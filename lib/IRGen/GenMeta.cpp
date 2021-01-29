@@ -5366,14 +5366,14 @@ bool irgen::methodRequiresReifiedVTableEntry(IRGenModule &IGM,
 }
 
 llvm::GlobalValue *irgen::emitAsyncFunctionPointer(IRGenModule &IGM,
-                                                   SILFunction *function,
+                                                   llvm::Function *function,
+                                                   LinkEntity entity,
                                                    Size size) {
   ConstantInitBuilder initBuilder(IGM);
   ConstantStructBuilder builder(
       initBuilder.beginStruct(IGM.AsyncFunctionPointerTy));
-  builder.addRelativeAddress(
-      IGM.getAddrOfSILFunction(function, NotForDefinition));
+  builder.addRelativeAddress(function);
   builder.addInt32(size.getValue());
   return cast<llvm::GlobalValue>(IGM.defineAsyncFunctionPointer(
-      function, builder.finishAndCreateFuture()));
+      entity, builder.finishAndCreateFuture()));
 }

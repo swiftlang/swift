@@ -1063,10 +1063,10 @@ public:
                               SILType objectType, const TypeInfo &objectTI,
                               const OutliningMetadataCollector &collector);
 
-private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+private:
   using CopyAddrHelperGenerator =
     llvm::function_ref<void(IRGenFunction &IGF, Address dest, Address src,
                             SILType objectType, const TypeInfo &objectTI)>;
@@ -1398,8 +1398,9 @@ public:
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
 
+  llvm::Constant *getAddrOfAsyncFunctionPointer(LinkEntity entity);
   llvm::Constant *getAddrOfAsyncFunctionPointer(SILFunction *function);
-  llvm::Constant *defineAsyncFunctionPointer(SILFunction *function,
+  llvm::Constant *defineAsyncFunctionPointer(LinkEntity entity,
                                              ConstantInit init);
   SILFunction *getSILFunctionForAsyncFunctionPointer(llvm::Constant *afp);
 

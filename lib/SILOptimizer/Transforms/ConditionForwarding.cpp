@@ -18,6 +18,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/SILBitfield.h"
 
 using namespace swift;
 
@@ -228,7 +229,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   // Now do the transformation!
   // First thing to do is to replace all uses of the Enum (= the merging block
   // argument), as this argument gets deleted.
-  llvm::SmallPtrSet<SILBasicBlock *, 4> NeedEnumArg;
+  BasicBlockSet NeedEnumArg(BB->getParent());
   while (!Arg->use_empty()) {
     Operand *ArgUse = *Arg->use_begin();
     SILInstruction *ArgUser = ArgUse->getUser();
@@ -244,7 +245,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
       // pass the corresponding enum to the block. This argument will be deleted
       // by a subsequent SimplifyCFG.
       SILArgument *NewArg = nullptr;
-      if (NeedEnumArg.insert(UseBlock).second) {
+      if (NeedEnumArg.insert(UseBlock)) {
         // The first Enum use in this UseBlock.
         NewArg =
             UseBlock->createPhiArgument(Arg->getType(), OwnershipKind::Owned);
@@ -271,7 +272,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     SILBasicBlock *SEDest = SEI->getCaseDestination(EI->getElement());
     SILBuilder B(BI);
     llvm::SmallVector<SILValue, 2> BranchArgs;
-    unsigned HasEnumArg = NeedEnumArg.count(SEDest);
+    unsigned HasEnumArg = NeedEnumArg.contains(SEDest);
     if (SEDest->getNumArguments() == 1 + HasEnumArg) {
       // The successor block has an original argument, which is the Enum's
       // payload.

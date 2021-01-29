@@ -445,13 +445,13 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   return FunctionType::get({selfParam}, type);
 }
 
-void
-TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
+void TypeBase::getTypeVariables(
+    SmallPtrSetImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
   if (hasTypeVariable()) {
     auto addTypeVariables = [&](Type type) -> bool {
       if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
-        typeVariables.push_back(tv);
+        typeVariables.insert(tv);
       }
 
       return false;

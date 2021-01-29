@@ -67,7 +67,7 @@ struct State {
   LinearLifetimeChecker::ErrorBuilder &errorBuilder;
 
   /// The blocks that we have already visited.
-  SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
+  BasicBlockSet visitedBlocks;
 
   /// If non-null a callback that we should pass any detected leaking blocks for
   /// our caller. The intention is that this can be used in a failing case to
@@ -86,7 +86,7 @@ struct State {
   ArrayRef<Operand *> nonConsumingUses;
 
   /// The set of blocks with consuming uses.
-  SmallPtrSet<SILBasicBlock *, 8> blocksWithConsumingUses;
+  BasicBlockSet blocksWithConsumingUses;
 
   /// The set of blocks with non-consuming uses and the associated
   /// non-consuming use SILInstruction.
@@ -105,32 +105,33 @@ struct State {
   /// terminates.
   SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
-  State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+  State(SILValue value,
         LinearLifetimeChecker::ErrorBuilder &errorBuilder,
         Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         Optional<function_ref<void(Operand *)>>
             nonConsumingUseOutsideLifetimeCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginInst(value->getDefiningInsertionPoint()),
-        errorBuilder(errorBuilder), visitedBlocks(visitedBlocks),
+        errorBuilder(errorBuilder), visitedBlocks(value->getFunction()),
         leakingBlockCallback(leakingBlockCallback),
         nonConsumingUseOutsideLifetimeCallback(
             nonConsumingUseOutsideLifetimeCallback),
-        consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
+        consumingUses(consumingUses), nonConsumingUses(nonConsumingUses),
+        blocksWithConsumingUses(value->getFunction()) {}
 
   State(SILBasicBlock *beginBlock,
-        SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
         LinearLifetimeChecker::ErrorBuilder &errorBuilder,
         Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         Optional<function_ref<void(Operand *)>>
             nonConsumingUseOutsideLifetimeCallback,
         ArrayRef<Operand *> consumingUses, ArrayRef<Operand *> nonConsumingUses)
       : value(), beginInst(&*beginBlock->begin()), errorBuilder(errorBuilder),
-        visitedBlocks(visitedBlocks),
+        visitedBlocks(beginBlock->getParent()),
         leakingBlockCallback(leakingBlockCallback),
         nonConsumingUseOutsideLifetimeCallback(
             nonConsumingUseOutsideLifetimeCallback),
-        consumingUses(consumingUses), nonConsumingUses(nonConsumingUses) {}
+        consumingUses(consumingUses), nonConsumingUses(nonConsumingUses),
+        blocksWithConsumingUses(beginBlock->getParent()) {}
 
   SILBasicBlock *getBeginBlock() const { return beginInst->getParent(); }
 
@@ -273,7 +274,7 @@ void State::initializeConsumingUse(Operand *consumingUse,
                                    SILBasicBlock *userBlock) {
   // Map this user to the block. If we already have a value for the block, then
   // we have a double consume and need to fail.
-  if (blocksWithConsumingUses.insert(userBlock).second)
+  if (blocksWithConsumingUses.insert(userBlock))
     return;
 
   errorBuilder.handleOverConsume([&] {
@@ -345,15 +346,15 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
 
 void State::checkPredsForDoubleConsume(Operand *consumingUse,
                                        SILBasicBlock *userBlock) {
-  if (!blocksWithConsumingUses.count(userBlock))
+  if (!blocksWithConsumingUses.contains(userBlock))
     return;
 
   // Check if this is a block that we have already visited. This means that we
   // had a back edge of some sort. Double check that we haven't missed any
   // successors.
-  if (visitedBlocks.count(userBlock)) {
+  if (visitedBlocks.contains(userBlock)) {
     for (auto *succ : userBlock->getSuccessorBlocks()) {
-      if (!visitedBlocks.count(succ)) {
+      if (!visitedBlocks.contains(succ)) {
         successorBlocksThatMustBeVisited.insert(succ);
       }
     }
@@ -375,15 +376,15 @@ void State::checkPredsForDoubleConsume(Operand *consumingUse,
 }
 
 void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
-  if (!blocksWithConsumingUses.count(userBlock))
+  if (!blocksWithConsumingUses.contains(userBlock))
     return;
 
   // Check if this is a block that we have already visited. This means that we
   // had a back edge of some sort. Double check that we haven't missed any
   // successors.
-  if (visitedBlocks.count(userBlock)) {
+  if (visitedBlocks.contains(userBlock)) {
     for (auto *succ : userBlock->getSuccessorBlocks()) {
-      if (!visitedBlocks.count(succ)) {
+      if (!visitedBlocks.contains(succ)) {
         successorBlocksThatMustBeVisited.insert(succ);
       }
     }
@@ -438,7 +439,7 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
     for (auto *succBlock : block->getSuccessorBlocks()) {
       // If we already visited the successor, there is nothing to do since we
       // already visited the successor.
-      if (visitedBlocks.count(succBlock))
+      if (visitedBlocks.contains(succBlock))
         continue;
 
       // Then check if the successor is a transitively unreachable block. In
@@ -470,7 +471,7 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
       // Check if we have an over consume.
       checkPredsForDoubleConsume(predBlock);
 
-      if (visitedBlocks.count(predBlock)) {
+      if (visitedBlocks.contains(predBlock)) {
         continue;
       }
 
@@ -563,7 +564,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
   //        || deadEndBlocks.isDeadEnd(value->getParentBlock())) &&
   //       "Must have at least one consuming user?!");
 
-  State state(value, visitedBlocks, errorBuilder, leakingBlockCallback,
+  State state(value, errorBuilder, leakingBlockCallback,
               nonConsumingUseOutsideLifetimeCallback, consumingUses,
               nonConsumingUses);
 
@@ -637,7 +638,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     // list.
     state.checkPredsForDoubleConsume(use, predBlock);
 
-    if (!state.visitedBlocks.insert(predBlock).second)
+    if (!state.visitedBlocks.insert(predBlock))
       continue;
 
     state.worklist.push_back(predBlock);

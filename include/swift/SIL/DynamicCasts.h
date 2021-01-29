@@ -158,17 +158,14 @@ public:
   SILDynamicCastInst(ID *i) : inst(i) {}
 #include "swift/SIL/SILNodes.def"
 
-  static SILDynamicCastInst getAs(SILNode *node) {
-    auto *i = dyn_cast<SILInstruction>(node);
-    if (!i)
-      return SILDynamicCastInst();
-    auto kind = SILDynamicCastKind::fromNodeKind(i->getKind());
+  static SILDynamicCastInst getAs(SILInstruction *inst) {
+    auto kind = SILDynamicCastKind::fromNodeKind(inst->getKind());
     if (!kind)
       return SILDynamicCastInst();
     switch (kind.getValue()) {
 #define DYNAMICCAST_INST(ID, PARENT)                                           \
   case SILDynamicCastKind::ID:                                                 \
-    return SILDynamicCastInst(cast<ID>(node));
+    return SILDynamicCastInst(cast<ID>(inst));
 #include "swift/SIL/SILNodes.def"
     }
   }

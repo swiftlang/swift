@@ -336,10 +336,6 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
 # User-configurable debugging options.
 #
 
-option(SWIFT_AST_VERIFIER
-    "Enable the AST verifier in the built compiler, and run it on every compilation"
-    TRUE)
-
 option(SWIFT_SIL_VERIFY_ALL
     "Run SIL verification after each transform when building Swift files in the build process"
     FALSE)

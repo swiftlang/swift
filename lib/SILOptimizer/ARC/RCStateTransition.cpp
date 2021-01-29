@@ -129,12 +129,12 @@ bool RCStateTransition::matchingInst(SILInstruction *Inst) const {
     return false;
 
   if (Kind == RCStateTransitionKind::StrongIncrement) {
-    auto InstTransKind = getRCStateTransitionKind(Inst);
+    auto InstTransKind = getRCStateTransitionKind(Inst->asSILNode());
     return InstTransKind == RCStateTransitionKind::StrongDecrement;
   }
 
   if (Kind == RCStateTransitionKind::StrongDecrement) {
-    auto InstTransKind = getRCStateTransitionKind(Inst);
+    auto InstTransKind = getRCStateTransitionKind(Inst->asSILNode());
     return InstTransKind == RCStateTransitionKind::StrongIncrement;
   }
 

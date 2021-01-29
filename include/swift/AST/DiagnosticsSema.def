@@ -2788,6 +2788,10 @@ ERROR(unexportable_clang_function_type,none,
       "it may use anonymous types or types defined outside of a module",
       (Type))
 
+ERROR(cxx_class_instantiation_failed,none,
+      "couldn't instantiate a C++ class template",
+      ())
+
 WARNING(warn_implementation_only_conflict,none,
         "%0 inconsistently imported as implementation-only",
         (Identifier))

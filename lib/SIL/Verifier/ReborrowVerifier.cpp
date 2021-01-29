@@ -18,13 +18,12 @@ using namespace swift;
 
 bool ReborrowVerifier::verifyReborrowLifetime(SILPhiArgument *phiArg,
                                               SILValue baseVal) {
-  SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
   bool result = false;
   SmallVector<Operand *, 4> phiArgUses(phiArg->getUses());
 
   // Verify whether the guaranteed phi arg lies within the lifetime of the base
   // value.
-  LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+  LinearLifetimeChecker checker(deadEndBlocks);
   // newErrorBuilder is consumed at the end of the checkValue function.
   // Copy initial state from errorBuilder everytime
   LinearLifetimeChecker::ErrorBuilder newErrorBuilder = errorBuilder;

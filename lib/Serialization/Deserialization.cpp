@@ -34,6 +34,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
@@ -5351,6 +5352,31 @@ public:
         return argTy.takeError();
 
       genericArgs.push_back(argTy.get());
+    }
+
+    if (auto clangDecl = nominal->getClangDecl()) {
+      if (auto ctd = dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
+        auto clangImporter = static_cast<ClangImporter *>(
+            nominal->getASTContext().getClangModuleLoader());
+
+        SmallVector<Type, 2> typesOfGenericArgs;
+        for (auto arg : genericArgs) {
+          typesOfGenericArgs.push_back(arg);
+        }
+
+        SmallVector<clang::TemplateArgument, 2> templateArguments;
+        std::unique_ptr<TemplateInstantiationError> error =
+            ctx.getClangTemplateArguments(ctd->getTemplateParameters(),
+                                          typesOfGenericArgs,
+                                          templateArguments);
+
+        auto instantiation = clangImporter->instantiateCXXClassTemplate(
+            const_cast<clang::ClassTemplateDecl *>(ctd), templateArguments);
+
+        instantiation->setTemplateInstantiationType(
+            BoundGenericType::get(nominal, parentTy, genericArgs));
+        return instantiation->getDeclaredInterfaceType();
+      }
     }
 
     return BoundGenericType::get(nominal, parentTy, genericArgs);

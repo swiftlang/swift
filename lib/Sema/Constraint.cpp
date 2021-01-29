@@ -28,7 +28,7 @@ using namespace constraints;
 
 Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                        ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
       RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Nested(constraints), Locator(locator) {
@@ -39,7 +39,7 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(Kind), HasRestriction(false), IsActive(false), IsDisabled(false),
       RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Type()},
@@ -105,7 +105,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
                        ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(Kind), HasRestriction(false), IsActive(false), IsDisabled(false),
       RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Third},
@@ -160,7 +160,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        DeclNameRef member, DeclContext *useDC,
                        FunctionRefKind functionRefKind,
                        ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
       RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Member{first, second, {member}, useDC},
@@ -179,7 +179,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        ValueDecl *requirement, DeclContext *useDC,
                        FunctionRefKind functionRefKind,
                        ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasRestriction(false), IsActive(false), IsDisabled(false),
       RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Locator(locator) {
@@ -199,7 +199,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
 
 Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
                        ConstraintFix *fix, ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(ConstraintKind::BindOverload), TheFix(fix), HasRestriction(false),
       IsActive(false), IsDisabled(bool(fix)), RememberChoice(false),
       IsFavored(false),
@@ -211,7 +211,7 @@ Constraint::Constraint(Type type, OverloadChoice choice, DeclContext *useDC,
 Constraint::Constraint(ConstraintKind kind,
                        ConversionRestrictionKind restriction, Type first,
                        Type second, ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), Restriction(restriction), HasRestriction(true),
       IsActive(false), IsDisabled(false), RememberChoice(false),
       IsFavored(false),
@@ -224,7 +224,7 @@ Constraint::Constraint(ConstraintKind kind,
 
 Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
                        Type second, ConstraintLocator *locator,
-                       ArrayRef<TypeVariableType *> typeVars)
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), TheFix(fix), HasRestriction(false), IsActive(false),
       IsDisabled(false), RememberChoice(false), IsFavored(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
@@ -549,7 +549,7 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
 /// Recursively gather the set of type variables referenced by this constraint.
 static void
 gatherReferencedTypeVars(Constraint *constraint,
-                         SmallVectorImpl<TypeVariableType *> &typeVars) {
+                         SmallPtrSetImpl<TypeVariableType *> &typeVars) {
   switch (constraint->getKind()) {
   case ConstraintKind::Disjunction:
     for (auto nested : constraint->getNestedConstraints())
@@ -606,17 +606,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   }
 }
 
-/// Unique the given set of type variables.
-static void uniqueTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVars) {
-  // Remove any duplicate type variables.
-  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
-  typeVars.erase(std::remove_if(typeVars.begin(), typeVars.end(),
-                                [&](TypeVariableType *typeVar) {
-                                  return !knownTypeVars.insert(typeVar).second;
-                                }),
-                 typeVars.end());
-}
-
 bool Constraint::isExplicitConversion() const {
   assert(Kind == ConstraintKind::Disjunction);
 
@@ -631,14 +620,13 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                ConstraintLocator *locator,
                                ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second && second->hasTypeVariable())
     second->getTypeVariables(typeVars);
 
-  typeVars.append(extraTypeVars.begin(), extraTypeVars.end());
-  uniqueTypeVariables(typeVars);
+  typeVars.insert(extraTypeVars.begin(), extraTypeVars.end());
 
   // Conformance constraints expect an existential on the right-hand side.
   assert((kind != ConstraintKind::ConformsTo &&
@@ -660,7 +648,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                ConstraintLocator *locator,
                                ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars(extraTypeVars.begin(),
+  SmallPtrSet<TypeVariableType *, 4> typeVars(extraTypeVars.begin(),
                                               extraTypeVars.end());
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
@@ -668,8 +656,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
     second->getTypeVariables(typeVars);
   if (third->hasTypeVariable())
     third->getTypeVariables(typeVars);
-  uniqueTypeVariables(typeVars);
-  
+
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return ::new (mem) Constraint(kind,
@@ -703,12 +690,11 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocator *locator) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
     second->getTypeVariables(typeVars);
-  uniqueTypeVariables(typeVars);
 
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
@@ -724,12 +710,11 @@ Constraint *Constraint::createValueWitness(
   assert(kind == ConstraintKind::ValueWitness);
 
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
     second->getTypeVariables(typeVars);
-  uniqueTypeVariables(typeVars);
 
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
@@ -751,12 +736,11 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
                                          Type first, Type second, 
                                          ConstraintLocator *locator) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
     second->getTypeVariables(typeVars);
-  uniqueTypeVariables(typeVars);
 
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
@@ -769,12 +753,11 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
                                     ConstraintFix *fix, Type first, Type second,
                                     ConstraintLocator *locator) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())
     second->getTypeVariables(typeVars);
-  uniqueTypeVariables(typeVars);
 
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
@@ -788,7 +771,7 @@ Constraint *Constraint::createFixedChoice(ConstraintSystem &cs, Type type,
                                           ConstraintFix *fix,
                                           ConstraintLocator *locator) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (type->hasTypeVariable())
     type->getTypeVariables(typeVars);
   if (auto baseType = choice.getBaseType()) {
@@ -807,7 +790,7 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
                                           RememberChoice_t rememberChoice) {
   // Unwrap any disjunctions inside the disjunction constraint; we only allow
   // disjunctions at the top level.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   bool unwrappedAny = false;
   SmallVector<Constraint *, 1> unwrapped;
   unsigned index = 0;
@@ -866,7 +849,6 @@ Constraint *Constraint::createDisjunction(ConstraintSystem &cs,
 #endif
 
   // Create the disjunction constraint.
-  uniqueTypeVariables(typeVars);
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto disjunction =  new (mem) Constraint(ConstraintKind::Disjunction,
@@ -880,12 +862,11 @@ Constraint *Constraint::createApplicableFunction(
     Optional<TrailingClosureMatching> trailingClosureMatching,
     ConstraintLocator *locator) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (argumentFnType->hasTypeVariable())
     argumentFnType->getTypeVariables(typeVars);
   if (calleeType->hasTypeVariable())
     calleeType->getTypeVariables(typeVars);
-  uniqueTypeVariables(typeVars);
 
   // Create the constraint.
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());

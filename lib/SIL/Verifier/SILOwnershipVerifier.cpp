@@ -104,19 +104,15 @@ class SILValueOwnershipChecker {
   /// is successful.
   SmallVector<Operand *, 16> regularUsers;
 
-  /// The set of blocks that we have visited.
-  SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
-
   ReborrowVerifier &reborrowVerifier;
 
 public:
   SILValueOwnershipChecker(
       DeadEndBlocks &deadEndBlocks, SILValue value,
       LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-      llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
       ReborrowVerifier &reborrowVerifier)
       : result(), deadEndBlocks(deadEndBlocks), value(value),
-        errorBuilder(errorBuilder), visitedBlocks(visitedBlocks),
+        errorBuilder(errorBuilder),
         reborrowVerifier(reborrowVerifier) {
     assert(value && "Can not initialize a checker with an empty SILValue");
   }
@@ -170,7 +166,7 @@ bool SILValueOwnershipChecker::check() {
   SmallVector<Operand *, 32> allRegularUsers;
   llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
 
-  LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+  LinearLifetimeChecker checker(deadEndBlocks);
   auto linearLifetimeResult = checker.checkValue(value, allLifetimeEndingUsers,
                                                  allRegularUsers, errorBuilder);
   result = !linearLifetimeResult.getFoundError();
@@ -523,8 +519,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
     coroutineEndUses.push_back(use);
   }
 
-  assert(visitedBlocks.empty());
-  LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+  LinearLifetimeChecker checker(deadEndBlocks);
   auto linearLifetimeResult =
       checker.checkValue(yield, coroutineEndUses, regularUses, errorBuilder);
   if (linearLifetimeResult.getFoundError()) {
@@ -771,8 +766,7 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
   if (!f->hasOwnership() || !f->shouldVerifyOwnership())
     return;
 
-  SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
-  SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder, liveBlocks,
+  SILValueOwnershipChecker(*deadEndBlocks, value, errorBuilder,
                            reborrowVerifier)
     .check();
 }

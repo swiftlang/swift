@@ -569,9 +569,10 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SubstitutionMap(), SubstitutionMap(),
                                    C);
 
+  auto name = getASTContext().getEntryPointFunctionName();
   SILGenFunctionBuilder builder(*this);
   return builder.createFunction(
-      SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION, topLevelType, nullptr,
+      SILLinkage::Public, name, topLevelType, nullptr,
       Loc, IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       ProfileCounter(), IsNotThunk, SubclassScope::NotApplicable);
 }
@@ -1829,8 +1830,9 @@ public:
     // If this is the script-mode file for the module, create a toplevel.
     if (sf->isScriptMode()) {
       assert(!sgm.TopLevelSGF && "already emitted toplevel?!");
-      assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
-             && "already emitted toplevel?!");
+      assert(!sgm.M.lookUpFunction(
+                 sgm.getASTContext().getEntryPointFunctionName()) &&
+             "already emitted toplevel?!");
 
       RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
       SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
@@ -1952,8 +1954,9 @@ public:
     // If the source file contains an artificial main, emit the implicit
     // toplevel code.
     if (auto mainDecl = sf->getMainDecl()) {
-      assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
-             && "already emitted toplevel before main class?!");
+      assert(!sgm.M.lookUpFunction(
+                 sgm.getASTContext().getEntryPointFunctionName()) &&
+             "already emitted toplevel before main class?!");
 
       RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
       SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);

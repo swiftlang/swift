@@ -4193,3 +4193,25 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
   sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
   return spec;
 }
+
+StructDecl *
+ClangImporter::instantiateCXXClassTemplate(
+    clang::ClassTemplateDecl *decl,
+    ArrayRef<clang::TemplateArgument> arguments) {
+  void *InsertPos = nullptr;
+  auto *ctsd = decl->findSpecialization(arguments, InsertPos);
+  if (!ctsd) {
+    ctsd = clang::ClassTemplateSpecializationDecl::Create(
+        decl->getASTContext(), decl->getTemplatedDecl()->getTagKind(),
+        decl->getDeclContext(), decl->getTemplatedDecl()->getBeginLoc(),
+        decl->getLocation(), decl, arguments, nullptr);
+    decl->AddSpecialization(ctsd, InsertPos);
+  }
+
+  auto CanonType = decl->getASTContext().getTypeDeclType(ctsd);
+  assert(isa<clang::RecordType>(CanonType) &&
+          "type of non-dependent specialization is not a RecordType");
+
+  return dyn_cast_or_null<StructDecl>(
+      Impl.importDecl(ctsd, Impl.CurrentVersion));
+}

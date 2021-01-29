@@ -8898,9 +8898,11 @@ retry_after_fail:
   // If we have a common result type, bind the expected result type to it.
   if (commonResultType && !commonResultType->is<ErrorType>()) {
     if (isDebugMode()) {
+      PrintOptions PO;
+      PO.PrintTypesForDebugging = true;
       llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
         << "(common result type for $T" << fnTypeVar->getID() << " is "
-        << commonResultType.getString()
+        << commonResultType.getString(PO)
         << ")\n";
     }
 
@@ -10574,13 +10576,16 @@ ConstraintSystem::addArgumentConversionConstraintImpl(
   if (auto *argTypeVar = first->getAs<TypeVariableType>()) {
     if (argTypeVar->getImpl().isClosureType()) {
       // Extract any type variables present in the parameter's result builder.
-      SmallVector<TypeVariableType *, 4> typeVars;
+      SmallPtrSet<TypeVariableType *, 4> typeVars;
       if (auto builderTy = getOpenedResultBuilderTypeFor(*this, locator))
         builderTy->getTypeVariables(typeVars);
 
+      SmallVector<TypeVariableType *, 4> referencedVars{typeVars.begin(),
+                                                        typeVars.end()};
+
       auto *loc = getConstraintLocator(locator);
       addUnsolvedConstraint(
-          Constraint::create(*this, kind, first, second, loc, typeVars));
+          Constraint::create(*this, kind, first, second, loc, referencedVars));
       return SolutionKind::Solved;
     }
   }
