@@ -661,9 +661,9 @@ void IRGenModule::emitRuntimeRegistration() {
     return;
   
   // Find the entry point.
-  SILFunction *EntryPoint =
-    getSILModule().lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
-  
+  SILFunction *EntryPoint = getSILModule().lookUpFunction(
+      getSILModule().getASTContext().getEntryPointFunctionName());
+
   // If we're debugging (and not in the REPL), we don't have a
   // main. Find a function marked with the LLDBDebuggerFunction
   // attribute instead.
@@ -1965,7 +1965,8 @@ static std::string getEntryPointSection(IRGenModule &IGM) {
 
 void IRGenerator::emitEntryPointInfo() {
   SILFunction *entrypoint = nullptr;
-  if (!(entrypoint = SIL.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION))) {
+  if (!(entrypoint = SIL.lookUpFunction(
+            SIL.getASTContext().getEntryPointFunctionName()))) {
     return;
   }
   auto &IGM = *getGenModule(entrypoint);

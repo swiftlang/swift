@@ -260,8 +260,6 @@ getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
 SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
                                               SILInstruction *ignoreUser);
 
-FullApplySite findApplyFromDevirtualizedResult(SILValue value);
-
 /// Cast a value into the expected, ABI compatible type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.
@@ -706,6 +704,11 @@ makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock,
 SILValue
 makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock,
                       JointPostDominanceSetComputer *jointPostDomComputer);
+
+/// Given a forwarding instruction, eliminate it if all of its users are debug
+/// instructions and ownership uses.
+bool tryEliminateOnlyOwnershipUsedForwardingInst(
+    SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks);
 
 } // end namespace swift
 

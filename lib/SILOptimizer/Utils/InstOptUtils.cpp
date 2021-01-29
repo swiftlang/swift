@@ -810,20 +810,6 @@ getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) 
   return getConcreteValueOfExistentialBox(box, singleStackStore);
 }
 
-// Devirtualization of functions with covariant return types produces
-// a result that is not an apply, but takes an apply as an
-// argument. Attempt to dig the apply out from this result.
-FullApplySite swift::findApplyFromDevirtualizedResult(SILValue v) {
-  if (auto Apply = FullApplySite::isa(v))
-    return Apply;
-
-  if (isa<UpcastInst>(v) || isa<EnumInst>(v) || isa<UncheckedRefCastInst>(v))
-    return findApplyFromDevirtualizedResult(
-        cast<SingleValueInstruction>(v)->getOperand(0));
-
-  return FullApplySite();
-}
-
 bool swift::mayBindDynamicSelf(SILFunction *F) {
   if (!F->hasDynamicSelfMetadata())
     return false;
@@ -2037,4 +2023,41 @@ SILValue swift::makeNewValueAvailable(
       });
 
   return controlEqCopy ? controlEqCopy : value;
+}
+
+bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
+    SingleValueInstruction *forwardingInst, InstModCallbacks &callbacks) {
+  if (!OwnershipForwardingMixin::isa(forwardingInst) ||
+      isa<AllArgOwnershipForwardingSingleValueInst>(forwardingInst))
+    return false;
+
+  SmallVector<Operand *, 32> worklist(getNonDebugUses(forwardingInst));
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+    auto *user = use->getUser();
+
+    if (isa<EndBorrowInst>(user) || isa<DestroyValueInst>(user) ||
+        isa<RefCountingInst>(user))
+      continue;
+
+    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
+      for (auto result : user->getResults())
+        for (auto *resultUse : getNonDebugUses(result))
+          worklist.push_back(resultUse);
+      continue;
+    }
+
+    return false;
+  }
+
+  // Now that we know we can perform our transform, set all uses of
+  // forwardingInst to be used of its operand and then delete \p forwardingInst.
+  auto newValue = forwardingInst->getOperand(0);
+  while (!forwardingInst->use_empty()) {
+    auto *use = *(forwardingInst->use_begin());
+    use->set(newValue);
+  }
+
+  callbacks.deleteInst(forwardingInst);
+  return true;
 }

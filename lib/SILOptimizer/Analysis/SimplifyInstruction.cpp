@@ -70,6 +70,7 @@ namespace {
     SILValue visitPointerToThinFunctionInst(PointerToThinFunctionInst *PTTFI);
     SILValue visitBeginAccessInst(BeginAccessInst *BAI);
     SILValue visitMetatypeInst(MetatypeInst *MTI);
+    SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
 
     SILValue simplifyOverflowBuiltin(BuiltinInst *BI);
   };
@@ -479,6 +480,19 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
       })) {
     return BAI->getOperand();
   }
+  return SILValue();
+}
+
+SILValue InstSimplifier::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
+  // Eliminate round trip convert_function. Non round-trip is performed in
+  // SILCombine.
+  //
+  // (convert_function Y->X (convert_function x X->Y)) -> x
+  SILValue convertedValue = lookThroughOwnershipInsts(cfi->getConverted());
+  if (auto *subCFI = dyn_cast<ConvertFunctionInst>(convertedValue))
+    if (subCFI->getConverted()->getType() == cfi->getType())
+      return lookThroughOwnershipInsts(subCFI->getConverted());
+
   return SILValue();
 }
 

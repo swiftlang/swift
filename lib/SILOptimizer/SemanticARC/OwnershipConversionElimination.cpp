@@ -56,8 +56,7 @@ bool SemanticARCOptVisitor::visitUncheckedOwnershipConversionInst(
 
   // Ok, now we need to perform our lifetime check.
   SmallVector<Operand *, 8> consumingUses(op->getConsumingUses());
-  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
-  LinearLifetimeChecker checker(visitedBlocks, ctx.getDeadEndBlocks());
+  LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
   if (!checker.validateLifetime(op, consumingUses, newUses))
     return false;
 

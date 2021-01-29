@@ -396,10 +396,16 @@ void TBDGenVisitor::addLinkerDirectiveSymbolsLdHide(StringRef name,
 
 void TBDGenVisitor::addSymbol(StringRef name, SymbolSource source,
                               SymbolKind kind) {
-  // The linker expects to see mangled symbol names in TBD files, so make sure
-  // to mangle before inserting the symbol.
+  // The linker expects to see mangled symbol names in TBD files,
+  // except when being passed objective c classes,
+  // so make sure to mangle before inserting the symbol.
   SmallString<32> mangled;
-  llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+  if (kind == SymbolKind::ObjectiveCClass) {
+    mangled = name;
+  } else {
+    llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
+  }
+
   addSymbolInternal(mangled, kind, source);
   if (previousInstallNameMap) {
     addLinkerDirectiveSymbolsLdPrevious(mangled, kind);
@@ -449,6 +455,9 @@ void TBDGenVisitor::addSymbol(LinkEntity entity) {
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
   auto entity = LinkEntity::forDispatchThunk(declRef);
   addSymbol(entity);
+
+  if (declRef.getAbstractFunctionDecl()->hasAsync())
+    addSymbol(LinkEntity::forAsyncFunctionPointer(entity));
 }
 
 void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {

@@ -26,11 +26,13 @@
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
@@ -1720,7 +1722,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
 
   if (funcTy->isAsync()) {
-    emitAsyncFunctionEntry(IGF, IGF.CurSILFn);
+    emitAsyncFunctionEntry(IGF,
+                           getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
+                           LinkEntity::forSILFunction(IGF.CurSILFn));
   }
 
   SILFunctionConventions conv(funcTy, IGF.getSILModule());
@@ -1942,9 +1946,12 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
   auto funcTy = CurSILFn->getLoweredFunctionType();
-  if (funcTy->isAsync() && funcTy->getLanguage() == SILFunctionLanguage::Swift)
-    emitAsyncFunctionPointer(IGM, CurSILFn,
+  if (funcTy->isAsync() && funcTy->getLanguage() == SILFunctionLanguage::Swift) {
+    emitAsyncFunctionPointer(IGM,
+                             CurFn,
+                             LinkEntity::forSILFunction(CurSILFn),
                              getAsyncContextLayout(*this).getSize());
+  }
 
   // Configure the dominance resolver.
   // TODO: consider re-using a dom analysis from the PassManager
@@ -2007,7 +2014,7 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Invariant: for every block in the work queue, we have visited all
   // of its dominators.
-  llvm::SmallPtrSet<SILBasicBlock*, 8> visitedBlocks;
+  BasicBlockSet visitedBlocks(CurSILFn);
   SmallVector<SILBasicBlock*, 8> workQueue; // really a stack
 
   // Queue up the entry block, for which the invariant trivially holds.
@@ -2042,7 +2049,7 @@ void IRGenSILFunction::emitSILFunction() {
     // Therefore the invariant holds of all the successors, and we can
     // queue them up if we haven't already visited them.
     for (auto *succBB : bb->getSuccessorBlocks()) {
-      if (visitedBlocks.insert(succBB).second)
+      if (visitedBlocks.insert(succBB))
         workQueue.push_back(succBB);
     }
   }
@@ -2050,7 +2057,7 @@ void IRGenSILFunction::emitSILFunction() {
   // If there are dead blocks in the SIL function, we might have left
   // invalid blocks in the IR.  Do another pass and kill them off.
   for (SILBasicBlock &bb : *CurSILFn)
-    if (!visitedBlocks.count(&bb))
+    if (!visitedBlocks.contains(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
 
 }
@@ -2277,14 +2284,14 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
-  llvm::Value *value;
+  llvm::Constant *value;
   auto isSpecialAsyncWithoutCtxtSize =
       fn->isAsync() && (
           fn->getName().equals("swift_task_future_wait") ||
           fn->getName().equals("swift_task_group_wait_next"));
   if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
-    value = Builder.CreateBitCast(value, fnPtr->getType());
+    value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
   } else {
     value = fnPtr;
   }

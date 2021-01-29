@@ -18,6 +18,11 @@ module ConstructorsObjC {
   requires cplusplus
 }
 
+module Destructors {
+  header "destructors.h"
+  requires cplusplus
+}
+
 module LoadableTypes {
   header "loadable-types.h"
   requires cplusplus

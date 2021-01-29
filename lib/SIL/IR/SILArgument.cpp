@@ -27,7 +27,7 @@ SILArgument::SILArgument(ValueKind subClassKind,
                          SILBasicBlock *inputParentBlock, SILType type,
                          ValueOwnershipKind ownershipKind,
                          const ValueDecl *inputDecl)
-    : ValueBase(subClassKind, type, IsRepresentative::Yes),
+    : ValueBase(subClassKind, type),
       parentBlock(inputParentBlock), decl(inputDecl) {
   Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
   inputParentBlock->insertArgument(inputParentBlock->args_end(), this);

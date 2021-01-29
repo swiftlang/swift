@@ -733,6 +733,9 @@ def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
 def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
     HelpText<"Directory for bridging header to be printed in compatibility header">;
 
+def entry_point_function_name: Separate<["-"], "entry-point-function-name">, MetaVarName<"<string>">, 
+    HelpText<"Name of the entry point function">;
+
 def target_sdk_version : Separate<["-"], "target-sdk-version">,
   HelpText<"The version of target SDK used for compilation">;
 
@@ -767,4 +770,20 @@ def bad_file_descriptor_retry_count:
   Separate<["-"], "bad-file-descriptor-retry-count">,
   HelpText<"Number of retrying opening a file if previous open returns a bad "
            "file descriptor error.">;
+
+def enable_ast_verifier : Flag<["-"], "enable-ast-verifier">,
+  HelpText<"Run the AST verifier during compilation. NOTE: This lets the user "
+           "override the default behavior on whether or not the ASTVerifier "
+           "is run. The default behavior is to run the verifier when asserts "
+           "are enabled and not run it when asserts are disabled. NOTE: "
+           "Can not be used if disable-ast-verifier is used as well">;
+
+def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
+  HelpText<"Do not run the AST verifier during compilation. NOTE: This lets "
+           "the user override the default behavior on whether or not the "
+           "ASTVerifier is run. The default behavior is to run the verifier "
+           "when asserts are enabled and not run it when asserts are "
+           "disabled. NOTE: Can not be used if enable-ast-verifier is used "
+           "as well">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

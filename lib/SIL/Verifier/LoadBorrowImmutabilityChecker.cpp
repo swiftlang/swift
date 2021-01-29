@@ -97,6 +97,7 @@ bool GatherWritesVisitor::visitUse(Operand *op, AccessUseType useTy) {
   case SILInstructionKind::DeallocBoxInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::ExistentialMetatypeInst:
+  case SILInstructionKind::IsUniqueInst:
     return true;
 
   // Known writes...
@@ -291,8 +292,7 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
     LoadBorrowInst *lbi, ArrayRef<Operand *> endBorrowUses,
     AccessPath accessPath) {
 
-  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
-  LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+  LinearLifetimeChecker checker(deadEndBlocks);
   auto writes = cache.get(accessPath);
 
   // Treat None as a write.
@@ -303,8 +303,6 @@ bool LoadBorrowImmutabilityAnalysis::isImmutableInScope(
   }
   // Then for each write...
   for (auto *op : *writes) {
-    visitedBlocks.clear();
-
     // First see if the write is a dead end block. In such a case, just skip it.
     if (deadEndBlocks.isDeadEnd(op->getUser()->getParent())) {
       continue;

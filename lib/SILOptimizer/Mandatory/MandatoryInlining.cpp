@@ -71,7 +71,6 @@ static  bool fixupReferenceCounts(
   // can use this to copy if we need to.
   assert(captureArgConventions.size() == capturedArgs.size());
 
-  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   // FIXME: Can we cache this in between inlining invocations?
   DeadEndBlocks deadEndBlocks(pai->getFunction());
   SmallVector<SILBasicBlock *, 4> leakingBlocks;
@@ -111,9 +110,8 @@ static  bool fixupReferenceCounts(
       SILBuilderWithScope builder(pai);
       auto *stackLoc = builder.createAllocStack(loc, v->getType().getObjectType());
       builder.createCopyAddr(loc, v, stackLoc, IsNotTake, IsInitialization);
-      visitedBlocks.clear();
 
-      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      LinearLifetimeChecker checker(deadEndBlocks);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -144,8 +142,6 @@ static  bool fixupReferenceCounts(
         argument = SILBuilderWithScope(pai).createBeginBorrow(loc, argument);
       }
 
-      visitedBlocks.clear();
-
       // If we need to insert compensating destroys, do so.
       //
       // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
@@ -158,7 +154,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      LinearLifetimeChecker checker(deadEndBlocks);
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -190,7 +186,6 @@ static  bool fixupReferenceCounts(
     // TODO: Do we need to lifetime extend here?
     case ParameterConvention::Direct_Unowned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-      visitedBlocks.clear();
 
       // If our consuming partial apply does not post-dominate our
       // partial_apply, compute the completion of the post dominance set and if
@@ -206,7 +201,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      LinearLifetimeChecker checker(deadEndBlocks);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -230,7 +225,6 @@ static  bool fixupReferenceCounts(
     // apply has another use that would destroy our value first.
     case ParameterConvention::Direct_Owned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-      visitedBlocks.clear();
 
       // If we need to insert compensating destroys, do so.
       //
@@ -244,7 +238,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      LinearLifetimeChecker checker(deadEndBlocks);
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {

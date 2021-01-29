@@ -132,6 +132,36 @@ int MemoryLocations::getLocationIdx(SILValue addr) const {
   return iter->second;
 }
 
+static bool canHandleAllocStack(AllocStackInst *asi) {
+  assert(asi);
+
+  // An alloc_stack with dynamic lifetime set has a lifetime that relies on
+  // unrelated conditional control flow for correctness. This means that we may
+  // statically leak along paths that were known by the emitter to never be
+  // taken if the value is live. So bail since we can't verify this.
+  if (asi->hasDynamicLifetime())
+    return false;
+
+  // Currently in this verifier, we stop verifying if we find a switch_enum_addr
+  // use. This creates a problem since no one has gone through and changed the
+  // frontend/optimizer to understand that it needs to insert destroy_addr on
+  // alloc_stack even if dynamically we know that the enum has a trivial case or
+  // non-payloaded case due to a switch_enum_addr. So if one then performs the
+  // completely unrelated, valid optimization of promoting the switch_enum_addr
+  // to a switch_enum (lets say using a load_borrow), then this verifier will
+  // see a leaked value along the non-payloaded path.
+  //
+  // Disable this verification for now until a complete analysis of enums is
+  // implemented.
+  //
+  // https://bugs.swift.org/browse/SR-14123
+  if (asi->getType().getEnumOrBoundGenericEnum())
+    return false;
+
+  // Otherwise we can optimize!
+  return true;
+}
+
 void MemoryLocations::analyzeLocations(SILFunction *function) {
   // As we have to limit the set of handled locations to memory, which is
   // guaranteed to be not aliased, we currently only handle indirect function
@@ -152,12 +182,13 @@ void MemoryLocations::analyzeLocations(SILFunction *function) {
   }
   for (SILBasicBlock &BB : *function) {
     for (SILInstruction &I : BB) {
-      auto *ASI = dyn_cast<AllocStackInst>(&I);
-      if (ASI && !ASI->hasDynamicLifetime()) {
-        if (allUsesInSameBlock(ASI)) {
-          singleBlockLocations.push_back(ASI);
-        } else {
-          analyzeLocation(ASI);
+      if (auto *ASI = dyn_cast<AllocStackInst>(&I)) {
+        if (canHandleAllocStack(ASI)) {
+          if (allUsesInSameBlock(ASI)) {
+            singleBlockLocations.push_back(ASI);
+          } else {
+            analyzeLocation(ASI);
+          }
         }
       }
     }

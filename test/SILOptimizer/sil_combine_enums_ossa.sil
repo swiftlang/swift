@@ -56,8 +56,10 @@ bb2:                                              // Preds: bb0
 
 // CHECK-LABEL: sil [ossa] @eliminate_select_enum_addr :
 // CHECK-NOT: select_enum_addr
-// CHECK: [[BORROWED_VAL:%.*]] = load_borrow
-// CHECK: select_enum [[BORROWED_VAL]]
+// CHECK-NOT: select_enum
+// CHECK: switch_enum
+// CHECK-NOT: select_enum_addr
+// CHECK-NOT: select_enum
 // CHECK: } // end sil function 'eliminate_select_enum_addr'
 sil [ossa] @eliminate_select_enum_addr : $@convention(thin) () -> Int {
 bb0:
@@ -278,11 +280,11 @@ bb2:
 
 // Check the cond_br(select_enum) -> switch_enum conversion.
 //
-// CHECK-LABEL: sil [ossa] @convert_select_enum_cond_br_to_switch_enum
-// XHECK-NOT: select_enum
-// XHECK: switch_enum
-// XHECK: return
-
+// CHECK-LABEL: sil [ossa] @convert_select_enum_cond_br_to_switch_enum :
+// CHECK-NOT: select_enum
+// CHECK: switch_enum
+// CHECK: return
+// CHECK: } // end sil function 'convert_select_enum_cond_br_to_switch_enum'
 sil [ossa] @convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Optional<SomeClass>) -> Int {
 bb0(%0 : @owned $Optional<SomeClass>):
   %1 = integer_literal $Builtin.Int1, 0
@@ -304,13 +306,13 @@ bb2:
 }
 
 // Check that cond_br(select_enum) is converted into switch_enum.
-// CHECK-LABEL: sil [ossa] @convert_select_enum_cond_br_to_switch_enum2
-// XHECK: bb0
-// XHECK-NOT: select_enum
-// XHECK-NOT: return
-// XHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
-// XHECK: return
-// XHECK: }
+// CHECK-LABEL: sil [ossa] @convert_select_enum_cond_br_to_switch_enum2 :
+// CHECK: bb0
+// CHECK-NOT: select_enum
+// CHECK-NOT: return
+// CHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
+// CHECK: return
+// CHECK: } // end sil function 'convert_select_enum_cond_br_to_switch_enum2'
 sil [ossa] @convert_select_enum_cond_br_to_switch_enum2 : $@convention(thin) (Numerals) -> Builtin.Int64 {
 bb0(%0 : $Numerals):
   %2 = integer_literal $Builtin.Int1, 0
@@ -336,12 +338,12 @@ bb3:
 // Check that cond_br(select_enum) is converted into switch_enum.
 // This test checks that select_enum instructions with default cases are handled correctly.
 // CHECK-LABEL: sil [ossa] @convert_select_enum_cond_br_to_switch_enum3
-// XHECK: bb0
-// XHECK-NOT: select_enum
-// XHECK-NOT: return
-// XHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
-// XHECK: return
-// XHECK: }
+// CHECK: bb0
+// CHECK-NOT: select_enum
+// CHECK-NOT: return
+// CHECK: switch_enum %0 : $Numerals, case #Numerals.Two!enumelt: bb3, default bb2
+// CHECK: return
+// CHECK: } // end sil function 'convert_select_enum_cond_br_to_switch_enum3'
 sil [ossa] @convert_select_enum_cond_br_to_switch_enum3 : $@convention(thin) (Numerals) -> Builtin.Int64 {
 bb0(%0 : $Numerals):
   %2 = integer_literal $Builtin.Int1, 0
@@ -365,74 +367,12 @@ bb3:
   br bb1
 }
 
-
-// Check that cond_br(select_enum) is not converted into switch_enum as it would create a critical edge, which
-// is not originating from cond_br/br. And this is forbidden in a canonical SIL form.
-//
-// CHECK-LABEL: sil [ossa] @dont_convert_select_enum_cond_br_to_switch_enum
-// XHECK: select_enum
-// XHECK-NOT: switch_enum
-// XHECK: return
-sil [ossa] @dont_convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Optional<SomeClass>) -> Int {
-bb0(%0 : @owned $Optional<SomeClass>):
-  %2 = integer_literal $Builtin.Int1, 0
-  %3 = integer_literal $Builtin.Int1, -1
-  %4 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %3, case #Optional.some!enumelt: %2 : $Builtin.Int1
-  cond_br %4, bb2, bb1a
-
-bb1a:
-  br bb1
-
-bb1:
-  %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt
-  %6 = class_method %5 : $SomeClass, #SomeClass.hash : (SomeClass) -> () -> Int, $@convention(method) (@guaranteed SomeClass) -> Int
-  %7 = apply %6(%5) : $@convention(method) (@guaranteed SomeClass) -> Int
-  fix_lifetime %5 : $SomeClass
-  destroy_value %5 : $SomeClass
-  return %7 : $Int
-
-bb2:
-  %10 = function_ref @external_func: $@convention(thin) () -> ()
-  apply %10(): $@convention(thin) () -> ()
-  br bb1
-}
-
-// Check that cond_br(select_enum) is not converted into switch_enum as it would create a critical edge, which
-// is not originating from cond_br/br. And this is forbidden in a canonical SIL form.
-//
-// CHECK-LABEL: sil [ossa] @dont_convert_select_enum_cond_br_to_switch_enum2
-// XHECK: select_enum
-// XHECK-NOT: switch_enum
-// XHECK: return
-sil [ossa] @dont_convert_select_enum_cond_br_to_switch_enum2 : $@convention(thin) (Numerals) -> Builtin.Int64 {
-bb0(%0 : $Numerals):
-  %2 = integer_literal $Builtin.Int1, 0
-  %3 = integer_literal $Builtin.Int1, -1
-  // There are two cases for each possible outcome.
-  // This means that we would always get a critical edge, if we convert it into a switch_enum.
-  %4 = select_enum %0 : $Numerals, case #Numerals.One!enumelt: %3, case #Numerals.Two!enumelt: %2, case #Numerals.Three!enumelt: %3, case #Numerals.Four!enumelt: %2 : $Builtin.Int1
-
-  cond_br %4, bb2, bb3
-
-bb1:
-  %7 = integer_literal $Builtin.Int64, 10
-  return %7 : $Builtin.Int64
-
-bb2:
-  %10 = function_ref @external_func: $@convention(thin) () -> ()
-  apply %10(): $@convention(thin) () -> ()
-  br bb1
-
-bb3:
-  br bb1
-}
-
 // Check that cond_br(select_enum) is not converted into switch_enum,
 // because the result of the default case is not an integer literal.
-// CHECK-LABEL: sil [ossa] @dont_convert_select_enum_cond_br_to_switch_enum3
-// XHECK: select_enum
-// XHECK-NOT: switch_enum
-// XHECK: return
+// CHECK-LABEL: sil [ossa] @dont_convert_select_enum_cond_br_to_switch_enum3 :
+// CHECK: select_enum
+// CHECK-NOT: switch_enum
+// CHECK: } // end sil function 'dont_convert_select_enum_cond_br_to_switch_enum3'
 sil [ossa] @dont_convert_select_enum_cond_br_to_switch_enum3 : $@convention(thin) (Numerals, Builtin.Int1) -> Builtin.Int64 {
 bb0(%0 : $Numerals, %1 : $Builtin.Int1):
   %2 = integer_literal $Builtin.Int1, 0
@@ -478,33 +418,33 @@ public enum Y {
 // the types involved, and we'll generate a trap at IRGen-time if the
 // bitcasted types are not the same size.
 
-// CHECK-LABEL: sil [ossa] @keep_unchecked_enum_data
-// TODO: Fix
+// CHECK-LABEL: sil [ossa] @keep_unchecked_enum_data :
+// CHECK: bb0
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $X to $Y
+// CHECK: bb1
+// CHECK: bb2
+// CHECK: bb3
+// CHECK: return
+// CHECK:  } // end sil function 'keep_unchecked_enum_data'
 sil [ossa] @keep_unchecked_enum_data : $@convention(thin) (@owned X, @owned T) -> @owned T {
-// XHECK: bb0
 bb0(%0 : @owned $X, %1 : @owned $T):
-// XHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $X to $Y
   %4 = unchecked_bitwise_cast %0 : $X to $Y
   %5 = copy_value %4 : $Y
   switch_enum %5 : $Y, case #Y.none!enumelt: bb1, case #Y.some!enumelt: bb2
 
-// XHECK: bb1
 bb1:
   (%7, %8) = destructure_struct %1 : $T
   br bb3(%7 : $C)
 
-// XHECK: bb2
 bb2(%10 : @owned $T):
   (%12a, %12b) = destructure_struct %10 : $T
   destroy_value %1 : $T
   br bb3(%12a : $C)
 
-// XHECK: bb3
 bb3(%14 : @owned $C):
   %15 = struct $S ()
   %16 = struct $T (%14 : $C, %15 : $S)
   destroy_value %0 : $X
-// XHECK: return
   return %16 : $T
 }
 

@@ -90,29 +90,34 @@ public:
 
   SILModule &getModule() const { return Inst->getModule(); }
 
-  static ApplySite isa(SILNode *node) {
-    auto *i = dyn_cast<SILInstruction>(node);
-    if (!i)
-      return ApplySite();
-
-    auto kind = ApplySiteKind::fromNodeKind(i->getKind());
+  static ApplySite isa(SILInstruction *inst) {
+    auto kind = ApplySiteKind::fromNodeKind(inst->getKind());
     if (!kind)
       return ApplySite();
 
     switch (kind.getValue()) {
     case ApplySiteKind::ApplyInst:
-      return ApplySite(cast<ApplyInst>(node));
+      return ApplySite(cast<ApplyInst>(inst));
     case ApplySiteKind::BeginApplyInst:
-      return ApplySite(cast<BeginApplyInst>(node));
+      return ApplySite(cast<BeginApplyInst>(inst));
     case ApplySiteKind::TryApplyInst:
-      return ApplySite(cast<TryApplyInst>(node));
+      return ApplySite(cast<TryApplyInst>(inst));
     case ApplySiteKind::PartialApplyInst:
-      return ApplySite(cast<PartialApplyInst>(node));
+      return ApplySite(cast<PartialApplyInst>(inst));
     }
     llvm_unreachable("covered switch");
   }
 
+  static ApplySite isa(SILValue value) {
+    if (auto *inst = value->getDefiningInstruction())
+      return ApplySite::isa(inst);
+    return ApplySite();
+  }
+
   ApplySiteKind getKind() const { return ApplySiteKind(Inst->getKind()); }
+
+  SILInstruction *operator*() const { return Inst; }
+  SILInstruction *operator->() const { return Inst; }
 
   explicit operator bool() const { return Inst != nullptr; }
 
@@ -181,8 +186,8 @@ public:
   /// Calls to (previous_)dynamic_function_ref have a dynamic target function so
   /// we should not optimize them.
   bool canOptimize() const {
-    return !DynamicFunctionRefInst::classof(getCallee()) &&
-      !PreviousDynamicFunctionRefInst::classof(getCallee());
+    return !swift::isa<DynamicFunctionRefInst>(getCallee()) &&
+      !swift::isa<PreviousDynamicFunctionRefInst>(getCallee());
   }
 
   /// Return the type.
@@ -493,22 +498,25 @@ public:
   FullApplySite(BeginApplyInst *inst) : ApplySite(inst) {}
   FullApplySite(TryApplyInst *inst) : ApplySite(inst) {}
 
-  static FullApplySite isa(SILNode *node) {
-    auto *i = dyn_cast<SILInstruction>(node);
-    if (!i)
-      return FullApplySite();
-    auto kind = FullApplySiteKind::fromNodeKind(i->getKind());
+  static FullApplySite isa(SILInstruction *inst) {
+    auto kind = FullApplySiteKind::fromNodeKind(inst->getKind());
     if (!kind)
       return FullApplySite();
     switch (kind.getValue()) {
     case FullApplySiteKind::ApplyInst:
-      return FullApplySite(cast<ApplyInst>(node));
+      return FullApplySite(cast<ApplyInst>(inst));
     case FullApplySiteKind::BeginApplyInst:
-      return FullApplySite(cast<BeginApplyInst>(node));
+      return FullApplySite(cast<BeginApplyInst>(inst));
     case FullApplySiteKind::TryApplyInst:
-      return FullApplySite(cast<TryApplyInst>(node));
+      return FullApplySite(cast<TryApplyInst>(inst));
     }
     llvm_unreachable("covered switch");
+  }
+
+  static FullApplySite isa(SILValue value) {
+    if (auto *inst = value->getDefiningInstruction())
+      return FullApplySite::isa(inst);
+    return FullApplySite();
   }
 
   FullApplySiteKind getKind() const {

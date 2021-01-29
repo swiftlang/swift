@@ -661,6 +661,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_entry_point_function_name)) {
+    Opts.entryPointFunctionName = A->getValue();
+  }
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::EmitSyntax) {
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
@@ -687,6 +691,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (FrontendOpts.AllowModuleWithCompilerErrors) {
     Opts.AllowModuleWithCompilerErrors = true;
+  }
+
+  if (auto A =
+          Args.getLastArg(OPT_enable_ast_verifier, OPT_disable_ast_verifier)) {
+    using ASTVerifierOverrideKind = LangOptions::ASTVerifierOverrideKind;
+    if (A->getOption().matches(OPT_enable_ast_verifier)) {
+      Opts.ASTVerifierOverride = ASTVerifierOverrideKind::EnableVerifier;
+    } else if (A->getOption().matches(OPT_disable_ast_verifier)) {
+      Opts.ASTVerifierOverride = ASTVerifierOverrideKind::DisableVerifier;
+    } else {
+      // This is an assert since getLastArg should not have let us get here if
+      // we did not have one of enable/disable specified.
+      llvm_unreachable(
+          "Should have found one of enable/disable ast verifier?!");
+    }
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;

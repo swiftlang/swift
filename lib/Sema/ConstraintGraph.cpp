@@ -340,17 +340,15 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   if (!fixed->hasTypeVariable())
     return;
 
-  SmallVector<TypeVariableType *, 4> typeVars;
-  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
   fixed->getTypeVariables(typeVars);
   auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
-    if (knownTypeVars.insert(otherTypeVar).second) {
-      if (typeVar == otherTypeVar) continue;
+    if (typeVar == otherTypeVar)
+      continue;
 
-      (*this)[otherTypeVar].addFixedBinding(typeVar);
-      node.addFixedBinding(otherTypeVar);
-    }
+    (*this)[otherTypeVar].addFixedBinding(typeVar);
+    node.addFixedBinding(otherTypeVar);
   }
 
   // Record the change, if there are active scopes.
@@ -365,15 +363,12 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   if (!fixed->hasTypeVariable())
     return;
 
-  SmallVector<TypeVariableType *, 4> typeVars;
-  llvm::SmallPtrSet<TypeVariableType *, 4> knownTypeVars;
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
   fixed->getTypeVariables(typeVars);
   auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
-    if (knownTypeVars.insert(otherTypeVar).second) {
-      (*this)[otherTypeVar].removeFixedBinding(typeVar);
-      node.removeFixedBinding(otherTypeVar);
-    }
+    (*this)[otherTypeVar].removeFixedBinding(typeVar);
+    node.removeFixedBinding(otherTypeVar);
   }
 }
 
@@ -809,7 +804,7 @@ namespace {
     getRepresentativesInType(Type type) const {
       TinyPtrVector<TypeVariableType *> results;
 
-      SmallVector<TypeVariableType *, 2> typeVars;
+      SmallPtrSet<TypeVariableType *, 2> typeVars;
       type->getTypeVariables(typeVars);
       for (auto typeVar : typeVars) {
         auto rep = findRepresentative(typeVar);
@@ -1282,16 +1277,19 @@ void ConstraintGraph::printConnectedComponents(
                  out << ' ';
                });
 
-    if (component.getDependencies().empty())
+    auto dependencies = component.getDependencies();
+    if (dependencies.empty())
       continue;
+
+    SmallVector<unsigned, 4> indices{dependencies.begin(), dependencies.end()};
+    // Sort dependencies so output is stable.
+    llvm::sort(indices);
 
     // Print all of the one-way components.
     out << " depends on ";
     llvm::interleave(
-        component.getDependencies(),
-        [&](unsigned index) { out << index; },
-        [&] { out << ", "; }
-      );
+        indices, [&out](unsigned index) { out << index; },
+        [&out] { out << ", "; });
   }
 }
 

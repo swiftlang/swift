@@ -942,7 +942,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       }
       // FIXME: Does this need to be signed?
       auto idRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-        LinkEntity::forSILFunction(id.getFunction(), false));
+        LinkEntity::forSILFunction(id.getFunction()));
       
       idValue = idRef.getValue();
       // If we got an indirect reference, we'll need to resolve it at

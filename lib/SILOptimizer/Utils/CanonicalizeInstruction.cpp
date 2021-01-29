@@ -26,6 +26,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
@@ -521,7 +522,7 @@ eliminateUnneededForwardingUnarySingleValueInst(SingleValueInstruction *inst,
   for (auto *use : getNonDebugUses(inst))
     if (!isa<DestroyValueInst>(use->getUser()))
       return next;
-  deleteAllDebugUses(inst);
+  deleteAllDebugUses(inst, pass.callbacks);
   SILValue op = inst->getOperand(0);
   inst->replaceAllUsesWith(op);
   pass.notifyHasNewUsers(op);
