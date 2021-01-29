@@ -47,6 +47,8 @@ SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
   std::uninitialized_copy(BufferContent.begin(), BufferContent.end(), Data);
   ArenaSourceBuffer = StringRef(Data, BufferContent.size());
   assert(ArenaSourceBuffer == BufferContent);
+  Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
+                               ArenaSourceBuffer.end());
 }
 
 SyntaxTreeCreator::~SyntaxTreeCreator() = default;
