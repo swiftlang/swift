@@ -2149,6 +2149,9 @@ private:
         return nullptr;
     }
 
+    if (Mangled.nextIf('h'))
+      addImplFunctionAttribute(type, "@concurrent");
+
     if (Mangled.nextIf('H'))
       addImplFunctionAttribute(type, "@async");
 

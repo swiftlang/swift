@@ -5408,6 +5408,7 @@ public:
     uint8_t rawRepresentation;
     uint8_t rawDiffKind;
     bool pseudogeneric = false;
+    bool concurrent;
     bool noescape;
     bool hasErrorResult;
     unsigned numParams;
@@ -5420,6 +5421,7 @@ public:
     ClangTypeID clangFunctionTypeID;
 
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
+                                             concurrent,
                                              async,
                                              rawCoroutineKind,
                                              rawCalleeConvention,
@@ -5457,7 +5459,7 @@ public:
 
     auto extInfo =
         SILFunctionType::ExtInfoBuilder(*representation, pseudogeneric,
-                                        noescape, async, *diffKind, 
+                                        noescape, concurrent, async, *diffKind, 
                                         clangFunctionType)
             .build();
 
