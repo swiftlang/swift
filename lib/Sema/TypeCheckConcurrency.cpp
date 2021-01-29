@@ -2025,9 +2025,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      // Async closures use concurrency features.
-      if (closure->getType() && closure->isBodyAsync())
-        return true;
+      // Async and concurrent closures use concurrency features.
+      if (auto closureType = closure->getType()) {
+        if (auto fnType = closureType->getAs<AnyFunctionType>())
+          if (fnType->isAsync() || fnType->isConcurrent())
+            return true;
+      }
     } else if (auto decl = dc->getAsDecl()) {
       // If any isolation attributes are present, we're using concurrency
       // features.
@@ -2035,8 +2038,8 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
         return true;
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // Async functions use concurrency features.
-        if (func->hasAsync())
+        // Async and concurrent functions use concurrency features.
+        if (func->hasAsync() || func->isConcurrent())
           return true;
 
         // If there is an explicit @asyncHandler, we're using concurrency

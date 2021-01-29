@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
-var mutableGlobal: String = "can't touch this" // expected-note 3{{var declared here}}
+var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
@@ -332,6 +332,16 @@ func testGlobalRestrictions(actor: MyActor) async {
     i = 42 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
   }
   print(i)
+}
+
+func f() {
+  acceptConcurrentClosure {
+    _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+  }
+
+  @concurrent func g() {
+    _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+  }
 }
 
 // ----------------------------------------------------------------------
