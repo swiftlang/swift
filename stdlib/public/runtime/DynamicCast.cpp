@@ -759,7 +759,7 @@ tryCastToAnyHashable(
         srcValue, /*emptyCases=*/1);
       auto nonNil = (sourceEnumCase == 0);
       if (nonNil) {
-        return DynamicCast::Failure;  // Our caller will unwrap the optional and try again
+        return DynamicCastResult::Failure;  // Our caller will unwrap the optional and try again
       }
       // If it is nil, fall through to the general case to just wrap the nil
     }
