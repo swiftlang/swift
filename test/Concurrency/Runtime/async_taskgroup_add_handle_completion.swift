@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
@@ -65,4 +65,8 @@ func test_sum_nextOnPending() async {
   assert(sum == 6, "Expected \(6) but got \(sum)")
 }
 
-runAsyncAndBlock(test_sum_nextOnPending)
+@main struct Main {
+  static func main() async {
+    await test_sum_nextOnPending()
+  }
+}
