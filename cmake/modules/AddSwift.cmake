@@ -435,8 +435,9 @@ function(add_swift_host_library name)
   endif()
 
   if(XCODE)
-    get_filename_component(dir ${CMAKE_CURRENT_SOURCE_DIR} DIRECTORY)
-
+    string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
+    list(GET split_path -1 dir)
+  
     file(GLOB_RECURSE ASHL_HEADERS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
