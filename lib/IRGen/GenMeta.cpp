@@ -289,8 +289,14 @@ static void buildMethodDescriptorFields(IRGenModule &IGM,
 
   if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
     assert(entry->getKind() == SILVTable::Entry::Kind::Normal);
-    auto *implFn = IGM.getAddrOfSILFunction(entry->getImplementation(),
-                                            NotForDefinition);
+
+    auto *impl = entry->getImplementation();
+    llvm::Constant *implFn;
+    if (impl->isAsync())
+      implFn = IGM.getAddrOfAsyncFunctionPointer(impl);
+    else
+      implFn = IGM.getAddrOfSILFunction(impl, NotForDefinition);
+
     descriptor.addRelativeAddress(implFn);
   } else {
     // The method is removed by dead method elimination.
@@ -1757,8 +1763,14 @@ namespace {
       // The implementation of the override.
       if (auto entry = VTable->getEntry(IGM.getSILModule(), baseRef)) {
         assert(entry->getKind() == SILVTable::Entry::Kind::Override);
-        auto *implFn = IGM.getAddrOfSILFunction(entry->getImplementation(),
-                                                NotForDefinition);
+
+        auto *impl = entry->getImplementation();
+        llvm::Constant *implFn;
+        if (impl->isAsync())
+          implFn = IGM.getAddrOfAsyncFunctionPointer(impl);
+        else
+          implFn = IGM.getAddrOfSILFunction(impl, NotForDefinition);
+
         descriptor.addRelativeAddress(implFn);
       } else {
         // The method is removed by dead method elimination.
