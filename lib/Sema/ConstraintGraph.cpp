@@ -146,6 +146,11 @@ void ConstraintGraphNode::addToEquivalenceClass(
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
 }
 
+void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
+  EquivalenceClass.erase(EquivalenceClass.begin() + prevSize,
+                         EquivalenceClass.end());
+}
+
 void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
   bool inserted = References.insert(typeVar);
   assert(inserted && "Attempt to reference a duplicate type variable");
@@ -255,9 +260,7 @@ void ConstraintGraph::Change::undo(ConstraintGraph &cg) {
 
   case ChangeKind::ExtendedEquivalenceClass: {
     auto &node = cg[EquivClass.TypeVar];
-    node.EquivalenceClass.erase(
-      node.EquivalenceClass.begin() + EquivClass.PrevSize,
-      node.EquivalenceClass.end());
+    node.truncateEquivalenceClass(EquivClass.PrevSize);
     break;
    }
 

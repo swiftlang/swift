@@ -102,6 +102,9 @@ private:
   /// Add the given type variables to this node's equivalence class.
   void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
 
+  /// Remove N last members from equivalence class of the current type variable.
+  void truncateEquivalenceClass(unsigned prevSize);
+
   /// Add a type variable related to this type variable through fixed
   /// binding.
   void addReferencedVar(TypeVariableType *typeVar);
