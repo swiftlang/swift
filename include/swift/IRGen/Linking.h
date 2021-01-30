@@ -126,6 +126,11 @@ class LinkEntity {
     /// or a class.
     DispatchThunk,
 
+    /// A derivative method dispatch thunk.  The pointer is a
+    /// AbstractFunctionDecl* inside a protocol or a class, and the secondary
+    /// pointer is an AutoDiffDerivativeFunctionIdentifier*.
+    DispatchThunkDerivative,
+
     /// A method dispatch thunk for an initializing constructor.  The pointer
     /// is a ConstructorDecl* inside a class.
     DispatchThunkInitializer,
@@ -151,6 +156,11 @@ class LinkEntity {
     /// A method descriptor.  The pointer is a FuncDecl* inside a protocol
     /// or a class.
     MethodDescriptor,
+
+    /// A derivative method descriptor.  The pointer is a AbstractFunctionDecl*
+    /// inside a protocol or a class, and the secondary pointer is an
+    /// AutoDiffDerivativeFunctionIdentifier*.
+    MethodDescriptorDerivative,
 
     /// A method descriptor for an initializing constructor.  The pointer
     /// is a ConstructorDecl* inside a class.
@@ -618,6 +628,16 @@ public:
   static LinkEntity forDispatchThunk(SILDeclRef declRef) {
     assert(isValidResilientMethodRef(declRef));
 
+    if (declRef.isAutoDiffDerivativeFunction()) {
+      LinkEntity entity;
+      // The derivative function for any decl is always a method (not an
+      // initializer).
+      entity.setForDecl(Kind::DispatchThunkDerivative, declRef.getDecl());
+      entity.SecondaryPointer =
+          declRef.getAutoDiffDerivativeFunctionIdentifier();
+      return entity;
+    }
+
     LinkEntity::Kind kind;
     switch (declRef.kind) {
     case SILDeclRef::Kind::Func:
@@ -640,6 +660,16 @@ public:
 
   static LinkEntity forMethodDescriptor(SILDeclRef declRef) {
     assert(isValidResilientMethodRef(declRef));
+
+    if (declRef.isAutoDiffDerivativeFunction()) {
+      LinkEntity entity;
+      // The derivative function for any decl is always a method (not an
+      // initializer).
+      entity.setForDecl(Kind::MethodDescriptorDerivative, declRef.getDecl());
+      entity.SecondaryPointer =
+          declRef.getAutoDiffDerivativeFunctionIdentifier();
+      return entity;
+    }
 
     LinkEntity::Kind kind;
     switch (declRef.kind) {
@@ -1263,6 +1293,15 @@ public:
     assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
     return reinterpret_cast<ProtocolDecl*>(Pointer);
   }
+
+  AutoDiffDerivativeFunctionIdentifier *
+  getAutoDiffDerivativeFunctionIdentifier() const {
+    assert(getKind() == Kind::DispatchThunkDerivative ||
+           getKind() == Kind::MethodDescriptorDerivative);
+    return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
+        SecondaryPointer);
+  }
+
   bool isDynamicallyReplaceable() const {
     assert(getKind() == Kind::SILFunction);
     return LINKENTITY_GET_FIELD(Data, IsDynamicallyReplaceableImpl);
