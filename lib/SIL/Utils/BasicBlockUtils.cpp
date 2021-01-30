@@ -398,7 +398,7 @@ static bool endsInUnreachable(SILBasicBlock *block) {
   return isa<UnreachableInst>(block->getTerminator());
 }
 
-void JointPostDominanceSetComputer::findJointPostDominatingSet(
+void swift::findJointPostDominatingSet(
     SILBasicBlock *dominatingBlock, ArrayRef<SILBasicBlock *> dominatedBlockSet,
     function_ref<void(SILBasicBlock *)> inputBlocksFoundDuringWalk,
     function_ref<void(SILBasicBlock *)> foundJointPostDomSetCompletionBlocks,
@@ -418,9 +418,8 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
     return;
   }
 
-  // At the top of where we for sure are going to use state... make sure we
-  // always clean up any resources that we use!
-  SWIFT_DEFER { clear(); };
+  /// The worklist that drives the algorithm.
+  SmallVector<SILBasicBlock *, 32> worklist;
 
   /// All blocks visited during the backwards walk of the CFG, but not including
   /// the initial blocks in `dominatedBlockSet`.
