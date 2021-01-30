@@ -21,6 +21,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
+#include "Debug.h"
 
 #include <dispatch/dispatch.h>
 
@@ -167,6 +168,9 @@ static FullMetadata<HeapMetadata> taskHeapMetadata = {
     MetadataKind::Task
   }
 };
+
+const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
+    static_cast<Metadata *>(&taskHeapMetadata);
 
 /// The function that we put in the context of a simple task
 /// to handle the final return.
