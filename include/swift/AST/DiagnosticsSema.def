@@ -4165,8 +4165,8 @@ ERROR(actor_isolated_objc,none,
       "actor-isolated %0 %1 cannot be @objc",
        (DescriptiveDeclKind, DeclName))
 NOTE(protocol_witness_async_conflict,none,
-     "candidate is %select{not |}0'async', but protocol requirement is%select{| not}0",
-     (bool))
+     "candidate is %select{not |}0'async', but%select{| @objc}1 protocol requirement is%select{| not}0",
+     (bool, bool))
 ERROR(async_autoclosure_nonasync_function,none,
       "'async' autoclosure parameter in a non-'async' function", ())
 
@@ -4214,9 +4214,6 @@ ERROR(objc_ambiguous_async_convention,none,
 NOTE(objc_ambiguous_async_convention_candidate,none,
      "%0 provides async here", (DeclName))
 
-ERROR(satisfy_async_objc,none,
-      "satisfying an asychronous @objc %select{method|initializer}0 with "
-      "a synchronous %select{method|initializer}0 is not supported", (bool))
 ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 

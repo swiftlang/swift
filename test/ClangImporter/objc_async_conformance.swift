@@ -11,3 +11,57 @@ class C1: ConcurrentProtocol {
 
   func askUser(toJumpThroughHoop hoop: String) async -> String { "hello" }
 }
+
+// try to conform to an objc protocol that has both a sync and async requirement
+// that has the same name, and both requirements are optional.
+class C2 : NSObject, OptionalObserver {}
+extension C2 {
+  func hello(_ session: NSObject) -> Bool { true }
+}
+
+// a version of C2 that requires both sync and async methods (differing only by
+// completion handler) in ObjC, is not possible to conform to with 'async' in
+// a Swift protocol
+class C3 : NSObject, RequiredObserver {}
+extension C3 {
+  func hello() -> Bool { true } // expected-note {{'hello()' previously declared here}}
+  func hello() async -> Bool { true } // expected-error {{invalid redeclaration of 'hello()'}}
+}
+
+// the only way to conform to 'RequiredObserver' in Swift is to not use 'async'
+class C4 : NSObject, RequiredObserver {}
+extension C4 {
+  func hello() -> Bool { true }
+  func hello(_ completion : @escaping (Bool) -> Void) -> Void { completion(true) }
+}
+
+///////
+// selector conflicts
+
+// attempting to satisfy the ObjC async requirement in two ways simultaenously
+// is problematic due to a clash in selector names on this ObjC-compatible type
+class SelectorConflict : NSObject, RequiredObserverOnlyCompletion {
+  func hello() async -> Bool { true } // expected-note {{method 'hello()' declared here}}
+
+  // expected-error@+1 {{method 'hello' with Objective-C selector 'hello:' conflicts with method 'hello()' with the same Objective-C selector}}
+  func hello(_ completion : @escaping (Bool) -> Void) -> Void { completion(true) }
+}
+
+// making either one of the two methods nonobjc fixes it:
+class SelectorOK1 : NSObject, RequiredObserverOnlyCompletion {
+  @nonobjc func hello() async -> Bool { true }
+  func hello(_ completion : @escaping (Bool) -> Void) -> Void { completion(true) }
+}
+
+class SelectorOK2 : NSObject, RequiredObserverOnlyCompletion {
+  func hello() async -> Bool { true }
+  @nonobjc func hello(_ completion : @escaping (Bool) -> Void) -> Void { completion(true) }
+}
+
+// additional coverage for situation like C4, where the method names don't
+// clash on the ObjC side, but they do on Swift side, BUT their ObjC selectors
+// differ, so it's OK.
+class Rock : NSObject, Rollable {
+  func roll(completionHandler: @escaping () -> Void) { completionHandler() }
+  func roll() { roll(completionHandler: {}) }
+}
