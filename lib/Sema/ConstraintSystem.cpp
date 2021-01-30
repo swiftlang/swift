@@ -1900,6 +1900,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto bodyClosure = FunctionType::get(arg, result,
                                          FunctionType::ExtInfoBuilder()
                                              .withNoEscape(true)
+                                             .withAsync(true)
                                              .withThrows(true)
                                              .build());
     FunctionType::Param args[] = {
@@ -1910,6 +1911,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto refType = FunctionType::get(args, result,
                                      FunctionType::ExtInfoBuilder()
                                          .withNoEscape(false)
+                                         .withAsync(true)
                                          .withThrows(true)
                                          .build());
     return {refType, refType};

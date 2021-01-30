@@ -39,3 +39,12 @@ protocol P2 {
 struct ConformsToP2: P2 {
   func f() { }  // okay
 }
+
+// withoutActuallyEscaping on async functions
+func takeEscaping(_: @escaping () async -> Void) async { }
+
+func thereIsNoEscape(_ body: () async -> Void) async {
+  await withoutActuallyEscaping(body) { escapingBody in
+    await takeEscaping(escapingBody)
+  }
+}
