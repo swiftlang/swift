@@ -181,6 +181,17 @@ public:
     return false;
   }
 
+  /// Whether this function is @concurrent.
+  bool isConcurrent() const {
+    if (!hasType())
+      return false;
+
+    if (auto *fnType = getType()->getAs<AnyFunctionType>())
+      return fnType->isConcurrent();
+
+    return false;
+  }
+
   bool isObjC() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->isObjC();

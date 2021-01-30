@@ -4256,9 +4256,8 @@ ERROR(global_actor_from_nonactor_context,none,
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
-WARNING(concurrent_access_local,none,
-        "local %0 %1 is unsafe to reference in code that may execute "
-        "concurrently",
+ERROR(concurrent_access_local,none,
+        "use of local %0 %1 in concurrently-executing code",
         (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_from_concurrent_closure,none,
         "actor-isolated %0 %1 cannot be referenced from a concurrent closure",
@@ -4274,6 +4273,9 @@ ERROR(actor_isolated_from_escaping_closure,none,
         (DescriptiveDeclKind, DeclName))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@concurrent'",
+      (DescriptiveDeclKind, DeclName))
+ERROR(concurrent_mutation_of_local_capture,none,
+      "mutation of captured %0 %1 in concurrently-executing code",
       (DescriptiveDeclKind, DeclName))
 NOTE(concurrent_access_here,none,
      "access in concurrently-executed code here", ())
