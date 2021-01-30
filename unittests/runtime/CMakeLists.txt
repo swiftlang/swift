@@ -1,5 +1,10 @@
+# We can't currently build the runtime tests under ASAN
+# The problem is that we want to use the just-build compiler (just like the
+# runtime) but ASAN will complain if we link against libgtest and LLVMSupport
+# libraries because they were compiled with the host compiler.
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
-   ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}"))
+  ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}") AND
+  (NOT (LLVM_USE_SANITIZER STREQUAL "Address")))
 
   if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
     if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)

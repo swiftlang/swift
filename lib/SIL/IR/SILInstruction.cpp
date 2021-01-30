@@ -36,12 +36,6 @@ using namespace Lowering;
 // Instruction-specific properties on SILValue
 //===----------------------------------------------------------------------===//
 
-SILLocation SILInstruction::getLoc() const { return Location.getLocation(); }
-
-const SILDebugScope *SILInstruction::getDebugScope() const {
-  return Location.getScope();
-}
-
 void SILInstruction::setDebugScope(const SILDebugScope *DS) {
   if (getDebugScope() && getDebugScope()->InlinedCallSite)
     assert(DS->InlinedCallSite && "throwing away inlined scope info");
@@ -49,7 +43,7 @@ void SILInstruction::setDebugScope(const SILDebugScope *DS) {
   assert(DS->getParentFunction() == getFunction() &&
          "scope belongs to different function");
 
-  Location = SILDebugLocation(getLoc(), DS);
+  debugScope = DS;
 }
 
 //===----------------------------------------------------------------------===//

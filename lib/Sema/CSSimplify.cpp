@@ -1926,6 +1926,20 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     }
   }
 
+  // A @concurrent function can be a subtype of a non-@concurrent function.
+  if (func1->isConcurrent() != func2->isConcurrent()) {
+    // Cannot add '@concurrent'.
+    if (func2->isConcurrent() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = AddConcurrentAttribute::create(
+          *this, func1, func2, getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
+  }
+
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
   if (func1->isNoEscape() != func2->isNoEscape() &&
@@ -7881,9 +7895,16 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     parameters.push_back(param);
   }
 
+  // Propagate @concurrent from the contextual type to the closure.
+  auto closureExtInfo = inferredClosureType->getExtInfo();
+  if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
+    if (contextualFnType->isConcurrent())
+      closureExtInfo = closureExtInfo.withConcurrent();
+  }
+
   auto closureType =
       FunctionType::get(parameters, inferredClosureType->getResult(),
-                        inferredClosureType->getExtInfo());
+                        closureExtInfo);
   assignFixedType(typeVar, closureType, closureLocator);
 
   // If there is a result builder to apply, do so now.

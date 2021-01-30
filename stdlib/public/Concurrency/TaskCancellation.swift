@@ -64,7 +64,7 @@ extension Task {
   /// This function returns instantly and will never suspend.
   /* @instantaneous */
   public static func withCancellationHandler<T>(
-    handler: /* @concurrent */ () -> (),
+    handler: @concurrent () -> (),
     operation: () async throws -> T
   ) async throws -> T {
       fatalError("\(#function) not implemented yet.")

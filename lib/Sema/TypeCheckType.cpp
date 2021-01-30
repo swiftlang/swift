@@ -1811,6 +1811,7 @@ namespace {
                            AnyFunctionType::Representation representation =
                                AnyFunctionType::Representation::Swift,
                            bool noescape = false,
+                           bool concurrent = false,
                            const clang::Type *parsedClangFunctionType = nullptr,
                            DifferentiabilityKind diffKind =
                                DifferentiabilityKind::NonDifferentiable);
@@ -2149,7 +2150,8 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many, TAK_async
+    TAK_differentiable, TAK_escaping, TAK_concurrent,
+    TAK_yield_once, TAK_yield_many, TAK_async
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2290,7 +2292,8 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
       auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
           rep, attrs.has(TAK_pseudogeneric), attrs.has(TAK_noescape),
-          attrs.has(TAK_async), diffKind, parsedClangFunctionType);
+          attrs.has(TAK_concurrent), attrs.has(TAK_async), diffKind,
+          parsedClangFunctionType);
 
       ty =
           resolveSILFunctionType(fnRepr, options, coroutineKind, extInfoBuilder,
@@ -2337,8 +2340,20 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
         }
       }
 
+      bool concurrent = false;
+      if (attrs.has(TAK_concurrent)) {
+        if (getASTContext().LangOpts.EnableExperimentalConcurrency) {
+          concurrent = true;
+        } else {
+          diagnoseInvalid(repr, attrs.getLoc(TAK_concurrent),
+                          diag::attr_requires_concurrency,
+                          TypeAttributes::getAttrName(TAK_concurrent),
+                          false);
+        }
+      }
+
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
-                                  parsedClangFunctionType,
+                                  concurrent, parsedClangFunctionType,
                                   diffKind);
       if (!ty || ty->hasError())
         return ty;
@@ -2730,7 +2745,7 @@ TypeResolver::resolveOpaqueReturnType(TypeRepr *repr, StringRef mangledName,
 NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     AnyFunctionType::Representation representation, bool noescape,
-    const clang::Type *parsedClangFunctionType,
+    bool concurrent, const clang::Type *parsedClangFunctionType,
     DifferentiabilityKind diffKind) {
 
   Optional<llvm::SaveAndRestore<GenericParamList *>> saveGenericParams;
@@ -2792,6 +2807,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
         getASTContext().getClangFunctionType(params, outputTy, representation);
 
   auto extInfo = extInfoBuilder.withRepresentation(representation)
+                     .withConcurrent(concurrent)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
                      .build();

@@ -1481,7 +1481,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
 
   // We don't want to exit here with a dead cleanup on the stack,
   // so push the scope first.
-  FullExpr scope(Cleanups, CleanupLocation::get(loc));
+  FullExpr scope(Cleanups, CleanupLocation(loc));
   emitThrow(loc, emitManagedRValueWithCleanup(exn));
 
   return destBB;

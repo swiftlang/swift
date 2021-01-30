@@ -333,7 +333,7 @@ void swift::endLifetimeAtFrontier(
     SILBuilderContext &builderCtxt, InstModCallbacks callbacks) {
   for (SILInstruction *endPoint : frontier) {
     SILBuilderWithScope builder(endPoint, builderCtxt);
-    SILLocation loc = RegularLocation(endPoint->getLoc().getSourceLoc());
+    SILLocation loc = RegularLocation(endPoint->getLoc());
     emitDestroyOperation(builder, loc, valueOrStackLoc, callbacks);
     if (isa<AllocStackInst>(valueOrStackLoc)) {
       builder.createDeallocStack(loc, valueOrStackLoc);

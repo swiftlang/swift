@@ -21,6 +21,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
 #include "AsyncCall.h"
+#include "Debug.h"
 
 #if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dispatch/dispatch.h>
@@ -169,6 +170,9 @@ static FullMetadata<HeapMetadata> taskHeapMetadata = {
     MetadataKind::Task
   }
 };
+
+const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
+    static_cast<Metadata *>(&taskHeapMetadata);
 
 /// The function that we put in the context of a simple task
 /// to handle the final return.
@@ -562,11 +566,17 @@ void swift::swift_task_asyncMainDrainQueue() {
 
   pfndispatch_main();
 #else
+  // CFRunLoop is not available on non-Darwin targets.  Foundation has an
+  // implementation, but CoreFoundation is not meant to be exposed.  We can only
+  // assume the existence of `CFRunLoopRun` on Darwin platforms, where the
+  // system provides an implementation of CoreFoundation.
+#if defined(__APPLE__)
   auto runLoop =
       reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
   if (runLoop)
-    runLoop();
-  else
+    return runLoop();
+#endif
+
     dispatch_main();
 #endif
 #endif

@@ -555,7 +555,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   auto &Lowering = ABI->getFunction()->getTypeLowering(
       getSILBoxFieldType(TypeExpansionContext(*ABI->getFunction()),
                          ABI->getBoxType(), ABI->getModule().Types, 0));
-  auto Loc = CleanupLocation::get(ABI->getLoc());
+  auto Loc = CleanupLocation(ABI->getLoc());
 
   for (auto LastRelease : FinalReleases) {
     SILBuilderWithScope Builder(LastRelease);

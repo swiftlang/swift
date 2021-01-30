@@ -1788,7 +1788,7 @@ namespace {
       // an unwind.
       if (!isFinal) return;
 
-      SGF.Cleanups.popAndEmitCleanup(EndApplyHandle, CleanupLocation::get(loc),
+      SGF.Cleanups.popAndEmitCleanup(EndApplyHandle, CleanupLocation(loc),
                                      NotForUnwind);
     }
 

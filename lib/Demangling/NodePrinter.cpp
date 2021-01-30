@@ -518,6 +518,7 @@ private:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
     case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
+    case Node::Kind::ConcurrentFunctionType:
     case Node::Kind::AsyncAnnotation:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
@@ -762,7 +763,7 @@ private:
   }
 
   void printFunctionType(NodePointer LabelList, NodePointer node) {
-    if (node->getNumChildren() < 2 || node->getNumChildren() > 5) {
+    if (node->getNumChildren() < 2 || node->getNumChildren() > 6) {
       setInvalid();
       return;
     }
@@ -810,7 +811,7 @@ private:
     }
 
     unsigned startIndex = 0;
-    bool isAsync = false, isThrows = false;
+    bool isConcurrent = false, isAsync = false, isThrows = false;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
       ++startIndex;
@@ -819,10 +820,18 @@ private:
       ++startIndex;
       isThrows = true;
     }
+    if (node->getChild(startIndex)->getKind()
+            == Node::Kind::ConcurrentFunctionType) {
+      ++startIndex;
+      isConcurrent = true;
+    }
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
     }
+
+    if (isConcurrent)
+      Printer << "@concurrent ";
 
     printFunctionParameters(LabelList, node->getChild(startIndex),
                             Options.ShowFunctionArgumentTypes);
@@ -2398,6 +2407,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(0));
     return nullptr;
 
+  case Node::Kind::ConcurrentFunctionType:
+    Printer<< "@concurrent ";
+    return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer<< " async ";
     return nullptr;

@@ -765,6 +765,7 @@ recur:
       }
 
     case 'I': return demangleImplFunctionType();
+    case 'J': return createNode(Node::Kind::ConcurrentFunctionType);
     case 'K': return createNode(Node::Kind::ThrowsAnnotation);
     case 'L': return demangleLocalIdentifier();
     case 'M': return demangleMetatype();
@@ -1251,6 +1252,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   }
   addChild(FuncType, ClangType);
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
+  addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
@@ -1286,6 +1288,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
   unsigned FirstChildIdx = 0;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::ThrowsAnnotation)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::ConcurrentFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::AsyncAnnotation)
@@ -1871,6 +1876,11 @@ NodePointer Demangler::demangleImplFunctionType() {
     CoroAttr = "@yield_many";
   if (CoroAttr)
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, CoroAttr), *this);
+
+  if (nextIf('h')) {
+    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@concurrent"),
+                   *this);
+  }
 
   if (nextIf('H')) {
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@async"),

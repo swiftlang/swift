@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
@@ -2693,6 +2694,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                              resultTypeID);
   }
 
+  void writeForeignAsyncConvention(const ForeignAsyncConvention &fac) {
+    using namespace decls_block;
+    TypeID completionHandlerTypeID = S.addTypeRef(fac.completionHandlerType());
+    unsigned rawErrorParameterIndex = fac.completionHandlerErrorParamIndex()
+      .map([](unsigned index) { return index + 1; }).getValueOr(0);
+    auto abbrCode = S.DeclTypeAbbrCodes[ForeignAsyncConventionLayout::Code];
+    ForeignAsyncConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                             completionHandlerTypeID,
+                                             fac.completionHandlerParamIndex(),
+                                             rawErrorParameterIndex);
+  }
+
   void writeGenericParams(const GenericParamList *genericParams) {
     using namespace decls_block;
 
@@ -3590,6 +3603,8 @@ public:
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+    if (auto asyncConvention = fn->getForeignAsyncConvention())
+      writeForeignAsyncConvention(*asyncConvention);
 
     writeInlinableBodyTextIfNeeded(fn);
   }
@@ -3671,6 +3686,8 @@ public:
 
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+    if (auto asyncConvention = fn->getForeignAsyncConvention())
+      writeForeignAsyncConvention(*asyncConvention);
 
     writeInlinableBodyTextIfNeeded(fn);
   }
@@ -3825,6 +3842,8 @@ public:
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+    if (auto asyncConvention = ctor->getForeignAsyncConvention())
+      writeForeignAsyncConvention(*asyncConvention);
 
     writeInlinableBodyTextIfNeeded(ctor);
   }
@@ -4299,6 +4318,7 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         clangType,
         fnTy->isNoEscape(),
+        fnTy->isConcurrent(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
@@ -4314,7 +4334,7 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        fnTy->isAsync(), fnTy->isThrowing(),
+        fnTy->isConcurrent(), fnTy->isAsync(), fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         S.addGenericSignatureRef(genericSig));
 
@@ -4392,7 +4412,7 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isConcurrent(),
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
@@ -4668,6 +4688,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SubstitutionMapLayout>();
 
   registerDeclTypeAbbr<ForeignErrorConventionLayout>();
+  registerDeclTypeAbbr<ForeignAsyncConventionLayout>();
   registerDeclTypeAbbr<AbstractClosureExprLayout>();
   registerDeclTypeAbbr<PatternBindingInitializerLayout>();
   registerDeclTypeAbbr<DefaultArgumentInitializerLayout>();
