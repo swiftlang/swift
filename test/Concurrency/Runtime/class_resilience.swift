@@ -24,14 +24,22 @@ class MyDerived : BaseClass<Int> {
   override func wait() async -> Int {
     return await super.wait() * 2
   }
+
+  override func wait(orThrow: Bool) async throws {
+    return try await super.wait(orThrow: orThrow)
+  }
 }
 
 func virtualWaitForNothing<T>(_ c: BaseClass<T>) async {
   await c.waitForNothing()
 }
 
-func virtualWait<T>(_ t: BaseClass<T>) async -> T {
-  return await t.wait()
+func virtualWait<T>(_ c: BaseClass<T>) async -> T {
+  return await c.wait()
+}
+
+func virtualWait<T>(orThrow: Bool, _ c: BaseClass<T>) async throws {
+  return try await c.wait(orThrow: orThrow)
 }
 
 var AsyncVTableMethodSuite = TestSuite("ResilientClass")
@@ -43,6 +51,9 @@ AsyncVTableMethodSuite.test("AsyncVTableMethod") {
     await virtualWaitForNothing(x)
 
     expectEqual(642, await virtualWait(x))
+
+    expectNil(try? await virtualWait(orThrow: true, x))
+    try! await virtualWait(orThrow: false, x)
   }
 }
 
