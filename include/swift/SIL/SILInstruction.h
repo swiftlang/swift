@@ -323,13 +323,17 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
 
   /// A backreference to the containing basic block.  This is maintained by
   /// ilist_traits<SILInstruction>.
-  SILBasicBlock *ParentBB;
+  SILBasicBlock *ParentBB = nullptr;
 
-  /// This instruction's containing lexical scope and source location
-  /// used for debug info and diagnostics.
-  SILDebugLocation Location;
+  /// This instruction's containing lexical scope for debug info.
+  const SILDebugScope *debugScope = nullptr;
 
-  SILInstruction() = delete;
+  /// This instructions source location for diagnostics and debug info.
+  ///
+  /// To reduce space, this is only the storage of the SILLocation. The
+  /// location's kindAndFlags is stored in the SILNode inline bitfields.
+  SILLocation::Storage locationStorage;
+
   void operator=(const SILInstruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
@@ -360,8 +364,7 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   SILInstructionResultArray getResultsImpl() const;
 
 protected:
-  SILInstruction(SILDebugLocation DebugLoc) :
-        ParentBB(nullptr), Location(DebugLoc) {
+  SILInstruction() {
     NumCreatedInstructions++;
   }
 
@@ -423,14 +426,25 @@ public:
   SILModule &getModule() const;
 
   /// This instruction's source location (AST node).
-  SILLocation getLoc() const;
-  const SILDebugScope *getDebugScope() const;
-  SILDebugLocation getDebugLocation() const { return Location; }
+  SILLocation getLoc() const {
+    return SILLocation(locationStorage,
+                       asSILNode()->Bits.SILInstruction.LocationKindAndFlags);
+  }
+  const SILDebugScope *getDebugScope() const { return debugScope; }
+  SILDebugLocation getDebugLocation() const {
+    return SILDebugLocation(getLoc(), debugScope);
+  }
 
   /// Sets the debug location.
   /// Note: Usually it should not be needed to use this function as the location
   /// is already set in when creating an instruction.
-  void setDebugLocation(SILDebugLocation Loc) { Location = Loc; }
+  void setDebugLocation(SILDebugLocation debugLoc) {
+    debugScope = debugLoc.getScope();
+    SILLocation loc = debugLoc.getLocation();
+    asSILNode()->Bits.SILInstruction.LocationKindAndFlags =
+      loc.kindAndFlags.packedKindAndFlags;
+    locationStorage = loc.storage;
+  }
 
   /// This method unlinks 'self' from the containing basic block and deletes it.
   void eraseFromParent();
@@ -758,7 +772,9 @@ class NonSingleValueInstruction : public SILInstruction, public SILNode {
   friend struct SILNodeOffsetChecker;
 public:
   NonSingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc)
-    : SILInstruction(loc), SILNode((SILNodeKind)kind) {}
+      : SILInstruction(), SILNode((SILNodeKind)kind) {
+    setDebugLocation(loc);
+  }
 
   using SILInstruction::operator new;
   using SILInstruction::dumpInContext;
@@ -929,8 +945,9 @@ class SingleValueInstruction : public SILInstruction, public ValueBase {
 public:
   SingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc,
                          SILType type)
-      : SILInstruction(loc),
-        ValueBase(ValueKind(kind), type) {}
+        : SILInstruction(), ValueBase(ValueKind(kind), type) {
+    setDebugLocation(loc);
+  }
 
   using SILInstruction::operator new;
   using SILInstruction::dumpInContext;

@@ -2287,7 +2287,7 @@ static void rewriteFunction(StructLoweringState &pass,
   while (!pass.modReturnInsts.empty()) {
     auto *instr = pass.modReturnInsts.pop_back_val();
     auto loc = instr->getLoc(); // SILLocation::RegularKind
-    auto regLoc = RegularLocation(loc.getSourceLoc());
+    auto regLoc = RegularLocation(loc);
     SILBuilderWithScope retBuilder(instr);
     assert(modNonFuncTypeResultType(pass.F, pass.Mod) &&
            "Expected a regular type");

@@ -601,9 +601,9 @@ public:
         DebugScopeStack.size() ? DebugScopeStack.back().getPointer() : F.getDebugScope();
     auto *DS = Parent;
     // Don't nest a scope for Loc under Parent unless it's actually different.
-    if (DS->getLoc().getAsRegularLocation() != Loc.getAsRegularLocation()) {
+    if (RegularLocation(DS->getLoc()) != RegularLocation(Loc)) {
       DS = new (SGM.M)
-          SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), DS);
+          SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
     }
     DebugScopeStack.emplace_back(DS, isGuardScope);
     B.setCurrentDebugScope(DS);

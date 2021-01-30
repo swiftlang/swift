@@ -36,7 +36,7 @@ public:
     SILAccessKind Kind;
 
     /// The location of the access. Used for diagnostics.
-    SILLocation AccessLoc = SILLocation((Expr *)nullptr);
+    SILLocation AccessLoc = SILLocation::invalid();
 
     const IndexTrieNode *SubPath = nullptr;
 

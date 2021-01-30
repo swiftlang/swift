@@ -28,26 +28,17 @@ llvm::cl::opt<bool>
 SILPrintOnError("sil-print-on-error", llvm::cl::init(false),
                 llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
 
-static void printDebugLocDescription(llvm::raw_ostream &out,
-                                     SILLocation::DebugLoc loc,
-                                     ASTContext &Context) {
-  out << "<<debugloc at " << QuotedString(loc.Filename)
-      << ":" << loc.Line << ":" << loc.Column << ">>";
+static void printLocationDescription(llvm::raw_ostream &out,
+                                         SILLocation::FilenameAndLocation loc,
+                                         ASTContext &Context) {
+  out << "<<debugloc at " << QuotedString(loc.filename)
+      << ":" << loc.line << ":" << loc.column << ">>";
 }
 
 void swift::printSILLocationDescription(llvm::raw_ostream &out,
                                         SILLocation loc,
                                         ASTContext &Context) {
-  switch (loc.getStorageKind()) {
-  case SILLocation::UnknownKind:
-    out << "<<invalid location>>";
-    return;
-
-  case SILLocation::SILFileKind:
-    printSourceLocDescription(out, loc.getSourceLoc(), Context);
-    return;
-
-  case SILLocation::ASTNodeKind:
+  if (loc.isASTNode()) {
     if (auto decl = loc.getAsASTNode<Decl>()) {
       printDeclDescription(out, decl, Context);
     } else if (auto expr = loc.getAsASTNode<Expr>()) {
@@ -60,13 +51,17 @@ void swift::printSILLocationDescription(llvm::raw_ostream &out,
       out << "<<unknown AST node>>";
     }
     return;
-
-  case SILLocation::DebugInfoKind:
-    printDebugLocDescription(out, loc.getDebugInfoLoc(), Context);
+  }
+  if (loc.isFilenameAndLocation()) {
+    printLocationDescription(out, *loc.getFilenameAndLocation(), Context);
     return;
   }
-
-  out << "<<bad SILLocation kind>>";
+  if (loc.isSILFile()) {
+    printSourceLocDescription(out, loc.getSourceLoc(), Context);
+    return;
+  }
+  out << "<<invalid location>>";
+  return;
 }
 
 void PrettyStackTraceSILLocation::print(llvm::raw_ostream &out) const {

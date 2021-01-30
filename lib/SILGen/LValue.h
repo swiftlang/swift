@@ -547,7 +547,7 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
                         SILGenFunction &SGF) const;
 
   void performWriteback(SILGenFunction &SGF, bool isFinal) {
-    Scope S(SGF.Cleanups, CleanupLocation::get(loc));
+    Scope S(SGF.Cleanups, CleanupLocation(loc));
     component->writeback(SGF, loc, base, materialized, isFinal);
   }
 

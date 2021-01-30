@@ -875,7 +875,7 @@ void ClosureSpecCloner::populateCloned() {
       SILBasicBlock *OpBB = getOpBasicBlock(BB);
 
       TermInst *TI = OpBB->getTerminator();
-      auto Loc = CleanupLocation::get(NewClosure->getLoc());
+      auto Loc = CleanupLocation(NewClosure->getLoc());
 
       // If we have an exit, we place the release right before it so we know
       // that it will be executed at the end of the epilogue.
