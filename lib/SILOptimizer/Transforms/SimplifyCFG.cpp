@@ -78,6 +78,10 @@ class SimplifyCFG {
   llvm::SmallDenseMap<SILBasicBlock *, unsigned, 32> WorklistMap;
   // Keep track of loop headers - we don't want to jump-thread through them.
   SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
+  // The set of cloned loop headers to avoid infinite loop peeling. Blocks in
+  // this set may or may not still be LoopHeaders.
+  // (ultimately this can be used to eliminate findLoopHeaders)
+  SmallPtrSet<SILBasicBlock *, 4> ClonedLoopHeaders;
   // The cost (~ number of copied instructions) of jump threading per basic
   // block. Used to prevent infinite jump threading loops.
   llvm::SmallDenseMap<SILBasicBlock *, int, 8> JumpThreadingCost;
@@ -125,6 +129,16 @@ public:
   }
 
 private:
+  // Called when \p newBlock inherits the former predecessors of \p
+  // oldBlock. e.g. if \p oldBlock was a loop header, then newBlock is now a
+  // loop header.
+  void substitutedBlockPreds(SILBasicBlock *oldBlock, SILBasicBlock *newBlock) {
+    if (LoopHeaders.count(oldBlock))
+      LoopHeaders.insert(newBlock);
+    if (ClonedLoopHeaders.count(oldBlock))
+      ClonedLoopHeaders.insert(newBlock);
+  }
+
   void clearWorklist() {
     WorklistMap.clear();
     WorklistList.clear();
@@ -170,8 +184,10 @@ private:
     // Remove it from the map as well.
     WorklistMap.erase(It);
 
-    if (LoopHeaders.count(BB))
+    if (LoopHeaders.count(BB)) {
       LoopHeaders.erase(BB);
+      ClonedLoopHeaders.erase(BB);
+    }
   }
 
   bool simplifyBlocks();
@@ -1082,10 +1098,13 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     return false;
 
   // Don't jump thread through a potential header - this can produce irreducible
-  // control flow. Still, we make an exception for switch_enum.
+  // control flow and lead to infinite loop peeling.
   bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
   if (DestIsLoopHeader) {
-    if (!isa<SwitchEnumInst>(destTerminator))
+    // Make an exception for switch_enum, but only if it's block was not already
+    // peeled out of it's original loop. In that case, further jump threading
+    // can accomplish nothing, and the loop will be infinitely peeled.
+    if (!isa<SwitchEnumInst>(destTerminator) || ClonedLoopHeaders.count(DestBB))
       return false;
   }
 
@@ -1127,8 +1146,14 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
   // If we jump-thread a switch_enum in the loop header, we have to recalculate
   // the loop header info.
-  if (DestIsLoopHeader)
+  //
+  // FIXME: findLoopHeaders should not be called repeatedly during simplify-cfg
+  // iteration. It is a whole-function analysis! It also does no nothing help to
+  // avoid infinite loop peeling.
+  if (DestIsLoopHeader) {
+    ClonedLoopHeaders.insert(Cloner.getNewBB());
     findLoopHeaders();
+  }
 
   ++NumJumpThreads;
   return true;
@@ -1375,8 +1400,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     for (auto &Succ : remainingBlock->getSuccessors())
       addToWorklist(Succ);
 
-    if (LoopHeaders.count(deletedBlock))
-      LoopHeaders.insert(remainingBlock);
+    substitutedBlockPreds(deletedBlock, remainingBlock);
 
     auto Iter = JumpThreadingCost.find(deletedBlock);
     if (Iter != JumpThreadingCost.end()) {
@@ -1400,8 +1424,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
                                          trampolineDest.newSourceBranchArgs);
     // Eliminating the trampoline can expose opportunities to improve the
     // new block we branch to.
-    if (LoopHeaders.count(DestBB))
-      LoopHeaders.insert(BB);
+    substitutedBlockPreds(DestBB, trampolineDest.destBB);
 
     addToWorklist(trampolineDest.destBB);
     BI->eraseFromParent();
@@ -1586,8 +1609,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
         BI->getTrueBBCount(), BI->getFalseBBCount());
     BI->eraseFromParent();
 
-    if (LoopHeaders.count(TrueSide))
-      LoopHeaders.insert(ThisBB);
+    substitutedBlockPreds(TrueSide, ThisBB);
     removeIfDead(TrueSide);
     addToWorklist(ThisBB);
     return true;
@@ -1605,8 +1627,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
         falseTrampolineDest.destBB, falseTrampolineDest.newSourceBranchArgs,
         BI->getTrueBBCount(), BI->getFalseBBCount());
     BI->eraseFromParent();
-    if (LoopHeaders.count(FalseSide))
-      LoopHeaders.insert(ThisBB);
+    substitutedBlockPreds(FalseSide, ThisBB);
     removeIfDead(FalseSide);
     addToWorklist(ThisBB);
     return true;
