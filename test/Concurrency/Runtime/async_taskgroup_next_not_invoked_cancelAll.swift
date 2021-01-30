@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
@@ -43,4 +43,8 @@ func test_skipCallingNext_butInvokeCancelAll() async {
   assert(result == 0)
 }
 
-runAsyncAndBlock(test_skipCallingNext_butInvokeCancelAll)
+@main struct Main {
+  static func main() async {
+    await test_skipCallingNext_butInvokeCancelAll()
+  }
+}

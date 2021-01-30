@@ -2,12 +2,13 @@
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
-var mutableGlobal: String = "can't touch this" // expected-note 3{{var declared here}}
+var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
+func acceptConcurrentClosure<T>(_: @concurrent () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
-func acceptEscapingClosure<T>(_: (String) -> ()) async -> T? { nil }
+func acceptEscapingClosure<T>(_: @escaping (String) -> ()) async -> T? { nil }
 
 func acceptAsyncClosure<T>(_: () async -> T) { }
 func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
@@ -29,12 +30,12 @@ actor class MySuperActor {
 
 actor class MyActor: MySuperActor {
   let immutable: Int = 17
-  var text: [String] = [] // expected-note 9{{mutable state is only available within the actor instance}}
+  var text: [String] = [] // expected-note 10{{mutable state is only available within the actor instance}}
 
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 21{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String { synchronous() }
 }
 
@@ -127,7 +128,7 @@ extension MyActor {
 
     // Closures.
     let localConstant = 17
-    var localVar = 17 // expected-note 3{{var declared here}}
+    var localVar = 17
 
     // Non-escaping closures are okay.
     acceptClosure {
@@ -137,27 +138,38 @@ extension MyActor {
       _ = localConstant
     }
 
+    // Concurrent closures might run... concurrently.
+    acceptConcurrentClosure {
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent closure}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
+      _ = localVar // okay
+      localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
+      _ = localConstant
+    }
+
     // Escaping closures might run concurrently.
     acceptEscapingClosure {
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
-      _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from an '@escaping' closure}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from an '@escaping' closure}}
+      _ = localVar // okay, don't complain about escaping
       _ = localConstant
     }
 
     // Local functions might run concurrently.
-    func localFn1() {
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
-      _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
+    @concurrent func localFn1() {
+      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
+      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
+      _ = localVar // okay
+      localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
     }
 
-    func localFn2() {
+    @concurrent func localFn2() {
       acceptClosure {
-        _ = text[0]  // expected-error{{actor-isolated property 'text' is unsafe to reference in code that may execute concurrently}}
-        _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
-        _ = localVar // expected-warning{{local var 'localVar' is unsafe to reference in code that may execute concurrently}}
+        _ = text[0]  // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
+        _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
+        _ = localVar // okay
+        localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
         _ = localConstant
       }
     }
@@ -171,7 +183,7 @@ extension MyActor {
 
     // Partial application
     _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' is unsafe to reference in code that may execute concurrently}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from an '@actorIndependent' context}}
     acceptClosure(synchronous)
     acceptClosure(self.synchronous)
     acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
@@ -312,13 +324,24 @@ func testGlobalRestrictions(actor: MyActor) async {
   // Global mutable state cannot be accessed.
   _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
 
-  // Local mutable variables cannot be accessed from concurrently-executing
+  // Local mutable variables cannot be modified from concurrently-executing
   // code.
-  var i = 17 // expected-note{{var declared here}}
-  acceptEscapingClosure {
-    i = 42 // expected-warning{{local var 'i' is unsafe to reference in code that may execute concurrently}}
+  var i = 17
+  acceptConcurrentClosure {
+    _ = i
+    i = 42 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
   }
   print(i)
+}
+
+func f() {
+  acceptConcurrentClosure {
+    _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+  }
+
+  @concurrent func g() {
+    _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
+  }
 }
 
 // ----------------------------------------------------------------------
@@ -326,14 +349,14 @@ func testGlobalRestrictions(actor: MyActor) async {
 // ----------------------------------------------------------------------
 func checkLocalFunctions() async {
   var i = 0
-  var j = 0 // expected-note{{var declared here}}
+  var j = 0
 
   func local1() {
     i = 17
   }
 
-  func local2() {
-    j = 42 // expected-warning{{local var 'j' is unsafe to reference in code that may execute concurrently}}
+  func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@concurrent'}}{{3-3=@concurrent }}
+    j = 42 // expected-error{{mutation of captured var 'j' in concurrently-executing code}}
   }
 
   // Okay to call locally.
@@ -347,22 +370,22 @@ func checkLocalFunctions() async {
   }
 
   // Escaping closures can make the local function execute concurrently.
-  acceptEscapingClosure {
-    local2()
+  acceptConcurrentClosure {
+    local2() // expected-note{{access in concurrently-executed code here}}
   }
 
   print(i)
   print(j)
 
-  var k = 17 // expected-note{{var declared here}}
+  var k = 17
   func local4() {
-    acceptEscapingClosure {
-      local3()
+    acceptConcurrentClosure {
+      local3() // expected-note{{access in concurrently-executed code here}}
     }
   }
 
-  func local3() {
-    k = 25 // expected-warning{{local var 'k' is unsafe to reference in code that may execute concurrently}}
+  func local3() { // expected-error{{concurrently-executed local function 'local3()' must be marked as '@concurrent'}}
+    k = 25 // expected-error{{mutation of captured var 'k' in concurrently-executing code}}
   }
 
   print(k)
@@ -374,7 +397,7 @@ func checkLocalFunctions() async {
 
 actor class LazyActor {
     var v: Int = 0
-    // expected-note@-1 5 {{mutable state is only available within the actor instance}}
+    // expected-note@-1 6 {{mutable state is only available within the actor instance}}
 
     let l: Int = 0
 
@@ -382,7 +405,7 @@ actor class LazyActor {
     lazy var l12: Int = v
     lazy var l13: Int = { self.v }()
     lazy var l14: Int = self.v
-    lazy var l15: Int = { [unowned self] in self.v }()
+    lazy var l15: Int = { [unowned self] in self.v }() // expected-error{{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
 
     lazy var l21: Int = { l }()
     lazy var l22: Int = l

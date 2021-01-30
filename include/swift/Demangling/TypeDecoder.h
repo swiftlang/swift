@@ -240,52 +240,61 @@ class ImplFunctionTypeFlags {
   unsigned Rep : 3;
   unsigned Pseudogeneric : 1;
   unsigned Escaping : 1;
+  unsigned Concurrent : 1;
   unsigned Async : 1;
   unsigned DifferentiabilityKind : 2;
 
 public:
   ImplFunctionTypeFlags()
-      : Rep(0), Pseudogeneric(0), Escaping(0), Async(0),
+      : Rep(0), Pseudogeneric(0), Escaping(0), Concurrent(0), Async(0),
         DifferentiabilityKind(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
-                        bool noescape, bool async,
+                        bool noescape, bool concurrent, bool async,
                         ImplFunctionDifferentiabilityKind diffKind)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
-        Async(async), DifferentiabilityKind(unsigned(diffKind)) {}
+        Concurrent(concurrent), Async(async),
+        DifferentiabilityKind(unsigned(diffKind)) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
     return ImplFunctionTypeFlags(
-        rep, Pseudogeneric, Escaping, Async,
+        rep, Pseudogeneric, Escaping, Concurrent, Async,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
+  }
+
+  ImplFunctionTypeFlags
+  withConcurrent() const {
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true,
+        Async, ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withAsync() const {
     return ImplFunctionTypeFlags(
-        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true,
-        ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
+        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
+        true, ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withEscaping() const {
     return ImplFunctionTypeFlags(
-        ImplFunctionRepresentation(Rep), Pseudogeneric, true, Async,
+        ImplFunctionRepresentation(Rep), Pseudogeneric, true, Concurrent, Async,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
   
   ImplFunctionTypeFlags
   withPseudogeneric() const {
     return ImplFunctionTypeFlags(
-        ImplFunctionRepresentation(Rep), true, Escaping, Async,
+        ImplFunctionRepresentation(Rep), true, Escaping, Concurrent, Async,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind));
   }
 
   ImplFunctionTypeFlags
   withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
     return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
-                                 Escaping, Async, diffKind);
+                                 Escaping, Concurrent, Async, diffKind);
   }
 
   ImplFunctionRepresentation getRepresentation() const {
@@ -295,6 +304,8 @@ public:
   bool isAsync() const { return Async; }
 
   bool isEscaping() const { return Escaping; }
+
+  bool isConcurrent() const { return Concurrent; }
 
   bool isPseudogeneric() const { return Pseudogeneric; }
 
@@ -645,6 +656,13 @@ public:
         ++firstChildIdx;
       }
 
+      bool isConcurrent = false;
+      if (Node->getChild(firstChildIdx)->getKind()
+            == NodeKind::ConcurrentFunctionType) {
+        isConcurrent = true;
+        ++firstChildIdx;
+      }
+
       bool isAsync = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::AsyncAnnotation) {
@@ -652,7 +670,8 @@ public:
         ++firstChildIdx;
       }
 
-      flags = flags.withAsync(isAsync).withThrows(isThrow);
+      flags = flags.withConcurrent(isConcurrent)
+          .withAsync(isAsync).withThrows(isThrow);
 
       if (Node->getNumChildren() < firstChildIdx + 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -723,7 +742,9 @@ public:
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
-          if (child->getText() == "@async") {
+          if (child->getText() == "@concurrent") {
+            flags = flags.withConcurrent();
+          } else if (child->getText() == "@async") {
             flags = flags.withAsync();
           }
         } else if (child->getKind() == NodeKind::ImplDifferentiable) {

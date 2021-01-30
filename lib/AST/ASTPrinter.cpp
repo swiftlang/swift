@@ -4160,6 +4160,11 @@ public:
       }
     }
 
+    if (!Options.excludeAttrKind(TAK_concurrent) &&
+        info.isConcurrent()) {
+      Printer << "@concurrent ";
+    }
+
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
@@ -4287,6 +4292,9 @@ public:
     }
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
+    }
+    if (info.isConcurrent()) {
+      Printer.printSimpleAttr("@concurrent") << " ";
     }
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";

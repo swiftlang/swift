@@ -54,13 +54,13 @@ public:
     Block = nullptr;
     Depth = CleanupsDepth::invalid();
     // Null location.
-    CleanupLoc = CleanupLocation::get(ArtificialUnreachableLocation());
+    CleanupLoc = CleanupLocation(ArtificialUnreachableLocation());
     return NewValue;
   }
 
   bool isValid() const { return Block != nullptr; }
   static JumpDest invalid() {
-    return JumpDest(CleanupLocation((Expr*) nullptr));
+    return JumpDest(CleanupLocation::invalid());
   }
 };
   

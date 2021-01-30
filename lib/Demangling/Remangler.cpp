@@ -1600,6 +1600,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
                         .Case("@yield_once", 'A')
                         .Case("@yield_many", 'G')
+                        .Case("@concurrent", 'h')
                         .Case("@async", 'H')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");
@@ -2412,6 +2413,10 @@ void Remangler::mangleObjCResilientClassStub(Node *node) {
 void Remangler::mangleFullObjCResilientClassStub(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mt";
+}
+
+void Remangler::mangleConcurrentFunctionType(Node *node) {
+  Buffer << 'J';
 }
 
 void Remangler::mangleAsyncAnnotation(Node *node) {

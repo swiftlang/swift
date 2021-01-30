@@ -482,6 +482,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       case AttrLoc::Attribute::Escaping:
         out << "@escaping";
         break;
+
+      case AttrLoc::Attribute::Concurrent:
+        out << "@concurrent";
+        break;
       }
 
       break;

@@ -5773,6 +5773,11 @@ public:
   /// type of the function will be `async` as well.
   bool hasAsync() const { return Bits.AbstractFunctionDecl.Async; }
 
+  /// Determine whether the given function is concurrent.
+  ///
+  /// A function is concurrent if it has the @concurrent attribute.
+  bool isConcurrent() const;
+
   /// Returns true if the function is a suitable 'async' context.
   ///
   /// Functions that are an 'async' context can make calls to 'async' functions.

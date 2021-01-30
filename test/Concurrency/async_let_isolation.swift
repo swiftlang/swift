@@ -10,16 +10,16 @@ actor class MyActor {
 
   func testAsyncLetIsolation() async {
     async let x = self.synchronous()
-    // expected-error @-1{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+    // expected-error @-1{{actor-isolated instance method 'synchronous()' cannot be referenced from 'async let' initializer}}
 
     async let y = await self.asynchronous()
 
     async let z = synchronous()
-    // expected-error @-1{{actor-isolated instance method 'synchronous()' is unsafe to reference in code that may execute concurrently}}
+    // expected-error @-1{{actor-isolated instance method 'synchronous()' cannot be referenced from 'async let' initializer}}
 
-    var localText = text // expected-note{{var declared here}}
+    var localText = text
     async let w = localText.removeLast()
-    // expected-warning@-1{{local var 'localText' is unsafe to reference in code that may execute concurrently}}
+    // expected-error@-1{{mutation of captured var 'localText' in concurrently-executing code}}
 
     _ = await x
     _ = await y

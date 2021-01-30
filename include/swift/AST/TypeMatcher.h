@@ -208,6 +208,9 @@ class TypeMatcher {
         if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
+        if (firstFunc->isConcurrent() != secondFunc->isConcurrent())
+          return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
+
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
         if (firstFunc->getParams().size() != secondFunc->getParams().size())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstFunc);

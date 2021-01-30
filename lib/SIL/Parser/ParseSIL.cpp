@@ -1828,7 +1828,6 @@ collectExistentialConformances(Parser &P, CanType conformingType, SourceLoc loc,
 
 /// sil-loc ::= 'loc' string-literal ':' [0-9]+ ':' [0-9]+
 bool SILParser::parseSILLocation(SILLocation &Loc) {
-  SILLocation::DebugLoc L;
   if (parseVerbatim("loc"))
     return true;
 
@@ -1838,18 +1837,20 @@ bool SILParser::parseSILLocation(SILLocation &Loc) {
   }
   // Drop the double quotes.
   StringRef File = P.Tok.getText().drop_front().drop_back();
-  L.Filename = P.Context.getIdentifier(File).str().data();
   P.consumeToken(tok::string_literal);
   if (P.parseToken(tok::colon, diag::expected_colon_in_sil_location))
     return true;
-  if (parseInteger(L.Line, diag::sil_invalid_line_in_sil_location))
+  unsigned Line = 0;
+  if (parseInteger(Line, diag::sil_invalid_line_in_sil_location))
     return true;
   if (P.parseToken(tok::colon, diag::expected_colon_in_sil_location))
     return true;
-  if (parseInteger(L.Column, diag::sil_invalid_column_in_sil_location))
+  unsigned Column = 0;
+  if (parseInteger(Column, diag::sil_invalid_column_in_sil_location))
     return true;
 
-  Loc.setDebugInfoLoc(L);
+  Loc = RegularLocation(SILLocation::FilenameAndLocation::alloc(Line, Column,
+    P.Context.getIdentifier(File).str().data(), SILMod));
   return false;
 }
 
@@ -7018,7 +7019,7 @@ bool SILParserState::parseSILScope(Parser &P) {
   P.consumeToken(tok::l_brace);
 
   StringRef Key = P.Tok.getText();
-  RegularLocation Loc{SILLocation::DebugLoc()};
+  SILLocation Loc = SILLocation::invalid();
   if (Key == "loc")
     if (ScopeState.parseSILLocation(Loc))
       return true;

@@ -720,7 +720,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       SILValue branchArg;
       {
         // Don't allow cleanups to escape the conditional block.
-        FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
+        FullExpr presentScope(Cleanups, CleanupLocation(loc));
         enterDestroyCleanup(concreteValue.getValue());
 
         // Receive the error value.  It's typed as an 'AnyObject' for
@@ -740,7 +740,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // path again.
       B.emitBlock(isNotPresentBB);
       {
-        FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
+        FullExpr presentScope(Cleanups, CleanupLocation(loc));
         concreteValue = emitManagedRValueWithCleanup(concreteValue.getValue());
         branchArg = emitExistentialErasure(loc, concreteFormalType, concreteTL,
                                            existentialTL, conformances,

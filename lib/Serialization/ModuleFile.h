@@ -805,8 +805,11 @@ public:
   llvm::Expected<NormalProtocolConformance *>
   readNormalConformanceChecked(serialization::NormalConformanceID id);
 
-  /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
+  /// Reads a foreign error convention from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
+
+  /// Reads a foreign async convention from \c DeclTypeCursor, if present.
+  Optional<ForeignAsyncConvention> maybeReadForeignAsyncConvention();
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   Optional<StringRef> maybeReadInlinableBodyText();

@@ -125,8 +125,8 @@ class SILDebugInfoGenerator : public SILModuleTransform {
         PrintedFuncs.push_back(F);
 
         // Set the debug scope for the function.
-        SILLocation::DebugLoc DL(Ctx.LCS.LineNum, 1, FileNameBuf);
-        RegularLocation Loc(DL);
+        RegularLocation Loc(SILLocation::FilenameAndLocation::alloc(
+             Ctx.LCS.LineNum, 1,FileNameBuf, *M));
         SILDebugScope *Scope = new (*M) SILDebugScope(Loc, F);
         F->setSILDebugScope(Scope);
 
@@ -151,14 +151,18 @@ class SILDebugInfoGenerator : public SILModuleTransform {
               continue;
             }
             SILLocation Loc = I->getLoc();
-            SILLocation::DebugLoc DL(Ctx.LineNums[I], 1, FileNameBuf);
-            assert(DL.Line && "no line set for instruction");
-            if (Loc.is<ReturnLocation>() || Loc.is<ImplicitReturnLocation>()) {
-              Loc.setDebugInfoLoc(DL);
-              I->setDebugLocation(SILDebugLocation(Loc, Scope));
+            auto *filePos = SILLocation::FilenameAndLocation::alloc(
+                Ctx.LineNums[I], 1, FileNameBuf, *M);
+            assert(filePos->line && "no line set for instruction");
+            if (Loc.is<ReturnLocation>()) {
+              I->setDebugLocation(
+                SILDebugLocation(ReturnLocation(filePos), Scope));
+            } else if (Loc.is<ImplicitReturnLocation>()) {
+              I->setDebugLocation(
+                SILDebugLocation(ImplicitReturnLocation(filePos), Scope));
             } else {
-              RegularLocation RLoc(DL);
-              I->setDebugLocation(SILDebugLocation(RLoc, Scope));
+              I->setDebugLocation(
+                SILDebugLocation(RegularLocation(filePos), Scope));
             }
           }
         }

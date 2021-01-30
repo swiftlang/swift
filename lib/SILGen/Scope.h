@@ -66,7 +66,7 @@ public:
   }
 
   explicit Scope(SILGenFunction &SGF, SILLocation loc)
-      : Scope(SGF.Cleanups, CleanupLocation::get(loc)) {}
+      : Scope(SGF.Cleanups, CleanupLocation(loc)) {}
 
   void pop() {
     assert(depth.isValid() && "popping a scope twice!");

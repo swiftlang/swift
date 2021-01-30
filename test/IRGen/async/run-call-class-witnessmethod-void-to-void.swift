@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -emit-ir | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -module-name main -o %t/main
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -emit-ir -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -52,7 +52,9 @@ func call_f<T : P>(_ t: T) async {
 
 class X {}
 
-runAsyncAndBlock {
-  let x = X()
-  await call_f(x)
+@main struct Main {
+  static func main() async {
+    let x = X()
+    await call_f(x)
+  }
 }
