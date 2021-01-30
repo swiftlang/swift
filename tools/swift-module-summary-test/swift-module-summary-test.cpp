@@ -17,6 +17,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Serialization/ModuleSummary.h"
 #include "llvm/Support/CommandLine.h"
