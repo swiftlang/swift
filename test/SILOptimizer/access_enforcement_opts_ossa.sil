@@ -14,6 +14,10 @@ struct X {
   init()
 }
 
+class Klass {
+
+}
+
 var globalX: X
 
 var globalOtherX: X
@@ -1789,3 +1793,27 @@ bb0(%0 : $*T):
   %108 = tuple ()
   return %108 : $()
 }
+
+// Test that SILInstruction::mayRelease recognizes
+// unchecked_ownership_conversion without asserting.
+// CHECK-LABEL: sil hidden [ossa] @$testUncheckedOwnershipConversion :
+// CHECK: begin_access
+// CHECK: unchecked_ownership_conversion
+// CHECK-LABEL: } // end sil function '$testUncheckedOwnershipConversion'
+sil hidden [ossa] @$testUncheckedOwnershipConversion : $@convention(method) (@guaranteed Klass, @in Int64) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $Klass, %1 : $*Int64):
+  %2 = begin_access [modify] [dynamic] %1 : $*Int64
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  %4 = load [trivial] %3 : $*Builtin.Int64
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = builtin "ssub_with_overflow_Int64"(%4 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%7, %8) = destructure_tuple %6 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %8 : $Builtin.Int1, "arithmetic overflow"
+  %10 = struct $Int64 (%7 : $Builtin.Int64)
+  store %10 to [trivial] %2 : $*Int64
+  end_access %2 : $*Int64
+  %13 = unchecked_ref_cast %0 : $Klass to $Builtin.NativeObject
+  %14 = unchecked_ownership_conversion %13 : $Builtin.NativeObject, @guaranteed to @owned
+  return %14 : $Builtin.NativeObject
+}
+
