@@ -41,7 +41,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
                                        SILValue value) {
   SmallVector<std::tuple<Operand *, SILValue>, 4> worklist;
   // Initialize the worklist with borrow lifetime ending uses
-  initialScopedOperand.visitLocalEndScopeUses([&](Operand *op) {
+  initialScopedOperand.visitScopeEndingUses([&](Operand *op) {
     worklist.emplace_back(op, value);
     return true;
   });
@@ -88,6 +88,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
       scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
         addVisitedOp(op, newBaseVal);
         worklist.emplace_back(op, newBaseVal);
+        return true;
       });
     }
   }

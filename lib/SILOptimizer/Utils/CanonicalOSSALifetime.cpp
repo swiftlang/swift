@@ -76,13 +76,13 @@ SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
       case BorrowedValueKind::SILFunctionArgument:
         return def;
       case BorrowedValueKind::BeginBorrow: {
-        bool localScope = true;
-        // TODO: visitLocalScopeEndingUses should have an early exit.
-        borrowedVal.visitLocalScopeEndingUses([&](Operand *endBorrow) {
-          if (endBorrow->getUser()->getParent() != def->getParentBlock())
-            localScope = false;
-        });
-        if (localScope) {
+        // TODO: Remove this call to visitLocalScopeEndingUses and the
+        // same-block check once computeBorrowLiveness supports multiple blocks.
+        auto *defBB = def->getParentBlock();
+        if (borrowedVal.visitLocalScopeEndingUses(
+              [&](Operand *endBorrow) {
+                return endBorrow->getUser()->getParent() == defBB;
+              })) {
           return def;
         }
         break;
@@ -144,6 +144,7 @@ bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
   }
   borrowedVal.visitLocalScopeEndingUses([this](Operand *use) {
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ true);
+    return true;
   });
 
   // TODO: Fix getCanonicalCopiedDef to allow multi-block borrows and remove
@@ -247,7 +248,7 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
         recordOuterUse(use);
         // For borrows, record the scope-ending instructions in addition to the
         // borrow instruction as an outer use point.
-        borrowOper.visitLocalEndScopeUses([&](Operand *endBorrow) {
+        borrowOper.visitScopeEndingUses([&](Operand *endBorrow) {
           if (!isUserInLiveOutBlock(endBorrow->getUser())) {
             outerUseInsts.insert(endBorrow->getUser());
           }
@@ -286,7 +287,7 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
       }
       // For sub-borrows also check that the scope-ending instructions are
       // within the scope.
-      if (borrowOper.visitLocalEndScopeUses([&](Operand *endBorrow) {
+      if (borrowOper.visitScopeEndingUses([&](Operand *endBorrow) {
             return !outerUseInsts.count(endBorrow->getUser());
           })) {
         continue;
@@ -387,7 +388,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
       case OperandOwnership::Borrow:
         // An entire borrow scope is considered a single use that occurs at the
         // point of the end_borrow.
-        BorrowingOperand(use).visitLocalEndScopeUses([this](Operand *end) {
+        BorrowingOperand(use).visitScopeEndingUses([this](Operand *end) {
           liveness.updateForUse(end->getUser(), /*lifetimeEnding*/ false);
           return true;
         });
