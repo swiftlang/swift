@@ -40,7 +40,7 @@ struct OwnershipFixupContext {
   JointPostDominanceSetComputer &jointPostDomSetComputer;
 
   SmallVector<Operand *, 8> transitiveBorrowedUses;
-  SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> recursiveReborrows;
+  SmallVector<PhiOperand, 8> recursiveReborrows;
 
   /// Extra state initialized by OwnershipRAUWFixupHelper::get() that we use
   /// when RAUWing addresses. This ensures we do not need to recompute this

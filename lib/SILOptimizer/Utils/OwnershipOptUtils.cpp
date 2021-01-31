@@ -180,9 +180,7 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
     // TODO: if non-phi reborrows even exist, handle them using a separate
     // SILValue list since we don't want to refer directly to phi SILValues.
     reborrows.insert(borrowingOper.getBorrowIntroducingUserResult().value);
-    auto *branch = endScope->getUser();
-    context.recursiveReborrows.push_back(
-      {branch->getParent(), endScope->getOperandNumber()});
+    context.recursiveReborrows.push_back(endScope);
   };
   if (!findTransitiveGuaranteedUses(oldValue, context.transitiveBorrowedUses,
                                     visitReborrow))
@@ -452,7 +450,7 @@ OwnershipLifetimeExtender::createPlusZeroBorrow(SILValue newValue,
 //===----------------------------------------------------------------------===//
 
 static void eliminateReborrowsOfRecursiveBorrows(
-    ArrayRef<std::pair<SILBasicBlock *, unsigned>> transitiveReborrows,
+    ArrayRef<PhiOperand> transitiveReborrows,
     SmallVectorImpl<Operand *> &usePoints, InstModCallbacks &callbacks) {
   SmallVector<std::pair<SILPhiArgument *, SILPhiArgument *>, 8>
       baseBorrowedValuePair;
@@ -462,8 +460,8 @@ static void eliminateReborrowsOfRecursiveBorrows(
     // edge from the base value and using that for the reborrow instead of the
     // actual value. We of course insert an end_borrow for our original incoming
     // value.
-    auto *bi = cast<BranchInst>(it.first->getTerminator());
-    auto &op = bi->getOperandRef(it.second);
+    auto *bi = cast<BranchInst>(it.predBlock->getTerminator());
+    auto &op = bi->getOperandRef(it.argIndex);
     BorrowingOperand borrowingOperand(&op);
     SILValue value = borrowingOperand->get();
     SILBuilderWithScope reborrowBuilder(bi);
@@ -1288,9 +1286,7 @@ OwnershipReplaceSingleUseHelper::OwnershipReplaceSingleUseHelper(
     if (reborrowOperand.isReborrow()) {
       // Check that the old lifetime can be extended and record the necessary
       // book-keeping in the OwnershipFixupContext.
-      auto *branch = reborrowOperand->getUser();
-      ctx->recursiveReborrows.push_back(
-          {branch->getParent(), reborrowOperand->getOperandNumber()});
+      ctx->recursiveReborrows.push_back(use);
     }
   }
 }
