@@ -165,9 +165,10 @@ void IRGenThunk::prepareArguments() {
     }
 
     for (unsigned i = 0, e = asyncLayout->getArgumentCount(); i < e; ++i) {
-      Address addr = asyncLayout->getArgumentLayout(i).project(
-          IGF, context, llvm::None);
-      params.add(IGF.Builder.CreateLoad(addr));
+      auto layout = asyncLayout->getArgumentLayout(i);
+      Address addr = layout.project(IGF, context, llvm::None);
+      auto &ti = cast<LoadableTypeInfo>(layout.getType());
+      ti.loadAsTake(IGF, addr, params);
     }
 
     if (asyncLayout->hasBindings()) {
@@ -329,7 +330,19 @@ void IRGenThunk::emit() {
     emission->emitToExplosion(result, /*isOutlined=*/false);
   }
 
+  llvm::Value *errorValue = nullptr;
+
+  if (isAsync && origTy->hasErrorResult()) {
+    SILType errorType = conv.getSILErrorType(expansionContext);
+    Address calleeErrorSlot = emission->getCalleeErrorSlot(errorType);
+    errorValue = IGF.Builder.CreateLoad(calleeErrorSlot);
+  }
+
   emission->end();
+
+  if (isAsync && errorValue) {
+    IGF.Builder.CreateStore(errorValue, IGF.getCallerErrorResultSlot());
+  }
 
   if (isAsync) {
     emitAsyncReturn(IGF, *asyncLayout, origTy);

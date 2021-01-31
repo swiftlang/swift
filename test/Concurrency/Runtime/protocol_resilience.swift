@@ -16,11 +16,21 @@
 import StdlibUnittest
 import resilient_protocol
 
+enum MyError : Error {
+	case bad
+}
+
 struct IntAwaitable : Awaitable {
   func waitForNothing() async {}
 
   func wait() async -> Int {
     return 123
+  }
+
+  func wait(orThrow: Bool) async throws {
+    if (orThrow) {
+      throw MyError.bad
+    }
   }
 }
 
@@ -32,6 +42,10 @@ func genericWait<T : Awaitable>(_ t: T) async -> T.Result {
   return await t.wait()
 }
 
+func genericWait<T : Awaitable>(orThrow: Bool, _ t: T) async throws {
+  return try await t.wait(orThrow: orThrow)
+}
+
 var AsyncProtocolRequirementSuite = TestSuite("ResilientProtocol")
 
 AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
@@ -41,6 +55,9 @@ AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
     await genericWaitForNothing(x)
 
     expectEqual(123, await genericWait(x))
+
+    expectNil(try? await genericWait(orThrow: true, x))
+    try! await genericWait(orThrow: false, x)
   }
 }
 

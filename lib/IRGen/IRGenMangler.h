@@ -15,6 +15,7 @@
 
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ProtocolAssociations.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -51,6 +52,21 @@ public:
     return finalize();
   }
 
+  std::string mangleDerivativeDispatchThunk(
+      const AbstractFunctionDecl *func,
+      AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    beginManglingWithAutoDiffOriginalFunction(func);
+    auto kindCode =
+        (char)Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    AutoDiffConfig config(
+        derivativeId->getParameterIndices(),
+        IndexSubset::get(func->getASTContext(), 1, {0}),
+        derivativeId->getDerivativeGenericSignature());
+    appendAutoDiffFunctionParts(kindCode, config);
+    appendOperator("Tj");
+    return finalize();
+  }
+
   std::string mangleConstructorDispatchThunk(const ConstructorDecl *ctor,
                                              bool isAllocating) {
     beginMangling();
@@ -62,6 +78,21 @@ public:
   std::string mangleMethodDescriptor(const FuncDecl *func) {
     beginMangling();
     appendEntity(func);
+    appendOperator("Tq");
+    return finalize();
+  }
+
+  std::string mangleDerivativeMethodDescriptor(
+      const AbstractFunctionDecl *func,
+      AutoDiffDerivativeFunctionIdentifier *derivativeId) {
+    beginManglingWithAutoDiffOriginalFunction(func);
+    auto kindCode =
+        (char)Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    AutoDiffConfig config(
+        derivativeId->getParameterIndices(),
+        IndexSubset::get(func->getASTContext(), 1, {0}),
+        derivativeId->getDerivativeGenericSignature());
+    appendAutoDiffFunctionParts(kindCode, config);
     appendOperator("Tq");
     return finalize();
   }

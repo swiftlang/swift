@@ -104,6 +104,12 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleDispatchThunk(func);
   }
 
+  case Kind::DispatchThunkDerivative: {
+    auto *func = cast<AbstractFunctionDecl>(getDecl());
+    auto *derivativeId = getAutoDiffDerivativeFunctionIdentifier();
+    return mangler.mangleDerivativeDispatchThunk(func, derivativeId);
+  }
+
   case Kind::DispatchThunkInitializer: {
     auto *ctor = cast<ConstructorDecl>(getDecl());
     return mangler.mangleConstructorDispatchThunk(ctor,
@@ -119,6 +125,12 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::MethodDescriptor: {
     auto *func = cast<FuncDecl>(getDecl());
     return mangler.mangleMethodDescriptor(func);
+  }
+
+  case Kind::MethodDescriptorDerivative: {
+    auto *func = cast<AbstractFunctionDecl>(getDecl());
+    auto *derivativeId = getAutoDiffDerivativeFunctionIdentifier();
+    return mangler.mangleDerivativeMethodDescriptor(func, derivativeId);
   }
 
   case Kind::MethodDescriptorInitializer: {
@@ -460,9 +472,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   switch (getKind()) {
   case Kind::DispatchThunk:
+  case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:
   case Kind::DispatchThunkAllocator:
   case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorDerivative:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator: {
     auto *decl = getDecl();
@@ -742,12 +756,14 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::AsyncFunctionPointerAST:
   case Kind::PropertyDescriptor:
   case Kind::DispatchThunk:
+  case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:
   case Kind::DispatchThunkAllocator:
   case Kind::DispatchThunkAsyncFunctionPointer:
   case Kind::DispatchThunkInitializerAsyncFunctionPointer:
   case Kind::DispatchThunkAllocatorAsyncFunctionPointer:
   case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorDerivative:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
   case Kind::MethodLookupFunction:
@@ -892,6 +908,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::MethodDescriptor:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
+  case Kind::MethodDescriptorDerivative:
     return IGM.MethodDescriptorStructTy;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::OpaqueTypeDescriptorAccessorKey:
@@ -1020,9 +1037,11 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 
   case Kind::AsyncFunctionPointerAST:
   case Kind::DispatchThunk:
+  case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:
   case Kind::DispatchThunkAllocator:
   case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorDerivative:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
   case Kind::MethodLookupFunction:
@@ -1104,9 +1123,11 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   switch (getKind()) {
   case Kind::AsyncFunctionPointerAST:
   case Kind::DispatchThunk:
+  case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:
   case Kind::DispatchThunkAllocator:
   case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorDerivative:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator:
   case Kind::MethodLookupFunction:

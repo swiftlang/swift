@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -enable-cxx-interop -I %S/Inputs %s -emit-ir | %FileCheck %s
 
+// This tests output needs to be updated for arm64.
+// XFAIL: arm64e
+
 import CustomDestructor
 
 protocol InitWithDummy {
