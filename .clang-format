@@ -1,1 +1,2 @@
 BasedOnStyle: LLVM
+AlwaysBreakTemplateDeclarations: Yes
