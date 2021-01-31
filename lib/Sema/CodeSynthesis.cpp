@@ -1414,6 +1414,24 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   return areAllStoredPropertiesDefaultInitializable(evaluator, decl);
 }
 
+bool
+HasDistributedActorLocalInitRequest::evaluate(Evaluator &evaluator,
+                                                     NominalTypeDecl *nominal) const {
+  if (auto *decl = dyn_cast<ClassDecl>(nominal)) {
+    if (!decl->isDistributedActor())
+      return false;
+
+    for (auto *member : decl->getMembers())
+      if (auto ctor = dyn_cast<ConstructorDecl>(member))
+        if (ctor->isDistributedActorLocalInit())
+          return true;
+  }
+
+  // areAllStoredPropertiesDefaultInitializable(evaluator, decl);
+
+  return false;
+}
+
 /// Synthesizer callback for a function body consisting of "return".
 static std::pair<BraceStmt *, bool>
 synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {

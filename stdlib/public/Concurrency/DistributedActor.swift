@@ -41,7 +41,7 @@ public protocol DistributedActor: Actor, Codable {
   ///
   /// - Parameter address: the address to resolve, and produce an instance or proxy for.
   /// - Parameter transport: transport which should be used to resolve the `address`.
-  init(resolve address: ActorAddress, using transport: ActorTransport)
+  init(resolve address: ActorAddress, using transport: ActorTransport) throws
 
   /// The `ActorTransport` associated with this actor.
   /// It is immutable and equal to the transport passed in the local/resolve
@@ -65,25 +65,31 @@ public protocol DistributedActor: Actor, Codable {
 // ==== Codable conformance ----------------------------------------------------
 
 extension CodingUserInfoKey {
-  static let actorTransport = CodingUserInfoKey(rawValue: "$dist_act_trans")!
+  static let actorTransportKey = CodingUserInfoKey(rawValue: "$dist_act_trans")!
 }
 
 extension DistributedActor {
   public init(from decoder: Decoder) throws {
-    fatalError("DistributedActor.init(from decoder) NOT IMPLEMENTED")
-//    guard let transport = decoder.userInfo["transport"] else {
-//      throw DistributedActorDecodingError()
-//    }
-//    self =
+    guard let transport = decoder.userInfo[.actorTransportKey] as? ActorTransport else {
+      throw DistributedActorCodingError(message:
+      "ActorTransport not available under the decoder.userInfo")
+    }
+
+    var container = try decoder.singleValueContainer()
+    let address = try container.decode(ActorAddress.self)
+    // self = try Self(resolve: address, using: transport) // FIXME!!!!
+    fatalError("XXXX")
   }
 
   @actorIndependent
   public func encode(to encoder: Encoder) throws {
-//    var container = encoder.singleContainer()
-//    container.encode(self.actorAddress)
-    fatalError("DistributedActor.init(from decoder) NOT IMPLEMENTED")
+    var container = encoder.singleValueContainer()
+    try container.encode(self.actorAddress)
   }
 }
+/******************************************************************************/
+/***************************** Actor Transport ********************************/
+/******************************************************************************/
 
 public protocol ActorTransport {
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
@@ -114,6 +120,15 @@ public protocol ActorTransport {
 //  ) async throws where Request: Codable, Reply: Codable
 }
 
+public enum ActorResolved<Act: DistributedActor> {
+  case resolved(Act)
+  case makeProxy
+}
+
+/******************************************************************************/
+/***************************** Actor Address **********************************/
+/******************************************************************************/
+
 // TODO: make into a protocol
 public struct ActorAddress: Equatable, Codable {
   /// Uniquely specifies the actor transport and the protocol used by it.
@@ -139,18 +154,21 @@ public struct ActorAddress: Equatable, Codable {
   }
 }
 
-public enum ActorResolved<Act: DistributedActor> {
-  case resolved(Act)
-  case makeProxy
-}
+/******************************************************************************/
+/******************************** Misc ****************************************/
+/******************************************************************************/
 
 /// Error protocol to which errors thrown by any `ActorTransport` should conform.
 public protocol ActorTransportError: Error {}
 
-public struct DistributedActorDecodingError: ActorTransportError {
-  let message: String
+public struct DistributedActorCodingError: ActorTransportError {
+  public let message: String
 
-  static func missingTransportUserInfo<Act>(_ actorType: Act.Type) -> DistributedActorDecodingError
+  public init(message: String) {
+    self.message = message
+  }
+
+  public static func missingTransportUserInfo<Act>(_ actorType: Act.Type) -> Self
     where Act: DistributedActor {
     .init(message: "Missing ActorTransport userInfo while decoding")
   }

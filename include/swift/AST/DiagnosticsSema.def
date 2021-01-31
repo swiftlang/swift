@@ -4425,33 +4425,43 @@ ERROR(actor_instance_property_wrapper,none,
       "the actor instance; consider @actorIndependent",
       (Identifier, Identifier))
 
-ERROR(distributedactor_local_var,none,
+ERROR(distributed_actor_user_defined_init_not_convenience,none,
+      "'distributed actor' initializer %0 must be 'convenience' initializer. "
+      "Distributed actors have an implicitly synthesized designated 'init(transport:)' "
+      "local initializer, which other initializers must delegate to.",
+      (DeclName))
+ERROR(distributed_actor_parameterless_init,none,
+      "illegal zero-argument 'distributed actor' initializer $0. "
+      "Distributed actor initializers must always 'transport: ActorTransport' argument, "
+      "and delegate it to the init(transport:) designated initializer.",
+      (DeclName))
+ERROR(distributed_actor_local_var,none,
       "'distributed' can not be applied to local variables",
       ())
-ERROR(distributedactor_property,none,
+ERROR(distributed_actor_property,none,
       "'distributed' can not be applied to local properties",
       ())
-ERROR(distributedactor_storage,none,
+ERROR(distributed_actor_storage,none,
       "'distributed' can not be applied to actor properties; "
       "Only functions can be 'distributed'",
       ())
-ERROR(distributedactor_not_actor,none,
+ERROR(distributed_actor_not_actor,none,
       "'distributed' can only be applied to 'actor class' definitions, "
       "and distributed actor-isolated async functions",
       ())
-ERROR(distributedactor_not_actor_func,none,
+ERROR(distributed_actor_not_actor_func,none,
       "'distributed' can only be applied to distributed actor async functions",
       ())
-ERROR(distributedactor_func_static,none,
+ERROR(distributed_actor_func_static,none,
       "'distributed' functions cannot be 'static'",
       ())
-ERROR(distributedactor_func_not_in_distributed_actor,none,
+ERROR(distributed_actor_func_not_in_distributed_actor,none,
       "'distributed' function can only be declared within 'distributed actor class'",
       ())
-ERROR(distributedactor_independent_property_must_be_let,none,
+ERROR(distributed_actor_independent_property_must_be_let,none,
       "_distributedActorIndependent can be applied to properties, however they must be 'let'",
       ())
-ERROR(distributedactor_isolated_property,none,
+ERROR(distributed_actor_isolated_property,none,
       "distributed actor state is only available within the actor instance",
       ())
 

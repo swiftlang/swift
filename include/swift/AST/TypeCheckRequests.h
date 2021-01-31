@@ -1979,6 +1979,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Checks whether this type has a distributed actor "local" initializer.
+class HasDistributedActorLocalInitRequest
+    : public SimpleRequest<HasDistributedActorLocalInitRequest, bool(NominalTypeDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Synthesizes a default initializer for a given type.
 class SynthesizeDefaultInitRequest
     : public SimpleRequest<SynthesizeDefaultInitRequest,

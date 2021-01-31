@@ -9,10 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file implements semantic analysis for declarations.
-//
-//===----------------------------------------------------------------------===//
 
 #include "CodeSynthesis.h"
 
@@ -41,6 +37,8 @@ using namespace swift;
 /******************************************************************************/
 /******************************* INITIALIZERS *********************************/
 /******************************************************************************/
+
+// ==== Distributed Actor: Local Initializer -----------------------------------
 
 /// Creates a new \c CallExpr representing
 ///
@@ -134,7 +132,13 @@ createBody_DistributedActor_init_transport(AbstractFunctionDecl *initDecl, void 
   return { body, /*isTypeChecked=*/false };
 }
 
-/// Synthesizes the `init(transport: ActorTransport)` initializer.
+/// Synthesizes the
+///
+/// ```
+/// init(transport: ActorTransport)
+/// ```
+///
+/// initializer.
 static ConstructorDecl *
 createDistributedActor_init_local(ClassDecl *classDecl,
                                   ASTContext &ctx) {
@@ -184,6 +188,8 @@ createDistributedActor_init_local(ClassDecl *classDecl,
 
   return initDecl;
 }
+
+// ==== Distributed Actor: Resolve Initializer ---------------------------------
 
 /// Synthesizes the body for
 ///
@@ -282,22 +288,21 @@ createDistributedActor_init_resolve(ClassDecl *classDecl,
   );
 
   // Func name: init(resolve:using:)
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FLE__, __LINE__, __FUNCTION__, "init func");
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(),
           /*Failable=*/false, SourceLoc(),
-          /*Throws=*/false, SourceLoc(), paramList, // TODO: make throws.
+          /*Throws=*/true, SourceLoc(), paramList,
           /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&createDistributedActor_init_resolve_body);
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "init func prepared");
 
-  // This constructor is 'required', all distributed actors MUST invoke it.
-  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-  initDecl->getAttrs().add(reqAttr);
+  // This constructor is 'required', all distributed actors MUST have it.
+  initDecl->getAttrs().add(new (C) RequiredAttr(/*IsImplicit*/true));
+//  // This constructor is 'final' as no-one outside the compiler is able to implement it.
+//  initDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit*/true));
 
   initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
 
@@ -315,30 +320,31 @@ createDistributedActorInit(ClassDecl *classDecl,
   const auto name = requirement->getName();
   auto argumentNames = name.getArgumentNames();
 
-  if (argumentNames.size() == 1) {
-    if (argumentNames[0] == C.Id_transport) {
-      // TODO: check type
-      return createDistributedActor_init_local(classDecl, ctx);
-    }
+  switch (argumentNames.size()) {
+    case 1: {
+      if (argumentNames[0] == C.Id_transport) {
+        // TODO: do we need to check types of the params here too?
+        return createDistributedActor_init_local(classDecl, ctx);
+      }
 
-    if (argumentNames[0] == C.Id_from) {
-      // TODO: check type
-      // TODO: implement synthesis
-      requirement->dump();
-      fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__, "unrecognized constructor requirement for DistributedActor");
+      if (argumentNames[0] == C.Id_from) {
+        // TODO: do we need to check types of the params here too?
+        // TODO: implement synthesis
+        requirement->dump();
+        fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__,
+                "unrecognized constructor requirement for DistributedActor");
+        return nullptr;
+      }
 
       return nullptr;
     }
+    case 2:
+      if (argumentNames[0] == C.Id_resolve &&
+          argumentNames[1] == C.Id_using) {
+        // TODO: do we need to check types of the params here too?
+        return createDistributedActor_init_resolve(classDecl, ctx);
+      }
   }
-
-  if (argumentNames.size() == 2) {
-    if (argumentNames[0] == C.Id_resolve &&
-        argumentNames[1] == C.Id_using) {
-      return createDistributedActor_init_resolve(classDecl, ctx);
-    }
-  }
-
-  // TODO: synthesize
 
   requirement->dump();
   fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__, "unrecognized constructor requirement for DistributedActor");
@@ -398,8 +404,7 @@ static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
 
   fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "GENERATE DA INITS");
 
-  // Bail out if we're validating one of our constructors already;
-  // we'll revisit the issue later.
+  //
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       if (ctor->isRecursiveValidation())

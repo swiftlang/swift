@@ -340,38 +340,38 @@ public:
     // distributed can be applied to actor class definitions and async functions
     if (auto var = dyn_cast<VarDecl>(D)) {
       // distributed can not be applied to stored properties
-      diagnoseAndRemoveAttr(attr, diag::distributedactor_property);
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_property);
       return;
     }
 
     // distributed can only be declared on an `actor class`
     if (auto classDecl = dyn_cast<ClassDecl>(D)) {
       if (!classDecl->isActor()) {
-        diagnoseAndRemoveAttr(attr, diag::distributedactor_not_actor);
+        diagnoseAndRemoveAttr(attr, diag::distributed_actor_not_actor);
         return;
       } else {
         // good: `distributed actor class`
         return;
       }
     } else if (dyn_cast<StructDecl>(D) || dyn_cast<EnumDecl>(D)) {
-      diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_in_distributed_actor);
+      diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
       return;
     }
 
     if (auto funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
       // distributed functions must not be static
       if (funcDecl->isStatic()) {
-        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_static);
+        diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_static);
         return;
       }
 
       // distributed func must be declared inside an distributed actor
       if (dc->getSelfClassDecl() &&
           !dc->getSelfClassDecl()->isDistributedActor()) {
-        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_in_distributed_actor);
+        diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
         return;
       } else if (dc->getSelfStructDecl() || dc->getSelfEnumDecl()) {
-        diagnoseAndRemoveAttr(attr, diag::distributedactor_func_not_in_distributed_actor);
+        diagnoseAndRemoveAttr(attr, diag::distributed_actor_func_not_in_distributed_actor);
         return;
       }
     }
@@ -383,7 +383,7 @@ public:
     /// user-inaccessible _distributedActorIndependent can only be applied to let properties
     if (auto var = dyn_cast<VarDecl>(D)) {
       if (!var->isLet()) {
-        diagnoseAndRemoveAttr(attr, diag::distributedactor_independent_property_must_be_let);
+        diagnoseAndRemoveAttr(attr, diag::distributed_actor_independent_property_must_be_let);
         return;
       }
     }

@@ -3227,6 +3227,8 @@ public:
   /// for types that are not global actors.
   VarDecl *getGlobalActorInstance() const;
 
+  bool hasDistributedActorLocalInitializer() const;
+
   /// Whether this type is a global actor, which can be used as an
   /// attribute to decorate declarations for inclusion in the actor-isolated
   /// state denoted by this type.
@@ -6781,6 +6783,9 @@ public:
   /// @objc init(forMemory: ())
   /// \endcode
   bool isObjCZeroParameterWithLongSelector() const;
+
+  /// Checks if the ctor is a distributed actor's 'local' init.
+  bool isDistributedActorLocalInit() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Constructor;
