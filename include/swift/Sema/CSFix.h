@@ -2265,10 +2265,12 @@ public:
   }
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AllowUnsupportedRuntimeCheckedCast *create(ConstraintSystem &cs,
-                                                    Type fromType, Type toType,
-                                                    CheckedCastKind kind,
-                                                    ConstraintLocator *locator);
+  static bool runtimeSupportedFunctionTypeCast(FunctionType *fnFromType,
+                                               FunctionType *fnToType);
+
+  static AllowUnsupportedRuntimeCheckedCast *
+  attempt(ConstraintSystem &cs, Type fromType, Type toType,
+          CheckedCastKind kind, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

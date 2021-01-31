@@ -5963,24 +5963,6 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
   return CheckedCastKind::ValueCast;
 }
 
-// Although function types maybe compile-time convertible because
-// compiler can emit thunks at SIL to handle the conversion when
-// required, only convertions that are supported by the runtime are
-// when types are trivially equal or non-throwing from type is equal
-// to throwing to type without throwing clause conversions are not
-// possible at runtime.
-static bool runtimeSupportedFunctionTypeCast(FunctionType *fnFromType,
-                                             FunctionType *fnToType) {
-  if (fnFromType->isEqual(fnToType)) {
-    return true;
-  } else if (!fnFromType->isThrowing() && fnToType->isThrowing()) {
-    return fnFromType->isEqual(
-        fnToType->getWithoutThrowing()->castTo<FunctionType>());
-  }
-  // Runtime cannot perform such conversion.
-  return false;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyCheckedCastConstraint(
                     Type fromType, Type toType,
@@ -6067,8 +6049,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     if (flags.contains(TMF_ApplyingFix))
       return nullptr;
 
-    auto loc = getConstraintLocator(locator);
-    auto anchor = loc->getAnchor();
+    SmallVector<LocatorPathElt, 4> path;
+    auto anchor = locator.getLocatorParts(path);
     auto *castExpr = getAsExpr<ExplicitCastExpr>(anchor);
     if (!castExpr)
       return nullptr;
@@ -6091,7 +6073,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // If original from type is a non-optional and subExpr is an
     // OptionalTryExpr, to make sure we handle this correctly lets add the
     // optionality because the result of the expression is always an optional
-    // type.
+    // type regardless of language mode.
     auto *sub = castExpr->getSubExpr()->getSemanticsProvidingExpr();
     if (isExpr<OptionalTryExpr>(sub) &&
         !origFromType->getOptionalObjectType()) {
@@ -6131,15 +6113,10 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     if (!(castKind == CheckedCastKind::Coercion ||
           castKind == CheckedCastKind::BridgingCoercion))
       return nullptr;
-    
-    auto fnFromType = fromType->getAs<FunctionType>();
-    auto fnToType = toType->getAs<FunctionType>();
-    if (fnFromType && fnToType &&
-        !runtimeSupportedFunctionTypeCast(fnFromType, fnToType)) {
-      // Runtime cannot perform such conversion.
-      return AllowUnsupportedRuntimeCheckedCast::create(
-          *this, origFromType, origToType, castKind,
-          getConstraintLocator(locator));
+
+    if (auto *fix = AllowUnsupportedRuntimeCheckedCast::attempt(
+            *this, fromType, toType, castKind, getConstraintLocator(locator))) {
+      return fix;
     }
     if (extraOptionals > 0) {
       return AllowCheckedCastCoercibleOptionalType::create(

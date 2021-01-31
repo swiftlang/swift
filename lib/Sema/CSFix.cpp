@@ -1823,10 +1823,37 @@ bool AllowAlwaysSucceedCheckedCast::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+// Although function types maybe compile-time convertible because
+// compiler can emit thunks at SIL to handle the conversion when
+// required, only convertions that are supported by the runtime are
+// when types are trivially equal or non-throwing from type is equal
+// to throwing to type without throwing clause conversions are not
+// possible at runtime.
+bool AllowUnsupportedRuntimeCheckedCast::runtimeSupportedFunctionTypeCast(
+    FunctionType *fnFromType, FunctionType *fnToType) {
+  if (fnFromType->isEqual(fnToType)) {
+    return true;
+  } else if (!fnFromType->isThrowing() && fnToType->isThrowing()) {
+    return fnFromType->isEqual(
+        fnToType->getWithoutThrowing()->castTo<FunctionType>());
+  }
+  // Runtime cannot perform such conversion.
+  return false;
+}
+
 AllowUnsupportedRuntimeCheckedCast *
-AllowUnsupportedRuntimeCheckedCast::create(ConstraintSystem &cs, Type fromType,
-                                           Type toType, CheckedCastKind kind,
-                                           ConstraintLocator *locator) {
+AllowUnsupportedRuntimeCheckedCast::attempt(ConstraintSystem &cs, Type fromType,
+                                            Type toType, CheckedCastKind kind,
+                                            ConstraintLocator *locator) {
+  auto fnFromType = fromType->getAs<FunctionType>();
+  auto fnToType = toType->getAs<FunctionType>();
+
+  if (!(fnFromType && fnToType))
+    return nullptr;
+
+  if (runtimeSupportedFunctionTypeCast(fnFromType, fnToType))
+    return nullptr;
+
   return new (cs.getAllocator())
       AllowUnsupportedRuntimeCheckedCast(cs, fromType, toType, kind, locator);
 }
