@@ -2739,7 +2739,11 @@ bool ConformanceChecker::checkActorIsolation(
 
   // If the witness has a global actor but the requirement does not, we have
   // an isolation error.
-  if (witnessGlobalActor && !requirementGlobalActor) {
+  //
+  // However, we allow this case when the requirement was imported, because
+  // it might not have been annotated.
+  if (witnessGlobalActor && !requirementGlobalActor &&
+      !requirement->hasClangNode()) {
     witness->diagnose(
         diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
         witness->getName(), witnessGlobalActor, Proto->getName());
