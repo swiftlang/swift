@@ -83,9 +83,22 @@ extension Array where Element == Struct {
   }
 }
 
+// SR-13866: Dispatch thunks and method descriptor mangling.
+public protocol P: Differentiable {
+  @differentiable(wrt: self)
+  @differentiable(wrt: (self, x))
+  func method(_ x: Float) -> Float
 
-/* FIXME(SR-13866): Enable the following tests once we've fixed TBDGen for dispatch
- * thunks and method descriptors.
+  @differentiable(wrt: self)
+  var property: Float { get set }
+
+  @differentiable(wrt: self)
+  @differentiable(wrt: (self, x))
+  subscript(_ x: Float) -> Float { get set }
+}
+
+/* FIXME(rdar://73791807): Enable the following tests once we've fixed TBDGen
+   for derivative vtable entry thunks.
 public final class Class: Differentiable {
   var stored: Float
 
