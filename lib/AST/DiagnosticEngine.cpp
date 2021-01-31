@@ -1062,18 +1062,21 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
 void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   if (auto info = diagnosticInfoForDiagnostic(diagnostic)) {
     SmallVector<DiagnosticInfo, 1> childInfo;
-    TinyPtrVector<DiagnosticInfo *> childInfoPtrs;
     auto childNotes = diagnostic.getChildNotes();
-    for (unsigned idx = 0; idx < childNotes.size(); ++idx) {
-      if (auto child = diagnosticInfoForDiagnostic(childNotes[idx])) {
-        childInfo.push_back(*child);
-        childInfoPtrs.push_back(&childInfo[idx]);
-      }
+    for (unsigned i : indices(childNotes)) {
+      auto child = diagnosticInfoForDiagnostic(childNotes[i]);
+      assert(child);
+      assert(child->Kind == DiagnosticKind::Note &&
+             "Expected child diagnostics to all be notes?!");
+      childInfo.push_back(*child);
+    }
+    TinyPtrVector<DiagnosticInfo *> childInfoPtrs;
+    for (unsigned i : indices(childInfo)) {
+      childInfoPtrs.push_back(&childInfo[i]);
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
-    
-    SmallVector<std::string, 1> educationalNotePaths;
 
+    SmallVector<std::string, 1> educationalNotePaths;
     auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
     while (associatedNotes && *associatedNotes) {
       SmallString<128> notePath(getDiagnosticDocumentationPath());
