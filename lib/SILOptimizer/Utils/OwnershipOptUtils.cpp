@@ -101,6 +101,238 @@ insertOwnedBaseValueAlongBranchEdge(BranchInst *bi, SILValue innerCopy,
 }
 
 //===----------------------------------------------------------------------===//
+//                          BorrowedLifetimeExtender
+//===----------------------------------------------------------------------===//
+
+/// Model an extended borrow scope, including transitive reborrows. This applies
+/// to "local" borrow scopes (begin_borrow, load_borrow, & phi).
+///
+/// Allow extending the lifetime of an owned value that dominates this borrowed
+/// value across that extended borrow scope. This handles uses of reborrows that
+/// are not dominated by the owned value by generating phis and copying the
+/// borrowed values the reach this borrow scope from non-dominated paths.
+///
+/// This produces somewhat canonical owned phis, although that isn't a
+/// requirement for valid SIL. Given an owned value, a dominated borrowed value,
+/// and a reborrow:
+///
+///     %ownedValue = ...
+///     %borrowedValue = ...
+///     %reborrow = phi(%borrowedValue, %otherBorrowedValue)
+///
+/// %otherBorrowedValue will always be copied even if %ownedValue also dominates
+/// %otherBorrowedValue, as such:
+///
+///     %otherCopy = copy_value %borrowedValue
+///     %newPhi = phi(%ownedValue, %otherCopy)
+///
+/// The immediate effect is to produce an unnecesssary copy, but it avoids
+/// extending %ownedValue's liveness to new paths and hopefully simplifies
+/// downstream optimization and debugging. Unnecessary copies could be
+/// avoided with simple dominance check if it becomes desirable to do so.
+struct BorrowedLifetimeExtender {
+  BorrowedValue borrowedValue;
+
+  // Owned value currently being extended over borrowedValue.
+  SILValue currentOwnedValue;
+
+  InstModCallbacks &callbacks;
+
+  llvm::SmallVector<PhiValue, 4> reborrowedPhis;
+  llvm::SmallDenseMap<PhiValue, PhiValue, 4> reborrowedToOwnedPhis;
+
+  /// Check that all reaching operands are handled. This can be removed once the
+  /// utility and OSSA representation are stable.
+  SWIFT_ASSERT_ONLY_DECL(llvm::SmallDenseSet<PhiOperand, 4> reborrowedOperands);
+
+  /// Initially map the reborrowed phi to an invalid value prior to creating the
+  /// owned phi.
+  void discoverReborrow(PhiValue reborrowedPhi) {
+    if (reborrowedToOwnedPhis.try_emplace(reborrowedPhi, PhiValue()).second) {
+      reborrowedPhis.push_back(reborrowedPhi);
+    }
+  }
+
+  /// Remap the reborrowed phi to an valid owned phi after creating it.
+  void mapOwnedPhi(PhiValue reborrowedPhi, PhiValue ownedPhi) {
+    reborrowedToOwnedPhis[reborrowedPhi] = ownedPhi;
+  }
+
+  /// Get the owned value associated with this reborrowed operand, or return an
+  /// invalid SILValue indicating that the borrowed lifetime does not reach this
+  /// operand.
+  SILValue getExtendedOwnedValue(PhiOperand reborrowedOper) {
+    // If this operand reborrows the original borrow, then the currentOwned phi
+    // reaches it directly.
+    SILValue borrowSource = reborrowedOper.getSource();
+    if (borrowSource == borrowedValue.value)
+      return currentOwnedValue;
+
+    // Check if the borrowed operand's source is already mapped to an owned phi.
+    auto reborrowedAndOwnedPhi = reborrowedToOwnedPhis.find(borrowSource);
+    if (reborrowedAndOwnedPhi != reborrowedToOwnedPhis.end()) {
+      // Return the already-mapped owned phi.
+      assert(reborrowedOperands.erase(reborrowedOper));
+      return reborrowedAndOwnedPhi->second;
+    }
+    // The owned value does not reach this reborrowed operand.
+    assert(
+        !reborrowedOperands.count(reborrowedOper)
+        && "reachable borrowed phi operand must be mapped to an owned value");
+    return SILValue();
+  }
+
+public:
+  /// Precondition: \p borrowedValue must introduce a local borrow scope
+  /// (begin_borrow, load_borrow, & phi).
+  BorrowedLifetimeExtender(BorrowedValue borrowedValue,
+                           InstModCallbacks &callbacks)
+      : borrowedValue(borrowedValue), callbacks(callbacks) {
+    assert(borrowedValue.isLocalScope() && "expect a valid borrowed value");
+  }
+
+  /// Extend \p ownedValue over this extended borrow scope.
+  ///
+  /// Precondition: \p ownedValue dominates this borrowed value.
+  void extendOverBorrowScopeAndConsume(SILValue ownedValue);
+
+protected:
+  void analyzeExtendedScope();
+
+  SILValue createCopyAtEdge(PhiOperand reborrowOper);
+
+  void destroyAtScopeEnd(SILValue ownedValue, BorrowedValue pairedBorrow);
+};
+
+// Gather all transitive phi-reborrows and check that all the borrowed uses can
+// be found with no escapes.
+//
+// Calls discoverReborrow to populate reborrowedPhis.
+void BorrowedLifetimeExtender::analyzeExtendedScope() {
+  auto visitReborrow = [&](Operand *endScope) {
+    if (auto borrowingOper = BorrowingOperand(endScope)) {
+      assert(borrowingOper.isReborrow());
+
+      SWIFT_ASSERT_ONLY(reborrowedOperands.insert(endScope));
+
+      // TODO: if non-phi reborrows are added, handle multiple results.
+      discoverReborrow(borrowingOper.getBorrowIntroducingUserResult().value);
+    }
+    return true;
+  };
+
+  bool result = borrowedValue.visitLocalScopeEndingUses(visitReborrow);
+  assert(result && "visitReborrow always succeeds, escapes are irrelevant");
+
+  // Note: Iterate in the same manner as findExtendedTransitiveGuaranteedUses(),
+  // but using BorrowedLifetimeExtender's own reborrowedPhis.
+  for (unsigned idx = 0; idx < reborrowedPhis.size(); ++idx) {
+    auto borrowedValue = BorrowedValue(reborrowedPhis[idx]);
+    result = borrowedValue.visitLocalScopeEndingUses(visitReborrow);
+    assert(result && "visitReborrow always succeeds, escapes are irrelevant");
+  }
+}
+
+// Insert a copy on this edge. This might not be necessary if the owned
+// value dominates this path, but this avoids forcing the owned value to be
+// live across new paths.
+//
+// TODO: consider copying the base of the borrowed value instead of the
+// borrowed value directly. It's likely that the copy is used outside of the
+// borrow scope, in which case, canonicalizeOSSA will create a copy outside
+// the borrow scope anyway. However, we can't be sure that the base is the
+// same type.
+//
+// TODO: consider reusing copies that dominate multiple reborrowed
+// operands. Howeer, this requires copying in an earlier block and inserting
+// post-dominating destroys, which may be better handled in an ownership phi
+// canonicalization pass.
+SILValue BorrowedLifetimeExtender::createCopyAtEdge(PhiOperand reborrowOper) {
+  auto *branch = reborrowOper.getBranch();
+  auto loc = RegularLocation::getAutoGeneratedLocation(branch->getLoc());
+  auto *copy = SILBuilderWithScope(branch).createCopyValue(
+      loc, reborrowOper.getSource());
+  callbacks.createdNewInst(copy);
+  return copy;
+}
+
+// Destroy \p ownedValue at \p pairedBorrow's scope-ending uses, excluding
+// reborrows.
+//
+// Precondition: ownedValue takes ownership of its value at the same point as
+// pairedBorrow. e.g. an owned and guaranteed pair of phis.
+void BorrowedLifetimeExtender::destroyAtScopeEnd(SILValue ownedValue,
+                                                 BorrowedValue pairedBorrow) {
+  pairedBorrow.visitLocalScopeEndingUses([&](Operand *scopeEnd) {
+    if (scopeEnd->getOperandOwnership() == OperandOwnership::Reborrow)
+      return true;
+
+    auto *endInst = scopeEnd->getUser();
+    assert(!isa<TermInst>(endInst) && "branch must be a reborrow");
+    auto *destroyPt = &*std::next(endInst->getIterator());
+    auto *destroy = SILBuilderWithScope(destroyPt).createDestroyValue(
+        destroyPt->getLoc(), ownedValue);
+    callbacks.createdNewInst(destroy);
+    return true;
+  });
+}
+
+// Insert and map an owned phi for each reborrowed phi.
+//
+// For each reborrowed phi, insert a copy on each edge that does not originate
+// from the extended borrowedValue.
+//
+// TODO: If non-phi reborrows are added, they would also need to be
+// mapped to their owned counterpart. This means generating new owned
+// struct/destructure instructions.
+void BorrowedLifetimeExtender::
+extendOverBorrowScopeAndConsume(SILValue ownedValue) {
+  currentOwnedValue = ownedValue;
+
+  // Populate the reborrowedPhis vector.
+  analyzeExtendedScope();
+
+  InstructionDeleter deleter(callbacks);
+
+  // Generate and map the phis with undef operands first, in case of recursion.
+  auto undef = SILUndef::get(ownedValue->getType(), *ownedValue->getFunction());
+  for (PhiValue reborrowedPhi : reborrowedPhis) {
+    auto *phiBlock = reborrowedPhi.phiBlock;
+    auto *ownedPhi = phiBlock->createPhiArgument(ownedValue->getType(),
+                                                 OwnershipKind::Owned);
+    for (auto *predBlock : phiBlock->getPredecessorBlocks()) {
+      TermInst *ti = predBlock->getTerminator();
+      addNewEdgeValueToBranch(ti, phiBlock, undef, deleter);
+    }
+    mapOwnedPhi(reborrowedPhi, PhiValue(ownedPhi));
+  }
+  // Generate copies and set the phi operands.
+  for (PhiValue reborrowedPhi : reborrowedPhis) {
+    PhiValue ownedPhi = reborrowedToOwnedPhis[reborrowedPhi];
+    reborrowedPhi.getValue()->visitIncomingPhiOperands(
+        // For each reborrowed operand, get the owned value for that edge,
+        // and set the owned phi's operand.
+        [&](Operand *reborrowedOper) {
+          SILValue ownedVal = getExtendedOwnedValue(reborrowedOper);
+          if (!ownedVal) {
+            ownedVal = createCopyAtEdge(reborrowedOper);
+          }
+          BranchInst *branch = PhiOperand(reborrowedOper).getBranch();
+          branch->getOperandRef(ownedPhi.argIndex).set(ownedVal);
+          return true;
+        });
+  }
+  assert(reborrowedOperands.empty() && "not all phi operands are handled");
+
+  // Create destroys at the last uses.
+  destroyAtScopeEnd(ownedValue, borrowedValue);
+  for (PhiValue reborrowedPhi : reborrowedPhis) {
+    PhiValue ownedPhi = reborrowedToOwnedPhis[reborrowedPhi];
+    destroyAtScopeEnd(ownedPhi, BorrowedValue(reborrowedPhi));
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                      Ownership RAUW Helper Functions
 //===----------------------------------------------------------------------===//
 
