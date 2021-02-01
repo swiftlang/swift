@@ -378,8 +378,6 @@ public:
   }
 
   void visitDistributedActorIndependentAttr(DistributedActorIndependentAttr *attr) {
-    auto dc = D->getDeclContext();
-
     /// user-inaccessible _distributedActorIndependent can only be applied to let properties
     if (auto var = dyn_cast<VarDecl>(D)) {
       if (!var->isLet()) {

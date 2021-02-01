@@ -2425,20 +2425,6 @@ void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
     return;
   }
 
-  auto &C = decl->getASTContext();
-
-  // TODO: we don't really care if zero params, as long as the init(transport:) is called
-//  if (argumentNames.size() == 0) {
-//    ctor->diagnose(diag::distributed_actor_parameterless_init, ctor->getName())
-//      .fixItInsertAfter(ctor->getStartLoc(), "transport: ActorTransport");
-////        // TODO: can we use types instead of hardcoded strings here?
-////        .fixItInsertAfter(decl->getStartLoc(), "%0: %1", {
-////            C.Id_transport.str(),
-////            transportType.getName()
-////        })
-//    return;
-//  }
-
   if (ctor->isDistributedActorLocalInit()) {
     // it is not legal to manually define init(transport:)
     // TODO: we want to lift this restriction but it is tricky
@@ -2511,24 +2497,32 @@ void swift::checkActorConstructorBody(ClassDecl *classDecl,
 
   // we're dealing with a convenience constructor,
   // which are required to eventually delegate to init(transport:)
-  if (auto fn = initKindAndExpr.initExpr->getFn()) {
-    // TODO: recursively keep checking; there could be a few convenience inits
+  auto fn = initKindAndExpr.initExpr->getFn();
+  bool delegatedToLocalInit = false;
+  while (fn && !delegatedToLocalInit) {
     if (auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       auto otherCtorDecl = otherCtorRef->getDecl();
-
-      fprintf(stderr, "[%s:%d] >> (%s) %s\n", __FILE__, __LINE__, __FUNCTION__,
-              "delegated to:");
-      otherCtorDecl->dump();
-
-      if (!otherCtorDecl->isDistributedActorLocalInit()) {
-        ctor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
-                       ctor->getName())
-            .fixItInsert(ctor->getStartLoc(), "self.init(transport: transport)"); // FIXME: how to get better position?
+      if (otherCtorDecl->isDistributedActorLocalInit()) {
+        delegatedToLocalInit = true;
+      } else {
+        // it delegated to some other constructor; it may still have a chance
+        // to get it right and eventually delegate to init(transport:),
+        // so we keep searching.
+        initKindAndExpr = otherCtorDecl->getDelegatingOrChainedInitKind();
+        fn = initKindAndExpr.initExpr ?
+          initKindAndExpr.initExpr->getFn() : nullptr;
       }
-
-      // great, seems we delegated to the local init properly.
-      return;
+    } else {
+      // break out of the loop, seems the constructor didn't delegate to anything next
+      fn = nullptr;
     }
+  }
+
+  //
+  if (!delegatedToLocalInit) {
+    ctor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
+                   ctor->getName())
+        .fixItInsert(ctor->getStartLoc(), "self.init(transport: transport)"); // FIXME: how to get better position?
   }
 }
 

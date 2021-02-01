@@ -48,24 +48,33 @@ distributed actor class Bad3 {
   }
 }
 
-//// TODO: we need to handle multiple initializers as well
-//distributed actor class BadMulti4 {
-//  let x: Int
-//  let y: Int
-//
-//  // @derived init(transport:)
-//
-//  convenience init(y: Int, transport: ActorTransport) { // ok
-//    self.y = y
-//    self.init(transport: transport)
-//  }
-//
-//  convenience init(x: Int, y: Int, transport: ActorTransport) {
-//    // ok, since we do delegate to init(transport) *eventually*
-//    self.x = x
-//    self.init(y: y, transport: transport)
-//  }
-//}
+distributed actor class OKMulti {
+  // @derived init(transport:)
+
+  convenience init(y: Int, transport: ActorTransport) { // ok
+    self.init(transport: transport)
+  }
+
+  convenience init(x: Int, y: Int, transport: ActorTransport) {
+    // ok, since we do delegate to init(transport) *eventually*
+    self.init(y: y, transport: transport)
+  }
+}
+
+distributed actor class BadMulti {
+  // @derived init(transport:)
+
+  convenience init(y: Int, transport: ActorTransport) {
+    // expected-error@-1 {{'distributed actor' initializer 'init(y:transport:)' must (directly or indirectly) delegate to 'self.init(transport:)'}}
+    // self.init(transport: transport) // forgot to delegate to local init!
+  }
+
+  convenience init(x: Int, y: Int, transport: ActorTransport) {
+    // expected-error@-1 {{'distributed actor' initializer 'init(x:y:transport:)' must (directly or indirectly) delegate to 'self.init(transport:)'}}
+    // ok, since we do delegate to init(transport) *eventually*
+    self.init(y: y, transport: transport)
+  }
+}
 
 distributed actor class BadRedeclare1 { // expected-error {{type 'BadRedeclare1' does not conform to protocol 'DistributedActor'}}
   convenience init(transport: ActorTransport) {}

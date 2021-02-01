@@ -4442,7 +4442,8 @@ ERROR(distributed_actor_init_user_defined_must_be_convenience,none,
       "'init(transport:)' local initializer, which other initializers must delegate to",
       (DeclName))
 ERROR(distributed_actor_init_must_delegate_to_local_init,none,
-      "'distributed actor' initializer %0 must delegate to 'self.init(transport:)'",
+      "'distributed actor' initializer %0 must (directly or indirectly) delegate "
+      "to 'self.init(transport:)'",
       (DeclName))
 ERROR(distributed_actor_local_var,none,
       "'distributed' can not be applied to local variables",
