@@ -12,4 +12,14 @@ struct HasDeletedOperator {
   void operator!=(HasDeletedOperator) const = delete;
 };
 
+struct AddressOnlyIntWrapper {
+  int value;
+  AddressOnlyIntWrapper(int value) : value(value) {}
+  AddressOnlyIntWrapper(AddressOnlyIntWrapper const &other)
+      : value(other.value) {}
+  AddressOnlyIntWrapper operator-(AddressOnlyIntWrapper rhs) {
+    return AddressOnlyIntWrapper(value - rhs.value);
+  }
+};
+
 #endif
