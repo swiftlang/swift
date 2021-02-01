@@ -1,5 +1,7 @@
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 func globalFuncAsync() async {}
 func globalFuncAsyncThrows() async throws {}
 func globalFuncAsyncRethrows(_ x: () async throws -> ()) async rethrows {}
