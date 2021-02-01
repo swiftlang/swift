@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 591; // @concurrent function type
+const uint16_t SWIFTMODULE_VERSION_MINOR = 593; // foreign async convention
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1071,6 +1071,7 @@ namespace decls_block {
 
   using SILFunctionTypeLayout = BCRecordLayout<
     SIL_FUNCTION_TYPE,
+    BCFixed<1>,                         // concurrent?
     BCFixed<1>,                         // async?
     SILCoroutineKindField, // coroutine kind
     ParameterConventionField, // callee convention
@@ -1764,6 +1765,13 @@ namespace decls_block {
     BCVBR<4>,                         // error parameter index
     TypeIDField,                      // error parameter type
     TypeIDField                       // result type
+  >;
+
+  using ForeignAsyncConventionLayout = BCRecordLayout<
+    FOREIGN_ASYNC_CONVENTION,
+    TypeIDField, // completion handler type
+    BCVBR<4>,    // completion handler parameter index
+    BCVBR<4>     // completion handler error parameter index (+1)
   >;
 
   using AbstractClosureExprLayout = BCRecordLayout<

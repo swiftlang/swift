@@ -53,3 +53,43 @@ func closures() {
   acceptsConcurrent(closure1) // expected-error{{converting non-concurrent function value to '@concurrent (Int) -> Int' may introduce data races}}
 }
 
+// Mutation of captured locals from within @concurrent functions.
+extension Int {
+  mutating func makeNegative() {
+    self = -self
+  }
+
+  func printMe() {
+    print(self)
+  }
+}
+
+func mutationOfLocal() {
+  var localInt = 17
+  acceptsConcurrent { i in
+    // Non-mutating accesses are okay
+    print(localInt + 17)
+    localInt.printMe()
+
+    // Mutations of locally-defined variables are fine.
+    var localResult = localInt + 1
+    print(localResult)
+
+    _ = {
+      localResult = localResult + 1
+    }()
+
+    // Mutations of captured variables executing concurrently are bad.
+    localInt = 17 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt += 1 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+    localInt.makeNegative() // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+
+    _ = {
+      localInt = localInt + 12 // expected-error{{mutation of captured var 'localInt' in concurrently-executing code}}
+    }()
+
+    return i + localInt
+  }
+
+  localInt = 20
+}

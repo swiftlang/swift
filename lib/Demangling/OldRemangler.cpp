@@ -744,7 +744,7 @@ void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
 }
 
-void Remangler::mangleAutoDiffFunction(Node *node) {
+void Remangler::mangleAutoDiffFunction(Node *node, EntityContext &ctx) {
   Buffer << "<autodiff-function>";
 }
 
@@ -1271,6 +1271,8 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Buffer << "A";
   } else if (text == "@yield_many") {
     Buffer << "G";
+  } else if (text == "@concurrent") {
+    Buffer << "h";
   } else if (text == "@async") {
     Buffer << "H";
   } else {

@@ -281,8 +281,11 @@ extension Task {
 
 }
 
-public func _runAsyncHandler(operation: @concurrent @escaping () async -> ()) {
-  _ = Task.runDetached(operation: operation)
+public func _runAsyncHandler(operation: @escaping () async -> ()) {
+  typealias ConcurrentFunctionType = @concurrent () async -> ()
+  _ = Task.runDetached(
+    operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)
+  )
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------

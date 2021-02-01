@@ -79,8 +79,7 @@ static Optional<SILLocation>
 prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
                               SILBasicBlock *epilogBB,
                               SmallVectorImpl<SILValue> &directResults) {
-  SILLocation implicitReturnFromTopLevel =
-      ImplicitReturnLocation::getImplicitReturnLoc(topLevel);
+  ImplicitReturnLocation implicitReturnFromTopLevel(topLevel);
 
   // If the current BB we are inserting into isn't terminated, and we require a
   // return, then we
@@ -160,7 +159,7 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
   // epilog logic is simplified.)
   //
   // Otherwise make the ret instruction part of the cleanups.
-  auto cleanupLoc = CleanupLocation::get(topLevel);
+  auto cleanupLoc = CleanupLocation(topLevel);
   return cleanupLoc;
 }
 
@@ -184,7 +183,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
                                         ReturnDest.getDepth()) &&
          "emitting epilog in wrong scope");
 
-  auto cleanupLoc = CleanupLocation::get(topLevel);
+  auto cleanupLoc = CleanupLocation(topLevel);
   Cleanups.emitCleanupsForReturn(cleanupLoc, NotForUnwind);
 
   // Build the return value.  We don't do this if there are no direct
@@ -222,7 +221,7 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
 
     // Return () if no return value was given.
     if (!returnValue)
-      returnValue = emitEmptyTuple(CleanupLocation::get(TopLevel));
+      returnValue = emitEmptyTuple(CleanupLocation(TopLevel));
 
     B.createReturn(returnLoc, returnValue);
   }

@@ -199,6 +199,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-single-threaded-runtime          "0"               "whether to build stdlib as a single-threaded runtime only"
     swift-stdlib-os-versioning                    "1"               "whether to build stdlib with availability based on OS versions (Darwin only)"
     swift-stdlib-stable-abi                       ""                "should stdlib be built with stable ABI, if not set defaults to true on Darwin, false otherwise"
+    swift-disable-dead-stripping                  "0"               "turns off Darwin-specific dead stripping for Swift host tools"
 
     ## FREESTANDING Stdlib Options
     swift-freestanding-sdk                      ""                "which SDK to use when building the FREESTANDING stdlib"
@@ -243,12 +244,16 @@ components=(
   xctest
 )
 for component in ${components[@]} ; do
+  component_skip_test_default=""
+  if [[ "${component}" == "cmark" ]]; then
+    component_skip_test_default="1"
+  fi
   KNOWN_SETTINGS+=(
-    ${component}-build-type                       "Debug"           "the build variant for ${component}"
-    ${component}-cmake-options                    ""                "CMake options used for ${component}"
-    skip-build-${component}                       ""                "set to skip building ${component}"
-    skip-test-${component}                        ""                "set to skip testing ${component}"
-    install-${component}                          ""                "whether to install ${component}"
+    ${component}-build-type                       "Debug"                              "the build variant for ${component}"
+    ${component}-cmake-options                    ""                                   "CMake options used for ${component}"
+    skip-build-${component}                       ""                                   "set to skip building ${component}"
+    skip-test-${component}                        "${component_skip_test_default}"     "set to skip testing ${component}"
+    install-${component}                          ""                                   "whether to install ${component}"
   )
 done
 

@@ -380,8 +380,8 @@ function(_add_host_variant_link_flags target)
   #
   # TODO: Evaluate/enable -f{function,data}-sections --gc-sections for bfd,
   # gold, and lld.
-  if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
-    if(CMAKE_SYSTEM_NAME MATCHES Darwin)
+  if(NOT CMAKE_BUILD_TYPE STREQUAL Debug AND CMAKE_SYSTEM_NAME MATCHES Darwin)
+    if (NOT SWIFT_DISABLE_DEAD_STRIPPING)
       # See rdar://48283130: This gives 6MB+ size reductions for swift and
       # SourceKitService, and much larger size reductions for sil-opt etc.
       target_link_options(${target} PRIVATE
@@ -435,15 +435,15 @@ function(add_swift_host_library name)
   endif()
 
   if(XCODE)
-    string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
-    list(GET split_path -1 dir)
+    get_filename_component(base_dir ${CMAKE_CURRENT_SOURCE_DIR} NAME)
   
     file(GLOB_RECURSE ASHL_HEADERS
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
+      ${SWIFT_SOURCE_DIR}/include/swift/${base_dir}/*.h
+      ${SWIFT_SOURCE_DIR}/include/swift/${base_dir}/*.def
+      ${CMAKE_CURRENT_SOURCE_DIR}/*.h
       ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
     file(GLOB_RECURSE ASHL_TDS
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
+      ${SWIFT_SOURCE_DIR}/include/swift${base_dir}/*.td)
 
     set_source_files_properties(${ASHL_HEADERS} ${ASHL_TDS} PROPERTIES
       HEADER_FILE_ONLY true)

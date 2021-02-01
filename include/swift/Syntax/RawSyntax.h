@@ -126,78 +126,6 @@ template <typename CursorType> constexpr CursorIndex cursorIndex(CursorType C) {
   return static_cast<CursorIndex>(C);
 }
 
-/// An absolute position in a source file as text - the absolute offset from
-/// the start, line, and column.
-class AbsolutePosition {
-  uintptr_t Offset = 0;
-  uint32_t Line = 1;
-  uint32_t Column = 1;
-
-public:
-  /// Add some number of columns to the position.
-  void addColumns(uint32_t Columns) {
-    Column += Columns;
-    Offset += Columns;
-  }
-
-  /// Add some number of newlines to the position, resetting the column.
-  /// Size is byte size of newline char.
-  /// '\n' and '\r' are 1, '\r\n' is 2.
-  void addNewlines(uint32_t NewLines, uint32_t Size) {
-    Line += NewLines;
-    Column = 1;
-    Offset += NewLines * Size;
-  }
-  
-  /// Use some text as a reference for adding to the absolute position,
-  /// taking note of newlines, etc.
-  void addText(StringRef Str) {
-    const char * C = Str.begin();
-    while (C != Str.end()) {
-      switch (*C++) {
-      case '\n':
-        addNewlines(1, 1);
-        break;
-      case '\r':
-        if (C != Str.end() && *C == '\n') {
-          addNewlines(1, 2);
-          ++C;
-        } else {
-          addNewlines(1, 1);
-        }
-        break;
-      default:
-        addColumns(1);
-        break;
-      }
-    }
-  }
-
-  /// Get the line number of this position.
-  uint32_t getLine() const { return Line; }
-
-  /// Get the column number of this position.
-  uint32_t getColumn() const { return Column; }
-
-  /// Get the line and column number of this position.
-  std::pair<uint32_t, uint32_t> getLineAndColumn() const {
-    return {Line, Column};
-  }
-
-  /// Get the absolute offset of this position, suitable for indexing into a
-  /// buffer if applicable.
-  uintptr_t getOffset() const { return Offset; }
-
-  /// Print the line and column as "l:c" to the given output stream.
-  void printLineAndColumn(llvm::raw_ostream &OS) const;
-
-  /// Dump a description of this position to the given output stream
-  /// for debugging.
-  void dump(llvm::raw_ostream &OS) const;
-
-  SWIFT_DEBUG_DUMP;
-};
-
 /// An indicator of whether a Syntax node was found or written in the source.
 ///
 /// This is not an 'implicit' bit.
@@ -239,33 +167,35 @@ class RawSyntax final
   RC<SyntaxArena> Arena;
 
   union {
-    uint64_t OpaqueBits;
     struct {
-      /// The kind of syntax this node represents.
-      unsigned Kind : bitmax(NumSyntaxKindBits, 8);
+      // FIXME: Reduce TextLength to 30 bits so that common fits in 4 bytes?
+      /// Number of bytes this node takes up spelled out in the source code
+      unsigned TextLength : 32;
       /// Whether this piece of syntax was actually present in the source.
       unsigned Presence : 1;
+      unsigned IsToken : 1;
     } Common;
-    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 };
+    enum { NumRawSyntaxBits = 32 + 1 + 1 };
 
     // For "layout" nodes.
     struct {
-      static_assert(NumRawSyntaxBits <= 32,
-                    "Only 32 bits reserved for standard syntax bits");
-      uint64_t : bitmax(NumRawSyntaxBits, 32); // align to 32 bits
+      static_assert(NumRawSyntaxBits <= 64,
+                    "Only 64 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 64); // align to 32 bits
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
-      /// Number of bytes this node takes up spelled out in the source code
-      /// A value of UINT32_MAX indicates that the text length has not been
-      /// computed yet.
-      unsigned TextLength : 32;
+      /// Total number of sub nodes, i.e. number of transitive children of this
+      /// node. This does not include the node itself.
+      unsigned TotalSubNodeCount : 32;
+      /// The kind of syntax this node represents.
+      unsigned Kind : bitmax(NumSyntaxKindBits, 8);
     } Layout;
 
     // For "token" nodes.
     struct {
-      static_assert(NumRawSyntaxBits <= 16,
-                    "Only 16 bits reserved for standard syntax bits");
-      uint64_t : bitmax(NumRawSyntaxBits, 16); // align to 16 bits
+      static_assert(NumRawSyntaxBits <= 64,
+                    "Only 64 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 64); // align to 16 bits
       /// The kind of token this "token" node represents.
       unsigned TokenKind : 16;
       /// Number of leading  trivia pieces.
@@ -293,7 +223,7 @@ class RawSyntax final
   /// underlying storage.
   /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
   /// the caller needs to assure that the node ID has not been used yet.
-  RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+  RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout, size_t TextLength,
             SourcePresence Presence, const RC<SyntaxArena> &Arena,
             llvm::Optional<SyntaxNodeId> NodeId);
   /// Constructor for creating token nodes
@@ -301,7 +231,8 @@ class RawSyntax final
   /// underlying storage.
   /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
   /// the caller needs to assure that the NodeId has not been used yet.
-  RawSyntax(tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
+  RawSyntax(tok TokKind, OwnedString Text, size_t TextLength,
+            ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
             const RC<SyntaxArena> &Arena, llvm::Optional<SyntaxNodeId> NodeId);
 
@@ -348,47 +279,93 @@ public:
 
   /// Make a raw "layout" syntax node.
   static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                            SourcePresence Presence,
+                            size_t TextLength, SourcePresence Presence,
+                            const RC<SyntaxArena> &Arena,
+                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
+
+  static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                            size_t TextLength, SourcePresence Presence,
                             llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
-    RC<SyntaxArena> Arena = nullptr;
-    return make(Kind, Layout, Presence, Arena, NodeId);
+    return make(Kind, Layout, TextLength, Presence, /*Arena=*/nullptr, NodeId);
   }
 
-  /// Make a raw "layout" syntax node that was allocated in \p Arena.
-  static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+  static RC<RawSyntax>
+  makeAndCalcLength(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                    SourcePresence Presence, const RC<SyntaxArena> &Arena,
+                    llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+    size_t TextLength = 0;
+    for (auto Child : Layout) {
+      if (Child) {
+        TextLength += Child->getTextLength();
+      }
+    }
+    return make(Kind, Layout, TextLength, Presence, Arena, NodeId);
+  }
+
+  static RC<RawSyntax>
+  makeAndCalcLength(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
+                    SourcePresence Presence,
+                    llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+    return makeAndCalcLength(Kind, Layout, Presence, /*Arena=*/nullptr, NodeId);
+  }
+
+  /// Make a raw "token" syntax node.
+  static RC<RawSyntax> make(tok TokKind, OwnedString Text, size_t TextLength,
+                            ArrayRef<TriviaPiece> LeadingTrivia,
+                            ArrayRef<TriviaPiece> TrailingTrivia,
                             SourcePresence Presence,
                             const RC<SyntaxArena> &Arena,
                             llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
-  /// Make a raw "token" syntax node.
-  static RC<RawSyntax> make(tok TokKind, OwnedString Text,
+  static RC<RawSyntax> make(tok TokKind, OwnedString Text, size_t TextLength,
                             ArrayRef<TriviaPiece> LeadingTrivia,
                             ArrayRef<TriviaPiece> TrailingTrivia,
                             SourcePresence Presence,
                             llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
-    RC<SyntaxArena> Arena = nullptr;
-    return make(TokKind, Text, LeadingTrivia, TrailingTrivia, Presence, Arena,
-                NodeId);
+    return make(TokKind, Text, TextLength, LeadingTrivia, TrailingTrivia,
+                Presence, /*Arena=*/nullptr, NodeId);
   }
 
   /// Make a raw "token" syntax node that was allocated in \p Arena.
-  static RC<RawSyntax> make(tok TokKind, OwnedString Text,
-                            ArrayRef<TriviaPiece> LeadingTrivia,
-                            ArrayRef<TriviaPiece> TrailingTrivia,
-                            SourcePresence Presence,
-                            const RC<SyntaxArena> &Arena,
-                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
+  static RC<RawSyntax>
+  makeAndCalcLength(tok TokKind, OwnedString Text,
+                    ArrayRef<TriviaPiece> LeadingTrivia,
+                    ArrayRef<TriviaPiece> TrailingTrivia,
+                    SourcePresence Presence, const RC<SyntaxArena> &Arena,
+                    llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+    size_t TextLength = 0;
+    if (Presence != SourcePresence::Missing) {
+      for (auto Trivia : LeadingTrivia) {
+        TextLength += Trivia.getTextLength();
+      }
+      TextLength += Text.size();
+      for (auto Trivia : TrailingTrivia) {
+        TextLength += Trivia.getTextLength();
+      }
+    }
+    return make(TokKind, Text, TextLength, LeadingTrivia, TrailingTrivia,
+                Presence, Arena, NodeId);
+  }
+
+  static RC<RawSyntax> makeAndCalcLength(
+      tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
+      ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
+      llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+    return makeAndCalcLength(TokKind, Text, LeadingTrivia, TrailingTrivia,
+                             Presence, /*Arena=*/nullptr, NodeId);
+  }
 
   /// Make a missing raw "layout" syntax node.
   static RC<RawSyntax> missing(SyntaxKind Kind,
                                RC<SyntaxArena> Arena = nullptr) {
-    return make(Kind, {}, SourcePresence::Missing, Arena);
+    return make(Kind, {}, /*TextLength=*/0, SourcePresence::Missing, Arena);
   }
 
   /// Make a missing raw "token" syntax node.
   static RC<RawSyntax> missing(tok TokKind, OwnedString Text,
                                RC<SyntaxArena> Arena = nullptr) {
-    return make(TokKind, Text, {}, {}, SourcePresence::Missing, Arena);
+    return make(TokKind, Text, /*TextLength=*/0, {}, {},
+                SourcePresence::Missing, Arena);
   }
 
   /// @}
@@ -398,7 +375,25 @@ public:
   }
 
   SyntaxKind getKind() const {
-    return static_cast<SyntaxKind>(Bits.Common.Kind);
+    if (Bits.Common.IsToken) {
+      return SyntaxKind::Token;
+    } else {
+      return static_cast<SyntaxKind>(Bits.Layout.Kind);
+    }
+  }
+
+  /// Get the number of nodes included in the subtree spanned by this node.
+  /// This includes all transitive children and this node itself.
+  size_t getTotalNodes() { return getTotalSubNodeCount() + 1; }
+
+  /// Get the number of transitive children of this node. This does not include
+  /// the node itself.
+  size_t getTotalSubNodeCount() {
+    if (isToken()) {
+      return 0;
+    } else {
+      return Bits.Layout.TotalSubNodeCount;
+    }
   }
 
   /// Get an ID for this node that is stable across incremental parses
@@ -430,7 +425,7 @@ public:
   bool isUnknown() const { return isUnknownKind(getKind()); }
 
   /// Return true if this raw syntax node is a token.
-  bool isToken() const { return isTokenKind(getKind()); }
+  bool isToken() const { return Bits.Common.IsToken; }
 
   /// \name Getter routines for SyntaxKind::Token.
   /// @{
@@ -476,8 +471,9 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withLeadingTrivia(ArrayRef<TriviaPiece> NewLeadingTrivia) const {
-    return make(getTokenKind(), getOwnedTokenText(), NewLeadingTrivia,
-                getTrailingTrivia(), getPresence());
+    return makeAndCalcLength(getTokenKind(), getOwnedTokenText(),
+                             NewLeadingTrivia, getTrailingTrivia(),
+                             getPresence());
   }
 
   RC<RawSyntax> withLeadingTrivia(Trivia NewLeadingTrivia) const {
@@ -488,8 +484,9 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withTrailingTrivia(ArrayRef<TriviaPiece> NewTrailingTrivia) const {
-    return make(getTokenKind(), getOwnedTokenText(), getLeadingTrivia(),
-                NewTrailingTrivia, getPresence());
+    return makeAndCalcLength(getTokenKind(), getOwnedTokenText(),
+                             getLeadingTrivia(), NewTrailingTrivia,
+                             getPresence());
   }
 
   RC<RawSyntax> withTrailingTrivia(Trivia NewTrailingTrivia) const {
@@ -521,23 +518,7 @@ public:
   }
 
   /// Return the number of bytes this node takes when spelled out in the source
-  size_t getTextLength() {
-    // For tokens the computation of the length is fast enough to justify the
-    // space for caching it. For layout nodes, we cache the length to avoid
-    // traversing the tree
-
-    // FIXME: Or would it be sensible to cache the size of token nodes as well?
-    if (isToken()) {
-      AbsolutePosition Pos;
-      accumulateAbsolutePosition(Pos);
-      return Pos.getOffset();
-    } else {
-      if (Bits.Layout.TextLength == UINT32_MAX) {
-        Bits.Layout.TextLength = computeTextLength();
-      }
-      return Bits.Layout.TextLength;
-    }
-  }
+  size_t getTextLength() { return Bits.Common.TextLength; }
 
   /// @}
 
@@ -550,22 +531,26 @@ public:
 
   /// Return a new raw syntax node with the given new layout element replacing
   /// another at some cursor position.
-  RC<RawSyntax>
-  replaceChild(CursorIndex Index, RC<RawSyntax> NewLayoutElement) const;
+  RC<RawSyntax> replacingChild(CursorIndex Index,
+                               RC<RawSyntax> NewLayoutElement) const;
 
   /// @}
 
-  /// Advance the provided AbsolutePosition by the full width of this node.
-  ///
-  /// If this is token node, returns the AbsolutePosition of the start of the
-  /// token's nontrivial text. Otherwise, return the position of the first
-  /// token. If this contains no tokens, return None.
-  llvm::Optional<AbsolutePosition>
-  accumulateAbsolutePosition(AbsolutePosition &Pos) const;
+  size_t getLeadingTriviaLength() {
+    size_t Length = 0;
+    for (auto Trivia : getLeadingTrivia()) {
+      Length += Trivia.getTextLength();
+    }
+    return Length;
+  }
 
-  /// Advance the provided AbsolutePosition by the first trivia of this node.
-  /// Return true if we found this trivia; otherwise false.
-  bool accumulateLeadingTrivia(AbsolutePosition &Pos) const;
+  size_t getTrailingTriviaLength() {
+    size_t Length = 0;
+    for (auto Trivia : getTrailingTrivia()) {
+      Length += Trivia.getTextLength();
+    }
+    return Length;
+  }
 
   /// Print this piece of syntax recursively.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const;
@@ -584,8 +569,5 @@ public:
 } // end namespace syntax
 } // end namespace swift
 
-namespace llvm {
-raw_ostream &operator<<(raw_ostream &OS, swift::syntax::AbsolutePosition Pos);
-} // end namespace llvm
 
 #endif // SWIFT_SYNTAX_RAWSYNTAX_H

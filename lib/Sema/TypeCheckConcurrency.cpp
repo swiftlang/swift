@@ -697,6 +697,12 @@ namespace {
 
     ConcurrentExecutionChecker concurrentExecutionChecker;
 
+    using MutableVarParent = llvm::PointerUnion<InOutExpr *, LoadExpr *>;
+
+    /// Mapping from mutable local variables to the parent expression, when
+    /// that parent is either a load or a inout expression.
+    llvm::SmallDenseMap<DeclRefExpr *, MutableVarParent, 4> mutableLocalVarParent;
+
     const DeclContext *getDeclContext() const {
       return contextStack.back();
     }
@@ -707,6 +713,33 @@ namespace {
       const DeclContext *useContext, const DeclContext *defContext) {
       return concurrentExecutionChecker.mayExecuteConcurrentlyWith(
           useContext, defContext);
+    }
+
+    /// If the subexpression is a reference to a mutable local variable from a
+    /// different context, record its parent. We'll query this as part of
+    /// capture semantics in concurrent functions.
+    void recordMutableVarParent(MutableVarParent parent, Expr *subExpr) {
+      auto declRef = dyn_cast<DeclRefExpr>(subExpr);
+      if (!declRef)
+        return;
+
+      auto var = dyn_cast_or_null<VarDecl>(declRef->getDecl());
+      if (!var)
+        return;
+
+      // Only mutable variables matter.
+      if (!var->supportsMutation())
+        return;
+
+      // Only mutable variables outside of the current context. This is an
+      // optimization, because the parent map won't be queried in this case, and
+      // it is the most common case for variables to be referenced in their
+      // own context.
+      if (var->getDeclContext() == getDeclContext())
+        return;
+
+      assert(mutableLocalVarParent[declRef].isNull());
+      mutableLocalVarParent[declRef] = parent;
     }
 
   public:
@@ -777,6 +810,12 @@ namespace {
       if (auto inout = dyn_cast<InOutExpr>(expr)) {
         if (!applyStack.empty())
           diagnoseInOutArg(applyStack.back(), inout, false);
+
+        recordMutableVarParent(inout, inout->getSubExpr());
+      }
+
+      if (auto load = dyn_cast<LoadExpr>(expr)) {
+        recordMutableVarParent(load, load->getSubExpr());
       }
 
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
@@ -786,7 +825,8 @@ namespace {
       }
 
       if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
-        checkNonMemberReference(declRef->getDeclRef(), declRef->getLoc());
+        checkNonMemberReference(
+            declRef->getDeclRef(), declRef->getLoc(), declRef);
         return { true, expr };
       }
 
@@ -863,6 +903,11 @@ namespace {
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
         assert(applyStack.back() == apply);
         applyStack.pop_back();
+      }
+
+      // Clear out the mutable local variable parent map on the way out.
+      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr)) {
+        mutableLocalVarParent.erase(declRefExpr);
       }
 
       return expr;
@@ -1216,7 +1261,8 @@ namespace {
     }
 
     /// Check a reference to a local or global.
-    bool checkNonMemberReference(ConcreteDeclRef valueRef, SourceLoc loc) {
+    bool checkNonMemberReference(
+        ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
       if (!valueRef)
         return false;
 
@@ -1234,22 +1280,37 @@ namespace {
             value, loc, isolation.getGlobalActor());
 
       case ActorIsolationRestriction::LocalCapture:
-        if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
+        // Check whether we are in a context that will not execute concurrently
+        // with the context of 'self'. If not, it's safe.
+        if (!mayExecuteConcurrentlyWith(
+                getDeclContext(), isolation.getLocalContext()))
           return false;
 
-        // Check whether we are in a context that will not execute concurrently
-        // with the context of 'self'.
-        if (mayExecuteConcurrentlyWith(
-                getDeclContext(), isolation.getLocalContext())) {
+        // Check whether this is a local variable, in which case we can
+        // determine whether it was captured by value.
+        if (auto var = dyn_cast<VarDecl>(value)) {
+          auto parent = mutableLocalVarParent[declRefExpr];
+
+          // If we have an immediate load of this variable, the by-value
+          // capture in a concurrent function will guarantee that this is
+          // safe.
+          if (parent.dyn_cast<LoadExpr *>())
+            return false;
+
+          // Otherwise, we have concurrent mutation. Complain.
           ctx.Diags.diagnose(
-              loc, diag::concurrent_access_local,
-              value->getDescriptiveKind(), value->getName());
-          value->diagnose(
-              diag::kind_declared_here, value->getDescriptiveKind());
+              loc, diag::concurrent_mutation_of_local_capture,
+              var->getDescriptiveKind(), var->getName());
           return true;
         }
 
-        return false;
+        // Concurrent access to some other local.
+        ctx.Diags.diagnose(
+            loc, diag::concurrent_access_local,
+            value->getDescriptiveKind(), value->getName());
+        value->diagnose(
+            diag::kind_declared_here, value->getDescriptiveKind());
+        return true;
 
       case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafeGlobal(value, loc);
@@ -1536,6 +1597,10 @@ SourceLoc ConcurrentExecutionChecker::getConcurrentReferenceLoc(
     enclosingBody = enclosingFunc->getBody();
   else if (auto enclosingClosure = dyn_cast<ClosureExpr>(enclosingDC))
     enclosingBody = enclosingClosure->getBody();
+  else if (auto enclosingTopLevelCode = dyn_cast<TopLevelCodeDecl>(enclosingDC))
+    enclosingBody = enclosingTopLevelCode->getBody();
+  else
+    return SourceLoc();
 
   assert(enclosingBody && "Cannot have a local function here");
   ConcurrentLocalRefWalker walker(*this, localFunc);
@@ -1549,10 +1614,8 @@ bool ConcurrentExecutionChecker::mayExecuteConcurrentlyWith(
   // Walk the context chain from the use to the definition.
   while (useContext != defContext) {
     // If we find a concurrent closure... it can be run concurrently.
-    // NOTE: We also classify escaping closures this way, which detects more
-    // problematic cases.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isEscapingClosure(closure) || isConcurrentClosure(closure))
+      if (isConcurrentClosure(closure))
         return true;
     }
 
@@ -1953,6 +2016,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isolation == overriddenIsolation)
     return;
 
+  // If the overridden declaration is from Objective-C with no actor annotation,
+  // and the overriding declaration has been placed in a global actor, allow it.
+  if (overridden->hasClangNode() && !overriddenIsolation &&
+      isolation.getKind() == ActorIsolation::GlobalActor)
+    return;
+
   // Isolation mismatch. Diagnose it.
   value->diagnose(
       diag::actor_isolation_override_mismatch, isolation,
@@ -1963,9 +2032,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      // Async closures use concurrency features.
-      if (closure->getType() && closure->isBodyAsync())
-        return true;
+      // Async and concurrent closures use concurrency features.
+      if (auto closureType = closure->getType()) {
+        if (auto fnType = closureType->getAs<AnyFunctionType>())
+          if (fnType->isAsync() || fnType->isConcurrent())
+            return true;
+      }
     } else if (auto decl = dc->getAsDecl()) {
       // If any isolation attributes are present, we're using concurrency
       // features.
@@ -1973,8 +2045,8 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
         return true;
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // Async functions use concurrency features.
-        if (func->hasAsync())
+        // Async and concurrent functions use concurrency features.
+        if (func->hasAsync() || func->isConcurrent())
           return true;
 
         // If there is an explicit @asyncHandler, we're using concurrency

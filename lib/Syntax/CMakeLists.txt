@@ -5,6 +5,7 @@ else()
 endif()
 
 add_swift_host_library(swiftSyntax STATIC
+  AbsoluteRawSyntax.cpp
   RawSyntax.cpp
   Syntax.cpp
   SyntaxData.cpp

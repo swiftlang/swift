@@ -4569,7 +4569,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
         fnConv.getSILErrorType(getTypeExpansionContext()),
         OwnershipKind::Owned);
 
-    Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), IsForUnwind);
+    Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
     B.createThrow(loc, error);
   }
 

@@ -28,7 +28,7 @@ using namespace swift::syntax;
 %   if node.requires_validation():
 void ${node.name}::validate() const {
 #ifndef NDEBUG
-  auto raw = Data->getRaw();
+  auto raw = Data.getRaw();
   if (isMissing()) return;
   assert(raw->getLayout().size() == ${len(node.children)});
 %     for child in node.children:
@@ -56,14 +56,14 @@ void ${node.name}::validate() const {
 %   for child in node.children:
 %     if child.is_optional:
 llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() const {
-  auto ChildData = Data->getChild(Cursor::${child.name});
+  auto ChildData = Data.getChild(Cursor::${child.name});
   if (!ChildData)
     return llvm::None;
-  return ${child.type_name} {Root, ChildData.get()};
+  return ${child.type_name}(*ChildData);
 }
 %     else:
 ${child.type_name} ${node.name}::get${child.name}() const {
-  return ${child.type_name} {Root, Data->getChild(Cursor::${child.name}).get()};
+  return ${child.type_name}(*Data.getChild(Cursor::${child.name}));
 }
 %     end
 
@@ -79,9 +79,9 @@ ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
   if (raw)
     raw = raw->append(${child_elt}.getRaw());
   else
-    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
-                          {${child_elt}.getRaw()}, SourcePresence::Present);
-  return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
+    raw = RawSyntax::makeAndCalcLength(SyntaxKind::${child_node.syntax_kind},
+      {${child_elt}.getRaw()}, SourcePresence::Present);
+  return ${node.name}(Data.replacingChild(raw, Cursor::${child.name}));
 }
 %     end
 
@@ -97,7 +97,7 @@ ${node.name} ${node.name}::with${child.name}(
     raw = ${make_missing_child(child)};
 % end
   }
-  return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
+  return ${node.name}(Data.replacingChild(raw, Cursor::${child.name}));
 }
 
 %   end

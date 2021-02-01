@@ -4293,6 +4293,9 @@ public:
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
     }
+    if (info.isConcurrent()) {
+      Printer.printSimpleAttr("@concurrent") << " ";
+    }
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }

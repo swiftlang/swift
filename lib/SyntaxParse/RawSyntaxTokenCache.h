@@ -62,7 +62,7 @@ class RawSyntaxTokenCache {
 
 public:
   RC<syntax::RawSyntax> getToken(RC<syntax::SyntaxArena> &Arena, tok TokKind,
-                                 OwnedString Text,
+                                 size_t TextLength, OwnedString Text,
                                  ArrayRef<syntax::TriviaPiece> LeadingTrivia,
                                  ArrayRef<syntax::TriviaPiece> TrailingTrivia);
 

@@ -221,7 +221,7 @@ void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding,
 
   // Return void.
   auto ret = emitEmptyTuple(binding);
-  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(binding), ret);
+  B.createReturn(ImplicitReturnLocation(binding), ret);
 }
 
 static void emitOnceCall(SILGenFunction &SGF, VarDecl *global,

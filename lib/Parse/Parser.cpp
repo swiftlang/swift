@@ -320,14 +320,13 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
   return Tokens;
 }
 
-std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsolutePosition>>
+std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
                           unsigned BufferID, unsigned Offset,
-                          unsigned EndOffset,
-                          DiagnosticEngine *Diags) {
-  std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsolutePosition>>
+                          unsigned EndOffset, DiagnosticEngine *Diags) {
+  std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
       Tokens;
-  syntax::AbsolutePosition RunningPos;
+  syntax::AbsoluteOffsetPosition RunningPos(0);
 
   tokenize(
       LangOpts, SM, BufferID, Offset, EndOffset, Diags,
@@ -346,13 +345,17 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
         Trivia syntaxTrailingTrivia =
           TrailingTrivia.convertToSyntaxTrivia(TrailingTriviaLoc, SM, BufferID);
         auto Text = OwnedString::makeRefCounted(Tok.getRawText());
-        auto ThisToken =
-            RawSyntax::make(Tok.getKind(), Text, syntaxLeadingTrivia.Pieces,
-                            syntaxTrailingTrivia.Pieces,
-                            SourcePresence::Present);
+        size_t TextLength = LeadingTrivia.getLength() +
+                            TokRange.getByteLength() +
+                            TrailingTrivia.getLength();
+        auto ThisToken = RawSyntax::make(
+            Tok.getKind(), Text, TextLength, syntaxLeadingTrivia.Pieces,
+            syntaxTrailingTrivia.Pieces, SourcePresence::Present);
 
-        auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
-        Tokens.push_back({ThisToken, ThisTokenPos.getValue()});
+        auto ThisTokenPos =
+            RunningPos.advancedBy(ThisToken->getLeadingTriviaLength());
+        Tokens.push_back({ThisToken, ThisTokenPos});
+        RunningPos = RunningPos.advancedBy(ThisToken->getTextLength());
       });
 
   return Tokens;

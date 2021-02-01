@@ -33,4 +33,10 @@ template <class T> struct TemplateClassWithMemberTemplates {
 
 using IntWrapper = TemplateClassWithMemberTemplates<int>;
 
+struct HasStaticMemberTemplates {
+  template <class T> static T add(T a, T b) { return a + b; }
+  template <class T, class U> static T addTwoTemplates(T a, U b) { return a + b; }
+  template <class T> static T removeReference(T &a) { return a; }
+};
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_MEMBER_TEMPLATES_H

@@ -379,17 +379,25 @@ func inout2(x: inout Int) { }
 
 // optionals
 func optional(x: Int?) { } // expected-note{{previously declared}}
-func optional(x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
+func optional(x: Int!) { } 
+// expected-error@-1{{invalid redeclaration of 'optional(x:)'}}
+// expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 
 func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)}}
+func optionalInOut(x: inout Int!) { } 
+// expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
+// expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 
 class optionalOverloads {
   class func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-  class func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)'}}
+  class func optionalInOut(x: inout Int!) { } 
+  // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
+  // expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 
   func optionalInOut(x: inout Int?) { } // expected-note{{previously declared}}
-  func optionalInOut(x: inout Int!) { } // expected-error{{invalid redeclaration of 'optionalInOut(x:)}}
+  func optionalInOut(x: inout Int!) { } 
+  // expected-error@-1{{invalid redeclaration of 'optionalInOut(x:)'}}
+  // expected-note@-2 {{implicitly unwrapped optional parameter is of same type as optional parameter}}
 }
 
 func optional_3() -> Int? { } // expected-note{{previously declared}}
