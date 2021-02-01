@@ -4426,7 +4426,7 @@ ERROR(actor_instance_property_wrapper,none,
       (Identifier, Identifier))
 
 ERROR(distributed_actor_func_defined_outside_of_distributed_actor,none,
-      "distributed function %0 is declared outside of an distributed actor.",
+      "distributed function %0 is declared outside of an distributed actor",
       (DeclName))
 ERROR(distributed_actor_local_init_explicitly_defined,none,
       "'distributed actor' local-initializer 'init(transport:)' "
@@ -4439,11 +4439,15 @@ ERROR(distributed_actor_init_resolve_must_not_be_user_defined,none,
 ERROR(distributed_actor_init_user_defined_must_be_convenience,none,
       "'distributed actor' initializer %0 must be 'convenience' initializer. "
       "Distributed actors have an implicitly synthesized designated "
-      "'init(transport:)' local initializer, which other initializers must delegate to",
+      "'init(transport:)' local-initializer, which other initializers must delegate to",
       (DeclName))
 ERROR(distributed_actor_init_must_delegate_to_local_init,none,
       "'distributed actor' initializer %0 must (directly or indirectly) delegate "
-      "to 'self.init(transport:)'",
+      "to 'init(transport:)'",
+      (DeclName))
+ERROR(distributed_actor_init_must_not_delegate_to_resolve_init,none,
+      "'distributed actor' initializer %0 cannot delegate to resolve-initializer "
+      "'init(resolve:using:)', as it may result resolving a storageless proxy instance",
       (DeclName))
 ERROR(distributed_actor_local_var,none,
       "'distributed' can not be applied to local variables",

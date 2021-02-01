@@ -8,16 +8,26 @@ distributed actor class OK1 {
   // ok, since all fields are initialized, the constructors can be synthesized
 }
 
+// TODO: test all the FIXITs in this file (!!!)
+
 distributed actor class Bad1 {
-  init() {} // expected-error {{'distributed actor' initializer 'init()' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local initializer, which other initializers must delegate to}}
+  init() {
+    // expected-error@-1 {{'distributed actor' initializer 'init()' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local-initializer, which other initializers must delegate to}}
+    // expected-error@-2 {{'distributed actor' initializer 'init()' must (directly or indirectly) delegate to 'init(transport:)}}
+  }
 }
 
 distributed actor class Bad11 {
-  convenience init() {} // expected-error {{'distributed actor' initializer 'init()' must delegate to 'self.init(transport:)'}}
+  convenience init() {
+    // expected-error@-1 {{'distributed actor' initializer 'init()' must (directly or indirectly) delegate to 'init(transport:)'}}
+  }
 }
 
 distributed actor class Bad12 {
-  init(x: String) {} // expected-error {{'distributed actor' initializer 'init(x:)' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local initializer, which other initializers must delegate to}}
+  init(x: String) {
+    // expected-error@-1 {{'distributed actor' initializer 'init(x:)' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local-initializer, which other initializers must delegate to}}
+    // expected-error@-2 {{'distributed actor' initializer 'init(x:)' must (directly or indirectly) delegate to 'init(transport:)}}
+  }
 }
 
 distributed actor class OK2 {
@@ -42,7 +52,7 @@ distributed actor class Bad3 {
   var x: Int
 
   convenience init(y: Int, transport: ActorTransport) {
-    // expected-error@-1 {{'distributed actor' initializer 'init(y:transport:)' must delegate to 'self.init(transport:)'}}
+    // expected-error@-1 {{'distributed actor' initializer 'init(y:transport:)' must (directly or indirectly) delegate to 'init(transport:)'}}
     // forgot to delegate to init(transport:)
     self.x = y
   }
@@ -65,14 +75,26 @@ distributed actor class BadMulti {
   // @derived init(transport:)
 
   convenience init(y: Int, transport: ActorTransport) {
-    // expected-error@-1 {{'distributed actor' initializer 'init(y:transport:)' must (directly or indirectly) delegate to 'self.init(transport:)'}}
+    // expected-error@-1 {{'distributed actor' initializer 'init(y:transport:)' must (directly or indirectly) delegate to 'init(transport:)'}}
     // self.init(transport: transport) // forgot to delegate to local init!
   }
 
   convenience init(x: Int, y: Int, transport: ActorTransport) {
-    // expected-error@-1 {{'distributed actor' initializer 'init(x:y:transport:)' must (directly or indirectly) delegate to 'self.init(transport:)'}}
+    // expected-error@-1 {{'distributed actor' initializer 'init(x:y:transport:)' must (directly or indirectly) delegate to 'init(transport:)'}}
     // ok, since we do delegate to init(transport) *eventually*
     self.init(y: y, transport: transport)
+  }
+}
+
+// It is illegal to manually invoke the resolve initializer,
+// because it may result in "not a real instance" i.e. a proxy
+// and a proxy does not have any storage, so it would be wrong to allow other
+// initializers to keep running while we actually created a proxy with no storage.
+distributed actor class BadResolveInitCall {
+  convenience init(any: Any, address: ActorAddress, transport: ActorTransport) throws {
+    // expected-error@-1 {{'distributed actor' initializer 'init(any:address:transport:)' cannot delegate to resolve-initializer 'init(resolve:using:)', as it may result resolving a storageless proxy instance}}
+    // expected-error@-2 {{'distributed actor' initializer 'init(any:address:transport:)' must (directly or indirectly) delegate to 'init(transport:)'}}
+    try self.init(resolve: address, using: transport) // TODO: suggest removing this call, since it is illegal
   }
 }
 
@@ -102,6 +124,14 @@ distributed actor class BadRedeclare2 { // expected-error {{type 'BadRedeclare2'
 
 distributed actor class BadRedeclare21 { //expected-error {{type 'BadRedeclare21' does not conform to protocol 'DistributedActor'}}
   convenience init(resolve xxx: ActorAddress, using yyy: ActorTransport) {}
+  // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
+  // expected-note@-2 {{candidate exactly matches}}
+  // expected-error@-3 {{invalid redeclaration of synthesized 'init(resolve:using:)'}}
+  // expected-error@-4 {{invalid redeclaration of synthesized initializer 'init(resolve:using:)'}}
+}
+
+distributed actor class BadRedeclare22 { //expected-error {{type 'BadRedeclare22' does not conform to protocol 'DistributedActor'}}
+  convenience init(resolve: ActorAddress, using yyy: ActorTransport) throws {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
   // expected-note@-2 {{candidate exactly matches}}
   // expected-error@-3 {{invalid redeclaration of synthesized 'init(resolve:using:)'}}

@@ -7699,8 +7699,8 @@ bool ConstructorDecl::isDistributedActorResolveInit() const {
   auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
   auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
-  return params->get(0)->getType()->isEqual(addressType) &&
-         params->get(1)->getType()->isEqual(transportType);
+  return params->get(0)->getInterfaceType()->isEqual(addressType) &&
+         params->get(1)->getInterfaceType()->isEqual(transportType);
 }
 
 

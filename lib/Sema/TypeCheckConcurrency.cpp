@@ -2414,17 +2414,6 @@ void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
   if (ctor->isSynthesized())
     return;
 
-  // the only initializer that is allowed to be designated is init(transport:)
-  // which we synthesize on behalf of a distributed actor.
-  //
-  // All user defined initializers must be 'convenience'
-  if (ctor->isDesignatedInit()) {
-    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
-                   ctor->getName())
-        .fixItInsert(ctor->getConstructorLoc(), "convenience ");
-    return;
-  }
-
   if (ctor->isDistributedActorLocalInit()) {
     // it is not legal to manually define init(transport:)
     // TODO: we want to lift this restriction but it is tricky
@@ -2443,11 +2432,16 @@ void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
     return;
   }
 
-  // All other initializers must be 'convenience'.
-  // During checking the constructor body we'll check if it delegates properly.
+  // All user defined initializers on distributed actors must be 'convenience'.
+  //
+  // The only initializer that is allowed to be designated is init(transport:)
+  // which we synthesize on behalf of a distributed actor.
+  //
+  // When checking ctor bodies we'll check
   if (!ctor->isConvenienceInit()) {
     ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
-                   ctor->getName());
+                   ctor->getName())
+        .fixItInsert(ctor->getConstructorLoc(), "convenience ");
     return;
   }
 }
@@ -2471,14 +2465,6 @@ void swift::checkActorConstructorBody(ClassDecl *classDecl,
     return;
   }
 
-  // all user defined initializers must be 'convenience',
-  // because the designated one is synthesized already: init(transport:)
-  if (!ctor->isConvenienceInit()) {
-    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
-                   ctor->getName());
-    return;
-  }
-
   // it is convenience initializer, but does it properly delegate to the designated one?
   auto initKindAndExpr = ctor->getDelegatingOrChainedInitKind();
   bool isDelegating = initKindAndExpr.initKind == BodyInitKind::Delegating;
@@ -2499,11 +2485,16 @@ void swift::checkActorConstructorBody(ClassDecl *classDecl,
   // which are required to eventually delegate to init(transport:)
   auto fn = initKindAndExpr.initExpr->getFn();
   bool delegatedToLocalInit = false;
-  while (fn && !delegatedToLocalInit) {
+  bool delegatedToResolveInit = false;
+  Expr *resolveInitApplyExpr = nullptr;
+  while (fn && !delegatedToLocalInit && !delegatedToResolveInit) {
     if (auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       auto otherCtorDecl = otherCtorRef->getDecl();
       if (otherCtorDecl->isDistributedActorLocalInit()) {
         delegatedToLocalInit = true;
+      } else if (otherCtorDecl->isDistributedActorResolveInit()) {
+        resolveInitApplyExpr = initKindAndExpr.initExpr;
+        delegatedToResolveInit = true;
       } else {
         // it delegated to some other constructor; it may still have a chance
         // to get it right and eventually delegate to init(transport:),
@@ -2517,8 +2508,14 @@ void swift::checkActorConstructorBody(ClassDecl *classDecl,
       fn = nullptr;
     }
   }
+  if (delegatedToResolveInit) {
+    assert(resolveInitApplyExpr);
+    ctor->diagnose(diag::distributed_actor_init_must_not_delegate_to_resolve_init,
+                   ctor->getName())
+        .fixItRemove(resolveInitApplyExpr->getSourceRange());
+    // fallthrough, suggest that initializers must instead delegate to init(transport:)
+  }
 
-  //
   if (!delegatedToLocalInit) {
     ctor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
                    ctor->getName())

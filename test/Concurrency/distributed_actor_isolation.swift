@@ -4,6 +4,10 @@
 actor class LocalActor_1 {
   let name: String = "alice"
   var mutable: String = "" // expected-note{{mutable state is only available within the actor instance}}
+
+  distributed func nope() {
+    // expected-error@-1{{'distributed' function can only be declared within 'distributed actor class'}}
+  }
 }
 
 struct NotCodableValue { }
