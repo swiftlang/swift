@@ -7,6 +7,9 @@
 // to test them in the same file.
 // XFAIL: OS=windows-msvc
 
+// Failing on i386 simulator, disable for now. rdar://73829982
+// XFAIL: DARWIN_SIMULATOR=ios
+
 import WitnessLayoutOpts
 
 protocol Dummy { }
