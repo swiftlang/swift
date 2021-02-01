@@ -34,6 +34,7 @@
 namespace swift {
 
 class DominanceInfo;
+class DeadEndBlocks;
 template <class T> class NullablePtr;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
@@ -202,7 +203,7 @@ SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(
-    SILFunction *fn, DominanceInfo *dt,
+    SILFunction *fn, DominanceInfo *dt, DeadEndBlocks *deBlocks,
     SmallVectorImpl<SILBasicBlock *> &blocksForWorklist,
     bool EnableOSSARewriteTerminator);
 
