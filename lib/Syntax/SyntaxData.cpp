@@ -15,46 +15,44 @@
 using namespace swift;
 using namespace swift::syntax;
 
-RC<SyntaxData> SyntaxData::make(RC<RawSyntax> Raw,
-                                const SyntaxData *Parent,
-                                CursorIndex IndexInParent) {
-  auto size = totalSizeToAlloc<AtomicCache<SyntaxData>>(Raw->getNumChildren());
-  void *data = ::operator new(size);
-  return RC<SyntaxData>{new (data) SyntaxData(Raw, Parent, IndexInParent)};
+SyntaxData SyntaxData::make(AbsoluteRawSyntax AbsoluteRaw,
+                            const RC<RefCountedBox<SyntaxData>> &Parent) {
+  return SyntaxData(AbsoluteRaw, Parent);
 }
 
-bool SyntaxData::isType() const {
-  return Raw->isType();
+SyntaxData SyntaxData::replacingSelf(const RC<RawSyntax> &NewRaw) const {
+  if (hasParent()) {
+    auto NewRoot = getParent()->replacingChild(NewRaw, getIndexInParent());
+    auto NewRootBox = RefCountedBox<SyntaxData>::make(NewRoot);
+    auto NewSelf = AbsoluteRaw.replacingSelf(
+        NewRaw, NewRoot.AbsoluteRaw.getNodeId().getRootId());
+    return SyntaxData(NewSelf, NewRootBox);
+  } else {
+    auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
+    return SyntaxData(NewSelf, /*Parent=*/nullptr);
+  }
 }
 
-bool SyntaxData::isStmt() const {
-  return Raw->isStmt();
-}
+bool SyntaxData::isType() const { return getRaw()->isType(); }
 
-bool SyntaxData::isDecl() const {
-  return Raw->isDecl();
-}
+bool SyntaxData::isStmt() const { return getRaw()->isStmt(); }
 
-bool SyntaxData::isExpr() const {
-  return Raw->isExpr();
-}
+bool SyntaxData::isDecl() const { return getRaw()->isDecl(); }
 
-bool SyntaxData::isPattern() const {
-  return Raw->isPattern();
-}
+bool SyntaxData::isExpr() const { return getRaw()->isExpr(); }
 
-bool SyntaxData::isUnknown() const {
-  return Raw->isUnknown();
-}
+bool SyntaxData::isPattern() const { return getRaw()->isPattern(); }
+
+bool SyntaxData::isUnknown() const { return getRaw()->isUnknown(); }
 
 void SyntaxData::dump(llvm::raw_ostream &OS) const {
-  Raw->dump(OS, 0);
+  getRaw()->dump(OS, 0);
   OS << '\n';
 }
 
 void SyntaxData::dump() const { dump(llvm::errs()); }
 
-RC<SyntaxData> SyntaxData::getPreviousNode() const {
+Optional<SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
     if (hasParent()) {
       for (size_t I = N - 1; ; --I) {
@@ -67,28 +65,26 @@ RC<SyntaxData> SyntaxData::getPreviousNode() const {
       }
     }
   }
-  return hasParent() ? Parent->getPreviousNode() : nullptr;
+  return hasParent() ? getParent()->getPreviousNode() : None;
 }
 
-RC<SyntaxData> SyntaxData::getNextNode() const {
+Optional<SyntaxData> SyntaxData::getNextNode() const {
   if (hasParent()) {
-    for (size_t I = getIndexInParent() + 1, N = Parent->getNumChildren();
+    for (size_t I = getIndexInParent() + 1, N = getParent()->getNumChildren();
          I != N; ++I) {
       if (auto C = getParent()->getChild(I)) {
         if (C->getRaw()->isPresent() && C->getFirstToken())
           return C;
       }
     }
-    return Parent->getNextNode();
+    return getParent()->getNextNode();
   }
-  return nullptr;
+  return None;
 }
 
-RC<SyntaxData> SyntaxData::getFirstToken() const {
+Optional<SyntaxData> SyntaxData::getFirstToken() const {
   if (getRaw()->isToken()) {
-    // Get a reference counted version of this
-    assert(hasParent() && "The syntax tree should not conisist only of the root");
-    return getParent()->getChild(getIndexInParent());
+    return *this;
   }
 
   for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
@@ -102,35 +98,83 @@ RC<SyntaxData> SyntaxData::getFirstToken() const {
       }
     }
   }
-  return nullptr;
+  return None;
 }
 
-AbsolutePosition SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {
-  if (PositionCache.hasValue())
-    return *PositionCache;
-  if (auto P = getPreviousNode()) {
-    auto Result = P->getAbsolutePositionBeforeLeadingTrivia();
-    P->getRaw()->accumulateAbsolutePosition(Result);
-    // FIXME: avoid using const_cast.
-    const_cast<SyntaxData*>(this)->PositionCache = Result;
-  } else {
-    const_cast<SyntaxData*>(this)->PositionCache = AbsolutePosition();
+Optional<SyntaxData> SyntaxData::getLastToken() const {
+  if (getRaw()->isToken() && !getRaw()->isMissing()) {
+    return *this;
   }
-  return *PositionCache;
-}
 
-AbsolutePosition SyntaxData::getAbsolutePosition() const {
-  auto Result = getAbsolutePositionBeforeLeadingTrivia();
-  getRaw()->accumulateLeadingTrivia(Result);
-  return Result;
-}
-
-AbsolutePosition SyntaxData::getAbsoluteEndPositionAfterTrailingTrivia() const {
-  if (auto N = getNextNode()) {
-    return N->getAbsolutePositionBeforeLeadingTrivia();
-  } else {
-    auto Result = getAbsolutePositionBeforeLeadingTrivia();
-    getRaw()->accumulateAbsolutePosition(Result);
-    return Result;
+  if (getNumChildren() == 0) {
+    return None;
   }
+  for (int I = getNumChildren() - 1; I >= 0; --I) {
+    if (auto Child = getChild(I)) {
+      if (Child->getRaw()->isMissing()) {
+        continue;
+      }
+      if (Child->getRaw()->isToken()) {
+        return Child;
+      } else if (auto Token = Child->getLastToken()) {
+        return Token;
+      }
+    }
+  }
+  return None;
+}
+
+Optional<SyntaxData>
+SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
+  if (!getRaw()->getChild(Index)) {
+    return None;
+  }
+  /// FIXME: Start from the back (advancedToEndOfChildren) and reverse from
+  /// there if Index is closer to the end as a performance improvement?
+  AbsoluteSyntaxPosition Position =
+      AbsoluteRaw.getInfo().getPosition().advancedToFirstChild();
+  SyntaxIdentifier NodeId =
+      AbsoluteRaw.getInfo().getNodeId().advancedToFirstChild();
+
+  for (size_t I = 0; I < Index; ++I) {
+    Position = Position.advancedBy(getRaw()->getChild(I));
+    NodeId = NodeId.advancedBy(getRaw()->getChild(I));
+  }
+  AbsoluteSyntaxInfo Info(Position, NodeId);
+
+  const RC<RefCountedBox<SyntaxData>> RefCountedParent =
+      RefCountedBox<SyntaxData>::make(*this);
+  return SyntaxData(AbsoluteRawSyntax(getRaw()->getChild(Index), Info),
+                    RefCountedParent);
+}
+
+AbsoluteOffsetPosition
+SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {
+  return AbsoluteRaw.getPosition();
+}
+
+AbsoluteOffsetPosition
+SyntaxData::getAbsolutePositionAfterLeadingTrivia() const {
+  if (auto FirstToken = getFirstToken()) {
+    return getAbsolutePositionBeforeLeadingTrivia().advancedBy(
+        FirstToken->getRaw()->getLeadingTriviaLength());
+  } else {
+    return getAbsolutePositionBeforeLeadingTrivia();
+  }
+}
+
+AbsoluteOffsetPosition
+SyntaxData::getAbsoluteEndPositionBeforeTrailingTrivia() const {
+  if (auto LastToken = getLastToken()) {
+    return getAbsoluteEndPositionAfterTrailingTrivia().advancedBy(
+        -LastToken->getRaw()->getTrailingTriviaLength());
+  } else {
+    return getAbsoluteEndPositionAfterTrailingTrivia();
+  }
+}
+
+AbsoluteOffsetPosition
+SyntaxData::getAbsoluteEndPositionAfterTrailingTrivia() const {
+  return getAbsolutePositionBeforeLeadingTrivia().advancedBy(
+      getRaw()->getTextLength());
 }

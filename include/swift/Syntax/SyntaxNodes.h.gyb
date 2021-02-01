@@ -69,8 +69,7 @@ public:
   };
 %     end
 
-  ${node.name}(const RC<SyntaxData> Root, const SyntaxData *Data)
-    : ${node.base_type}(Root, Data) {
+  ${node.name}(const SyntaxData Data) : ${node.base_type}(Data) {
 %     if node.requires_validation():
       this->validate();
 %     end

@@ -29,8 +29,7 @@ namespace syntax {
 class UnknownSyntax : public Syntax {
   void validate() const;
 public:
-  UnknownSyntax(const RC<SyntaxData> Root, const SyntaxData *Data)
-    : Syntax(Root, Data) {}
+  UnknownSyntax(const SyntaxData Data) : Syntax(Data) {}
 
   static bool classof(const Syntax *S) {
     return S->isUnknown();

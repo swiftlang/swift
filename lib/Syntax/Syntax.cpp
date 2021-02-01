@@ -17,9 +17,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-const RC<RawSyntax> &Syntax::getRaw() const {
-  return Data->getRaw();
-}
+const RC<RawSyntax> &Syntax::getRaw() const { return Data.getRaw(); }
 
 SyntaxKind Syntax::getKind() const {
   return getRaw()->getKind();
@@ -38,33 +36,21 @@ void Syntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   getRaw()->dump(OS, 0);
 }
 
-bool Syntax::isType() const {
-  return Data->isType();
-}
+bool Syntax::isType() const { return Data.isType(); }
 
-bool Syntax::isDecl() const {
-  return Data->isDecl();
-}
+bool Syntax::isDecl() const { return Data.isDecl(); }
 
-bool Syntax::isStmt() const {
-  return Data->isStmt();
-}
+bool Syntax::isStmt() const { return Data.isStmt(); }
 
-bool Syntax::isExpr() const {
-  return Data->isExpr();
-}
+bool Syntax::isExpr() const { return Data.isExpr(); }
 
 bool Syntax::isToken() const {
   return getRaw()->isToken();
 }
 
-bool Syntax::isPattern() const {
-  return Data->isPattern();
-}
+bool Syntax::isPattern() const { return Data.isPattern(); }
 
-bool Syntax::isUnknown() const {
-  return Data->isUnknown();
-}
+bool Syntax::isUnknown() const { return Data.isUnknown(); }
 
 bool Syntax::isPresent() const {
   return getRaw()->isPresent();
@@ -76,23 +62,18 @@ bool Syntax::isMissing() const {
 
 llvm::Optional<Syntax> Syntax::getParent() const {
   auto ParentData = getData().getParent();
-  if (!ParentData) return llvm::None;
-  return llvm::Optional<Syntax> {
-    Syntax { Root, ParentData }
-  };
+  if (!ParentData) {
+    return None;
+  }
+  return Syntax(*ParentData);
 }
 
-Syntax Syntax::getRoot() const {
-  return { Root, Root.get() };
-}
-
-size_t Syntax::getNumChildren() const {
-  return Data->getNumChildren();
-}
+size_t Syntax::getNumChildren() const { return Data.getNumChildren(); }
 
 llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
-  auto ChildData = Data->getChild(N);
-  if (!ChildData)
-    return llvm::None;
-  return Syntax {Root, ChildData.get()};
+  auto ChildData = Data.getChild(N);
+  if (!ChildData) {
+    return None;
+  }
+  return Syntax(*ChildData);
 }

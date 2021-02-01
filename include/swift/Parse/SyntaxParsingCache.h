@@ -48,8 +48,8 @@ struct SourceEdit {
 };
 
 struct SyntaxReuseRegion {
-  AbsolutePosition Start;
-  AbsolutePosition End;
+  AbsoluteOffsetPosition Start;
+  AbsoluteOffsetPosition End;
 };
 
 class SyntaxParsingCache {
