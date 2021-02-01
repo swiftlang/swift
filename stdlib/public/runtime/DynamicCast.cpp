@@ -712,14 +712,6 @@ struct ObjCBridgeMemo {
 };
 #endif
 
-static bool avoidOptionalsInAnyHashable() {
-  // Unexpected nulls are fatal in Swift 5.4 and not before
-  // AnyHashable avoids optionals before Swift 5.4
-  // TODO: This is admittedly awkward, but I need to get this changed quickly
-  // I'll come back and clean this up later.
-  return !unexpectedNullIsFatal();
-}
-
 static DynamicCastResult
 tryCastToAnyHashable(
   OpaqueValue *destLocation, const Metadata *destType,
@@ -747,22 +739,24 @@ tryCastToAnyHashable(
 #endif
   }
   case MetadataKind::Optional: {
-    if (avoidOptionalsInAnyHashable()) {
-      // Mimic the Swift 5.3 behavior when running in older contexts
-      // This behavior is consistent with Swift 5.3 runtime, but inconsistent
-      // with how other casting paths handle this case (which is why it's being
-      // changed in Swift 5.4).
-      // Old behavior:  "Foo" as! String? as! AnyHashable => AnyHashable("Foo")
-      // New behavior:  "Foo" as! String? as! AnyHashable => AnyHashable(Optional("Foo"))
-      auto srcInnerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
-      unsigned sourceEnumCase = srcInnerType->vw_getEnumTagSinglePayload(
-        srcValue, /*emptyCases=*/1);
-      auto nonNil = (sourceEnumCase == 0);
-      if (nonNil) {
-        return DynamicCastResult::Failure;  // Our caller will unwrap the optional and try again
-      }
-      // If it is nil, fall through to the general case to just wrap the nil
+    // Until SR-9047 fixes the interactions between AnyHashable and Optional, we
+    // avoid directly injecting Optionals.  In particular, this allows
+    // casts from [String?:String] to [AnyHashable:Any] to work the way people
+    // expect. Otherwise, without SR-9047, the resulting dictionary can only be
+    // indexed with an explicit Optional<String>, not a plain String.
+    // After SR-9047, we can consider dropping this special case entirely.
+
+    // !!!!  This breaks compatibility with compiler-optimized casts
+    // (which just inject) and violates the Casting Spec.  It just preserves
+    // the behavior of the older casting code until we can clean things up.
+    auto srcInnerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+    unsigned sourceEnumCase = srcInnerType->vw_getEnumTagSinglePayload(
+      srcValue, /*emptyCases=*/1);
+    auto nonNil = (sourceEnumCase == 0);
+    if (nonNil) {
+      return DynamicCastResult::Failure;  // Our caller will unwrap the optional and try again
     }
+    // Else Optional is nil -- the general case below will inject it
     break;
   }
   default:
