@@ -7663,7 +7663,6 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   return params->get(0)->getInterfaceType()->isVoid();
 }
 
-/// Checks if the initializer is a `init(transport: ActorTransport)`.
 bool ConstructorDecl::isDistributedActorLocalInit() const {
   auto name = getName();
   auto argumentNames = name.getArgumentNames();
@@ -7671,14 +7670,37 @@ bool ConstructorDecl::isDistributedActorLocalInit() const {
   if (argumentNames.size() != 1)
     return false;
 
+  auto &C = getASTContext();
+  if (argumentNames[0] != C.Id_transport)
+    return false;
+
   auto *params = getParameters();
-  if (params->size() != 1)
+  assert(params->size() == 1);
+
+  auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
+  return params->get(0)->getInterfaceType()->isEqual(transportType);
+}
+
+bool ConstructorDecl::isDistributedActorResolveInit() const {
+  auto name = getName();
+  auto argumentNames = name.getArgumentNames();
+
+  if (argumentNames.size() != 2)
     return false;
 
   auto &C = getASTContext();
+  if (argumentNames[0] != C.Id_resolve ||
+      argumentNames[1] != C.Id_using)
+    return false;
+
+  auto *params = getParameters();
+  assert(params->size() == 2);
+
+  auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
   auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
-  return params->get(0)->getInterfaceType()->isEqual(transportType);
+  return params->get(0)->getType()->isEqual(addressType) &&
+         params->get(1)->getType()->isEqual(transportType);
 }
 
 

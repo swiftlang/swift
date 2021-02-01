@@ -679,7 +679,9 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
         if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
           return forDistributedActorSelf(classDecl);
         } else {
-          assert(false && "distributed functions must be declared within an distributed actor, yet no enclosing actor context was available?");
+          func->diagnose(
+              diag::distributed_actor_func_defined_outside_of_distributed_actor,
+              func->getName());
         }
       }
 
@@ -2403,44 +2405,131 @@ void swift::checkFunctionActorIsolation(AbstractFunctionDecl *decl) {
 }
 
 /// Some actor constructors are special, so we need to check rules about them.
-void swift::checkConstructorActorIsolation(ClassDecl *decl, ConstructorDecl *ctor) {
+void swift::checkActorConstructor(ClassDecl *decl, ConstructorDecl *ctor) {
   // bail out unless distributed actor, only those have special rules to check here
   if (!decl->isDistributedActor())
+    return;
+
+  // bail out for synthesized constructors
+  if (ctor->isSynthesized())
     return;
 
   // the only initializer that is allowed to be designated is init(transport:)
   // which we synthesize on behalf of a distributed actor.
   //
   // All user defined initializers must be 'convenience'
-  if (ctor->isDesignatedInit() && !ctor->isSynthesized()) {
-    decl->diagnose(diag::distributed_actor_user_defined_init_not_convenience,
+  if (ctor->isDesignatedInit()) {
+    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
                    ctor->getName())
         .fixItInsert(ctor->getConstructorLoc(), "convenience ");
     return;
   }
 
   auto &C = decl->getASTContext();
-  auto name = ctor->getName();
-  auto argumentNames = name.getArgumentNames();
 
-  if (argumentNames.size() == 0) {
-//    auto transportType = C.getActorTransportDecl()->getDeclaredInterfaceType();
-    decl->diagnose(diag::distributed_actor_parameterless_init, ctor->getName())
-    .fixItInsertAfter(decl->getStartLoc(), "transport: ActorTransport");
+  // TODO: we don't really care if zero params, as long as the init(transport:) is called
+//  if (argumentNames.size() == 0) {
+//    ctor->diagnose(diag::distributed_actor_parameterless_init, ctor->getName())
+//      .fixItInsertAfter(ctor->getStartLoc(), "transport: ActorTransport");
+////        // TODO: can we use types instead of hardcoded strings here?
+////        .fixItInsertAfter(decl->getStartLoc(), "%0: %1", {
+////            C.Id_transport.str(),
+////            transportType.getName()
+////        })
+//    return;
+//  }
+
+  if (ctor->isDistributedActorLocalInit()) {
+    // it is not legal to manually define init(transport:)
+    // TODO: we want to lift this restriction but it is tricky
+    ctor->diagnose(diag::distributed_actor_local_init_explicitly_defined)
+        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
+    // TODO: we should be able to allow this, but then we need to inject
+    //       code or force users to "do the right thing"
     return;
-        // TODO: can we use types instead of hardcoded strings here?
-//        .fixItInsertAfter(decl->getStartLoc(), "%0: %1", {
-//            C.Id_transport.str(),
-//            transportType.getName()
-//        })
   }
 
-  if (argumentNames.size() == 1) {
-    if (argumentNames[0] == C.Id_transport) { // TODO also check type
-      // FIXME: we need to inject our special transport interactions here???
+  if (ctor->isDistributedActorResolveInit()) {
+    // It is illegal for users to attempt defining a resolve initializer;
+    // Suggest removing it entirely, there is no way users can implement this init.
+    ctor->diagnose(diag::distributed_actor_init_resolve_must_not_be_user_defined)
+        .fixItRemove(SourceRange(ctor->getStartLoc(), decl->getStartLoc()));
+    return;
+  }
+
+  // All other initializers must be 'convenience'.
+  // During checking the constructor body we'll check if it delegates properly.
+  if (!ctor->isConvenienceInit()) {
+    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
+                   ctor->getName());
+    return;
+  }
+}
+
+void swift::checkActorConstructorBody(ClassDecl *classDecl,
+                                      ConstructorDecl *ctor,
+                                      BraceStmt *body) {
+  // we only have additional checks for distributed actor initializers
+  if (!classDecl->isDistributedActor())
+    return;
+
+  // our synthesized constructors don't need any of those checks
+  // (i.e. the resolve/local constructor would not delegate anywhere etc)
+  if (ctor->isSynthesized())
+    return;
+
+  if (ctor->isDistributedActorLocalInit() ||
+      ctor->isDistributedActorResolveInit()) {
+    // it is illegal-to re-declare those explicitly, and this is already diagnosed
+    // on the decl-level; no need to proceed diagnosing anything about the body here.
+    return;
+  }
+
+  // all user defined initializers must be 'convenience',
+  // because the designated one is synthesized already: init(transport:)
+  if (!ctor->isConvenienceInit()) {
+    ctor->diagnose(diag::distributed_actor_init_user_defined_must_be_convenience,
+                   ctor->getName());
+    return;
+  }
+
+  // it is convenience initializer, but does it properly delegate to the designated one?
+  auto initKindAndExpr = ctor->getDelegatingOrChainedInitKind();
+  bool isDelegating = initKindAndExpr.initKind == BodyInitKind::Delegating;
+
+  /// the constructor didn't delegate anywhere, but it should have!
+  if (!isDelegating ||
+      !initKindAndExpr.initExpr ||
+      !initKindAndExpr.initExpr->getFn()) {
+    // the resolve-initializer of course must never actually delegate to the local one
+    ctor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
+                   ctor->getName())
+        .fixItInsert(ctor->getStartLoc(), "self.init(transport: transport)"); // FIXME: how to get better position?
+    // we're done here, it is not delegating or does delegate anywhere
+    return;
+  }
+
+  // we're dealing with a convenience constructor,
+  // which are required to eventually delegate to init(transport:)
+  if (auto fn = initKindAndExpr.initExpr->getFn()) {
+    // TODO: recursively keep checking; there could be a few convenience inits
+    if (auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+      auto otherCtorDecl = otherCtorRef->getDecl();
+
+      fprintf(stderr, "[%s:%d] >> (%s) %s\n", __FILE__, __LINE__, __FUNCTION__,
+              "delegated to:");
+      otherCtorDecl->dump();
+
+      if (!otherCtorDecl->isDistributedActorLocalInit()) {
+        ctor->diagnose(diag::distributed_actor_init_must_delegate_to_local_init,
+                       ctor->getName())
+            .fixItInsert(ctor->getStartLoc(), "self.init(transport: transport)"); // FIXME: how to get better position?
+      }
+
+      // great, seems we delegated to the local init properly.
+      return;
     }
   }
-
 }
 
 void swift::checkInitializerActorIsolation(Initializer *init, Expr *expr) {

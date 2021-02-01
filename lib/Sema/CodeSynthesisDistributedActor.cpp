@@ -138,7 +138,7 @@ createBody_DistributedActor_init_transport(AbstractFunctionDecl *initDecl, void 
 /// init(transport: ActorTransport)
 /// ```
 ///
-/// initializer.
+/// local initializer.
 static ConstructorDecl *
 createDistributedActor_init_local(ClassDecl *classDecl,
                                   ASTContext &ctx) {
@@ -176,15 +176,7 @@ createDistributedActor_init_local(ClassDecl *classDecl,
   auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
   initDecl->getAttrs().add(reqAttr);
 
-//  // This constructor is 'required', all distributed actors MUST invoke it.
-//  // TODO: this makes sense I guess, and we should ban defining such constructor at all.
-//  auto *reqAttr = new (C) RequiredAttr(/*IsImplicit*/true);
-//  initDecl->getAttrs().add(reqAttr);
-
   initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
-
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT DECL:");
-//  initDecl->dump();
 
   return initDecl;
 }
@@ -246,13 +238,16 @@ createDistributedActor_init_resolve_body(AbstractFunctionDecl *initDecl, void *)
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
       /*implicit=*/true);
 
-//  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "INIT transport BODY:");
-//  initDecl->dump();
-
   return { body, /*isTypeChecked=*/false };
 }
 
-
+/// Synthesizes the
+///
+/// ```
+/// init(resolve address: ActorAddress, using transport: ActorTransport) throws
+/// ```
+///
+/// resolve initializer.
 static ConstructorDecl *
 createDistributedActor_init_resolve(ClassDecl *classDecl,
                                   ASTContext &ctx) {
@@ -301,8 +296,6 @@ createDistributedActor_init_resolve(ClassDecl *classDecl,
 
   // This constructor is 'required', all distributed actors MUST have it.
   initDecl->getAttrs().add(new (C) RequiredAttr(/*IsImplicit*/true));
-//  // This constructor is 'final' as no-one outside the compiler is able to implement it.
-//  initDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit*/true));
 
   initDecl->copyFormalAccessFrom(classDecl, /*sourceIsParentContext=*/true);
 
@@ -322,8 +315,7 @@ createDistributedActorInit(ClassDecl *classDecl,
 
   switch (argumentNames.size()) {
     case 1: {
-      if (argumentNames[0] == C.Id_transport) {
-        // TODO: do we need to check types of the params here too?
+      if (requirement->isDistributedActorLocalInit()) {
         return createDistributedActor_init_local(classDecl, ctx);
       }
 
@@ -332,18 +324,16 @@ createDistributedActorInit(ClassDecl *classDecl,
         // TODO: implement synthesis
         requirement->dump();
         fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__,
-                "unrecognized constructor requirement for DistributedActor");
+                "init(from:) requirement for DistributedActor");
         return nullptr;
       }
-
-      return nullptr;
+      break;
     }
     case 2:
-      if (argumentNames[0] == C.Id_resolve &&
-          argumentNames[1] == C.Id_using) {
-        // TODO: do we need to check types of the params here too?
+      if (requirement->isDistributedActorResolveInit()) {
         return createDistributedActor_init_resolve(classDecl, ctx);
       }
+      break;
   }
 
   requirement->dump();

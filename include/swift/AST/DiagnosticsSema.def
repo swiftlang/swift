@@ -4425,15 +4425,24 @@ ERROR(actor_instance_property_wrapper,none,
       "the actor instance; consider @actorIndependent",
       (Identifier, Identifier))
 
-ERROR(distributed_actor_user_defined_init_not_convenience,none,
-      "'distributed actor' initializer %0 must be 'convenience' initializer. "
-      "Distributed actors have an implicitly synthesized designated 'init(transport:)' "
-      "local initializer, which other initializers must delegate to.",
+ERROR(distributed_actor_func_defined_outside_of_distributed_actor,none,
+      "distributed function %0 is declared outside of an distributed actor.",
       (DeclName))
-ERROR(distributed_actor_parameterless_init,none,
-      "illegal zero-argument 'distributed actor' initializer $0. "
-      "Distributed actor initializers must always 'transport: ActorTransport' argument, "
-      "and delegate it to the init(transport:) designated initializer.",
+ERROR(distributed_actor_local_init_explicitly_defined,none,
+      "'distributed actor' local-initializer 'init(transport:)' "
+      "cannot be implemented explicitly.",
+      ())
+ERROR(distributed_actor_init_resolve_must_not_be_user_defined,none,
+      "'distributed actor' resolve-initializer 'init(resolve:using:)' "
+      "cannot be implemented explicitly.",
+      ())
+ERROR(distributed_actor_init_user_defined_must_be_convenience,none,
+      "'distributed actor' initializer %0 must be 'convenience' initializer. "
+      "Distributed actors have an implicitly synthesized designated "
+      "'init(transport:)' local initializer, which other initializers must delegate to",
+      (DeclName))
+ERROR(distributed_actor_init_must_delegate_to_local_init,none,
+      "'distributed actor' initializer %0 must delegate to 'self.init(transport:)'",
       (DeclName))
 ERROR(distributed_actor_local_var,none,
       "'distributed' can not be applied to local variables",
