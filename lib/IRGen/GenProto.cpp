@@ -3058,20 +3058,6 @@ NecessaryBindings NecessaryBindings::computeBindings(
   // Figure out what we're actually required to pass:
   PolymorphicConvention convention(IGM, origType, considerParameterSources);
 
-  //  - unfulfilled requirements
-  convention.enumerateUnfulfilledRequirements(
-                                        [&](GenericRequirement requirement) {
-    CanType type = requirement.TypeParameter.subst(subs)->getCanonicalType();
-
-    if (requirement.Protocol) {
-      auto conf = subs.lookupConformance(requirement.TypeParameter,
-                                         requirement.Protocol);
-      bindings.addProtocolConformance(type, conf);
-    } else {
-      bindings.addTypeMetadata(type);
-    }
-  });
-
   //   - extra sources
   for (auto &source : convention.getSources()) {
     switch (source.getKind()) {
@@ -3097,6 +3083,20 @@ NecessaryBindings NecessaryBindings::computeBindings(
     }
     llvm_unreachable("bad source kind");
   }
+
+  //  - unfulfilled requirements
+  convention.enumerateUnfulfilledRequirements(
+                                        [&](GenericRequirement requirement) {
+    CanType type = requirement.TypeParameter.subst(subs)->getCanonicalType();
+
+    if (requirement.Protocol) {
+      auto conf = subs.lookupConformance(requirement.TypeParameter,
+                                         requirement.Protocol);
+      bindings.addProtocolConformance(type, conf);
+    } else {
+      bindings.addTypeMetadata(type);
+    }
+  });
 
   return bindings;
 }
