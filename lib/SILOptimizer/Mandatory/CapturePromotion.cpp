@@ -17,8 +17,8 @@
 ///
 /// Swift's closure model is that all local variables are capture by reference.
 /// This produces a very simple programming model which is great to use, but
-/// relies on the optimizer to promote by-ref captures to by-value (i.e. by-copy)
-/// captures for decent performance. Consider this simple example:
+/// relies on the optimizer to promote by-ref captures to by-value (i.e.
+/// by-copy) captures for decent performance. Consider this simple example:
 ///
 ///   func foo(a : () -> ()) {} // assume this has an unknown body
 ///
@@ -30,25 +30,25 @@
 ///
 /// Since x is captured by-ref by the closure, x must live on the heap. By
 /// looking at bar without any knowledge of foo, we can know that it is safe to
-/// promote this to a by-value capture, allowing x to live on the stack under the
-/// following conditions:
+/// promote this to a by-value capture, allowing x to live on the stack under
+/// the following conditions:
 ///
 /// 1. If x is not modified in the closure body and is only loaded.
 /// 2. If we can prove that all mutations to x occur before the closure is
 ///    formed.
 ///
-/// Under these conditions if x is loadable then we can even load the given value
-/// and pass it as a scalar instead of an address.
+/// Under these conditions if x is loadable then we can even load the given
+/// value and pass it as a scalar instead of an address.
 ///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -58,12 +58,19 @@
 
 using namespace swift;
 
-typedef llvm::SmallSet<unsigned, 4> IndicesSet;
-typedef llvm::DenseMap<PartialApplyInst*, IndicesSet> PartialApplyIndicesMap;
-
 STATISTIC(NumCapturesPromoted, "Number of captures promoted");
 
 namespace {
+using IndicesSet = llvm::SmallSet<unsigned, 4>;
+using PartialApplyIndicesMap = llvm::DenseMap<PartialApplyInst *, IndicesSet>;
+} // anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                           Reachability Utilities
+//===----------------------------------------------------------------------===//
+
+namespace {
+
 /// Transient reference to a block set within ReachabilityInfo.
 ///
 /// This is a bitset that conveniently flattens into a matrix allowing bit-wise
@@ -184,50 +191,6 @@ private:
 
 } // end anonymous namespace
 
-
-namespace {
-/// A SILCloner subclass which clones a closure function while converting
-/// one or more captures from 'inout' (by-reference) to by-value.
-class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
-public:
-  friend class SILInstructionVisitor<ClosureCloner>;
-  friend class SILCloner<ClosureCloner>;
-
-  ClosureCloner(SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-                IsSerialized_t serialized, StringRef clonedName,
-                IndicesSet &promotableIndices, ResilienceExpansion expansion);
-
-  void populateCloned();
-
-  SILFunction *getCloned() { return &getBuilder().getFunction(); }
-
-private:
-  static SILFunction *initCloned(SILOptFunctionBuilder &funcBuilder,
-                                 SILFunction *orig, IsSerialized_t serialized,
-                                 StringRef clonedName,
-                                 IndicesSet &promotableIndices,
-                                 ResilienceExpansion expansion);
-
-  SILValue getProjectBoxMappedVal(SILValue operandValue);
-
-  void visitDebugValueAddrInst(DebugValueAddrInst *inst);
-  void visitStrongReleaseInst(StrongReleaseInst *inst);
-  void visitDestroyValueInst(DestroyValueInst *inst);
-  void visitStructElementAddrInst(StructElementAddrInst *inst);
-  void visitLoadInst(LoadInst *inst);
-  void visitLoadBorrowInst(LoadBorrowInst *inst);
-  void visitProjectBoxInst(ProjectBoxInst *inst);
-  void visitBeginAccessInst(BeginAccessInst *inst);
-  void visitEndAccessInst(EndAccessInst *inst);
-
-  ResilienceExpansion resilienceExpansion;
-  SILFunction *origF;
-  IndicesSet &promotableIndices;
-  llvm::DenseMap<SILArgument *, SILValue> boxArgumentMap;
-  llvm::DenseMap<ProjectBoxInst *, SILValue> projectBoxArgumentMap;
-};
-} // end anonymous namespace
-
 /// Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic
 /// block in the function.
@@ -308,6 +271,61 @@ bool ReachabilityInfo::isReachable(SILBasicBlock *fromBlock,
   return fromSet.test(fi->second);
 }
 
+//===----------------------------------------------------------------------===//
+//                               ClosureCloner
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// A SILCloner subclass which clones a closure function while converting
+/// one or more captures from 'inout' (by-reference) to by-value.
+class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
+public:
+  friend class SILInstructionVisitor<ClosureCloner>;
+  friend class SILCloner<ClosureCloner>;
+
+  ClosureCloner(SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
+                IsSerialized_t serialized, StringRef clonedName,
+                IndicesSet &promotableIndices, ResilienceExpansion expansion);
+
+  void populateCloned();
+
+  SILFunction *getCloned() { return &getBuilder().getFunction(); }
+
+  static SILFunction *
+  constructClonedFunction(SILOptFunctionBuilder &funcBuilder,
+                          PartialApplyInst *pai, FunctionRefInst *fri,
+                          IndicesSet &promotableIndices,
+                          ResilienceExpansion resilienceExpansion);
+
+private:
+  static SILFunction *initCloned(SILOptFunctionBuilder &funcBuilder,
+                                 SILFunction *orig, IsSerialized_t serialized,
+                                 StringRef clonedName,
+                                 IndicesSet &promotableIndices,
+                                 ResilienceExpansion expansion);
+
+  SILValue getProjectBoxMappedVal(SILValue operandValue);
+
+  void visitDebugValueAddrInst(DebugValueAddrInst *inst);
+  void visitStrongReleaseInst(StrongReleaseInst *inst);
+  void visitDestroyValueInst(DestroyValueInst *inst);
+  void visitStructElementAddrInst(StructElementAddrInst *inst);
+  void visitLoadInst(LoadInst *inst);
+  void visitLoadBorrowInst(LoadBorrowInst *inst);
+  void visitProjectBoxInst(ProjectBoxInst *inst);
+  void visitBeginAccessInst(BeginAccessInst *inst);
+  void visitEndAccessInst(EndAccessInst *inst);
+
+  ResilienceExpansion resilienceExpansion;
+  SILFunction *origF;
+  IndicesSet &promotableIndices;
+  llvm::DenseMap<SILArgument *, SILValue> boxArgumentMap;
+  llvm::DenseMap<ProjectBoxInst *, SILValue> projectBoxArgumentMap;
+};
+
+} // end anonymous namespace
+
 ClosureCloner::ClosureCloner(SILOptFunctionBuilder &funcBuilder,
                              SILFunction *orig, IsSerialized_t serialized,
                              StringRef clonedName,
@@ -365,8 +383,8 @@ computeNewArgInterfaceTypes(SILFunction *f, IndicesSet &promotableIndices,
         param.getSILStorageType(fnConv.silConv.getModule(), fnConv.funcTy,
                                 TypeExpansionContext::minimal());
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
-    assert(paramBoxTy->getLayout()->getFields().size() == 1
-           && "promoting compound box not implemented yet");
+    assert(paramBoxTy->getLayout()->getFields().size() == 1 &&
+           "promoting compound box not implemented yet");
     auto paramBoxedTy =
         getSILBoxFieldType(TypeExpansionContext(*f), paramBoxTy, types, 0);
     assert(expansion == f->getResilienceExpansion());
@@ -452,8 +470,7 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
 
 /// Populate the body of the cloned closure, modifying instructions as
 /// necessary to take into consideration the promoted capture(s)
-void
-ClosureCloner::populateCloned() {
+void ClosureCloner::populateCloned() {
   SILFunction *cloned = getCloned();
 
   // Create arguments for the entry block
@@ -504,9 +521,38 @@ ClosureCloner::populateCloned() {
       }
     }
   }
+
   // Visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions and terminators.
   cloneFunctionBody(origF, clonedEntryBB, entryArgs);
+}
+
+SILFunction *ClosureCloner::constructClonedFunction(
+    SILOptFunctionBuilder &funcBuilder, PartialApplyInst *pai,
+    FunctionRefInst *fri, IndicesSet &promotableIndices,
+    ResilienceExpansion resilienceExpansion) {
+  SILFunction *f = pai->getFunction();
+
+  // Create the Cloned Name for the function.
+  SILFunction *origF = fri->getReferencedFunctionOrNull();
+
+  IsSerialized_t isSerialized = IsNotSerialized;
+  if (f->isSerialized() && origF->isSerialized())
+    isSerialized = IsSerialized_t::IsSerializable;
+
+  auto clonedName = getSpecializedName(origF, isSerialized, promotableIndices);
+
+  // If we already have such a cloned function in the module then just use it.
+  if (auto *prevF = f->getModule().lookUpFunction(clonedName)) {
+    assert(prevF->isSerialized() == isSerialized);
+    return prevF;
+  }
+
+  // Otherwise, create a new clone.
+  ClosureCloner cloner(funcBuilder, origF, isSerialized, clonedName,
+                       promotableIndices, resilienceExpansion);
+  cloner.populateCloned();
+  return cloner.getCloned();
 }
 
 /// If this operand originates from a mapped ProjectBox, return the mapped
@@ -703,6 +749,30 @@ void ClosureCloner::visitLoadInst(LoadInst *li) {
   SILCloner<ClosureCloner>::visitLoadInst(li);
 }
 
+//===----------------------------------------------------------------------===//
+//                        EscapeMutationScanningState
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct EscapeMutationScanningState {
+  /// The list of mutations that we found while checking for escapes.
+  llvm::SmallVector<SILInstruction *, 8> foundMutations;
+
+  /// A flag that we use to ensure that we only ever see 1 project_box on an
+  /// alloc_box.
+  bool sawProjectBoxInst;
+
+  /// The global partial_apply -> index map.
+  llvm::DenseMap<PartialApplyInst *, unsigned> &globalIndexMap;
+};
+
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//         Partial Apply BoxArg Mutation/Escape/Capture Use Analysis
+//===----------------------------------------------------------------------===//
+
 static SILArgument *getBoxFromIndex(SILFunction *f, unsigned index) {
   assert(f->isDefinition() && "Expected definition not external declaration!");
   auto &entry = f->front();
@@ -774,6 +844,77 @@ static bool isNonMutatingCapture(SILArgument *boxArg) {
 
   return true;
 }
+
+bool isPartialApplyNonEscapingUser(Operand *currentOp, PartialApplyInst *pai,
+                                   EscapeMutationScanningState &state) {
+  LLVM_DEBUG(llvm::dbgs() << "    Found partial: " << *pai);
+
+  unsigned opNo = currentOp->getOperandNumber();
+  assert(opNo != 0 && "Alloc box used as callee of partial apply?");
+
+  // If we've already seen this partial apply, then it means the same alloc
+  // box is being captured twice by the same closure, which is odd and
+  // unexpected: bail instead of trying to handle this case.
+  if (state.globalIndexMap.count(pai)) {
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
+    return false;
+  }
+
+  SILModule &mod = pai->getModule();
+  SILFunction *f = pai->getFunction();
+  auto closureType = pai->getType().castTo<SILFunctionType>();
+  SILFunctionConventions closureConv(closureType, mod);
+
+  // Calculate the index into the closure's argument list of the captured
+  // box pointer (the captured address is always the immediately following
+  // index so is not stored separately);
+  unsigned index = opNo - 1 + closureConv.getNumSILArguments();
+
+  auto *fn = pai->getReferencedFunctionOrNull();
+
+  // It is not safe to look at the content of dynamically replaceable functions
+  // since this pass looks at the content of Fn.
+  if (!fn || !fn->isDefinition() || fn->isDynamicallyReplaceable()) {
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
+                               "reference.\n");
+    return false;
+  }
+
+  SILArgument *boxArg = getBoxFromIndex(fn, index);
+
+  // For now, return false is the address argument is an address-only type,
+  // since we currently handle loadable types only.
+  // TODO: handle address-only types
+  // FIXME: Expansion
+  auto boxTy = boxArg->getType().castTo<SILBoxType>();
+  assert(boxTy->getLayout()->getFields().size() == 1 &&
+         "promoting compound box not implemented yet");
+  if (getSILBoxFieldType(TypeExpansionContext(*fn), boxTy, mod.Types, 0)
+          .isAddressOnly(*f)) {
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
+                               "argument!\n");
+    return false;
+  }
+
+  // Verify that this closure is known not to mutate the captured value; if
+  // it does, then conservatively refuse to promote any captures of this
+  // value.
+  if (!isNonMutatingCapture(boxArg)) {
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
+    return false;
+  }
+
+  // Record the index and continue.
+  LLVM_DEBUG(llvm::dbgs()
+             << "        Partial apply does not escape, may be optimizable!\n");
+  LLVM_DEBUG(llvm::dbgs() << "        Index: " << index << "\n");
+  state.globalIndexMap.insert(std::make_pair(pai, index));
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                     Project Box Escaping Use Analysis
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -868,10 +1009,10 @@ public:
   /// the old behavior of non-top-level uses not being able to have partial
   /// apply and project box uses.
   struct detail {
-  enum IsMutating_t {
-    IsNotMutating = 0,
-    IsMutating = 1,
-  };
+    enum IsMutating_t {
+      IsNotMutating = 0,
+      IsMutating = 1,
+    };
   };
 #define RECURSIVE_INST_VISITOR(MUTATING, INST)                                 \
   bool visit##INST##Inst(INST##Inst *i) {                                      \
@@ -898,7 +1039,7 @@ public:
   // begin_access may signify a modification, but is considered nonmutating
   // because we will peek though it's uses to find the actual mutation.
   RECURSIVE_INST_VISITOR(IsNotMutating, BeginAccess)
-  RECURSIVE_INST_VISITOR(IsMutating   , UncheckedTakeEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsMutating, UncheckedTakeEnumDataAddr)
 #undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {
@@ -928,22 +1069,6 @@ public:
 
 } // end anonymous namespace
 
-namespace {
-
-struct EscapeMutationScanningState {
-  /// The list of mutations that we found while checking for escapes.
-  llvm::SmallVector<SILInstruction *, 8> foundMutations;
-
-  /// A flag that we use to ensure that we only ever see 1 project_box on an
-  /// alloc_box.
-  bool sawProjectBoxInst;
-
-  /// The global partial_apply -> index map.
-  llvm::DenseMap<PartialApplyInst *, unsigned> &globalIndexMap;
-};
-
-} // end anonymous namespace
-
 /// Given a use of an alloc_box instruction, return true if the use
 /// definitely does not allow the box to escape; also, if the use is an
 /// instruction which possibly mutates the contents of the box, then add it to
@@ -951,73 +1076,6 @@ struct EscapeMutationScanningState {
 static bool isNonEscapingUse(Operand *initialOp,
                              EscapeMutationScanningState &state) {
   return NonEscapingUserVisitor(initialOp, state.foundMutations).compute();
-}
-
-bool isPartialApplyNonEscapingUser(Operand *currentOp, PartialApplyInst *pai,
-                                   EscapeMutationScanningState &state) {
-  LLVM_DEBUG(llvm::dbgs() << "    Found partial: " << *pai);
-
-  unsigned opNo = currentOp->getOperandNumber();
-  assert(opNo != 0 && "Alloc box used as callee of partial apply?");
-
-  // If we've already seen this partial apply, then it means the same alloc
-  // box is being captured twice by the same closure, which is odd and
-  // unexpected: bail instead of trying to handle this case.
-  if (state.globalIndexMap.count(pai)) {
-    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
-    return false;
-  }
-
-  SILModule &mod = pai->getModule();
-  SILFunction *f = pai->getFunction();
-  auto closureType = pai->getType().castTo<SILFunctionType>();
-  SILFunctionConventions closureConv(closureType, mod);
-
-  // Calculate the index into the closure's argument list of the captured
-  // box pointer (the captured address is always the immediately following
-  // index so is not stored separately);
-  unsigned index = opNo - 1 + closureConv.getNumSILArguments();
-
-  auto *fn = pai->getReferencedFunctionOrNull();
-
-  // It is not safe to look at the content of dynamically replaceable functions
-  // since this pass looks at the content of Fn.
-  if (!fn || !fn->isDefinition() || fn->isDynamicallyReplaceable()) {
-    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
-                          "reference.\n");
-    return false;
-  }
-
-  SILArgument *boxArg = getBoxFromIndex(fn, index);
-
-  // For now, return false is the address argument is an address-only type,
-  // since we currently handle loadable types only.
-  // TODO: handle address-only types
-  // FIXME: Expansion
-  auto boxTy = boxArg->getType().castTo<SILBoxType>();
-  assert(boxTy->getLayout()->getFields().size() == 1 &&
-         "promoting compound box not implemented yet");
-  if (getSILBoxFieldType(TypeExpansionContext(*fn), boxTy, mod.Types, 0)
-          .isAddressOnly(*f)) {
-    LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
-                               "argument!\n");
-    return false;
-  }
-
-  // Verify that this closure is known not to mutate the captured value; if
-  // it does, then conservatively refuse to promote any captures of this
-  // value.
-  if (!isNonMutatingCapture(boxArg)) {
-    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
-    return false;
-  }
-
-  // Record the index and continue.
-  LLVM_DEBUG(llvm::dbgs()
-             << "        Partial apply does not escape, may be optimizable!\n");
-  LLVM_DEBUG(llvm::dbgs() << "        Index: " << index << "\n");
-  state.globalIndexMap.insert(std::make_pair(pai, index));
-  return true;
 }
 
 static bool isProjectBoxNonEscapingUse(ProjectBoxInst *pbi,
@@ -1034,6 +1092,10 @@ static bool isProjectBoxNonEscapingUse(ProjectBoxInst *pbi,
 
   return true;
 }
+
+//===----------------------------------------------------------------------===//
+//                Top Level AllocBox Escape/Mutation Analysis
+//===----------------------------------------------------------------------===//
 
 static bool scanUsesForEscapesAndMutations(Operand *op,
                                            EscapeMutationScanningState &state) {
@@ -1149,35 +1211,6 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
   return true;
 }
 
-static SILFunction *
-constructClonedFunction(SILOptFunctionBuilder &funcBuilder,
-                        PartialApplyInst *pai, FunctionRefInst *fri,
-                        IndicesSet &promotableIndices,
-                        ResilienceExpansion resilienceExpansion) {
-  SILFunction *f = pai->getFunction();
-
-  // Create the Cloned Name for the function.
-  SILFunction *origF = fri->getReferencedFunctionOrNull();
-
-  IsSerialized_t isSerialized = IsNotSerialized;
-  if (f->isSerialized() && origF->isSerialized())
-    isSerialized = IsSerialized_t::IsSerializable;
-
-  auto clonedName = getSpecializedName(origF, isSerialized, promotableIndices);
-
-  // If we already have such a cloned function in the module then just use it.
-  if (auto *prevF = f->getModule().lookUpFunction(clonedName)) {
-    assert(prevF->isSerialized() == isSerialized);
-    return prevF;
-  }
-
-  // Otherwise, create a new clone.
-  ClosureCloner cloner(funcBuilder, origF, isSerialized, clonedName,
-                       promotableIndices, resilienceExpansion);
-  cloner.populateCloned();
-  return cloner.getCloned();
-}
-
 /// For an alloc_box or iterated copy_value alloc_box, get or create the
 /// project_box for the copy or original alloc_box.
 ///
@@ -1221,6 +1254,10 @@ static SILValue getOrCreateProjectBoxHelper(SILValue partialOperand) {
   return b.createProjectBox(box->getLoc(), box, 0);
 }
 
+//===----------------------------------------------------------------------===//
+//         Top Level Processing of Partial Applies with AllocBox Args
+//===----------------------------------------------------------------------===//
+
 /// Change the base in mark_dependence.
 static void
 mapMarkDependenceArguments(SingleValueInstruction *root,
@@ -1257,7 +1294,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   auto *fri = dyn_cast<FunctionRefInst>(pai->getCallee());
 
   // Clone the closure with the given promoted captures.
-  SILFunction *clonedFn = constructClonedFunction(
+  SILFunction *clonedFn = ClosureCloner::constructClonedFunction(
       funcBuilder, pai, fri, promotableIndices, f->getResilienceExpansion());
   worklist.push_back(clonedFn);
 
@@ -1382,6 +1419,10 @@ static void constructMapFromPartialApplyToPromotableIndices(
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                            Top Level Entrypoint
+//===----------------------------------------------------------------------===//
 
 namespace {
 
