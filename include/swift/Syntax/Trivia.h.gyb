@@ -99,8 +99,6 @@
 namespace swift {
 namespace syntax {
 
-class AbsolutePosition;
-
 /// The kind of source trivia, such as spaces, newlines, or comments.
 enum class TriviaKind {
 % for trivia in TRIVIAS:
@@ -181,8 +179,6 @@ public:
   bool isComment() const {
     return isCommentTriviaKind(getKind());
   }
-
-  void accumulateAbsolutePosition(AbsolutePosition &Pos) const;
   
   /// Try to compose this and Next to one TriviaPiece.
   /// It returns true if it is succeeded.

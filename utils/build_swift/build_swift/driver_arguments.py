@@ -350,6 +350,9 @@ def create_argument_parser():
            help='enable code coverage analysis in Swift (false, not-merged, '
                 'merged).')
 
+    option('--swift-disable-dead-stripping', toggle_true, 
+           help="Turn off Darwin-specific dead stripping for Swift host tools")
+
     option('--build-subdir', store,
            metavar='PATH',
            help='name of the directory under $SWIFT_BUILD_ROOT where the '

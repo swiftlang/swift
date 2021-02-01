@@ -171,6 +171,9 @@ endif()
 set(SWIFT_USE_LINKER ${SWIFT_USE_LINKER_default} CACHE STRING
     "Build Swift with a non-default linker")
 
+option(SWIFT_DISABLE_DEAD_STRIPPING 
+      "Turn off Darwin-specific dead stripping for Swift host tools." FALSE)
+
 set(SWIFT_TOOLS_ENABLE_LTO OFF CACHE STRING "Build Swift tools with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
     option only affects the tools that run on the host (the compiler), and has

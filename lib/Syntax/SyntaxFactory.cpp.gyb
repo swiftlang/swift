@@ -43,9 +43,8 @@ TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
                                      const Trivia &TrailingTrivia,
                                      SourcePresence Presence,
                                      RC<SyntaxArena> Arena) {
-  return make<TokenSyntax>(RawSyntax::make(Kind, Text, LeadingTrivia.Pieces,
-                                           TrailingTrivia.Pieces, Presence,
-                                           Arena));
+  return makeRoot<TokenSyntax>(RawSyntax::makeAndCalcLength(Kind, Text, 
+    LeadingTrivia.Pieces, TrailingTrivia.Pieces, Presence, Arena));
 }
 
 UnknownSyntax
@@ -56,9 +55,9 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
   for (auto &Token : Tokens) {
     Layout.push_back(Token.getRaw());
   }
-  auto Raw = RawSyntax::make(SyntaxKind::Unknown, Layout,
-                             SourcePresence::Present, Arena);
-  return make<UnknownSyntax>(Raw);
+  auto Raw = RawSyntax::makeAndCalcLength(SyntaxKind::Unknown, Layout,
+                                          SourcePresence::Present, Arena);
+  return makeRoot<UnknownSyntax>(Raw);
 }
 
 Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
@@ -147,13 +146,15 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
 %   end
     if (I != Elements.size())
       return nullptr;
-    return RawSyntax::make(Kind, Layout, SourcePresence::Present, Arena);
+    return RawSyntax::makeAndCalcLength(Kind, Layout, SourcePresence::Present, 
+                                        Arena);
 % elif node.is_syntax_collection():
     for (auto &E : Elements) {
       if (!canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E))
         return nullptr;
     }
-    return RawSyntax::make(Kind, Elements, SourcePresence::Present, Arena);
+    return RawSyntax::makeAndCalcLength(Kind, Elements, SourcePresence::Present, 
+                                        Arena);
 % else:
     return nullptr;
 % end
@@ -173,7 +174,7 @@ Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
     Layout.emplace_back(E.getRaw());
 
   if (auto Raw = createRaw(Kind, Layout, Arena))
-    return make<Syntax>(Raw);
+    return makeRoot<Syntax>(Raw);
   else
     return None;
 }
@@ -190,7 +191,7 @@ Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(${child_params},
                                        RC<SyntaxArena> Arena) {
-  auto Raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
+  auto Raw = RawSyntax::makeAndCalcLength(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
     ${child.name}.hasValue() ? ${child.name}->getRaw() : nullptr,
@@ -199,7 +200,7 @@ SyntaxFactory::make${node.syntax_kind}(${child_params},
 %       end
 %     end
   }, SourcePresence::Present, Arena);
-  return make<${node.name}>(Raw);
+  return makeRoot<${node.name}>(Raw);
 }
 %   elif node.is_syntax_collection():
 ${node.name}
@@ -211,9 +212,9 @@ SyntaxFactory::make${node.syntax_kind}(
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
   }
-  auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind},
-                             layout, SourcePresence::Present, Arena);
-  return make<${node.name}>(raw);
+  auto raw = RawSyntax::makeAndCalcLength(SyntaxKind::${node.syntax_kind},
+    layout, SourcePresence::Present, Arena);
+  return makeRoot<${node.name}>(raw);
 }
 %   end
 
@@ -227,8 +228,8 @@ SyntaxFactory::makeBlank${node.syntax_kind}(RC<SyntaxArena> Arena) {
     ${make_missing_child(child)},
 %       end
 %   end
-  }, SourcePresence::Present, Arena);
-  return make<${node.name}>(raw);
+  }, /*TextLength=*/0, SourcePresence::Present, Arena);
+  return makeRoot<${node.name}>(raw);
 }
 % end
 

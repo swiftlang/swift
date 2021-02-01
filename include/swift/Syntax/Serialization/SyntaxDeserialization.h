@@ -162,7 +162,7 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
       StringRef nodeIdString;
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::make(
+      value = swift::RawSyntax::makeAndCalcLength(
           tokenKind, swift::OwnedString::makeRefCounted(text), leadingTrivia,
           trailingTrivia, presence, /*Arena=*/nullptr, nodeId);
     } else {
@@ -178,8 +178,8 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
       StringRef nodeIdString;
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::make(kind, layout, presence, /*Arena=*/nullptr,
-                                     nodeId);
+      value = swift::RawSyntax::makeAndCalcLength(kind, layout, presence,
+                                                  /*Arena=*/nullptr, nodeId);
     }
   }
 };
@@ -198,7 +198,7 @@ public:
   llvm::Optional<swift::SourceFileSyntax> getSourceFileSyntax() {
     swift::RC<swift::RawSyntax> raw;
     Input >> raw;
-    return swift::make<swift::SourceFileSyntax>(raw);
+    return swift::makeRoot<swift::SourceFileSyntax>(raw);
   }
 };
 } // namespace json

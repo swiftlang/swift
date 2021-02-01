@@ -121,7 +121,8 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
   // In either case, we only want the result of that function type because that
   // is the function type with the generic params that need to be substituted:
   //   (Generic) -> CType
-  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember())
+  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember() ||
+      oldDecl->isStatic())
     newFnType = cast<FunctionType>(newFnType->getResult().getPointer());
   SmallVector<ParamDecl *, 4> newParams;
   unsigned i = 0;
@@ -162,6 +163,10 @@ static ConcreteDeclRef generateDeclRefForSpecializedCXXFunctionTemplate(
       /*Async=*/false, oldDecl->hasThrows(), newParamList,
       newFnType->getResult(), /*GenericParams=*/nullptr,
       oldDecl->getDeclContext(), specialized);
+  if (oldDecl->isStatic()) {
+    newFnDecl->setStatic();
+    newFnDecl->setImportAsStaticMember();
+  }
   newFnDecl->setSelfAccessKind(cast<FuncDecl>(oldDecl)->getSelfAccessKind());
   return ConcreteDeclRef(newFnDecl);
 }
