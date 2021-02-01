@@ -202,6 +202,7 @@ EXPECTED_DEFAULTS = {
     'swift_assertions': True,
     'swift_build_variant': 'Debug',
     'swift_compiler_version': None,
+    'swift_disable_dead_stripping': False,
     'swift_darwin_module_archs': None,
     'swift_darwin_supported_archs': None,
     'swift_stdlib_assertions': True,
@@ -551,6 +552,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--verbose-build'),
     EnableOption('--watchos'),
     EnableOption('--xctest', dest='build_xctest'),
+    EnableOption('--swift-disable-dead-stripping'),
 
     DisableOption('--skip-build-cmark', dest='build_cmark'),
     DisableOption('--skip-build-llvm', dest='build_llvm'),
