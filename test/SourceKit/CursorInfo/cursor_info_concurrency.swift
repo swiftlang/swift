@@ -14,6 +14,8 @@ func test(act: MyActor) async throws {
     try await act.asyncFunc {}
 }
 
+// REQUIRES: concurrency
+
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
