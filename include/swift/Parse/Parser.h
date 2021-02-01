@@ -59,7 +59,6 @@ namespace swift {
   struct EnumElementInfo;
   
   namespace syntax {
-    class AbsolutePosition;
     class RawSyntax;
     enum class SyntaxKind;
   }// end of syntax namespace
@@ -1817,14 +1816,10 @@ bool isKeywordPossibleDeclStart(const Token &Tok);
 
 /// Lex and return a vector of `TokenSyntax` tokens, which include
 /// leading and trailing trivia.
-std::vector<std::pair<RC<syntax::RawSyntax>,
-                                 syntax::AbsolutePosition>>
-tokenizeWithTrivia(const LangOptions &LangOpts,
-                   const SourceManager &SM,
-                   unsigned BufferID,
-                   unsigned Offset = 0,
-                   unsigned EndOffset = 0,
-                   DiagnosticEngine *Diags = nullptr);
+std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
+                   unsigned BufferID, unsigned Offset = 0,
+                   unsigned EndOffset = 0, DiagnosticEngine *Diags = nullptr);
 } // end namespace swift
 
 #endif

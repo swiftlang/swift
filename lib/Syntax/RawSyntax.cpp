@@ -67,15 +67,24 @@ void swift::dumpTokenKind(llvm::raw_ostream &OS, tok Kind) {
   }
 }
 
+// FIXME: If we want thread-safety for tree creation, this needs to be atomic.
 unsigned RawSyntax::NextFreeNodeId = 1;
 
 RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                     SourcePresence Presence, const RC<SyntaxArena> &Arena,
+                     size_t TextLength, SourcePresence Presence,
+                     const RC<SyntaxArena> &Arena,
                      llvm::Optional<unsigned> NodeId) {
   assert(Kind != SyntaxKind::Token &&
          "'token' syntax node must be constructed with dedicated constructor");
 
   RefCount = 0;
+
+  size_t TotalSubNodeCount = 0;
+  for (auto Child : Layout) {
+    if (Child) {
+      TotalSubNodeCount += Child->getTotalSubNodeCount() + 1;
+    }
+  }
 
   if (NodeId.hasValue()) {
     this->NodeId = NodeId.getValue();
@@ -83,10 +92,12 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   } else {
     this->NodeId = NextFreeNodeId++;
   }
-  Bits.Common.Kind = unsigned(Kind);
+  Bits.Common.TextLength = TextLength;
   Bits.Common.Presence = unsigned(Presence);
+  Bits.Common.IsToken = false;
   Bits.Layout.NumChildren = Layout.size();
-  Bits.Layout.TextLength = UINT32_MAX;
+  Bits.Layout.TotalSubNodeCount = TotalSubNodeCount;
+  Bits.Layout.Kind = unsigned(Kind);
 
   this->Arena = Arena;
 
@@ -95,7 +106,7 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                           getTrailingObjects<RC<RawSyntax>>());
 }
 
-RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
+RawSyntax::RawSyntax(tok TokKind, OwnedString Text, size_t TextLength,
                      ArrayRef<TriviaPiece> LeadingTrivia,
                      ArrayRef<TriviaPiece> TrailingTrivia,
                      SourcePresence Presence, const RC<SyntaxArena> &Arena,
@@ -108,8 +119,9 @@ RawSyntax::RawSyntax(tok TokKind, OwnedString Text,
   } else {
     this->NodeId = NextFreeNodeId++;
   }
-  Bits.Common.Kind = unsigned(SyntaxKind::Token);
+  Bits.Common.TextLength = TextLength;
   Bits.Common.Presence = unsigned(Presence);
+  Bits.Common.IsToken = true;
   Bits.Token.TokenKind = unsigned(TokKind);
   Bits.Token.NumLeadingTrivia = LeadingTrivia.size();
   Bits.Token.NumTrailingTrivia = TrailingTrivia.size();
@@ -142,7 +154,7 @@ RawSyntax::~RawSyntax() {
 }
 
 RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                              SourcePresence Presence,
+                              size_t TextLength, SourcePresence Presence,
                               const RC<SyntaxArena> &Arena,
                               llvm::Optional<unsigned> NodeId) {
   auto size = totalSizeToAlloc<RC<RawSyntax>, OwnedString, TriviaPiece>(
@@ -150,10 +162,10 @@ RC<RawSyntax> RawSyntax::make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   void *data = Arena ? Arena->Allocate(size, alignof(RawSyntax))
                      : ::operator new(size);
   return RC<RawSyntax>(
-      new (data) RawSyntax(Kind, Layout, Presence, Arena, NodeId));
+      new (data) RawSyntax(Kind, Layout, TextLength, Presence, Arena, NodeId));
 }
 
-RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
+RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text, size_t TextLength,
                               ArrayRef<TriviaPiece> LeadingTrivia,
                               ArrayRef<TriviaPiece> TrailingTrivia,
                               SourcePresence Presence,
@@ -163,9 +175,9 @@ RC<RawSyntax> RawSyntax::make(tok TokKind, OwnedString Text,
       0, 1, LeadingTrivia.size() + TrailingTrivia.size());
   void *data = Arena ? Arena->Allocate(size, alignof(RawSyntax))
                      : ::operator new(size);
-  return RC<RawSyntax>(new (data) RawSyntax(TokKind, Text, LeadingTrivia,
-                                            TrailingTrivia, Presence,
-                                            Arena, NodeId));
+  return RC<RawSyntax>(new (data)
+                           RawSyntax(TokKind, Text, TextLength, LeadingTrivia,
+                                     TrailingTrivia, Presence, Arena, NodeId));
 }
 
 RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
@@ -174,11 +186,12 @@ RC<RawSyntax> RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
   NewLayout.reserve(Layout.size() + 1);
   std::copy(Layout.begin(), Layout.end(), std::back_inserter(NewLayout));
   NewLayout.push_back(NewLayoutElement);
-  return RawSyntax::make(getKind(), NewLayout, SourcePresence::Present);
+  return RawSyntax::makeAndCalcLength(getKind(), NewLayout,
+                                      SourcePresence::Present);
 }
 
-RC<RawSyntax> RawSyntax::replaceChild(CursorIndex Index,
-                                      RC<RawSyntax> NewLayoutElement) const {
+RC<RawSyntax> RawSyntax::replacingChild(CursorIndex Index,
+                                        RC<RawSyntax> NewLayoutElement) const {
   auto Layout = getLayout();
   std::vector<RC<RawSyntax>> NewLayout;
   NewLayout.reserve(Layout.size());
@@ -191,49 +204,7 @@ RC<RawSyntax> RawSyntax::replaceChild(CursorIndex Index,
   std::copy(Layout.begin() + Index + 1, Layout.end(),
             std::back_inserter(NewLayout));
 
-  return RawSyntax::make(getKind(), NewLayout, getPresence());
-}
-
-llvm::Optional<AbsolutePosition>
-RawSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
-  llvm::Optional<AbsolutePosition> Ret;
-  if (isToken()) {
-    if (isMissing())
-      return None;
-    for (auto &Leader : getLeadingTrivia())
-      Leader.accumulateAbsolutePosition(Pos);
-    Ret = Pos;
-    Pos.addText(getTokenText());
-    for (auto &Trailer : getTrailingTrivia())
-      Trailer.accumulateAbsolutePosition(Pos);
-  } else {
-    for (auto &Child : getLayout()) {
-      if (!Child)
-        continue;
-      auto Result = Child->accumulateAbsolutePosition(Pos);
-      if (!Ret && Result)
-        Ret = Result;
-    }
-  }
-  return Ret;
-}
-
-bool RawSyntax::accumulateLeadingTrivia(AbsolutePosition &Pos) const {
- if (isToken()) {
-    if (!isMissing()) {
-      for (auto &Leader: getLeadingTrivia())
-        Leader.accumulateAbsolutePosition(Pos);
-      return true;
-    }
-  } else {
-    for (auto &Child: getLayout()) {
-      if (!Child || Child->isMissing())
-        continue;
-      if (Child->accumulateLeadingTrivia(Pos))
-        return true;
-    }
-  }
-  return false;
+  return RawSyntax::makeAndCalcLength(getKind(), NewLayout, getPresence());
 }
 
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
@@ -313,22 +284,6 @@ void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   OS << ')';
 }
 
-void AbsolutePosition::printLineAndColumn(llvm::raw_ostream &OS) const {
-  OS << getLine() << ':' << getColumn();
-}
-
-void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
-  OS << "(absolute_position ";
-  OS << "offset=" << getOffset() << " ";
-  OS << "line=" << getLine() << " ";
-  OS << "column=" << getColumn();
-  OS << ')';
-}
-
-void AbsolutePosition::dump() const {
-  dump(llvm::errs());
-}
-
 void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
                         OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
                         ArrayRef<TriviaPiece> TrailingTrivia) {
@@ -350,9 +305,4 @@ void RawSyntax::Profile(llvm::FoldingSetNodeID &ID, tok TokKind,
     Piece.Profile(ID);
   for (auto &Piece : TrailingTrivia)
     Piece.Profile(ID);
-}
-
-llvm::raw_ostream &llvm::operator<<(raw_ostream &OS, AbsolutePosition Pos) {
-  Pos.printLineAndColumn(OS);
-  return OS;
 }

@@ -289,26 +289,23 @@ struct ByteBasedSourceRangeSet {
   }
 };
 
-int getTokensFromFile(unsigned BufferID,
-                      LangOptions &LangOpts,
-                      SourceManager &SourceMgr,
-                      swift::DiagnosticEngine &Diags,
-                      std::vector<std::pair<RC<syntax::RawSyntax>,
-                      syntax::AbsolutePosition>> &Tokens) {
+int getTokensFromFile(
+    unsigned BufferID, LangOptions &LangOpts, SourceManager &SourceMgr,
+    swift::DiagnosticEngine &Diags,
+    std::vector<std::pair<RC<syntax::RawSyntax>,
+                          syntax::AbsoluteOffsetPosition>> &Tokens) {
   Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID,
                               /*Offset=*/0, /*EndOffset=*/0,
                               &Diags);
   return EXIT_SUCCESS;
 }
 
-
-int
-getTokensFromFile(const StringRef InputFilename,
-                  LangOptions &LangOpts,
-                  SourceManager &SourceMgr,
-                  DiagnosticEngine &Diags,
-                  std::vector<std::pair<RC<syntax::RawSyntax>,
-                                        syntax::AbsolutePosition>> &Tokens) {
+int getTokensFromFile(
+    const StringRef InputFilename, LangOptions &LangOpts,
+    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    unsigned int &OutBufferID,
+    std::vector<std::pair<RC<syntax::RawSyntax>,
+                          syntax::AbsoluteOffsetPosition>> &Tokens) {
   auto Buffer = llvm::MemoryBuffer::getFile(InputFilename);
   if (!Buffer) {
     Diags.diagnose(SourceLoc(), diag::cannot_open_file,
@@ -316,8 +313,8 @@ getTokensFromFile(const StringRef InputFilename,
     return EXIT_FAILURE;
   }
 
-  auto BufferID = SourceMgr.addNewSourceBuffer(std::move(Buffer.get()));
-  return getTokensFromFile(BufferID, LangOpts, SourceMgr, Diags, Tokens);
+  OutBufferID = SourceMgr.addNewSourceBuffer(std::move(Buffer.get()));
+  return getTokensFromFile(OutBufferID, LangOpts, SourceMgr, Diags, Tokens);
 }
 
 void anchorForGetMainExecutable() {}
@@ -674,10 +671,11 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::RawSyntax>,
-                                   syntax::AbsolutePosition>> Tokens;
-  if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
-                        Diags, Tokens) == EXIT_FAILURE) {
+  unsigned int BufferID;
+  std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+      Tokens;
+  if (getTokensFromFile(InputFilename, LangOpts, SourceMgr, Diags, BufferID,
+                        Tokens) == EXIT_FAILURE) {
     return EXIT_FAILURE;
   }
 
@@ -695,15 +693,20 @@ int doDumpRawTokenSyntax(const StringRef InputFile) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<RC<syntax::RawSyntax>,
-                        syntax::AbsolutePosition>> Tokens;
-  if (getTokensFromFile(InputFile, LangOpts, SourceMgr, Diags, Tokens) ==
-      EXIT_FAILURE) {
+  unsigned int BufferID;
+  std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+      Tokens;
+  if (getTokensFromFile(InputFile, LangOpts, SourceMgr, Diags, BufferID,
+                        Tokens) == EXIT_FAILURE) {
     return EXIT_FAILURE;
   }
 
   for (auto TokAndPos : Tokens) {
-    llvm::outs() << TokAndPos.second << "\n";
+    SourceLoc Loc =
+        SourceMgr.getLocForOffset(BufferID, TokAndPos.second.getOffset());
+    unsigned Line, Column;
+    std::tie(Line, Column) = SourceMgr.getPresumedLineAndColumnForLoc(Loc);
+    llvm::outs() << Line << ":" << Column << "\n";
     TokAndPos.first->dump(llvm::outs());
     llvm::outs() << "\n";
   }
@@ -824,8 +827,7 @@ int dumpEOFSourceLoc(const char *MainExecutablePath,
 
     // To ensure the correctness of position when translated to line & column
     // pair.
-    if (SourceMgr.getPresumedLineAndColumnForLoc(EndLoc) !=
-        AbPos.getLineAndColumn()) {
+    if (SourceMgr.getLocOffsetInBuffer(EndLoc, BufferId) != AbPos.getOffset()) {
       llvm::outs() << "locations should be identical";
       return EXIT_FAILURE;
     }

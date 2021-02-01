@@ -97,7 +97,7 @@ Optional<SourceFileSyntax>
 SyntaxTreeCreator::realizeSyntaxRoot(OpaqueSyntaxNode rootN,
                                      const SourceFile &SF) {
   auto raw = transferOpaqueNode(rootN);
-  auto rootNode = make<SourceFileSyntax>(raw);
+  auto rootNode = makeRoot<SourceFileSyntax>(raw);
 
   // Verify the tree if specified.
   if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
@@ -132,8 +132,9 @@ SyntaxTreeCreator::recordToken(tok tokenKind,
                                              trailingTriviaLoc, SM, BufferID);
   StringRef tokenText = SM.extractText(tokRange, BufferID);
   auto ownedText = OwnedString::makeRefCounted(tokenText);
-  auto raw = TokenCache->getToken(Arena, tokenKind, ownedText,
-                    syntaxLeadingTrivia.Pieces, syntaxTrailingTrivia.Pieces);
+  auto raw = TokenCache->getToken(Arena, tokenKind, range.getByteLength(),
+                                  ownedText, syntaxLeadingTrivia.Pieces,
+                                  syntaxTrailingTrivia.Pieces);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;
@@ -157,7 +158,9 @@ SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
   for (OpaqueSyntaxNode opaqueN : elements) {
     parts.push_back(transferOpaqueNode(opaqueN));
   }
-  auto raw = RawSyntax::make(kind, parts, SourcePresence::Present, Arena);
+  size_t TextLength = range.isValid() ? range.getByteLength() : 0;
+  auto raw =
+      RawSyntax::make(kind, parts, TextLength, SourcePresence::Present, Arena);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;

@@ -42,16 +42,14 @@ static bool shouldCacheNode(tok TokKind, size_t TextSize,
   return true;
 }
 
-RC<RawSyntax>
-RawSyntaxTokenCache::getToken(RC<SyntaxArena> &Arena, tok TokKind,
-                              OwnedString Text,
-                              ArrayRef<TriviaPiece> LeadingTrivia,
-                              ArrayRef<TriviaPiece> TrailingTrivia) {
+RC<RawSyntax> RawSyntaxTokenCache::getToken(
+    RC<SyntaxArena> &Arena, tok TokKind, size_t TextLength, OwnedString Text,
+    ArrayRef<TriviaPiece> LeadingTrivia, ArrayRef<TriviaPiece> TrailingTrivia) {
   // Determine whether this token is worth to cache.
   if (!shouldCacheNode(TokKind, Text.size(), LeadingTrivia, TrailingTrivia)) {
     // Do not use cache.
-    return RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
-                           SourcePresence::Present, Arena);
+    return RawSyntax::make(TokKind, Text, TextLength, LeadingTrivia,
+                           TrailingTrivia, SourcePresence::Present, Arena);
   }
 
   // This node is cacheable. Get or create.
@@ -65,8 +63,8 @@ RawSyntaxTokenCache::getToken(RC<SyntaxArena> &Arena, tok TokKind,
   }
 
   // Could not found in the cache. Create it.
-  auto Raw = RawSyntax::make(TokKind, Text, LeadingTrivia, TrailingTrivia,
-                             SourcePresence::Present, Arena);
+  auto Raw = RawSyntax::make(TokKind, Text, TextLength, LeadingTrivia,
+                             TrailingTrivia, SourcePresence::Present, Arena);
   auto IDRef = ID.Intern(Arena->getAllocator());
   auto CacheNode = new (Arena) RawSyntaxCacheNode(Raw, IDRef);
   // Keep track of the created RawSyntaxCacheNode so that we can destruct it
