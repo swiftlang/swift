@@ -248,13 +248,13 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --test
+       --sccache --release-debuginfo --swift-disable-dead-stripping --test
      ```
    - Via Xcode:
      ```sh
      utils/build-script --skip-build-benchmarks \
        --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
-       --sccache --release-debuginfo --test \
+       --sccache --release-debuginfo --swift-disable-dead-stripping --test \
        --xcode
      ```
    This will create a directory
