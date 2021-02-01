@@ -22,6 +22,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
@@ -90,6 +91,12 @@ class SimplifyCFG {
   SILOptFunctionBuilder FuncBuilder;
   SILFunction &Fn;
   SILPassManager *PM;
+
+  // DeadEndBlocks remains conservatively valid across updates that rewrite
+  // branches and remove edges. Any transformation that adds a block must call
+  // updateForReachableBlock(). Removing a block causes a dangling pointer
+  // within DeadEndBlocks, but this pointer can't be accessed by queries.
+  DeadEndBlocks *deBlocks = nullptr;
 
   // WorklistList is the actual list that we iterate over (for determinism).
   // Slots may be null, which should be ignored.
@@ -700,7 +707,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
     // Do dominator based simplification of terminator condition. This does not
     // and MUST NOT change the CFG without updating the dominator tree to
     // reflect such change.
-    if (tryCheckedCastBrJumpThreading(&Fn, DT, BlocksForWorklist,
+    if (tryCheckedCastBrJumpThreading(&Fn, DT, deBlocks, BlocksForWorklist,
                                       EnableOSSARewriteTerminator)) {
       for (auto BB: BlocksForWorklist)
         addToWorklist(BB);
@@ -1204,7 +1211,7 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
     // All of our interesting simplifications are on single-value instructions
     // for now.
     if (auto *I = dyn_cast<SingleValueInstruction>(*O)) {
-      simplifyAndReplaceAllSimplifiedUsesAndErase(I, callbacks);
+      simplifyAndReplaceAllSimplifiedUsesAndErase(I, callbacks, deBlocks);
     }
   }
   return callbacks.hadCallbackInvocation();
@@ -3373,6 +3380,16 @@ bool SimplifyCFG::run() {
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);
 
+  DeadEndBlocksAnalysis *deBlocksAnalysis =
+    PM->getAnalysis<DeadEndBlocksAnalysis>();
+  if (Changed) {
+    // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
+    // but avoids excess dangling pointers in deBlocks.
+    deBlocksAnalysis->invalidate(&Fn,
+                                 SILAnalysis::InvalidationKind::Everything);
+  }
+  deBlocks = deBlocksAnalysis->get(&Fn);
+
   // Find the set of loop headers. We don't want to jump-thread through headers.
   findLoopHeaders();
 
@@ -3391,11 +3408,15 @@ bool SimplifyCFG::run() {
 
   // Do simplifications that require the dominator tree to be accurate.
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
-
   if (Changed) {
     // Force dominator recomputation since we modified the cfg.
     DA->invalidate(&Fn, SILAnalysis::InvalidationKind::Everything);
+    // Eliminate unreachable blocks from deBlocks. This isn't strictly necessary
+    // but avoids excess dangling pointers in deBlocks.
+    deBlocksAnalysis->invalidate(&Fn,
+                                 SILAnalysis::InvalidationKind::Everything);
   }
+  deBlocks = deBlocksAnalysis->get(&Fn);
 
   Changed |= dominatorBasedSimplify(DA);
 
