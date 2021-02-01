@@ -4070,23 +4070,34 @@ ConstraintSystem::applyPropertyWrapperParameter(
 
   PropertyWrapperInitKind initKind;
   if (argLabel.hasDollarPrefix()) {
-    auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
-    if (!typeInfo.projectedValueVar) {
+    auto attemptProjectedValueFix = [&](ConstraintFix *fix) -> ConstraintSystem::TypeMatchResult {
       if (shouldAttemptFixes()) {
         if (paramType->hasTypeVariable())
           recordPotentialHole(paramType);
 
-        auto *fix = AddProjectedValue::create(*this, wrapperType, getConstraintLocator(locator));
         if (!recordFix(fix))
           return getTypeMatchSuccess();
       }
 
       return getTypeMatchFailure(locator);
+    };
+
+    auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+    if (!typeInfo.projectedValueVar) {
+      auto *fix = AddProjectedValue::create(*this, wrapperType, getConstraintLocator(locator));
+      return attemptProjectedValueFix(fix);
     }
 
     auto projectionType = wrapperType->getTypeOfMember(param->getModuleContext(),
                                                        typeInfo.projectedValueVar);
     addConstraint(matchKind, paramType, projectionType, locator);
+
+    if (param->getAttachedPropertyWrappers().front()->getArg()) {
+      auto *fix = UseWrappedValue::create(*this, param, /*base=*/Type(), wrapperType,
+                                          getConstraintLocator(locator));
+      return attemptProjectedValueFix(fix);
+    }
+
     initKind = PropertyWrapperInitKind::ProjectedValue;
   } else {
     generateWrappedPropertyTypeConstraints(*this, wrapperType, param, paramType);

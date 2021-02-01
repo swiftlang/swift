@@ -3291,6 +3291,13 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
     return true;
   }
 
+  if (isa<ParamDecl>(getProperty())) {
+    auto wrapperType = getToType();
+    auto wrappedValueType = computeWrappedValueType(getProperty(), wrapperType);
+    emitDiagnostic(diag::property_wrapper_param_projection_invalid, wrappedValueType);
+    return true;
+  }
+
   emitDiagnostic(diag::incorrect_property_wrapper_reference, getPropertyName(),
                  getFromType(), getToType(), true)
       .fixItRemoveChars(getLoc(), endLoc);

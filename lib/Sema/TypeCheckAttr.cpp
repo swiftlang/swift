@@ -2995,12 +2995,6 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
     }
 
-    if (isa<ParamDecl>(D) && attr->getArg()) {
-      diagnose(attr->getArg()->getLoc(), diag::property_wrapper_param_arg);
-      attr->setInvalid();
-      return;
-    }
-
     return;
   }
 
