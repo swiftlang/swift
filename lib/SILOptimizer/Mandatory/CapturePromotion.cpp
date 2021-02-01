@@ -17,8 +17,8 @@
 ///
 /// Swift's closure model is that all local variables are capture by reference.
 /// This produces a very simple programming model which is great to use, but
-/// relies on the optimizer to promote by-ref captures to by-value (i.e. by-copy)
-/// captures for decent performance. Consider this simple example:
+/// relies on the optimizer to promote by-ref captures to by-value (i.e.
+/// by-copy) captures for decent performance. Consider this simple example:
 ///
 ///   func foo(a : () -> ()) {} // assume this has an unknown body
 ///
@@ -30,25 +30,25 @@
 ///
 /// Since x is captured by-ref by the closure, x must live on the heap. By
 /// looking at bar without any knowledge of foo, we can know that it is safe to
-/// promote this to a by-value capture, allowing x to live on the stack under the
-/// following conditions:
+/// promote this to a by-value capture, allowing x to live on the stack under
+/// the following conditions:
 ///
 /// 1. If x is not modified in the closure body and is only loaded.
 /// 2. If we can prove that all mutations to x occur before the closure is
 ///    formed.
 ///
-/// Under these conditions if x is loadable then we can even load the given value
-/// and pass it as a scalar instead of an address.
+/// Under these conditions if x is loadable then we can even load the given
+/// value and pass it as a scalar instead of an address.
 ///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -365,8 +365,8 @@ computeNewArgInterfaceTypes(SILFunction *f, IndicesSet &promotableIndices,
         param.getSILStorageType(fnConv.silConv.getModule(), fnConv.funcTy,
                                 TypeExpansionContext::minimal());
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
-    assert(paramBoxTy->getLayout()->getFields().size() == 1
-           && "promoting compound box not implemented yet");
+    assert(paramBoxTy->getLayout()->getFields().size() == 1 &&
+           "promoting compound box not implemented yet");
     auto paramBoxedTy =
         getSILBoxFieldType(TypeExpansionContext(*f), paramBoxTy, types, 0);
     assert(expansion == f->getResilienceExpansion());
@@ -452,8 +452,7 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
 
 /// Populate the body of the cloned closure, modifying instructions as
 /// necessary to take into consideration the promoted capture(s)
-void
-ClosureCloner::populateCloned() {
+void ClosureCloner::populateCloned() {
   SILFunction *cloned = getCloned();
 
   // Create arguments for the entry block
@@ -868,10 +867,10 @@ public:
   /// the old behavior of non-top-level uses not being able to have partial
   /// apply and project box uses.
   struct detail {
-  enum IsMutating_t {
-    IsNotMutating = 0,
-    IsMutating = 1,
-  };
+    enum IsMutating_t {
+      IsNotMutating = 0,
+      IsMutating = 1,
+    };
   };
 #define RECURSIVE_INST_VISITOR(MUTATING, INST)                                 \
   bool visit##INST##Inst(INST##Inst *i) {                                      \
@@ -898,7 +897,7 @@ public:
   // begin_access may signify a modification, but is considered nonmutating
   // because we will peek though it's uses to find the actual mutation.
   RECURSIVE_INST_VISITOR(IsNotMutating, BeginAccess)
-  RECURSIVE_INST_VISITOR(IsMutating   , UncheckedTakeEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsMutating, UncheckedTakeEnumDataAddr)
 #undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {
