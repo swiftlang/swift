@@ -390,6 +390,14 @@ void DeadEndBlocks::compute() {
 //                  Post Dominance Set Completion Utilities
 //===----------------------------------------------------------------------===//
 
+static bool endsInUnreachable(SILBasicBlock *block) {
+  // Handle the case where a single "unreachable" block (e.g. containing a call
+  // to fatalError()), is jumped to from multiple source blocks.
+  if (SILBasicBlock *singleSucc = block->getSingleSuccessorBlock())
+    block = singleSucc;
+  return isa<UnreachableInst>(block->getTerminator());
+}
+
 void JointPostDominanceSetComputer::findJointPostDominatingSet(
     SILBasicBlock *dominatingBlock, ArrayRef<SILBasicBlock *> dominatedBlockSet,
     function_ref<void(SILBasicBlock *)> inputBlocksFoundDuringWalk,
@@ -403,47 +411,31 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
   // dominatingBlock, then we return success since a block post-doms its self so
   // it is already complete.
   //
-  // NOTE: We do not consider this a visiteed
-  if (dominatedBlockSet.size() == 1) {
-    if (dominatingBlock == dominatedBlockSet[0]) {
-      if (inputBlocksInJointPostDomSet)
-        inputBlocksInJointPostDomSet(dominatingBlock);
-      return;
-    }
+  // NOTE: We do not consider this a visited
+  if (dominatedBlockSet.size() == 1 && dominatingBlock == dominatedBlockSet[0]) {
+    if (inputBlocksInJointPostDomSet)
+      inputBlocksInJointPostDomSet(dominatingBlock);
+    return;
   }
 
   // At the top of where we for sure are going to use state... make sure we
   // always clean up any resources that we use!
   SWIFT_DEFER { clear(); };
 
-  /// A set that guards our worklist. Any block before it is added to worklist
-  /// should be checked against visitedBlocks.
-  SILFunction *function = dominatingBlock->getParent();
-  BasicBlockSet visitedBlocks(function);
+  /// All blocks visited during the backwards walk of the CFG, but not including
+  /// the initial blocks in `dominatedBlockSet`.
+  BasicBlockSet visitedBlocks(dominatingBlock->getParent());
 
-  /// The set of blocks where we begin our walk.
-  BasicBlockSet initialBlocks(function);
+  /// All blocks in `dominatedBlockSet` (= blocks where we begin our walk).
+  BasicBlockSet initialBlocks(visitedBlocks.getFunction());
 
-  /// True for blocks which are in blocksThatLeakIfNeverVisited.
-  BasicBlockFlag isLeakingBlock(function);
-
-  // Otherwise, we need to compute our joint post dominating set. We do this by
-  // performing a backwards walk up the CFG tracking back liveness until we find
-  // our dominating block. As we walk up, we keep track of any successor blocks
-  // that we need to visit before the walk completes lest we leak. After we
-  // finish the walk, these leaking blocks are a valid (albeit not unique)
-  // completion of the post dom set.
+  // Compute our joint post dominating set. We do this by performing a backwards
+  // walk up the CFG tracking back liveness until we find our dominating block.
   for (auto *block : dominatedBlockSet) {
-    // Skip dead end blocks.
-    if (deadEndBlocks.isDeadEnd(block))
-      continue;
-
     // We require dominatedBlockSet to be a set and thus assert if we hit it to
     // flag user error to our caller.
-    bool succeededInserting = visitedBlocks.insert(block);
-    (void)succeededInserting;
-    assert(succeededInserting &&
-           "Repeat Elt: dominatedBlockSet should be a set?!");
+    assert(!initialBlocks.contains(block) &&
+           "dominatedBlockSet must not contain duplicate elements");
     initialBlocks.insert(block);
     worklist.push_back(block);
   }
@@ -452,64 +444,64 @@ void JointPostDominanceSetComputer::findJointPostDominatingSet(
   while (!worklist.empty()) {
     auto *block = worklist.pop_back_val();
 
-    // Then if our block is not one of our initial blocks, add the block's
-    // successors to blocksThatLeakIfNeverVisited.
-    if (!initialBlocks.contains(block)) {
-      for (auto *succBlock : block->getSuccessorBlocks()) {
-        if (visitedBlocks.contains(succBlock))
-          continue;
-        if (deadEndBlocks.isDeadEnd(succBlock))
-          continue;
-        blocksThatLeakIfNeverVisited.push_back(succBlock);
-        isLeakingBlock.set(succBlock);
-      }
-    }
-
     // If we are the dominating block, we are done.
     if (dominatingBlock == block)
       continue;
 
-    // Otherwise for each predecessor that we have, first check if it was one of
-    // our initial blocks (signaling a loop) and then add it to the worklist if
-    // we haven't visited it already.
     for (auto *predBlock : block->getPredecessorBlocks()) {
-      if (initialBlocks.contains(predBlock)) {
-        reachableInputBlocks.push_back(predBlock);
-        for (auto *succBlock : predBlock->getSuccessorBlocks()) {
-          if (visitedBlocks.contains(succBlock))
-            continue;
-          if (deadEndBlocks.isDeadEnd(succBlock))
-            continue;
-          if (!isLeakingBlock.testAndSet(succBlock))
-            blocksThatLeakIfNeverVisited.push_back(succBlock);
-        }
-      }
       if (visitedBlocks.insert(predBlock))
         worklist.push_back(predBlock);
     }
   }
 
-  // After our worklist has emptied, any not visited blocks in
-  // blocksThatLeakIfNeverVisited are "leaking blocks".
-  for (auto *leakingBlock : blocksThatLeakIfNeverVisited) {
-    if (!visitedBlocks.contains(leakingBlock))
-      foundJointPostDomSetCompletionBlocks(leakingBlock);
+  // Do the same walk over all visited blocks again to find the "leaking"
+  // blocks. These leaking blocks are the completion of the post dom set.
+  //
+  // Note that we could also keep all visited blocks in a SmallVector in the
+  // first run. But the worklist algorithm is fast and we don't want
+  // to risk that the small vector overflows (the set of visited blocks can be
+  // much larger than the maximum worklist size).
+  BasicBlockSet visitedBlocksInSecondRun(visitedBlocks.getFunction());
+  assert(worklist.empty());
+  worklist.append(dominatedBlockSet.begin(), dominatedBlockSet.end());
+  while (!worklist.empty()) {
+    auto *block = worklist.pop_back_val();
+    if (dominatingBlock == block)
+      continue;
+
+    for (auto *predBlock : block->getPredecessorBlocks()) {
+      assert(visitedBlocks.contains(predBlock));
+      if (visitedBlocksInSecondRun.insert(predBlock)) {
+        worklist.push_back(predBlock);
+        
+        for (auto *succBlock : predBlock->getSuccessorBlocks()) {
+          // All not-visited successors of a visited block are "leaking" blocks.
+          if (!visitedBlocks.contains(succBlock) &&
+              // For this purpose also the initial blocks count as "visited",
+              // although they are not added to the visitedBlocks set.
+              !initialBlocks.contains(succBlock) &&
+              // Ignore blocks which end in an unreachable. This is a very
+              // simple check, but covers most of the cases, e.g. block which
+              // calls fatalError().
+              !endsInUnreachable(succBlock)) {
+            assert(succBlock->getSinglePredecessorBlock() == predBlock &&
+                   "CFG must not contain critical edge");
+            // Note that since there are no critical edges in the CFG, we are
+            // not calling the closure for a leaking successor block twice.
+            foundJointPostDomSetCompletionBlocks(succBlock);
+          }
+        }
+      }
+    }
   }
-
-  // Then unique our list of reachable input blocks and pass them to our
-  // callback.
-  sortUnique(reachableInputBlocks);
-  for (auto *block : reachableInputBlocks)
-    inputBlocksFoundDuringWalk(block);
-
-  // Then if were asked to find the subset of our input blocks that are in the
-  // joint-postdominance set, compute that.
-  if (!inputBlocksInJointPostDomSet)
-    return;
 
   // Pass back the reachable input blocks that were not reachable from other
   // input blocks to.
-  for (auto *block : dominatedBlockSet)
-    if (lower_bound(reachableInputBlocks, block) == reachableInputBlocks.end())
+  for (auto *block : dominatedBlockSet) {
+    if (visitedBlocks.contains(block)) {
+      inputBlocksFoundDuringWalk(block);
+    } else if (inputBlocksInJointPostDomSet) {
       inputBlocksInJointPostDomSet(block);
+    }
+  }
 }
