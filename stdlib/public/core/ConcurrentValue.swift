@@ -10,8 +10,6 @@
 ////
 ////===----------------------------------------------------------------------===//
 
-import Swift
-
 /// The ConcurrentValue protocol indicates that value of the given type can
 /// be safely used in concurrent code.
 @_marker public protocol ConcurrentValue { }
