@@ -8,7 +8,7 @@
 // XFAIL: OS=windows-msvc
 
 // Failing on i386 simulator, disable for now. rdar://73829982
-// XFAIL: DARWIN_SIMULATOR=ios
+// UNSUPPORTED: DARWIN_SIMULATOR=ios
 
 import WitnessLayoutOpts
 
