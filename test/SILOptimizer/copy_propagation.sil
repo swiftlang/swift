@@ -1345,19 +1345,21 @@ bb3:
   return %result : $()
 }
 
-// Do not consolidate this local borrowscope because it has a PointerEscape.
+// Consolidate this local borrowscope even though it has a
+// PointerEscape. The escaping value can be assumed not to be used
+// outside the borrow scope.
 //
 // CHECK-LABEL: sil [ossa] @testBorrowEscape : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       [[BORROW:%.*]] = begin_borrow %0 : $C
-// CHECK:       [[COPY:%.*]] = copy_value [[BORROW]] : $C
-// CHECK-NEXT:  end_borrow %1 : $C
+// CHECK-NOT:   copy_value
+// CHECK:       end_borrow [[BORROW]] : $C
 // CHECK-NEXT:  cond_br undef, bb1, bb2
 // CHECK:     bb1:
+// CHECK:       [[COPY:%.*]] = copy_value %0 : $C
 // CHECK:       apply %{{.*}}([[COPY]]) : $@convention(thin) (@owned C) -> ()
 // CHECK:       br bb3
 // CHECK:     bb2:
-// CHECK-NEXT:  destroy_value [[COPY]] : $C
-// CHECK:     br bb3
+// CHECK-NEXT:  br bb3
 // CHECK:     bb3:
 // CHECK-NOT:   destroy
 // CHECK-LABEL: } // end sil function 'testBorrowEscape'
@@ -1446,4 +1448,183 @@ bb2:
 bb3:
   destroy_value %2 : $C
   return %0 : $C
+}
+
+// =============================================================================
+// Test reborrows
+// =============================================================================
+
+// Extend the lifetime of an owned value through a nested borrow scope
+// with cross-block reborrows. Its lifetime must be extended past the
+// end_borrow of the phi.
+//
+// CHECK-LABEL: sil [ossa] @testSubReborrowExtension : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: [[ALLOC:%.*]] = alloc_ref $C
+// CHECK: [[BORROW:%.*]] = begin_borrow %0 : $C
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   [[CP1:%.*]] = copy_value %0 : $C
+// CHECK:   br bb3([[CP1]] : $C, [[BORROW]] : $C)
+// CHECK: bb2:
+// CHECK:   [[CP2:%.*]] = copy_value %0 : $C
+// CHECK:   br bb3([[CP2]] : $C, [[BORROW]] : $C)
+// CHECK: bb3([[OWNEDPHI:%.*]] : @owned $C, [[BORROWPHI:%.*]] @guaranteed $C
+// CHECK:   end_borrow [[BORROWPHI]]
+// CHECK:   destroy_value [[OWNEDPHI]] : $C
+// CHECK:   destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'testSubReborrowExtension'
+sil [ossa] @testSubReborrowExtension : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  %copy = copy_value %alloc : $C
+  %borrow = begin_borrow %alloc : $C
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3(%copy : $C, %borrow: $C)
+bb2:
+  br bb3(%copy : $C, %borrow: $C)
+bb3(%phi : @owned $C, %borrowphi : @guaranteed $C):
+  end_borrow %borrowphi : $C
+  destroy_value %phi : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a cross-block reborrow and a live nested copy of the reborrow:
+//   def: borrow
+//   use: phi reborrow (in the same block as the borrow)
+//   copy reborrowed phi
+//   end reborrow
+//   copy outside borrow scope.
+//
+// consolidateBorrow only processes the SSA borrow scope, not the
+// extended borrow scope, and it does not process the borrow scope
+// introduced by the phi. Therefore, it should leave the in-scope copy
+// alone-- it will be treated like the definition of a separate OSSA
+// lifetime. The inner copy's lifetime will be canonicalized, removing
+// outercopy.
+//
+// CHECK-LABEL: sil [ossa] @testLiveCopyAfterReborrow : $@convention(thin) () -> () {
+// CHECK: [[ALLOC:%.*]] = alloc_ref $C
+// CHECK: bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK: [[COPY:%.*]] = copy_value [[BORROWPHI]]
+// CHECK: end_borrow [[BORROWPHI]] : $C
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+// CHECK: apply
+// CHECK: destroy_value [[COPY]]
+// CHECK: destroy_value [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testLiveCopyAfterReborrow'
+sil [ossa] @testLiveCopyAfterReborrow : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow1 = begin_borrow %alloc : $C
+  br bb3(%borrow1: $C)
+bb2:
+  %borrow2 = begin_borrow %alloc : $C
+  br bb3(%borrow2: $C)
+bb3(%borrowphi : @guaranteed $C):
+  %innercopy = copy_value %borrowphi : $C
+  end_borrow %borrowphi : $C
+  %outercopy = copy_value %innercopy : $C
+  destroy_value %innercopy : $C
+  %f = function_ref @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
+  apply %f(%outercopy) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %outercopy : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a cross-block reborrow and a dead nested copy of the reborrow:
+//   def: borrow
+//   use: phi reborrow (in the same block as the borrow)
+//   copy reborrowed phi
+//   end reborrow
+//   use of copied reborrow outside borrow scope.
+//
+// consolidateBorrow only processes the SSA borrow scope, not the
+// extended borrow scope, and it does not process the borrow scope
+// introduced by the phi. Therefore, it should leave the in-scope copy alone--
+// it will be treated like the definition of a separate OSSA lifetime.
+// The inner copy's lifetime will be canonicalized, removing
+// outercopy.
+//
+// CHECK-LABEL: sil [ossa] @testDeadCopyAfterReborrow : $@convention(thin) () -> () {
+// CHECK: [[ALLOC:%.*]] = alloc_ref $C
+// CHECK: bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK-NOT: copy_value
+// CHECK: end_borrow [[BORROWPHI]] : $C
+// CHECK-NOT: copy_value
+// CHECK: destroy_value [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testDeadCopyAfterReborrow'
+sil [ossa] @testDeadCopyAfterReborrow : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow1 = begin_borrow %alloc : $C
+  br bb3(%borrow1: $C)
+bb2:
+  %borrow2 = begin_borrow %alloc : $C
+  br bb3(%borrow2: $C)
+bb3(%borrowphi : @guaranteed $C):
+  %innercopy = copy_value %borrowphi : $C
+  end_borrow %borrowphi : $C
+  %outercopy = copy_value %innercopy : $C
+  destroy_value %innercopy : $C
+  destroy_value %outercopy : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// Test a reborrow with a nested borrow with an outside use
+//   def: borrowphi
+//   nested borrow -- consolidated borrow scope
+//   inner copy -- removed when rewriting nested borrow
+//   end nested borrow
+//   middle copy -- when consolidating borrow scope,
+//                  its operand is replace with a copy of borrowphi
+//                  then removeed when borrowphi's copy is canonicalized
+//   end borrowphi
+//   outer copy -- removeed when borrowphi's copy is canonicalized
+//
+// CHECK-LABEL: sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
+// CHECK:        [[ALLOC:%.*]] = alloc_ref $C
+// CHECK:      bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK-NEXT:   [[COPY:%.*]] = copy_value [[BORROWPHI]] : $C
+// CHECK-NEXT:   begin_borrow [[BORROWPHI]] : $C
+// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   end_borrow
+// CHECK-NEXT:   destroy_value [[COPY]] : $C
+// CHECK-NEXT:   destroy_value [[ALLOC]] : $C
+// CHECK-LABEL: } // end sil function 'testNestedReborrowOutsideUse'
+sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_ref $C
+  cond_br undef, bb1, bb2
+bb1:
+  %borrow1 = begin_borrow %alloc : $C
+  br bb3(%borrow1: $C)
+bb2:
+  %borrow2 = begin_borrow %alloc : $C
+  br bb3(%borrow2: $C)
+bb3(%borrowphi : @guaranteed $C):
+  %nestedborrow = begin_borrow %borrowphi : $C
+  %innercopy = copy_value %nestedborrow : $C
+  end_borrow %nestedborrow : $C
+  %middlecopy = copy_value %innercopy : $C
+  end_borrow %borrowphi : $C
+  %outercopy = copy_value %middlecopy : $C
+  destroy_value %innercopy : $C
+  destroy_value %middlecopy : $C
+  destroy_value %outercopy : $C
+  destroy_value %alloc : $C
+  %99 = tuple ()
+  return %99 : $()
 }
