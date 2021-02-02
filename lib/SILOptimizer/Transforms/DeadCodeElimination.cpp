@@ -12,12 +12,13 @@
 
 #define DEBUG_TYPE "sil-dce"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -118,6 +119,14 @@ class DCE {
   llvm::DenseMap<SILValue, SmallPtrSet<SILInstruction *, 4>>
       ReverseDependencies;
 
+  // reborrowDependencies tracks the dependency of a reborrowed phiArg with its
+  // renamed base value.
+  // A reborrowed phiArg may have a new base value, if it's original base value
+  // was also passed as a branch operand. The renamed base value should then be
+  // live if the reborrow phiArg was also live.
+  using BaseValueSet = SmallPtrSet<SILValue, 8>;
+  llvm::DenseMap<SILPhiArgument *, BaseValueSet> reborrowDependencies;
+
   /// Tracks if the pass changed branches.
   bool BranchesChanged = false;
   /// Tracks if the pass changed ApplyInsts.
@@ -128,6 +137,9 @@ class DCE {
   /// Record a reverse dependency from \p from to \p to meaning \p to is live
   /// if \p from is also live.
   void addReverseDependency(SILValue from, SILInstruction *to);
+  /// Starting from \p borrowInst find all reborrow dependency of its reborrows
+  /// with their renamed base values.
+  void findReborrowDependencies(BeginBorrowInst *borrowInst);
   bool removeDead();
 
   void computeLevelNumbers(PostDomTreeNode *root);
@@ -253,6 +265,10 @@ void DCE::markLive() {
         addReverseDependency(I.getOperand(0), &I);
         break;
       }
+      case SILInstructionKind::BeginBorrowInst: {
+        findReborrowDependencies(cast<BeginBorrowInst>(&I));
+        break;
+      }
       default:
         if (seemsUseful(&I))
           markInstructionLive(&I);
@@ -273,6 +289,21 @@ void DCE::addReverseDependency(SILValue from, SILInstruction *to) {
   LLVM_DEBUG(llvm::dbgs() << "Adding reverse dependency from " << from << " to "
                           << to);
   ReverseDependencies[from].insert(to);
+}
+
+void DCE::findReborrowDependencies(BeginBorrowInst *borrowInst) {
+  LLVM_DEBUG(llvm::dbgs() << "Finding reborrow dependencies of " << borrowInst
+                          << "\n");
+  BorrowingOperand initialScopedOperand(&borrowInst->getOperandRef());
+  auto visitReborrowBaseValuePair = [&](SILPhiArgument *phiArg,
+                                        SILValue baseValue) {
+    reborrowDependencies[phiArg].insert(baseValue);
+  };
+  // Find all reborrow dependencies starting from \p borrowInst and populate
+  // them in reborrowDependencies
+  findTransitiveReborrowBaseValuePairs(initialScopedOperand,
+                                       borrowInst->getOperand(),
+                                       visitReborrowBaseValuePair);
 }
 
 // Mark as live the terminator argument at index ArgIndex in Pred that
@@ -350,6 +381,12 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   // Mark all reverse dependencies on the Arg live
   for (auto *depInst : ReverseDependencies.lookup(Arg)) {
     markInstructionLive(depInst);
+  }
+
+  if (auto *phi = dyn_cast<SILPhiArgument>(Arg)) {
+    for (auto depVal : reborrowDependencies.lookup(phi)) {
+      markValueLive(depVal);
+    }
   }
 
   auto *Block = Arg->getParent();

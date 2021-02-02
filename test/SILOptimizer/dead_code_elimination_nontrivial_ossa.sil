@@ -339,3 +339,86 @@ bb4:
   return %res : $()
 }
 
+struct TestStruct {
+  var val:Klass
+  var index:Int
+}
+
+// CHECK-LABEL: sil [ossa] @dce_destructurenotfullydead :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'dce_destructurenotfullydead'
+sil [ossa] @dce_destructurenotfullydead : $@convention(thin) (@owned TestStruct) -> Int {
+bb0(%0 : @owned $TestStruct):
+  %stk = alloc_stack $TestStruct
+  store %0 to [init] %stk : $*TestStruct
+  %copy = load [take] %stk : $*TestStruct
+  (%2, %3) = destructure_struct %copy : $TestStruct
+  %4 = struct $TestStruct (%2 : $Klass, %3 : $Int)
+  destroy_value %4 : $TestStruct
+  dealloc_stack %stk : $*TestStruct
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime1 :
+// CHECK: bb1([[ARG1:%.*]] : @owned $NonTrivialStruct, [[ARG2:%.*]] : @guaranteed $NonTrivialStruct):
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime1'
+sil [ossa] @dce_borrowlifetime1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  %copy = copy_value %0 : $NonTrivialStruct
+  %borrow = begin_borrow %copy : $NonTrivialStruct
+  br bb1(%copy : $NonTrivialStruct, %borrow : $NonTrivialStruct)
+
+bb1(%copy2 : @owned $NonTrivialStruct, %borrow2 : @guaranteed $NonTrivialStruct):
+  %newcopy = copy_value %borrow2 : $NonTrivialStruct
+  end_borrow %borrow2 : $NonTrivialStruct
+  destroy_value %copy2 : $NonTrivialStruct
+  return %newcopy : $NonTrivialStruct
+}
+
+// CHECK-LABEL: sil [ossa] @infinite_loop :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'infinite_loop'
+sil [ossa] @infinite_loop : $@convention(thin) (@guaranteed NonTrivialStruct, @guaranteed NonTrivialStruct) -> () {
+bb0(%0 : @guaranteed $NonTrivialStruct, %1 : @guaranteed $NonTrivialStruct):
+  cond_br undef, bb1, bb4
+
+bb1:
+  %copy0 = copy_value %0 : $NonTrivialStruct
+  %borrow0 = begin_borrow %copy0 : $NonTrivialStruct
+  br bb3(%borrow0 : $NonTrivialStruct, %copy0 : $NonTrivialStruct)
+
+bb3(%newborrow : @guaranteed $NonTrivialStruct, %newowned : @owned $NonTrivialStruct):
+  br bb3(%newborrow : $NonTrivialStruct, %newowned : $NonTrivialStruct)
+
+bb4:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_reborrow_with_different_basevalues :
+// CHECK: bb3([[ARG1:%.*]] : @guaranteed $NonTrivialStruct, [[ARG2:%.*]] : @owned $NonTrivialStruct, [[ARG3:%.*]] : @owned $NonTrivialStruct):
+// CHECK-LABEL: } // end sil function 'dce_reborrow_with_different_basevalues'
+sil [ossa] @dce_reborrow_with_different_basevalues : $@convention(thin) (@guaranteed NonTrivialStruct, @guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $NonTrivialStruct, %1 : @guaranteed $NonTrivialStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0a = copy_value %0 : $NonTrivialStruct
+  %borrow0a = begin_borrow %copy0a : $NonTrivialStruct
+  %copy1a = copy_value %1 : $NonTrivialStruct
+  br bb3(%borrow0a : $NonTrivialStruct, %copy0a : $NonTrivialStruct, %copy1a : $NonTrivialStruct)
+
+bb2:
+  %copy1b = copy_value %1 : $NonTrivialStruct
+  %borrow0b = begin_borrow %copy1b : $NonTrivialStruct
+  %copy0b = copy_value %0 : $NonTrivialStruct
+  br bb3(%borrow0b : $NonTrivialStruct, %copy0b : $NonTrivialStruct, %copy1b : $NonTrivialStruct)
+
+bb3(%newborrow : @guaranteed $NonTrivialStruct, %newowned1 : @owned $NonTrivialStruct, %newowned2 : @owned $NonTrivialStruct):
+  %res = copy_value %newborrow : $NonTrivialStruct
+  end_borrow %newborrow : $NonTrivialStruct
+  destroy_value %newowned1 : $NonTrivialStruct
+  destroy_value %newowned2 : $NonTrivialStruct
+  return %res : $NonTrivialStruct
+}
+
