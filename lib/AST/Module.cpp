@@ -1549,6 +1549,25 @@ void ModuleDecl::collectBasicSourceFileInfo(
   }
 }
 
+Fingerprint ModuleDecl::getFingerprint() const {
+  StableHasher hasher = StableHasher::defaultHasher();
+  SmallVector<Fingerprint, 16> FPs;
+  collectBasicSourceFileInfo([&](const BasicSourceFileInfo &bsfi) {
+    FPs.emplace_back(bsfi.InterfaceHash);
+  });
+  
+  // Sort the fingerprints lexicographically so we have a stable hash despite
+  // an unstable ordering of files across rebuilds.
+  // FIXME: If we used a commutative hash combine (say, if we could take an
+  // XOR here) we could avoid this sort.
+  std::sort(FPs.begin(), FPs.end(), std::less<Fingerprint>());
+  for (const auto &FP : FPs) {
+    hasher.combine(FP);
+  }
+
+  return Fingerprint{std::move(hasher)};
+}
+
 //===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//
