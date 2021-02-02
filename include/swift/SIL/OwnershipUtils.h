@@ -527,13 +527,34 @@ struct BorrowedValue {
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
   /// Visit each of the interior pointer uses of this underlying borrow
-  /// introduced value. These object -> address projections and any transitive
-  /// address uses must be treated as liveness requiring uses of the guaranteed
-  /// value and we can not shrink the scope beyond that point. Returns true if
-  /// we were able to understand all uses and thus guarantee we found all
-  /// interior pointer uses. Returns false otherwise.
+  /// introduced value without looking through nested borrows or reborrows.
+  ///
+  /// These object -> address projections and any transitive address uses must
+  /// be treated as liveness requiring uses of the guaranteed value and we can
+  /// not shrink the scope beyond that point. Returns true if we were able to
+  /// understand all uses and thus guarantee we found all interior pointer
+  /// uses. Returns false otherwise.
   bool visitInteriorPointerOperands(
-      function_ref<void(InteriorPointerOperand)> func) const;
+      function_ref<void(InteriorPointerOperand)> func) const {
+    return visitInteriorPointerOperandHelper(
+        func, InteriorPointerOperandVisitorKind::NoNestedNoReborrows);
+  }
+
+  /// Visit each of the interior pointer uses of this underlying borrow
+  /// introduced value looking through nested borrow scopes but not reborrows.
+  bool visitNestedInteriorPointerOperands(
+      function_ref<void(InteriorPointerOperand)> func) const {
+    return visitInteriorPointerOperandHelper(
+        func, InteriorPointerOperandVisitorKind::YesNestedNoReborrows);
+  }
+
+  /// Visit each of the interior pointer uses of this underlying borrow
+  /// introduced value looking through nested borrow scopes and reborrows.
+  bool visitExtendedInteriorPointerOperands(
+      function_ref<void(InteriorPointerOperand)> func) const {
+    return visitInteriorPointerOperandHelper(
+        func, InteriorPointerOperandVisitorKind::YesNestedYesReborrows);
+  }
 
   /// Visit all immediate uses of this borrowed value and if any of them are
   /// reborrows, place them in BorrowingOperand form into \p
@@ -560,6 +581,16 @@ struct BorrowedValue {
   SILValue operator->() const { return value; }
   SILValue operator*() { return value; }
   SILValue operator*() const { return value; }
+
+private:
+  enum class InteriorPointerOperandVisitorKind {
+    NoNestedNoReborrows,
+    YesNestedNoReborrows,
+    YesNestedYesReborrows,
+  };
+  bool visitInteriorPointerOperandHelper(
+      function_ref<void(InteriorPointerOperand)> func,
+      InteriorPointerOperandVisitorKind kind) const;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -602,6 +633,8 @@ public:
   operator Kind() const {
     return value;
   }
+
+  explicit operator bool() const { return isValid(); }
 
   bool isValid() const { return value != Kind::Invalid; }
 
@@ -651,7 +684,6 @@ struct InteriorPointerOperand {
 
   InteriorPointerOperand(Operand *op)
       : operand(op), kind(InteriorPointerOperandKind::get(op)) {
-    assert(kind.isValid());
   }
 
   operator bool() const {

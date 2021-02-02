@@ -600,24 +600,56 @@ bool BorrowedValue::visitExtendedLocalScopeEndingUses(
   return true;
 }
 
-bool BorrowedValue::visitInteriorPointerOperands(
-    function_ref<void(InteriorPointerOperand)> func) const {
+bool BorrowedValue::visitInteriorPointerOperandHelper(
+    function_ref<void(InteriorPointerOperand)> func,
+    BorrowedValue::InteriorPointerOperandVisitorKind kind) const {
+  using Kind = BorrowedValue::InteriorPointerOperandVisitorKind;
+
   SmallVector<Operand *, 32> worklist(value->getUses());
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
 
-    if (auto interiorPointer = InteriorPointerOperand::get(op)) {
+    if (auto interiorPointer = InteriorPointerOperand(op)) {
       func(interiorPointer);
       continue;
     }
 
+    if (auto borrowingOperand = BorrowingOperand(op)) {
+      switch (kind) {
+      case Kind::NoNestedNoReborrows:
+        // We do not look through nested things and or reborrows, so just
+        // continue.
+        continue;
+      case Kind::YesNestedNoReborrows:
+        // We only look through nested borrowing operands, we never look through
+        // reborrows though.
+        if (borrowingOperand.isReborrow())
+          continue;
+        break;
+      case Kind::YesNestedYesReborrows:
+        // Look through everything!
+        break;
+      }
+
+      borrowingOperand.visitBorrowIntroducingUserResults([&](auto bv) {
+        for (auto *use : bv->getUses()) {
+          if (auto intPtrOperand = InteriorPointerOperand(use)) {
+            func(intPtrOperand);
+            continue;
+          }
+          worklist.push_back(use);
+        }
+        return true;
+      });
+      continue;
+    }
+
     auto *user = op->getUser();
-    if (isa<BeginBorrowInst>(user) || isa<DebugValueInst>(user) ||
-        isa<SuperMethodInst>(user) || isa<ClassMethodInst>(user) ||
-        isa<CopyValueInst>(user) || isa<EndBorrowInst>(user) ||
-        isa<ApplyInst>(user) || isa<StoreBorrowInst>(user) ||
-        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
-        isa<UnmanagedRetainValueInst>(user) ||
+    if (isa<DebugValueInst>(user) || isa<SuperMethodInst>(user) ||
+        isa<ClassMethodInst>(user) || isa<CopyValueInst>(user) ||
+        isa<EndBorrowInst>(user) || isa<ApplyInst>(user) ||
+        isa<StoreBorrowInst>(user) || isa<StoreInst>(user) ||
+        isa<PartialApplyInst>(user) || isa<UnmanagedRetainValueInst>(user) ||
         isa<UnmanagedReleaseValueInst>(user) ||
         isa<UnmanagedAutoreleaseValueInst>(user)) {
       continue;
@@ -693,10 +725,11 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
     if (Projection::isAddressProjection(user) ||
         isa<ProjectBlockStorageInst>(user) ||
         isa<OpenExistentialAddrInst>(user) ||
-        isa<InitExistentialAddrInst>(user) ||
-        isa<InitEnumDataAddrInst>(user) || isa<BeginAccessInst>(user) ||
-        isa<TailAddrInst>(user) || isa<IndexAddrInst>(user) ||
-        isa<UnconditionalCheckedCastAddrInst>(user)) {
+        isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
+        isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
+        isa<IndexAddrInst>(user) ||
+        isa<UnconditionalCheckedCastAddrInst>(user) ||
+        isa<UncheckedAddrCastInst>(user)) {
       for (SILValue r : user->getResults()) {
         llvm::copy(r->getUses(), std::back_inserter(worklist));
       }
