@@ -211,6 +211,7 @@ func overloadedByOptionality(_ a: inout Int!) {}
 // expected-note@-1 {{'overloadedByOptionality' previously declared here}}
 func overloadedByOptionality(_ a: inout Int?) {}
 // expected-error@-1 {{invalid redeclaration of 'overloadedByOptionality'}}
+// expected-note@-2 {{optional parameter is of same type as implicitly unwrapped optional parameter}}
 
 struct T {
   let i: Int!

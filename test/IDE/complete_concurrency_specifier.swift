@@ -1,5 +1,7 @@
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -enable-experimental-concurrency
 
+// REQUIRES: concurrency
+
 // SPECIFIER: Begin completions
 // SPECIFIER-DAG: Keyword/None:                       async; name=async
 // SPECIFIER-DAG: Keyword[throws]/None:               throws; name=throws

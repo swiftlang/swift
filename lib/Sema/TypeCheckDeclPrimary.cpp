@@ -646,6 +646,66 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
           continue;
       }
 
+      // Signatures are the same, but interface types are not. We must
+      // have a type that we've massaged as part of signature
+      // interface type generation.
+      if (current->getInterfaceType()->isEqual(other->getInterfaceType())) {
+        if (currentDC->isTypeContext() == other->getDeclContext()->isTypeContext()) {
+          auto currFnTy = current->getInterfaceType()->getAs<AnyFunctionType>();
+          auto otherFnTy = other->getInterfaceType()->getAs<AnyFunctionType>();
+          if (currFnTy && otherFnTy && currentDC->isTypeContext()) {
+            currFnTy = currFnTy->getResult()->getAs<AnyFunctionType>();
+            otherFnTy = otherFnTy->getResult()->getAs<AnyFunctionType>();
+          }
+          
+          if (currFnTy && otherFnTy) {
+            ArrayRef<AnyFunctionType::Param> currParams = currFnTy->getParams();
+            ArrayRef<AnyFunctionType::Param> otherParams = otherFnTy->getParams();
+            
+            if (currParams.size() == otherParams.size()) {
+              auto diagnosed = false;
+              for (unsigned i : indices(currParams)) {
+                  
+                bool currIsIUO = false;
+                bool otherIsIUO = false;
+                bool optionalRedecl = false;
+                
+                if (currParams[i].getPlainType()->getOptionalObjectType()) {
+                  optionalRedecl = true;
+                  if (swift::getParameterAt(current, i)->isImplicitlyUnwrappedOptional())
+                    currIsIUO = true;
+                }
+                
+                if (otherParams[i].getPlainType()->getOptionalObjectType()) {
+                  if (swift::getParameterAt(other, i)->isImplicitlyUnwrappedOptional())
+                    otherIsIUO = true;
+                }
+                else {
+                  optionalRedecl = false;
+                }
+                
+                if (optionalRedecl && currIsIUO != otherIsIUO) {
+                  ctx.Diags.diagnoseWithNotes(
+                    current->diagnose(diag::invalid_redecl,
+                                      current->getName()), [&]() {
+                    other->diagnose(diag::invalid_redecl_prev, other->getName());
+                  });
+                  current->diagnose(diag::invalid_redecl_by_optionality_note,
+                                    otherIsIUO, currIsIUO);
+                  
+                  current->setInvalid();
+                  diagnosed = true;
+                  break;
+                }
+              }
+
+              if (diagnosed)
+                break;
+            }
+          }
+        }
+      }
+
       // If the conflicting declarations have non-overlapping availability and,
       // we allow the redeclaration to proceed if...
       //

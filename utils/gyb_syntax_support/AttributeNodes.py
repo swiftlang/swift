@@ -277,7 +277,7 @@ ATTRIBUTE_NODES = [
     Node('DifferentiabilityParamList', kind='SyntaxCollection',
          element='DifferentiabilityParam'),
 
-    # differentiability-param -> ('self' | identifer | integer-literal) ','?
+    # differentiability-param -> ('self' | identifier | integer-literal) ','?
     Node('DifferentiabilityParam', kind='Syntax',
          description='''
          A differentiability parameter: either the "self" identifier, a function

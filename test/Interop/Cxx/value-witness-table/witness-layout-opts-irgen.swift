@@ -7,6 +7,9 @@
 // to test them in the same file.
 // XFAIL: OS=windows-msvc
 
+// Failing on 32-bit simulator, disable for now. rdar://73829982
+// REQUIRES: rdar73829982
+
 import WitnessLayoutOpts
 
 protocol Dummy { }

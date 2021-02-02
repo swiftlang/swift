@@ -310,7 +310,7 @@ makeLocalSection(const void *Buffer,
   }
 
   swift_reflection_section_t LS = {(void *)Buffer,
-                                   (void *)(Buffer + Section.Size)};
+                                   (void *)((uint8_t *)Buffer + Section.Size)};
   return LS;
 }
 
