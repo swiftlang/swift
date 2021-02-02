@@ -3197,9 +3197,14 @@ void IRGenFunction::emitCoroutineOrAsyncExit() {
   // Emit the block.
   Builder.emitBlock(coroEndBB);
   auto handle = getCoroutineHandle();
-  Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
-                              {handle,
-                               /*is unwind*/ Builder.getFalse()});
+  if (isAsync())
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_async,
+                                {handle,
+                                 /*is unwind*/ Builder.getFalse()});
+  else
+    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                {handle,
+                                 /*is unwind*/ Builder.getFalse()});
   Builder.CreateUnreachable();
 }
 
@@ -3243,7 +3248,6 @@ static void emitReturnInst(IRGenSILFunction &IGF,
           .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
     }
     emitAsyncReturn(IGF, layout, fnType);
-    IGF.emitCoroutineOrAsyncExit();
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
@@ -3286,7 +3290,6 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   if (isAsync()) {
     auto layout = getAsyncContextLayout(*this);
     emitAsyncReturn(*this, layout, i->getFunction()->getLoweredFunctionType());
-    emitCoroutineOrAsyncExit();
     return;
   }
 

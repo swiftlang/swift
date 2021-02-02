@@ -84,7 +84,7 @@ bb0:
 // CHECK:  br label %coro.end
 
 // CHECK: coro.end:
-// CHECK:   call i1 @llvm.coro.end(
+// CHECK:   call i1 (i8*, i1, ...) @llvm.coro.end.async(
 // CHECK:   unreachable
 
 // CHECK: await.async.maybe.resume:
