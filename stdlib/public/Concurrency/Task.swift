@@ -31,20 +31,47 @@ import Swift
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Partial tasks are generally not interacted with by end-users directly,
 /// unless implementing a scheduler.
-public enum Task {
+public struct Task: TaskOperations {
+  internal let _task: Builtin.NativeObject
+
+  // May only be created by the standard library.
+  internal init(_ task: Builtin.NativeObject) {
+    self._task = task
+  }
+}
+
+// ==== Current Task -----------------------------------------------------------
+
+extension Task {
+
+  /// Returns 'current' `Task` instance, representing the task from within which
+  /// this function was called.
+  ///
+  /// All functions available on the Task
+  // TODO: once Kavon's async properties land make this computed property
+  public static func current() async -> Task {
+    Task.unsafeCurrent!.task // !-safe, guaranteed to have a Task available.
+  }
+
 }
 
 // ==== Task Priority ----------------------------------------------------------
 
 extension Task {
 
-  /// Returns the current task's priority.
+  /// Returns the `current` task's priority.
   ///
-  /// ### Suspension
-  /// This function returns instantly and will never suspend.
-  /* @instantaneous */
-  public static func currentPriority() async -> Priority {
-    getJobFlags(Builtin.getCurrentAsyncTask()).priority
+  /// If no current `Task` is available, returns `Priority.default`.
+  ///
+  /// - SeeAlso: `Task.Priority`
+  /// - SeeAlso: `Task.priority`
+  public static var currentPriority: Priority {
+    Task.unsafeCurrent?.priority ?? Priority.default
+  }
+
+  // Docs inherited from `TaskOperations`.
+  public var priority: Priority {
+    getJobFlags(_task).priority
   }
 
   /// Task priority may inform decisions an `Executor` makes about how and when
@@ -98,14 +125,23 @@ extension Task {
 
 extension Task {
   /// A task handle refers to an in-flight `Task`,
-  /// allowing for potentially awaiting for its result or canceling it.
+  /// allowing for potentially awaiting for its result or Cancelling it.
   ///
-  /// It is not a programming error to drop a handle without awaiting or canceling it,
+  /// It is not a programming error to drop a handle without awaiting or cancelling it,
   /// i.e. the task will run regardless of the handle still being present or not.
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
-  public struct Handle<Success> {
-    let task: Builtin.NativeObject
+  public struct Handle<Success, Failure: Error> {
+    private let _task: Builtin.NativeObject
+
+    internal init(_ task: Builtin.NativeObject) {
+      self._task = task
+    }
+
+    /// Returns the `Task` that this handle refers to.
+    public var task: Task {
+      Task(_task)
+    }
 
     /// Wait for the task to complete, returning (or throwing) its result.
     ///
@@ -122,7 +158,29 @@ extension Task {
     /// and throwing a specific error or using `checkCancellation` the error
     /// thrown out of the task will be re-thrown here.
     public func get() async throws -> Success {
-      return try await _taskFutureGetThrowing(task)
+      return try await _taskFutureGetThrowing(_task)
+    }
+
+    /// Wait for the task to complete, returning its `Result`.
+    ///
+    /// ### Priority
+    /// If the task has not completed yet, its priority will be elevated to the
+    /// priority of the current task. Note that this may not be as effective as
+    /// creating the task with the "right" priority to in the first place.
+    ///
+    /// ### Cancellation
+    /// If the awaited on task gets cancelled externally the `get()` will throw
+    /// a cancellation error.
+    ///
+    /// If the task gets cancelled internally, e.g. by checking for cancellation
+    /// and throwing a specific error or using `checkCancellation` the error
+    /// thrown out of the task will be re-thrown here.
+    public func getResult() async -> Result<Success, Failure> {
+      do {
+        return .success(try await get())
+      } catch {
+        return .failure(error as! Failure) // as!-safe, guaranteed to be Failure
+      }
     }
 
     /// Attempt to cancel the task.
@@ -134,8 +192,79 @@ extension Task {
     /// their "actual work", however this is not a requirement nor is it guaranteed
     /// how and when tasks check for cancellation in general.
     public func cancel() {
-      Builtin.cancelAsyncTask(task)
+      Builtin.cancelAsyncTask(_task)
     }
+  }
+}
+
+extension Task.Handle where Failure == Never {
+
+  /// Wait for the task to complete, returning its result.
+  ///
+  /// ### Priority
+  /// If the task has not completed yet, its priority will be elevated to the
+  /// priority of the current task. Note that this may not be as effective as
+  /// creating the task with the "right" priority to in the first place.
+  ///
+  /// ### Cancellation
+  /// The task this handle refers to may check for cancellation, however
+  /// since it is not-throwing it would have to handle it using some other
+  /// way than throwing a `CancellationError`, e.g. it could provide a neutral
+  /// value of the `Success` type, or encode that cancellation has occurred in
+  /// that type itself.
+  public func get() async -> Success {
+    return try! await _taskFutureGetThrowing(_task) // try-! safe, cannot throw
+  }
+  
+}
+
+extension Task.Handle: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    unsafeBitCast(_task, to: UInt64.self).hash(into: &hasher)
+  }
+}
+
+extension Task.Handle: Equatable {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    unsafeBitCast(lhs._task, to: UInt64.self) ==
+      unsafeBitCast(rhs._task, to: UInt64.self)
+  }
+}
+
+// ==== Conformances -----------------------------------------------------------
+
+/// Protocol for those operations which are safe to be invoked on any `Task`
+/// instance regardless if the caller is running in the same task or a different
+/// one.
+///
+/// This protocol also lists the functions and computed properties shared between
+/// `Task` and `UnsafeCurrentTask`.
+public protocol TaskOperations {
+
+  /// Returns `true` if the task is cancelled, and should stop executing.
+  ///
+  /// - SeeAlso: `checkCancellation()`
+  var isCancelled: Bool { get }
+
+  /// Returns the `current` task's priority.
+  ///
+  /// If no current `Task` is available, returns `Priority.default`.
+  ///
+  /// - SeeAlso: `Task.Priority`
+  /// - SeeAlso: `Task.currentPriority`
+  var priority: Task.Priority { get }
+}
+
+extension Task: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    unsafeBitCast(_task, to: UInt64.self).hash(into: &hasher)
+  }
+}
+
+extension Task: Equatable {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    unsafeBitCast(lhs._task, to: UInt64.self) ==
+      unsafeBitCast(rhs._task, to: UInt64.self)
   }
 }
 
@@ -246,7 +375,7 @@ extension Task {
   /// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
   /// cancel given task.
   ///
-  /// Canceling a task must be performed explicitly via `handle.cancel()`.
+  /// Cancelling a task must be performed explicitly via `handle.cancel()`.
   ///
   /// - Note: it is generally preferable to use child tasks rather than detached
   ///   tasks. Child tasks automatically carry priorities, task-local state,
@@ -256,14 +385,17 @@ extension Task {
   ///
   /// - Parameters:
   ///   - priority: priority of the task
+  ///   - executor: the executor on which the detached closure should start
+  ///               executing on.
   ///   - operation: the operation to execute
   /// - Returns: handle to the task, allowing to `await handle.get()` on the
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
   public static func runDetached<T>(
     priority: Priority = .default,
-    operation: @concurrent @escaping () async throws -> T
-  ) -> Handle<T> {
+    startingOn executor: ExecutorRef? = nil,
+    operation: @concurrent @escaping () async -> T
+  ) -> Handle<T, Never> {
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -276,10 +408,63 @@ extension Task {
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
-    return Handle<T>(task: task)
+    return Handle<T, Never>(task)
   }
 
+  /// Run given throwing `operation` as part of a new top-level task.
+  ///
+  /// Creating detached tasks should, generally, be avoided in favor of using
+  /// `async` functions, `async let` declarations and `await` expressions - as
+  /// those benefit from structured, bounded concurrency which is easier to reason
+  /// about, as well as automatically inheriting the parent tasks priority,
+  /// task-local storage, deadlines, as well as being cancelled automatically
+  /// when their parent task is cancelled. Detached tasks do not get any of those
+  /// benefits, and thus should only be used when an operation is impossible to
+  /// be modelled with child tasks.
+  ///
+  /// ### Cancellation
+  /// A detached task always runs to completion unless it is explicitly cancelled.
+  /// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
+  /// cancel given task.
+  ///
+  /// Cancelling a task must be performed explicitly via `handle.cancel()`.
+  ///
+  /// - Note: it is generally preferable to use child tasks rather than detached
+  ///   tasks. Child tasks automatically carry priorities, task-local state,
+  ///   deadlines and have other benefits resulting from the structured
+  ///   concurrency concepts that they model. Consider using detached tasks only
+  ///   when strictly necessary and impossible to model operations otherwise.
+  ///
+  /// - Parameters:
+  ///   - priority: priority of the task
+  ///   - executor: the executor on which the detached closure should start
+  ///               executing on.
+  ///   - operation: the operation to execute
+  /// - Returns: handle to the task, allowing to `await handle.get()` on the
+  ///     tasks result or `cancel` it. If the operation fails the handle will
+  ///     throw the error the operation has thrown when awaited on.
+  public static func runDetached<T, Failure>(
+    priority: Priority = .default,
+    startingOn executor: ExecutorRef? = nil,
+    operation: @concurrent @escaping () async throws -> T
+  ) -> Handle<T, Failure> {
+    // Set up the job flags for a new task.
+    var flags = JobFlags()
+    flags.kind = .task
+    flags.priority = priority
+    flags.isFuture = true
+
+    // Create the asynchronous task future.
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
+
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+
+    return Handle<T, Failure>(task)
+  }
 }
+
+// ==== Async Handler ----------------------------------------------------------
 
 public func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @concurrent () async -> ()
@@ -289,18 +474,8 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
-extension Task {
 
-  /// Suspend until a given point in time.
-  ///
-  /// ### Cancellation
-  /// Does not check for cancellation and suspends the current context until the
-  /// given deadline.
-  ///
-  /// - Parameter until: point in time until which to suspend.
-  public static func sleep(until: Deadline) async {
-    fatalError("\(#function) not implemented yet.")
-  }
+extension Task {
 
   /// Explicitly suspend the current task, potentially giving up execution actor
   /// of current actor/task, allowing other tasks to execute.
@@ -313,6 +488,79 @@ extension Task {
   }
 }
 
+// ==== UnsafeCurrentTask ------------------------------------------------------
+
+extension Task {
+  /// If available, returns the 'current' task, representing the async context
+  /// from which this function was called.
+  ///
+  /// This computed property can be called from 'async' as well as synchronous
+  /// functions. Within synchronous functions it may return a `nil` value,
+  /// which means that the function was not called within any asynchronous task
+  /// at all, otherwise the returned task is equal to the task of the nearest
+  /// asynchronous function present in this functions call stack.
+  ///
+  /// The returned value must not be accessed from tasks other than the current one.
+  public static var unsafeCurrent: UnsafeCurrentTask? {
+    // FIXME: implement this once getCurrentAsyncTask can be called from sync funcs
+    //    guard let _task = Builtin.getCurrentAsyncTask() else {
+    //      return nil
+    //    }
+    //    return UnsafeCurrentTask(_task)
+    fatalError("\(#function) is not implemented yet, can not (yet) get task from sync function")
+  }
+
+  @available(*, deprecated, message: "This should be removed", renamed: "unsafeCurrent()")
+  public static func unsafeCurrentASYNC() async -> UnsafeCurrentTask {
+    let task = Builtin.getCurrentAsyncTask()
+    _swiftRetain(task)
+    return UnsafeCurrentTask(task)
+  }
+}
+
+/// An *unsafe* 'current' task handle.
+///
+/// An `UnsafeCurrentTask` should not be stored for "later" access.
+///
+/// Storing an `UnsafeCurrentTask` has no implication on the task's actual lifecycle.
+///
+/// The sub-set of APIs of `UnsafeCurrentTask` which also exist on `Task` are
+/// generally safe to be invoked from any task/thread.
+///
+/// All other APIs must not, be called 'from' any other task than the one
+/// represented by this handle itself. Doing so may result in undefined behavior,
+/// and most certainly will break invariants in other places of the program
+/// actively running on this task.
+public struct UnsafeCurrentTask: TaskOperations {
+  private let _task: Builtin.NativeObject
+
+  // May only be created by the standard library.
+  internal init(_ task: Builtin.NativeObject) {
+    self._task = task
+  }
+
+  /// Returns `Task` representing the same asynchronous context as this 'UnsafeCurrentTask'.
+  ///
+  /// Operations on `Task` (unlike `UnsafeCurrentTask`) are safe to be called
+  /// from any other task (or thread).
+  public var task: Task {
+    Task(_task)
+  }
+
+  // Docs inherited from `TaskOperations`.
+  public var isCancelled: Bool {
+    _taskIsCancelled(_task)
+  }
+
+  // Docs inherited from `TaskOperations`.
+  public var priority: Task.Priority {
+    getJobFlags(_task).priority
+  }
+
+}
+
+// ==== Internal ---------------------------------------------------------------
+
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
@@ -324,7 +572,7 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_runAndBlockThread")
-public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
+func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
 @_silgen_name("swift_task_asyncMainDrainQueue")
 public func _asyncMainDrainQueue() -> Never
