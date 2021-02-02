@@ -88,6 +88,13 @@ public:
   bool isComputed() const { return didComputeValue; }
 
   const SILFunction *getFunction() const { return f; }
+  
+  /// Performs a simple check if \p block (or its single successor) ends in an
+  /// "unreachable".
+  ///
+  /// This handles the common case of failure-handling blocks, which e.g.
+  /// contain a call to fatalError().
+  static bool triviallyEndsInUnreachable(SILBasicBlock *block);
 };
 
 /// Compute joint-postdominating set for \p dominatingBlock and \p

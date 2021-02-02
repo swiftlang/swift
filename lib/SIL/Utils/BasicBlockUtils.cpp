@@ -386,17 +386,17 @@ void DeadEndBlocks::compute() {
   }
 }
 
-//===----------------------------------------------------------------------===//
-//                  Post Dominance Set Completion Utilities
-//===----------------------------------------------------------------------===//
-
-static bool endsInUnreachable(SILBasicBlock *block) {
+bool DeadEndBlocks::triviallyEndsInUnreachable(SILBasicBlock *block) {
   // Handle the case where a single "unreachable" block (e.g. containing a call
   // to fatalError()), is jumped to from multiple source blocks.
   if (SILBasicBlock *singleSucc = block->getSingleSuccessorBlock())
     block = singleSucc;
   return isa<UnreachableInst>(block->getTerminator());
 }
+
+//===----------------------------------------------------------------------===//
+//                  Post Dominance Set Completion Utilities
+//===----------------------------------------------------------------------===//
 
 void swift::findJointPostDominatingSet(
     SILBasicBlock *dominatingBlock, ArrayRef<SILBasicBlock *> dominatedBlockSet,
@@ -482,7 +482,7 @@ void swift::findJointPostDominatingSet(
               // Ignore blocks which end in an unreachable. This is a very
               // simple check, but covers most of the cases, e.g. block which
               // calls fatalError().
-              !endsInUnreachable(succBlock)) {
+              !DeadEndBlocks::triviallyEndsInUnreachable(succBlock)) {
             assert(succBlock->getSinglePredecessorBlock() == predBlock &&
                    "CFG must not contain critical edge");
             // Note that since there are no critical edges in the CFG, we are
