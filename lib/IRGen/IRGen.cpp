@@ -1467,6 +1467,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
                                           Data, "__Swift_AST");
   std::string Section;
   switch (IGM.TargetInfo.OutputObjectFormat) {
+  case llvm::Triple::GOFF:
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
   case llvm::Triple::XCOFF:

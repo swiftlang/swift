@@ -348,11 +348,11 @@ OpaqueTypeDecl *ModuleFile::lookupOpaqueResultType(StringRef MangledName) {
 
   if (!Core->OpaqueReturnTypeDecls)
     return nullptr;
-  
+
   auto iter = Core->OpaqueReturnTypeDecls->find(MangledName);
   if (iter == Core->OpaqueReturnTypeDecls->end())
     return nullptr;
-  
+
   return cast<OpaqueTypeDecl>(getDecl(*iter));
 }
 
@@ -758,7 +758,7 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
         auto vd = cast<ValueDecl>(getDecl(item.second));
         if (!vd->getName().matchesRef(name))
           continue;
-        
+
         auto dc = vd->getDeclContext();
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();

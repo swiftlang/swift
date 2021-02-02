@@ -183,7 +183,7 @@ private:
 
     HeaderAddress = UINT64_MAX;
 
-    auto phdrs = O->getELFFile()->program_headers();
+    auto phdrs = O->getELFFile().program_headers();
     if (!phdrs) {
       llvm::consumeError(phdrs.takeError());
     }
@@ -209,7 +209,7 @@ private:
     if (!resolverSupports || !resolve)
       return;
     
-    auto machine = O->getELFFile()->getHeader()->e_machine;
+    auto machine = O->getELFFile().getHeader().e_machine;
     auto relativeRelocType = getELFRelativeRelocationType(machine);
     
     for (auto &S : static_cast<const ELFObjectFileBase*>(O)
@@ -235,7 +235,7 @@ private:
           llvm::consumeError(name.takeError());
           continue;
         }
-        uint64_t offset = resolve(R, 0, 0);
+        uint64_t offset = resolve(R.getType(), R.getOffset(), 0, 0, 0);
         DynamicRelocations.insert({R.getOffset(), {*name, offset}});
       }
     }

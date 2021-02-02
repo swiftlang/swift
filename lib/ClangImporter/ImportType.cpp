@@ -234,7 +234,7 @@ namespace {
         return NAT->getSinglyDesugaredType();
       return T;
     }
-    
+
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       switch (type->getKind()) {
       case clang::BuiltinType::Void:
@@ -360,10 +360,16 @@ namespace {
       case clang::BuiltinType::OMPIterator:
         return Type();
 
-      // SVE builtin types that don't have Swift equivalents.
+      // ARM SVE builtin types that don't have Swift equivalents.
 #define SVE_TYPE(Name, Id, ...) \
       case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
+        return Type();
+
+      // PPC SVE builtin types that don't have Swift equivalents.
+#define PPC_VECTOR_TYPE(Name, Id, Size) \
+      case clang::BuiltinType::Id:
+#include "clang/Basic/PPCTypes.def"
         return Type();
       }
 
@@ -398,8 +404,8 @@ namespace {
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
       return Type();
     }
-    
-    ImportResult VisitPointerType(const clang::PointerType *type) {      
+
+    ImportResult VisitPointerType(const clang::PointerType *type) {
       auto pointeeQualType = type->getPointeeType();
       auto quals = pointeeQualType.getQualifiers();
 
@@ -544,7 +550,7 @@ namespace {
       // context.
       return Type();
     }
-    
+
     ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
       // FIXME: Map to a real fixed-size Swift array type when we have those.
       // Importing as a tuple at least fills the right amount of space, and
@@ -559,7 +565,7 @@ namespace {
       auto size = type->getSize().getZExtValue();
       // An array of size N is imported as an N-element tuple which
       // takes very long to compile. We chose 4096 as the upper limit because
-      // we don't want to break arrays of size PATH_MAX. 
+      // we don't want to break arrays of size PATH_MAX.
       if (size > 4096)
         return Type();
       
@@ -861,7 +867,6 @@ namespace {
     MAYBE_SUGAR_TYPE(TemplateSpecialization)
     MAYBE_SUGAR_TYPE(Auto)
     MAYBE_SUGAR_TYPE(DeducedTemplateSpecialization)
-    MAYBE_SUGAR_TYPE(PackExpansion)
 
     // These types are ALWAYS sugared.
 #define SUGAR_TYPE(KIND)                                                       \
@@ -1021,7 +1026,7 @@ namespace {
         } else {
           importedType = imported->getDeclaredInterfaceType();
         }
- 
+
         if (!type->qual_empty()) {
           // As a special case, turn 'NSObject <NSCopying>' into
           // 'id <NSObject, NSCopying>', which can be imported more usefully.
@@ -1570,7 +1575,7 @@ ImportedType ClangImporter::Implementation::importType(
                 clangContext.getObjCSelRedefinitionType()))
       type = clangContext.getObjCSelType();
   }
-  
+
   // If nullability is provided as part of the type, that overrides
   // optionality provided externally.
   if (auto nullability = type->getNullability(clangContext)) {
@@ -1883,7 +1888,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         swiftParamTy = newParamTy;
       }
     }
-    
+
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
                               .getDeclName()
@@ -2055,7 +2060,7 @@ adjustResultTypeForThrowingFunction(ForeignErrorConvention::Info errorInfo,
 
   llvm_unreachable("Invalid ForeignErrorConvention.");
 }
-                                     
+
 /// Produce the foreign error convention from the imported error info,
 /// error parameter type, and original result type.
 static ForeignErrorConvention
@@ -2427,7 +2432,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   // If we have a constructor with no parameters and a name with an
   // argument name, synthesize a Void parameter with that name.
-  if (kind == SpecialMethodKind::Constructor && params.empty() && 
+  if (kind == SpecialMethodKind::Constructor && params.empty() &&
       argNames.size() == 1) {
     addEmptyTupleParameter(argNames[0]);
   }
@@ -2453,7 +2458,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     return {Type(), false};
   }
 
-  
+
   // Form the parameter list.
   *bodyParams = ParameterList::create(SwiftContext, swiftParams);
 

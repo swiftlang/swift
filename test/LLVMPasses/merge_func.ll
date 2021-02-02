@@ -92,10 +92,10 @@ declare void @callee3(i32 %x)
 
 ; Preserve attributes
 
-; CHECK-LABEL: define void @sret_func1(i32* sret %p, i32 %x, i32 %y)
-; CHECK: tail call void @sret_func1Tm(i32* sret %p, i32 %x, i32 %y, i32* @g1)
+; CHECK-LABEL: define void @sret_func1(i32* sret(i32) %p, i32 %x, i32 %y)
+; CHECK: tail call void @sret_func1Tm(i32* sret(i32) %p, i32 %x, i32 %y, i32* @g1)
 ; CHECK: ret void
-define void @sret_func1(i32* sret %p, i32 %x, i32 %y) {
+define void @sret_func1(i32* sret(i32) %p, i32 %x, i32 %y) {
   %sum = add i32 %x, %y
   %l = load i32, i32* @g1, align 4
   %sum2 = add i32 %sum, %l
@@ -103,10 +103,10 @@ define void @sret_func1(i32* sret %p, i32 %x, i32 %y) {
   ret void
 }
 
-; CHECK-LABEL: define void @sret_func2(i32* sret %p, i32 %x, i32 %y)
-; CHECK: tail call void @sret_func1Tm(i32* sret %p, i32 %x, i32 %y, i32* @g2)
+; CHECK-LABEL: define void @sret_func2(i32* sret(i32) %p, i32 %x, i32 %y)
+; CHECK: tail call void @sret_func1Tm(i32* sret(i32) %p, i32 %x, i32 %y, i32* @g2)
 ; CHECK: ret void
-define void @sret_func2(i32* sret %p, i32 %x, i32 %y) {
+define void @sret_func2(i32* sret(i32) %p, i32 %x, i32 %y) {
   %sum = add i32 %x, %y
   %l = load i32, i32* @g2, align 4
   %sum2 = add i32 %sum, %l
@@ -114,7 +114,7 @@ define void @sret_func2(i32* sret %p, i32 %x, i32 %y) {
   ret void
 }
 
-; CHECK-LABEL: define internal void @sret_func1Tm(i32* sret %0, i32 %1, i32 %2, i32* %3)
+; CHECK-LABEL: define internal void @sret_func1Tm(i32* sret(i32) %0, i32 %1, i32 %2, i32* %3)
 ; CHECK: %l = load i32, i32* %3, align 4
 ; CHECK: store i32 %sum2, i32* %0
 ; CHECK: ret
