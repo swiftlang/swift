@@ -10,12 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/Decl.h"
 #include "clang/Basic/SourceLocation.h"
 #include "clang/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/FileSystem.h"
