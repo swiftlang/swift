@@ -402,16 +402,14 @@ namespace {
 /// Extracts uses out of a SourceFile
 class UsedDeclEnumerator {
   const SourceFile *SF;
-  const DependencyTracker &depTracker;
   StringRef swiftDeps;
 
   /// Cache these for efficiency
   const DependencyKey sourceFileImplementation;
 
 public:
-  UsedDeclEnumerator(const SourceFile *SF, const DependencyTracker &depTracker,
-                     StringRef swiftDeps)
-      : SF(SF), depTracker(depTracker), swiftDeps(swiftDeps),
+  UsedDeclEnumerator(const SourceFile *SF, StringRef swiftDeps)
+      : SF(SF), swiftDeps(swiftDeps),
         sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
             DeclAspect::implementation, swiftDeps)) {}
 
@@ -446,7 +444,6 @@ public:
       }
       }
     });
-    enumerateExternalUses(enumerator);
     enumerateNominalUses(enumerator);
   }
 
@@ -474,23 +471,59 @@ private:
       enumerateUse<NodeKind::nominal>(context, "", enumerator);
     });
   }
+};
+} // end namespace
+
+namespace {
+class ExternalDependencyEnumerator {
+  const DependencyTracker &depTracker;
+  const DependencyKey sourceFileImplementation;
+
+public:
+  using UseEnumerator = llvm::function_ref<void(
+      const DependencyKey &, const DependencyKey &, Optional<Fingerprint>)>;
+
+  ExternalDependencyEnumerator(const DependencyTracker &depTracker,
+                               StringRef swiftDeps)
+      : depTracker(depTracker),
+        sourceFileImplementation(DependencyKey::createKeyForWholeSourceFile(
+            DeclAspect::implementation, swiftDeps)) {}
 
   void enumerateExternalUses(UseEnumerator enumerator) {
-    for (StringRef s : depTracker.getIncrementalDependencies())
-      enumerateUse<NodeKind::incrementalExternalDepend>("", s, enumerator);
+    for (const auto &id : depTracker.getIncrementalDependencies()) {
+      enumerateUse<NodeKind::incrementalExternalDepend>(enumerator, id.path,
+                                                        id.fingerprint);
+    }
+    for (StringRef s : depTracker.getDependencies()) {
+      enumerateUse<NodeKind::externalDepend>(enumerator, s, None);
+    }
+  }
 
-    for (StringRef s : depTracker.getDependencies())
-      enumerateUse<NodeKind::externalDepend>("", s, enumerator);
+private:
+  template <NodeKind kind>
+  void enumerateUse(UseEnumerator createDefUse, StringRef name,
+                    Optional<Fingerprint> maybeFP) {
+    static_assert(kind == NodeKind::incrementalExternalDepend ||
+                      kind == NodeKind::externalDepend,
+                  "Not a kind of external dependency!");
+    createDefUse(DependencyKey(kind, DeclAspect::interface, "", name.str()),
+                 sourceFileImplementation, maybeFP);
   }
 };
 } // end namespace
 
 void FrontendSourceFileDepGraphFactory::addAllUsedDecls() {
-  UsedDeclEnumerator(SF, depTracker, swiftDeps)
+  UsedDeclEnumerator(SF, swiftDeps)
       .enumerateAllUses(
           [&](const DependencyKey &def, const DependencyKey &use) {
             addAUsedDecl(def, use);
           });
+  ExternalDependencyEnumerator(depTracker, swiftDeps)
+      .enumerateExternalUses([&](const DependencyKey &def,
+                                 const DependencyKey &use,
+                                 Optional<Fingerprint> maybeFP) {
+        addAnExternalDependency(def, use, maybeFP);
+      });
 }
 
 //==============================================================================
