@@ -317,6 +317,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   return {task, initialContext};
 }
 
+SWIFT_CC(swiftasync)
 void swift::swift_task_future_wait(
     AsyncTask *waitingTask, ExecutorRef executor,
     SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {

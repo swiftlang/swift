@@ -46,7 +46,7 @@ bb0(%0 : $MyActor):
 // CHECK-arm64e: [[PTRAUTH_SIGN:%[^,]+]] = call i64 @llvm.ptrauth.sign.i64(i64 [[CTXT_INT]], i32 2, i64 [[PTRAUTH_BLEND]])
 // CHECK-arm64e: [[CTXT:%[^,]+]] = inttoptr i64 [[PTRAUTH_SIGN]] to %swift.context*
 // CHECK:    store %swift.context* [[CTXT]], %swift.context** [[CTXT_ADDR]]
-// CHECK:    tail call swiftcc void @swift_task_switch(%swift.task* %2, %swift.executor* %3, %swift.executor* %1)
+// CHECK:    tail call swift{{(tail)?}}cc void @swift_task_switch(%swift.task* %2, %swift.executor* %3, %swift.executor* %1)
 // CHECK:    ret void
 
 sil_vtable MyActor {

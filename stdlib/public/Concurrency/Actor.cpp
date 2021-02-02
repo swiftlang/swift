@@ -1328,6 +1328,7 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef newExecutor,
     actor->giveUpThread(runner);
 }
 
+SWIFT_CC(swiftasync)
 void swift::swift_task_switch(AsyncTask *task, ExecutorRef currentExecutor,
                               ExecutorRef newExecutor) {
   assert(task && "no task provided");
