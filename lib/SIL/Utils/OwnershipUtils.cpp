@@ -601,7 +601,7 @@ bool BorrowedValue::visitExtendedLocalScopeEndingUses(
 }
 
 bool BorrowedValue::visitInteriorPointerOperands(
-    function_ref<void(const InteriorPointerOperand &)> func) const {
+    function_ref<void(InteriorPointerOperand)> func) const {
   SmallVector<Operand *, 32> worklist(value->getUses());
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();

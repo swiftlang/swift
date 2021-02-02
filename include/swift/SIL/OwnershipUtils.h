@@ -533,7 +533,7 @@ struct BorrowedValue {
   /// we were able to understand all uses and thus guarantee we found all
   /// interior pointer uses. Returns false otherwise.
   bool visitInteriorPointerOperands(
-      function_ref<void(const InteriorPointerOperand &)> func) const;
+      function_ref<void(InteriorPointerOperand)> func) const;
 
   /// Visit all immediate uses of this borrowed value and if any of them are
   /// reborrows, place them in BorrowingOperand form into \p
