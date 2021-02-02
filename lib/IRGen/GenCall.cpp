@@ -4797,8 +4797,24 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   Args.push_back(IGF.getAsyncTask());
   Args.push_back(IGF.getAsyncExecutor());
   Args.push_back(IGF.getAsyncContext());
-  auto call = IGF.Builder.CreateCall(fnPtr, Args);
-  call->setTailCall();
+
+  // Setup the coro.end.async intrinsic call.
+  auto &Builder = IGF.Builder;
+  auto mustTailCallFn = IGF.createAsyncDispatchFn(fnPtr,Args);
+  auto handle = IGF.getCoroutineHandle();
+  auto rawFnPtr =
+      Builder.CreateBitOrPointerCast(fnPtr.getRawPointer(), IGF.IGM.Int8PtrTy);
+
+  SmallVector<llvm::Value*, 8> arguments;
+  arguments.push_back(handle);
+  arguments.push_back(/*is unwind*/Builder.getFalse());
+  arguments.push_back(mustTailCallFn);
+  arguments.push_back(rawFnPtr);
+  for (auto *arg: Args)
+    arguments.push_back(arg);
+
+  Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_async, arguments);
+  Builder.CreateUnreachable();
 }
 
 void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,

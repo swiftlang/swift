@@ -44,6 +44,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -755,6 +756,9 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
   llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
+
+  /// What kind of tail call should be used for async->async calls.
+  llvm::CallInst::TailCallKind AsyncTailCallKind;
 
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
 

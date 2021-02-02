@@ -548,12 +548,16 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
-  bool isAsynCCSupported =
+  bool isAsyncCCSupported =
     clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
     == clang::TargetInfo::CCCR_OK;
-  SwiftAsyncCC = (opts.UseAsyncLowering && isAsynCCSupported)
-                     ? llvm::CallingConv::SwiftTail
-                     : SwiftCC;
+  if (opts.UseAsyncLowering && isAsyncCCSupported) {
+    SwiftAsyncCC = llvm::CallingConv::SwiftTail;
+    AsyncTailCallKind = llvm::CallInst::TCK_MustTail;
+  } else {
+    SwiftAsyncCC = SwiftCC;
+    AsyncTailCallKind = llvm::CallInst::TCK_Tail;
+  }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
