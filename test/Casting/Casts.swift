@@ -881,4 +881,47 @@ CastsTests.test("NSDictionary -> Dictionary casting [SR-12025]") {
 }
 #endif
 
+// Casting optionals to AnyHashable is a little peculiar
+// TODO: It would be nice if AnyHashable(Optional("Foo")) == AnyHashable("Foo")
+// (including as dictionary keys).  That would make this a lot less confusing.
+CastsTests.test("Optional cast to AnyHashable") {
+  let d: [String?: String] = ["FooKey": "FooValue", nil: "NilValue"]
+  // In Swift 5.3, this cast DOES unwrap the non-nil key
+  // We've deliberately tried to preserve that behavior in Swift 5.4
+  let d2 = d as [AnyHashable: String]
+
+  // After SR-9047, all four of the following should work:
+  let d3 = d2["FooKey" as String? as AnyHashable]
+  expectNil(d3)
+  let d4 = d2["FooKey" as String?]
+  expectNil(d4)
+  let d5 = d2["FooKey"]
+  expectNotNil(d5)
+  let d6 = d2["FooKey" as AnyHashable]
+  expectNotNil(d6)
+
+  // The nil key should be preserved and still function
+  let d7 = d2[String?.none as AnyHashable]
+  expectNotNil(d7)
+
+  // Direct casts via the runtime unwrap the optional
+  let a: String = "Foo"
+  let ah: AnyHashable = a
+  let b: String? = a
+  let bh = runtimeCast(b, to: AnyHashable.self)
+  expectEqual(bh, ah)
+
+  // Direct casts that don't go through the runtime don't unwrap the optional
+  // This is inconsistent with the runtime cast behavior above.  We should
+  // probably change the runtime behavior above to work the same as this,
+  // but that should wait until SR-9047 lands.
+  let x: String = "Baz"
+  let xh = x as AnyHashable
+  let y: String? = x
+  let yh = y as AnyHashable // Doesn't unwrap the optional
+  // xh is AnyHashable("Baz")
+  // yh is AnyHashable(Optional("Baz"))
+  expectNotEqual(xh, yh)
+}
+
 runAllTests()

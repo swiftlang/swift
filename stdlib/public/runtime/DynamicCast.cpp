@@ -709,8 +709,49 @@ tryCastToAnyHashable(
   assert(cast<StructMetadata>(destType)->Description
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
+  switch (srcType->getKind()) {
+  case MetadataKind::ForeignClass: // CF -> String
+  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
+#if SWIFT_OBJC_INTEROP
+    // TODO: Implement a fast path for NSString->AnyHashable casts.
+    // These are incredibly common because an NSDictionary with
+    // NSString keys is bridged by default to [AnyHashable:Any].
+    // Until this is implemented, fall through to the general case
+    break;
+#else
+    // If no Obj-C interop, just fall through to the general case.
+    break;
+#endif
+  }
+  case MetadataKind::Optional: {
+    // Until SR-9047 fixes the interactions between AnyHashable and Optional, we
+    // avoid directly injecting Optionals.  In particular, this allows
+    // casts from [String?:String] to [AnyHashable:Any] to work the way people
+    // expect. Otherwise, without SR-9047, the resulting dictionary can only be
+    // indexed with an explicit Optional<String>, not a plain String.
+    // After SR-9047, we can consider dropping this special case entirely.
+
+    // !!!!  This breaks compatibility with compiler-optimized casts
+    // (which just inject) and violates the Casting Spec.  It just preserves
+    // the behavior of the older casting code until we can clean things up.
+    auto srcInnerType = cast<EnumMetadata>(srcType)->getGenericArgs()[0];
+    unsigned sourceEnumCase = srcInnerType->vw_getEnumTagSinglePayload(
+      srcValue, /*emptyCases=*/1);
+    auto nonNil = (sourceEnumCase == 0);
+    if (nonNil) {
+      return DynamicCastResult::Failure;  // Our caller will unwrap the optional and try again
+    }
+    // Else Optional is nil -- the general case below will inject it
+    break;
+  }
+  default:
+    break;
+  }
+
+
+  // General case: If it conforms to Hashable, we cast it
   auto hashableConformance = reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
+    swift_conformsToProtocol(srcType, &HashableProtocolDescriptor));
   if (hashableConformance) {
     _swift_convertToAnyHashableIndirect(srcValue, destLocation,
                                         srcType, hashableConformance);
