@@ -731,6 +731,12 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::AsyncConflict);
     }
 
+    // If witness is sync, the requirement cannot be @objc and 'async'
+    if (!witnessFnType->getExtInfo().isAsync() &&
+          (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
+      return RequirementMatch(witness, MatchKind::AsyncConflict);
+    }
+
     // If the witness is 'throws', the requirement must be.
     if (witnessFnType->getExtInfo().isThrowing() &&
         !reqFnType->getExtInfo().isThrowing()) {
@@ -2381,7 +2387,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::AsyncConflict:
     diags.diagnose(match.Witness, diag::protocol_witness_async_conflict,
-                   cast<AbstractFunctionDecl>(match.Witness)->hasAsync());
+                   cast<AbstractFunctionDecl>(match.Witness)->hasAsync(),
+                   req->isObjC());
     break;
 
   case MatchKind::ThrowsConflict:
