@@ -3,9 +3,9 @@ add_sourcekit_executable(complete-test
   LLVM_LINK_COMPONENTS option coverage lto
 )
 if(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
-  target_link_libraries(complete-test PRIVATE sourcekitdInProc)
+  target_link_libraries(complete-test PRIVATE sourcekitdInProc swiftBasic)
 else()
-  target_link_libraries(complete-test PRIVATE sourcekitd)
+  target_link_libraries(complete-test PRIVATE sourcekitd swiftBasic)
 endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   target_link_libraries(complete-test PRIVATE

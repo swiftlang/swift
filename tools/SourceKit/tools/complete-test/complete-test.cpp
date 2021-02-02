@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "sourcekitd/sourcekitd.h"
+#include "swift/Basic/Statistic.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
@@ -44,7 +45,7 @@ int STDOUT_FILENO = _fileno(stdout);
 namespace {
 struct TestOptions {
   StringRef sourceFile;
-  StringRef completionToken;
+  SmallVector<StringRef, 2> completionTokens;
   StringRef popularAPI;
   StringRef unpopularAPI;
   Optional<bool> sortByName;
@@ -68,6 +69,7 @@ struct TestOptions {
   std::string moduleCachePath;
   bool rawOutput = false;
   bool structureOutput = false;
+  StringRef statsOutputDir;
   ArrayRef<const char *> compilerArgs;
 };
 } // end anonymous namespace
@@ -136,7 +138,7 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
     opt = opt.ltrim("-");
 
     if (opt == "tok") {
-      options.completionToken = value;
+      options.completionTokens.push_back(value);
     } else if (opt == "sort") {
       if (value == "context") {
         options.sortByName = false;
@@ -254,6 +256,8 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.showTopNonLiteral = uval;
     } else if (opt == "module-cache-path") {
       options.moduleCachePath = value.str();
+    } else if (opt == "stats-output-dir") {
+      options.statsOutputDir = value;
     }
   }
 
@@ -261,13 +265,24 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
     error = "missing <source-file>";
     return false;
   }
-  if (options.completionToken.empty()) {
+  if (options.completionTokens.empty()) {
     error = "missing -tok=<completion-token>";
     return false;
   }
 
   return true;
 }
+
+struct CompletionToken {
+  /// The name of the token, i.e. the text inside the #^TOK_NAME^# marker
+  std::string Name;
+  /// The offset of the token in the source file.
+  unsigned Offset;
+  /// The prefixes for which completions should be made, i.e. the text after
+  /// the ',' inside the code completion markers. E.g. in #^TOK_NAME,PRE1,PRE2^#
+  /// this is 'PRE1' and 'PRE2'
+  std::vector<std::string> Prefixes;
+};
 
 static int skt_main(int argc, const char **argv);
 
@@ -365,12 +380,20 @@ static int skt_main(int argc, const char **argv) {
   return ret;
 }
 
+/// Checks if a collection \p C (i.e. a type with a \c begin and \c end method)
+/// contains an element that matches the predicate \p P using \c std::find_if.
+template <typename CollectionType, typename PredicateType>
+static bool contains(const CollectionType &C, PredicateType P) {
+  return std::find_if(C.begin(), C.end(), P) != C.end();
+}
+
+/// Return the \p Input string with code completion tokens (#^TOK^#) removed and
+/// populate \p CompletionTokens with all tokens whose name occurs in \p TokenNames.
 static std::string
-removeCodeCompletionTokens(StringRef Input, StringRef TokenName,
-                           SmallVectorImpl<std::string> &prefixes,
-                           unsigned *CompletionOffset) {
-  assert(TokenName.size() >= 1);
-  *CompletionOffset = ~0U;
+removeCodeCompletionTokens(StringRef Input,
+                           const SmallVectorImpl<StringRef> &TokenNames,
+                           SmallVectorImpl<CompletionToken> &CompletionTokens) {
+  CompletionTokens.clear();
 
   std::string CleanFile;
   CleanFile.reserve(Input.size());
@@ -392,20 +415,44 @@ removeCodeCompletionTokens(StringRef Input, StringRef TokenName,
 
     // Check the token.
     assert(match.size() == 2 || match.size() == 3);
-    if (match[1].str() != TokenName)
-      continue;
-    *CompletionOffset = CleanFile.size();
-    if (match.size() == 2 || !match[2].matched)
-      continue;
+    auto matchedTokenName = match[1].str();
 
-    std::string fullMatch = match[2].str();
-    assert(fullMatch[0] == ',');
-    StringRef next = StringRef(fullMatch).split(',').second;
-    while (next != "") {
-      auto split = next.split(',');
-      prefixes.push_back(split.first.str());
-      next = split.second;
+    bool alreadyExists = contains(CompletionTokens, [&](CompletionToken Pos) {
+      return matchedTokenName == Pos.Name;
+    });
+    if (alreadyExists) {
+      llvm::errs()
+          << "Code completion token '" << matchedTokenName
+          << "' exists twice in source file. Ignoring second occurance.\n";
+      continue;
     }
+
+    bool shouldComplete = contains(TokenNames, [&](StringRef TokenName) {
+      return matchedTokenName == TokenName;
+    });
+    if (!shouldComplete) {
+      // No completion was requested for this token. Ignore it.
+      continue;
+    }
+
+    // Construct the CompletionToken struct.
+    CompletionToken Token;
+    Token.Offset = CleanFile.size();
+    Token.Name = matchedTokenName;
+    assert(matchedTokenName.size() >= 1);
+
+    if (match.size() > 2 && match[2].matched) {
+      std::string fullMatch = match[2].str();
+      assert(fullMatch[0] == ',');
+      StringRef next = StringRef(fullMatch).split(',').second;
+      while (next != "") {
+        auto split = next.split(',');
+        Token.Prefixes.push_back(split.first.str());
+        next = split.second;
+      }
+    }
+
+    CompletionTokens.push_back(Token);
   }
 
   return CleanFile;
@@ -608,8 +655,10 @@ static bool sendRequestSync(sourcekitd_object_t request, HandlerFunc func) {
 }
 
 static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
-                                unsigned offset, const char *sourceText,
-                                const char *filterText, TestOptions &options,
+                                unsigned offset, StringRef tokenName,
+                                const char *sourceText, const char *filterText,
+                                TestOptions &options,
+                                swift::UnifiedStatsReporter *stats,
                                 HandlerFunc func) {
 
   auto request = createBaseRequest(requestUID, name, offset);
@@ -688,6 +737,13 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
   sourcekitd_request_release(args);
 
   // Send the request!
+  std::string eventName;
+  if (filterText) {
+    eventName = ("complete-request." + tokenName + "." + filterText).str();
+  } else {
+    eventName = ("complete-request." + tokenName).str();
+  }
+  swift::FrontendStatsTracer tracer(stats, eventName);
   bool result = sendRequestSync(request, func);
   sourcekitd_request_release(request);
   return result;
@@ -753,86 +809,110 @@ static bool setupPopularAPI(const TestOptions &options) {
 }
 
 static int handleTestInvocation(TestOptions &options) {
+  // 'statsOpt' keeps the UnifiedStatsReporter alive if one exists.
+  // 'stats' points to the storage or is a nullptr if no stats were requested.
+  llvm::Optional<swift::UnifiedStatsReporter> statsOpt;
+  swift::UnifiedStatsReporter *stats = nullptr;
+  if (!options.statsOutputDir.empty()) {
+    statsOpt.emplace(/*ProgramName=*/"swift-completetest",
+                     /*ModuleName=*/"complete-test-invocation",
+                     /*InputName=*/options.sourceFile,
+                     /*TripleName=*/"na",
+                     /*OutputType=*/"na",
+                     /*OptType=*/"", options.statsOutputDir);
+    stats = statsOpt.getPointer();
+  }
 
   StringRef SourceFilename = options.sourceFile;
   auto SourceBuf = getBufferForFilename(SourceFilename);
   if (!SourceBuf)
     return 1;
 
-  unsigned CodeCompletionOffset;
-  SmallVector<std::string, 4> prefixes;
+  SmallVector<CompletionToken, 4> CompletionTokens;
   std::string CleanFile = removeCodeCompletionTokens(
-      SourceBuf->getBuffer(), options.completionToken, prefixes,
-      &CodeCompletionOffset);
+      SourceBuf->getBuffer(), options.completionTokens, CompletionTokens);
 
-  if (CodeCompletionOffset == ~0U) {
+  if (CompletionTokens.empty()) {
     llvm::errs() << "cannot find code completion token in source file\n";
     return 1;
   }
 
-  sourcekitd_uid_t RequestCodeCompleteOpen =
-      sourcekitd_uid_get_from_cstr("source.request.codecomplete.open");
-  sourcekitd_uid_t RequestCodeCompleteClose =
-      sourcekitd_uid_get_from_cstr("source.request.codecomplete.close");
-  sourcekitd_uid_t RequestCodeCompleteUpdate =
-      sourcekitd_uid_get_from_cstr("source.request.codecomplete.update");
-
-  if (setupPopularAPI(options))
+  if (setupPopularAPI(options)) {
     return 1;
+  }
 
-  // Open the connection and get the first set of results.
-  bool isError = codeCompleteRequest(
-      RequestCodeCompleteOpen, SourceFilename.data(), CodeCompletionOffset,
-      CleanFile.c_str(), /*filterText*/ nullptr, options,
-      [&](sourcekitd_object_t response) -> bool {
-        if (sourcekitd_response_is_error(response)) {
-          sourcekitd_response_description_dump(response);
-          return true;
-        }
+  bool isError = false;
+  for (CompletionToken Tok : CompletionTokens) {
 
-        // If there are no prefixes, just dump all the results.
-        if (prefixes.empty())
-          printResponse(response, options.rawOutput, options.structureOutput,
-                        /*indentation*/ 0);
-        return false;
-      });
+    sourcekitd_uid_t RequestCodeCompleteOpen =
+        sourcekitd_uid_get_from_cstr("source.request.codecomplete.open");
+    sourcekitd_uid_t RequestCodeCompleteClose =
+        sourcekitd_uid_get_from_cstr("source.request.codecomplete.close");
+    sourcekitd_uid_t RequestCodeCompleteUpdate =
+        sourcekitd_uid_get_from_cstr("source.request.codecomplete.update");
 
-  if (isError)
-    return isError;
-
-  for (auto &prefix : prefixes) {
+    // Open the connection and get the first set of results.
     isError |= codeCompleteRequest(
-        RequestCodeCompleteUpdate, SourceFilename.data(), CodeCompletionOffset,
-        CleanFile.c_str(), prefix.c_str(), options,
+        RequestCodeCompleteOpen, SourceFilename.data(), Tok.Offset, Tok.Name,
+        CleanFile.c_str(), /*filterText=*/nullptr, options, stats,
         [&](sourcekitd_object_t response) -> bool {
           if (sourcekitd_response_is_error(response)) {
             sourcekitd_response_description_dump(response);
             return true;
           }
-          llvm::outs() << "Results for filterText: " << prefix << " [\n";
-          llvm::outs().flush();
-          printResponse(response, options.rawOutput, options.structureOutput,
-                        /*indentation*/ 4);
-          llvm::outs() << "]\n";
-          llvm::outs().flush();
+
+          // If there are no prefixes, just dump all the results.
+          if (Tok.Prefixes.empty())
+            printResponse(response, options.rawOutput, options.structureOutput,
+                          /*indentation*/ 0);
           return false;
         });
-    if (isError)
-      break;
-  }
 
-  // Close the code completion connection.
-  auto request = createBaseRequest(RequestCodeCompleteClose,
-                                   SourceFilename.data(), CodeCompletionOffset);
-
-  isError |= sendRequestSync(request, [&](sourcekitd_object_t response) {
-    if (sourcekitd_response_is_error(response)) {
-      sourcekitd_response_description_dump(response);
-      return true;
+    if (isError) {
+      // We had an error opening the code completion. No point in filtering.
+      continue;
     }
-    return false;
-  });
 
-  sourcekitd_request_release(request);
+    for (auto &prefix : Tok.Prefixes) {
+      isError |= codeCompleteRequest(
+          RequestCodeCompleteUpdate, SourceFilename.data(), Tok.Offset,
+          Tok.Name, CleanFile.c_str(), prefix.c_str(), options, stats,
+          [&](sourcekitd_object_t response) -> bool {
+            if (sourcekitd_response_is_error(response)) {
+              sourcekitd_response_description_dump(response);
+              return true;
+            }
+            llvm::outs() << "Results for filterText: " << prefix << " [\n";
+            llvm::outs().flush();
+            printResponse(response, options.rawOutput, options.structureOutput,
+                          /*indentation*/ 4);
+            llvm::outs() << "]\n";
+            llvm::outs().flush();
+            return false;
+          });
+      if (isError) {
+        // We had an error during the update. No point updating any further.
+        // Still close the session further down.
+        break;
+      }
+    }
+
+    // Close the code completion connection.
+    auto request = createBaseRequest(RequestCodeCompleteClose,
+                                     SourceFilename.data(), Tok.Offset);
+
+    isError |= sendRequestSync(request, [&](sourcekitd_object_t response) {
+      if (sourcekitd_response_is_error(response)) {
+        sourcekitd_response_description_dump(response);
+        return true;
+      }
+      return false;
+    });
+
+    sourcekitd_request_release(request);
+  }
+  if (stats) {
+    stats->noteCurrentProcessExitStatus(isError);
+  }
   return isError;
 }
