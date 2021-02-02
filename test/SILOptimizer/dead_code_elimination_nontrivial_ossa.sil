@@ -375,6 +375,91 @@ bb1(%copy2 : @owned $NonTrivialStruct, %borrow2 : @guaranteed $NonTrivialStruct)
   return %newcopy : $NonTrivialStruct
 }
 
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime2 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime2'
+sil [ossa] @dce_borrowlifetime2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%copy : $Klass, %borrow : $Klass)
+
+bb1(%copy2 : @owned $Klass, %borrow2 : @guaranteed $Klass):
+  end_borrow %borrow2 : $Klass
+  destroy_value %copy2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime3 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime3'
+sil [ossa] @dce_borrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrow : $Klass, %copy : $Klass)
+
+bb1(%borrow2 : @guaranteed $Klass, %copy2 : @owned $Klass):
+  end_borrow %borrow2 : $Klass
+  destroy_value %copy2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime4 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime4'
+sil [ossa] @dce_borrowlifetime4 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrow : $Klass)
+
+bb1(%borrow2 : @guaranteed $Klass):
+  end_borrow %borrow2 : $Klass
+  br bb2(%copy : $Klass)
+
+bb2(%copy2 : @owned $Klass):
+  destroy_value %copy2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime5 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime5'
+sil [ossa] @dce_borrowlifetime5 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy1 = copy_value %0 : $Klass
+  %copy2 = copy_value %0 : $Klass
+  %borrow1 = begin_borrow %copy1 : $Klass
+  %borrow2 = begin_borrow %copy2 : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %2(%borrow2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %2(%copy2) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%copy1 : $Klass, %borrow1 : $Klass, %borrow2 : $Klass)
+
+bb1(%newcopy : @owned $Klass, %newborrow1 : @guaranteed $Klass, %newborrow2 : @guaranteed $Klass):
+  end_borrow %newborrow1 : $Klass
+  end_borrow %newborrow2 : $Klass
+  destroy_value %newcopy : $Klass
+  destroy_value %copy2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
 // CHECK-LABEL: sil [ossa] @infinite_loop :
 // CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'infinite_loop'

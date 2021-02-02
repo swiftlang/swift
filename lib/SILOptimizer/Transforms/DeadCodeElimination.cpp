@@ -557,6 +557,8 @@ bool DCE::removeDead() {
         BranchesChanged = true;
         continue;
       }
+
+      auto *phiArg = cast<SILPhiArgument>(arg);
       // In OSSA, we have to delete a dead phi argument and insert destroy or
       // end_borrow at its predecessors if the incoming values are live.
       // This is not necessary in non-OSSA, and will infact be incorrect.
@@ -564,8 +566,23 @@ bool DCE::removeDead() {
       // lifetime in non-OSSA.
       for (auto *pred : BB.getPredecessorBlocks()) {
         auto *predTerm = pred->getTerminator();
-        auto predArg = predTerm->getAllOperands()[i].get();
-        endLifetimeOfLiveValue(predArg, predTerm);
+        SILInstruction *insertPt = predTerm;
+        if (phiArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+          // If the phiArg is dead and had reborrow dependencies, its baseValue
+          // may also have been dead and a destroy_value of its baseValue may
+          // have been inserted before the pred's terminator. Make sure to
+          // adjust the insertPt before any destroy_value.
+          for (SILInstruction &predInst : llvm::reverse(*pred)) {
+            if (&predInst == predTerm)
+              continue;
+            if (!isa<DestroyValueInst>(&predInst)) {
+              insertPt = &*std::next(predInst.getIterator());
+              break;
+            }
+          }
+        }
+
+        endLifetimeOfLiveValue(phiArg->getIncomingPhiValue(pred), insertPt);
       }
       erasePhiArgument(&BB, i);
       Changed = true;
