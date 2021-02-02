@@ -611,11 +611,16 @@ bool DCE::removeDead() {
 
       // We want to replace dead terminators with unconditional branches to
       // the nearest post-dominator that has useful instructions.
-      if (isa<TermInst>(Inst)) {
+      if (auto *termInst = dyn_cast<TermInst>(Inst)) {
         SILBasicBlock *postDom = nearestUsefulPostDominator(Inst->getParent());
         if (!postDom)
           continue;
 
+        for (auto &op : termInst->getAllOperands()) {
+          if (op.isLifetimeEnding()) {
+            endLifetimeOfLiveValue(op.get(), termInst);
+          }
+        }
         LLVM_DEBUG(llvm::dbgs() << "Replacing branch: ");
         LLVM_DEBUG(Inst->dump());
         LLVM_DEBUG(llvm::dbgs() << "with jump to: BB" << postDom->getDebugID());
