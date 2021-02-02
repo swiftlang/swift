@@ -240,7 +240,7 @@ CharSourceRange RawComment::getCharSourceRange() {
   return CharSourceRange(Start, Length);
 }
 
-bool BasicSourceFileInfo::populate(SourceFile *SF) {
+bool BasicSourceFileInfo::populate(const SourceFile *SF) {
   SourceManager &SM = SF->getASTContext().SourceMgr;
 
   auto filename = SF->getFilename();

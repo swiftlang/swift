@@ -1536,9 +1536,9 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
 }
 
 void ModuleDecl::collectBasicSourceFileInfo(
-    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) {
-  for (FileUnit *fileUnit : getFiles()) {
-    if (SourceFile *SF = dyn_cast<SourceFile>(fileUnit)) {
+    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
+  for (const FileUnit *fileUnit : getFiles()) {
+    if (const auto *SF = dyn_cast<SourceFile>(fileUnit)) {
       BasicSourceFileInfo info;
       if (info.populate(SF))
         continue;
