@@ -65,3 +65,12 @@ class Rock : NSObject, Rollable {
   func roll(completionHandler: @escaping () -> Void) { completionHandler() }
   func roll() { roll(completionHandler: {}) }
 }
+
+// Crash involving actor isolation checking.
+class C5 {
+  @MainActor @objc var allOperations: [String] = []
+}
+
+class C6: C5, ServiceProvider {
+  @MainActor func allOperations() async -> [String] { [] }
+}
