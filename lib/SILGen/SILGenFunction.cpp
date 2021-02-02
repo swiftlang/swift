@@ -559,7 +559,8 @@ void SILGenFunction::emitAsyncHandler(FuncDecl *fd) {
   bodyFn->setDebugScope(new (getModule()) SILDebugScope(loc, bodyFn));
 
   SILGenFunction(SGM, *bodyFn, fd).emitFunction(fd);
-  
+  SGM.emitLazyConformancesForFunction(bodyFn);
+
   // 2. step: emit the original asyncHandler function
   //
   Scope scope(*this, loc);
