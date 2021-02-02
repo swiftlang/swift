@@ -1245,3 +1245,55 @@ bool ForwardingOperand::visitForwardedValues(
     return visitor(args[0]);
   });
 }
+
+void swift::findTransitiveReborrowBaseValuePairs(
+    BorrowingOperand initialScopedOperand, SILValue origBaseValue,
+    function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair) {
+  // We need a SetVector to make sure we don't revisit the same reborrow operand
+  // again.
+  SmallSetVector<std::tuple<Operand *, SILValue>, 4> worklist;
+
+  // Populate the worklist with reborrow and the base value
+  initialScopedOperand.visitScopeEndingUses([&](Operand *op) {
+    if (op->getOperandOwnership() == OperandOwnership::Reborrow) {
+      worklist.insert(std::make_tuple(op, origBaseValue));
+    }
+    return true;
+  });
+
+  // Size of worklist changes in this loop
+  for (unsigned idx = 0; idx < worklist.size(); idx++) {
+    Operand *reborrowOp;
+    SILValue baseValue;
+    std::tie(reborrowOp, baseValue) = worklist[idx];
+
+    BorrowingOperand borrowingOperand(reborrowOp);
+    assert(borrowingOperand.isReborrow());
+
+    auto *branchInst = cast<BranchInst>(reborrowOp->getUser());
+    auto *succBlock = branchInst->getDestBB();
+    auto *phiArg = cast<SILPhiArgument>(
+        succBlock->getArgument(reborrowOp->getOperandNumber()));
+
+    SILValue newBaseVal = baseValue;
+    // If the previous base value was also passed as a phi arg, that will be
+    // the new base value.
+    for (auto *arg : succBlock->getArguments()) {
+      if (arg->getIncomingPhiValue(branchInst->getParent()) == baseValue) {
+        newBaseVal = arg;
+        break;
+      }
+    }
+
+    // Call the visitor function
+    visitReborrowBaseValuePair(phiArg, newBaseVal);
+
+    BorrowedValue scopedValue(phiArg);
+    scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
+      if (op->getOperandOwnership() == OperandOwnership::Reborrow) {
+        worklist.insert(std::make_tuple(op, newBaseVal));
+      }
+      return true;
+    });
+  }
+}

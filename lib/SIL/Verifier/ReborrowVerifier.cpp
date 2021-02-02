@@ -39,57 +39,18 @@ bool ReborrowVerifier::verifyReborrowLifetime(SILPhiArgument *phiArg,
 
 void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
                                        SILValue value) {
-  SmallVector<std::tuple<Operand *, SILValue>, 4> worklist;
-  // Initialize the worklist with borrow lifetime ending uses
-  initialScopedOperand.visitScopeEndingUses([&](Operand *op) {
-    worklist.emplace_back(op, value);
-    return true;
-  });
-
-  while (!worklist.empty()) {
-    Operand *borrowLifetimeEndOp;
-    SILValue baseVal;
-    std::tie(borrowLifetimeEndOp, baseVal) = worklist.pop_back_val();
-    auto *borrowLifetimeEndUser = borrowLifetimeEndOp->getUser();
-
-    auto borrowingOperand = BorrowingOperand::get(borrowLifetimeEndOp);
-    if (!borrowingOperand || !borrowingOperand.isReborrow())
-      continue;
-
-    if (isVisitedOp(borrowLifetimeEndOp, baseVal))
-      continue;
-
-    // Process reborrow
-    auto *branchInst = cast<BranchInst>(borrowLifetimeEndUser);
-    for (auto *succBlock : branchInst->getSuccessorBlocks()) {
-      auto *phiArg = cast<SILPhiArgument>(
-          succBlock->getArgument(borrowLifetimeEndOp->getOperandNumber()));
-      assert(phiArg->getOwnershipKind() == OwnershipKind::Guaranteed);
-
-      SILValue newBaseVal = baseVal;
-      // If the previous base value was also passed as a phi arg, that will be
-      // the new base value.
-      for (auto *arg : succBlock->getArguments()) {
-        if (arg->getIncomingPhiValue(branchInst->getParent()) == baseVal) {
-          newBaseVal = arg;
-          break;
-        }
-      }
-
-      if (isVisitedPhiArg(phiArg, newBaseVal))
-        continue;
-      addVisitedPhiArg(phiArg, newBaseVal);
-      verifyReborrowLifetime(phiArg, newBaseVal);
-
-      // Find the scope ending uses of the guaranteed phi arg and add it to the
-      // worklist.
-      auto scopedValue = BorrowedValue(phiArg);
-      assert(scopedValue);
-      scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
-        addVisitedOp(op, newBaseVal);
-        worklist.emplace_back(op, newBaseVal);
-        return true;
-      });
+  auto visitReborrowBaseValuePair = [&](SILPhiArgument *phiArg,
+                                        SILValue baseValue) {
+    // If the (phiArg, baseValue) pair was not visited before, verify the
+    // lifetime.
+    auto it = reborrowToBaseValuesMap.find(phiArg);
+    if (it == reborrowToBaseValuesMap.end() ||
+        it->second.find(baseValue) == it->second.end()) {
+      reborrowToBaseValuesMap[phiArg].insert(baseValue);
+      verifyReborrowLifetime(phiArg, baseValue);
     }
-  }
+  };
+  // For every unique reborrow/base value pair, verify the lifetime
+  findTransitiveReborrowBaseValuePairs(initialScopedOperand, value,
+                                       visitReborrowBaseValuePair);
 }
