@@ -315,6 +315,14 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                        // FIXME: pass down formal type
                                        destBuf->getType().getASTType(),
                                        destBuf->getType().getObjectType());
+          // Force-unwrap an argument that comes to us as Optional if it's
+          // formally non-optional in the return.
+          if (bridgedArg.getType().getOptionalObjectType()
+              && !destBuf->getType().getOptionalObjectType()) {
+            bridgedArg = SGF.emitPreconditionOptionalHasValue(loc,
+                                                             bridgedArg,
+                                                             /*implicit*/ true);
+          }
           bridgedArg.forwardInto(SGF, loc, destBuf);
         };
 

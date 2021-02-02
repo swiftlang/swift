@@ -60,6 +60,7 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: String = try await slowServer.doSomethingDangerousNullably("foo")
 
   let _: NSObject? = try await slowServer.stopRecording()
+  let _: NSObject = try await slowServer.someObject()
 }
 
 // CHECK: sil{{.*}}@[[INT_COMPLETION_BLOCK]]
