@@ -604,6 +604,11 @@ public:
   /// version. This only works for valid constants.
   SymbolicValue cloneInto(SymbolicValueAllocator &allocator) const;
 
+  /// Check that all nested SymbolicValues are constant. Symbolic values such as arrays,
+  /// aggregates and pointers can contain non-constant symbolic values, when instructions
+  /// are skipped during evaluation.
+  bool containsOnlyConstants() const;
+
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
 };
