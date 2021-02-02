@@ -108,3 +108,16 @@ void AbstractSourceFileDepGraphFactory::addAUsedDecl(
   assert(useNode->getIsProvides() && "Use (using node) must be a provides");
   g.addArc(defNode, useNode);
 }
+
+void AbstractSourceFileDepGraphFactory::addAnExternalDependency(
+    const DependencyKey &defKey, const DependencyKey &useKey,
+    Optional<Fingerprint> maybeFP) {
+  auto *defNode = g.findExistingNodeOrCreateIfNew(defKey, maybeFP,
+                                                  false /* = !isProvides */);
+
+  auto nullableUse = g.findExistingNode(useKey);
+  assert(nullableUse.isNonNull() && "Use must be an already-added provides");
+  auto *useNode = nullableUse.get();
+  assert(useNode->getIsProvides() && "Use (using node) must be a provides");
+  g.addArc(defNode, useNode);
+}
