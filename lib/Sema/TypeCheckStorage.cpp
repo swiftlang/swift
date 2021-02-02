@@ -2814,7 +2814,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     SourceLoc typeLoc;
     if (auto *repr = var->getTypeReprOrParentPatternTypeRepr())
-      typeLoc = repr->getLoc();
+      typeLoc = repr->getEndLoc();
     
     if (info.hasStorage()) {
       // Protocols cannot have stored properties.
