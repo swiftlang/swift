@@ -35,6 +35,16 @@ func testLocalWrapper() {
   // CHECK: mark_function_escape [[P]] : $*Wrapper<Int>
   // CHECK-LABEL: function_ref @$s22property_wrapper_local16testLocalWrapperyyF6$valueL_AA0F0VySiGvg : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Wrapper<Int>
 
+  // Check that the wrapped value is materialized to a temporary when used as `inout`
+  value += 5
+  // CHECK: [[TMP:%.*]] = alloc_stack $Int
+  // CHECK: [[GET:%.*]] = function_ref @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivg : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int
+  // CHECK: [[VAL:%.*]] = apply [[GET]]({{%.*}}) : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int
+  // CHECK: store [[VAL]] to [trivial] [[TMP]] : $*Int
+  // CHECK: [[OP:%.*]] = function_ref @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
+  // CHECK: apply [[OP]]({{%.*}}) : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
+  // CHECK: [[RESULT:%.*]] = load [trivial] [[TMP]] : $*Int
+  // CHECK: assign_by_wrapper [[RESULT]] : $Int to [[P]]
 
   // Check local property wrapper backing initializer and accessors
 
@@ -60,6 +70,12 @@ func testInitialValue() {
   value = 15
   // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
   // CHECK-NOT: assign_by_wrapper
+
+  value += 5
+  // CHECK: function_ref @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
+  // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
+  // CHECK-NOT: assign_by_wrapper
+
   // CHECK: return
 
   // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testInitialValueyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int> {
