@@ -241,7 +241,7 @@ public:
     // borrow it's based on.
     SmallVector<Operand *, 4> endScopeInsts;
     value.visitLocalScopeEndingUses(
-        [&](Operand *use) { endScopeInsts.push_back(use); });
+      [&](Operand *use) { endScopeInsts.push_back(use); return true; });
 
     LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
 
