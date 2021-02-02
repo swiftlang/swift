@@ -760,37 +760,35 @@ struct ClassImpl : ReflectionMirrorImpl {
 #if SWIFT_OBJC_INTEROP
 // Implementation for ObjC classes.
 struct ObjCClassImpl : ClassImpl {
-  intptr_t count() {
+  intptr_t count() override {
     // ObjC makes no guarantees about the state of ivars, so we can't safely
     // introspect them in the general case.
     return 0;
   }
-  
-  intptr_t childOffset(intptr_t i) {
+
+  intptr_t childOffset(intptr_t i) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 
   const FieldType childMetadata(intptr_t i, const char **outName,
-                                void (**outFreeFunc)(const char *)) {
+                                void (**outFreeFunc)(const char *)) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 
   AnyReturn subscript(intptr_t i, const char **outName,
-                      void (**outFreeFunc)(const char *)) {
+                      void (**outFreeFunc)(const char *)) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 
-  virtual intptr_t recursiveCount() {
-    return 0;
-  }
+  virtual intptr_t recursiveCount() override { return 0; }
 
-  virtual intptr_t recursiveChildOffset(intptr_t index) {
+  virtual intptr_t recursiveChildOffset(intptr_t index) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
-  virtual const FieldType recursiveChildMetadata(intptr_t index,
-                                                 const char **outName,
-                                                 void (**outFreeFunc)(const char *))
-  {
+
+  virtual const FieldType
+  recursiveChildMetadata(intptr_t index, const char **outName,
+                         void (**outFreeFunc)(const char *)) override {
     swift::crash("Cannot get children of Objective-C objects.");
   }
 };
