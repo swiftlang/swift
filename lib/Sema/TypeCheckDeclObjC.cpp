@@ -1795,11 +1795,8 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
 
     // Attach the foreign async convention.
     if (inheritedAsyncConvention) {
-      if (!method->hasAsync())
-        method->diagnose(diag::satisfy_async_objc,
-                         isa<ConstructorDecl>(method));
-      else
-        method->setForeignAsyncConvention(*inheritedAsyncConvention);
+      assert(method->hasAsync() && "async objc req offered for sync witness?");
+      method->setForeignAsyncConvention(*inheritedAsyncConvention);
 
     } else if (method->hasAsync()) {
       assert(asyncConvention && "Missing async convention");
