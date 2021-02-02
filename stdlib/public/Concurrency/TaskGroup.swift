@@ -98,7 +98,7 @@ extension Task {
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(groupTask))
 
-    return try await Handle<BodyResult>(task: groupTask).get()
+    return try await Handle<BodyResult, Error>(groupTask).get()
   }
 
   /// A task group serves as storage for dynamically started tasks.
@@ -135,7 +135,7 @@ extension Task {
     public mutating func add(
       overridingPriority priorityOverride: Priority? = nil,
       operation: @concurrent @escaping () async throws -> TaskResult
-    ) async -> Task.Handle<TaskResult> {
+    ) async -> Task.Handle<TaskResult, Error> {
       // Increment the number of pending tasks immediately;
       // We don't need to know which specific task is pending, just that pending
       // ones exist, so that next() can know if to wait or return nil.
@@ -144,7 +144,7 @@ extension Task {
       let childTask =
         await _runGroupChildTask(overridingPriority: priorityOverride, operation: operation)
 
-      return Handle<TaskResult>(task: childTask)
+      return Handle<TaskResult, Error>(childTask)
     }
 
     /// Wait for the a child task that was added to the group to complete,

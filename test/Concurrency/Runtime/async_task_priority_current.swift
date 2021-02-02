@@ -4,9 +4,8 @@
 
 @main struct Main {
   static func main() async {
-    let p = await Task.currentPriority()
-    // CHECK: priority: default
-    print("priority: \(p)")
+    // FIXME: use Task.currentPriority once unsafeCurrent works
+    let p = await Task.unsafeCurrentASYNC().task.priority
     assert(p == Task.Priority.default)
   }
 }
