@@ -2070,8 +2070,8 @@ void IRGenDebugInfoImpl::setInlinedTrapLocation(IRBuilder &Builder,
     TheLastScope = TheLastScope->InlinedCallSite;
   }
   auto LastLocation = llvm::DILocation::get(
-      IGM.getLLVMContext(), LastDebugLoc.line, LastDebugLoc.column,
-      getOrCreateScope(TheLastScope));
+      IGM.getLLVMContext(), LastFilenameAndLocation.line,
+      LastFilenameAndLocation.column, getOrCreateScope(TheLastScope));
   // FIXME: This location should point to stdlib instead of being artificial.
   auto DL = llvm::DILocation::get(IGM.getLLVMContext(), 0, 0,
                                   getOrCreateScope(Scope), LastLocation);
