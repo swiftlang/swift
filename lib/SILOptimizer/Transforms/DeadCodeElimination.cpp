@@ -44,11 +44,10 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though begin_access/begin_borrow/destroy_value/copy_value have
-  // side-effects, they can be DCE'ed if they do not have useful
-  // dependencies/reverse dependencies
-  if (isa<BeginAccessInst>(I) || isa<BeginBorrowInst>(I) ||
-      isa<CopyValueInst>(I) || isa<DestroyValueInst>(I))
+  // Even though begin_access/destroy_value/copy_value have side-effects, they
+  // can be DCE'ed if they do not have useful dependencies/reverse dependencies
+  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
+      isa<DestroyValueInst>(I))
     return false;
 
   // A load [copy] is okay to be DCE'ed if there are no useful dependencies
@@ -266,6 +265,21 @@ void DCE::markLive() {
         break;
       }
       case SILInstructionKind::BeginBorrowInst: {
+        // Currently we only support borrows of owned values.
+        // Nested borrow handling can be complex in the presence of reborrows.
+        // So it is not handled currently.
+        auto *borrowInst = cast<BeginBorrowInst>(&I);
+        if (borrowInst->getOperand().getOwnershipKind() !=
+            OwnershipKind::Owned) {
+          markInstructionLive(borrowInst);
+          // Visit all end_borrows and mark them live
+          auto visitEndBorrow = [&](EndBorrowInst *endBorrow) {
+            markInstructionLive(endBorrow);
+          };
+          visitTransitiveEndBorrows(borrowInst, visitEndBorrow);
+          continue;
+        }
+        // If not populate reborrowDependencies for this borrow
         findReborrowDependencies(cast<BeginBorrowInst>(&I));
         break;
       }

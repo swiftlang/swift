@@ -1297,3 +1297,25 @@ void swift::findTransitiveReborrowBaseValuePairs(
     });
   }
 }
+
+void swift::visitTransitiveEndBorrows(
+    BeginBorrowInst *borrowInst,
+    function_ref<void(EndBorrowInst *)> visitEndBorrow) {
+  SmallSetVector<SILValue, 4> worklist;
+  worklist.insert(borrowInst);
+
+  while (!worklist.empty()) {
+    auto val = worklist.pop_back_val();
+    for (auto *consumingUse : val->getConsumingUses()) {
+      auto *consumingUser = consumingUse->getUser();
+      if (auto *branch = dyn_cast<BranchInst>(consumingUser)) {
+        auto *succBlock = branch->getSingleSuccessorBlock();
+        auto *phiArg = cast<SILPhiArgument>(
+            succBlock->getArgument(consumingUse->getOperandNumber()));
+        worklist.insert(phiArg);
+      } else {
+        visitEndBorrow(cast<EndBorrowInst>(consumingUser));
+      }
+    }
+  }
+}

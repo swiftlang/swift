@@ -456,6 +456,57 @@ bb1(%newcopy : @owned $Klass, %newborrow1 : @guaranteed $Klass, %newborrow2 : @g
   end_borrow %newborrow2 : $Klass
   destroy_value %newcopy : $Klass
   destroy_value %copy2 : $Klass
+   %res = tuple ()
+  return %res : $()
+}
+
+// Nested borrows are currently not optimized in DCE
+sil [ossa] @dce_nestedborrowlifetime1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  %borrowo = begin_borrow %0 : $NonTrivialStruct
+  %borrow = begin_borrow %borrowo : $NonTrivialStruct
+  br bb1(%borrowo : $NonTrivialStruct, %borrow : $NonTrivialStruct)
+
+bb1(%newborrowo : @guaranteed $NonTrivialStruct, %borrow2 : @guaranteed $NonTrivialStruct):
+  %newcopy = copy_value %borrow2 : $NonTrivialStruct
+  end_borrow %borrow2 : $NonTrivialStruct
+  end_borrow %newborrowo : $NonTrivialStruct
+  return %newcopy : $NonTrivialStruct
+}
+
+sil [ossa] @dce_nestedborrowlifetime2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %borrowo = begin_borrow %0 : $Klass
+  %borrow = begin_borrow %borrowo : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%borrowo) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrowo : $Klass, %borrow : $Klass)
+
+bb1(%newborrow : @guaranteed $Klass, %borrow2 : @guaranteed $Klass):
+  end_borrow %borrow2 : $Klass
+  end_borrow %newborrow : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// This test shows it is non trivial to find the insert point of an outer reborrow.
+// Here %newborrowo and %newborrowi are both dead phis.
+// First end_borrow for the incoming value of %newborrowi is added
+// It is non straight forward to find the insert pt for the end_borrow of the incoming value of %newborrowo
+// This may not be important once CanonicalizeOSSALifetime supports rewrite of multi-block borrows. 
+sil [ossa] @dce_nestedborrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %borrowo = begin_borrow %0 : $Klass
+  %borrow = begin_borrow %borrowo : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%borrowo) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrow : $Klass, %borrowo : $Klass)
+
+bb1(%newborrowi : @guaranteed $Klass, %newborrowo : @guaranteed $Klass):
+  end_borrow %newborrowi : $Klass
+  end_borrow %newborrowo : $Klass
   %res = tuple ()
   return %res : $()
 }
