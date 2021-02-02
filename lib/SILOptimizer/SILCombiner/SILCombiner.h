@@ -93,10 +93,6 @@ class SILCombiner :
   /// edges so it is safe to use this here.
   DeadEndBlocks deBlocks;
 
-  /// A utility struct used by OwnershipFixupContext to map sets of partially
-  /// post-dominating blocks to a full jointly post-dominating set.
-  JointPostDominanceSetComputer jPostDomComputer;
-
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
 
@@ -131,8 +127,8 @@ public:
               use->set(newValue);
               Worklist.add(use->getUser());
             }),
-        deBlocks(&B.getFunction()), jPostDomComputer(deBlocks),
-        ownershipFixupContext(instModCallbacks, deBlocks, jPostDomComputer) {}
+        deBlocks(&B.getFunction()),
+        ownershipFixupContext(instModCallbacks, deBlocks) {}
 
   bool runOnFunction(SILFunction &F);
 
@@ -437,17 +433,6 @@ private:
 
   bool hasOwnership() const {
     return Builder.hasOwnership();
-  }
-
-  /// Gets access to the joint post dominance computer and clears it after \p
-  /// callback.
-  template <typename ResultTy>
-  ResultTy withJointPostDomComputer(
-      function_ref<ResultTy(JointPostDominanceSetComputer &)> callback) {
-    // Make sure we clear the joint post dom computer after callback.
-    SWIFT_DEFER { jPostDomComputer.clear(); };
-    // Then return callback passing in the computer.
-    return callback(jPostDomComputer);
   }
 };
 

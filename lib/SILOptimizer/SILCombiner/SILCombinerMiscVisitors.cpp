@@ -1963,12 +1963,11 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
     }
 
     SILValue selectEnumOperand = SEI->getEnumOperand();
-    auto switchEnumOperand = withJointPostDomComputer<SILValue>([&](auto &j) {
-      if (selectEnumOperand.getOwnershipKind() == OwnershipKind::None)
-        return selectEnumOperand;
-      return makeCopiedValueAvailable(selectEnumOperand,
-                                      Builder.getInsertionBB(), &j);
-    });
+    SILValue switchEnumOperand = selectEnumOperand;
+    if (selectEnumOperand.getOwnershipKind() != OwnershipKind::None) {
+      switchEnumOperand = makeCopiedValueAvailable(selectEnumOperand,
+                                                   Builder.getInsertionBB());
+    }
     return Builder.createSwitchEnum(SEI->getLoc(), switchEnumOperand, DefaultBB,
                                     Cases);
   }

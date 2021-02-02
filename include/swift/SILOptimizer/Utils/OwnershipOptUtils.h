@@ -37,7 +37,6 @@ struct OwnershipFixupContext {
   Optional<InstModCallbacks> inlineCallbacks;
   InstModCallbacks &callbacks;
   DeadEndBlocks &deBlocks;
-  JointPostDominanceSetComputer &jointPostDomSetComputer;
 
   SmallVector<Operand *, 8> transitiveBorrowedUses;
   SmallVector<PhiOperand, 8> recursiveReborrows;
@@ -64,28 +63,14 @@ struct OwnershipFixupContext {
   };
   AddressFixupContext extraAddressFixupInfo;
 
-  OwnershipFixupContext(InstModCallbacks &callbacks, DeadEndBlocks &deBlocks,
-                        JointPostDominanceSetComputer &jointPostDomSetComputer)
-      : callbacks(callbacks), deBlocks(deBlocks),
-        jointPostDomSetComputer(jointPostDomSetComputer) {}
+  OwnershipFixupContext(InstModCallbacks &callbacks, DeadEndBlocks &deBlocks)
+      : callbacks(callbacks), deBlocks(deBlocks) {}
 
   void clear() {
-    jointPostDomSetComputer.clear();
     transitiveBorrowedUses.clear();
     recursiveReborrows.clear();
     extraAddressFixupInfo.allAddressUsesFromOldValue.clear();
     extraAddressFixupInfo.intPtrOp = InteriorPointerOperand();
-  }
-
-  /// Gets access to the joint post dominance computer and clears it after \p
-  /// callback.
-  template <typename ResultTy>
-  ResultTy withJointPostDomComputer(
-      function_ref<ResultTy(JointPostDominanceSetComputer &)> callback) {
-    // Make sure we clear the joint post dom computer after callback.
-    SWIFT_DEFER { jointPostDomSetComputer.clear(); };
-    // Then return callback passing in the computer.
-    return callback(jointPostDomSetComputer);
   }
 
 private:

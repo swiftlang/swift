@@ -1397,9 +1397,8 @@ class SILCSE : public SILFunctionTransform {
 
     auto *Fn = getFunction();
     DeadEndBlocks DeadEndBBs(Fn);
-    JointPostDominanceSetComputer Computer(DeadEndBBs);
     InstModCallbacks callbacks;
-    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs, Computer};
+    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs};
     CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
     bool Changed = false;
 
