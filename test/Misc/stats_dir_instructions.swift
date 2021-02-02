@@ -1,4 +1,5 @@
 // REQUIRES: OS=macosx
+// REQUIRES: rdar73834542
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t %s
 // RUN: %{python} %utils/process-stats-dir.py --set-csv-baseline %t/frontend.csv %t

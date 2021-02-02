@@ -1,5 +1,6 @@
 // Windows doesn't track/use read() and poll()
 // UNSUPPORTED: windows
+// REQUIRES: rdar73834542
 // RUN: %empty-directory(%t/manyfuncs)
 // RUN: %empty-directory(%t/stats)
 //

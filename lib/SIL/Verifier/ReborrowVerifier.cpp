@@ -41,7 +41,7 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
                                        SILValue value) {
   SmallVector<std::tuple<Operand *, SILValue>, 4> worklist;
   // Initialize the worklist with borrow lifetime ending uses
-  initialScopedOperand.visitLocalEndScopeUses([&](Operand *op) {
+  initialScopedOperand.visitScopeEndingUses([&](Operand *op) {
     worklist.emplace_back(op, value);
     return true;
   });
@@ -83,11 +83,12 @@ void ReborrowVerifier::verifyReborrows(BorrowingOperand initialScopedOperand,
 
       // Find the scope ending uses of the guaranteed phi arg and add it to the
       // worklist.
-      auto scopedValue = BorrowedValue::get(phiArg);
+      auto scopedValue = BorrowedValue(phiArg);
       assert(scopedValue);
       scopedValue.visitLocalScopeEndingUses([&](Operand *op) {
         addVisitedOp(op, newBaseVal);
         worklist.emplace_back(op, newBaseVal);
+        return true;
       });
     }
   }

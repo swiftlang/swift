@@ -475,7 +475,7 @@ static bool tryJoinIfDestroyConsumingUseInSameBlock(
     // singleConsumingUse (the original forwarded use) and the destroy_value. In
     // such a case, we must bail!
     if (auto operand = BorrowingOperand::get(use))
-      if (!operand.visitLocalEndScopeUses([&](Operand *endScopeUse) {
+      if (!operand.visitScopeEndingUses([&](Operand *endScopeUse) {
             // Return false if we did see the relevant end scope instruction
             // in the block. That means that we are going to exit early and
             // return false.

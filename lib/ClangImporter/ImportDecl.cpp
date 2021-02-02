@@ -4111,7 +4111,7 @@ namespace {
                 clangVar->getEvaluatedValue()->getInt().getZExtValue()));
       } else if (evaluated->isFloat()) {
         auto floatStr = evaluated->getAsString(Impl.getClangASTContext(),
-                                               clang::QualType());
+                                               clangVar->getType());
         auto floatIdent = Impl.SwiftContext.getIdentifier(floatStr);
         value = new (Impl.SwiftContext)
             FloatLiteralExpr(floatIdent.str(), SourceLoc());
