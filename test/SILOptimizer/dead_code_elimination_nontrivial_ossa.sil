@@ -218,6 +218,21 @@ bb3(%2 : @owned $Klass):
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dce_deadcopy7 :
+// CHECK-NOT: load [copy]
+// CHECK-LABEL: } // end sil function 'dce_deadcopy7'
+sil [ossa] @dce_deadcopy7 : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = load [copy] %0 : $*Klass
+  br bb1(%1 : $Klass)
+
+bb1(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  destroy_addr %0 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dce_destructure1 :
 // CHECK: bb0(%0 : {{.*}})
 // CHECK-NEXT: destroy_value %0

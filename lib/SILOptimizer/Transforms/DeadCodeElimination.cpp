@@ -43,21 +43,18 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // begin_access is defined to have side effects, but this is not relevant for
-  // DCE.
-  if (isa<BeginAccessInst>(I))
+  // Even though begin_access/begin_borrow/destroy_value/copy_value have
+  // side-effects, they can be DCE'ed if they do not have useful
+  // dependencies/reverse dependencies
+  if (isa<BeginAccessInst>(I) || isa<BeginBorrowInst>(I) ||
+      isa<CopyValueInst>(I) || isa<DestroyValueInst>(I))
     return false;
 
-  // Even though begin_borrow/destroy_value/copy_value have side-effects, they
-  // can be DCE'ed if they do not have useful dependencies/reverse dependencies
-  if (isa<BeginBorrowInst>(I))
-    return false;
-
-  if (isa<DestroyValueInst>(I))
-    return false;
-
-  if (isa<CopyValueInst>(I))
-    return false;
+  // A load [copy] is okay to be DCE'ed if there are no useful dependencies
+  if (auto *load = dyn_cast<LoadInst>(I)) {
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+      return false;
+  }
 
   if (I->mayHaveSideEffects())
     return true;
