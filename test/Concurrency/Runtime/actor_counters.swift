@@ -6,6 +6,8 @@
 
 // Remove with rdar://problem/72439642
 // UNSUPPORTED: asan
+// Remove with rdar://problem/72357371
+// UNSUPPORTED: CPU=arm64e
 
 #if canImport(Darwin)
 import Darwin
