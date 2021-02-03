@@ -943,7 +943,8 @@ public:
 
   bool operator==(AccessPath other) const {
     return
-      storage.hasIdenticalBase(other.storage) && pathNode == other.pathNode;
+      storage.hasIdenticalBase(other.storage) && pathNode == other.pathNode &&
+      offset == other.offset;
   }
   bool operator!=(AccessPath other) const { return !(*this == other); }
 
