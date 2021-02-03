@@ -33,6 +33,7 @@ namespace irgen {
   /// Emit a call to a builtin function.
   void emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &builtin,
                        Identifier fnId, SILType resultType,
+                       ArrayRef<SILType> argTypes,
                        Explosion &args, Explosion &result,
                        SubstitutionMap substitutions);
 
