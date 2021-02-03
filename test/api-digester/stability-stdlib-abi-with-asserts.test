@@ -1,29 +1,3 @@
-// Welcome, Build Wrangler!
-//
-// A failure in this test indicates that there is a potential ABI breaking
-// change in the Standard Library. If you observe a failure, please reach out to
-// the Standard Library team directly to make sure we resolve this quickly!
-//
-// Instead of XFAILing this test, please consider extending the list of expected
-// changes at the bottom. (In addition to ignoring the current set of ABI breaks,
-// XFAILing this test also silences any future ABI breaks that may land on this
-// branch, which isn't ideal.)
-//
-// You can find a diff of what needs to be added in the output of the failed
-// test run. The order of lines doesn't matter, and you can also include
-// comments to refer to any bugs you filed.
-//
-// Thanks! -- Your friendly stdlib engineers
-
-// REQUIRES: OS=macosx
-// REQUIRES: swift_stdlib_asserts
-
-// SR-13362
-// This currently fails on non-Intel architectures due to no baseline being
-// available and it is not possible to filter across architectures in the
-// output.
-// XFAIL: CPU=arm64 || CPU=arm64e
-
 // RUN: %empty-directory(%t.tmp)
 // mkdir %t.tmp/module-cache && mkdir %t.tmp/dummy.sdk
 // RUN: %api-digester -diagnose-sdk -module Swift -o %t.tmp/changes.txt -module-cache-path %t.tmp/module-cache -sdk %t.tmp/dummy.sdk -abi -avoid-location
@@ -33,9 +7,35 @@
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
 
+// Welcome, Build Wrangler!
+//
+// A failure in this test indicates that there is a potential ABI breaking
+// change in the Standard Library. If you observe a failure, please reach out to
+// the Standard Library team directly to make sure we resolve this quickly!
+//
+// Please DO NOT XFAIL THIS TEST. In addition to ignoring the current set of ABI
+// breaks, XFAILing this test also silences any future ABI breaks that may land
+// on this branch, which isn't ideal.
+//
+// Instead, consider extending the list of expected changes at the bottom. You
+// can find a diff of what needs to be added in the output of the failed test
+// run. The order of lines doesn't matter, and you can also include comments to
+// refer to any bugs you filed.
+//
+// Thanks! -- Your friendly stdlib engineers
+
+// REQUIRES: swift_stdlib_asserts
+
+// SR-13362
+// We currently only have a baseline for Intel CPUs on macOS.
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
+
 // The digester can incorrectly register a generic signature change when
 // declarations are shuffled. rdar://problem/46618883
 // UNSUPPORTED: swift_evolve
+
+// *** DO NOT XFAIL THIS TEST *** (See comment above.)
 
 Func _collectReferencesInsideObject(_:) is a new API without @available attribute
 Func _loadDestroyTLSCounter() is a new API without @available attribute
