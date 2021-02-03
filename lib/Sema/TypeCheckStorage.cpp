@@ -2921,7 +2921,7 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
     return;
   }
 
-  if (var->hasObservers()) {
+  if (var->hasObservers() || var->getDeclContext()->isLocalContext()) {
     info = StorageImplInfo::getMutableComputed();
   } else {
     info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
