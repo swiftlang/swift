@@ -608,9 +608,15 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   assert(AsyncCoroutineCurrentResume == nullptr &&
          "Don't support nested get_async_continuation");
   AsyncCoroutineCurrentResume = coroResume;
-  Builder.CreateStore(
-      Builder.CreateBitOrPointerCast(coroResume, IGM.FunctionPtrTy),
-      Address(currTaskResumeTaskAddr, pointerAlignment));
+  llvm::Value *coroResumeValue =
+      Builder.CreateBitOrPointerCast(coroResume, IGM.FunctionPtrTy);
+  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeFunction) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema, currTaskResumeTaskAddr,
+                                          PointerAuthEntity());
+    coroResumeValue = emitPointerAuthSign(*this, coroResumeValue, authInfo);
+  }
+  Builder.CreateStore(coroResumeValue,
+                      Address(currTaskResumeTaskAddr, pointerAlignment));
   // currTask->ResumeContext = &continuation_context;
   auto currTaskResumeCtxtAddr = Builder.CreateStructGEP(currTask, 5);
   llvm::Value *continuationContextValue = Builder.CreateBitOrPointerCast(
