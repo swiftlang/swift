@@ -280,7 +280,7 @@ OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
   callbacks.createdNewInst(copy);
 
   auto *result = copy;
-  ctx.jointPostDomSetComputer.findJointPostDominatingSet(
+  findJointPostDominatingSet(
       newValInsertPt->getParent(), consumingPoint->getParent(),
       // inputBlocksFoundDuringWalk.
       [&](SILBasicBlock *loopBlock) {
@@ -329,33 +329,31 @@ OwnershipLifetimeExtender::createPlusOneBorrow(SILValue value,
   callbacks.createdNewInst(borrow);
 
   auto *result = borrow;
-  ctx.withJointPostDomComputer<void>([&](auto &j) {
-    j.findJointPostDominatingSet(
-        newValInsertPt->getParent(), consumingPoint->getParent(),
-        // inputBlocksFoundDuringWalk.
-        [&](SILBasicBlock *loopBlock) {
-          // This must be consumingPoint->getParent() since we only have one
-          // consuming use. In this case, we know that this is the consuming
-          // point where we will need a control equivalent copy_value (and that
-          // destroy_value will be put for the out of loop value as appropriate.
-          assert(loopBlock == consumingPoint->getParent());
-          auto front = loopBlock->begin();
-          SILBuilderWithScope newBuilder(front);
-          result = newBuilder.createBeginBorrow(front->getLoc(), borrow);
-          callbacks.createdNewInst(result);
+  findJointPostDominatingSet(
+      newValInsertPt->getParent(), consumingPoint->getParent(),
+      // inputBlocksFoundDuringWalk.
+      [&](SILBasicBlock *loopBlock) {
+        // This must be consumingPoint->getParent() since we only have one
+        // consuming use. In this case, we know that this is the consuming
+        // point where we will need a control equivalent copy_value (and that
+        // destroy_value will be put for the out of loop value as appropriate.
+        assert(loopBlock == consumingPoint->getParent());
+        auto front = loopBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        result = newBuilder.createBeginBorrow(front->getLoc(), borrow);
+        callbacks.createdNewInst(result);
 
-          llvm_unreachable("Should never visit this!");
-        },
-        // Input blocks in joint post dom set. We don't care about thse.
-        [&](SILBasicBlock *postDomBlock) {
-          auto front = postDomBlock->begin();
-          SILBuilderWithScope newBuilder(front);
-          auto *ebi = newBuilder.createEndBorrow(front->getLoc(), borrow);
-          callbacks.createdNewInst(ebi);
-          auto *dvi = newBuilder.createDestroyValue(front->getLoc(), copy);
-          callbacks.createdNewInst(dvi);
-        });
-  });
+        llvm_unreachable("Should never visit this!");
+      },
+      // Input blocks in joint post dom set. We don't care about thse.
+      [&](SILBasicBlock *postDomBlock) {
+        auto front = postDomBlock->begin();
+        SILBuilderWithScope newBuilder(front);
+        auto *ebi = newBuilder.createEndBorrow(front->getLoc(), borrow);
+        callbacks.createdNewInst(ebi);
+        auto *dvi = newBuilder.createDestroyValue(front->getLoc(), copy);
+        callbacks.createdNewInst(dvi);
+      });
   return result;
 }
 

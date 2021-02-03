@@ -1975,9 +1975,7 @@ SILBasicBlock::iterator swift::replaceSingleUse(Operand *use, SILValue newValue,
   return nextII;
 }
 
-SILValue swift::makeCopiedValueAvailable(
-    SILValue value, SILBasicBlock *inBlock,
-    JointPostDominanceSetComputer *jointPostDomComputer) {
+SILValue swift::makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock) {
   if (!value->getFunction()->hasOwnership())
     return value;
 
@@ -1988,12 +1986,10 @@ SILValue swift::makeCopiedValueAvailable(
   auto *copy =
       SILBuilderWithScope(insertPt).createCopyValue(insertPt->getLoc(), value);
 
-  return makeNewValueAvailable(copy, inBlock, jointPostDomComputer);
+  return makeNewValueAvailable(copy, inBlock);
 }
 
-SILValue swift::makeNewValueAvailable(
-    SILValue value, SILBasicBlock *inBlock,
-    JointPostDominanceSetComputer *jointPostDomComputer) {
+SILValue swift::makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock) {
   if (!value->getFunction()->hasOwnership())
     return value;
 
@@ -2007,7 +2003,7 @@ SILValue swift::makeNewValueAvailable(
   // 1. Create a control equivalent copy at \p inBlock if needed
   // 2. Insert destroy_value at leaking blocks
   SILValue controlEqCopy;
-  jointPostDomComputer->findJointPostDominatingSet(
+  findJointPostDominatingSet(
       value->getParentBlock(), inBlock,
       [&](SILBasicBlock *loopBlock) {
         assert(loopBlock == inBlock);

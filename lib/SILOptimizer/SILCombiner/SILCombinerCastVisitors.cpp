@@ -1062,10 +1062,8 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         continue;
       SmallVector<SILValue, 4> args(pa->getArguments().begin(),
                                     pa->getArguments().end());
-      auto newValue = withJointPostDomComputer<SILValue>([&](auto &j) {
-        return makeCopiedValueAvailable(cfi->getConverted(), pa->getParent(),
-                                        &j);
-      });
+      auto newValue = makeCopiedValueAvailable(cfi->getConverted(),
+                                               pa->getParent());
 
       SILBuilderWithScope localBuilder(std::next(pa->getIterator()), Builder);
       auto *newPA = localBuilder.createPartialApply(
