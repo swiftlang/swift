@@ -68,6 +68,11 @@ sil @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
 sil @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
 sil [ossa] @unknown : $@convention(thin) () -> ()
 
+enum KlassNativeObjEither {
+case lhs(Klass)
+case rhs(Builtin.NativeObject)
+}
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -4824,3 +4829,50 @@ bb1:
 bb2:
   unreachable
 }
+
+// Make sure that when we promote the unchecked_take_enum_data_uses in bb1, bb2,
+// we keep the loads in bb1, bb2 instead of hoisting them to the
+// unchecked_take_enum_data_addr that we are optimizing.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion_host_load : $@convention(thin) (@inout FakeOptional<KlassNativeObjEither>) -> @owned KlassNativeObjEither {
+// CHECK: bb0([[ARG:%.*]] : $*
+// CHECK:   [[LOADED_ARG:%.*]] = load_borrow [[ARG]]
+// CHECK:   [[FOR_SWITCH:%.*]] = unchecked_enum_data [[LOADED_ARG]]
+// CHECK:   switch_enum [[FOR_SWITCH]] :
+//
+// CHECK: bb1(
+// CHECK-NEXT: end_borrow [[LOADED_ARG]]
+// CHECK-NEXT: [[LOADED_ARG_2:%.*]] = load [copy] [[ARG]]
+// CHECK-NEXT: [[LOADED_ARG_2_EXT:%.*]] = unchecked_enum_data [[LOADED_ARG_2]]
+// CHECK-NEXT: br bb3([[LOADED_ARG_2_EXT]] :
+//
+// CHECK: bb2(
+// CHECK-NEXT: end_borrow [[LOADED_ARG]]
+// CHECK-NEXT: [[LOADED_ARG_3:%.*]] = load [take] [[ARG]]
+// CHECK-NEXT: [[LOADED_ARG_3_EXT:%.*]] = unchecked_enum_data [[LOADED_ARG_3]]
+// CHECK-NEXT: [[NONE:%.*]] = enum $FakeOptional<
+// CHECK-NEXT: store [[NONE]] to [init] [[ARG]]
+// CHECK-NEXT: br bb3([[LOADED_ARG_3_EXT]] :
+//
+// CHECK: bb3([[RESULT:%.*]] : @owned
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_promotion_host_load'
+sil [ossa] @unchecked_take_enum_data_addr_promotion_host_load : $@convention(thin) (@inout FakeOptional<KlassNativeObjEither>) -> @owned KlassNativeObjEither {
+bb0(%0 : $*FakeOptional<KlassNativeObjEither>):
+  %1 = unchecked_take_enum_data_addr %0 : $*FakeOptional<KlassNativeObjEither>, #FakeOptional.some!enumelt
+  switch_enum_addr %1 : $*KlassNativeObjEither, case #KlassNativeObjEither.lhs!enumelt: bb1, case #KlassNativeObjEither.rhs!enumelt: bb2
+
+bb1:
+  %2 = load [copy] %1 : $*KlassNativeObjEither
+  br bb3(%2 : $KlassNativeObjEither)
+
+bb2:
+  %3 = load [take] %1 : $*KlassNativeObjEither
+  %nil = enum $FakeOptional<KlassNativeObjEither>, #FakeOptional.none!enumelt
+  store %nil to [init] %0 : $*FakeOptional<KlassNativeObjEither>
+  br bb3(%3 : $KlassNativeObjEither)
+
+bb3(%4 : @owned $KlassNativeObjEither):
+  return %4 : $KlassNativeObjEither
+}
+
