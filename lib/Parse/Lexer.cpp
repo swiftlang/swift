@@ -2875,7 +2875,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
       Pieces.appendOrSquash(TriviaKind::Newline, 1);
       continue;
     case '\r':
-      if (CurPtr[0] == '\n') {
+      if (CurPtr < BufferEnd && CurPtr[0] == '\n') {
         Pieces.appendOrSquash(TriviaKind::CarriageReturnLineFeed, 2);
         ++CurPtr;
         continue;
@@ -2896,7 +2896,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
       Pieces.appendOrSquash(TriviaKind::Formfeed, 1);
       continue;
     case '/':
-      if (*CurPtr == '/') {
+      if (CurPtr < BufferEnd && CurPtr[0] == '/') {
         // '// ...' comment.
         bool isDocComment = CurPtr[1] == '/';
         advanceToEndOfLine(CurPtr, BufferEnd);
@@ -2905,7 +2905,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
                                       : TriviaKind::LineComment,
                          Length);
         continue;
-      } else if (*CurPtr == '*') {
+      } else if (CurPtr < BufferEnd && CurPtr[0] == '*') {
         // '/* ... */' comment.
         bool isDocComment = CurPtr[1] == '*';
         skipToEndOfSlashStarComment(CurPtr, BufferEnd);
@@ -2917,7 +2917,7 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
       }
       break;
     case '#':
-      if (*CurPtr == '!') {
+      if (CurPtr < BufferEnd && CurPtr[0] == '!') {
         // Hashbang '#!/path/to/swift'.
         advanceToEndOfLine(CurPtr, BufferEnd);
         size_t Length = CurPtr - TriviaStart;
@@ -2929,6 +2929,15 @@ ParsedTrivia TriviaLexer::lexTrivia(StringRef TriviaStr) {
     case '>':
       if (tryAdvanceToEndOfConflictMarker(CurPtr, BufferEnd)) {
         // Conflict marker.
+        size_t Length = CurPtr - TriviaStart;
+        Pieces.push_back(TriviaKind::GarbageText, Length);
+        continue;
+      }
+      break;
+    case '\xEF':
+      if ((CurPtr + 1) < BufferEnd && CurPtr[0] == '\xBB' && CurPtr[1] == '\xBF') {
+        // BOM marker.
+        CurPtr = CurPtr + 2;
         size_t Length = CurPtr - TriviaStart;
         Pieces.push_back(TriviaKind::GarbageText, Length);
         continue;
