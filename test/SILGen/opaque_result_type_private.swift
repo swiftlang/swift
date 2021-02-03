@@ -21,12 +21,12 @@ _ = returnLocalOpaque()
 
 fileprivate class PrivateClass {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s26opaque_result_type_private19returnPrivateOpaqueQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s26opaque_result_type_private19returnPrivateOpaqueQryF", 0) 🦸
+// CHECK-LABEL: sil hidden [ossa] @$s26opaque_result_type_private19returnPrivateOpaqueQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s26opaque_result_type_private19returnPrivateOpaqueQryF", 0) __
 func returnPrivateOpaque() -> some Any {
   return PrivateClass()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s26opaque_result_type_private17returnLocalOpaqueQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s26opaque_result_type_private17returnLocalOpaqueQryF", 0) 🦸
+// CHECK-LABEL: sil hidden [ossa] @$s26opaque_result_type_private17returnLocalOpaqueQryF : $@convention(thin) () -> @out @_opaqueReturnTypeOf("$s26opaque_result_type_private17returnLocalOpaqueQryF", 0) __
 func returnLocalOpaque() -> some Any {
   class LocalClass {}
 
