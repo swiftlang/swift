@@ -10,6 +10,16 @@
 ////
 ////===----------------------------------------------------------------------===//
 
+import Dispatch
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif os(Windows)
+import CRT
+#endif
+
+
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
@@ -31,7 +41,7 @@ import Swift
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Partial tasks are generally not interacted with by end-users directly,
 /// unless implementing a scheduler.
-public struct Task: TaskOperations {
+public struct Task {
   internal let _task: Builtin.NativeObject
 
   // May only be created by the standard library.
@@ -69,7 +79,12 @@ extension Task {
     Task.unsafeCurrent?.priority ?? Priority.default
   }
 
-  // Docs inherited from `TaskOperations`.
+  /// Returns the `current` task's priority.
+  ///
+  /// If no current `Task` is available, returns `Priority.default`.
+  ///
+  /// - SeeAlso: `Task.Priority`
+  /// - SeeAlso: `Task.currentPriority`
   public var priority: Priority {
     getJobFlags(_task).priority
   }
@@ -220,51 +235,29 @@ extension Task.Handle where Failure == Never {
 
 extension Task.Handle: Hashable {
   public func hash(into hasher: inout Hasher) {
-    unsafeBitCast(_task, to: UInt64.self).hash(into: &hasher)
+    unsafeBitCast(_task, to: size_t.self).hash(into: &hasher)
   }
 }
 
 extension Task.Handle: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    unsafeBitCast(lhs._task, to: UInt64.self) ==
-      unsafeBitCast(rhs._task, to: UInt64.self)
+    unsafeBitCast(lhs._task, to: size_t.self) ==
+      unsafeBitCast(rhs._task, to: size_t.self)
   }
 }
 
 // ==== Conformances -----------------------------------------------------------
 
-/// Protocol for those operations which are safe to be invoked on any `Task`
-/// instance regardless if the caller is running in the same task or a different
-/// one.
-///
-/// This protocol also lists the functions and computed properties shared between
-/// `Task` and `UnsafeCurrentTask`.
-public protocol TaskOperations {
-
-  /// Returns `true` if the task is cancelled, and should stop executing.
-  ///
-  /// - SeeAlso: `checkCancellation()`
-  var isCancelled: Bool { get }
-
-  /// Returns the `current` task's priority.
-  ///
-  /// If no current `Task` is available, returns `Priority.default`.
-  ///
-  /// - SeeAlso: `Task.Priority`
-  /// - SeeAlso: `Task.currentPriority`
-  var priority: Task.Priority { get }
-}
-
 extension Task: Hashable {
   public func hash(into hasher: inout Hasher) {
-    unsafeBitCast(_task, to: UInt64.self).hash(into: &hasher)
+    unsafeBitCast(_task, to: size_t.self).hash(into: &hasher)
   }
 }
 
 extension Task: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
-    unsafeBitCast(lhs._task, to: UInt64.self) ==
-      unsafeBitCast(rhs._task, to: UInt64.self)
+    unsafeBitCast(lhs._task, to: size_t.self) ==
+      unsafeBitCast(rhs._task, to: size_t.self)
   }
 }
 
@@ -502,7 +495,7 @@ extension Task {
   ///
   /// The returned value must not be accessed from tasks other than the current one.
   public static var unsafeCurrent: UnsafeCurrentTask? {
-    // FIXME: implement this once getCurrentAsyncTask can be called from sync funcs
+    // FIXME: rdar://70546948 implement this once getCurrentAsyncTask can be called from sync funcs
     //    guard let _task = Builtin.getCurrentAsyncTask() else {
     //      return nil
     //    }
@@ -531,7 +524,7 @@ extension Task {
 /// represented by this handle itself. Doing so may result in undefined behavior,
 /// and most certainly will break invariants in other places of the program
 /// actively running on this task.
-public struct UnsafeCurrentTask: TaskOperations {
+public struct UnsafeCurrentTask {
   private let _task: Builtin.NativeObject
 
   // May only be created by the standard library.
@@ -547,12 +540,19 @@ public struct UnsafeCurrentTask: TaskOperations {
     Task(_task)
   }
 
-  // Docs inherited from `TaskOperations`.
+  /// Returns `true` if the task is cancelled, and should stop executing.
+  ///
+  /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
 
-  // Docs inherited from `TaskOperations`.
+  /// Returns the `current` task's priority.
+  ///
+  /// If no current `Task` is available, returns `Priority.default`.
+  ///
+  /// - SeeAlso: `Task.Priority`
+  /// - SeeAlso: `Task.currentPriority`
   public var priority: Task.Priority {
     getJobFlags(_task).priority
   }
@@ -572,7 +572,7 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 
 @_silgen_name("swift_task_runAndBlockThread")
-func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
+public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
 @_silgen_name("swift_task_asyncMainDrainQueue")
 public func _asyncMainDrainQueue() -> Never

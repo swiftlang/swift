@@ -27,7 +27,9 @@ extension Task {
      Task.unsafeCurrent?.isCancelled ?? false
   }
 
-  // docs inherited from protocol
+  /// Returns `true` if the task is cancelled, and should stop executing.
+  ///
+  /// - SeeAlso: `checkCancellation()`
   public var isCancelled: Bool {
     _taskIsCancelled(_task)
   }
