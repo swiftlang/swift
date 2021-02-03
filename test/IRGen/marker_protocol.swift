@@ -5,7 +5,6 @@
 
 // CHECK-NOT: $s15marker_protocol1PP
 // CHECK-NOT: $s15marker_protocol1PMp
-// CHECK-NOT: "\01l_protocols"
 
 @_marker public protocol P { }
 
@@ -20,3 +19,5 @@ public func testGeneric(i: Int, array: [Int]) {
   generic(i)
   generic(array)
 }
+
+public protocol Q: P { }
