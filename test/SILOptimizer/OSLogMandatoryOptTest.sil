@@ -1055,3 +1055,59 @@ bb0:
     // CHECK: bb0
     // CHECK: alloc_stack $OSLogInterpolationDCEStub
 }
+
+// The following tests are for checking that constant folding doesn't
+// cause a crash when evaulating the instructions of an animation signpost.
+
+// Protocol stub for CVarArgStub
+protocol CVarArgStub {}
+
+// Ensure that Int conforms to our protocol stub
+extension Int64 : CVarArgStub {}
+
+// _finalizeUninitializedArray<A>(_:)
+sil shared_external [serialized] [_semantics "array.finalize_intrinsic"] @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <Element> (@owned Array<Element>) -> @owned Array<Element>
+
+// Test that the OSLogOptimization does not fail while attempting to
+// fold CVarArgStubs in animation signposts.
+// CHECK-LABEL: @testFoldingOfCVarArgStubConstruction
+sil [ossa] @testFoldingOfCVarArgStubConstruction : $@convention(thin) () -> () {
+bb0:
+  // Construct an OSLogMessageStub instance.
+  %0 = string_literal utf8 "animation begins here %d"
+  %1 = integer_literal $Builtin.Word, 24
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // users: %60, %47
+  %6 = function_ref @oslogMessageInit : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+  %7 = apply %6(%5) : $@convention(thin) (@owned String) -> @owned OSLogMessageStub
+
+  // Begin chain of evaluated instructions
+  %8 = begin_borrow %7 : $OSLogMessageStub
+
+  // Construct CVarArgStub
+  %11 = integer_literal $Builtin.Word, 1
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %12 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %13 = apply %12<CVarArgStub>(%11) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%14, %15) = destructure_tuple %13 : $(Array<CVarArgStub>, Builtin.RawPointer)
+  %16 = pointer_to_address %15 : $Builtin.RawPointer to [strict] $*CVarArgStub
+  %17 = integer_literal $Builtin.IntLiteral, 42
+  %18 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%17 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  (%19, %20) = destructure_tuple %18 : $(Builtin.Int64, Builtin.Int1)
+  %21 = struct $Int64 (%19 : $Builtin.Int64)
+  %22 = init_existential_addr %16 : $*CVarArgStub, $Int64
+  store %21 to [trivial] %22 : $*Int64
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %23 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+  %24 = apply %23<CVarArgStub>(%14) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+  destroy_value %24 : $Array<CVarArgStub>
+
+  // End chain of evaluated instructions
+  end_borrow %8 : $OSLogMessageStub
+  destroy_value %7 : $OSLogMessageStub
+  %25 = tuple ()
+  return %25 : $()
+}

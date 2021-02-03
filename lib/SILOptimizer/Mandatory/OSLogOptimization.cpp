@@ -322,8 +322,9 @@ static bool isFoldableArray(SILValue value, ASTContext &astContext) {
     return true;
   SILFunction *callee = cast<ApplyInst>(constructorInst)->getCalleeFunction();
   return !callee ||
-         (!callee->hasSemanticsAttr("array.init.empty") &&
-          !callee->hasSemanticsAttr("array.uninitialized_intrinsic"));
+         (!callee->hasSemanticsAttr(semantics::ARRAY_INIT_EMPTY) &&
+          !callee->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED_INTRINSIC) &&
+          !callee->hasSemanticsAttr(semantics::ARRAY_FINALIZE_INTRINSIC));
 }
 
 /// Return true iff the given value is a closure but is not a creation of a
@@ -997,6 +998,14 @@ static void substituteConstants(FoldState &foldState) {
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
         evaluator.lookupConstValue(constantSILValue).getValue();
+    // Make sure that the symbolic value tracked in the foldState is a constant.
+    // In the case of ArraySymbolicValue, the array storage could be a non-constant
+    // if some instruction in the array initialization sequence was not evaluated
+    // and skipped.
+    if (!constantSymbolicVal.containsOnlyConstants()) {
+      assert(constantSymbolicVal.getKind() != SymbolicValue::String && "encountered non-constant string symbolic value");
+      continue;
+    }
 
     SILInstruction *definingInst = constantSILValue->getDefiningInstruction();
     assert(definingInst);

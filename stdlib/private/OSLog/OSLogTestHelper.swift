@@ -113,3 +113,55 @@ internal func _os_log_impl_test(
       start: UnsafePointer(bufferMemory),
       count: Int(bufferSize)))
 }
+
+
+
+/// A function that pretends to be os_signpost(.animationBegin, ...). The purpose
+/// of this function is to test whether the OSLogOptimization pass works properly
+/// on the special case of animation begin signposts.
+@_transparent
+public func _osSignpostAnimationBeginTestHelper(
+  _ format: AnimationFormatString.OSLogMessage,
+  _ arguments: CVarArg...
+) {
+  _animationBeginSignpostHelper(formatStringPointer: format.formatStringPointer,
+                                arguments: arguments)
+}
+
+@usableFromInline
+internal func _animationBeginSignpostHelper(
+  formatStringPointer: UnsafePointer<CChar>,
+  arguments: [CVarArg]
+) {}
+
+// A namespace for utilities specific to os_signpost animation tests.
+public enum AnimationFormatString {
+  @inlinable
+  @_optimize(none)
+  @_semantics("constant_evaluable")
+  internal static func constructOSLogInterpolation(
+    _ formatString: String
+  ) -> OSLogInterpolation {
+    var s = OSLogInterpolation(literalCapacity: 1, interpolationCount: 0)
+    s.formatString += formatString
+    s.formatString += " isAnimation=YES"
+    return s
+  }
+
+  @frozen
+  public struct OSLogMessage : ExpressibleByStringLiteral {
+    @usableFromInline
+    var formatStringPointer: UnsafePointer<CChar>
+
+    @_transparent
+    public init(stringLiteral value: String) {
+      let message =
+        OSLogTestHelper.OSLogMessage(
+          stringInterpolation:
+            constructOSLogInterpolation(
+              value))
+      let formatString = message.interpolation.formatString
+      formatStringPointer = _getGlobalStringTablePointer(formatString)
+    }
+  }
+}
