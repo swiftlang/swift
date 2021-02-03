@@ -7,6 +7,9 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
+// Remove with rdar://problem/72357371
+// UNSUPPORTED: CPU=arm64e
+
 
 @main struct Main {
   static func main() async {
