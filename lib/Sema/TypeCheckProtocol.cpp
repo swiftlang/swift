@@ -2749,8 +2749,12 @@ bool ConformanceChecker::checkActorIsolation(
   //
   // However, we allow this case when the requirement was imported, because
   // it might not have been annotated.
-  if (witnessGlobalActor && !requirementGlobalActor &&
-      !requirement->hasClangNode()) {
+  if (witnessGlobalActor && !requirementGlobalActor) {
+    // If the requirement was imported from Objective-C, it may not have been
+    // annotated appropriately. Allow the mismatch.
+    if (requirement->hasClangNode())
+      return false;
+
     witness->diagnose(
         diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
         witness->getName(), witnessGlobalActor, Proto->getName());
