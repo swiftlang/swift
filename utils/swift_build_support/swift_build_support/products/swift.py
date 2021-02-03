@@ -14,6 +14,7 @@ from . import cmark
 from . import libcxx
 from . import libicu
 from . import llvm
+from . import clibdispatch
 from . import product
 from ..cmake import CMakeOptions
 
@@ -147,4 +148,5 @@ updated without updating swift.py?")
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU]
+                libicu.LibICU,
+                clibdispatch.CLibDispatch]
