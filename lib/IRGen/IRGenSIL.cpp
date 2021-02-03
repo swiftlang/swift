@@ -2680,6 +2680,7 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
 
   auto argValues = i->getArguments();
   Explosion args;
+  SmallVector<SILType, 4> argTypes;
 
   for (auto idx : indices(argValues)) {
     auto argValue = argValues[idx];
@@ -2687,11 +2688,13 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
     // Builtin arguments should never be substituted, so use the value's type
     // as the parameter type.
     emitApplyArgument(*this, argValue, argValue->getType(), args);
+
+    argTypes.push_back(argValue->getType());
   }
   
   Explosion result;
   emitBuiltinCall(*this, builtin, i->getName(), i->getType(),
-                  args, result, i->getSubstitutions());
+                  argTypes, args, result, i->getSubstitutions());
   
   setLoweredExplosion(i, result);
 }
