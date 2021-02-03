@@ -68,6 +68,14 @@ protected:
   std::function<bool (SymbolicReferent)> CanSymbolicReference;
   
   bool canSymbolicReference(SymbolicReferent referent) {
+    // Marker protocols cannot ever be symbolically referenced.
+    if (auto nominal = referent.dyn_cast<const NominalTypeDecl *>()) {
+      if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
+        if (proto->isMarkerProtocol())
+          return false;
+      }
+    }
+
     return AllowSymbolicReferences
       && (!CanSymbolicReference || CanSymbolicReference(referent));
   }

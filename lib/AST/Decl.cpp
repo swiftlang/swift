@@ -4601,6 +4601,10 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
     setTrailingWhereClause(TrailingWhere);
 }
 
+bool ProtocolDecl::isMarkerProtocol() const {
+  return getAttrs().hasAttribute<MarkerAttr>();
+}
+
 ArrayRef<ProtocolDecl *> ProtocolDecl::getInheritedProtocols() const {
   auto *mutThis = const_cast<ProtocolDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
