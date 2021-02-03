@@ -17,6 +17,7 @@
 # SKIP-CMARK-CHECK: cmake --build {{.*}}swift-
 # SKIP-CMARK-CHECK-NOT: --- Installing cmark ---
 # SKIP-CMARK-CHECK: --- Installing llvm ---
+# SKIP-CMARK-CHECK: --- Installing libdispatch ---
 # SKIP-CMARK-CHECK: --- Installing swift ---
 
 # SKIP-LLVM-CHECK: cmake --build {{.*}}cmark-
@@ -24,6 +25,7 @@
 # SKIP-LLVM-CHECK: cmake --build {{.*}}swift-
 # SKIP-LLVM-CHECK: --- Installing cmark ---
 # SKIP-LLVM-CHECK-NOT: --- Installing llvm ---
+# SKIP-LLVM-CHECK: --- Installing libdispatch ---
 # SKIP-LLVM-CHECK: --- Installing swift ---
 
 # SKIP-SWIFT-CHECK: cmake --build {{.*}}cmark-

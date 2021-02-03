@@ -8,6 +8,7 @@
 #
 # CHECK: --- Installing cmark ---
 # CHECK: --- Installing llvm ---
+# CHECK: --- Installing libdispatch ---
 # CHECK: --- Installing swift ---
 # CHECK: --- Installing llbuild ---
 
@@ -17,10 +18,12 @@
 # CHECK: Initial Product List:
 # CHECK:     cmark
 # CHECK:     llvm
+# CHECK:     clibdispatch
 # CHECK:     swift
 # CHECK: Final Build Order:
 # CHECK:     cmark
 # CHECK:     llvm
+# CHECK:     clibdispatch
 # CHECK:     swift
 
 # Then make sure we are installing/building SwiftPM last.

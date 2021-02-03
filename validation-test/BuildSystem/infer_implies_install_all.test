@@ -6,6 +6,7 @@
 
 # CHECK: --- Installing cmark ---
 # CHECK: --- Installing llvm ---
+# CHECK: --- Installing libdispatch ---
 # CHECK: --- Installing swift ---
 # CHECK: --- Installing llbuild ---
 # CHECK: --- Building swiftpm ---

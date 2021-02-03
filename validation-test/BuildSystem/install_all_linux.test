@@ -6,6 +6,7 @@
 # REQUIRES: OS=linux-gnu
 
 # CHECK-DAG: --- Installing cmark ---
+# CHECK-DAG: --- Installing libdispatch ---
 # CHECK-DAG: --- Installing swift ---
 # CHECK-DAG: --- Installing llvm ---
 # CHECK-DAG: --- Installing llbuild ---

@@ -2522,7 +2522,7 @@ for host in "${ALL_HOSTS[@]}"; do
         # so the tests can find it
         if [[ "${product}" = "clibdispatch" ]] && [[ "uname -s" != "Darwin" ]]; then
             clibdispatch_libdir="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-            cp "${build_dir}/libdispatch.so" "${clibdispatch_libdir}"
+            call cp "${build_dir}/libdispatch.so" "${clibdispatch_libdir}"
         fi
     done
 done
@@ -2977,7 +2977,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 ;;
             clibdispatch|libdispatch|libdispatch_static)
-                if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
+                if [[ "${product}" = clibdispatch ]]; then
+                  if [[ -z "${INSTALL_CLIBDISPATCH}" ]]; then
+                    continue
+                  fi
+                elif [[ -z "${INSTALL_LIBDISPATCH}" ]]; then
                     continue
                 fi
 
