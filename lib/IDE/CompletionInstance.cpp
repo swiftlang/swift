@@ -199,7 +199,7 @@ forEachDependencyUntilTrue(CompilerInstance &CI, unsigned excludeBufferID,
     if (callback(dep))
       return true;
   }
-  for (auto &dep : CI.getDependencyTracker()->getIncrementalDependencies()) {
+  for (auto dep : CI.getDependencyTracker()->getIncrementalDependencyPaths()) {
     if (callback(dep))
       return true;
   }

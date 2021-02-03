@@ -95,6 +95,11 @@ public:
   }
 
 public:
+  bool operator<(const Fingerprint &other) const {
+    return core < other.core;
+  }
+
+public:
   /// The fingerprint value consisting of 32 bytes of zeroes.
   ///
   /// This fingerprint is a perfectly fine value for a hash, but it is
