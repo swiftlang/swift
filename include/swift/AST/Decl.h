@@ -4162,6 +4162,10 @@ public:
   ProtocolRethrowsRequirementList getRethrowingRequirements() const;
   bool isRethrowingProtocol() const;
 
+  /// Determine whether this is a "marker" protocol, meaning that is indicates
+  /// semantics but has no corresponding witness table.
+  bool isMarkerProtocol() const;
+
 private:
   void computeKnownProtocolKind() const;
 

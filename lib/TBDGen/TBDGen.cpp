@@ -1037,7 +1037,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
 #endif
 
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
-  if (!PD->isObjC()) {
+  if (!PD->isObjC() && !PD->isMarkerProtocol()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
     struct WitnessVisitor : public SILWitnessVisitor<WitnessVisitor> {
