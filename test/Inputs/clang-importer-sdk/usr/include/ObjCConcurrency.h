@@ -51,6 +51,8 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 // rdar://72604599
 - (void)stopRecordingWithHandler:(nullable void (^)(NSObject *_Nullable_result x, NSError *_Nullable error))handler __attribute__((swift_async_name("stopRecording()"))) __attribute__((swift_async(not_swift_private, 1)));
 
+// rdar://73798726
+- (void)getSomeObjectWithCompletionHandler:(nullable void (^)(NSObject *_Nullable x, NSError *_Nullable error))handler;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
