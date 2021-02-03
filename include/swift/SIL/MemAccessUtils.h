@@ -821,6 +821,10 @@ public:
   /// access, thus not within an access scope.
   static AccessPath computeInScope(SILValue address);
 
+  /// Creates an AccessPass, which identifies the first tail-element of the
+  /// object \p rootReference.
+  static AccessPath forTailStorage(SILValue rootReference);
+
   // Encode a dynamic index_addr as an UnknownOffset.
   static constexpr int UnknownOffset = std::numeric_limits<int>::min() >> 1;
 
@@ -983,6 +987,12 @@ public:
   collectUses(SmallVectorImpl<Operand *> &uses, AccessUseType useTy,
               SILFunction *function,
               unsigned useLimit = std::numeric_limits<unsigned>::max()) const;
+
+  /// Returns a new AccessPass, identical to this AccessPath, except that the
+  /// offset is replaced with \p newOffset.
+  AccessPath withOffset(int newOffset) const {
+    return AccessPath(storage, pathNode, newOffset);
+  }
 
   void printPath(raw_ostream &os) const;
   void print(raw_ostream &os) const;
