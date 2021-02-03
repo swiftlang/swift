@@ -13,7 +13,7 @@ extension Int: P { }
 extension Array: P where Element: P { }
 
 // Note: no witness tables
-// CHECK: define swiftcc void @"$s15marker_protocol7genericyyxAA1PRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T)
+// CHECK: swiftcc void @"$s15marker_protocol7genericyyxAA1PRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T)
 public func generic<T: P>(_: T) { }
 
 public func testGeneric(i: Int, array: [Int]) {
