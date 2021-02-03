@@ -5582,6 +5582,17 @@ NOTE(result_builder_missing_build_limited_availability, none,
         "this behavior is deprecated", ())
 
 //------------------------------------------------------------------------------
+// MARK: marker protocol diagnostics
+//------------------------------------------------------------------------------
+ERROR(marker_protocol_requirement, none,
+      "marker protocol %0 cannot have any requirements", (DeclName))
+ERROR(marker_protocol_inherit_nonmarker, none,
+      "marker protocol %0 cannot inherit non-marker protocol %1",
+      (DeclName, DeclName))
+ERROR(marker_protocol_value,none,
+      "marker protocol %0 can only be used in generic constraints", (DeclName))
+
+//------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
 //------------------------------------------------------------------------------
 

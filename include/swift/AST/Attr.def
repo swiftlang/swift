@@ -606,6 +606,12 @@ SIMPLE_DECL_ATTR(concurrent, Concurrent,
   APIBreakingToAdd | APIBreakingToRemove,
   107)
 
+SIMPLE_DECL_ATTR(_marker, Marker,
+  OnProtocol | UserInaccessible |
+  ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd | APIBreakingToRemove,
+  108)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

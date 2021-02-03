@@ -1534,6 +1534,7 @@ namespace  {
     UNINTERESTING_ATTR(Concurrent)
 
     UNINTERESTING_ATTR(AtRethrows)
+    UNINTERESTING_ATTR(Marker)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
