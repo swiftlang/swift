@@ -129,6 +129,10 @@ class Lexer {
   /// The StringRef points into the source buffer that is currently being lexed.
   StringRef TrailingTrivia;
 
+  /// The location at which the comment of the next token starts. \c nullptr if
+  /// the next token doesn't have a comment.
+  const char *CommentStart;
+
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 

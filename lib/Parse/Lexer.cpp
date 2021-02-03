@@ -283,14 +283,8 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   }
   unsigned CommentLength = 0;
   if (RetainComments == CommentRetentionMode::AttachToNextToken) {
-    auto LeadingTriviaPieces = TriviaLexer::lexTrivia(LeadingTrivia);
-    // 'CommentLength' here is the length from the *first* comment to the
-    // token text (or its backtick if exist).
-    auto Iter = llvm::find_if(LeadingTriviaPieces, [](const ParsedTriviaPiece &Piece) {
-      return isCommentTriviaKind(Piece.getKind());
-    });
-    for (auto End = LeadingTriviaPieces.end(); Iter != End; Iter++) {
-      CommentLength += Iter->getLength();
+    if (CommentStart) {
+      CommentLength = TokStart - CommentStart;
     }
   }
 
@@ -2533,6 +2527,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
 
 StringRef Lexer::lexTrivia(bool IsForTrailingTrivia) {
   const char *AllTriviaStart = CurPtr;
+  CommentStart = nullptr;
 
 Restart:
   const char *TriviaStart = CurPtr;
@@ -2562,10 +2557,16 @@ Restart:
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {
+      if (CommentStart == nullptr) {
+        CommentStart = CurPtr - 1;
+      }
       // '// ...' comment.
       skipSlashSlashComment(/*EatNewline=*/false);
       goto Restart;
     } else if (*CurPtr == '*') {
+      if (CommentStart == nullptr) {
+        CommentStart = CurPtr - 1;
+      }
       // '/* ... */' comment.
       skipSlashStarComment();
       goto Restart;

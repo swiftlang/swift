@@ -2017,8 +2017,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     SyntaxContext->addToken(CloseDelimiter, StringRef(), EntireTrailingTrivia);
   } else {
     // Without custom delimiter the quote owns trailing trivia.
-    auto EntireTrailingTriviaPieces =
-        TriviaLexer::lexTrivia(EntireTrailingTrivia);
     SyntaxContext->addToken(CloseQuote, StringRef(), EntireTrailingTrivia);
   }
 
