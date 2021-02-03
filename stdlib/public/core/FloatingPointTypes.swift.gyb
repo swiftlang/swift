@@ -1343,6 +1343,9 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 }
 % end
 
+${Availability(bits)}
+extension ${Self} : ConcurrentValue { }
+
 //===----------------------------------------------------------------------===//
 // Deprecated operators
 //===----------------------------------------------------------------------===//

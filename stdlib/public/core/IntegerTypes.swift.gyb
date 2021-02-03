@@ -1399,7 +1399,7 @@ ${assignmentOperatorComment(x.operator, True)}
 
   /// A type that represents the words of this integer.
   @frozen
-  public struct Words: RandomAccessCollection {
+  public struct Words: RandomAccessCollection, ConcurrentValue {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
@@ -1708,6 +1708,8 @@ ${operatorComment(x.operator, True)}
   }
 }
 
+
+extension ${Self}: ConcurrentValue { }
 
 % if signed:
 // TODO: Consider removing the underscore.

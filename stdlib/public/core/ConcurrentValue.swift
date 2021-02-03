@@ -14,7 +14,7 @@ import Swift
 
 /// The ConcurrentValue protocol indicates that value of the given type can
 /// be safely used in concurrent code.
-public protocol ConcurrentValue { }
+@_marker public protocol ConcurrentValue { }
 
 extension Array: ConcurrentValue where Element: ConcurrentValue { }
 extension ArraySlice: ConcurrentValue where Element: ConcurrentValue { }
@@ -115,39 +115,12 @@ extension Mirror: ConcurrentValue { }
 extension Mirror.AncestorRepresentation: ConcurrentValue { }
 extension Mirror.DisplayStyle: ConcurrentValue { }
 
-// FIXME: Float16 when available
-extension Float: ConcurrentValue { }
-extension Double: ConcurrentValue { }
-// FIXME: Float80 when available
-
-// FIXME: hacks to enumerate integer types, and ".Words", and "SIMDnStorage"
-extension UInt8: ConcurrentValue { }
-extension Int8: ConcurrentValue { }
-extension UInt16: ConcurrentValue { }
-extension Int16: ConcurrentValue { }
-extension UInt32: ConcurrentValue { }
-extension Int32: ConcurrentValue { }
-extension UInt64: ConcurrentValue { }
-extension Int64: ConcurrentValue { }
-extension UInt: ConcurrentValue { }
-extension Int: ConcurrentValue { }
-
 extension UnsafeMutableBufferPointer: ConcurrentValue { }
 extension UnsafeBufferPointer: ConcurrentValue { }
 extension UnsafeBufferPointer.Iterator: ConcurrentValue { }
 extension UnsafeMutableRawBufferPointer: ConcurrentValue { }
 extension UnsafeRawBufferPointer: ConcurrentValue { }
 extension UnsafeRawBufferPointer.Iterator: ConcurrentValue { }
-
-extension SIMDMask: ConcurrentValue where Storage: ConcurrentValue { }
-// FIXME: enumerate SIMD types
-extension SIMD2: ConcurrentValue where Scalar: ConcurrentValue { }
-extension SIMD3: ConcurrentValue where Scalar: ConcurrentValue { }
-extension SIMD4: ConcurrentValue where Scalar: ConcurrentValue { }
-extension SIMD8: ConcurrentValue where Scalar: ConcurrentValue { }
-extension SIMD16: ConcurrentValue where Scalar: ConcurrentValue { }
-extension SIMD32: ConcurrentValue where Scalar: ConcurrentValue { }
-extension SIMD64: ConcurrentValue where Scalar: ConcurrentValue { }
 
 extension PartialKeyPath: ConcurrentValue where Root: ConcurrentValue { }
 
@@ -158,4 +131,3 @@ extension FloatingPointRoundingRule: ConcurrentValue { }
 extension Optional: ConcurrentValue where Wrapped: ConcurrentValue { }
 extension Never: ConcurrentValue { }
 extension Result: ConcurrentValue where Success: ConcurrentValue, Failure: ConcurrentValue { }
-
