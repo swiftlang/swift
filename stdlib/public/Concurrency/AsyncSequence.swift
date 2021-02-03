@@ -16,5 +16,153 @@ import Swift
 public protocol AsyncSequence {
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
   associatedtype Element
-  func makeAsyncIterator() -> AsyncIterator
+  __consuming func makeAsyncIterator() -> AsyncIterator
+}
+
+extension AsyncSequence {
+  @inlinable
+  public func reduce<Result>(
+    _ initialResult: Result,
+    _ nextPartialResult:
+      (_ partialResult: Result, Element) async throws -> Result
+  ) async rethrows -> Result {
+    var accumulator = initialResult
+    var iterator = makeAsyncIterator()
+    while let element = try await iterator.next() {
+      accumulator = try await nextPartialResult(accumulator, element)
+    }
+    return accumulator
+  }
+
+  @inlinable
+  public func reduce<Result>(
+    into initialResult: __owned Result,
+    _ updateAccumulatingResult:
+      (_ partialResult: inout Result, Element) async throws -> Void
+  ) async rethrows -> Result {
+    var accumulator = initialResult
+    var iterator = makeAsyncIterator()
+    while let element = try await iterator.next() {
+      try await updateAccumulatingResult(&accumulator, element)
+    }
+    return accumulator
+  }
+}
+
+extension AsyncSequence {
+  @inlinable
+  public func contains(
+    where predicate: (Element) async throws -> Bool
+  ) async rethrows -> Bool {
+    var iterator = makeAsyncIterator()
+    while let element = try await iterator.next() {
+      if try await predicate(element) {
+        return true
+      }
+    }
+    return false
+  }
+
+  @inlinable
+  public func allSatisfy(
+    _ predicate: (Element) async throws -> Bool
+  ) async rethrows -> Bool {
+    return try await !contains { try await !predicate($0) }
+  }
+}
+
+extension AsyncSequence where Element: Equatable {
+  @inlinable
+  public func contains(_ search: Element) async rethrows -> Bool {
+    var iterator = makeAsyncIterator()
+    while let element = try await iterator.next() {
+      if element == search {
+        return true
+      }
+    }
+    return false
+  }
+}
+
+extension AsyncSequence {
+  @inlinable
+  public func first(
+    where predicate: (Element) async throws -> Bool
+  ) async rethrows -> Element? {
+    var iterator = makeAsyncIterator()
+    while let element = try await iterator.next() {
+      if try await predicate(element) {
+        return element
+      }
+    }
+    return nil
+  }
+}
+
+extension AsyncSequence {
+  @inlinable
+  @warn_unqualified_access
+  public func min(
+    by areInIncreasingOrder: (Element, Element) async throws -> Bool
+  ) async rethrows -> Element? {
+    var it = makeAsyncIterator()
+    guard var result = try await it.next() else { 
+      return nil 
+    }
+    while let e = try await it.next() {
+      if try await areInIncreasingOrder(e, result) { 
+        result = e 
+      }
+    }
+    return result
+  }
+  
+  @inlinable
+  @warn_unqualified_access
+  public func max(
+    by areInIncreasingOrder: (Element, Element) async throws -> Bool
+  ) async rethrows -> Element? {
+    var it = makeAsyncIterator()
+    guard var result = try await it.next() else { 
+      return nil 
+    }
+    while let e = try await it.next() {
+      if try await areInIncreasingOrder(result, e) { 
+        result = e 
+      }
+    }
+    return result
+  }
+}
+
+extension AsyncSequence where Element: Comparable {
+  @inlinable
+  @warn_unqualified_access
+  public func min() async rethrows -> Element? {
+    var it = makeAsyncIterator()
+    guard var result = try await it.next() else { 
+      return nil 
+    }
+    while let e = try await it.next() {
+      if e < result { 
+        result = e 
+      }
+    }
+    return result
+  }
+
+  @inlinable
+  @warn_unqualified_access
+  public func max() async rethrows -> Element? {
+    var it = makeAsyncIterator()
+    guard var result = try await it.next() else { 
+      return nil 
+    }
+    while let e = try await it.next() {
+      if result < e { 
+        result = e 
+      }
+    }
+    return result
+  }
 }

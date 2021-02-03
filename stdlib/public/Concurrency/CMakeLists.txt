@@ -39,7 +39,21 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   CheckedContinuation.swift
   GlobalExecutor.cpp
   Executor.swift
+  AsyncCompactMapSequence.swift
+  AsyncDropFirstSequence.swift
+  AsyncDropWhileSequence.swift
+  AsyncFailableCompactMapSequence.swift
+  AsyncFailableDropWhileSequence.swift
+  AsyncFailableFilterSequence.swift
+  AsyncFailableFlatMapSequence.swift
+  AsyncFailableMapSequence.swift
+  AsyncFailablePrefixWhileSequence.swift
+  AsyncFilterSequence.swift
+  AsyncFlatMapSequence.swift
   AsyncIteratorProtocol.swift
+  AsyncMapSequence.swift
+  AsyncPrefixSequence.swift
+  AsyncPrefixWhileSequence.swift
   AsyncSequence.swift
   PartialAsyncTask.swift
   Task.cpp
