@@ -2293,20 +2293,27 @@ Constraint *ConstraintSystem::selectDisjunction() {
           return first->countActiveNestedConstraints() < second->countActiveNestedConstraints();
 
         if (firstFavored == secondFavored) {
-          // Look for additional choices to favor
+          // Look for additional choices that are "favored"
           SmallVector<unsigned, 4> firstExisting;
           SmallVector<unsigned, 4> secondExisting;
 
           existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
-          firstFavored = firstExisting.size() ? firstExisting.size() : first->countActiveNestedConstraints();
+          firstFavored += firstExisting.size();
           existingOperatorBindingsForDisjunction(*cs, second->getNestedConstraints(), secondExisting);
-          secondFavored = secondExisting.size() ? secondExisting.size() : second->countActiveNestedConstraints();
-
-          return firstFavored < secondFavored;
+          secondFavored += secondExisting.size();
         }
 
         firstFavored = firstFavored ? firstFavored : first->countActiveNestedConstraints();
         secondFavored = secondFavored ? secondFavored : second->countActiveNestedConstraints();
+
+        // Everything else equal, choose the disjunction with the greatest
+        // number of resoved argument types. The number of resolved argument
+        // types is always zero for disjunctions that don't represent applied
+        // overloads.
+        if (firstFavored == secondFavored) {
+          return first->countResolvedArgumentTypes(*this) > second->countResolvedArgumentTypes(*this);
+        }
+
         return firstFavored < secondFavored;
       });
 

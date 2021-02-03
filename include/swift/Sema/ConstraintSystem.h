@@ -4983,7 +4983,7 @@ public:
 
   // If the given constraint is an applied disjunction, get the argument function
   // that the disjunction is applied to.
-  const FunctionType *getAppliedDisjunctionArgumentFunction(Constraint *disjunction) {
+  const FunctionType *getAppliedDisjunctionArgumentFunction(const Constraint *disjunction) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     return AppliedDisjunctions[disjunction->getLocator()];
   }
