@@ -25,6 +25,7 @@
 
 #include "Callee.h"
 #include "Explosion.h"
+#include "GenPointerAuth.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -612,10 +613,16 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
       Address(currTaskResumeTaskAddr, pointerAlignment));
   // currTask->ResumeContext = &continuation_context;
   auto currTaskResumeCtxtAddr = Builder.CreateStructGEP(currTask, 5);
-  Builder.CreateStore(
-      Builder.CreateBitOrPointerCast(continuationContext.getAddress(),
-                                     IGM.SwiftContextPtrTy),
-      Address(currTaskResumeCtxtAddr, pointerAlignment));
+  llvm::Value *continuationContextValue = Builder.CreateBitOrPointerCast(
+      continuationContext.getAddress(), IGM.SwiftContextPtrTy);
+  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeContext) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema, currTaskResumeCtxtAddr,
+                                          PointerAuthEntity());
+    continuationContextValue =
+        emitPointerAuthSign(*this, continuationContextValue, authInfo);
+  }
+  Builder.CreateStore(continuationContextValue,
+                      Address(currTaskResumeCtxtAddr, pointerAlignment));
 
   // Publish all the writes.
   // continuation_context.awaitSynchronization =(atomic release) nullptr;

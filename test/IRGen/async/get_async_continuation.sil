@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 // RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all
 
 // REQUIRES: concurrency
@@ -41,8 +41,16 @@ bb0:
 // CHECK: [[continuation_fn:%.*]] = call i8* @llvm.coro.async.resume()
 // CHECK: store i8* [[continuation_fn]], i8** [[task_continuation_fn_addr]]
 // CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 5
-// CHECK: [[cont_context2:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
-// CHECK: store %swift.context* [[cont_context2]], %swift.context** [[task_resume_context_addr]]
+// CHECK: [[task_resume_context:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
+
+// CHECK-arm64e: [[task_resume_context_addr_int:%[0-9]+]] = ptrtoint %swift.context** [[task_resume_context_addr]] to i64
+// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[task_resume_context_addr_int]], i64 30010)
+// CHECK-arm64e: [[task_resume_context_int:%[0-9]+]]      = ptrtoint %swift.context* [[task_resume_context]] to i64
+// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[task_resume_context_int]], i32 2, i64 [[ptrauth_blend]])
+// CHECK-arm64e: [[signed_task_resume_context:%[0-9]+]]   = inttoptr i64 [[signed_int]] to %swift.context*
+// CHECK-arm64e: store %swift.context* [[signed_task_resume_context]], %swift.context** [[task_resume_context_addr]]
+// CHECK-x86_64: store %swift.context* [[task_resume_context]], %swift.context** [[task_resume_context_addr]]
+
 //  Initialize the synchronization variable.
 // CHECK: [[synchronization_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 1
 // CHECK: store atomic {{(i64|i32)}} 0, {{(i64|i32)}}* [[synchronization_addr]] release
