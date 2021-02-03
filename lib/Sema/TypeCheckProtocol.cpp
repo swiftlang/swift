@@ -1589,17 +1589,11 @@ isUnsatisfiedReq(ConformanceChecker &checker,
   if (!witness) {
     // If another @objc requirement refers to the same Objective-C
     // method, this requirement isn't unsatisfied.
-    if (conformance->getProtocol()->isObjC() &&
-        isa<AbstractFunctionDecl>(req)) {
-      auto funcReq = cast<AbstractFunctionDecl>(req);
-      auto key = checker.getObjCMethodKey(funcReq);
-      for (auto otherReq : checker.getObjCRequirements(key)) {
-        if (otherReq == req)
-          continue;
-
-        if (conformance->getWitness(otherReq))
-          return false;
-      }
+    if (checker.getObjCRequirementSibling(
+            req, [conformance](AbstractFunctionDecl *cand) {
+              return static_cast<bool>(conformance->getWitness(cand));
+            })) {
+      return false;
     }
 
     // An optional requirement might not have a witness.
@@ -3329,46 +3323,36 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses(
         scratch.push_back(missingWitness);
     };
 
-    // We only care about functions
-    auto funcRequirement = dyn_cast<AbstractFunctionDecl>(
-        missingWitness.requirement);
-    if (!funcRequirement) {
+    // We only care about functions.
+    if (!isa<AbstractFunctionDecl>(missingWitness.requirement)) {
       addWitness();
       continue;
     }
 
-    // ... whose selector is one that maps to multiple requirement declarations.
-    auto key = checker.getObjCMethodKey(funcRequirement);
-    auto matchingRequirements = checker.getObjCRequirements(key);
-    if (matchingRequirements.size() < 2) {
-      addWitness();
-      continue;
-    }
+    auto fnRequirement = cast<AbstractFunctionDecl>(missingWitness.requirement);
+    auto key = checker.getObjCMethodKey(fnRequirement);
 
     // If we have already reported a function with this selector as missing,
     // don't do it again.
-    if (!alreadyReportedAsMissing.insert(key).second) {
+    if (alreadyReportedAsMissing.count(key)) {
       skipWitness();
       continue;
     }
 
-    // If there is a witness for any of the *other* requirements with this
-    // same selector, don't report it.
-    bool foundOtherWitness = false;
-    for (auto otherReq : matchingRequirements) {
-      if (otherReq == funcRequirement)
-        continue;
+    auto sibling = checker.getObjCRequirementSibling(
+        fnRequirement, [conformance](AbstractFunctionDecl *candidate) {
+          return static_cast<bool>(conformance->getWitness(candidate));
+        });
 
-      if (conformance->getWitness(otherReq)) {
-        foundOtherWitness = true;
-        break;
-      }
+    if (!sibling) {
+      alreadyReportedAsMissing.insert(key);
+      addWitness();
+      continue;
     }
 
-    if (foundOtherWitness)
-      skipWitness();
-    else
-      addWitness();
+    // Otherwise, there is a witness for any of the *other* requirements with
+    // this same selector, so prune it out.
+    skipWitness();
   }
 
   if (removedAny)
@@ -4621,6 +4605,22 @@ void ConformanceChecker::resolveValueWitnesses() {
     if (isa<AccessorDecl>(requirement))
       continue;
 
+    // If this requirement is part of a pair of imported async requirements,
+    // where one has already been witnessed, we can skip it.
+    //
+    // This situation primarily arises when the ClangImporter translates an
+    // async-looking ObjC protocol method requirement into two Swift protocol
+    // requirements: an async version and a sync version. Exactly one of the two
+    // must be witnessed by the conformer.
+    if (!requirement->isImplicit() && getObjCRequirementSibling(
+            requirement, [this](AbstractFunctionDecl *cand) {
+              return !cand->getAttrs().hasAttribute<OptionalAttr>() &&
+                     !cand->isImplicit() &&
+                     this->Conformance->hasWitness(cand);
+            })) {
+      continue;
+    }
+
     // Try to resolve the witness.
     switch (resolveWitnessTryingAllStrategies(requirement)) {
     case ResolveWitnessResult::Success:
@@ -4636,6 +4636,33 @@ void ConformanceChecker::resolveValueWitnesses() {
       break;
     }
   }
+}
+
+ValueDecl *ConformanceChecker::getObjCRequirementSibling(ValueDecl *requirement,
+               llvm::function_ref<bool(AbstractFunctionDecl*)> predicate) {
+  if (!Proto->isObjC())
+    return nullptr;
+
+  assert(requirement->isProtocolRequirement());
+  assert(Proto == requirement->getDeclContext()->getAsDecl());
+
+  // We only care about functions
+  if (auto fnRequirement = dyn_cast<AbstractFunctionDecl>(requirement)) {
+    auto fnSelector = getObjCMethodKey(fnRequirement);
+    auto similarRequirements = getObjCRequirements(fnSelector);
+    // ... whose selector is one that maps to multiple requirement declarations.
+    for (auto candidate : similarRequirements) {
+      if (candidate == fnRequirement)
+        continue; // skip the requirement we're trying to resolve.
+
+      if (!predicate(candidate))
+        continue; // skip if doesn't match requirements
+
+      return candidate;
+    }
+  }
+
+  return nullptr;
 }
 
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
