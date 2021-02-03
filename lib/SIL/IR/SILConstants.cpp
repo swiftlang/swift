@@ -260,6 +260,52 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   llvm_unreachable("covered switch");
 }
 
+bool SymbolicValue::containsOnlyConstants() const {
+  if (!isConstant())
+    return false;
+
+  auto thisRK = representationKind;
+  switch (thisRK) {
+  case RK_UninitMemory:
+  case RK_Unknown:
+  case RK_Metatype:
+  case RK_Function:
+  case RK_Enum:
+  case RK_IntegerInline:
+  case RK_Integer:
+  case RK_String:
+  case RK_Closure:
+    return true;
+  case RK_Aggregate: {
+    auto elts = getAggregateMembers();
+    for (auto elt : elts)
+      if (!elt.containsOnlyConstants())
+        return false;
+    return true;
+  }
+  case RK_EnumWithPayload: {
+    return getEnumPayloadValue().containsOnlyConstants();
+  }
+  case RK_DirectAddress:
+  case RK_DerivedAddress: {
+    auto *memObject = getAddressValueMemoryObject();
+    return memObject->getValue().containsOnlyConstants();
+  }
+  case RK_ArrayStorage: {
+    CanType elementType;
+    ArrayRef<SymbolicValue> elts = getStoredElements(elementType);
+    for (auto elt : elts)
+      if (!elt.containsOnlyConstants())
+        return false;
+    return true;
+  }
+  case RK_Array: {
+    return getStorageOfArray().containsOnlyConstants();
+  }
+  }
+  llvm_unreachable("covered switch");
+}
+
 //===----------------------------------------------------------------------===//
 // SymbolicValueMemoryObject implementation
 //===----------------------------------------------------------------------===//

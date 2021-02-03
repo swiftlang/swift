@@ -1169,8 +1169,11 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
         if (CD->isObjCZeroParameterWithLongSelector())
           numParameters = 0;  // Something like "init(foo: ())"
 
-      // A throwing method has an error parameter.
-      if (func->hasThrows())
+      // An async method, even if it is also 'throws', has
+      // one additional completion handler parameter in ObjC.
+      if (func->hasAsync())
+        ++numParameters;
+      else if (func->hasThrows()) // A throwing method has an error parameter.
         ++numParameters;
 
       unsigned numArgumentNames = objcName->getNumArgs();

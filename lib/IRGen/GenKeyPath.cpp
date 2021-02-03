@@ -195,7 +195,9 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     accessorThunk->addAttribute(2, llvm::Attribute::NoCapture);
     accessorThunk->addAttribute(2, llvm::Attribute::NoAlias);
     // Output is sret.
-    accessorThunk->addAttribute(1, llvm::Attribute::StructRet);
+    accessorThunk->addAttribute(
+        1, llvm::Attribute::getWithStructRetType(
+               IGM.getLLVMContext(), thunkParams[0]->getPointerElementType()));
     break;
   case Setter:
     // Original accessor's args should be @in or @out, meaning they won't be

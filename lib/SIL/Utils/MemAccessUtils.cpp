@@ -1485,7 +1485,7 @@ public:
     : AccessUseVisitor(useTy, NestedAccessType::IgnoreAccessBegin), uses(uses),
       useLimit(useLimit) {}
 
-  bool visitUse(Operand *use, AccessUseType useTy) {
+  bool visitUse(Operand *use, AccessUseType useTy) override {
     if (uses.size() == useLimit) {
       return false;
     }

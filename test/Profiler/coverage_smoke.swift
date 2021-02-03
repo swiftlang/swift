@@ -13,7 +13,6 @@
 // RUN: %llvm-profdata show %t/default.profdata -function=main | %FileCheck %s --check-prefix=CHECK-MAIN
 // RUN: %llvm-cov show %t/main -instr-profile=%t/default.profdata | %FileCheck %s --check-prefix=CHECK-COV
 // RUN: %llvm-cov report %t/main -instr-profile=%t/default.profdata -show-functions %s | %FileCheck %s --check-prefix=CHECK-REPORT
-// RUN: rm -rf %t
 
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test
@@ -135,8 +134,8 @@ var g2: Int = 0
 
 class Class3 {
   var m1 = g2 == 0     // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 }
 
 // rdar://34244637: Wrong coverage for do/catch sequence
@@ -151,7 +150,7 @@ func throwError(_ b: Bool) throws {
 func catchError(_ b: Bool) -> Int {
   do {
     try throwError(b) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
-  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
     return 1          // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
   }                   // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
   let _ = 1 + 1       // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1

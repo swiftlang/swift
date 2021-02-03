@@ -397,7 +397,7 @@ public:
 };
 
 class VerifyModuleInterfaceJobAction : public JobAction {
-  virtual void anchor();
+  virtual void anchor() override;
   file_types::ID inputType;
 
 public:

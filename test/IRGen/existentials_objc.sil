@@ -22,7 +22,7 @@ bb0(%0 : $*Any, %1 : $T):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential([[ANY:%Any]]* noalias nocapture sret %0, [[GIZMO:%.*]]* %1, [[TYPE:%.*]]* %T) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential([[ANY:%Any]]* noalias nocapture sret({{.*}}) %0, [[GIZMO:%.*]]* %1, [[TYPE:%.*]]* %T) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
@@ -38,7 +38,7 @@ bb0(%0 : $*Any, %1 : $*Any):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret %0, %Any* noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential([[ANY:%Any]]* noalias nocapture sret({{.*}}) %0, %Any* noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK: call %Any* @"$sypWOb"(%Any* %1, %Any* %0)
 // CHECK-NEXT:    ret void
 
@@ -100,7 +100,7 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret %0, i64 %1, i64 %2)
+// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret({{.*}}) %0, i64 %1, i64 %2)
 sil @class_existential_weak : $@convention(thin) (@owned CP?) -> @out @sil_weak CP? {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }

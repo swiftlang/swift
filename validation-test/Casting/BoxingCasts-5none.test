@@ -1,0 +1,14 @@
+// RUN: %empty-directory(%t)
+//
+// RUN: %gyb %S/Inputs/BoxingCasts.swift.gyb -o %t/BoxingCasts.swift
+//
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -Onone -swift-version 5 %t/BoxingCasts.swift -o %t/a.swift5.Onone.out
+// RUN: %target-codesign %t/a.swift5.Onone.out
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.Onone.out
+//
+// Note: The RUN directives above override the default test optimizations.
+// These tests are deliberately run both ways:
+//  * optimized to verify compiler cast optimizations, and
+//  * non-optimized to verify the runtime methods used for non-optimized casts.
+//
+// REQUIRES: executable_test

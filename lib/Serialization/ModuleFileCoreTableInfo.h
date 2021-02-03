@@ -457,7 +457,7 @@ public:
       int32_t nameLength = endian::readNext<int32_t, little, unaligned>(data);
       std::string mangledName(reinterpret_cast<const char *>(data), nameLength);
       data += nameLength;
-      result.push_back({mangledName, genSigId});
+      result.push_back({std::string(mangledName), genSigId});
     }
     return result;
   }

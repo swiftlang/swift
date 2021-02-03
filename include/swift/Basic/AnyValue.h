@@ -30,14 +30,6 @@ namespace llvm {
     return hash_value(ptr.getOpaqueValue());
   }
 
-  // FIXME: Belongs in LLVM itself
-  template<typename T>
-  hash_code hash_value(const llvm::Optional<T> &opt) {
-    if (!opt)
-      return 1;
-    return hash_value(*opt);
-  }
-
   template<typename T>
   bool operator==(const TinyPtrVector<T> &lhs, const TinyPtrVector<T> &rhs) {
     if (lhs.size() != rhs.size())

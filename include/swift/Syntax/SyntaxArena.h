@@ -17,6 +17,7 @@
 #ifndef SWIFT_SYNTAX_SYNTAXARENA_H
 #define SWIFT_SYNTAX_SYNTAXARENA_H
 
+#include "swift/Syntax/References.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/Allocator.h"
 
@@ -32,6 +33,8 @@ class SyntaxArena : public llvm::ThreadSafeRefCountedBase<SyntaxArena> {
 
 public:
   SyntaxArena() {}
+
+  static RC<SyntaxArena> make() { return RC<SyntaxArena>(new SyntaxArena()); }
 
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
   void *Allocate(size_t size, size_t alignment) {

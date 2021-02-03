@@ -79,6 +79,7 @@
 #include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
@@ -485,8 +486,6 @@ private:
   /// If set, RLE ignores loads from that array type.
   NominalTypeDecl *ArrayType;
 
-  JointPostDominanceSetComputer &jointPostDomComputer;
-
 #ifndef NDEBUG
   SILPrintContext printCtx;
 #endif
@@ -494,8 +493,7 @@ private:
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
              TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-             EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads,
-             JointPostDominanceSetComputer &computer);
+             EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = delete;
@@ -542,11 +540,6 @@ public:
 
   /// Return the BlockState for the basic block this basic block belongs to.
   BlockState &getBlockState(SILBasicBlock *B) { return BBToLocState[B]; }
-
-  /// Return the initialized jointPostDomComputer
-  JointPostDominanceSetComputer *getJointPostDomSetComputer() {
-    return &jointPostDomComputer;
-  }
 
   /// Get the bit representing the LSLocation in the LocationVault.
   unsigned getLocationBit(const LSLocation &L);
@@ -692,16 +685,14 @@ SILValue BlockState::reduceValuesAtEndOfBlock(RLEContext &Ctx, LSLocation &L) {
   ValueTableMap &OTM = getForwardValOut();
   for (unsigned i = 0; i < Locs.size(); ++i) {
     auto Val = Ctx.getValue(OTM[Ctx.getLocationBit(Locs[i])]);
-    auto AvailVal = makeCopiedValueAvailable(Val.getBase(), BB,
-                                             Ctx.getJointPostDomSetComputer());
+    auto AvailVal = makeCopiedValueAvailable(Val.getBase(), BB);
     Values[Locs[i]] = LSValue(AvailVal, Val.getPath().getValue());
   }
 
   // Second, reduce the available values into a single SILValue we can use to
   // forward.
   SILValue TheForwardingValue =
-      LSValue::reduce(L, &BB->getModule(), Values, BB->getTerminator(),
-                      Ctx.getJointPostDomSetComputer());
+      LSValue::reduce(L, &BB->getModule(), Values, BB->getTerminator());
   /// Return the forwarding value.
   return TheForwardingValue;
 }
@@ -727,7 +718,7 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // Reduce the available values into a single SILValue we can use to forward.
   SILModule *Mod = &I->getModule();
   SILValue TheForwardingValue =
-      LSValue::reduce(L, Mod, Values, I, Ctx.getJointPostDomSetComputer());
+      LSValue::reduce(L, Mod, Values, I);
 
   if (!TheForwardingValue)
     return false;
@@ -1211,14 +1202,12 @@ void BlockState::dump(RLEContext &Ctx) {
 
 RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-                       EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads,
-                       JointPostDominanceSetComputer &computer)
+                       EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads)
     : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI), BBToLocState(F),
       BBWithLoads(F),
       ArrayType(disableArrayLoads
                     ? F->getModule().getASTContext().getArrayDecl()
-                    : nullptr),
-      jointPostDomComputer(computer)
+                    : nullptr)
 #ifndef NDEBUG
       ,
       printCtx(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true)
@@ -1343,8 +1332,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 
     // Reduce the available values into a single SILValue we can use to forward
     SILInstruction *IPt = CurBB->getTerminator();
-    Values.push_back({CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt,
-                                             &jointPostDomComputer)});
+    Values.push_back({CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt)});
   }
 
   // Finally, collect all the values for the SILArgument, materialize it using
@@ -1359,7 +1347,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
   }
 
   auto Val = Updater.getValueInMiddleOfBlock(BB);
-  return makeNewValueAvailable(Val, BB, &jointPostDomComputer);
+  return makeNewValueAvailable(Val, BB);
 }
 
 bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
@@ -1377,7 +1365,7 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
     auto Val = getValue(VM[getLocationBit(X)]);
     if (!Val.isCoveringValue()) {
       auto AvailValue =
-          makeCopiedValueAvailable(Val.getBase(), BB, &jointPostDomComputer);
+          makeCopiedValueAvailable(Val.getBase(), BB);
       Values[X] = LSValue(AvailValue, Val.getPath().getValue());
       continue;
     }
@@ -1691,9 +1679,7 @@ public:
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
     auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
 
-    DeadEndBlocks deadEndBlocks(F);
-    JointPostDominanceSetComputer computer(deadEndBlocks);
-    RLEContext RLE(F, PM, AA, TE, PO, EAFI, disableArrayLoads, computer);
+    RLEContext RLE(F, PM, AA, TE, PO, EAFI, disableArrayLoads);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }

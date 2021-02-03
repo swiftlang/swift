@@ -369,10 +369,9 @@ private:
     // Pretend transparent functions don't exist.
     if (!Scope)
       return createInlinedAt(CS);
-    auto InlinedAt =
-        llvm::DebugLoc::get(L.line, L.column, Scope, createInlinedAt(CS));
-    InlinedAtCache.insert(
-        {CS, llvm::TrackingMDNodeRef(InlinedAt.getAsMDNode())});
+    auto InlinedAt = llvm::DILocation::get(
+        IGM.getLLVMContext(), L.line, L.column, Scope, createInlinedAt(CS));
+    InlinedAtCache.insert({CS, llvm::TrackingMDNodeRef(InlinedAt)});
     return InlinedAt;
   }
 
@@ -1998,7 +1997,8 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   auto *InlinedAt = createInlinedAt(DS);
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
-  auto DL = llvm::DebugLoc::get(L.line, L.column, Scope, InlinedAt);
+  auto DL = llvm::DILocation::get(IGM.getLLVMContext(), L.line, L.column, Scope,
+                                  InlinedAt);
   Builder.SetCurrentDebugLocation(DL);
 }
 
@@ -2028,7 +2028,7 @@ void IRGenDebugInfoImpl::addFailureMessageToCurrentLoc(IRBuilder &Builder,
   assert(parentScopesAreSane(TrapSc) && "parent scope sanity check failed");
 
   // Wrap the existing TrapLoc into the failure function.
-  auto DL = llvm::DebugLoc::get(0, 0, TrapSP, TrapLoc);
+  auto DL = llvm::DILocation::get(IGM.getLLVMContext(), 0, 0, TrapSP, TrapLoc);
   Builder.SetCurrentDebugLocation(DL);
 }
 
@@ -2069,15 +2069,18 @@ void IRGenDebugInfoImpl::setInlinedTrapLocation(IRBuilder &Builder,
          TheLastScope->InlinedCallSite != TheLastScope) {
     TheLastScope = TheLastScope->InlinedCallSite;
   }
-  auto LastLocation = llvm::DebugLoc::get(LastFilenameAndLocation.line,
-        LastFilenameAndLocation.column, getOrCreateScope(TheLastScope));
+  auto LastLocation = llvm::DILocation::get(
+      IGM.getLLVMContext(), LastFilenameAndLocation.line,
+      LastFilenameAndLocation.column, getOrCreateScope(TheLastScope));
   // FIXME: This location should point to stdlib instead of being artificial.
-  auto DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope), LastLocation);
+  auto DL = llvm::DILocation::get(IGM.getLLVMContext(), 0, 0,
+                                  getOrCreateScope(Scope), LastLocation);
   Builder.SetCurrentDebugLocation(DL);
 }
 
 void IRGenDebugInfoImpl::setEntryPointLoc(IRBuilder &Builder) {
-  auto DL = llvm::DebugLoc::get(0, 0, getEntryPointFn(), nullptr);
+  auto DL = llvm::DILocation::get(IGM.getLLVMContext(), 0, 0, getEntryPointFn(),
+                                  nullptr);
   Builder.SetCurrentDebugLocation(DL);
 }
 
@@ -2412,7 +2415,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     llvm::DILocalScope *Scope, const SILDebugScope *DS, bool InCoroContext) {
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);
-  auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
+  auto DL =
+      llvm::DILocation::get(IGM.getLLVMContext(), Line, Col, Scope, InlinedAt);
   auto *BB = Builder.GetInsertBlock();
 
   // An alloca may only be described by exactly one dbg.declare.
@@ -2684,7 +2688,7 @@ ArtificialLocation::ArtificialLocation(const SILDebugScope *DS,
       else if (auto *SP = dyn_cast<llvm::DISubprogram>(Scope))
         Line = SP->getLine();
     }
-    auto DL = llvm::DebugLoc::get(Line, 0, Scope);
+    auto DL = llvm::DILocation::get(Scope->getContext(), Line, 0, Scope);
     Builder.SetCurrentDebugLocation(DL);
   }
 }

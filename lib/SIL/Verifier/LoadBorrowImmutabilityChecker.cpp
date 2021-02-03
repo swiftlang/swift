@@ -52,7 +52,7 @@ public:
                          NestedAccessType::StopAtAccessBegin),
         writeAccumulator(writes) {}
 
-  bool visitUse(Operand *op, AccessUseType useTy);
+  bool visitUse(Operand *op, AccessUseType useTy) override;
 };
 
 // Functor for MultiMapCache construction.

@@ -38,7 +38,7 @@ class ObjCPropertyDecl;
 class ParmVarDecl;
 class QualType;
 class Sema;
-class SwiftNewtypeAttr;
+class SwiftNewTypeAttr;
 class Type;
 class TypedefNameDecl;
 }
@@ -107,7 +107,7 @@ OmissionTypeName getClangTypeNameForOmission(clang::ASTContext &ctx,
                                              clang::QualType type);
 
 /// Find the swift_newtype attribute on the given typedef, if present.
-clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
+clang::SwiftNewTypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
                                              ImportNameVersion version);
 
 /// Retrieve a bit vector containing the non-null argument
