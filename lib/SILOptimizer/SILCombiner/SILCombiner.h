@@ -312,6 +312,8 @@ public:
   SILInstruction *optimizeBuiltinIsConcrete(BuiltinInst *I);
 
   SILInstruction *optimizeBuiltinCOWBufferForReading(BuiltinInst *BI);
+  SILInstruction *optimizeBuiltinCOWBufferForReadingNonOSSA(BuiltinInst *BI);
+  SILInstruction *optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *BI);
 
   // Optimize the "trunc_N1_M2" builtin. if N1 is a result of "zext_M1_*" and
   // the following holds true: N1 > M1 and M2>= M1
