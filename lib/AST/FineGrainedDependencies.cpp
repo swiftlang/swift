@@ -240,7 +240,6 @@ std::string DependencyKey::humanReadableName() const {
   switch (kind) {
   case NodeKind::member:
     return demangleTypeAsContext(context) + "." + name;
-  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     return llvm::sys::path::filename(name).str();
@@ -271,12 +270,9 @@ raw_ostream &fine_grained_dependencies::operator<<(raw_ostream &out,
 bool DependencyKey::verify() const {
   assert((getKind() != NodeKind::externalDepend || isInterface()) &&
          "All external dependencies must be interfaces.");
-  assert((getKind() != NodeKind::incrementalExternalDepend || isInterface()) &&
-         "All incremental external dependencies must be interfaces.");
   switch (getKind()) {
   case NodeKind::topLevel:
   case NodeKind::dynamicLookup:
-  case NodeKind::incrementalExternalDepend:
   case NodeKind::externalDepend:
   case NodeKind::sourceFileProvide:
     assert(context.empty() && !name.empty() && "Must only have a name");
@@ -307,7 +303,6 @@ void DependencyKey::verifyNodeKindNames() {
       CHECK_NAME(potentialMember)
       CHECK_NAME(member)
       CHECK_NAME(dynamicLookup)
-      CHECK_NAME(incrementalExternalDepend)
       CHECK_NAME(externalDepend)
       CHECK_NAME(sourceFileProvide)
     case NodeKind::kindCount:
