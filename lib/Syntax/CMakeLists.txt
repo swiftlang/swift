@@ -18,3 +18,5 @@ _swift_gyb_target_sources(swiftSyntax PRIVATE
     SyntaxVisitor.cpp.gyb
     Trivia.cpp.gyb
     SyntaxSerialization.cpp.gyb)
+target_link_libraries(swiftSyntax PRIVATE
+  swiftParse)
