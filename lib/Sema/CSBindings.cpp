@@ -538,11 +538,13 @@ PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
     break;
   }
 
-  if (type->isTypeVariableOrMember() || type->isHole())
-    return std::make_pair(false, Type());
-
   bool requiresUnwrap = false;
   do {
+    // Conformance check on type variable would always return true,
+    // but type variable can't cover anything until it's bound.
+    if (type->isTypeVariableOrMember() || type->isHole())
+      return std::make_pair(false, Type());
+
     if (literal.isCoveredBy(type, CS.DC)) {
       return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
     }
