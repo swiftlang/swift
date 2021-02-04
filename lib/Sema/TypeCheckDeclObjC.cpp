@@ -327,6 +327,17 @@ static bool checkObjCWithGenericParams(const ValueDecl *VD, ObjCReason Reason) {
     return true;
   }
 
+  if (GC->getTrailingWhereClause()) {
+    // Diagnose this problem, if asked to.
+    if (Diagnose) {
+      VD->diagnose(diag::objc_invalid_with_generic_requirements,
+                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason));
+      describeObjCReason(VD, Reason);
+    }
+
+    return true;
+  }
+
   return false;
 }
 
