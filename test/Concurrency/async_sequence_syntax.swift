@@ -32,3 +32,26 @@ func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) {
     } catch { }
   }
 }
+
+func doubleDiagCheckGeneric<T : AsyncSequence>(_ seq: T) async {
+  var it = seq.makeAsyncIterator()
+  // expected-note@+2{{call is to 'rethrows' function, but a conformance has a throwing witness}}
+  // expected-error@+1{{call can throw, but it is not marked with 'try' and the error is not handled}}
+  let _ = await it.next()
+}
+
+struct ThrowingAsyncSequence: AsyncSequence, AsyncIteratorProtocol {
+  typealias Element = Int
+  typealias AsyncIterator = Self
+  mutating func next() async throws -> Int? {
+    return nil
+  }
+
+  func makeAsyncIterator() -> Self { return self }
+}
+
+func doubleDiagCheckConcrete(_ seq: ThrowingAsyncSequence) async {
+  var it = seq.makeAsyncIterator()
+  // expected-error@+1{{call can throw, but it is not marked with 'try' and the error is not handled}}
+  let _ = await it.next()
+}
