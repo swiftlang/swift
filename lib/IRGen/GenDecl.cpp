@@ -2793,20 +2793,10 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
     IGF.Builder.CreateRet(Res);
 }
 
-/// If the calling convention for `ctor` doesn't match the calling convention
-/// that we assumed for it when we imported it as `initializer`, emit and
-/// return a thunk that conforms to the assumed calling convention. The thunk
-/// is marked `alwaysinline`, so it doesn't generate any runtime overhead.
-/// If the assumed calling convention was correct, just return `ctor`.
-///
-/// See also comments in CXXMethodConventions in SIL/IR/SILFunctionType.cpp.
-static llvm::Constant *
-emitCXXConstructorThunkIfNeeded(IRGenModule &IGM, SILFunction *initializer,
-                                const clang::CXXConstructorDecl *ctor,
-                                const LinkEntity &entity,
-                                llvm::Constant *ctorAddress) {
-  Signature signature = IGM.getSignature(initializer->getLoweredFunctionType());
-
+llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
+    IRGenModule &IGM, Signature signature,
+    const clang::CXXConstructorDecl *ctor, StringRef name,
+    llvm::Constant *ctorAddress) {
   llvm::FunctionType *assumedFnType = signature.getType();
   llvm::FunctionType *ctorFnType =
       cast<llvm::FunctionType>(ctorAddress->getType()->getPointerElementType());
@@ -2814,13 +2804,6 @@ emitCXXConstructorThunkIfNeeded(IRGenModule &IGM, SILFunction *initializer,
   if (assumedFnType == ctorFnType) {
     return ctorAddress;
   }
-
-  // The thunk has private linkage, so it doesn't need to have a predictable
-  // mangled name -- we just need to make sure the name is unique.
-  llvm::SmallString<32> name;
-  llvm::raw_svector_ostream stream(name);
-  stream << "__swift_cxx_ctor";
-  entity.mangle(stream);
 
   llvm::Function *thunk = llvm::Function::Create(
       assumedFnType, llvm::Function::PrivateLinkage, name, &IGM.Module);
@@ -2897,11 +2880,20 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
     } else {
       auto globalDecl = getClangGlobalDeclForFunction(clangDecl);
       clangAddr = getAddrOfClangGlobalDecl(globalDecl, forDefinition);
+    }
 
-      if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
-        clangAddr =
-            emitCXXConstructorThunkIfNeeded(*this, f, ctor, entity, clangAddr);
-      }
+    if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(clangDecl)) {
+      Signature signature = getSignature(f->getLoweredFunctionType());
+
+      // The thunk has private linkage, so it doesn't need to have a predictable
+      // mangled name -- we just need to make sure the name is unique.
+      llvm::SmallString<32> name;
+      llvm::raw_svector_ostream stream(name);
+      stream << "__swift_cxx_ctor";
+      entity.mangle(stream);
+
+      clangAddr = emitCXXConstructorThunkIfNeeded(*this, signature, ctor, name,
+                                                  clangAddr);
     }
   }
 

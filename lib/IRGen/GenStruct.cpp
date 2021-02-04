@@ -20,9 +20,11 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -36,6 +38,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 
+#include "GenDecl.h"
 #include "GenMeta.h"
 #include "GenRecord.h"
 #include "GenType.h"
@@ -43,10 +46,11 @@
 #include "IRGenModule.h"
 #include "IndirectTypeInfo.h"
 #include "MemberAccessStrategy.h"
+#include "MetadataLayout.h"
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
+#include "Signature.h"
 #include "StructMetadataVisitor.h"
-#include "MetadataLayout.h"
 
 #pragma clang diagnostic ignored "-Winconsistent-missing-override"
 
@@ -326,6 +330,7 @@ namespace {
     public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
                               ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
+
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                         unsigned explosionSize,
@@ -373,6 +378,73 @@ namespace {
       : public StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
                                   ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
+
+    const clang::CXXConstructorDecl *findCopyConstructor() const {
+      const clang::CXXRecordDecl *cxxRecordDecl =
+          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      if (!cxxRecordDecl)
+        return nullptr;
+      for (auto method : cxxRecordDecl->methods()) {
+        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
+          if (ctor->isCopyConstructor())
+            return ctor;
+        }
+      }
+      return nullptr;
+    }
+
+    CanSILFunctionType createCXXCopyConstructorFunctionType(IRGenFunction &IGF,
+                                                            SILType T) const {
+      // Create the following function type:
+      //   @convention(c) (UnsafePointer<T>) -> @out T
+      // This is how clang *would* import the copy constructor. So, later, when
+      // we pass it to "emitCXXConstructorThunkIfNeeded" we get a thunk with
+      // the following LLVM function type:
+      //   void (%struct.T* %this, %struct.T* %0)
+      auto ptrTypeDecl =
+          IGF.getSILModule().getASTContext().getUnsafePointerDecl();
+      auto subst = SubstitutionMap::get(ptrTypeDecl->getGenericSignature(),
+                                        {T.getASTType()},
+                                        ArrayRef<ProtocolConformanceRef>{});
+      auto ptrType = ptrTypeDecl->getDeclaredInterfaceType().subst(subst);
+      SILParameterInfo ptrParam(ptrType->getCanonicalType(),
+                                ParameterConvention::Direct_Unowned);
+      SILResultInfo result(T.getASTType(), ResultConvention::Indirect);
+
+      return SILFunctionType::get(
+          GenericSignature(),
+          SILFunctionType::ExtInfo().withRepresentation(
+              SILFunctionTypeRepresentation::CFunctionPointer),
+          SILCoroutineKind::None,
+          /*callee=*/ParameterConvention::Direct_Unowned,
+          /*params*/ {ptrParam},
+          /*yields*/ {}, /*results*/ {result},
+          /*error*/ None,
+          /*pattern subs*/ SubstitutionMap(),
+          /*invocation subs*/ SubstitutionMap(), IGF.IGM.Context);
+    }
+
+    void emitCopyWithCopyConstructor(
+        IRGenFunction &IGF, SILType T,
+        const clang::CXXConstructorDecl *copyConstructor, llvm::Value *src,
+        llvm::Value *dest) const {
+      auto fnType = createCXXCopyConstructorFunctionType(IGF, T);
+      auto globalDecl =
+          clang::GlobalDecl(copyConstructor, clang::Ctor_Complete);
+      auto clangFnAddr =
+          IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
+      auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
+      Signature signature = IGF.IGM.getSignature(fnType);
+      std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
+      clangFnAddr = emitCXXConstructorThunkIfNeeded(
+          IGF.IGM, signature, copyConstructor, name, clangFnAddr);
+      callee = cast<llvm::Function>(clangFnAddr);
+      dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
+                             IGF.IGM.DataLayout);
+      src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
+                            IGF.IGM.DataLayout);
+      IGF.Builder.CreateCall(callee, {dest, src});
+    }
 
   public:
     AddressOnlyClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
@@ -449,6 +521,21 @@ namespace {
                               bool isOutlined) const override {
       llvm_unreachable("Address-only C++ types must be created by C++ special "
                        "member functions.");
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                            Address srcAddr, SILType T,
+                            bool isOutlined) const override {
+      if (auto copyConstructor = findCopyConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, copyConstructor,
+                                    srcAddr.getAddress(),
+                                    destAddr.getAddress());
+        return;
+      }
+      StructTypeInfoBase<AddressOnlyClangRecordTypeInfo, FixedTypeInfo,
+                         ClangFieldInfo>::initializeWithCopy(IGF, destAddr,
+                                                             srcAddr, T,
+                                                             isOutlined);
     }
 
     llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }

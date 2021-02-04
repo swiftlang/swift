@@ -35,6 +35,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -47,11 +48,10 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Strings.h"
-
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
-#include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclObjCCommon.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -3481,6 +3481,11 @@ namespace {
         ctors.push_back(createDefaultConstructor(Impl, result));
       }
 
+      // We can assume that it is possible to correctly construct the object by
+      // simply initializing its member variables to arbitrary supplied values
+      // only when the same is possible in C++. While we could check for that
+      // exactly, checking whether the C++ class is an aggregate
+      // (C++ [dcl.init.aggr]) has the same effect.
       bool isAggregate = !cxxRecordDecl || cxxRecordDecl->isAggregate();
       if (hasReferenceableFields && hasMemberwiseInitializer && isAggregate) {
         // The default zero initializer suppresses the implicit value
@@ -3513,8 +3518,14 @@ namespace {
         result->setIsCxxNonTrivial(!cxxRecordDecl->isTriviallyCopyable());
 
         for (auto ctor : cxxRecordDecl->ctors()) {
-          if (ctor->isCopyConstructor() &&
-              (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)) {
+          if (ctor->isCopyConstructor()) {
+            // If we have no way of copying the type we can't import the class
+            // at all because we cannot express the correct semantics as a swift
+            // struct.
+            if (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)
+              return nullptr;
+          }
+          if (ctor->getAccess() != clang::AS_public) {
             result->setIsCxxNonTrivial(true);
             break;
           }
@@ -3540,19 +3551,45 @@ namespace {
         return VisitRecordDecl(decl);
 
       auto &clangSema = Impl.getClangSema();
-      // Make Clang define the implicit default constructor if the class needs
-      // it. Make sure we only do this if the class has been fully defined and
-      // we're not in a dependent context (this is equivalent to the logic in
-      // CanDeclareSpecialMemberFunction in Clang's SemaLookup.cpp).
+      // Make Clang define any implicit constructors it may need (copy,
+      // default). Make sure we only do this if the class has been fully defined
+      // and we're not in a dependent context (this is equivalent to the logic
+      // in CanDeclareSpecialMemberFunction in Clang's SemaLookup.cpp).
       if (decl->getDefinition() && !decl->isBeingDefined() &&
-          !decl->isDependentContext() &&
-          decl->needsImplicitDefaultConstructor()) {
-        clang::CXXConstructorDecl *ctor =
-            clangSema.DeclareImplicitDefaultConstructor(
-                const_cast<clang::CXXRecordDecl *>(decl->getDefinition()));
-        if (!ctor->isDeleted())
-          clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
-                                                     ctor);
+          !decl->isDependentContext()) {
+        if (decl->needsImplicitDefaultConstructor()) {
+          clang::CXXConstructorDecl *ctor =
+              clangSema.DeclareImplicitDefaultConstructor(
+                  const_cast<clang::CXXRecordDecl *>(decl->getDefinition()));
+          if (!ctor->isDeleted())
+            clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
+                                                       ctor);
+        }
+        clang::CXXConstructorDecl *copyCtor = nullptr;
+        if (decl->needsImplicitCopyConstructor()) {
+          copyCtor = clangSema.DeclareImplicitCopyConstructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
+        } else {
+          // We may have a defaulted copy constructor that needs to be defined.
+          // Try to find it.
+          for (auto methods : decl->methods()) {
+            if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
+              if (declCtor->isCopyConstructor() && declCtor->isDefaulted() &&
+                  declCtor->getAccess() == clang::AS_public &&
+                  !declCtor->isDeleted() &&
+                  // Note: we use "doesThisDeclarationHaveABody" here because
+                  // that's what "DefineImplicitCopyConstructor" checks.
+                  !declCtor->doesThisDeclarationHaveABody()) {
+                copyCtor = declCtor;
+                break;
+              }
+            }
+          }
+        }
+        if (copyCtor) {
+          clangSema.DefineImplicitCopyConstructor(clang::SourceLocation(),
+                                                  copyCtor);
+        }
       }
 
       return VisitRecordDecl(decl);
