@@ -950,8 +950,7 @@ DeclNameViewer::DeclNameViewer(StringRef Text): IsValid(true), HasParen(false) {
     return;
   if ((IsValid = Labels.back().empty())) {
     Labels.pop_back();
-    std::transform(Labels.begin(), Labels.end(), Labels.begin(),
-        [](StringRef Label) {
+    llvm::transform(Labels, Labels.begin(), [](StringRef Label) {
       return Label == "_" ? StringRef() : Label;
     });
   }

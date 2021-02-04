@@ -465,11 +465,9 @@ static bool initDocEntityInfo(const Decl *D,
       SmallVector<Identifier, 1> Bystanders;
       if (MD->getRequiredBystandersIfCrossImportOverlay(
           DeclaringModForCrossImport, Bystanders)) {
-        std::transform(Bystanders.begin(), Bystanders.end(),
-                       std::back_inserter(Info.RequiredBystanders),
-                       [](Identifier Bystander){
-          return Bystander.str().str();
-        });
+        llvm::transform(
+            Bystanders, std::back_inserter(Info.RequiredBystanders),
+            [](Identifier Bystander) { return Bystander.str().str(); });
       } else {
         llvm_unreachable("DeclaringModForCrossImport not correct?");
       }
@@ -1229,8 +1227,8 @@ public:
   void accept(SourceManager &SM, RegionType RegionType,
               ArrayRef<Replacement> Replacements) {
     unsigned Start = AllEdits.size();
-    std::transform(
-        Replacements.begin(), Replacements.end(), std::back_inserter(AllEdits),
+    llvm::transform(
+        Replacements, std::back_inserter(AllEdits),
         [&](const Replacement &R) -> Edit {
           std::pair<unsigned, unsigned> Start =
                                             SM.getPresumedLineAndColumnForLoc(
@@ -1239,8 +1237,8 @@ public:
                                             R.Range.getEnd());
           SmallVector<NoteRegion, 4> SubRanges;
           auto RawRanges = R.RegionsWorthNote;
-          std::transform(
-              RawRanges.begin(), RawRanges.end(), std::back_inserter(SubRanges),
+          llvm::transform(
+              RawRanges, std::back_inserter(SubRanges),
               [](swift::ide::NoteRegion R) -> SourceKit::NoteRegion {
                 return {SwiftLangSupport::getUIDForRefactoringRangeKind(R.Kind),
                         R.StartLine,

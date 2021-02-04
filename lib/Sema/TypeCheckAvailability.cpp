@@ -1961,11 +1961,11 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     return;
 
   SmallVector<Identifier, 4> argumentLabelIDs;
-  std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
-                 std::back_inserter(argumentLabelIDs),
-                 [&ctx](StringRef labelStr) -> Identifier {
-    return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
-  });
+  llvm::transform(parsed.ArgumentLabels, std::back_inserter(argumentLabelIDs),
+                  [&ctx](StringRef labelStr) -> Identifier {
+                    return labelStr.empty() ? Identifier()
+                                            : ctx.getIdentifier(labelStr);
+                  });
 
   // Coerce the `argumentLabelIDs` to the user supplied arguments.
   // e.g:

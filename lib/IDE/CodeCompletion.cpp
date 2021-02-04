@@ -1473,8 +1473,8 @@ void CodeCompletionContext::sortCompletionResults(
     return Result < 0;
   });
 
-  std::transform(nameCache.begin(), nameCache.end(), Results.begin(),
-                 [](const ResultAndName &entry) { return entry.result; });
+  llvm::transform(nameCache, Results.begin(),
+                  [](const ResultAndName &entry) { return entry.result; });
 }
 
 namespace {

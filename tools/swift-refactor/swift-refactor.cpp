@@ -204,10 +204,11 @@ std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
                                      bool IsFunctionLike,
                                      bool IsNonProtocolType) {
   std::vector<RenameLoc> Renames;
-  std::transform(Locs.begin(), Locs.end(), std::back_inserter(Renames), [&](const RefactorLoc &Loc) -> RenameLoc {
-    return {Loc.Line, Loc.Column, Loc.Usage, OldName, NewName, IsFunctionLike,
-      IsNonProtocolType};
-  });
+  llvm::transform(Locs, std::back_inserter(Renames),
+                  [&](const RefactorLoc &Loc) -> RenameLoc {
+                    return {Loc.Line, Loc.Column,     Loc.Usage,        OldName,
+                            NewName,  IsFunctionLike, IsNonProtocolType};
+                  });
   return Renames;
 }
 

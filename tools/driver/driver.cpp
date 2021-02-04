@@ -270,9 +270,8 @@ int main(int argc_, const char **argv_) {
   }
 
   std::vector<const char *> utf8CStrs;
-  std::transform(utf8Args.begin(), utf8Args.end(),
-                 std::back_inserter(utf8CStrs),
-                 std::mem_fn(&std::string::c_str));
+  llvm::transform(utf8Args, std::back_inserter(utf8CStrs),
+                  std::mem_fn(&std::string::c_str));
   argv_ = utf8CStrs.data();
 #endif
   // Expand any response files in the command line argument vector - arguments
