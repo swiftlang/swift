@@ -349,7 +349,7 @@ internal func unimplemented_utf8_32bit(
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @frozen
-public struct String: ConcurrentValue {
+public struct String {
   public // @SPI(Foundation)
   var _guts: _StringGuts
 
@@ -382,6 +382,8 @@ public struct String: ConcurrentValue {
   @_semantics("string.init_empty")
   public init() { self.init(_StringGuts()) }
 }
+
+extension String: ConcurrentValue { }
 
 extension String {
   #if !INTERNAL_CHECKS_ENABLED
