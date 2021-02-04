@@ -1292,18 +1292,28 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
   // required by sourcekitd.
   subClangImporterOpts.DetailedPreprocessingRecord =
     clangImporterOpts.DetailedPreprocessingRecord;
+
   // We need to add these extra clang flags because explict module building
   // related flags are all there: -fno-implicit-modules, -fmodule-map-file=,
   // and -fmodule-file=.
   // If we don't add these flags, the interface will be built with implicit
   // PCMs.
-  subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
-  for (auto arg: subClangImporterOpts.ExtraArgs) {
-    GenericArgs.push_back("-Xcc");
-    GenericArgs.push_back(ArgSaver.save(arg));
+  // FIXME: With Implicit Module Builds, if sub-invocations inherit `-fmodule-map-file=` options,
+  // those modulemaps become File dependencies of all downstream PCMs and their depending Swift
+  // modules, triggering unnecessary re-builds. We work around this by only inheriting these options
+  // when building with explicit modules. While this problem will not manifest with Explicit Modules
+  // (which do not use the ClangImporter to build PCMs), we may still need a better way to
+  // decide which options must be inherited here.
+  if (LoaderOpts.disableImplicitSwiftModule) {
+    subClangImporterOpts.ExtraArgs = clangImporterOpts.ExtraArgs;
+    for (auto arg : subClangImporterOpts.ExtraArgs) {
+      GenericArgs.push_back("-Xcc");
+      GenericArgs.push_back(ArgSaver.save(arg));
+    }
   }
 
-  // Tell the genericSubInvocation to serialize dependency hashes if asked to do so.
+  // Tell the genericSubInvocation to serialize dependency hashes if asked to do
+  // so.
   auto &frontendOpts = genericSubInvocation.getFrontendOptions();
   frontendOpts.SerializeModuleInterfaceDependencyHashes =
     serializeDependencyHashes;

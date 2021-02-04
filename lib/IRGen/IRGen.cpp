@@ -703,6 +703,10 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Constant,
                         SpecialPointerAuthDiscriminators::TaskResumeFunction);
 
+  opts.TaskResumeContext =
+      PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
+                        SpecialPointerAuthDiscriminators::TaskResumeContext);
+
   opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);

@@ -25,6 +25,7 @@
 
 #include "Callee.h"
 #include "Explosion.h"
+#include "GenPointerAuth.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -563,7 +564,13 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   // TODO: add lifetime with matching lifetime in await_async_continuation
   auto contResumeAddr =
       Builder.CreateStructGEP(continuationContext.getAddress(), 0);
-  Builder.CreateStore(getAsyncContext(),
+  llvm::Value *asyncContextValue = getAsyncContext();
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema, contResumeAddr,
+                                          PointerAuthEntity());
+    asyncContextValue = emitPointerAuthSign(*this, asyncContextValue, authInfo);
+  }
+  Builder.CreateStore(asyncContextValue,
                       Address(contResumeAddr, pointerAlignment));
   auto contErrResultAddr =
       Builder.CreateStructGEP(continuationContext.getAddress(), 2);
@@ -607,15 +614,27 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   assert(AsyncCoroutineCurrentResume == nullptr &&
          "Don't support nested get_async_continuation");
   AsyncCoroutineCurrentResume = coroResume;
-  Builder.CreateStore(
-      Builder.CreateBitOrPointerCast(coroResume, IGM.FunctionPtrTy),
-      Address(currTaskResumeTaskAddr, pointerAlignment));
+  llvm::Value *coroResumeValue =
+      Builder.CreateBitOrPointerCast(coroResume, IGM.FunctionPtrTy);
+  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeFunction) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema, currTaskResumeTaskAddr,
+                                          PointerAuthEntity());
+    coroResumeValue = emitPointerAuthSign(*this, coroResumeValue, authInfo);
+  }
+  Builder.CreateStore(coroResumeValue,
+                      Address(currTaskResumeTaskAddr, pointerAlignment));
   // currTask->ResumeContext = &continuation_context;
   auto currTaskResumeCtxtAddr = Builder.CreateStructGEP(currTask, 5);
-  Builder.CreateStore(
-      Builder.CreateBitOrPointerCast(continuationContext.getAddress(),
-                                     IGM.SwiftContextPtrTy),
-      Address(currTaskResumeCtxtAddr, pointerAlignment));
+  llvm::Value *continuationContextValue = Builder.CreateBitOrPointerCast(
+      continuationContext.getAddress(), IGM.SwiftContextPtrTy);
+  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeContext) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema, currTaskResumeCtxtAddr,
+                                          PointerAuthEntity());
+    continuationContextValue =
+        emitPointerAuthSign(*this, continuationContextValue, authInfo);
+  }
+  Builder.CreateStore(continuationContextValue,
+                      Address(currTaskResumeCtxtAddr, pointerAlignment));
 
   // Publish all the writes.
   // continuation_context.awaitSynchronization =(atomic release) nullptr;
