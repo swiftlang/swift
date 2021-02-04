@@ -11,11 +11,11 @@
 # ----------------------------------------------------------------------------
 
 from .benchmarks import Benchmarks
+from .clibdispatch import CLibDispatch
 from .cmark import CMark
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
-from .clibdispatch import CLibDispatch
 from .libdispatch import LibDispatch
 from .libicu import LibICU
 from .llbuild import LLBuild

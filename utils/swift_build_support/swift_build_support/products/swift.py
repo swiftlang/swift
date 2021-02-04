@@ -10,11 +10,11 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import clibdispatch
 from . import cmark
 from . import libcxx
 from . import libicu
 from . import llvm
-from . import clibdispatch
 from . import product
 from ..cmake import CMakeOptions
 
