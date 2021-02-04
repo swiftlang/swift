@@ -405,5 +405,10 @@ WARNING(module_incompatible_with_skip_function_bodies,none,
         "-experimental-skip-*-function-bodies* flags; they have "
         "been automatically disabled", (StringRef))
 
+WARNING(invalid_access_notes_file,none,
+        "access notes at '%0' will be ignored due to an error while loading "
+        "them: %1",
+        (StringRef, StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

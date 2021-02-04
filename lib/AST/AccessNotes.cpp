@@ -215,15 +215,30 @@ template <> struct llvm::yaml::MappingTraits<swift::AccessNote> {
 };
 
 namespace swift {
+
+static void
+convertToErrorAndJoin(const llvm::SMDiagnostic &diag, void *Context) {
+  auto newError = llvm::createStringError(std::errc::invalid_argument,
+                                          "%s at line %d, column %d",
+                                          diag.getMessage().bytes_begin(),
+                                          diag.getLineNo(), diag.getColumnNo());
+
+  auto &errors = *(llvm::Error*)Context;
+  errors = llvm::joinErrors(std::move(errors), std::move(newError));
+}
+
 llvm::Expected<AccessNotes>
 AccessNotes::load(ASTContext &ctx, llvm::MemoryBuffer *buffer) {
-  llvm::yaml::Input yamlIn(buffer->getBuffer(), (void *)&ctx);
+  llvm::Error errors = llvm::Error::success();
+
+  llvm::yaml::Input yamlIn(buffer->getBuffer(), (void *)&ctx,
+                           convertToErrorAndJoin, &errors);
 
   AccessNotes notes;
   yamlIn >> notes;
 
   if (yamlIn.error())
-    return llvm::errorCodeToError(yamlIn.error());
+    return llvm::Expected<AccessNotes>(std::move(errors));
 
   return notes;
 }

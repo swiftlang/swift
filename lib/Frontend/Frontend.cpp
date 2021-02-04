@@ -902,6 +902,16 @@ bool CompilerInstance::createFilesForMainModule(
   return false;
 }
 
+template<typename ExpectedOut, typename ExpectedIn>
+static llvm::Expected<ExpectedOut>
+flatMap(llvm::Expected<ExpectedIn> &&in,
+        llvm::function_ref<llvm::Expected<ExpectedOut>(ExpectedIn &&)> transform) {
+  if (!in)
+    return llvm::Expected<ExpectedOut>(in.takeError());
+
+  return transform(std::move(in.get()));
+}
+
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
@@ -935,18 +945,26 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
 
     if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
-      auto bufferOrError =
-          swift::vfs::getFileOrSTDIN(getFileSystem(),
-                               Invocation.getFrontendOptions().AccessNotesPath);
-      // FIXME: Diagnose properly
-      auto buffer = cantFail(llvm::errorOrToExpected(std::move(bufferOrError)),
-                             "can't open access notes file");
+      auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
 
-      auto expectedAccessNotes = AccessNotes::load(*Context, buffer.get());
-      // FIXME: Diagnose properly
-      MainModule->getAccessNotes() = cantFail(std::move(expectedAccessNotes),
-                                              "invalid access notes:");
+      auto expectedBuffer = llvm::errorOrToExpected(
+          swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath));
 
+      auto expectedAccessNotes =
+          flatMap<AccessNotes, std::unique_ptr<llvm::MemoryBuffer>>(
+              std::move(expectedBuffer),
+              [&](auto &&buffer) -> auto {
+                return AccessNotes::load(*Context, buffer.get());
+              });
+
+      if (expectedAccessNotes)
+        MainModule->getAccessNotes() = std::move(expectedAccessNotes).get();
+      else
+        llvm::handleAllErrors(expectedAccessNotes.takeError(),
+                              [&](const llvm::ErrorInfoBase &error) {
+          Context->Diags.diagnose(SourceLoc(), diag::invalid_access_notes_file,
+                                  accessNotesPath, error.message());
+        });
     }
   }
   return MainModule;
