@@ -544,8 +544,6 @@ namespace {
       auto *X = cast<RefElementAddrInst>(LHS);
       if (X->getField() != RHS->getField())
         return false;
-      if (X->getOperand() != RHS->getOperand())
-        return false;
       return true;
     }
 
