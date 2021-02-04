@@ -997,6 +997,31 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
   return Builder.createIndexAddr(IA->getLoc(), base2, newIndex);
 }
 
+/// Walks over all fields of an aggregate and checks if a reference count
+/// operation for \p value is required. This differs from a simple `isTrivial`
+/// check, because it treats a value_to_bridge_object instruction as "trivial".
+static bool isTrivial(SILValue value, SILFunction *function) {
+  SmallVector<ValueBase *, 32> workList;
+  SmallPtrSet<ValueBase *, 16> visited;
+  workList.push_back(value);
+  while (!workList.empty()) {
+    SILValue v = workList.pop_back_val();
+    if (v->getType().isTrivial(*function))
+      continue;
+    if (isa<ValueToBridgeObjectInst>(v))
+      continue;
+    if (isa<StructInst>(v) || isa<TupleInst>(v)) {
+      for (SILValue op : cast<SingleValueInstruction>(v)->getOperandValues()) {
+        if (visited.insert(op).second)
+          workList.push_back(op);
+      }
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
 SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
   assert(!RVI->getFunction()->hasOwnership());
 
@@ -1031,7 +1056,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
                                        RVI->getAtomicity());
 
   // ReleaseValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(*RVI->getFunction()))
+  if (isTrivial(Operand, RVI->getFunction()))
     return eraseInstFromFunction(*RVI);
 
   // Do nothing for non-trivial non-reference types.

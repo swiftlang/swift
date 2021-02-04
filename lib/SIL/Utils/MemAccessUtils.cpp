@@ -763,6 +763,13 @@ AccessedStorage AccessedStorage::computeInScope(SILValue sourceAddress) {
 //                              MARK: AccessPath
 //===----------------------------------------------------------------------===//
 
+AccessPath AccessPath::forTailStorage(SILValue rootReference) {
+  return AccessPath(
+    AccessedStorage::forClass(rootReference, AccessedStorage::TailIndex),
+    PathNode(rootReference->getModule()->getIndexTrieRoot()),
+    /*offset*/ 0);
+}
+
 bool AccessPath::contains(AccessPath subPath) const {
   if (!isValid() || !subPath.isValid()) {
     return false;
