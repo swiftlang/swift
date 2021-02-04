@@ -495,6 +495,7 @@ struct DocEntityInfo {
   bool IsUnavailable = false;
   bool IsDeprecated = false;
   bool IsOptional = false;
+  bool IsAsync = false;
   swift::Type Ty;
 };
 
