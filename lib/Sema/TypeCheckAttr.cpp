@@ -128,7 +128,6 @@ public:
   IGNORED_ATTR(OriginallyDefinedIn)
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
-  IGNORED_ATTR(Concurrent)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -419,6 +418,22 @@ public:
         break;
       }
     }
+  }
+
+  void visitConcurrentAttr(ConcurrentAttr *attr) {
+    auto VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      return;
+
+    auto innermostDC = VD->getInnermostDeclContext();
+    SubstitutionMap subs;
+    if (auto genericEnv = innermostDC->getGenericEnvironmentOfContext()) {
+      subs = genericEnv->getForwardingSubstitutionMap();
+    }
+
+    (void)diagnoseNonConcurrentTypesInReference(
+        ConcreteDeclRef(VD, subs), innermostDC, VD->getLoc(),
+        ConcurrentReferenceKind::ConcurrentFunction);
   }
 };
 } // end anonymous namespace

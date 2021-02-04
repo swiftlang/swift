@@ -1906,6 +1906,8 @@ public:
     (void) TAD->getGenericSignature();
     (void) TAD->getUnderlyingType();
 
+    // Make sure to check the underlying type.
+    
     TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TAD);
     checkGenericParams(TAD);

@@ -118,3 +118,30 @@ class SomeClass: MainActorProto {
   @SomeGlobalActor
   func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent' across actors}}
 }
+
+// ----------------------------------------------------------------------
+// ConcurrentValue restriction on concurrent functions.
+// ----------------------------------------------------------------------
+
+// FIXME: poor diagnostic
+@concurrent func concurrentFunc() -> NotConcurrent? { nil } // expected-warning{{cannot call function returning non-concurrent-value type 'NotConcurrent?' across actors}}
+
+// ----------------------------------------------------------------------
+// ConcurrentValue restriction on @concurrent types.
+// ----------------------------------------------------------------------
+typealias CF = @concurrent () -> NotConcurrent? // expected-warning{{`@concurrent` function type has non-concurrent-value result type 'NotConcurrent?'}}
+typealias BadGenericCF<T> = @concurrent () -> T? // expected-warning{{`@concurrent` function type has non-concurrent-value result type 'T?'}}
+typealias GoodGenericCF<T: ConcurrentValue> = @concurrent () -> T? // okay
+
+var concurrentFuncVar: (@concurrent (NotConcurrent) -> Void)? = nil // expected-warning{{`@concurrent` function type has non-concurrent-value parameter type 'NotConcurrent'}}
+
+// ----------------------------------------------------------------------
+// ConcurrentValue restriction on @concurrent closures.
+// ----------------------------------------------------------------------
+func acceptConcurrentUnary<T>(_: @concurrent (T) -> T) { }
+
+func concurrentClosures<T>(_: T) {
+  acceptConcurrentUnary { (x: T) in // expected-warning{{`@concurrent` closure has non-concurrent-value parameter type 'T'}}
+    x
+  }
+}

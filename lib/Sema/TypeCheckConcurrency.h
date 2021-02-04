@@ -25,6 +25,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class ActorIsolation;
+class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
 class ConcreteDeclRef;
@@ -60,6 +61,8 @@ enum class ConcurrentReferenceKind {
   CrossActor,
   /// A local capture referenced from concurrent code.
   LocalCapture,
+  /// Concurrent function
+  ConcurrentFunction,
 };
 
 /// Describes why or where a particular entity has a non-concurrent-value type.
@@ -232,6 +235,12 @@ void checkOverrideActorIsolation(ValueDecl *value);
 bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind);
+
+/// Diagnose the presence of any non-concurrent types within the given
+/// function type.
+bool diagnoseNonConcurrentTypesInFunctionType(
+    const AnyFunctionType *fnType, const DeclContext *dc, SourceLoc loc,
+    bool isClosure);
 
 } // end namespace swift
 

@@ -4315,6 +4315,10 @@ WARNING(non_concurrent_property_type,none,
         "cannot use %0 %1 with a non-concurrent-value type %2 "
         "%select{across actors|from concurrently-executed code}3",
         (DescriptiveDeclKind, DeclName, Type, bool))
+WARNING(non_concurrent_function_type,none,
+        "`@concurrent` %select{function type|closure}0 has "
+        "non-concurrent-value %select{parameter|result}1 type %2",
+        (bool, bool, Type))
 
 ERROR(actorindependent_let,none,
       "'@actorIndependent' is meaningless on 'let' declarations because "

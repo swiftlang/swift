@@ -938,6 +938,35 @@ bool swift::diagnoseNonConcurrentTypesInReference(
   return false;
 }
 
+bool swift::diagnoseNonConcurrentTypesInFunctionType(
+    const AnyFunctionType *fnType, const DeclContext *dc, SourceLoc loc,
+    bool isClosure) {
+  ASTContext &ctx = dc->getASTContext();
+  // Bail out immediately if we aren't supposed to do this checking.
+  if (!dc->getASTContext().LangOpts.EnableExperimentalConcurrentValueChecking)
+    return false;
+
+  // Check parameter types.
+  for (const auto &param : fnType->getParams()) {
+    Type paramType = param.getParameterType();
+    if (!isConcurrentValueType(dc, paramType)) {
+      ctx.Diags.diagnose(
+          loc, diag::non_concurrent_function_type, isClosure, false, paramType);
+      return true;
+    }
+  }
+
+  // Check result type.
+  if (!isConcurrentValueType(dc, fnType->getResult())) {
+    ctx.Diags.diagnose(
+        loc, diag::non_concurrent_function_type, isClosure, true,
+        fnType->getResult());
+    return true;
+  }
+
+  return false;
+}
+
 namespace {
   /// Check whether a particular context may execute concurrently within
   /// another context.
@@ -1079,6 +1108,18 @@ namespace {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         closure->setActorIsolation(determineClosureIsolation(closure));
         contextStack.push_back(closure);
+
+        
+        // Concurrent closures must be composed of concurrent-safe parameter
+        // and result types.
+        if (isConcurrentClosure(closure)) {
+          if (auto fnType = closure->getType()->getAs<FunctionType>()) {
+            (void)diagnoseNonConcurrentTypesInFunctionType(
+                 fnType, getDeclContext(), closure->getLoc(),
+                 /*isClosure=*/true);
+          }
+        }
+
         return { true, expr };
       }
 
