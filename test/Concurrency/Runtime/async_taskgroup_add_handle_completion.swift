@@ -1,8 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
+// XFAIL: windows
+// XFAIL: linux
 
 import Dispatch
 import Darwin

@@ -2559,6 +2559,11 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   auto *resumeAddr = Builder.CreateStructGEP(task, 4);
   Builder.CreateStore(resumeFunction, Address(resumeAddr, ptrAlign));
   auto *contextAddr = Builder.CreateStructGEP(task, 5);
+  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeContext) {
+    auto authInfo = PointerAuthInfo::emit(suspendIGF, schema, contextAddr,
+                                          PointerAuthEntity());
+    context = emitPointerAuthSign(suspendIGF, context, authInfo);
+  }
   Builder.CreateStore(context, Address(contextAddr, ptrAlign));
   auto *suspendCall = Builder.CreateCall(
       IGM.getTaskSwitchFuncFn(),
