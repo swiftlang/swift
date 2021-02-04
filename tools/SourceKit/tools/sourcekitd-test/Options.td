@@ -130,6 +130,9 @@ def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-reques
 def time_request : Flag<["-"], "time-request">,
   HelpText<"Print the time taken to process the request">;
 
+def time_request_instr : Flag<["-"], "time-request-instr">,
+  HelpText<"If -time-request is specified, also print the number of instructions executed during the request. Note that this only gives meaningful results if using the in process sourcekitd since sourcekitd-test cannot measure the number of instructions exectuted by the XPC service.">;
+
 def repeat_request : Separate<["-"], "repeat-request">,
   HelpText<"Repeat the request n times">, MetaVarName<"<n>">;
 def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;

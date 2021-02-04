@@ -14,6 +14,7 @@
 
 #include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -400,15 +401,23 @@ namespace {
 class PrintingTimer {
   std::string desc;
   llvm::sys::TimePoint<> start;
+  uint64_t startInstr;
   llvm::raw_ostream &OS;
 public:
-  PrintingTimer(std::string desc, llvm::raw_ostream &OS = llvm::errs())
-      : desc(std::move(desc)), start(std::chrono::system_clock::now()), OS(OS) {
-  }
+  PrintingTimer(std::string desc, bool measureInstr = true,
+                llvm::raw_ostream &OS = llvm::errs())
+      : desc(std::move(desc)), start(std::chrono::system_clock::now()),
+        startInstr(measureInstr ? swift::getInstructionsExecuted() : 0),
+        OS(OS) {}
   ~PrintingTimer() {
-    std::chrono::duration<float, std::milli> delta(
-        std::chrono::system_clock::now() - start);
-    OS << desc << ": " << llvm::formatv("{0:ms+f3}", delta) << "\n";
+    auto nowTime = std::chrono::system_clock::now();
+    auto nowInstr = swift::getInstructionsExecuted();
+    std::chrono::duration<float, std::milli> deltaTime(nowTime - start);
+    OS << desc << ": " << llvm::formatv("{0:ms+f3}", deltaTime) << "\n";
+    auto deltaInstr = nowInstr - startInstr;
+    if (startInstr != 0) {
+      OS << desc << ": " << deltaInstr << " instr \n";
+    }
   }
 };
 }
@@ -420,7 +429,7 @@ static sourcekitd_response_t sendRequestSync(sourcekitd_object_t req,
     sourcekitd_request_description_dump(req);
   Optional<PrintingTimer> timer;
   if (opts.timeRequest)
-    timer.emplace("request time");
+    timer.emplace("request time", opts.timeRequestInstr);
   return sourcekitd_send_request_sync(req);
 }
 

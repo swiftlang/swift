@@ -112,6 +112,7 @@ struct TestOptions {
   bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool timeRequest = false;
+  bool timeRequestInstr = false;
   llvm::Optional<bool> OptimizeForIde;
   bool SuppressDefaultConfigRequest = false;
   llvm::Optional<unsigned> CompletionCheckDependencyInterval;
