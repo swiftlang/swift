@@ -27,7 +27,15 @@ bb0:
 //   Initialize the async  continuation context.
 // CHECK: [[context_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 0
 // CHECK: [[ctxt:%.*]] = load %swift.context*, %swift.context** [[ctxt_addr]]
-// CHECK: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
+
+// CHECK-arm64e: [[ctxt_addr_int:%[0-9]+]] = ptrtoint %swift.context** [[context_addr]] to i64
+// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[ctxt_addr_int]], i64 48546)
+// CHECK-arm64e: [[ctxt_int:%[0-9]+]]      = ptrtoint %swift.context* [[ctxt]] to i64
+// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[ctxt_int]], i32 2, i64 [[ptrauth_blend]])
+// CHECK-arm64e: [[signed_ctxt:%[0-9]+]]   = inttoptr i64 [[signed_int]] to %swift.context*
+// CHECK-arm64e: store %swift.context* [[signed_ctxt]], %swift.context** [[context_addr]]
+// CHECK-x86_64: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
+
 // CHECK: [[error_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 2
 // CHECK: store %swift.error* null, %swift.error** [[error_addr]]
 // CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 3

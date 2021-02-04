@@ -564,7 +564,13 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   // TODO: add lifetime with matching lifetime in await_async_continuation
   auto contResumeAddr =
       Builder.CreateStructGEP(continuationContext.getAddress(), 0);
-  Builder.CreateStore(getAsyncContext(),
+  llvm::Value *asyncContextValue = getAsyncContext();
+  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema, contResumeAddr,
+                                          PointerAuthEntity());
+    asyncContextValue = emitPointerAuthSign(*this, asyncContextValue, authInfo);
+  }
+  Builder.CreateStore(asyncContextValue,
                       Address(contResumeAddr, pointerAlignment));
   auto contErrResultAddr =
       Builder.CreateStructGEP(continuationContext.getAddress(), 2);
