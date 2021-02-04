@@ -1985,4 +1985,4 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
   }
 }
 
-extension Array: ConcurrentValue where Element: ConcurrentValue { }
+extension Array: ConcurrentValue, UnsafeConcurrentValue where Element: ConcurrentValue { }
