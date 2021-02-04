@@ -1042,8 +1042,6 @@ ERROR(expected_else_after_guard,PointsToFirstBadToken,
       "expected 'else' after 'guard' condition", ())
 ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
       "expected '{' after 'guard' else", ())
-ERROR(bound_var_guard_body,none,
-      "variable declared in 'guard' condition is not usable in its body", ())
 
 // While Statement
 ERROR(expected_condition_while,PointsToFirstBadToken,
