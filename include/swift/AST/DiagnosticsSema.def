@@ -4690,6 +4690,9 @@ ERROR(objc_invalid_on_static_subscript,none,
 ERROR(objc_invalid_with_generic_params,none,
       "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has generic parameters",
       (DescriptiveDeclKind, unsigned))
+ERROR(objc_invalid_with_generic_requirements,none,
+      "%0 cannot be %" OBJC_ATTR_SELECT "1 because it has a 'where' clause",
+      (DescriptiveDeclKind, unsigned))
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
