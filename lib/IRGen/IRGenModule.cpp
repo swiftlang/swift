@@ -1570,6 +1570,16 @@ bool IRGenModule::finalize() {
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
 
+  // Clean up DSOLocal & DLLImport attributes, they cannot be applied together.
+  // The imported declarations are marked as DSO local by default.
+  for (auto &GV : Module.globals())
+    if (GV.hasDLLImportStorageClass())
+      GV.setDSOLocal(false);
+
+  for (auto &F : Module.functions())
+    if (F.hasDLLImportStorageClass())
+      F.setDSOLocal(false);
+
   return true;
 }
 
