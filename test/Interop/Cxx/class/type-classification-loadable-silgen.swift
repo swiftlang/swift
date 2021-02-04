@@ -52,21 +52,6 @@ func pass(s: StructWithSubobjectDefaultedCopyConstructor) {
   // CHECK: bb0(%0 : $StructWithSubobjectDefaultedCopyConstructor):
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithPrivateDefaultedCopyConstructor)
-func pass(s: StructWithPrivateDefaultedCopyConstructor) {
-  // CHECK: bb0(%0 : $*StructWithPrivateDefaultedCopyConstructor):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithInheritedPrivateDefaultedCopyConstructor)
-func pass(s: StructWithInheritedPrivateDefaultedCopyConstructor) {
-  // CHECK: bb0(%0 : $*StructWithInheritedPrivateDefaultedCopyConstructor):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithSubobjectPrivateDefaultedCopyConstructor)
-func pass(s: StructWithSubobjectPrivateDefaultedCopyConstructor) {
-  // CHECK: bb0(%0 : $*StructWithSubobjectPrivateDefaultedCopyConstructor):
-}
-
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithMoveConstructor)
 func pass(s: StructWithMoveConstructor) {
   // CHECK: bb0(%0 : $*StructWithMoveConstructor):
@@ -149,12 +134,7 @@ func pass(s: StructTriviallyCopyableMovable) {
   // CHECK: bb0(%0 : $StructTriviallyCopyableMovable):
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructNonCopyableTriviallyMovable)
-func pass(s: StructNonCopyableTriviallyMovable) {
-  // CHECK: bb0(%0 : $*StructNonCopyableTriviallyMovable):
-}
-
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructNonCopyableNonMovable)
 func pass(s: StructNonCopyableNonMovable) {
-  // CHECK: bb0(%0 : $*StructNonCopyableNonMovable):
+  // CHECK: bb0(%0 : $StructNonCopyableNonMovable):
 }
