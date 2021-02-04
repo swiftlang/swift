@@ -281,12 +281,7 @@ int main(int argc_, const char **argv_) {
   SmallVector<const char *, 256> ExpandedArgs(&argv_[0], &argv_[argc_]);
   llvm::BumpPtrAllocator Allocator;
   llvm::StringSaver Saver(Allocator);
-  llvm::cl::ExpandResponseFiles(
-      Saver,
-      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()
-          ? llvm::cl::TokenizeWindowsCommandLine
-          : llvm::cl::TokenizeGNUCommandLine,
-      ExpandedArgs);
+  swift::driver::ExpandResponseFilesWithRetry(Saver, ExpandedArgs);
 
   // Initialize the stack trace using the parsed argument vector with expanded
   // response files.
