@@ -2207,13 +2207,28 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
                                                                    lazyLoader);
 }
 
-bool ASTContext::hasDelayedConformanceErrors() const {
-  for (const auto &entry : getImpl().DelayedConformanceDiags) {
-    auto &diagnostics = entry.getSecond();
-    if (std::any_of(diagnostics.begin(), diagnostics.end(),
-                    [](const ASTContext::DelayedConformanceDiag &diag) {
+bool ASTContext::hasDelayedConformanceErrors(
+                          NormalProtocolConformance const* conformance) const {
+
+  auto hasDelayedErrors = [](std::vector<DelayedConformanceDiag> const& diags) {
+    return std::any_of(diags.begin(), diags.end(),
+                    [](ASTContext::DelayedConformanceDiag const& diag) {
                       return diag.IsError;
-                    }))
+                    });
+  };
+
+  if (conformance) {
+    auto entry = getImpl().DelayedConformanceDiags.find(conformance);
+    if (entry != getImpl().DelayedConformanceDiags.end())
+      return hasDelayedErrors(entry->second);
+
+    return false; // unknown conformance, so no delayed delayed diags either.
+  }
+  
+  // check all conformances for any delayed errors
+  for (const auto &entry : getImpl().DelayedConformanceDiags) {
+    auto const& diagnostics = entry.getSecond();
+    if (hasDelayedErrors(diagnostics))
       return true;
   }
 
@@ -2247,9 +2262,9 @@ ASTContext::takeDelayedMissingWitnesses(
 }
 
 std::vector<ASTContext::DelayedConformanceDiag>
-ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance *conformance){
+ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance const* cnfrm){
   std::vector<ASTContext::DelayedConformanceDiag> result;
-  auto known = getImpl().DelayedConformanceDiags.find(conformance);
+  auto known = getImpl().DelayedConformanceDiags.find(cnfrm);
   if (known != getImpl().DelayedConformanceDiags.end()) {
     result = std::move(known->second);
     getImpl().DelayedConformanceDiags.erase(known);
