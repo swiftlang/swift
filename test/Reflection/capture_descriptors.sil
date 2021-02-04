@@ -46,7 +46,14 @@ bb0(%i : $Int, %p : $@thick P.Type):
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
-// CHECK-NEXT: (builtin Builtin.NativeObject)
+// CHECK-NEXT: (sil_box_with_layout
+// CHECK-NEXT:   (layout
+// CHECK-NEXT:     (var
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=0)))
+// CHECK-NEXT:   (generic_signature
+// CHECK-NEXT:     (substitution
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT:       (struct Swift.Int))))
 // CHECK-NEXT: (existential_metatype
 // CHECK-NEXT:   (protocol_composition
 // CHECK-NEXT:     (protocol capture_descriptors.P)))
@@ -82,7 +89,14 @@ bb0:
 
 // CHECK:      - Capture types:
 // CHECK-NEXT: (struct Swift.Int)
-// CHECK-NEXT: (builtin Builtin.NativeObject)
+// CHECK-NEXT: (sil_box_with_layout
+// CHECK-NEXT:   (layout
+// CHECK-NEXT:     (var
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=0)))
+// CHECK-NEXT:   (generic_signature
+// CHECK-NEXT:     (substitution
+// CHECK-NEXT:       (generic_type_parameter depth=0 index=0)
+// CHECK-NEXT:       (struct Swift.String))))
 // CHECK-NEXT:   - Metadata sources:
 
 

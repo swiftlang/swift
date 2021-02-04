@@ -287,6 +287,8 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Dem; }
 
+  BuiltType decodeMangledType(Node *node);
+  
   ///
   /// Factory methods for all TypeRef kinds
   ///
@@ -512,6 +514,34 @@ public:
 
   const SILBoxTypeRef *createSILBoxType(const TypeRef *base) {
     return SILBoxTypeRef::create(*this, base);
+  }
+
+  using BuiltSILBoxField = typename SILBoxTypeWithLayoutTypeRef::Field;
+  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
+  using BuiltRequirement = TypeRefRequirement;
+  using BuiltLayoutConstraint = TypeRefLayoutConstraint;
+  BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
+    // FIXME: Implement this.
+    return {};
+  }
+  BuiltLayoutConstraint
+  getLayoutConstraintWithSizeAlign(LayoutConstraintKind kind, unsigned size,
+                                   unsigned alignment) {
+    // FIXME: Implement this.
+    return {};
+  }
+
+  const SILBoxTypeWithLayoutTypeRef *createSILBoxTypeWithLayout(
+      const llvm::SmallVectorImpl<BuiltSILBoxField> &Fields,
+      const llvm::SmallVectorImpl<BuiltSubstitution> &Substitutions,
+      const llvm::SmallVectorImpl<BuiltRequirement> &Requirements) {
+    return SILBoxTypeWithLayoutTypeRef::create(*this, Fields, Substitutions,
+                                               Requirements);
+  }
+
+  bool isExistential(const TypeRef *) {
+    // FIXME: Implement this.
+    return true;
   }
 
   const TypeRef *createDynamicSelfType(const TypeRef *selfType) {

@@ -35,5 +35,6 @@ TYPEREF(OpaqueArchetype, TypeRef)
   TYPEREF(Name##Storage, TypeRef)
 #include "swift/AST/ReferenceStorage.def"
 TYPEREF(SILBox, TypeRef)
+TYPEREF(SILBoxTypeWithLayout, TypeRef)
 
 #undef TYPEREF
