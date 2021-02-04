@@ -3970,12 +3970,26 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
     };
   }
 
-  ASTContext &ctx = dc->getASTContext();
   const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener)
                         .resolveType(attr->getTypeRepr());
 
-  // We always require the type to resolve to a nominal type.
-  if (!type->getAnyNominal()) {
+  // We always require the type to resolve to a nominal type. If the type was
+  // not a nominal type, we should have already diagnosed an error via
+  // CustomAttrNominalRequest.
+  auto checkType = [](Type type) -> bool {
+    while (auto *genericDecl = type->getAnyGeneric()) {
+      if (isa<NominalTypeDecl>(genericDecl))
+        return true;
+
+      auto *aliasDecl = cast<TypeAliasDecl>(genericDecl);
+      type = aliasDecl->getUnderlyingType();
+    }
+
+    return false;
+  };
+
+  if (!checkType(type)) {
+    ASTContext &ctx = dc->getASTContext();
     assert(ctx.Diags.hadAnyError());
     return ErrorType::get(ctx);
   }
