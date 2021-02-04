@@ -36,8 +36,8 @@ sil @use_nontrivialstruct1 : $@convention(thin) (@guaranteed NonTrivialStruct) -
 sil @use_nontrivialstruct2 : $@convention(thin) (@owned NonTrivialStruct) -> ()
 
 // CHECK-LABEL: sil [ossa] @structliteral1 :
-// CHECK: struct $NonTrivialStruct 
-// CHECK-NOT: struct $NonTrivialStruct 
+// CHECK: struct $NonTrivialStruct
+// CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'structliteral1'
 sil [ossa] @structliteral1 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -51,8 +51,8 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @structliteral2 :
-// CHECK: struct $NonTrivialStruct 
-// CHECK-NOT: struct $NonTrivialStruct 
+// CHECK: struct $NonTrivialStruct
+// CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'structliteral2'
 sil [ossa] @structliteral2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
@@ -232,7 +232,7 @@ bb0(%0 : @owned $Klass):
 // CHECK-LABEL: } // end sil function 'test2cse2'
 sil [ossa] @test2cse2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  %copy0 = copy_value %0 : $Klass 
+  %copy0 = copy_value %0 : $Klass
   %1 = ref_to_raw_pointer %0 : $Klass to $Builtin.RawPointer
   %2 = ref_to_raw_pointer %copy0 : $Klass to $Builtin.RawPointer
   %4 = function_ref @helper : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> Builtin.Word
@@ -368,8 +368,8 @@ struct KlassPair {
 sil [ossa] @destructure_struct_test1 : $@convention(thin) (@owned KlassPair) -> () {
 bb0(%0 : @owned $KlassPair):
   %copy0 = copy_value %0: $KlassPair
-  (%1, %2) = destructure_struct %0 : $KlassPair 
-  (%3, %4) = destructure_struct %copy0 : $KlassPair 
+  (%1, %2) = destructure_struct %0 : $KlassPair
+  (%3, %4) = destructure_struct %copy0 : $KlassPair
   destroy_value %1 : $Klass
   destroy_value %2 : $Klass
   destroy_value %3 : $Klass
@@ -385,8 +385,8 @@ bb0(%0 : @owned $KlassPair):
 // CHECK-LABEL: } // end sil function 'destructure_struct_test2'
 sil [ossa] @destructure_struct_test2 : $@convention(thin) (@guaranteed KlassPair) -> () {
 bb0(%0 : @guaranteed $KlassPair):
-  (%1, %2) = destructure_struct %0 : $KlassPair 
-  (%3, %4) = destructure_struct %0 : $KlassPair 
+  (%1, %2) = destructure_struct %0 : $KlassPair
+  (%3, %4) = destructure_struct %0 : $KlassPair
   %func = function_ref @klass_user : $@convention(thin) (@guaranteed Klass) -> ()
   apply %func(%2) : $@convention(thin) (@guaranteed Klass) -> ()
   apply %func(%3) : $@convention(thin) (@guaranteed Klass) -> ()
@@ -402,8 +402,8 @@ bb0(%0 : @guaranteed $KlassPair):
 sil [ossa] @destructure_tuple_test1 : $@convention(thin) (@owned (Klass, Klass)) -> () {
 bb0(%0 : @owned $(Klass, Klass)):
   %copy0 = copy_value %0: $(Klass, Klass)
-  (%1, %2) = destructure_tuple %0 : $(Klass, Klass) 
-  (%3, %4) = destructure_tuple %copy0 : $(Klass, Klass) 
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  (%3, %4) = destructure_tuple %copy0 : $(Klass, Klass)
   destroy_value %1 : $Klass
   destroy_value %2 : $Klass
   destroy_value %3 : $Klass
@@ -419,8 +419,8 @@ bb0(%0 : @owned $(Klass, Klass)):
 // CHECK-LABEL: } // end sil function 'destructure_tuple_test2'
 sil [ossa] @destructure_tuple_test2 : $@convention(thin) (@guaranteed (Klass, Klass)) -> () {
 bb0(%0 : @guaranteed $(Klass, Klass)):
-  (%1, %2) = destructure_tuple %0 : $(Klass, Klass) 
-  (%3, %4) = destructure_tuple %0 : $(Klass, Klass) 
+  (%1, %2) = destructure_tuple %0 : $(Klass, Klass)
+  (%3, %4) = destructure_tuple %0 : $(Klass, Klass)
   %func = function_ref @klass_user : $@convention(thin) (@guaranteed Klass) -> ()
   apply %func(%2) : $@convention(thin) (@guaranteed Klass) -> ()
   apply %func(%3) : $@convention(thin) (@guaranteed Klass) -> ()
@@ -430,8 +430,8 @@ bb0(%0 : @guaranteed $(Klass, Klass)):
 
 
 // CHECK-LABEL: sil [ossa] @struct_test2 :
-// CHECK: struct $NonTrivialStruct 
-// CHECK-NOT: struct $NonTrivialStruct 
+// CHECK: struct $NonTrivialStruct
+// CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test2'
 sil [ossa] @struct_test2 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 bb0(%0 : @guaranteed $Klass):
@@ -445,8 +445,8 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @struct_test3 :
-// CHECK: struct $NonTrivialStruct 
-// CHECK-NOT: struct $NonTrivialStruct 
+// CHECK: struct $NonTrivialStruct
+// CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test3'
 sil [ossa] @struct_test3 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -462,8 +462,8 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @struct_test4 :
-// CHECK: struct $NonTrivialStruct 
-// CHECK-NOT: struct $NonTrivialStruct 
+// CHECK: struct $NonTrivialStruct
+// CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test4'
 sil [ossa] @struct_test4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -480,8 +480,8 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @struct_test5 :
-// CHECK: struct $NonTrivialStruct 
-// CHECK-NOT: struct $NonTrivialStruct 
+// CHECK: struct $NonTrivialStruct
+// CHECK-NOT: struct $NonTrivialStruct
 // CHECK-LABEL: } // end sil function 'struct_test5'
 sil [ossa] @struct_test5 : $@convention(thin) (@guaranteed Klass) -> @owned Klass {
 bb0(%0 : @guaranteed $Klass):
@@ -589,7 +589,7 @@ bb6(%arg5 : @guaranteed $Klass):
 bb7(%arg6 : $UInt):
   destroy_value %copy2 : $FakeOptional2
   br bb8
- 
+
 bb8:
   destroy_value %copy1 : $FakeOptional2
   %res = tuple ()
@@ -627,7 +627,7 @@ bb2:
 bb3(%borrow : @guaranteed $Klass):
   end_borrow %borrow : $Klass
   %copy = copy_value %1 : $NonTrivialStruct
-  return %copy : $NonTrivialStruct 
+  return %copy : $NonTrivialStruct
 }
 
 // Test to make sure we clear the context if we fail while checking if ownership rauw is possible
@@ -659,5 +659,111 @@ bb0(%0 : $UnsafeMutablePointer<Element>, %1 : @guaranteed $_ContiguousArrayBuffe
   %17 = struct $_SliceBuffer<Element> (%6 : $AnyObject, %0 : $UnsafeMutablePointer<Element>, %2 : $Int, %3 : $UInt)
   destroy_value %17 : $_SliceBuffer<Element>
   return %16 : $_SliceBuffer<Element>
+}
+
+sil [ossa] @use_word1 : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
+
+// TODO: Disable the TODO check when rauw address users correctly replaces all uses of the old ref_tail_addr with the new ref_tail_addr.
+// CHECK-LABEL: sil [ossa] @test_reftailaddr :
+// CHECK: bb0
+// CHECK: ref_tail_addr
+// TODO-CHECK-NOT: ref_tail_addr
+// CHECK-LABEL: } // end sil function 'test_reftailaddr'
+sil [ossa] @test_reftailaddr : $@convention(thin) (@owned __RawSetStorage) -> () {
+bb0(%0 : @owned $__RawSetStorage):
+  %func  = function_ref @use_word1 : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
+  %1 = copy_value %0 : $__RawSetStorage
+  %2 = begin_borrow %1 : $__RawSetStorage
+  %3 = ref_tail_addr %2 : $__RawSetStorage, $_UnsafeBitset.Word
+  apply %func(%3) : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
+  end_borrow %2 : $__RawSetStorage
+  %4 = copy_value %0 : $__RawSetStorage
+  %5 = begin_borrow %4 : $__RawSetStorage
+  %6 = ref_tail_addr %5 : $__RawSetStorage, $_UnsafeBitset.Word
+  apply %func(%6) : $@convention(thin) (@inout _UnsafeBitset.Word) -> ()
+  end_borrow %5 : $__RawSetStorage
+  destroy_value %1 : $__RawSetStorage
+  destroy_value %4 : $__RawSetStorage
+  destroy_value %0 : $__RawSetStorage
+  %res  = tuple ()
+  return %res : $()
+}
+
+class WrapperKlass {
+  var val:Builtin.NativeObject
+}
+
+sil [ossa] @use_object : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_refelementaddr :
+// CHECK: bb0
+// CHECK: ref_element_addr
+// CHECK-NOT: ref_element_addr
+// CHECK-LABEL: } // end sil function 'test_refelementaddr'
+sil [ossa] @test_refelementaddr : $@convention(thin) (@guaranteed WrapperKlass) -> () {
+bb0(%0 : @guaranteed $WrapperKlass):
+  %func  = function_ref @use_object : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  %ele1 = ref_element_addr %0 : $WrapperKlass, #WrapperKlass.val
+  apply %func(%ele1) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  %copy0 = copy_value %0 : $WrapperKlass
+  %borrow = begin_borrow %copy0 : $WrapperKlass
+  %ele2 = ref_element_addr %borrow : $WrapperKlass, #WrapperKlass.val
+  apply %func(%ele2) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  end_borrow %borrow : $WrapperKlass
+  destroy_value %copy0 : $WrapperKlass
+  %res  = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
+
+/*
+// TODO: Enable this test after the verifier correctly handles the case a ref_tail_addr's result is used in an unchecked_addr_cast
+// TODOCHECK-LABEL: sil [ossa] @test_uncheckedaddrcast :
+// TODOCHECK: bb0
+// TODOCHECK: unchecked_addr_cast
+// TODO-CHECK-NOT: unchecked_addr_cast
+// TODOCHECK-LABEL: } // end sil function 'test_uncheckedaddrcast'
+sil [ossa] @test_reftailaddr : $@convention(thin) (@owned __RawSetStorage) -> () {
+bb0(%0 : @owned $__RawSetStorage):
+  %func = function_ref @use_word2 : $@convention(thin) (@inout Builtin.Word) -> ()
+  %1 = copy_value %0 : $__RawSetStorage
+  %2 = begin_borrow %1 : $__RawSetStorage
+  %3 = ref_tail_addr %2 : $__RawSetStorage, $_UnsafeBitset.Word
+  %cast1 = unchecked_addr_cast %3 : $*_UnsafeBitset.Word to $*Builtin.Word
+  apply %func(%cast1) : $@convention(thin) (@inout Builtin.Word) -> ()
+  end_borrow %2 : $__RawSetStorage
+  %4 = copy_value %0 : $__RawSetStorage
+  %5 = begin_borrow %4 : $__RawSetStorage
+  %6 = ref_tail_addr %5 : $__RawSetStorage, $_UnsafeBitset.Word
+  %cast2 = unchecked_addr_cast %6 : $*_UnsafeBitset.Word to $*Builtin.Word
+  apply %func(%cast2) : $@convention(thin) (@inout Builtin.Word) -> ()
+  end_borrow %5 : $__RawSetStorage
+  destroy_value %1 : $__RawSetStorage
+  destroy_value %4 : $__RawSetStorage
+  destroy_value %0 : $__RawSetStorage
+  %res  = tuple ()
+  return %res : $()
+}
+*/
+
+sil [ossa] @use_bridgeobject : $@convention(thin) (Builtin.BridgeObject) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_valuetobridgeobject :
+// CHECK: bb0
+// CHECK: value_to_bridge_object
+// CHECK-NOT: value_to_bridge_object
+// CHECK-LABEL: } // end sil function 'test_valuetobridgeobject'
+sil [ossa] @test_valuetobridgeobject : $@convention(thin) (@guaranteed WrapperKlass) -> () {
+bb0(%0 : @guaranteed $WrapperKlass):
+  %func  = function_ref @use_bridgeobject : $@convention(thin) (Builtin.BridgeObject) -> ()
+  %1 = value_to_bridge_object %0 : $WrapperKlass
+  apply %func(%1) : $@convention(thin) (Builtin.BridgeObject) -> ()
+  %borrow = begin_borrow %0 : $WrapperKlass
+  %2 = value_to_bridge_object %borrow : $WrapperKlass
+  apply %func(%2) : $@convention(thin) (Builtin.BridgeObject) -> ()
+  end_borrow %borrow : $WrapperKlass
+  %res  = tuple ()
+  return %res : $()
 }
 
