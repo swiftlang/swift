@@ -672,7 +672,7 @@ extension _ArrayBuffer {
     }
   }
 }
-#endif
 
 extension _ArrayBuffer: ConcurrentValue, UnsafeConcurrentValue
   where Element: ConcurrentValue { }
+#endif
