@@ -349,7 +349,7 @@ internal func unimplemented_utf8_32bit(
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @frozen
-public struct String {
+public struct String: ConcurrentValue {
   public // @SPI(Foundation)
   var _guts: _StringGuts
 

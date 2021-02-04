@@ -230,3 +230,5 @@ extension _UIntBuffer: RangeReplaceableCollection {
       truncatingIfNeeded: Int(_bitCount) &+ growth &* w)
   }
 }
+
+extension _UIntBuffer: ConcurrentValue where Element: ConcurrentValue { }

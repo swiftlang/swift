@@ -826,3 +826,4 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 
 #endif // !_runtime(_ObjC)
 
+extension AutoreleasingUnsafeMutablePointer: ConcurrentValue { }

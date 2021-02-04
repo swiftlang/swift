@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 extension Unicode {
   @frozen
-  public enum UTF16 {
+  public enum UTF16: ConcurrentValue {
   case _swift3Buffer(Unicode.UTF16.ForwardParser)
   }
 }
@@ -370,7 +370,7 @@ extension Unicode.UTF16: Unicode.Encoding {
   }
   
   @frozen
-  public struct ForwardParser {
+  public struct ForwardParser: ConcurrentValue {
     public typealias _Buffer = _UIntBuffer<UInt16>
     @inlinable
     public init() { _buffer = _Buffer() }
@@ -378,7 +378,7 @@ extension Unicode.UTF16: Unicode.Encoding {
   }
   
   @frozen
-  public struct ReverseParser {
+  public struct ReverseParser: ConcurrentValue {
     public typealias _Buffer = _UIntBuffer<UInt16>
     @inlinable
     public init() { _buffer = _Buffer() }

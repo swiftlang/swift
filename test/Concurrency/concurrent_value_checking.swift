@@ -145,3 +145,74 @@ func concurrentClosures<T>(_: T) {
     x
   }
 }
+
+// ----------------------------------------------------------------------
+// ConcurrentValue checking
+// ----------------------------------------------------------------------
+struct S1: ConcurrentValue {
+  var nc: NotConcurrent // expected-error{{stored property 'nc' of 'ConcurrentValue'-conforming struct 'S1' has non-concurrent-value type 'NotConcurrent'}}
+}
+
+struct S2<T>: ConcurrentValue {
+  var nc: T // expected-error{{stored property 'nc' of 'ConcurrentValue'-conforming generic struct 'S2' has non-concurrent-value type 'T'}}
+}
+
+struct S3<T> {
+  var c: T
+  var array: [T]
+}
+
+extension S3: ConcurrentValue where T: ConcurrentValue { }
+
+enum E1: ConcurrentValue {
+  case payload(NotConcurrent) // expected-error{{associated value 'payload' of 'ConcurrentValue'-conforming enum 'E1' has non-concurrent-value type 'NotConcurrent'}}
+}
+
+enum E2<T> {
+  case payload(T)
+}
+
+extension E2: ConcurrentValue where T: ConcurrentValue { }
+
+class C1: ConcurrentValue {
+  let nc: NotConcurrent? = nil // expected-error{{stored property 'nc' of 'ConcurrentValue'-conforming class 'C1' has non-concurrent-value type 'NotConcurrent?'}}
+  var x: Int = 0 // expected-error{{stored property 'x' of 'ConcurrentValue'-conforming class 'C1' is mutable}}
+  let i: Int = 0
+}
+
+class C2: ConcurrentValue {
+  let x: Int = 0
+}
+
+class C3: C2 {
+  var y: Int = 0 // expected-error{{stored property 'y' of 'ConcurrentValue'-conforming class 'C3' is mutable}}
+}
+
+class C4: C2, UnsafeConcurrentValue {
+  var y: Int = 0 // okay
+}
+
+class C5: UnsafeConcurrentValue {
+  var x: Int = 0 // okay
+}
+
+class C6: C5 {
+  var y: Int = 0 // still okay
+}
+
+
+// ----------------------------------------------------------------------
+// UnsafeConcurrentValue disabling checking
+// ----------------------------------------------------------------------
+struct S11: UnsafeConcurrentValue {
+  var nc: NotConcurrent // okay
+}
+
+struct S12<T>: UnsafeConcurrentValue {
+  var nc: T // okay
+}
+
+enum E11<T>: UnsafeConcurrentValue {
+  case payload(NotConcurrent) // okay
+  case other(T) // okay
+}

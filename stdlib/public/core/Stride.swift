@@ -640,3 +640,12 @@ public func stride<T>(
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)
 }
+
+extension StrideToIterator: ConcurrentValue
+  where Element: ConcurrentValue, Element.Stride: ConcurrentValue { }
+extension StrideTo: ConcurrentValue
+  where Element: ConcurrentValue, Element.Stride: ConcurrentValue { }
+extension StrideThroughIterator: ConcurrentValue
+  where Element: ConcurrentValue, Element.Stride: ConcurrentValue { }
+extension StrideThrough: ConcurrentValue
+  where Element: ConcurrentValue, Element.Stride: ConcurrentValue { }

@@ -5139,6 +5139,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
   case KnownProtocolKind::ConcurrentValue:
+  case KnownProtocolKind::UnsafeConcurrentValue:
     return SpecialProtocol::None;
   }
 

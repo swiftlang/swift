@@ -5590,6 +5590,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto &Context = dc->getASTContext();
   MultiConformanceChecker groupChecker(Context);
 
+  ProtocolConformance *concurrentValueConformance = nullptr;
+  ProtocolConformance *unsafeConcurrentValueConformance = nullptr;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -5610,13 +5612,23 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     }
 
-    if (conformance->getProtocol()->
-          isSpecificProtocol(KnownProtocolKind::StringInterpolationProtocol)) {
+    auto proto = conformance->getProtocol();
+    if (proto->isSpecificProtocol(
+            KnownProtocolKind::StringInterpolationProtocol)) {
       if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
         diagnoseMissingAppendInterpolationMethod(typeDecl);
       }
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
+      concurrentValueConformance = conformance;
+    } else if (proto->isSpecificProtocol(
+                   KnownProtocolKind::UnsafeConcurrentValue)) {
+      unsafeConcurrentValueConformance = conformance;
     }
   }
+
+  // Check constraints of ConcurrentValue.
+  if (concurrentValueConformance && !unsafeConcurrentValueConformance)
+    checkConcurrentValueConformance(concurrentValueConformance);
 
   // Check all conformances.
   groupChecker.checkAllConformances();

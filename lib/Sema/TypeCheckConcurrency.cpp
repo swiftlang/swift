@@ -2429,3 +2429,68 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
 
   return false;
 }
+
+void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
+  auto conformanceDC = conformance->getDeclContext();
+  auto nominal = conformance->getType()->getAnyNominal();
+  if (!nominal)
+    return;
+
+  // Actors implicitly conform to ConcurrentValue and protect their state.
+  auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if (classDecl && classDecl->isActor())
+    return;
+
+  // ConcurrentValue can only be used in the same source file.
+  auto conformanceDecl = conformanceDC->getAsDecl();
+  if (!conformanceDC->getParentSourceFile() ||
+      conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
+    conformanceDecl->diagnose(
+        diag::concurrent_value_outside_source_file,
+        nominal->getDescriptiveKind(), nominal->getName());
+    return;
+  }
+
+  // Stored properties of structs and classes must have
+  // ConcurrentValue-conforming types.
+  if (isa<StructDecl>(nominal) || classDecl) {
+    for (auto property : nominal->getStoredProperties()) {
+      if (classDecl && property->supportsMutation()) {
+        property->diagnose(diag::concurrent_value_class_mutable_property, property->getName(), nominal->getDescriptiveKind(),
+            nominal->getName());
+        continue;
+      }
+
+      auto propertyType =
+          conformanceDC->mapTypeIntoContext(property->getInterfaceType());
+      if (!isConcurrentValueType(conformanceDC, propertyType)) {
+        property->diagnose(
+            diag::non_concurrent_type_member, false, property->getName(),
+            nominal->getDescriptiveKind(), nominal->getName(), propertyType);
+        continue;
+      }
+    }
+
+    return;
+  }
+
+  // Associated values of enum cases must have ConcurrentValue-conforming
+  // types.
+  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    for (auto caseDecl : enumDecl->getAllCases()) {
+      for (auto element : caseDecl->getElements()) {
+        if (!element->hasAssociatedValues())
+          continue;
+        
+        auto elementType = conformanceDC->mapTypeIntoContext(
+            element->getArgumentInterfaceType());
+        if (!isConcurrentValueType(conformanceDC, elementType)) {
+          element->diagnose(
+              diag::non_concurrent_type_member, true, element->getName(),
+              nominal->getDescriptiveKind(), nominal->getName(), elementType);
+          continue;
+        }
+      }
+    }
+  }
+}

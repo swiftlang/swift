@@ -36,6 +36,7 @@ class Expr;
 class FuncDecl;
 class Initializer;
 class PatternBindingDecl;
+class ProtocolConformance;
 class TopLevelCodeDecl;
 class TypeBase;
 class ValueDecl;
@@ -241,6 +242,9 @@ bool diagnoseNonConcurrentTypesInReference(
 bool diagnoseNonConcurrentTypesInFunctionType(
     const AnyFunctionType *fnType, const DeclContext *dc, SourceLoc loc,
     bool isClosure);
+
+/// Check the correctness of the given ConcurrentValue conformance.
+void checkConcurrentValueConformance(ProtocolConformance *conformance);
 
 } // end namespace swift
 

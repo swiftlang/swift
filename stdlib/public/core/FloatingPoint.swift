@@ -1229,7 +1229,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
 
 /// The sign of a floating-point value.
 @frozen
-public enum FloatingPointSign: Int {
+public enum FloatingPointSign: Int, ConcurrentValue {
   /// The sign for a positive value.
   case plus
 
@@ -1278,7 +1278,7 @@ public enum FloatingPointSign: Int {
 
 /// The IEEE 754 floating-point classes.
 @frozen
-public enum FloatingPointClassification {
+public enum FloatingPointClassification: ConcurrentValue {
   /// A signaling NaN ("not a number").
   ///
   /// A signaling NaN sets the floating-point exception status when used in
@@ -1316,7 +1316,7 @@ public enum FloatingPointClassification {
 }
 
 /// A rule for rounding a floating-point number.
-public enum FloatingPointRoundingRule {
+public enum FloatingPointRoundingRule: ConcurrentValue {
   /// Round to the closest allowed value; if two values are equally close, the
   /// one with greater magnitude is chosen.
   ///
