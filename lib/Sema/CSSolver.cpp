@@ -2135,7 +2135,9 @@ void ConstraintSystem::partitionGenericOperators(ArrayRef<Constraint *> constrai
   // overload choices first.
   for (auto arg : argFnType->getParams()) {
     auto argType = arg.getPlainType();
-    if (!argType || argType->hasTypeVariable())
+    argType = getFixedTypeRecursive(argType, /*wantRValue=*/true);
+
+    if (argType->isTypeVariableOrMember())
       continue;
 
     if (conformsToKnownProtocol(DC, argType, KnownProtocolKind::AdditiveArithmetic)) {
