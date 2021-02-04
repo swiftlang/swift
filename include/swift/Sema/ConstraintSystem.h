@@ -5539,6 +5539,11 @@ bool hasExplicitResult(ClosureExpr *closure);
 void performSyntacticDiagnosticsForTarget(
     const SolutionApplicationTarget &target, bool isExprStmt);
 
+/// Given a member of a protocol, check whether `Self` type of that
+/// protocol is contextually bound to some concrete type via same-type
+/// generic requirement and if so return that type or null type otherwise.
+Type getConcreteReplacementForProtocolSelfType(ValueDecl *member);
+
 } // end namespace constraints
 
 template<typename ...Args>

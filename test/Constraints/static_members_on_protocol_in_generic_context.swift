@@ -11,7 +11,7 @@ struct G<T> : P {
   var other: G<T> { fatalError() }
 }
 
-extension P {
+extension P where Self == S {
   static var property: S { S() }
 
   static var iuoProp: S! { S() }
@@ -25,15 +25,17 @@ extension P {
     return S()
   }
 
-  static func genericFn<T>(_: T) -> G<T> {
-    return G<T>()
-  }
-
   static subscript(_: Int) -> S {
     get { S() }
   }
+}
 
-  static subscript<T>(t t: T) -> G<T> {
+extension P {
+  static func genericFn<T>(_: T) -> G<T> where Self == G<T> {
+    return G<T>()
+  }
+
+  static subscript<T>(t t: T) -> G<T> where Self == G<T> {
     get { G<T>() }
   }
 }
@@ -107,7 +109,7 @@ protocol Q {}
 
 func test_combo<T: P & Q>(_: T) {} // expected-note 2 {{where 'T' = 'G<Int>'}}
 
-extension Q {
+extension Q where Self == S {
   static var otherProperty: S { S() }
 
   static func otherMethod() -> S {
@@ -136,14 +138,16 @@ test_combo(.genericFn(42)) // expected-error {{global function 'test_combo' requ
 /* Invalid result types */
 
 extension P {
+  static func generic<T>(_: T) -> T where Self == T { fatalError() } // expected-note 3 {{'generic' declared here}}
+  static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q, Self == Q { // expected-note {{in call to function 'genericWithReqs'}} expected-note 2 {{'genericWithReqs' declared here}} expected-note 3 {{required by static method 'genericWithReqs' where 'T' = '()'}}
+    fatalError()
+  }
+}
+
+extension P {
   static var invalidProp: Int { 42 } // expected-note 3 {{'invalidProp' declared here}}
   static var selfProp: Self { fatalError() }
   static func invalidMethod() -> Int { 42 } // expected-note 3 {{'invalidMethod()' declared here}}
-  static func generic<T>(_: T) -> T { fatalError() } // expected-note 3 {{'generic' declared here}}
-  static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q { // expected-note {{in call to function 'genericWithReqs'}} expected-note 2 {{'genericWithReqs' declared here}} expected-note 3 {{required by static method 'genericWithReqs' where 'T' = '()'}}
-    fatalError()
-  }
-
   static subscript(q q: String) -> Int { get { 42 } }
 }
 

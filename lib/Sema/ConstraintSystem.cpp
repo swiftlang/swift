@@ -1589,19 +1589,12 @@ ConstraintSystem::getTypeOfMemberReference(
     // reference e.g. it might be incorrect initializer call
     // or result type is invalid.
     if (!(shouldAttemptFixes() && hasFixFor(getConstraintLocator(locator)))) {
-      // Member type with Self applied.
-      auto refTy = openedType->castTo<FunctionType>()->getResult();
-      // If member is a function type, let's use its result type
-      // since it could be either a static method or a property
-      // which returns a function type.
-      if (auto *funcTy = refTy->getAs<FunctionType>())
-        baseOpenedTy = funcTy->getResult();
-      else
-        baseOpenedTy = refTy;
-
-      // It should be possible to form optional chains which start
-      // from a protocol metatype.
-      baseOpenedTy = baseOpenedTy->lookThroughAllOptionalTypes();
+      if (auto concreteSelf =
+              getConcreteReplacementForProtocolSelfType(value)) {
+        // Concrete type replacing `Self` could be generic, so we need
+        // to make sure that it's opened before use.
+        baseOpenedTy = openType(concreteSelf, replacements);
+      }
     }
   } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
@@ -4538,6 +4531,23 @@ bool constraints::hasExplicitResult(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
                            ClosureHasExplicitResultRequest{closure}, false);
+}
+
+Type constraints::getConcreteReplacementForProtocolSelfType(ValueDecl *member) {
+  auto *DC = member->getDeclContext();
+
+  if (!DC->getSelfProtocolDecl())
+    return Type();
+
+  GenericSignature signature;
+  if (auto *genericContext = member->getAsGenericContext()) {
+    signature = genericContext->getGenericSignature();
+  } else {
+    signature = DC->getGenericSignatureOfContext();
+  }
+
+  auto selfTy = DC->getProtocolSelfType();
+  return signature->getConcreteType(selfTy);
 }
 
 static bool isOperator(Expr *expr, StringRef expectedName) {

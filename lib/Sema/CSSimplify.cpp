@@ -6852,9 +6852,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       /* We're OK */
     } else if (hasStaticMembers && baseObjTy->is<MetatypeType>() &&
                instanceTy->isExistentialType()) {
-      // Static member lookup on protocol metatype requires that result type
-      // of a selected member to conform to protocol this method is being
-      // referred from.
+      // Static member lookup on protocol metatype in generic context
+      // requires `Self` of the protocol to be bound to some concrete
+      // type via same-type requirement, otherwise it would be
+      // impossible to find a witness for this member.
 
       // Cannot instantiate a protocol or reference a member on
       // protocol composition type.
@@ -6865,40 +6866,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         return;
       }
 
-      Type resultTy;
-
-      if (isa<AbstractFunctionDecl>(decl)) {
-        auto refTy =
-            decl->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
-        resultTy = refTy->castTo<FunctionType>()->getResult();
-      } else if (isa<SubscriptDecl>(decl)) {
-        resultTy =
-            decl->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+      if (getConcreteReplacementForProtocolSelfType(decl)) {
+        result.addViable(candidate);
       } else {
-        resultTy = decl->getInterfaceType();
-      }
-
-      if (auto *fnType = resultTy->getAs<FunctionType>())
-        resultTy = fnType->getResult();
-
-      // No reason to suggest that `Void` doesn't conform to some protocol.
-      if (resultTy->isVoid()) {
         result.addUnviable(candidate,
                            MemberLookupResult::UR_TypeMemberOnInstance);
-        return;
       }
 
-      // If result is not a concrete type which could conform to the
-      // expected protocol, this method is only viable for diagnostics.
-      if (resultTy->isExistentialType() || resultTy->is<AnyFunctionType>() ||
-          resultTy->is<TupleType>() || resultTy->is<AnyMetatypeType>()) {
-        result.addUnviable(
-            candidate,
-            MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype);
-        return;
-      }
-
-      result.addViable(candidate);
       return;
     } else {
       if (!hasStaticMembers) {
