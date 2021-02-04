@@ -574,6 +574,11 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     return Rec(ResponseBuilder().createResponse());
   }
 
+  if (ReqUID == RequestDependencyUpdated) {
+    getGlobalContext().getSwiftLangSupport().dependencyUpdated();
+    return Rec(ResponseBuilder().createResponse());
+  }
+
   Optional<StringRef> SourceFile = Req.getString(KeySourceFile);
   Optional<StringRef> SourceText = Req.getString(KeySourceText);
 
