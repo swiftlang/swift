@@ -137,7 +137,8 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
                              llvm::ArrayRef<DiagnosticConsumer*> DiagConsumers);
 
 ArrayRef<RefactoringKind>
-collectAvailableRefactorings(SourceFile *SF, ResolvedCursorInfo CursorInfo,
+collectAvailableRefactorings(SourceFile *SF,
+                             const ResolvedCursorInfo &CursorInfo,
                              std::vector<RefactoringKind> &Scratch,
                              bool ExcludeRename);
 

@@ -51,11 +51,11 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::ConvertStringsConcatenationToInterpolation,
                       "strings-concatenation-to-interpolation", "Perform strings concatenation to interpolation refactoring"),
            clEnumValN(RefactoringKind::ExpandTernaryExpr,
-                     "expand-ternary-expr", "Perform expand ternary expression"),
+                      "expand-ternary-expr", "Perform expand ternary expression"),
            clEnumValN(RefactoringKind::ConvertToTernaryExpr,
                       "convert-to-ternary-expr", "Perform convert to ternary expression"),
-		   clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
-					   "convert-to-guard", "Perform convert to guard expression"),
+		       clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
+                      "convert-to-guard", "Perform convert to guard expression"),
            clEnumValN(RefactoringKind::ConvertGuardExprToIfLetExpr,
                       "convert-to-iflet", "Perform convert to iflet expression"),
            clEnumValN(RefactoringKind::ExtractFunction,
@@ -75,8 +75,14 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
            clEnumValN(RefactoringKind::AddEquatableConformance, "add-equatable-conformance", "Add Equatable conformance"),
            clEnumValN(RefactoringKind::ConvertToComputedProperty,
-                   "convert-to-computed-property", "Convert from field initialization to computed property"),
-           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement")));
+                      "convert-to-computed-property", "Convert from field initialization to computed property"),
+           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement"),
+           clEnumValN(RefactoringKind::ConvertCallToAsyncAlternative,
+                      "convert-call-to-async-alternative", "Convert call to use its async alternative (if any)"),
+           clEnumValN(RefactoringKind::ConvertToAsync,
+                      "convert-to-async", "Convert the entire function to async"),
+           clEnumValN(RefactoringKind::AddAsyncAlternative,
+                      "add-async-alternative", "Add an async alternative of a function taking a callback")));
 
 
 static llvm::cl::opt<std::string>
@@ -112,10 +118,21 @@ static llvm::cl::opt<bool>
 IsNonProtocolType("is-non-protocol-type",
                   llvm::cl::desc("The symbol being renamed is a type and not a protocol"));
 
-static llvm::cl::opt<bool>
-DumpInJason("dump-json",
-            llvm::cl::desc("Whether to dump refactoring edits in Json"),
-            llvm::cl::init(false));
+enum class DumpType {
+  REWRITTEN,
+  JSON,
+  TEXT
+};
+static llvm::cl::opt<DumpType> DumpIn(
+    llvm::cl::desc("Dump edits to stdout as:"),
+    llvm::cl::init(DumpType::REWRITTEN),
+    llvm::cl::values(
+        clEnumValN(DumpType::REWRITTEN, "dump-rewritten",
+                   "rewritten file"),
+        clEnumValN(DumpType::JSON, "dump-json",
+                   "JSON"),
+        clEnumValN(DumpType::TEXT, "dump-text",
+                   "text")));
 
 static llvm::cl::opt<bool>
 AvailableActions("actions",
@@ -255,6 +272,7 @@ int main(int argc, char *argv[]) {
   Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().EnableExperimentalConcurrency = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
@@ -373,12 +391,19 @@ int main(int argc, char *argv[]) {
   RefactoringConfig.PreferredName = options::NewName;
   std::string Error;
   std::unique_ptr<SourceEditConsumer> pConsumer;
-  if (options::DumpInJason)
-    pConsumer.reset(new SourceEditJsonConsumer(llvm::outs()));
-  else
+  switch (options::DumpIn) {
+  case options::DumpType::REWRITTEN:
     pConsumer.reset(new SourceEditOutputConsumer(SF->getASTContext().SourceMgr,
-                                                      BufferID,
-                                                      llvm::outs()));
+                                                 BufferID,
+                                                 llvm::outs()));
+    break;
+  case options::DumpType::JSON:
+    pConsumer.reset(new SourceEditJsonConsumer(llvm::outs()));
+    break;
+  case options::DumpType::TEXT:
+    pConsumer.reset(new SourceEditTextConsumer(llvm::outs()));
+    break;
+  }
 
   return refactorSwiftModule(CI.getMainModule(), RefactoringConfig, *pConsumer,
                              PrintDiags);
