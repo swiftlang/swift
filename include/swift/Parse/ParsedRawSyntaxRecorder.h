@@ -37,7 +37,7 @@ namespace syntax {
   enum class SyntaxKind;
 }
 
-class ParsedRawSyntaxRecorder {
+class ParsedRawSyntaxRecorder final {
   std::shared_ptr<SyntaxParseActions> SPActions;
 
 public:
