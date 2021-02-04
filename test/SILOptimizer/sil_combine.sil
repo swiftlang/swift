@@ -3825,6 +3825,36 @@ bb0(%0 : $Builtin.Int64):
   return %2 : $Builtin.BridgeObject
 }
 
+struct MyStringObj {
+  @_hasStorage var a: UInt64
+  @_hasStorage var b: Builtin.BridgeObject
+}
+
+struct MyStringGuts {
+  @_hasStorage var o: MyStringObj
+}
+
+struct MyString {
+  @_hasStorage var g: MyStringGuts
+}
+
+// CHECK-LABEL: sil @optimize_arc_with_value_to_bridge_object2
+// CHECK:      bb0(%0 : $UInt64):
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK:      } // end sil function 'optimize_arc_with_value_to_bridge_object2'
+sil @optimize_arc_with_value_to_bridge_object2 : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = integer_literal $Builtin.Int64, -1945555039024054272
+  %2 = value_to_bridge_object %1 : $Builtin.Int64
+  %3 = struct $MyStringObj (%0 : $UInt64, %2 : $Builtin.BridgeObject)
+  %4 = struct $MyStringGuts (%3 : $MyStringObj)
+  %5 = struct $MyString (%4 : $MyStringGuts)
+  release_value %5 : $MyString
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // CHECK-LABEL: sil @optimize_stringObject_bit_operations
 // CHECK:      bb0:
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 4611686018427387904
