@@ -491,8 +491,8 @@ public:
 
   void enumerateExternalUses(UseEnumerator enumerator) {
     for (const auto &id : depTracker.getIncrementalDependencies()) {
-      enumerateUse<NodeKind::incrementalExternalDepend>(enumerator, id.path,
-                                                        id.fingerprint);
+      enumerateUse<NodeKind::externalDepend>(enumerator, id.path,
+                                             id.fingerprint);
     }
     for (StringRef s : depTracker.getDependencies()) {
       enumerateUse<NodeKind::externalDepend>(enumerator, s, None);
@@ -503,8 +503,7 @@ private:
   template <NodeKind kind>
   void enumerateUse(UseEnumerator createDefUse, StringRef name,
                     Optional<Fingerprint> maybeFP) {
-    static_assert(kind == NodeKind::incrementalExternalDepend ||
-                      kind == NodeKind::externalDepend,
+    static_assert(kind == NodeKind::externalDepend,
                   "Not a kind of external dependency!");
     createDefUse(DependencyKey(kind, DeclAspect::interface, "", name.str()),
                  sourceFileImplementation, maybeFP);

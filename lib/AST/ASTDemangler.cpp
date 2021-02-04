@@ -27,6 +27,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SILLayout.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -44,7 +45,7 @@ Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
     return Type();
 
   ASTBuilder builder(ctx);
-  return swift::Demangle::decodeMangledType(builder, node).getType();
+  return builder.decodeMangledType(node);
 }
 
 TypeDecl *swift::Demangle::getTypeDeclForMangling(ASTContext &ctx,
@@ -67,6 +68,10 @@ TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
   mangling.replace(0, 2, MANGLING_PREFIX_STR);
 
   return getTypeDeclForMangling(ctx, mangling);
+}
+
+Type ASTBuilder::decodeMangledType(NodePointer node) {
+  return swift::Demangle::decodeMangledType(*this, node).getType();
 }
 
 TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
@@ -196,7 +201,7 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
 static SubstitutionMap
 createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
                                      ArrayRef<Type> args,
-                                     ModuleDecl *moduleDecl) {
+                                     LookupConformanceFn lookupConformance) {
   if (!genericSig)
     return SubstitutionMap();
   
@@ -212,7 +217,7 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
           return args[ordinal];
         return Type();
       },
-      LookUpConformanceInModule(moduleDecl));
+      lookupConformance);
 }
 
 Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
@@ -228,7 +233,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   // Build a SubstitutionMap.
   auto genericSig = nominalDecl->getGenericSignature();
   auto subs = createSubstitutionMapFromGenericArgs(
-      genericSig, args, decl->getParentModule());
+      genericSig, args, LookUpConformanceInModule(decl->getParentModule()));
   if (!subs)
     return Type();
   auto origType = nominalDecl->getDeclaredInterfaceType();
@@ -268,7 +273,8 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     }
 
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
-                      opaqueDecl->getGenericSignature(), allArgs, parentModule);
+        opaqueDecl->getGenericSignature(), allArgs,
+        LookUpConformanceInModule(parentModule));
     return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
   }
   
@@ -662,6 +668,36 @@ Type ASTBuilder::createSILBoxType(Type base) {
   return SILBoxType::get(base->getCanonicalType());
 }
 
+Type ASTBuilder::createSILBoxTypeWithLayout(
+    ArrayRef<BuiltSILBoxField> fields,
+    ArrayRef<BuiltSubstitution> Substitutions,
+    ArrayRef<BuiltRequirement> Requirements) {
+  SmallVector<Type, 4> replacements;
+  SmallVector<GenericTypeParamType *, 4> genericTypeParams;
+  for (const auto &s : Substitutions) {
+    if (auto *t = dyn_cast_or_null<GenericTypeParamType>(s.first.getPointer()))
+      genericTypeParams.push_back(t);
+    replacements.push_back(s.second);
+  }
+
+  GenericSignature signature;
+  if (!genericTypeParams.empty())
+    signature = GenericSignature::get(genericTypeParams, Requirements);
+  SmallVector<SILField, 4> silFields;
+  for (auto field: fields)
+    silFields.emplace_back(field.getPointer()->getCanonicalType(),
+                           field.getInt());
+  SILLayout *layout =
+      SILLayout::get(Ctx, signature.getCanonicalSignature(), silFields);
+
+  SubstitutionMap substs;
+  if (signature)
+    substs = createSubstitutionMapFromGenericArgs(
+        signature, replacements,
+        LookUpConformanceInSignature(signature.getPointer()));
+  return SILBoxType::get(Ctx, layout, substs);
+}
+
 Type ASTBuilder::createObjCClassType(StringRef name) {
   auto typeDecl =
       findForeignTypeDecl(name, /*relatedEntityKind*/{},
@@ -838,95 +874,23 @@ ASTBuilder::getForeignModuleKind(NodePointer node) {
       .Default(None);
 }
 
+LayoutConstraint ASTBuilder::getLayoutConstraint(LayoutConstraintKind kind) {
+  return LayoutConstraint::getLayoutConstraint(kind, getASTContext());
+}
+
+LayoutConstraint ASTBuilder::getLayoutConstraintWithSizeAlign(
+    LayoutConstraintKind kind, unsigned size, unsigned alignment) {
+  return LayoutConstraint::getLayoutConstraint(kind, size, alignment,
+                                               getASTContext());
+}
+
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
     NodePointer node) {
   SmallVector<Requirement, 2> requirements;
 
-  for (auto &child : *node) {
-    if (child->getKind() ==
-          Demangle::Node::Kind::DependentGenericParamCount)
-      continue;
-
-    if (child->getNumChildren() != 2)
-      return CanGenericSignature();
-    auto subjectType =
-        swift::Demangle::decodeMangledType(*this, child->getChild(0)).getType();
-    if (!subjectType)
-      return CanGenericSignature();
-
-    Type constraintType;
-    if (child->getKind() ==
-          Demangle::Node::Kind::DependentGenericConformanceRequirement ||
-        child->getKind() ==
-          Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
-      constraintType =
-          swift::Demangle::decodeMangledType(*this, child->getChild(1))
-              .getType();
-      if (!constraintType)
-        return CanGenericSignature();
-    }
-
-    switch (child->getKind()) {
-    case Demangle::Node::Kind::DependentGenericConformanceRequirement: {
-      requirements.push_back(
-          Requirement(constraintType->isExistentialType()
-                        ? RequirementKind::Conformance
-                        : RequirementKind::Superclass,
-                      subjectType, constraintType));
-      break;
-    }
-    case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
-      requirements.push_back(
-          Requirement(RequirementKind::SameType,
-                      subjectType, constraintType));
-      break;
-    }
-    case Demangle::Node::Kind::DependentGenericLayoutRequirement: {
-      auto kindChild = child->getChild(1);
-      if (kindChild->getKind() != Demangle::Node::Kind::Identifier)
-        return CanGenericSignature();
-
-      auto kind = llvm::StringSwitch<Optional<
-          LayoutConstraintKind>>(kindChild->getText())
-        .Case("U", LayoutConstraintKind::UnknownLayout)
-        .Case("R", LayoutConstraintKind::RefCountedObject)
-        .Case("N", LayoutConstraintKind::NativeRefCountedObject)
-        .Case("C", LayoutConstraintKind::Class)
-        .Case("D", LayoutConstraintKind::NativeClass)
-        .Case("T", LayoutConstraintKind::Trivial)
-        .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
-        .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
-        .Default(None);
-
-      if (!kind)
-        return CanGenericSignature();
-
-      LayoutConstraint layout;
-
-      if (kind != LayoutConstraintKind::TrivialOfExactSize &&
-          kind != LayoutConstraintKind::TrivialOfAtMostSize) {
-        layout = LayoutConstraint::getLayoutConstraint(*kind, Ctx);
-      } else {
-        auto size = child->getChild(2)->getIndex();
-        auto alignment = 0;
-
-        if (child->getNumChildren() == 4)
-          alignment = child->getChild(3)->getIndex();
-
-        layout = LayoutConstraint::getLayoutConstraint(*kind, size, alignment,
-                                                       Ctx);
-      }
-
-      requirements.push_back(
-          Requirement(RequirementKind::Layout, subjectType, layout));
-      break;
-    }
-    default:
-      return CanGenericSignature();
-    }
-  }
-
+  decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
+                    ASTBuilder>(node, requirements, *this);
   return evaluateOrDefault(Ctx.evaluator,
                            AbstractGenericSignatureRequest{
                                nominalDecl->getGenericSignature().getPointer(),
