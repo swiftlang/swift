@@ -1,6 +1,5 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
-// REQUIRES: rdar73834542
 //
 // RUN: %target-swift-frontend -typecheck -I %S/Inputs/NamedLazyMembers %s -verify
 
