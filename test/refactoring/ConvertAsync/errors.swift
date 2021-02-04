@@ -1,5 +1,3 @@
-// rdar://problem/73984220
-// XFAIL: asan
 func simple(completion: (String?, Error?) -> Void) { }
 
 func mismatches() {

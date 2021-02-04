@@ -1,5 +1,3 @@
-// rdar://problem/73984220
-// XFAIL: asan
 func manyWithError(_ completion: (String?, Int?, Error?) -> Void) { }
 
 // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=MANYBOUND %s

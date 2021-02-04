@@ -5249,7 +5249,8 @@ bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
   assert(CE &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncConversionStringBuilder Builder(SM, DiagEngine, AsyncHandlerDesc());
+  AsyncHandlerDesc TempDesc;
+  AsyncConversionStringBuilder Builder(SM, DiagEngine, TempDesc);
   Builder.convertNode(CE);
 
   if (DiagEngine.hadAnyError())
@@ -5281,7 +5282,8 @@ bool RefactoringActionConvertToAsync::performChange() {
   assert(FD &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncConversionStringBuilder Builder(SM, DiagEngine, AsyncHandlerDesc());
+  AsyncHandlerDesc TempDesc;
+  AsyncConversionStringBuilder Builder(SM, DiagEngine, TempDesc);
   Builder.convertFunction(FD);
 
   if (DiagEngine.hadAnyError())
