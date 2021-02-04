@@ -13,6 +13,11 @@ struct NonTrivialStruct {
   var val:Klass
 }
 
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
 sil [ossa] @$testtryapplyklassgen : $@convention(thin) () -> (@owned Klass, @error Error)
 sil [ossa] @$use_klass1 : $@convention(thin) (@owned Klass) -> ()
 sil [ossa] @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
@@ -218,6 +223,21 @@ bb3(%2 : @owned $Klass):
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dce_deadcopy7 :
+// CHECK-NOT: load [copy]
+// CHECK-LABEL: } // end sil function 'dce_deadcopy7'
+sil [ossa] @dce_deadcopy7 : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = load [copy] %0 : $*Klass
+  br bb1(%1 : $Klass)
+
+bb1(%2 : @owned $Klass):
+  destroy_value %2 : $Klass
+  destroy_addr %0 : $*Klass
+  %res = tuple ()
+  return %res : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dce_destructure1 :
 // CHECK: bb0(%0 : {{.*}})
 // CHECK-NEXT: destroy_value %0
@@ -322,5 +342,272 @@ bb3:
 bb4:
   %res = tuple()
   return %res : $()
+}
+
+struct TestStruct {
+  var val:Klass
+  var index:Int
+}
+
+// CHECK-LABEL: sil [ossa] @dce_destructurenotfullydead :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'dce_destructurenotfullydead'
+sil [ossa] @dce_destructurenotfullydead : $@convention(thin) (@owned TestStruct) -> Int {
+bb0(%0 : @owned $TestStruct):
+  %stk = alloc_stack $TestStruct
+  store %0 to [init] %stk : $*TestStruct
+  %copy = load [take] %stk : $*TestStruct
+  (%2, %3) = destructure_struct %copy : $TestStruct
+  %4 = struct $TestStruct (%2 : $Klass, %3 : $Int)
+  destroy_value %4 : $TestStruct
+  dealloc_stack %stk : $*TestStruct
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime1 :
+// CHECK: bb1([[ARG1:%.*]] : @owned $NonTrivialStruct, [[ARG2:%.*]] : @guaranteed $NonTrivialStruct):
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime1'
+sil [ossa] @dce_borrowlifetime1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  %copy = copy_value %0 : $NonTrivialStruct
+  %borrow = begin_borrow %copy : $NonTrivialStruct
+  br bb1(%copy : $NonTrivialStruct, %borrow : $NonTrivialStruct)
+
+bb1(%copy2 : @owned $NonTrivialStruct, %borrow2 : @guaranteed $NonTrivialStruct):
+  %newcopy = copy_value %borrow2 : $NonTrivialStruct
+  end_borrow %borrow2 : $NonTrivialStruct
+  destroy_value %copy2 : $NonTrivialStruct
+  return %newcopy : $NonTrivialStruct
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime2 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime2'
+sil [ossa] @dce_borrowlifetime2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%copy : $Klass, %borrow : $Klass)
+
+bb1(%copy2 : @owned $Klass, %borrow2 : @guaranteed $Klass):
+  end_borrow %borrow2 : $Klass
+  destroy_value %copy2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime3 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime3'
+sil [ossa] @dce_borrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrow : $Klass, %copy : $Klass)
+
+bb1(%borrow2 : @guaranteed $Klass, %copy2 : @owned $Klass):
+  end_borrow %borrow2 : $Klass
+  destroy_value %copy2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime4 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime4'
+sil [ossa] @dce_borrowlifetime4 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrow : $Klass)
+
+bb1(%borrow2 : @guaranteed $Klass):
+  end_borrow %borrow2 : $Klass
+  br bb2(%copy : $Klass)
+
+bb2(%copy2 : @owned $Klass):
+  destroy_value %copy2 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_borrowlifetime5 :
+// CHECK: bb1:
+// CHECK-LABEL: } // end sil function 'dce_borrowlifetime5'
+sil [ossa] @dce_borrowlifetime5 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy1 = copy_value %0 : $Klass
+  %copy2 = copy_value %0 : $Klass
+  %borrow1 = begin_borrow %copy1 : $Klass
+  %borrow2 = begin_borrow %copy2 : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %2(%borrow2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%copy1) : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %2(%copy2) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%copy1 : $Klass, %borrow1 : $Klass, %borrow2 : $Klass)
+
+bb1(%newcopy : @owned $Klass, %newborrow1 : @guaranteed $Klass, %newborrow2 : @guaranteed $Klass):
+  end_borrow %newborrow1 : $Klass
+  end_borrow %newborrow2 : $Klass
+  destroy_value %newcopy : $Klass
+  destroy_value %copy2 : $Klass
+   %res = tuple ()
+  return %res : $()
+}
+
+// Nested borrows are currently not optimized in DCE
+sil [ossa] @dce_nestedborrowlifetime1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $NonTrivialStruct):
+  %borrowo = begin_borrow %0 : $NonTrivialStruct
+  %borrow = begin_borrow %borrowo : $NonTrivialStruct
+  br bb1(%borrowo : $NonTrivialStruct, %borrow : $NonTrivialStruct)
+
+bb1(%newborrowo : @guaranteed $NonTrivialStruct, %borrow2 : @guaranteed $NonTrivialStruct):
+  %newcopy = copy_value %borrow2 : $NonTrivialStruct
+  end_borrow %borrow2 : $NonTrivialStruct
+  end_borrow %newborrowo : $NonTrivialStruct
+  return %newcopy : $NonTrivialStruct
+}
+
+sil [ossa] @dce_nestedborrowlifetime2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %borrowo = begin_borrow %0 : $Klass
+  %borrow = begin_borrow %borrowo : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%borrowo) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrowo : $Klass, %borrow : $Klass)
+
+bb1(%newborrow : @guaranteed $Klass, %borrow2 : @guaranteed $Klass):
+  end_borrow %borrow2 : $Klass
+  end_borrow %newborrow : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// This test shows it is non trivial to find the insert point of an outer reborrow.
+// Here %newborrowo and %newborrowi are both dead phis.
+// First end_borrow for the incoming value of %newborrowi is added
+// It is non straight forward to find the insert pt for the end_borrow of the incoming value of %newborrowo
+// This may not be important once CanonicalizeOSSALifetime supports rewrite of multi-block borrows. 
+sil [ossa] @dce_nestedborrowlifetime3 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %borrowo = begin_borrow %0 : $Klass
+  %borrow = begin_borrow %borrowo : $Klass
+  %2 = function_ref @$use_klass2 : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%borrow) : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %2(%borrowo) : $@convention(thin) (@guaranteed Klass) -> ()
+  br bb1(%borrow : $Klass, %borrowo : $Klass)
+
+bb1(%newborrowi : @guaranteed $Klass, %newborrowo : @guaranteed $Klass):
+  end_borrow %newborrowi : $Klass
+  end_borrow %newborrowo : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @infinite_loop :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'infinite_loop'
+sil [ossa] @infinite_loop : $@convention(thin) (@guaranteed NonTrivialStruct, @guaranteed NonTrivialStruct) -> () {
+bb0(%0 : @guaranteed $NonTrivialStruct, %1 : @guaranteed $NonTrivialStruct):
+  cond_br undef, bb1, bb4
+
+bb1:
+  %copy0 = copy_value %0 : $NonTrivialStruct
+  %borrow0 = begin_borrow %copy0 : $NonTrivialStruct
+  br bb3(%borrow0 : $NonTrivialStruct, %copy0 : $NonTrivialStruct)
+
+bb3(%newborrow : @guaranteed $NonTrivialStruct, %newowned : @owned $NonTrivialStruct):
+  br bb3(%newborrow : $NonTrivialStruct, %newowned : $NonTrivialStruct)
+
+bb4:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_reborrow_with_different_basevalues :
+// CHECK: bb3([[ARG1:%.*]] : @guaranteed $NonTrivialStruct, [[ARG2:%.*]] : @owned $NonTrivialStruct, [[ARG3:%.*]] : @owned $NonTrivialStruct):
+// CHECK-LABEL: } // end sil function 'dce_reborrow_with_different_basevalues'
+sil [ossa] @dce_reborrow_with_different_basevalues : $@convention(thin) (@guaranteed NonTrivialStruct, @guaranteed NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @guaranteed $NonTrivialStruct, %1 : @guaranteed $NonTrivialStruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy0a = copy_value %0 : $NonTrivialStruct
+  %borrow0a = begin_borrow %copy0a : $NonTrivialStruct
+  %copy1a = copy_value %1 : $NonTrivialStruct
+  br bb3(%borrow0a : $NonTrivialStruct, %copy0a : $NonTrivialStruct, %copy1a : $NonTrivialStruct)
+
+bb2:
+  %copy1b = copy_value %1 : $NonTrivialStruct
+  %borrow0b = begin_borrow %copy1b : $NonTrivialStruct
+  %copy0b = copy_value %0 : $NonTrivialStruct
+  br bb3(%borrow0b : $NonTrivialStruct, %copy0b : $NonTrivialStruct, %copy1b : $NonTrivialStruct)
+
+bb3(%newborrow : @guaranteed $NonTrivialStruct, %newowned1 : @owned $NonTrivialStruct, %newowned2 : @owned $NonTrivialStruct):
+  %res = copy_value %newborrow : $NonTrivialStruct
+  end_borrow %newborrow : $NonTrivialStruct
+  destroy_value %newowned1 : $NonTrivialStruct
+  destroy_value %newowned2 : $NonTrivialStruct
+  return %res : $NonTrivialStruct
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadterm1 :
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'dce_deadterm1'
+sil [ossa] @dce_deadterm1 : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
+  %0a = alloc_stack $FakeOptional<Builtin.NativeObject>
+  store %0 to [init] %0a : $*FakeOptional<Builtin.NativeObject>
+  %1 = load [take] %0a : $*FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0a : $*FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dce_deadterm2 :
+// CHECK-NOT: load [copy]
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'dce_deadterm2'
+sil [ossa] @dce_deadterm2 : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
+bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
+  %0a = alloc_stack $FakeOptional<Builtin.NativeObject>
+  store %0 to [init] %0a : $*FakeOptional<Builtin.NativeObject>
+  %1 = load [copy] %0a : $*FakeOptional<Builtin.NativeObject>
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %0a :  $*FakeOptional<Builtin.NativeObject>
+  dealloc_stack %0a : $*FakeOptional<Builtin.NativeObject>
+  %9999 = tuple()
+  return %9999 : $()
 }
 
