@@ -5,6 +5,8 @@
 
 // REQUIRES: OS=macosx || OS=ios
 // FIXME: should not require Darwin to run this test once we have async main!
+// Remove with rdar://problem/72357371
+// UNSUPPORTED: CPU=arm64e
 
 // for exit(:Int)
 #if canImport(Darwin)
