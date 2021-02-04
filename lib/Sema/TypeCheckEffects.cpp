@@ -2096,6 +2096,12 @@ private:
                         Classification::forThrow(PotentialThrowReason::forThrow(),
                                                  /*async*/false));
     }
+    if (S->getAwaitLoc().isValid() && 
+        !Flags.has(ContextFlags::HasAnyAsyncSite)) {
+      if (!CurContext.handlesAsync()) {
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S);
+      }
+    }
     return ShouldRecurse;
   }
 };

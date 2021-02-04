@@ -602,27 +602,15 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return failed();
       }
     }
-    auto context = Ty->getNominalOrBoundGenericNominal();
-    if (!context) {
-      // if no nominal type can be determined then we must consider this to be
-      // a potential throwing source and concequently this must have a valid try
-      // location to account for that potential ambiguity.
-      if (stmt->getTryLoc().isInvalid()) {
-        auto &diags = dc->getASTContext().Diags;
-        diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled);
-        return failed();
-      } else {
-        return false;
-      }
-       
-    }
+    
     auto module = dc->getParentModule();
     auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
     
     if (conformanceRef.classifyAsThrows() && 
         stmt->getTryLoc().isInvalid()) {
       auto &diags = dc->getASTContext().Diags;
-      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled);
+      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled)
+        .fixItInsert(stmt->getAwaitLoc(), "try");
 
       return failed();
     }
