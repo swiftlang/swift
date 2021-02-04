@@ -961,3 +961,120 @@ bb8:
   return %res : $()
 }
 
+// CHECK-LABEL: @ignore_unreachable_simple :
+// CHECK:        [[V:%[0-9]+]] = load [copy]
+// CHECK:        [[C:%[0-9]+]] = copy_value [[V]]
+// CHECK:      bb1:
+// CHECK-NEXT:   destroy_value [[C]]
+// CHECK:      bb2:
+// CHECK-NEXT:   unreachable
+// CHECK: } // end sil function 'ignore_unreachable_simple'
+sil [ossa] @ignore_unreachable_simple : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  destroy_value %val1 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  br bb3
+
+bb2:
+  unreachable
+
+bb3:
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: @ignore_unreachable_complex :
+// CHECK:        [[V:%[0-9]+]] = load [copy]
+// CHECK:        copy_value [[V]]
+// CHECK:        copy_value [[V]]
+// CHECK:      bb1:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   cond_br
+// CHECK:      bb2:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   cond_br
+// CHECK:      bb3:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   br bb5
+// CHECK:      bb4:
+// CHECK-NEXT:   destroy_value
+// CHECK-NEXT:   br bb5
+// CHECK:      bb5:
+// CHECK-NEXT:   tuple
+// CHECK:      bb6:
+// CHECK-NEXT:   br bb8
+// CHECK:      bb7:
+// CHECK-NEXT:   br bb8
+// CHECK:      bb8:
+// CHECK-NEXT:   unreachable
+// CHECK: } // end sil function 'ignore_unreachable_complex'
+sil [ossa] @ignore_unreachable_complex : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  destroy_value %val1 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb6
+
+bb2:
+  cond_br undef, bb4, bb7
+
+bb3:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  br bb5
+
+bb4:
+  %val3 = load [copy] %ele : $*Klass
+  destroy_value %val3 : $Klass
+  br bb5
+
+bb5:
+  %res = tuple ()
+  return %res : $()
+
+bb6:
+  br bb8
+
+bb7:
+  br bb8
+
+bb8:
+  unreachable
+}
+
+
+// CHECK-LABEL: @infinite_loop_and_unreachable :
+// CHECK:   [[V:%[0-9]+]] = load [copy]
+// CHECK:   [[C1:%[0-9]+]] = copy_value [[V]]
+// CHECK: bb1:
+// CHECK:   [[C2:%[0-9]+]] = copy_value [[C1]]
+// CHECK:   destroy_value [[C2]]
+// CHECK: } // end sil function 'infinite_loop_and_unreachable'
+sil [ossa] @infinite_loop_and_unreachable : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
+bb0(%0 : $*NonTrivialStruct):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  destroy_value %val1 : $Klass
+  br bb1
+
+bb1:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  unreachable
+}
+

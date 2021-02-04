@@ -864,7 +864,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
                              &Impl.Instance->getModuleCache());
   auto invocation =
       std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
-  invocation->getPreprocessorOpts().DisablePCHValidation = false;
+  invocation->getPreprocessorOpts().DisablePCHOrModuleValidation =
+      clang::DisableValidationForModuleKind::None;
   invocation->getPreprocessorOpts().AllowPCHWithCompilerErrors = false;
   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
   invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;

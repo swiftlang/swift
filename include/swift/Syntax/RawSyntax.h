@@ -262,15 +262,11 @@ public:
     int NewRefCount = RefCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
     assert(NewRefCount >= 0 && "Reference count was already zero.");
     if (NewRefCount == 0) {
-      if (Arena) {
-        // The node was allocated inside a SyntaxArena and thus doesn't own its
-        // own memory region. Hence we cannot free it. It will be deleted once
-        // the last RawSyntax node allocated with it will release its reference
-        // to the arena.
-        this->~RawSyntax();
-      } else {
-        delete this;
-      }
+      // The node was allocated inside a SyntaxArena and thus doesn't own its
+      // own memory region. Hence we cannot free it. It will be deleted once
+      // the last RawSyntax node allocated with it will release its reference
+      // to the arena.
+      this->~RawSyntax();
     }
   }
 
@@ -280,18 +276,13 @@ public:
   /// Make a raw "layout" syntax node.
   static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
                             size_t TextLength, SourcePresence Presence,
-                            const RC<SyntaxArena> &Arena,
+                            const RC<SyntaxArena> &Arena = SyntaxArena::make(),
                             llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
-
-  static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                            size_t TextLength, SourcePresence Presence,
-                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
-    return make(Kind, Layout, TextLength, Presence, /*Arena=*/nullptr, NodeId);
-  }
 
   static RC<RawSyntax>
   makeAndCalcLength(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                    SourcePresence Presence, const RC<SyntaxArena> &Arena,
+                    SourcePresence Presence,
+                    const RC<SyntaxArena> &Arena = SyntaxArena::make(),
                     llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
     size_t TextLength = 0;
     for (auto Child : Layout) {
@@ -302,37 +293,20 @@ public:
     return make(Kind, Layout, TextLength, Presence, Arena, NodeId);
   }
 
-  static RC<RawSyntax>
-  makeAndCalcLength(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                    SourcePresence Presence,
-                    llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
-    return makeAndCalcLength(Kind, Layout, Presence, /*Arena=*/nullptr, NodeId);
-  }
-
   /// Make a raw "token" syntax node.
   static RC<RawSyntax> make(tok TokKind, OwnedString Text, size_t TextLength,
                             ArrayRef<TriviaPiece> LeadingTrivia,
                             ArrayRef<TriviaPiece> TrailingTrivia,
                             SourcePresence Presence,
-                            const RC<SyntaxArena> &Arena,
+                            const RC<SyntaxArena> &Arena = SyntaxArena::make(),
                             llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
-  static RC<RawSyntax> make(tok TokKind, OwnedString Text, size_t TextLength,
-                            ArrayRef<TriviaPiece> LeadingTrivia,
-                            ArrayRef<TriviaPiece> TrailingTrivia,
-                            SourcePresence Presence,
-                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
-    return make(TokKind, Text, TextLength, LeadingTrivia, TrailingTrivia,
-                Presence, /*Arena=*/nullptr, NodeId);
-  }
-
   /// Make a raw "token" syntax node that was allocated in \p Arena.
-  static RC<RawSyntax>
-  makeAndCalcLength(tok TokKind, OwnedString Text,
-                    ArrayRef<TriviaPiece> LeadingTrivia,
-                    ArrayRef<TriviaPiece> TrailingTrivia,
-                    SourcePresence Presence, const RC<SyntaxArena> &Arena,
-                    llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+  static RC<RawSyntax> makeAndCalcLength(
+      tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
+      ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
+      const RC<SyntaxArena> &Arena = SyntaxArena::make(),
+      llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
     size_t TextLength = 0;
     if (Presence != SourcePresence::Missing) {
       for (auto Trivia : LeadingTrivia) {
@@ -347,23 +321,16 @@ public:
                 Presence, Arena, NodeId);
   }
 
-  static RC<RawSyntax> makeAndCalcLength(
-      tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
-      ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
-      llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
-    return makeAndCalcLength(TokKind, Text, LeadingTrivia, TrailingTrivia,
-                             Presence, /*Arena=*/nullptr, NodeId);
-  }
-
   /// Make a missing raw "layout" syntax node.
-  static RC<RawSyntax> missing(SyntaxKind Kind,
-                               RC<SyntaxArena> Arena = nullptr) {
+  static RC<RawSyntax>
+  missing(SyntaxKind Kind, const RC<SyntaxArena> &Arena = SyntaxArena::make()) {
     return make(Kind, {}, /*TextLength=*/0, SourcePresence::Missing, Arena);
   }
 
   /// Make a missing raw "token" syntax node.
-  static RC<RawSyntax> missing(tok TokKind, OwnedString Text,
-                               RC<SyntaxArena> Arena = nullptr) {
+  static RC<RawSyntax>
+  missing(tok TokKind, OwnedString Text,
+          const RC<SyntaxArena> &Arena = SyntaxArena::make()) {
     return make(TokKind, Text, /*TextLength=*/0, {}, {},
                 SourcePresence::Missing, Arena);
   }

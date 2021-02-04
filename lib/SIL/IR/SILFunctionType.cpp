@@ -1464,7 +1464,7 @@ static bool isClangTypeMoreIndirectThanSubstType(TypeConverter &TC,
 
     // swift_newtypes are always passed directly
     if (auto typedefTy = clangTy->getAs<clang::TypedefType>()) {
-      if (typedefTy->getDecl()->getAttr<clang::SwiftNewtypeAttr>())
+      if (typedefTy->getDecl()->getAttr<clang::SwiftNewTypeAttr>())
         return false;
     }
 

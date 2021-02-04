@@ -44,7 +44,7 @@ class ClangSourceBufferImporter {
   // IntrusiveRefCntPtr to stay a ref-counting pointer.
   SmallVector<llvm::IntrusiveRefCntPtr<const clang::SourceManager>, 4>
     sourceManagersWithDiagnostics;
-  llvm::DenseMap<const llvm::MemoryBuffer *, unsigned> mirroredBuffers;
+  llvm::DenseMap<const char *, unsigned> mirroredBuffers;
   SourceManager &swiftSourceManager;
 
 public:

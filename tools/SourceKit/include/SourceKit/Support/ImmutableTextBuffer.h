@@ -66,7 +66,7 @@ private:
   ThreadSafeRefCntPtr<ImmutableTextUpdate> Next;
 
   friend class EditableTextBuffer;
-  virtual void anchor();
+  virtual void anchor() override;
 };
 
 class ImmutableTextBuffer : public ImmutableTextUpdate {

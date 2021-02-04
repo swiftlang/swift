@@ -77,6 +77,24 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)missingAtAttributeMethod __attribute__((__swift_attr__("asyncHandler")));
 @end
 
+@protocol OptionalObserver <NSObject>
+@optional
+- (void)hello:(NSObject *)session completion:(void (^)(BOOL answer))completion;
+- (BOOL)hello:(NSObject *)session;
+@end
+
+@protocol RequiredObserverOnlyCompletion <NSObject>
+- (void)hello:(void (^)(BOOL answer))completion;
+@end
+
+@protocol RequiredObserver <RequiredObserverOnlyCompletion>
+- (BOOL)hello;
+@end
+
+@protocol Rollable <NSObject>
+- (void)rollWithCompletionHandler: (void (^)(void))completionHandler;
+@end
+
 #define MAGIC_NUMBER 42
 
 #pragma clang assume_nonnull end

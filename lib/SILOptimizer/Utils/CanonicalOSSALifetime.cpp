@@ -67,7 +67,7 @@ SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
       v = def;
       continue;
     }
-    if (auto borrowedVal = BorrowedValue::get(def)) {
+    if (auto borrowedVal = BorrowedValue(def)) {
       // Any def's that aren't filtered out here must be handled by
       // computeBorrowLiveness.
       switch (borrowedVal.kind) {
@@ -76,13 +76,13 @@ SILValue CanonicalizeOSSALifetime::getCanonicalCopiedDef(SILValue v) {
       case BorrowedValueKind::SILFunctionArgument:
         return def;
       case BorrowedValueKind::BeginBorrow: {
-        bool localScope = true;
-        // TODO: visitLocalScopeEndingUses should have an early exit.
-        borrowedVal.visitLocalScopeEndingUses([&](Operand *endBorrow) {
-          if (endBorrow->getUser()->getParent() != def->getParentBlock())
-            localScope = false;
-        });
-        if (localScope) {
+        // TODO: Remove this call to visitLocalScopeEndingUses and the
+        // same-block check once computeBorrowLiveness supports multiple blocks.
+        auto *defBB = def->getParentBlock();
+        if (borrowedVal.visitLocalScopeEndingUses(
+              [&](Operand *endBorrow) {
+                return endBorrow->getUser()->getParent() == defBB;
+              })) {
           return def;
         }
         break;
@@ -121,7 +121,7 @@ llvm::cl::opt<bool>
                          llvm::cl::desc("Enable rewriting borrow scopes"));
 
 bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
-  auto borrowedVal = BorrowedValue::get(currentDef);
+  auto borrowedVal = BorrowedValue(currentDef);
   if (!borrowedVal) {
     return false;
   }
@@ -142,8 +142,13 @@ bool CanonicalizeOSSALifetime::computeBorrowLiveness() {
   if (!EnableRewriteBorrows) {
     return false;
   }
+  // Note that there is no need to look through any reborrows. The reborrowed
+  // value is considered a separate lifetime for canonicalization. Any copies of
+  // the reborrowed value will not be rewritten when canonicalizing the current
+  // borrow scope because they are "hidden" behind the reborrow.
   borrowedVal.visitLocalScopeEndingUses([this](Operand *use) {
     liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ true);
+    return true;
   });
 
   // TODO: Fix getCanonicalCopiedDef to allow multi-block borrows and remove
@@ -173,6 +178,10 @@ static CopyValueInst *createOuterCopy(BeginBorrowInst *beginBorrow) {
   return copy;
 }
 
+// If this succeeds, then all uses of the borrowed value outside the borrow
+// scope will be rewritten to use an outer copy, and all remaining uses of the
+// borrowed value will be confined to the borrow scope.
+//
 // TODO: Canonicalize multi-block borrow scopes, load_borrow scope, and phi
 // borrow scopes by adding one copy per block to persistentCopies for
 // each block that dominates an outer use.
@@ -199,7 +208,16 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
     outerUses.push_back(use);
     outerUseInsts.insert(use->getUser());
   };
+  // getCanonicalCopiedDef ensures that if currentDef is a guaranteed value,
+  // then it is a borrow scope introducer.
+  assert(BorrowedValue(currentDef).isLocalScope());
 
+  // This def-use traversal is similar to
+  // findExtendedTransitiveGuaranteedUses(), however, to cover the canonical
+  // lifetime, it looks through copies. It also considered uses within the
+  // introduced borrow scope itself (instead of simply visiting the scope-ending
+  // uses). It does not, however, look into nested borrow scopes uses, since
+  // nested scopes are canonicalized independently.
   defUseWorklist.clear();
   defUseWorklist.insert(currentDef);
   while (!defUseWorklist.empty()) {
@@ -226,11 +244,18 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
       case OperandOwnership::EndBorrow:
       case OperandOwnership::Reborrow:
         // Ignore uses that must be within the borrow scope.
+        // Rewriting does not look through reborrowed values--it considers them
+        // part of a separate lifetime.
         break;
 
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
-        return false;
+        // Pointer escapes are only allowed if they use the guaranteed value,
+        // which means that the escaped value must be confied to the current
+        // borrow scope.
+        if (use->get().getOwnershipKind() != OwnershipKind::Guaranteed)
+          return false;
+        break;
 
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
@@ -241,13 +266,12 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
         break;
       case OperandOwnership::Borrow:
         BorrowingOperand borrowOper(use);
-        if (borrowOper.kind == BorrowingOperandKind::Invalid) {
-          return false;
-        }
+        assert(borrowOper && "BorrowingOperand must handle OperandOwnership");
         recordOuterUse(use);
         // For borrows, record the scope-ending instructions in addition to the
-        // borrow instruction as an outer use point.
-        borrowOper.visitLocalEndScopeUses([&](Operand *endBorrow) {
+        // borrow instruction outer use points. The logic below to check whether
+        // a borrow scope is an outer use must visit the same set of uses.
+        borrowOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
           if (!isUserInLiveOutBlock(endBorrow->getUser())) {
             outerUseInsts.insert(endBorrow->getUser());
           }
@@ -255,13 +279,12 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
         });
         break;
       }
-    }
+    } // end switch OperandOwnership
   } // end def-use traversal
 
   auto *beginBorrow = cast<BeginBorrowInst>(currentDef);
   SmallVector<SILInstruction *, 1> scopeEndingInst;
-  BorrowedValue::get(beginBorrow)
-      .getLocalScopeEndingInstructions(scopeEndingInst);
+  BorrowedValue(beginBorrow).getLocalScopeEndingInstructions(scopeEndingInst);
   assert(scopeEndingInst.size() == 1 && "expected single-block borrow");
   // Remove outer uses that occur before the end of the borrow scope by
   // forward iterating from begin_borrow to end_borrow.
@@ -286,7 +309,7 @@ bool CanonicalizeOSSALifetime::consolidateBorrowScope() {
       }
       // For sub-borrows also check that the scope-ending instructions are
       // within the scope.
-      if (borrowOper.visitLocalEndScopeUses([&](Operand *endBorrow) {
+      if (borrowOper.visitExtendedScopeEndingUses([&](Operand *endBorrow) {
             return !outerUseInsts.count(endBorrow->getUser());
           })) {
         continue;
@@ -364,7 +387,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         llvm_unreachable("this operand cannot handle ownership");
 
       // Conservatively treat a conversion to an unowned value as a pointer
-      // escape. Is it legal to canonicalize these?
+      // escape. Is it legal to canonicalize ForwardingUnowned?
       case OperandOwnership::ForwardingUnowned:
       case OperandOwnership::PointerEscape:
         return false;
@@ -385,12 +408,13 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         recordConsumingUse(use);
         break;
       case OperandOwnership::Borrow:
-        // An entire borrow scope is considered a single use that occurs at the
-        // point of the end_borrow.
-        BorrowingOperand(use).visitLocalEndScopeUses([this](Operand *end) {
-          liveness.updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-          return true;
-        });
+        // The liveness of an entire extended borrow scope is modeled as use
+        // points and the scope-ending uses.
+        BorrowingOperand(use).visitExtendedScopeEndingUses(
+          [this](Operand *end) {
+            liveness.updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+            return true;
+          });
         break;
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::ForwardingBorrow:

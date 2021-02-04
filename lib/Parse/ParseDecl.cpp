@@ -4764,6 +4764,10 @@ bool Parser::parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
     return true;
   }
 
+  // Record '{' '}' to the current hash, nothing else.
+  recordTokenHash("}");
+  llvm::SaveAndRestore<Optional<StableHasher>> T(CurrentTokenHash, None);
+
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
 
@@ -4808,12 +4812,12 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
                       ParseDeclOptions Options, IterableDeclContext *IDC,
                       bool &hadError) {
 
-  // If we're hashing the type body separately, record the curly braces but
-  // nothing inside for the interface hash.
+  // Hash the type body separately.
   llvm::SaveAndRestore<Optional<StableHasher>> MemberHashingScope{
       CurrentTokenHash, StableHasher::defaultHasher()};
+
+  // Record '{' which has been consumed in callers.
   recordTokenHash("{");
-  recordTokenHash("}");
 
   std::vector<Decl *> decls;
   ParserStatus Status;

@@ -43,8 +43,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
+
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -756,8 +758,12 @@ void ClosureCloner::visitLoadInst(LoadInst *li) {
 namespace {
 
 struct EscapeMutationScanningState {
-  /// The list of mutations that we found while checking for escapes.
-  llvm::SmallVector<SILInstruction *, 8> foundMutations;
+  /// The list of mutations in the partial_apply caller that we found.
+  SmallVector<Operand *, 8> accumulatedMutations;
+
+  /// The list of escapes in the partial_apply caller/callee of the box that we
+  /// found.
+  SmallVector<Operand *, 8> accumulatedEscapes;
 
   /// A flag that we use to ensure that we only ever see 1 project_box on an
   /// alloc_box.
@@ -786,16 +792,20 @@ static bool isNonMutatingLoad(SILInstruction *inst) {
   return li->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
 }
 
-/// Given a partial_apply instruction and the argument index into its
-/// callee's argument list of a box argument (which is followed by an argument
-/// for the address of the box's contents), return true if the closure is known
-/// not to mutate the captured variable.
-static bool isNonMutatingCapture(SILArgument *boxArg) {
+/// Given a partial_apply instruction and the argument index into its callee's
+/// argument list of a box argument (which is followed by an argument for the
+/// address of the box's contents), return true if this box has mutating
+/// captures. Return false otherwise. All of the mutating captures that we find
+/// are placed into \p accumulatedMutatingUses.
+static bool getPartialApplyArgMutationsAndEscapes(
+    SILArgument *boxArg, SmallVectorImpl<Operand *> &accumulatedMutatingUses,
+    SmallVectorImpl<Operand *> &accumulatedEscapes) {
   SmallVector<ProjectBoxInst *, 2> projectBoxInsts;
 
   // Conservatively do not allow any use of the box argument other than a
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
+  SmallVector<Operand *, 32> incrementalEscapes;
   for (auto *use : boxArg->getUses()) {
     if (isa<StrongReleaseInst>(use->getUser()) ||
         isa<DestroyValueInst>(use->getUser()))
@@ -806,7 +816,7 @@ static bool isNonMutatingCapture(SILArgument *boxArg) {
       continue;
     }
 
-    return false;
+    incrementalEscapes.push_back(use);
   }
 
   // Only allow loads of projections, either directly or via
@@ -815,33 +825,44 @@ static bool isNonMutatingCapture(SILArgument *boxArg) {
   // TODO: This seems overly limited.  Why not projections of tuples and other
   // stuff?  Also, why not recursive struct elements?  This should be a helper
   // function that mirrors isNonEscapingUse.
-  auto isAddrUseMutating = [](SILInstruction *addrInst) {
+  auto checkIfAddrUseMutating = [&](Operand *addrUse) -> bool {
+    unsigned initSize = incrementalEscapes.size();
+    auto *addrInst = addrUse->getUser();
     if (auto *seai = dyn_cast<StructElementAddrInst>(addrInst)) {
-      return all_of(seai->getUses(), [](Operand *op) -> bool {
-        return isNonMutatingLoad(op->getUser());
-      });
+      for (auto *seaiUse : seai->getUses()) {
+        if (!isNonMutatingLoad(seaiUse->getUser())) {
+          incrementalEscapes.push_back(seaiUse);
+        }
+      }
+      return incrementalEscapes.size() != initSize;
     }
 
-    return isNonMutatingLoad(addrInst) || isa<DebugValueAddrInst>(addrInst) ||
-           isa<MarkFunctionEscapeInst>(addrInst) ||
-           isa<EndAccessInst>(addrInst);
+    if (isNonMutatingLoad(addrInst) || isa<DebugValueAddrInst>(addrInst) ||
+        isa<MarkFunctionEscapeInst>(addrInst) || isa<EndAccessInst>(addrInst)) {
+      return false;
+    }
+
+    incrementalEscapes.push_back(addrUse);
+    return true;
   };
 
   for (auto *pbi : projectBoxInsts) {
     for (auto *use : pbi->getUses()) {
       if (auto *bai = dyn_cast<BeginAccessInst>(use->getUser())) {
         for (auto *accessUseOper : bai->getUses()) {
-          if (!isAddrUseMutating(accessUseOper->getUser()))
-            return false;
+          checkIfAddrUseMutating(accessUseOper);
         }
         continue;
       }
 
-      if (!isAddrUseMutating(use->getUser()))
-        return false;
+      checkIfAddrUseMutating(use);
     }
   }
 
+  if (incrementalEscapes.empty())
+    return false;
+  while (!incrementalEscapes.empty())
+    accumulatedEscapes.push_back(incrementalEscapes.pop_back_val());
   return true;
 }
 
@@ -852,11 +873,14 @@ bool isPartialApplyNonEscapingUser(Operand *currentOp, PartialApplyInst *pai,
   unsigned opNo = currentOp->getOperandNumber();
   assert(opNo != 0 && "Alloc box used as callee of partial apply?");
 
-  // If we've already seen this partial apply, then it means the same alloc
-  // box is being captured twice by the same closure, which is odd and
-  // unexpected: bail instead of trying to handle this case.
+  // If we've already seen this partial apply, then it means the same alloc box
+  // is being captured twice by the same closure, which is odd and unexpected:
+  // bail instead of trying to handle this case.
   if (state.globalIndexMap.count(pai)) {
+    // TODO: Is it correct to treat this like an escape? We are just currently
+    // flagging all failures as warnings.
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
+    state.accumulatedEscapes.push_back(currentOp);
     return false;
   }
 
@@ -877,6 +901,7 @@ bool isPartialApplyNonEscapingUser(Operand *currentOp, PartialApplyInst *pai,
   if (!fn || !fn->isDefinition() || fn->isDynamicallyReplaceable()) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
                                "reference.\n");
+    state.accumulatedEscapes.push_back(currentOp);
     return false;
   }
 
@@ -893,14 +918,17 @@ bool isPartialApplyNonEscapingUser(Operand *currentOp, PartialApplyInst *pai,
           .isAddressOnly(*f)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
                                "argument!\n");
+    state.accumulatedEscapes.push_back(currentOp);
     return false;
   }
 
   // Verify that this closure is known not to mutate the captured value; if
   // it does, then conservatively refuse to promote any captures of this
   // value.
-  if (!isNonMutatingCapture(boxArg)) {
-    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
+  if (getPartialApplyArgMutationsAndEscapes(boxArg, state.accumulatedMutations,
+                                            state.accumulatedEscapes)) {
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Have a mutation or escape of a "
+                               "partial apply arg?!\n");
     return false;
   }
 
@@ -920,15 +948,17 @@ namespace {
 
 class NonEscapingUserVisitor
     : public SILInstructionVisitor<NonEscapingUserVisitor, bool> {
-  llvm::SmallVector<Operand *, 32> worklist;
-  llvm::SmallVectorImpl<SILInstruction *> &foundMutations;
+  SmallVector<Operand *, 32> worklist;
+  SmallVectorImpl<Operand *> &accumulatedMutations;
+  SmallVectorImpl<Operand *> &accumulatedEscapes;
   NullablePtr<Operand> currentOp;
 
 public:
-  NonEscapingUserVisitor(
-      Operand *initialOperand,
-      llvm::SmallVectorImpl<SILInstruction *> &foundMutations)
-      : worklist(), foundMutations(foundMutations), currentOp() {
+  NonEscapingUserVisitor(Operand *initialOperand,
+                         SmallVectorImpl<Operand *> &accumulatedMutations,
+                         SmallVectorImpl<Operand *> &accumulatedEscapes)
+      : worklist(), accumulatedMutations(accumulatedMutations),
+        accumulatedEscapes(accumulatedEscapes), currentOp() {
     worklist.push_back(initialOperand);
   }
 
@@ -937,6 +967,15 @@ public:
   NonEscapingUserVisitor(NonEscapingUserVisitor &&) = delete;
   NonEscapingUserVisitor &operator=(NonEscapingUserVisitor &&) = delete;
 
+private:
+  void markCurrentOpAsMutation() {
+    accumulatedMutations.push_back(currentOp.get());
+  }
+  void markCurrentOpAsEscape() {
+    accumulatedEscapes.push_back(currentOp.get());
+  }
+
+public:
   bool compute() {
     while (!worklist.empty()) {
       currentOp = worklist.pop_back_val();
@@ -964,6 +1003,7 @@ public:
   bool visitSILInstruction(SILInstruction *inst) {
     LLVM_DEBUG(llvm::dbgs()
                << "    FAIL! Have unknown escaping user: " << *inst);
+    markCurrentOpAsEscape();
     return false;
   }
 
@@ -979,7 +1019,7 @@ public:
 #undef ALWAYS_NON_ESCAPING_INST
 
   bool visitDeallocBoxInst(DeallocBoxInst *dbi) {
-    foundMutations.push_back(dbi);
+    markCurrentOpAsMutation();
     return true;
   }
 
@@ -992,9 +1032,10 @@ public:
     if (!convention.isIndirectConvention()) {
       LLVM_DEBUG(llvm::dbgs()
                  << "    FAIL! Found non indirect apply user: " << *ai);
+      markCurrentOpAsEscape();
       return false;
     }
-    foundMutations.push_back(ai);
+    markCurrentOpAsMutation();
     return true;
   }
 
@@ -1017,7 +1058,7 @@ public:
 #define RECURSIVE_INST_VISITOR(MUTATING, INST)                                 \
   bool visit##INST##Inst(INST##Inst *i) {                                      \
     if (bool(detail::MUTATING)) {                                              \
-      foundMutations.push_back(i);                                             \
+      markCurrentOpAsMutation();                                               \
     }                                                                          \
     addUsesToWorklist(i);                                                      \
     return true;                                                               \
@@ -1044,25 +1085,27 @@ public:
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {
     if (currentOp.get()->getOperandNumber() == 1 || cai->isTakeOfSrc())
-      foundMutations.push_back(cai);
+      markCurrentOpAsMutation();
     return true;
   }
 
   bool visitStoreInst(StoreInst *si) {
     if (currentOp.get()->getOperandNumber() != 1) {
       LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *si);
+      markCurrentOpAsEscape();
       return false;
     }
-    foundMutations.push_back(si);
+    markCurrentOpAsMutation();
     return true;
   }
 
   bool visitAssignInst(AssignInst *ai) {
     if (currentOp.get()->getOperandNumber() != 1) {
       LLVM_DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *ai);
+      markCurrentOpAsEscape();
       return false;
     }
-    foundMutations.push_back(ai);
+    markCurrentOpAsMutation();
     return true;
   }
 };
@@ -1075,7 +1118,9 @@ public:
 /// the Mutations vector.
 static bool isNonEscapingUse(Operand *initialOp,
                              EscapeMutationScanningState &state) {
-  return NonEscapingUserVisitor(initialOp, state.foundMutations).compute();
+  return NonEscapingUserVisitor(initialOp, state.accumulatedMutations,
+                                state.accumulatedEscapes)
+      .compute();
 }
 
 static bool isProjectBoxNonEscapingUse(ProjectBoxInst *pbi,
@@ -1097,12 +1142,12 @@ static bool isProjectBoxNonEscapingUse(ProjectBoxInst *pbi,
 //                Top Level AllocBox Escape/Mutation Analysis
 //===----------------------------------------------------------------------===//
 
-static bool scanUsesForEscapesAndMutations(Operand *op,
-                                           EscapeMutationScanningState &state) {
+static bool findEscapeOrMutationUses(Operand *op,
+                                     EscapeMutationScanningState &state) {
   SILInstruction *user = op->getUser();
 
   if (auto *pai = dyn_cast<PartialApplyInst>(user)) {
-    return isPartialApplyNonEscapingUser(op, pai, state);
+    return !isPartialApplyNonEscapingUser(op, pai, state);
   }
 
   // A mark_dependence user on a partial_apply is safe.
@@ -1112,7 +1157,11 @@ static bool scanUsesForEscapesAndMutations(Operand *op,
       while ((mdi = dyn_cast<MarkDependenceInst>(parent))) {
         parent = mdi->getValue();
       }
-      return isa<PartialApplyInst>(parent);
+      if (isa<PartialApplyInst>(parent))
+        return false;
+      state.accumulatedEscapes.push_back(
+          &mdi->getOperandRef(MarkDependenceInst::Value));
+      return true;
     }
   }
 
@@ -1121,9 +1170,9 @@ static bool scanUsesForEscapesAndMutations(Operand *op,
     // can be seen since there is no code for reasoning about multiple
     // boxes. Just put in the restriction so we are consistent.
     if (state.sawProjectBoxInst)
-      return false;
+      return true;
     state.sawProjectBoxInst = true;
-    return isProjectBoxNonEscapingUse(pbi, state);
+    return !isProjectBoxNonEscapingUse(pbi, state);
   }
 
   // Given a top level copy value use or mark_uninitialized, check all of its
@@ -1134,10 +1183,11 @@ static bool scanUsesForEscapesAndMutations(Operand *op,
   // derived from a projection like instruction). In fact such a thing may not
   // even make any sense!
   if (isa<CopyValueInst>(user) || isa<MarkUninitializedInst>(user)) {
-    return all_of(cast<SingleValueInstruction>(user)->getUses(),
-                  [&state](Operand *userOp) -> bool {
-                    return scanUsesForEscapesAndMutations(userOp, state);
-                  });
+    bool foundSomeMutations = false;
+    for (auto *use : cast<SingleValueInstruction>(user)->getUses()) {
+      foundSomeMutations |= findEscapeOrMutationUses(use, state);
+    }
+    return foundSomeMutations;
   }
 
   // Verify that this use does not otherwise allow the alloc_box to
@@ -1153,14 +1203,20 @@ static bool
 examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
                     llvm::DenseMap<PartialApplyInst *, unsigned> &im) {
   LLVM_DEBUG(llvm::dbgs() << "Visiting alloc box: " << *abi);
-  EscapeMutationScanningState state{{}, false, im};
+  EscapeMutationScanningState state{{}, {}, false, im};
 
-  // Scan the box for interesting uses.
-  if (any_of(abi->getUses(), [&state](Operand *op) {
-        return !scanUsesForEscapesAndMutations(op, state);
-      })) {
+  // Scan the box for escaping or mutating uses.
+  for (auto *use : abi->getUses()) {
+    findEscapeOrMutationUses(use, state);
+  }
+
+  if (!state.accumulatedEscapes.empty()) {
     LLVM_DEBUG(llvm::dbgs()
-               << "Found an escaping use! Can not optimize this alloc box?!\n");
+               << "Found escaping uses! Can not optimize this alloc box?!\n");
+    while (!state.accumulatedEscapes.empty()) {
+      auto *escapingUse = state.accumulatedEscapes.pop_back_val();
+      LLVM_DEBUG(llvm::dbgs() << "Escaping use: " << *escapingUse->getUser());
+    }
     return false;
   }
 
@@ -1183,17 +1239,18 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
   LLVM_DEBUG(llvm::dbgs()
              << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
-  for (auto *inst : state.foundMutations) {
+  for (auto *use : state.accumulatedMutations) {
     auto iter = im.begin();
     while (iter != im.end()) {
+      auto *user = use->getUser();
       auto *pai = iter->first;
       // The mutation invalidates a capture if it occurs in a block reachable
       // from the block the partial_apply is in, or if it is in the same
       // block is after the partial_apply.
-      if (ri.isReachable(pai->getParent(), inst->getParent()) ||
-          (pai->getParent() == inst->getParent() && isAfter(pai, inst))) {
+      if (ri.isReachable(pai->getParent(), user->getParent()) ||
+          (pai->getParent() == user->getParent() && isAfter(pai, user))) {
         LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *pai);
-        LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *inst);
+        LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *user);
         auto prev = iter++;
         im.erase(prev);
         continue;

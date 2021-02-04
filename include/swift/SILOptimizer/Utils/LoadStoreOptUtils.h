@@ -255,8 +255,7 @@ public:
   ///
   /// In the case where we have a single value this can be materialized by
   /// applying Path to the Base.
-  SILValue materialize(SILInstruction *Inst,
-                       JointPostDominanceSetComputer *jointPostDomComputer) {
+  SILValue materialize(SILInstruction *Inst) {
     if (CoveringValue)
       return SILValue();
     auto Val = Base;
@@ -269,8 +268,7 @@ public:
     }
     auto Res = Path.getValue().createExtract(Val, &*InsertPt, true);
     if (Val != Base) {
-      Res = makeCopiedValueAvailable(Res, Inst->getParent(),
-                                     jointPostDomComputer);
+      Res = makeCopiedValueAvailable(Res, Inst->getParent());
       Builder.emitEndBorrowOperation(InsertPt->getLoc(), Val);
       // Insert a destroy on the Base
       SILBuilderWithScope(Inst).emitDestroyValueOperation(Inst->getLoc(), Base);
@@ -296,11 +294,9 @@ public:
   /// location holds. This may involve extracting and aggregating available
   /// values.
   static void reduceInner(LSLocation &B, SILModule *M, LSLocationValueMap &Vals,
-                          SILInstruction *InsertPt,
-                          JointPostDominanceSetComputer *jointPostDomComputer);
+                          SILInstruction *InsertPt);
   static SILValue reduce(LSLocation &B, SILModule *M, LSLocationValueMap &Vals,
-                         SILInstruction *InsertPt,
-                         JointPostDominanceSetComputer *jointPostDomComputer);
+                         SILInstruction *InsertPt);
 };
 
 static inline llvm::hash_code hash_value(const LSValue &V) {

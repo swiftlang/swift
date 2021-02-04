@@ -1802,6 +1802,11 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     }
     return false;
   }
+
+  if (isa<IfConfigDecl>(D)) {
+    return Options.PrintIfConfig;
+  }
+
   return true;
 }
 

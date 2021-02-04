@@ -175,7 +175,8 @@ def run_once_with_primary(args, ast, rng, primary_idx):
         if not args.save_temps:
             shutil.rmtree(d)
 
-    return {k: v for (k, v) in r.items() if args.select in k}
+    return {k: v for (k, v) in r.items() if args.select in k and 
+            not (args.exclude_timers and k.startswith('time.'))}
 
 
 def run_once(args, ast, rng):
@@ -759,6 +760,10 @@ def main():
     parser.add_argument(
         '--select',
         default="", help='substring of counters/symbols to limit attention to')
+    parser.add_argument(
+        '--exclude-timers', action="store_true",
+        default=False, help='Exclude timers (starting with \'time.\') from the '
+                            'analysis')
     parser.add_argument(
         '--debug', action='store_true',
         default=False, help='invoke lldb on each scale test')

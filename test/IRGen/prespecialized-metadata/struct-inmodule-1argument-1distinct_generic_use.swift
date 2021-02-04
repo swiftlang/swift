@@ -24,7 +24,7 @@ func consume<T>(_ t: T) {
 //       themselves generic (Outer<Inner<Int>>, here), a direct reference to
 //       the prespecialized metadata should be emitted here.
 // CHECK: call swiftcc void @"$s4main5OuterV5firstACyxGx_tcfC"(
-// CHECK-SAME:   %T4main5OuterV* noalias nocapture sret %13, 
+// CHECK-SAME:   %T4main5OuterV* noalias nocapture sret({{.*}}) %13, 
 // CHECK-SAME:   %swift.opaque* noalias nocapture %14, 
 // CHECK-SAME:   %swift.type* getelementptr inbounds (
 // CHECK-SAME:     %swift.full_type, 

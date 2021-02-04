@@ -35,7 +35,7 @@
 
 // specialized InternalThing.compute()
 // CHECK-A-FRAG: define{{( dllexport)?}}{{( protected)?}} swiftcc [[INT:(i64|i32)]] @"$s1A13InternalThingV7computexyFAA09Resilienta5BoxedB0VySiG_Ts5"({{(i64|i32)}}{{( returned)?}} %0)
-// CHECK-A-RES: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s1A13InternalThingV7computexyFAA09Resilienta5BoxedB0VySiG_Ts5"(%T1A27ResilientInternalBoxedThingVySiG* noalias nocapture sret %0, [[INT:(i64|i32)]] %1)
+// CHECK-A-RES: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s1A13InternalThingV7computexyFAA09Resilienta5BoxedB0VySiG_Ts5"(%T1A27ResilientInternalBoxedThingVySiG* noalias nocapture sret({{.*}}) %0, [[INT:(i64|i32)]] %1)
 // CHECK-A: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @"$s1A13InternalThingV7computexyFSb_Ts5"(i1{{( returned)?}} %0)
 // CHECK-A: define{{( dllexport)?}}{{( protected)?}} swiftcc [[INT]] @"$s1A13InternalThingV7computexyFSi_Ts5"([[INT]]{{( returned)?}} %0)
 

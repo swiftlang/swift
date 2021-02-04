@@ -48,7 +48,7 @@ func allToInt<T>(_ x: T) -> Int {
   // CHECK: ret i64 [[INT_RESULT]]
 }
 
-// CHECK: define hidden swiftcc void @"$s13generic_casts8intToAllyxSilF"(%swift.opaque* noalias nocapture sret %0, i64 %1, %swift.type* %T) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts8intToAllyxSilF"(%swift.opaque* noalias nocapture sret({{.*}}) %0, i64 %1, %swift.type* %T) {{.*}} {
 func intToAll<T>(_ x: Int) -> T {
   // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
   // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
@@ -91,7 +91,7 @@ func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
 
 // <rdar://problem/15313840>
 // Class existential to opaque archetype cast
-// CHECK: define hidden swiftcc void @"$s13generic_casts33classExistentialToOpaqueArchetypeyxAA10ObjCProto1_plF"(%swift.opaque* noalias nocapture sret %0, %objc_object* %1, %swift.type* %T)
+// CHECK: define hidden swiftcc void @"$s13generic_casts33classExistentialToOpaqueArchetypeyxAA10ObjCProto1_plF"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %objc_object* %1, %swift.type* %T)
 func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   var x = x
   // CHECK: [[X:%.*]] = alloca %T13generic_casts10ObjCProto1P
@@ -105,7 +105,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
 protocol P {}
 protocol Q {}
 
-// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(%T13generic_casts1PP* noalias nocapture sret %0, %T13generic_casts1P_AA1Qp* noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(%T13generic_casts1PP* noalias nocapture sret({{.*}}) %0, %T13generic_casts1P_AA1Qp* noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
 func compositionToMember(_ a: P & Q) -> P {
   return a
 }

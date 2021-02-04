@@ -19,7 +19,15 @@
 #define SWIFT_SIL_CFG_H
 
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/GraphTraits.h"
+
+#if defined(__has_include)
+#if __has_include("llvm/Support/CfgTraits.h")
+#include "llvm/Support/CfgTraits.h"
+#define SWIFT_LLVM_HAS_CFGTRAITS_H
+#endif
+#endif
 
 namespace llvm {
 
@@ -118,6 +126,99 @@ template <> struct GraphTraits<Inverse<swift::SILFunction*> >
   }
   static unsigned size(GraphType F) { return F.Graph->size(); }
 };
+
+#ifdef SWIFT_LLVM_HAS_CFGTRAITS_H
+
+class SILCfgTraitsBase : public CfgTraitsBase {
+public:
+  using ParentType = swift::SILFunction;
+  using BlockRef = swift::SILBasicBlock *;
+  using ValueRef = swift::SILInstruction *;
+
+  static CfgBlockRef wrapRef(BlockRef block) {
+    return makeOpaque<CfgBlockRefTag>(block);
+  }
+  static CfgValueRef wrapRef(ValueRef block) {
+    return makeOpaque<CfgValueRefTag>(block);
+  }
+  static BlockRef unwrapRef(CfgBlockRef block) {
+    return static_cast<BlockRef>(getOpaque(block));
+  }
+  static ValueRef unwrapRef(CfgValueRef block) {
+    return static_cast<ValueRef>(getOpaque(block));
+  }
+};
+/// \brief CFG traits for SIL IR.
+class SILCfgTraits : public CfgTraits<SILCfgTraitsBase, SILCfgTraits> {
+public:
+  explicit SILCfgTraits(swift::SILFunction * /*parent*/) {}
+
+  static swift::SILFunction *getBlockParent(swift::SILBasicBlock *block) {
+    return block->getParent();
+  }
+
+  static auto predecessors(swift::SILBasicBlock *block) {
+    return block->getPredecessorBlocks();
+  }
+  static auto successors(swift::SILBasicBlock *block) {
+    return block->getSuccessors();
+  }
+
+  /// Get the defining block of a value if it is an instruction, or null
+  /// otherwise.
+  static BlockRef getValueDefBlock(ValueRef value) {
+    if (auto *instruction = dyn_cast<swift::SILInstruction>(value))
+      return instruction->getParent();
+    return nullptr;
+  }
+
+  struct block_iterator
+      : iterator_adaptor_base<block_iterator, swift::SILFunction::iterator> {
+    using Base = iterator_adaptor_base<block_iterator, swift::SILFunction::iterator>;
+
+    block_iterator() = default;
+
+    explicit block_iterator(swift::SILFunction::iterator i) : Base(i) {}
+
+    swift::SILBasicBlock *operator*() const { return &Base::operator*(); }
+  };
+
+  static iterator_range<block_iterator> blocks(swift::SILFunction *function) {
+    return {block_iterator(function->begin()), block_iterator(function->end())};
+  }
+
+  struct value_iterator
+      : iterator_adaptor_base<value_iterator, swift::SILBasicBlock::iterator> {
+    using Base = iterator_adaptor_base<value_iterator, swift::SILBasicBlock::iterator>;
+
+    value_iterator() = default;
+
+    explicit value_iterator(swift::SILBasicBlock::iterator i) : Base(i) {}
+
+    ValueRef operator*() const { return &Base::operator*(); }
+  };
+
+  static iterator_range<value_iterator> blockdefs(BlockRef block) {
+    return {value_iterator(block->begin()), value_iterator(block->end())};
+  }
+  struct Printer {
+    explicit Printer(const SILCfgTraits &) {}
+    ~Printer(){}
+
+    void printBlockName(raw_ostream &out, BlockRef block) const {
+      block->printAsOperand(out);
+    }
+    void printValue(raw_ostream &out, ValueRef value) const {
+      value->print(out);
+    }
+  };
+};
+
+template <> struct CfgTraitsFor<swift::SILBasicBlock> {
+  using CfgTraits = SILCfgTraits;
+};
+
+#endif
 
 } // end llvm namespace
 

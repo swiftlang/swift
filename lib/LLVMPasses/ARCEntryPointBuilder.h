@@ -378,7 +378,7 @@ private:
 
   Type *getNamedOpaquePtrTy(StringRef name) {
     auto &M = getModule();
-    if (auto *ty = M.getTypeByName(name)) {
+    if (auto *ty = llvm::StructType::getTypeByName(M.getContext(), name)) {
       return ty->getPointerTo();
     }
 

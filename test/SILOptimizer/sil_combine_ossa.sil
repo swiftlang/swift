@@ -7,6 +7,7 @@ sil_stage canonical
 
 import Builtin
 import Swift
+import SwiftShims
 
 class Klass {}
 
@@ -4663,3 +4664,100 @@ bb1(%2a : @guaranteed $Builtin.NativeObject):
   return %3 : $Builtin.NativeObject
 }
 
+// CHECK-LABEL: sil [ossa] @cowbuffer_reading_immutable_1 : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> Int {
+// CHECK: ref_element_addr [immutable]
+// CHECK: } // end sil function 'cowbuffer_reading_immutable_1'
+sil [ossa] @cowbuffer_reading_immutable_1 : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> Int {
+bb0(%0 : @guaranteed $_ContiguousArrayBuffer<Element>):
+  %3 = struct_extract %0 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
+  %4 = copy_value %3 : $__ContiguousArrayStorageBase
+  %5 = builtin "COWBufferForReading"<__ContiguousArrayStorageBase>(%4 : $__ContiguousArrayStorageBase) : $__ContiguousArrayStorageBase
+  %6 = begin_borrow %5 : $__ContiguousArrayStorageBase
+  %7 = ref_element_addr %6 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %8 = load [trivial] %7 : $*_ArrayBody
+  debug_value %8 : $_ArrayBody, let, name "self", argno 1
+  %10 = struct_extract %8 : $_ArrayBody, #_ArrayBody._storage
+  %11 = struct_extract %10 : $_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %12 = struct_extract %11 : $Int, #Int._value
+  %13 = builtin "assumeNonNegative_Int64"(%12 : $Builtin.Int64) : $Builtin.Int64
+  %14 = struct $Int (%13 : $Builtin.Int64)
+  end_borrow %6 : $__ContiguousArrayStorageBase
+  destroy_value %5 : $__ContiguousArrayStorageBase
+  return %14 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @cowbuffer_reading_no_crash_derived_borrow : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> Int {
+// CHECK: ref_element_addr [immutable]
+// CHECK: ref_tail_addr [immutable]
+// CHECK: } // end sil function 'cowbuffer_reading_no_crash_derived_borrow'
+sil [ossa] @cowbuffer_reading_no_crash_derived_borrow : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> Int {
+bb0(%0 : @guaranteed $_ContiguousArrayBuffer<Element>):
+  %3 = struct_extract %0 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
+  %4 = copy_value %3 : $__ContiguousArrayStorageBase
+  %5 = builtin "COWBufferForReading"<__ContiguousArrayStorageBase>(%4 : $__ContiguousArrayStorageBase) : $__ContiguousArrayStorageBase
+  %6 = begin_borrow %5 : $__ContiguousArrayStorageBase
+  %6b = begin_borrow %6 : $__ContiguousArrayStorageBase
+  %7 = ref_element_addr %6b : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %8 = load [trivial] %7 : $*_ArrayBody
+  debug_value %8 : $_ArrayBody, let, name "self", argno 1
+  %10 = struct_extract %8 : $_ArrayBody, #_ArrayBody._storage
+  %11 = struct_extract %10 : $_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %12 = struct_extract %11 : $Int, #Int._value
+  end_borrow %6b : $__ContiguousArrayStorageBase
+  %6c = begin_borrow %6 : $__ContiguousArrayStorageBase
+  %7b = ref_tail_addr %6c : $__ContiguousArrayStorageBase, $Element
+  // This is evil! I am doing it just for this test!
+  %7c = unchecked_addr_cast %7b : $*Element to $*Builtin.Int64
+  %12b = load [trivial] %7c : $*Builtin.Int64
+  end_borrow %6c : $__ContiguousArrayStorageBase
+  end_borrow %6 : $__ContiguousArrayStorageBase
+  destroy_value %5 : $__ContiguousArrayStorageBase
+  %12c = builtin "and_Int64"(%12 : $Builtin.Int64, %12b : $Builtin.Int64) : $Builtin.Int64
+  %13 = builtin "assumeNonNegative_Int64"(%12c : $Builtin.Int64) : $Builtin.Int64
+  %14 = struct $Int (%13 : $Builtin.Int64)
+  return %14 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @cowbuffer_reading_no_lookthrough_reborrow : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> Int {
+// CHECK-NOT: ref_element_addr [immutable]
+// CHECK-NOT: ref_tail_addr [immutable]
+// CHECK: ref_element_addr %
+// CHECK-NOT: ref_element_addr [immutable]
+// CHECK-NOT: ref_tail_addr [immutable]
+// CHECK: ref_tail_addr %
+// CHECK-NOT: ref_element_addr [immutable]
+// CHECK-NOT: ref_tail_addr [immutable]
+// CHECK: } // end sil function 'cowbuffer_reading_no_lookthrough_reborrow'
+sil [ossa] @cowbuffer_reading_no_lookthrough_reborrow : $@convention(method) <Element> (@guaranteed _ContiguousArrayBuffer<Element>) -> Int {
+bb0(%0 : @guaranteed $_ContiguousArrayBuffer<Element>):
+  %3 = struct_extract %0 : $_ContiguousArrayBuffer<Element>, #_ContiguousArrayBuffer._storage
+  %4 = copy_value %3 : $__ContiguousArrayStorageBase
+  %5 = builtin "COWBufferForReading"<__ContiguousArrayStorageBase>(%4 : $__ContiguousArrayStorageBase) : $__ContiguousArrayStorageBase
+  %6 = begin_borrow %5 : $__ContiguousArrayStorageBase
+  %6bb = begin_borrow %6 : $__ContiguousArrayStorageBase
+  br bb1(%6bb : $__ContiguousArrayStorageBase)
+
+bb1(%6b : @guaranteed $__ContiguousArrayStorageBase):
+  %7 = ref_element_addr %6b : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %8 = load [trivial] %7 : $*_ArrayBody
+  debug_value %8 : $_ArrayBody, let, name "self", argno 1
+  %10 = struct_extract %8 : $_ArrayBody, #_ArrayBody._storage
+  %11 = struct_extract %10 : $_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %12 = struct_extract %11 : $Int, #Int._value
+  end_borrow %6b : $__ContiguousArrayStorageBase
+  %6cb = begin_borrow %6 : $__ContiguousArrayStorageBase
+  br bb2(%6cb : $__ContiguousArrayStorageBase)
+
+bb2(%6c : @guaranteed $__ContiguousArrayStorageBase):
+  %7b = ref_tail_addr %6c : $__ContiguousArrayStorageBase, $Element
+  // This is evil! I am doing it just for this test!
+  %7c = unchecked_addr_cast %7b : $*Element to $*Builtin.Int64
+  %12b = load [trivial] %7c : $*Builtin.Int64
+  end_borrow %6c : $__ContiguousArrayStorageBase
+  end_borrow %6 : $__ContiguousArrayStorageBase
+  destroy_value %5 : $__ContiguousArrayStorageBase
+  %12c = builtin "and_Int64"(%12 : $Builtin.Int64, %12b : $Builtin.Int64) : $Builtin.Int64
+  %13 = builtin "assumeNonNegative_Int64"(%12c : $Builtin.Int64) : $Builtin.Int64
+  %14 = struct $Int (%13 : $Builtin.Int64)
+  return %14 : $Int
+}

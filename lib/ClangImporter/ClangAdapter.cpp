@@ -467,10 +467,16 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::OMPIterator:
       return OmissionTypeName();
 
-    // SVE builtin types that don't have Swift equivalents.
+    // ARM SVE builtin types that don't have Swift equivalents.
 #define SVE_TYPE(Name, Id, ...) \
     case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
+      return OmissionTypeName();
+
+    // PPC MMA builtin types that don't have Swift equivalents.
+#define PPC_VECTOR_TYPE(Name, Id, Size) \
+    case clang::BuiltinType::Id:
+#include "clang/Basic/PPCTypes.def"
       return OmissionTypeName();
     }
   }
@@ -494,10 +500,10 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
   return StringRef();
 }
 
-static clang::SwiftNewtypeAttr *
+static clang::SwiftNewTypeAttr *
 retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   // Retrieve the attribute.
-  auto attr = decl->getAttr<clang::SwiftNewtypeAttr>();
+  auto attr = decl->getAttr<clang::SwiftNewTypeAttr>();
   if (!attr)
     return nullptr;
 
@@ -510,7 +516,7 @@ retrieveNewTypeAttr(const clang::TypedefNameDecl *decl) {
   return attr;
 }
 
-clang::SwiftNewtypeAttr *
+clang::SwiftNewTypeAttr *
 importer::getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
                               ImportNameVersion version) {
   // Newtype was introduced in Swift 3

@@ -120,7 +120,7 @@ func call_class_bounded_archetype(_ x: ConcreteClass) -> ConcreteClass {
   // CHECK: ret %T22class_bounded_generics13ConcreteClassC* [[OUT]]
 }
 
-// CHECK: define hidden swiftcc void @"$s22class_bounded_generics04not_a1_B10_archetype{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.type* %T, i8** %T.NotClassBound)
+// CHECK: define hidden swiftcc void @"$s22class_bounded_generics04not_a1_B10_archetype{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.type* %T, i8** %T.NotClassBound)
 func not_class_bounded_archetype<T : NotClassBound>(_ x: T) -> T {
   return x
 }

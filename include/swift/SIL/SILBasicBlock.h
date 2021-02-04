@@ -488,4 +488,141 @@ private:
 
 } // end llvm namespace
 
+//===----------------------------------------------------------------------===//
+//                           PhiOperand & PhiValue
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Represent a phi argument without storing pointers to branches or their
+/// operands which are invalidated by adding new, unrelated phi values. Because
+/// this only stores a block pointer, it remains valid as long as the CFG is
+/// immutable and the index of the phi value does not change.
+///
+/// Note: this should not be confused with SILPhiArgument which should be
+/// renamed to SILPhiValue and only used for actual phis.
+///
+/// Warning: This is invalid for CondBranchInst arguments. Clients assume that
+/// any instructions inserted at the phi argument is post-dominated by that phi
+/// argument. This warning can be removed once the SILVerifier fully prohibits
+/// CondBranchInst arguments at all SIL stages.
+struct PhiOperand {
+  SILBasicBlock *predBlock = nullptr;
+  unsigned argIndex = 0;
+
+  PhiOperand() = default;
+
+  PhiOperand(Operand *operand) {
+    auto *branch = dyn_cast<BranchInst>(operand->getUser());
+    if (!branch)
+      return;
+
+    predBlock = branch->getParent();
+    argIndex = operand->getOperandNumber();
+  }
+
+  explicit operator bool() const { return predBlock != nullptr; }
+
+  bool operator==(PhiOperand other) const {
+    return predBlock == other.predBlock && argIndex == other.argIndex;
+  }
+
+  bool operator!=(PhiOperand other) const { return !(*this == other); }
+
+  BranchInst *getBranch() const {
+    return cast<BranchInst>(predBlock->getTerminator());
+  }
+
+  Operand *getOperand() const {
+    return &getBranch()->getAllOperands()[argIndex];
+  }
+
+  SILPhiArgument *getValue() const {
+    auto *branch = cast<BranchInst>(predBlock->getTerminator());
+    return cast<SILPhiArgument>(branch->getDestBB()->getArgument(argIndex));
+  }
+
+  SILValue getSource() const {
+    return getOperand()->get();
+  }
+
+  operator Operand *() const { return getOperand(); }
+  Operand *operator*() const { return getOperand(); }
+  Operand *operator->() const { return getOperand(); }
+};
+
+/// Represent a phi value without referencing the SILValue, which is invalidated
+/// by adding new, unrelated phi values. Because this only stores a block
+/// pointer, it remains valid as long as the CFG is immutable and the index of
+/// the phi value does not change.
+struct PhiValue {
+  SILBasicBlock *phiBlock = nullptr;
+  unsigned argIndex = 0;
+
+  PhiValue() = default;
+
+  PhiValue(SILValue value) {
+    auto *blockArg = dyn_cast<SILPhiArgument>(value);
+    if (!blockArg || !blockArg->isPhiArgument())
+      return;
+
+    phiBlock = blockArg->getParent();
+    argIndex = blockArg->getIndex();
+  }
+
+  explicit operator bool() const { return phiBlock != nullptr; }
+
+  bool operator==(PhiValue other) const {
+    return phiBlock == other.phiBlock && argIndex == other.argIndex;
+  }
+
+  bool operator!=(PhiValue other) const { return !(*this == other); }
+
+  SILPhiArgument *getValue() const {
+    return cast<SILPhiArgument>(phiBlock->getArgument(argIndex));
+  }
+
+  operator SILValue() const { return getValue(); }
+  SILValue operator*() const { return getValue(); }
+  SILValue operator->() const { return getValue(); }
+};
+
+} // namespace swift
+
+namespace llvm {
+
+template <> struct DenseMapInfo<swift::PhiOperand> {
+  static swift::PhiOperand getEmptyKey() { return swift::PhiOperand(); }
+  static swift::PhiOperand getTombstoneKey() {
+    swift::PhiOperand phiOper;
+    phiOper.predBlock =
+        llvm::DenseMapInfo<swift::SILBasicBlock *>::getTombstoneKey();
+    return phiOper;
+  }
+  static unsigned getHashValue(swift::PhiOperand phiOper) {
+    return llvm::hash_combine(phiOper.predBlock, phiOper.argIndex);
+  }
+  static bool isEqual(swift::PhiOperand lhs, swift::PhiOperand rhs) {
+    return lhs == rhs;
+  }
+};
+
+template <> struct DenseMapInfo<swift::PhiValue> {
+  static swift::PhiValue getEmptyKey() { return swift::PhiValue(); }
+  static swift::PhiValue getTombstoneKey() {
+    swift::PhiValue phiValue;
+    phiValue.phiBlock =
+        llvm::DenseMapInfo<swift::SILBasicBlock *>::getTombstoneKey();
+    return phiValue;
+  }
+  static unsigned getHashValue(swift::PhiValue phiValue) {
+    return llvm::hash_combine(phiValue.phiBlock, phiValue.argIndex);
+  }
+  static bool isEqual(swift::PhiValue lhs, swift::PhiValue rhs) {
+    return lhs == rhs;
+  }
+};
+
+} // end namespace llvm
+
 #endif

@@ -19,7 +19,7 @@ public func use_global() -> Int {
 // i386-LABEL: {{_?}}$s4main10use_globalSiyF:
 // i386:       [[PIC_BLOCK:^L.*\$pb]]:{{$}}
 // i386:         popl [[PIC_REG:%[a-z]+]]
-// i386:         movl {{_?}}$s4main6globalSivp-[[PIC_BLOCK]]([[PIC_REG]]), {{%[a-z]+}}
+// i386:         leal {{_?}}$s4main6globalSivp-[[PIC_BLOCK]]([[PIC_REG]]), {{%[a-z]+}}
 
 // armv7-LABEL: {{_?}}$s4main10use_globalSiyF:
 // Check for the runtime memory enforcement call. The global address may be
@@ -63,15 +63,13 @@ public func use_global() -> Int {
 
 // arm64-LABEL: {{_?}}$s4main10use_globalSiyF:
 // arm64:        adrp [[REG3:x[0-9]+]], _$s4main6globalSivp@PAGE
-// arm64:        adrp [[REG1:x[0-9]+]], _$s4main6globalSivp@PAGE
-// arm64:        add [[REG1]], [[REG1]], _$s4main6globalSivp@PAGEOFF
-// arm64:        str [[REG3]], [sp, #16]
+// arm64:        str [[REG3]], [sp]
 // arm64:        bl _swift_beginAccess
-// arm64:        ldr [[REG4:x[0-9]+]], [sp, #16]
+// arm64:        ldr [[REG4:x[0-9]+]], [sp]
 // arm64:        ldr [[REG2:x[0-9]+]], {{\[}}[[REG4]], _$s4main6globalSivp@PAGEOFF
-// arm64:        str [[REG2]], [sp]
+// arm64:        str [[REG2]], [sp, #16]
 // arm64:        bl _swift_endAccess
-// arm64:        ldr x0, [sp]
+// arm64:        ldr x0, [sp, #16]
 
 // aarch64-LABEL: $s4main10use_globalSiyF:
 // aarch64:         bl swift_beginAccess
@@ -85,10 +83,11 @@ public func use_global() -> Int {
 // aarch64:         ldr x0, [sp]
 
 // arm64e-LABEL: _$s4main10use_globalSiyF:
-// arm64e:         adrp [[REG1:x[0-9]+]], _$s4main6globalSivp@PAGE
-// arm64e:         add [[REG1]], [[REG1]], _$s4main6globalSivp@PAGEOFF
 // arm64e:         bl _swift_beginAccess
-// arm64e:         ldr {{x[0-9]+}}, {{\[}}[[REG1]]{{\]}}
+// arm64e:         adrp [[REG3:x[0-9]+]], _$s4main6globalSivp@PAGE
+// arm64e:         add  [[REG4:x[0-9]+]], [[REG3]], _$s4main6globalSivp@PAGEOFF
+// arm64e:         ldr {{x[0-9]+}}, {{\[}}[[REG4]]{{\]}}
+// arm64e:         bl _swift_endAccess
 
 // powerpc64le-LABEL: {{_?}}$s4main10use_globalSiyF:
 // powerpc64le:        bl swift_beginAccess

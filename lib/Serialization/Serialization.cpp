@@ -52,7 +52,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
@@ -4526,7 +4526,9 @@ class ClangToSwiftBasicWriter :
 
 public:
   ClangToSwiftBasicWriter(Serializer &S, SmallVectorImpl<uint64_t> &record)
-    : S(S), Record(record), Types(*this) {}
+    : swift::DataStreamBasicWriter<ClangToSwiftBasicWriter>(
+        S.getASTContext().getClangModuleLoader()->getClangASTContext()),
+      S(S), Record(record), Types(*this) {}
 
   void writeUInt64(uint64_t value) {
     Record.push_back(value);
@@ -5387,7 +5389,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       for (auto config : entry.second) {
         std::string paramIndices = config.first.str().str();
         auto genSigID = addGenericSignatureRef(config.second);
-        derivativeConfigs[entry.first].push_back({paramIndices, genSigID});
+        derivativeConfigs[entry.first].push_back(
+          {std::string(paramIndices), genSigID});
       }
     }
     index_block::DerivativeFunctionConfigTableLayout DerivativeConfigTable(Out);

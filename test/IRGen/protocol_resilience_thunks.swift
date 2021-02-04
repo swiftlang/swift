@@ -56,13 +56,13 @@ public protocol MyResilientProtocol {
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i1 [[FN]](%swift.opaque* noalias nocapture swiftself %0, %swift.type* %1, i8** %2)
 // CHECK-NEXT: ret i1 [[RESULT]]
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP10returnsAnyypyFTj"(%Any* noalias nocapture sret %0, %swift.opaque* noalias nocapture swiftself %1, %swift.type* %2, i8** %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP10returnsAnyypyFTj"(%Any* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture swiftself %1, %swift.type* %2, i8** %3)
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %3, i32 3
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to void (%Any*, %swift.opaque*, %swift.type*, i8**)*
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
-// CHECK-NEXT: call swiftcc void [[FN]](%Any* noalias nocapture sret %0, %swift.opaque* noalias nocapture swiftself %1, %swift.type* %2, i8** %3)
+// CHECK-NEXT: call swiftcc void [[FN]](%Any* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture swiftself %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret void
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP12throwingFuncyyKFTj"(%swift.opaque* noalias nocapture swiftself %0, %swift.error**{{( noalias nocapture( swifterror)? dereferenceable\(.\))?}} %1, %swift.type* %2, i8** %3)
@@ -74,13 +74,13 @@ public protocol MyResilientProtocol {
 // CHECK-NEXT: call swiftcc void [[FN]](%swift.opaque* noalias nocapture swiftself %0, %swift.error**{{( noalias nocapture( swifterror)? dereferenceable\(.\))?}} %1, %swift.type* %2, i8** %3)
 // CHECK-NEXT: ret void
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP11genericFuncyqd__qd__lFTj"(%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.type* %2, %swift.opaque* noalias nocapture swiftself %3, %swift.type* %4, i8** %5)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP11genericFuncyqd__qd__lFTj"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.type* %2, %swift.opaque* noalias nocapture swiftself %3, %swift.type* %4, i8** %5)
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %5, i32 5
 // CHECK-NEXT: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[WITNESS]] to void (%swift.opaque*, %swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*, i8**)*
 // CHECK-arm64e-NEXT: ptrtoint i8** [[WITNESS_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend.i64
-// CHECK-NEXT: call swiftcc void [[FN]](%swift.opaque* noalias nocapture sret %0, %swift.opaque* noalias nocapture %1, %swift.type* %2, %swift.opaque* noalias nocapture swiftself %3, %swift.type* %4, i8** %5)
+// CHECK-NEXT: call swiftcc void [[FN]](%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.type* %2, %swift.opaque* noalias nocapture swiftself %3, %swift.type* %4, i8** %5)
 // CHECK-NEXT: ret void
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @"$s26protocol_resilience_thunks19MyResilientProtocolP8propertySbvgTj"(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %1, i8** %2)

@@ -9,6 +9,8 @@
 // RUN: %target-swift-frontend-typecheck -emit-module-interface-path %t/out.swiftinterface %s -I %t -swift-version 5 -enable-library-evolution
 // RUN: %FileCheck %s < %t/out.swiftinterface
 
+// REQUIRES: OS=macosx
+
 #if IOI_LIB
 
 public struct IOIImportedType {
@@ -38,12 +40,26 @@ public protocol PublicProto {
   func foo()
 }
 extension IOIImportedType : PublicProto {}
+
+extension IOIImportedType {
+  #if os(iOS)
+    public func funcForAnotherOS() {}
+  #endif
+}
 // CHECK-NOT: IOIImportedType
+// CHECK-NOT: funcForAnotherOS
 
 extension NormalImportedType : PublicProto {}
 // CHECK: extension NormalImportedType
 
 extension ExportedType : PublicProto {}
 // CHECK: extension ExportedType
+
+extension NormalImportedType {
+  #if os(macOS)
+    public func funcForThisOS() {};
+  #endif
+}
+// CHECK: funcForThisOS
 
 #endif

@@ -438,6 +438,10 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     if (isSanitizerInstrumentation(User))
       continue;
 
+    // We don't care about debug instructions.
+    if (User->isDebugInstruction())
+      continue;
+
     // Otherwise, the use is something complicated, it escapes.
     Uses.emplace_back(User, PMOUseKind::Escape);
   }

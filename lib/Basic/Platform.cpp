@@ -147,6 +147,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::UnknownOS:
     llvm_unreachable("unknown OS");
+  case llvm::Triple::ZOS:
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
   case llvm::Triple::DragonFly:
@@ -159,7 +160,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::Minix:
   case llvm::Triple::RTEMS:
   case llvm::Triple::NaCl:
-  case llvm::Triple::CNK:
   case llvm::Triple::AIX:
   case llvm::Triple::CUDA:
   case llvm::Triple::NVCL:

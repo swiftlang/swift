@@ -329,7 +329,8 @@ namespace irgen {
   void addByvalArgumentAttributes(IRGenModule &IGM,
                                   llvm::AttributeList &attrs,
                                   unsigned argIndex,
-                                  Alignment align);
+                                  Alignment align,
+                                  llvm::Type *storageType);
 
   /// Add signext or zeroext attribute set for an argument that needs
   /// extending.

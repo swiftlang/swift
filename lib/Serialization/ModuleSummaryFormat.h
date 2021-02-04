@@ -13,7 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_MODULE_SUMMARY_FILE_H
 #define SWIFT_SERIALIZATION_MODULE_SUMMARY_FILE_H
 
-#include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitcode/BitcodeConvenience.h"
 #include <memory>
 
 namespace swift {

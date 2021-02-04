@@ -7,4 +7,4 @@ import MyModule
 // RUN: %target-swift-ide-test -print-module-metadata -module-to-print MyModule -enable-swiftsourceinfo -I %t/Modules -source-filename %s | %FileCheck %s
 
 // CHECK: filepath=SOURCE_DIR{{[/\\]}}test{{[/\\]}}Serialization{{[/\\]}}Inputs{{[/\\]}}SourceInfo{{[/\\]}}File1.swift; hash=9da710e9b2de1fff2915639236b8929c; mtime={{[0-9]{4}-[0-9]{2}-[0-9]{2} .*}}; size=35
-// CHECK: filepath=SOURCE_DIR{{[/\\]}}test{{[/\\]}}Serialization{{[/\\]}}Inputs{{[/\\]}}SourceInfo{{[/\\]}}File2.swift; hash=4ce628834bb98fd822ac840ea341de26; mtime={{[0-9]{4}-[0-9]{2}-[0-9]{2} .*}}; size=57
+// CHECK: filepath=SOURCE_DIR{{[/\\]}}test{{[/\\]}}Serialization{{[/\\]}}Inputs{{[/\\]}}SourceInfo{{[/\\]}}File2.swift; hash=22b75a7717318d48f7a979906f35195e; mtime={{[0-9]{4}-[0-9]{2}-[0-9]{2} .*}}; size=57

@@ -13,7 +13,7 @@
 #ifndef SWIFT_AST_FINEGRAINEDDEPENDENCYFORMAT_H
 #define SWIFT_AST_FINEGRAINEDDEPENDENCYFORMAT_H
 
-#include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitcode/BitcodeConvenience.h"
 #include "llvm/Bitstream/BitCodes.h"
 
 namespace llvm {

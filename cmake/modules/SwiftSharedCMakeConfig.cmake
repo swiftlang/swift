@@ -97,6 +97,10 @@ macro(swift_common_standalone_build_config_llvm product)
     endif()
   endif()
 
+  if(LLVM_ENABLE_ZLIB)
+   find_package(ZLIB REQUIRED)
+  endif()
+
   include(AddLLVM)
   include(AddSwiftTableGen) # This imports TableGen from LLVM.
   include(HandleLLVMOptions)

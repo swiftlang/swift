@@ -1840,6 +1840,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   switch (D.Kind) {
   case IITDescriptor::BFloat:
   case IITDescriptor::MMX:
+  case IITDescriptor::AMX:
   case IITDescriptor::Metadata:
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
@@ -1872,7 +1873,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Vector: {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
-    return makeVector(eltType, D.Vector_Width.Min);
+    return makeVector(eltType, D.Vector_Width.getKnownMinValue());
   }
 
   // A pointer to an immediate type.

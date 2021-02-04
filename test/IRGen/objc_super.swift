@@ -46,7 +46,7 @@ class Hoozit : Gizmo {
     // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to [[CLASS]]*
     // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(frame)"
-    // CHECK: call void bitcast (void ()* @objc_msgSendSuper2_stret to void ([[NSRECT]]*, [[SUPER]]*, i8*)*)([[NSRECT]]* noalias nocapture sret {{.*}}, [[SUPER]]* {{.*}}, i8* {{.*}})
+    // CHECK: call void bitcast (void ()* @objc_msgSendSuper2_stret to void ([[NSRECT]]*, [[SUPER]]*, i8*)*)([[NSRECT]]* noalias nocapture sret({{.*}}) {{.*}}, [[SUPER]]* {{.*}}, i8* {{.*}})
     return NSInsetRect(super.frame(), 2.0, 2.0)
   }
   // CHECK: }

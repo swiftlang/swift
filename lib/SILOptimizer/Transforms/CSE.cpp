@@ -629,20 +629,20 @@ private:
   class StackNode {
    public:
     StackNode(ScopedHTType *availableValues, DominanceInfoNode *n,
-              DominanceInfoNode::iterator child,
-              DominanceInfoNode::iterator end)
+              DominanceInfoNode::const_iterator child,
+              DominanceInfoNode::const_iterator end)
         : Node(n), ChildIter(child), EndIter(end), Scopes(availableValues),
       Processed(false) {}
 
     // Accessors.
     DominanceInfoNode *node() { return Node; }
-    DominanceInfoNode::iterator childIter() { return ChildIter; }
+    DominanceInfoNode::const_iterator childIter() { return ChildIter; }
     DominanceInfoNode *nextChild() {
       DominanceInfoNode *child = *ChildIter;
       ++ChildIter;
       return child;
     }
-    DominanceInfoNode::iterator end() { return EndIter; }
+    DominanceInfoNode::const_iterator end() { return EndIter; }
     bool isProcessed() { return Processed; }
     void process() { Processed = true; }
 
@@ -652,8 +652,8 @@ private:
 
     // Members.
     DominanceInfoNode *Node;
-    DominanceInfoNode::iterator ChildIter;
-    DominanceInfoNode::iterator EndIter;
+    DominanceInfoNode::const_iterator ChildIter;
+    DominanceInfoNode::const_iterator EndIter;
     NodeScope Scopes;
     bool Processed;
   };
@@ -1397,9 +1397,8 @@ class SILCSE : public SILFunctionTransform {
 
     auto *Fn = getFunction();
     DeadEndBlocks DeadEndBBs(Fn);
-    JointPostDominanceSetComputer Computer(DeadEndBBs);
     InstModCallbacks callbacks;
-    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs, Computer};
+    OwnershipFixupContext FixupCtx{callbacks, DeadEndBBs};
     CSE C(RunsOnHighLevelSil, SEA, FuncBuilder, DeadEndBBs, FixupCtx);
     bool Changed = false;
 

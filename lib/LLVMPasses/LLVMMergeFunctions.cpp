@@ -683,7 +683,7 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
     // If invoked from IRGen in the compiler, those options are already set.
     // If invoked from swift-llvm-opt, derive the options from the target triple.
     Triple triple(M.getTargetTriple());
-    ptrAuthEnabled = (triple.getSubArch() == Triple::AArch64SubArch_E);
+    ptrAuthEnabled = (triple.getSubArch() == Triple::AArch64SubArch_arm64e);
     ptrAuthKey = (unsigned)clang::PointerAuthSchema::ARM8_3Key::ASIA;
     ptrAuthOptionsSet = true;
   }

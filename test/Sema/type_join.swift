@@ -120,3 +120,14 @@ func rdar37241221(_ a: C?, _ b: D?) {
   let inferred = [a!, b]
   expectEqualType(type(of: array_c_opt).self, type(of: inferred).self)
 }
+
+extension FixedWidthInteger {
+  public static func test_nonstale_join_result<Other: BinaryInteger>(_ lhs: inout Self, _ rhs: Other) {
+    let shift = rhs < -Self.bitWidth ? -Self.bitWidth
+               : rhs > Self.bitWidth ? Self.bitWidth
+               : Int(rhs) // `shift` is `Int`
+
+    func accepts_int(_: Int) {}
+    accepts_int(shift) // Ok
+  }
+}

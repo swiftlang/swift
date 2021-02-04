@@ -44,6 +44,8 @@ class DataStreamBasicWriter
 public:
   using super::asImpl;
 
+  DataStreamBasicWriter(clang::ASTContext &ctx) : super(ctx) {}
+
   /// Perform all the calls necessary to write out the given type.
   void writeTypeRef(const clang::Type *type) {
     asImpl().writeUInt64(uint64_t(type->getTypeClass()));

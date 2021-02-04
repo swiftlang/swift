@@ -59,12 +59,10 @@ typedef NS_OPTIONS(NSUInteger, OMWWobbleOptions) {
 
 @protocol OMWWiggle
 -(void)joinSub;
--(void)conflicting1 NS_SWIFT_NAME(wiggle1());
 @property (readonly) NSInteger conflictingProp1 NS_SWIFT_NAME(wiggleProp1);
 @end
 
 @protocol OMWWaggle
--(void)conflicting1 NS_SWIFT_NAME(waggle1());
 @property (readonly) NSInteger conflictingProp1 NS_SWIFT_NAME(waggleProp1);
 @end
 
@@ -76,7 +74,6 @@ typedef NS_OPTIONS(NSUInteger, OMWWobbleOptions) {
 @interface OMWSub : OMWSuper <OMWWaggle>
 -(void)jumpSuper;
 -(void)joinSub;
--(void)conflicting1;
 @property (readonly) NSInteger conflictingProp1;
 @end
 

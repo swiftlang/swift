@@ -928,6 +928,8 @@ public:
         pushRegion(BS);
 
     } else if (auto *IS = dyn_cast<IfStmt>(S)) {
+      if (auto *Cond = getConditionNode(IS->getCond()))
+        assignCounter(Cond, CounterExpr::Ref(getCurrentCounter()));
       assignCounter(IS, CounterExpr::Zero());
       CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
       if (IS->getElseStmt())

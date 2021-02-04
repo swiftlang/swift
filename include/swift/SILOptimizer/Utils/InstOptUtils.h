@@ -695,15 +695,13 @@ SILBasicBlock::iterator replaceSingleUse(Operand *use, SILValue newValue,
 /// and destroy at leaking blocks to adjust ownership and make available for use
 /// at \p inBlock.
 SILValue
-makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock,
-                         JointPostDominanceSetComputer *jointPostDomComputer);
+makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock);
 
 /// Given a newly created @owned value \p value without any uses, this utility
 /// inserts control equivalent copy and destroy at leaking blocks to adjust
 /// ownership and make \p value available for use at \p inBlock.
 SILValue
-makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock,
-                      JointPostDominanceSetComputer *jointPostDomComputer);
+makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock);
 
 /// Given a forwarding instruction, eliminate it if all of its users are debug
 /// instructions and ownership uses.

@@ -759,8 +759,7 @@ swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
   assert(svi != result && "Cannot RAUW a value with itself");
 
   if (svi->getFunction()->hasOwnership()) {
-    JointPostDominanceSetComputer computer(*deadEndBlocks);
-    OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
+    OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
     OwnershipRAUWHelper helper(ctx, svi, result);
     return helper.perform();
   }
@@ -812,8 +811,7 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!deadEndBlocks)
     return next;
 
-  JointPostDominanceSetComputer computer(*deadEndBlocks);
-  OwnershipFixupContext ctx{callbacks, *deadEndBlocks, computer};
+  OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
   OwnershipRAUWHelper helper(ctx, svi, result);
 
   // If our RAUW helper is invalid, we do not support RAUWing this case, so
