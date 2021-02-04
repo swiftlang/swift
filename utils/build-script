@@ -339,6 +339,13 @@ def apply_default_arguments(toolchain, args):
         args.build_subdir = \
             workspace.compute_build_subdir(args)
 
+    if args.relocate_xdg_cache_home_under_build_subdir:
+        cache_under_build_subdir = os.path.join(
+            SWIFT_BUILD_ROOT, args.build_subdir, '.cache')
+        if args.verbose_build:
+            print("Relocating XDG_CACHE_HOME to {}".format(cache_under_build_subdir))
+        workspace.relocate_xdg_cache_home_under(cache_under_build_subdir)
+
     if args.install_destdir is None:
         args.install_destdir = os.path.join(
             SWIFT_BUILD_ROOT, args.build_subdir,

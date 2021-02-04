@@ -104,7 +104,7 @@ struct BasicSourceFileInfo {
 
   BasicSourceFileInfo() {}
 
-  bool populate(SourceFile *SF);
+  bool populate(const SourceFile *SF);
 };
 
 } // namespace swift

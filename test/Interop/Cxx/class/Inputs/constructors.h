@@ -63,6 +63,17 @@ struct TemplatedConstructorWithExtraArg {
   TemplatedConstructorWithExtraArg(T value, U other) { }
 };
 
+struct HasUserProvidedCopyConstructor {
+  int numCopies;
+  HasUserProvidedCopyConstructor(int numCopies = 0) : numCopies(numCopies) {}
+  HasUserProvidedCopyConstructor(const HasUserProvidedCopyConstructor &other)
+      : numCopies(other.numCopies + 1) {}
+};
+
+struct DeletedCopyConstructor {
+  DeletedCopyConstructor(const DeletedCopyConstructor &) = delete;
+};
+
 // TODO: we should be able to import this constructor correctly. Until we can,
 // make sure not to crash.
 struct UsingBaseConstructor : ConstructorWithParam {

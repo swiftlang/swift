@@ -1107,17 +1107,6 @@ namespace driver {
         }
       };
 
-      // Load our priors, which are always adjacent to the build record. We
-      // don't care if this load succeeds or not. If it fails, and we succeed at
-      // integrating one of the external files below, the changeset will be the
-      // entire module!
-      const auto *externalPriorJob = Comp.addExternalJob(
-          std::make_unique<Job>(Comp.getDerivedOutputFileMap(),
-                                Comp.getExternalSwiftDepsFilePath()));
-      getFineGrainedDepGraph().loadFromPath(
-          externalPriorJob, Comp.getExternalSwiftDepsFilePath(),
-          Comp.getDiags());
-
       for (auto external : getFineGrainedDepGraph()
                                .getIncrementalExternalDependencies()) {
         llvm::sys::fs::file_status depStatus;

@@ -1,3 +1,4 @@
+// REQUIRES: rdar73931872
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL

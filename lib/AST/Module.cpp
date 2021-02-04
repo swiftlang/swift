@@ -1536,9 +1536,9 @@ const clang::Module *ModuleDecl::findUnderlyingClangModule() const {
 }
 
 void ModuleDecl::collectBasicSourceFileInfo(
-    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) {
-  for (FileUnit *fileUnit : getFiles()) {
-    if (SourceFile *SF = dyn_cast<SourceFile>(fileUnit)) {
+    llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
+  for (const FileUnit *fileUnit : getFiles()) {
+    if (const auto *SF = dyn_cast<SourceFile>(fileUnit)) {
       BasicSourceFileInfo info;
       if (info.populate(SF))
         continue;
@@ -1547,6 +1547,25 @@ void ModuleDecl::collectBasicSourceFileInfo(
       serialized->collectBasicSourceFileInfo(callback);
     }
   }
+}
+
+Fingerprint ModuleDecl::getFingerprint() const {
+  StableHasher hasher = StableHasher::defaultHasher();
+  SmallVector<Fingerprint, 16> FPs;
+  collectBasicSourceFileInfo([&](const BasicSourceFileInfo &bsfi) {
+    FPs.emplace_back(bsfi.InterfaceHash);
+  });
+  
+  // Sort the fingerprints lexicographically so we have a stable hash despite
+  // an unstable ordering of files across rebuilds.
+  // FIXME: If we used a commutative hash combine (say, if we could take an
+  // XOR here) we could avoid this sort.
+  std::sort(FPs.begin(), FPs.end(), std::less<Fingerprint>());
+  for (const auto &FP : FPs) {
+    hasher.combine(FP);
+  }
+
+  return Fingerprint{std::move(hasher)};
 }
 
 //===----------------------------------------------------------------------===//

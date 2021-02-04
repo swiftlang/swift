@@ -7,3 +7,8 @@ module WitnessLayoutOpts {
   header "witness-layout-opts.h"
   requires cplusplus
 }
+
+module CopyConstructors {
+  header "copy-constructors.h"
+  requires cplusplus
+}

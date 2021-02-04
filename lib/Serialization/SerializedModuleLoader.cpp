@@ -1001,7 +1001,8 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
     // Don't record cached artifacts as dependencies.
     if (!isCached(DepPath)) {
       if (M->hasIncrementalInfo()) {
-        dependencyTracker->addIncrementalDependency(DepPath);
+        dependencyTracker->addIncrementalDependency(DepPath,
+                                                    M->getFingerprint());
       } else {
         dependencyTracker->addDependency(DepPath, /*isSystem=*/false);
       }

@@ -2516,6 +2516,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
 
 static void printModuleMetadata(ModuleDecl *MD) {
   auto &OS = llvm::outs();
+  OS << "fingerprint=" << MD->getFingerprint().getRawValue() << "\n";
   MD->collectLinkLibraries([&](LinkLibrary lib) {
     OS << "link library: " << lib.getName()
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
@@ -3293,8 +3294,8 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   StreamPrinter Printer(llvm::outs());
   std::string Error;
   std::string TypeName;
-  if (printTypeInterface(SemaT.DC->getParentModule(), SemaT.Ty, Printer,
-                         TypeName, Error)) {
+  if (printTypeInterface(SemaT.ValueD->getDeclContext()->getParentModule(),
+                         SemaT.Ty, Printer, TypeName, Error)) {
     llvm::errs() << Error;
     return 1;
   }

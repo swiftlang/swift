@@ -5152,6 +5152,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
 void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   PrettyStackTraceDecl stackTraceRAII("emitting metadata for", protocol);
 
+  // Marker protocols are never emitted.
+  if (protocol->isMarkerProtocol())
+    return;
+
   // Emit remote reflection metadata for the protocol.
   emitFieldDescriptor(protocol);
 
@@ -5241,6 +5245,11 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
     case RequirementKind::Conformance: {
       auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
         ->getDecl();
+
+      // Marker protocols do not record generic requirements at all.
+      if (protocol->isMarkerProtocol())
+        break;
+
       bool needsWitnessTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,

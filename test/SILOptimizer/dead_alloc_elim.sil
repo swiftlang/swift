@@ -2,6 +2,7 @@
 
 import Swift
 import Builtin
+import SwiftShims
 
 //////////
 // Data //
@@ -19,6 +20,11 @@ class Kl {}
 class NontrivialDestructor {
   @_hasStorage var p : Kl 
   @_hasStorage var i : Int 
+  init()
+}
+
+class ArrayStorage {
+  @_hasStorage var bodyField : Kl 
   init()
 }
 
@@ -441,6 +447,199 @@ bb0(%0 : $X):
   inject_enum_addr %3 : $*Optional<P>, #Optional.some!enumelt
   destroy_addr %3 : $*Optional<P>
   dealloc_stack %3 : $*Optional<P>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @remove_dead_array_with_destroy_simple
+// CHECK-NOT:   alloc_ref
+// CHECK-NOT:   dealloc_ref
+// CHECK:       strong_release %0 : $Kl
+// CHECK-NEXT:  strong_release %0 : $Kl
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+// CHECK:      } // end sil function 'remove_dead_array_with_destroy_simple'
+sil @remove_dead_array_with_destroy_simple : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : $Kl):
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [tail_elems $Kl * %3 : $Builtin.Word] $ArrayStorage
+  %11 = ref_tail_addr %4 : $ArrayStorage, $Kl
+  store %0 to %11 : $*Kl
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
+  retain_value %0 : $Kl
+  store %0 to %28 : $*Kl
+  set_deallocating %4 : $ArrayStorage
+  %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
+  %66 = metatype $@thick Kl.Type
+  %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  dealloc_ref %4 : $ArrayStorage
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @remove_dead_array_with_destroy_complex
+// CHECK-NOT:   alloc_ref
+// CHECK-NOT:   dealloc_ref
+// CHECK:       release_value %0 : $String
+// CHECK-NEXT:  release_value %0 : $String
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+// CHECK:      } // end sil function 'remove_dead_array_with_destroy_complex'
+sil @remove_dead_array_with_destroy_complex : $@convention(thin) (@guaranteed String, Int, UInt) -> () {
+bb0(%0 : $String, %1 : $Int, %2 : $UInt):
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [stack] [tail_elems $(Int, String) * %3 : $Builtin.Word] $_ContiguousArrayStorage<(Int, String)>
+  %5 = upcast %4 : $_ContiguousArrayStorage<(Int, String)> to $__ContiguousArrayStorageBase
+  %6 = struct $_SwiftArrayBodyStorage (%1 : $Int, %2 : $UInt)
+  %7 = struct $_ArrayBody (%6 : $_SwiftArrayBodyStorage)
+  %9 = ref_element_addr %5 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  store %7 to %9 : $*_ArrayBody
+  %11 = ref_tail_addr %5 : $__ContiguousArrayStorageBase, $(Int, String)
+  %12 = tuple_element_addr %11 : $*(Int, String), 0
+  %13 = tuple_element_addr %11 : $*(Int, String), 1
+  retain_value %0 : $String
+  store %1 to %12 : $*Int
+  store %0 to %13 : $*String
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr %11 : $*(Int, String), %27 : $Builtin.Word
+  %29 = tuple_element_addr %28 : $*(Int, String), 0
+  %30 = tuple_element_addr %28 : $*(Int, String), 1
+  retain_value %0 : $String
+  store %1 to %29 : $*Int
+  store %0 to %30 : $*String
+  set_deallocating %4 : $_ContiguousArrayStorage<(Int, String)>
+  %64 = ref_tail_addr %4 : $_ContiguousArrayStorage<(Int, String)>, $(Int, String)
+  %65 = address_to_pointer %64 : $*(Int, String) to $Builtin.RawPointer
+  %66 = metatype $@thick (Int, String).Type
+  %67 = builtin "destroyArray"<(Int, String)>(%66 : $@thick (Int, String).Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  fix_lifetime %4 : $_ContiguousArrayStorage<(Int, String)>
+  dealloc_ref %4 : $_ContiguousArrayStorage<(Int, String)>
+  dealloc_ref [stack] %4 : $_ContiguousArrayStorage<(Int, String)>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_dead_array_overlapping_stores
+// CHECK:   alloc_ref
+// CHECK:   dealloc_ref
+// CHECK: } // end sil function 'dont_remove_dead_array_overlapping_stores'
+sil @dont_remove_dead_array_overlapping_stores : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : $Kl):
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [tail_elems $Kl * %3 : $Builtin.Word] $ArrayStorage
+  %11 = ref_tail_addr %4 : $ArrayStorage, $Kl
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
+  retain_value %0 : $Kl
+  store %0 to %28 : $*Kl
+  store %0 to %11 : $*Kl
+  %30 = index_addr %11 : $*Kl, %27 : $Builtin.Word
+  retain_value %0 : $Kl
+  store %0 to %30 : $*Kl // Overwrites the first store
+  set_deallocating %4 : $ArrayStorage
+  %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
+  %66 = metatype $@thick Kl.Type
+  %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  dealloc_ref %4 : $ArrayStorage
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_dead_array_store_to_body
+// CHECK:   alloc_ref
+// CHECK:   dealloc_ref
+// CHECK: } // end sil function 'dont_remove_dead_array_store_to_body'
+sil @dont_remove_dead_array_store_to_body : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : $Kl):
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [tail_elems $Kl * %3 : $Builtin.Word] $ArrayStorage
+  %5 = ref_element_addr %4 : $ArrayStorage, #ArrayStorage.bodyField
+  %11 = ref_tail_addr %4 : $ArrayStorage, $Kl
+  store %0 to %5 : $*Kl // Store non-trivial type to body of ArrayStorage
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
+  retain_value %0 : $Kl
+  store %0 to %28 : $*Kl
+  set_deallocating %4 : $ArrayStorage
+  %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
+  %66 = metatype $@thick Kl.Type
+  %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  dealloc_ref %4 : $ArrayStorage
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_dead_array_out_of_bounds_store
+// CHECK:   alloc_ref
+// CHECK:   dealloc_ref
+// CHECK: } // end sil function 'dont_remove_dead_array_out_of_bounds_store'
+sil @dont_remove_dead_array_out_of_bounds_store: $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : $Kl):
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [tail_elems $Kl * %3 : $Builtin.Word] $ArrayStorage
+  %11 = ref_tail_addr %4 : $ArrayStorage, $Kl
+  store %0 to %11 : $*Kl
+  %28 = index_addr %11 : $*Kl, %2 : $Builtin.Word // out-of-bounds store
+  retain_value %0 : $Kl
+  store %0 to %28 : $*Kl
+  set_deallocating %4 : $ArrayStorage
+  %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
+  %66 = metatype $@thick Kl.Type
+  %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  dealloc_ref %4 : $ArrayStorage
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_dead_array_unknown_bounds
+// CHECK:   alloc_ref
+// CHECK:   dealloc_ref
+// CHECK: } // end sil function 'dont_remove_dead_array_unknown_bounds'
+sil @dont_remove_dead_array_unknown_bounds : $@convention(thin) (@owned Kl, Builtin.Word) -> () {
+bb0(%0 : $Kl, %1 : $Builtin.Word):
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [tail_elems $Kl * %3 : $Builtin.Word] $ArrayStorage
+  %11 = ref_tail_addr %4 : $ArrayStorage, $Kl
+  store %0 to %11 : $*Kl
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
+  retain_value %0 : $Kl
+  store %0 to %28 : $*Kl
+  set_deallocating %4 : $ArrayStorage
+  %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
+  %66 = metatype $@thick Kl.Type
+  %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  dealloc_ref %4 : $ArrayStorage
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_dead_array_wrong_blocks
+// CHECK:   alloc_ref
+// CHECK:   dealloc_ref
+// CHECK: } // end sil function 'dont_remove_dead_array_wrong_blocks'
+sil @dont_remove_dead_array_wrong_blocks : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : $Kl):
+  %3 = integer_literal $Builtin.Word, 2
+  %4 = alloc_ref [tail_elems $Kl * %3 : $Builtin.Word] $ArrayStorage
+  %11 = ref_tail_addr %4 : $ArrayStorage, $Kl
+  cond_br undef, bb1, bb2
+bb1:
+  store %0 to %11 : $*Kl
+  br bb3
+bb2:
+  %27 = integer_literal $Builtin.Word, 1
+  %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
+  store %0 to %28 : $*Kl
+  br bb3
+bb3:
+  set_deallocating %4 : $ArrayStorage
+  %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
+  %66 = metatype $@thick Kl.Type
+  %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  dealloc_ref %4 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }

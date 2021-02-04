@@ -2401,6 +2401,7 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
         // TODO: remove this once all platforms support lowering the intrinsic.
         // At the time of this writing only arm64 supports it.
         if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {
+          llvm::Value *storedCallerContext = callerContext;
           auto contextLocationInExtendedFrame =
               Address(Builder.CreateIntrinsicCall(
                           llvm::Intrinsic::swift_async_context_addr, {}),
@@ -2412,9 +2413,9 @@ llvm::Function *IRGenFunction::getOrCreateResumePrjFn() {
             auto authInfo = PointerAuthInfo::emit(
                 IGF, schema, contextLocationInExtendedFrame.getAddress(),
                 PointerAuthEntity());
-            callerContext = emitPointerAuthSign(IGF, callerContext, authInfo);
+            storedCallerContext = emitPointerAuthSign(IGF, storedCallerContext, authInfo);
           }
-          Builder.CreateStore(callerContext, contextLocationInExtendedFrame);
+          Builder.CreateStore(storedCallerContext, contextLocationInExtendedFrame);
         }
         Builder.CreateRet(callerContext);
       },

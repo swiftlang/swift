@@ -120,6 +120,7 @@ getLoweredTypeAndTypeInfo(IRGenModule &IGM, Type unloweredType) {
 /// emitBuiltinCall - Emit a call to a builtin function.
 void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
                             Identifier FnId, SILType resultType,
+                            ArrayRef<SILType> argTypes,
                             Explosion &args, Explosion &out,
                             SubstitutionMap substitutions) {
   if (Builtin.ID == BuiltinValueKind::COWBufferForReading) {
@@ -1074,7 +1075,18 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 
   if (Builtin.ID == BuiltinValueKind::TSanInoutAccess) {
     auto address = args.claimNext();
-    IGF.emitTSanInoutAccessCall(address);
+
+    // The tsanInoutAccess builtin takes a single argument, the address
+    // of the accessed storage
+    SILType accessedType = argTypes[0];
+
+    // Empty types (such as structs without stored properties) have a
+    // meaningless value for their address. We not should call into the
+    // TSan runtime to check for data races on accesses on such addresses.
+    if (!IGF.IGM.getTypeInfo(accessedType)
+        .isKnownEmpty(ResilienceExpansion::Maximal)) {
+      IGF.emitTSanInoutAccessCall(address);
+    }
     return;
   }
 

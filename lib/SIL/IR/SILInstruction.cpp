@@ -1131,6 +1131,7 @@ bool SILInstruction::mayRelease() const {
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
+  case SILInstructionKind::UncheckedOwnershipConversionInst:
     return true;
 
   case SILInstructionKind::CheckedCastAddrBranchInst: {

@@ -391,6 +391,35 @@ public:
       }
     }
   }
+
+  void visitMarkerAttr(MarkerAttr *attr) {
+    auto proto = dyn_cast<ProtocolDecl>(D);
+    if (!proto)
+      return;
+
+    // A marker protocol cannot inherit a non-marker protocol.
+    for (auto inheritedProto : proto->getInheritedProtocols()) {
+      if (!inheritedProto->isMarkerProtocol()) {
+        proto->diagnose(
+            diag::marker_protocol_inherit_nonmarker,
+            proto->getName(), inheritedProto->getName());
+        inheritedProto->diagnose(
+            diag::decl_declared_here, inheritedProto->getName());
+      }
+    }
+
+    // A marker protocol cannot have any requirements.
+    for (auto member : proto->getAllMembers()) {
+      auto value = dyn_cast<ValueDecl>(member);
+      if (!value)
+        continue;
+
+      if (value->isProtocolRequirement()) {
+        value->diagnose(diag::marker_protocol_requirement, proto->getName());
+        break;
+      }
+    }
+  }
 };
 } // end anonymous namespace
 

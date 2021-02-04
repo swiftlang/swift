@@ -51,8 +51,8 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // CHECK: fadd float
 // V7K-LABEL: _$s8test_v7k9addStack
 // V7K: sub     sp, #80
-// V7K: vldr s15, [sp, #88]
-// V7K: vadd.f32 s0, s14, s15
+// V7K: vldr s0, [sp, #88]
+// V7K: vadd.f32 s0, s14, s0
 // a is assigned to s14, b is via stack, c is via stack since it can't be back-filled to s15
 func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double, 
                d5: Double, d6: Double, a: Float, b: Double, c: Float) -> Float {
@@ -81,8 +81,11 @@ func testSingle(x: SingleCase) -> Int32{
 // CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A4Data{{.*}}"(i32 %0, double %1)
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k0A4Data
-// V7K: vstr d0
-// V7K: vmov.f64 d0
+// V7K: vstr    d0, [sp, #16]
+// V7K: vldr    d16, [sp, #16]
+// V7K: vstr    d16, [sp, #8]
+// V7K: vldr    d0, [sp, #8]
+// V7K: bx      lr
 enum DataCase { case Y(Int, Double) }
 func testData(x: DataCase) -> Double {
   switch x {
@@ -116,7 +119,7 @@ func testClike2(x: CLike2) -> Int {
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: _$s8test_v7k0A6Clike8
 // V7K: sxtb r0, r1
-// V7K: cmp r0, #0
+// V7K: cbnz r0
 // V7K: movs r0, #1
 // V7K: mvn r0, #0
 enum CLike8 {
@@ -153,7 +156,7 @@ func testClike8(t: Int, x: CLike8) -> Int {
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // V7K-LABEL: _$s8test_v7k0A7SingleP
 // V7K: tst.w     r2, #1
-// V7K: vmov.f64 d0
+// V7K: vldr    d0, [{{.*}}]
 enum SinglePayload {
   case Paragraph
   case Char(Double)
@@ -180,9 +183,15 @@ func testSingleP(x: SinglePayload) -> Double {
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // CHECK: ret double
 // V7K-LABEL: _$s8test_v7k0A6MultiP
-// V7K:        vldr     d16, [sp{{.*}}]
-// V7K:        vmov.f64 d0, d16
-// V7K:        bx lr
+// V7K:        ldr     r0, [sp, #24]
+// V7K:        ldr     r1, [sp, #28]
+// V7K:        vmov    d16, r0, r1
+// V7K:        vstr    d16, [sp, #8]
+// V7K:        vldr    d16, [sp, #8]
+// V7K:        vstr    d16, [sp]
+// V7K:        vldr    d0, [sp]
+// V7K:        add     sp, #{{[0-9]+}}
+// V7K:        bx      lr
 // Backend will assign r0, r1 and r2 for input parameters and d0 for return values.
 class Bignum {}
 enum MultiPayload {
@@ -210,11 +219,9 @@ func testMultiP(x: MultiPayload) -> Double {
 // CHECK: ret float
 // V7K-LABEL: _$s8test_v7k0A3Opt
 // V7K:         tst.w     r1, #1
-// V7K:         str     r0, [sp, [[SLOT:#[0-9]+]]
-// V7K:         ldr     r0, [sp, [[SLOT]]
 // V7K:         vmov    s0, r0
-// V7K:         vstr    s0, [sp, [[SLOT2:#[0-9]+]]
-// V7K:         vldr    s0, [sp, [[SLOT2]]
+// V7K:         vstr    s0, [sp, [[SLOT:#[0-9]+]]
+// V7K:         vldr    s0, [sp, [[SLOT]]
 // V7K:         pop     {{{.*}}, pc}
 func testOpt(x: Float?) -> Float {
   return x!
@@ -273,12 +280,9 @@ struct MyRect4 {
 // V7K-LABEL: _$s8test_v7k0A4Ret2
 // double in d0, i32 in r0, return in d0,...,d3
 // V7K: vmov [[ID:s[0-9]+]], r0
-// V7K: vcvt.f64.s32 [[ID2:d[0-9]+]], [[ID]]
-// V7K: vstr d0, [sp, #8]
-// V7K: vmov.f64 d0, [[ID2]]
+// V7K: vcvt.f64.s32 d0, [[ID]]
 // V7K: bl
-// V7K: vldr [[ID3:d[0-9]+]], [sp, #8]
-// V7K: vmov.f64 d2, [[ID3]]
+// V7K: vldr    d2, [sp, #8]
 func testRet2(w : Double, i : Int) -> MyRect {
   var r = MyRect(x : Double(i), y : 2.0, w : 3.0, h : 4.0)
   r.w = w
@@ -292,16 +296,16 @@ func testRet3() -> MyRect2 {
 }
 
 // Returning tuple?: (Int x 6)?
-// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax2{{.*}}"({{%TSi.*}} noalias nocapture sret %0, i32 %1, i32 %2)
+// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax2{{.*}}"({{%TSi.*}} noalias nocapture sret({{.*}}) %0, i32 %1, i32 %2)
 // V7K-LABEL: _$s8test_v7k7minMax2
 // We will indirectly return an optional with the address in r0, input parameters will be in r1 and r2
-// V7K: cmp r1, r2
 // V7K: str r0, [sp, [[IDX:#[0-9]+]]]
+// V7K: cmp r1, r2
 // V7K: ldr [[R0_RELOAD:r[0-9]+]], [sp, [[IDX]]]
-// V7K: str.w {{.*}}, [{{.*}}[[R0_RELOAD]]]
+// V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]]]
 // V7K: str.w {{.*}}, [{{.*}}[[R0_RELOAD]], #4]
 // V7K: str.w {{.*}}, [{{.*}}[[R0_RELOAD]], #8]
-// V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #12]
+// V7K: str.w {{.*}}, [{{.*}}[[R0_RELOAD]], #12]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #16]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #20]
 // V7K: and {{.*}}, {{.*}}, #1
@@ -320,7 +324,7 @@ func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min
 }
 
 // Returning struct?: {Int x 6}?
-// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax3{{.*}}"({{%T.*}} noalias nocapture sret %0, i32 %1, i32 %2)
+// CHECK-LABEL: define hidden swiftcc void @"$s8test_v7k7minMax3{{.*}}"({{%T.*}} noalias nocapture sret({{.*}}) %0, i32 %1, i32 %2)
 // V7K-LABEL: _$s8test_v7k7minMax3
 struct Ret {
   var min:Int

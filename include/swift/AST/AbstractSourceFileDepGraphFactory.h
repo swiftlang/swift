@@ -87,6 +87,12 @@ protected:
 
   void addAUsedDecl(const DependencyKey &def, const DependencyKey &use);
 
+  /// Add an external dependency node to the graph. If the provided fingerprint
+  /// is not \c None, it is added to the def key.
+  void addAnExternalDependency(const DependencyKey &def,
+                               const DependencyKey &use,
+                               Optional<Fingerprint> dependencyFingerprint);
+
   static Optional<Fingerprint>
   getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {
     return None;

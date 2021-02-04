@@ -106,6 +106,7 @@ UID_KEYS = [
     KEY('IsDeprecated', 'key.is_deprecated'),
     KEY('IsUnavailable', 'key.is_unavailable'),
     KEY('IsOptional', 'key.is_optional'),
+    KEY('IsAsync', 'key.is_async'),
     KEY('Message', 'key.message'),
     KEY('Introduced', 'key.introduced'),
     KEY('Deprecated', 'key.deprecated'),

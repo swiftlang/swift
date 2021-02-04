@@ -3918,6 +3918,12 @@ public:
                            proto->getName());
         T->setInvalid();
       }
+      if (proto->isMarkerProtocol()) {
+        Ctx.Diags.diagnose(comp->getNameLoc(),
+                           diag::marker_protocol_value,
+                           proto->getName());
+        T->setInvalid();
+      }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
       type.findIf([&](Type type) -> bool {
@@ -3927,6 +3933,14 @@ public:
           auto layout = type->getExistentialLayout();
           for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
+
+            if (protoDecl->isMarkerProtocol()) {
+              Ctx.Diags.diagnose(comp->getNameLoc(),
+                                 diag::marker_protocol_value,
+                                 protoDecl->getName());
+              T->setInvalid();
+              continue;
+            }
 
             if (protoDecl->existentialTypeSupported())
               continue;
@@ -4029,12 +4043,26 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
     };
   }
 
-  ASTContext &ctx = dc->getASTContext();
   const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener)
                         .resolveType(attr->getTypeRepr());
 
-  // We always require the type to resolve to a nominal type.
-  if (!type->getAnyNominal()) {
+  // We always require the type to resolve to a nominal type. If the type was
+  // not a nominal type, we should have already diagnosed an error via
+  // CustomAttrNominalRequest.
+  auto checkType = [](Type type) -> bool {
+    while (auto *genericDecl = type->getAnyGeneric()) {
+      if (isa<NominalTypeDecl>(genericDecl))
+        return true;
+
+      auto *aliasDecl = cast<TypeAliasDecl>(genericDecl);
+      type = aliasDecl->getUnderlyingType();
+    }
+
+    return false;
+  };
+
+  if (!checkType(type)) {
+    ASTContext &ctx = dc->getASTContext();
     assert(ctx.Diags.hadAnyError());
     return ErrorType::get(ctx);
   }

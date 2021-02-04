@@ -50,9 +50,10 @@ DependencyTracker::addDependency(StringRef File, bool IsSystem) {
                                      /*IsMissing=*/false);
 }
 
-void DependencyTracker::addIncrementalDependency(StringRef File) {
+void DependencyTracker::addIncrementalDependency(StringRef File,
+                                                 Fingerprint FP) {
   if (incrementalDepsUniquer.insert(File).second) {
-    incrementalDeps.emplace_back(File.str());
+    incrementalDeps.emplace_back(File.str(), FP);
   }
 }
 
@@ -61,7 +62,7 @@ DependencyTracker::getDependencies() const {
   return clangCollector->getDependencies();
 }
 
-ArrayRef<std::string>
+ArrayRef<DependencyTracker::IncrementalDependency>
 DependencyTracker::getIncrementalDependencies() const {
   return incrementalDeps;
 }

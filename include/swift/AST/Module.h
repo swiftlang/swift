@@ -734,7 +734,20 @@ public:
 
   /// Calls \p callback for each source file of the module.
   void collectBasicSourceFileInfo(
-      llvm::function_ref<void(const BasicSourceFileInfo &)> callback);
+      llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const;
+
+public:
+  /// Retrieve a fingerprint value that summarizes the contents of this module.
+  ///
+  /// This interface hash a of a module is guaranteed to change if the interface
+  /// hash of any of its (primary) source files changes. For example, when
+  /// building incrementally, the interface hash of this module will change when
+  /// the primaries contributing to its content changes. In contrast, when
+  /// a module is deserialized, the hash of every source file contributes to
+  /// the module's interface hash. It therefore serves as an effective, if
+  /// coarse-grained, way of determining when top-level changes to a module's
+  /// contents have been made.
+  Fingerprint getFingerprint() const;
 
   SourceRange getSourceRange() const { return SourceRange(); }
 

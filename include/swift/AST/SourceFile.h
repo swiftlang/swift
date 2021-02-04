@@ -520,12 +520,24 @@ public:
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
 
-  /// Whether this file has an interface hash available.
+  /// Whether this file can compute an interface hash.
   bool hasInterfaceHash() const {
     return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
-  /// Output this file's interface hash into the provided string buffer.
+  /// Retrieve a fingerprint value that summarizes the declarations in this
+  /// source file.
+  ///
+  /// Note that the interface hash merely summarizes the top-level declarations
+  /// in this file. Type body fingerprints are currently implemented such that
+  /// they divert tokens away from the hasher used for fingerprints. That is,
+  /// changes to the bodies of types and extensions will not result in a change
+  /// to the interface hash.
+  ///
+  /// In order for the interface hash to be enabled, this source file must be a
+  /// primary and the compiler must be set in incremental mode. If this is not
+  /// the case, this function will try to signal with an assert. It is useful
+  /// to guard requests for the interface hash with \c hasInterfaceHash().
   Fingerprint getInterfaceHash() const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
