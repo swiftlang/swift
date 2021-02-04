@@ -48,14 +48,14 @@ class ConstraintSystem;
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
 public:
-  explicit ConstraintGraphNode(ConstraintSystem &cs, TypeVariableType *typeVar)
-      : Bindings(cs, typeVar) {}
+  explicit ConstraintGraphNode(ConstraintGraph &CG, TypeVariableType *typeVar)
+      : CG(CG), TypeVar(typeVar) {}
 
   ConstraintGraphNode(const ConstraintGraphNode&) = delete;
   ConstraintGraphNode &operator=(const ConstraintGraphNode&) = delete;
 
   /// Retrieve the type variable this node represents.
-  TypeVariableType *getTypeVariable() const { return Bindings.TypeVar; }
+  TypeVariableType *getTypeVariable() const { return TypeVar; }
 
   /// Retrieve the set of constraints that mention this type variable.
   ///
@@ -77,7 +77,7 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-  inference::PotentialBindings &getBindings() { return Bindings; }
+  inference::PotentialBindings &getBindings() { return *Bindings; }
 
 private:
   /// Determines whether the type variable associated with this node
@@ -119,8 +119,14 @@ private:
   /// Remove a type variable which used to reference this type variable.
   void removeReferencedBy(TypeVariableType *typeVar);
 
+  /// The constraint graph this node belongs to.
+  ConstraintGraph &CG;
+
+  /// The type variable this node represents.
+  TypeVariableType *TypeVar;
+
   /// The set of bindings associated with this type variable.
-  inference::PotentialBindings Bindings;
+  llvm::Optional<inference::PotentialBindings> Bindings;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
