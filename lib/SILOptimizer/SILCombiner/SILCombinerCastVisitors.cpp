@@ -471,7 +471,7 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // can remove both the open_existential_ref and the init_existential_ref.
   if (auto *oer = dyn_cast<OpenExistentialRefInst>(urci->getOperand())) {
     if (auto *ier = dyn_cast<InitExistentialRefInst>(oer->getOperand())) {
-      if (ier->getOwnershipKind() != OwnershipKind::Owned) {
+      if (ier->getForwardingOwnershipKind() != OwnershipKind::Owned) {
         return Builder.createUncheckedRefCast(urci->getLoc(), ier->getOperand(),
                                               urci->getType());
       }
@@ -735,8 +735,8 @@ SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
         // contrast, for guaranteed, we are replacing a BitwiseEscape use
         // (ref_to_rawpointer) with a ForwardedBorrowingUse (unchecked_ref_cast)
         // which is safe.
-        if (newInst->getOwnershipKind() == OwnershipKind::Owned) {
-          newInst->setOwnershipKind(OwnershipKind::Unowned);
+        if (newInst->getForwardingOwnershipKind() == OwnershipKind::Owned) {
+          newInst->setForwardingOwnershipKind(OwnershipKind::Unowned);
         }
         helper.perform(newInst);
         return nullptr;
@@ -825,8 +825,8 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
       // creating breaking OSSA. In contrast, if we have a guaranteed value, we
       // are going to be replacing an UnownedInstantaneousUse with an
       // InstantaneousUse which is always safe for a guaranteed value.
-      if (newInst->getOwnershipKind() == OwnershipKind::Owned) {
-        newInst->setOwnershipKind(OwnershipKind::Unowned);
+      if (newInst->getForwardingOwnershipKind() == OwnershipKind::Owned) {
+        newInst->setForwardingOwnershipKind(OwnershipKind::Unowned);
       }
       helper.perform(newInst);
       return nullptr;
@@ -1086,7 +1086,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
     // We handle the case of an identity conversion in inst simplify, so if we
     // see this pattern then we know that we don't have a round trip and thus
     // should just bypass the intermediate conversion.
-    if (cfi->getOwnershipKind() != OwnershipKind::Owned) {
+    if (cfi->getForwardingOwnershipKind() != OwnershipKind::Owned) {
       cfi->getOperandRef().set(subCFI->getConverted());
       // Return cfi to show we changed it.
       return cfi;

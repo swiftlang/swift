@@ -1025,9 +1025,12 @@ protected:
   }
 
 public:
-  ValueOwnershipKind getOwnershipKind() const { return ownershipKind; }
-
-  void setOwnershipKind(ValueOwnershipKind newKind) { ownershipKind = newKind; }
+  ValueOwnershipKind getForwardingOwnershipKind() const {
+    return ownershipKind;
+  }
+  void setForwardingOwnershipKind(ValueOwnershipKind newKind) {
+    ownershipKind = newKind;
+  }
 
   /// Defined inline below due to forward declaration issues.
   static OwnershipForwardingMixin *get(SILInstruction *inst);

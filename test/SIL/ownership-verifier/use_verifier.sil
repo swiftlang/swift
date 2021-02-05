@@ -1431,3 +1431,30 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %2 = unmanaged_to_ref %1 : $@sil_unmanaged Builtin.NativeObject to $Builtin.NativeObject
   return %2 : $Builtin.NativeObject
 }
+
+sil [ossa] @nontrivial_enum_unchecked_enum_data_trivial_payload_owned : $@convention(thin) (@owned ThreeDifferingPayloadEnum) -> Builtin.Int32 {
+bb0(%0 : @owned $ThreeDifferingPayloadEnum):
+  // NOTE: It may be surprising that %0 is consumed by this unchecked_enum_data
+  // despite the result of the instruction being trivial... after all... aren't
+  // we leaking something?! If one takes a step back, one will realize that even
+  // though %0 is statically owned, it dynamically is known to be a value with
+  // OwnershipKind::None and thus there is nothing to clean up. So in a certain
+  // sense by converting its non-trivial input type to a trivial output type,
+  // the instruction is stating that it knows that %0 is really dynamically
+  // OwnershipKind::None and thus it is safe to not propagate a value with
+  // non-OwnershipKind::None to be cleaned up to cleanup %0.
+  %1 = unchecked_enum_data %0 : $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt
+  return %1 : $Builtin.Int32
+}
+
+sil [ossa] @nontrivial_enum_unchecked_enum_data_trivial_payload_guaranteed : $@convention(thin) (@guaranteed ThreeDifferingPayloadEnum) -> Builtin.Int32 {
+bb0(%0 : @guaranteed $ThreeDifferingPayloadEnum):
+  %1 = unchecked_enum_data %0 : $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt
+  return %1 : $Builtin.Int32
+}
+
+sil [ossa] @nontrivial_enum_unchecked_enum_data_trivial_payload_unowned : $@convention(thin) (ThreeDifferingPayloadEnum) -> Builtin.Int32 {
+bb0(%0 : @unowned $ThreeDifferingPayloadEnum):
+  %1 = unchecked_enum_data %0 : $ThreeDifferingPayloadEnum, #ThreeDifferingPayloadEnum.trivial_payload!enumelt
+  return %1 : $Builtin.Int32
+}
