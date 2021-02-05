@@ -1,3 +1,4 @@
+// REQUIRES: rdar73834542
 // RUN: %empty-directory(%t)
 // RUN: touch %t/main.swift
 // RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t %t/main.swift
