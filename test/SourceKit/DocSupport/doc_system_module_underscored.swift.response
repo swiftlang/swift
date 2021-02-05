@@ -1214,14 +1214,7 @@ protocol Other1 {
         key.usr: "s:16UnderscoredProto1BC4Elema",
         key.offset: 548,
         key.length: 23,
-        key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>Elem</decl.name> = <ref.struct usr=\"s:SS\">String</ref.struct></decl.typealias>",
-        key.conforms: [
-          {
-            key.kind: source.lang.swift.ref.protocol,
-            key.name: "ConcurrentValue",
-            key.usr: "s:s15ConcurrentValueP"
-          }
-        ]
+        key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>Elem</decl.name> = <ref.struct usr=\"s:SS\">String</ref.struct></decl.typealias>"
       },
       {
         key.kind: source.lang.swift.decl.function.method.instance,
