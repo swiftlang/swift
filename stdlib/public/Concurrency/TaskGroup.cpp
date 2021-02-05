@@ -16,26 +16,52 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
+#include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/Metadata.h"
+#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
+#include "TaskPrivate.h"
+#include "AsyncCall.h"
+#include "Debug.h"
+
+#include <dispatch/dispatch.h>
+
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
 
 using namespace swift;
-using GroupFragment = AsyncTask::GroupFragment;
+using TaskGroup = swift::TaskGroup;
 using FutureFragment = AsyncTask::FutureFragment;
 
-using ReadyQueueItem = GroupFragment::ReadyQueueItem;
-using ReadyStatus = GroupFragment::ReadyStatus;
-using GroupPollResult = GroupFragment::GroupPollResult;
+using ReadyQueueItem = TaskGroup::ReadyQueueItem;
+using ReadyStatus = TaskGroup::ReadyStatus;
+using GroupPollResult = TaskGroup::GroupPollResult;
+
+// =============================================================================
+// ==== create -----------------------------------------------------------------
+
+TaskGroup* swift::swift_task_group_create(AsyncTask *task) {
+  fprintf(stderr, "[%s:%d] (%s): task %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+  void *allocation = swift_task_alloc(task, sizeof(TaskGroup));
+  TaskGroup *group = new (allocation) TaskGroup();
+  fprintf(stderr, "[%s:%d] (%s): group %d\n", __FILE__, __LINE__, __FUNCTION__, group);
+  return group;
+}
 
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
 
-void GroupFragment::destroy() {
+void swift::swift_task_group_destroy(AsyncTask *task, TaskGroup *group) {
+  group->destroy(task);
+}
+
+void TaskGroup::destroy(AsyncTask *task) {
   // TODO: need to release all waiters as well
 //  auto waitHead = waitQueue.load(std::memory_order_acquire);
 //  switch (waitHead.getStatus()) {
-//    case GroupFragment::WaitStatus::Waiting:
+//    case TaskGroup::WaitStatus::Waiting:
 //      assert(false && "destroying a task group that still has waiting tasks");
 //  }
 
@@ -49,27 +75,29 @@ void GroupFragment::destroy() {
     bool taskDequeued = readyQueue.dequeue(item);
   }
   mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+
+  // TODO: get the parent task, do we need to store it?
+  swift_task_dealloc(task, this);
 }
 
 // =============================================================================
-// ==== groupOffer -------------------------------------------------------------
+// ==== offer ------------------------------------------------------------------
 
-void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
-                           ExecutorRef executor) {
+void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
+                      ExecutorRef executor) {
   assert(completedTask);
   assert(completedTask->isFuture());
   assert(completedTask->hasChildFragment());
-  assert(completedTask->childFragment()->getParent() == this);
+  assert(completedTask->hasGroupChildFragment());
+  assert(completedTask->groupChildFragment()->getGroup() == this);
 
-  assert(isTaskGroup());
-  auto fragment = groupFragment();
-  fragment->mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
+  mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
 
   // Immediately increment ready count and acquire the status
   // Examples:
   //   R:0 P:1 W:0 -> R:1 P:1 W:0 //
   //   R:0 P:1 W:1 -> R:1 P:1 W:1 // complete immediately
-  auto assumed = fragment->statusAddReadyTaskAcquire();
+  auto assumed = statusAddReadyTaskAcquire();
 
   // If an error was thrown, save it in the future fragment.
   auto futureContext = static_cast<FutureAsyncContext *>(context);
@@ -96,8 +124,8 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
 
     assert(completedTask == readyItem.getTask());
     assert(readyItem.getTask()->isFuture());
-    fragment->readyQueue.enqueue(readyItem);
-    fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+    readyQueue.enqueue(readyItem);
+    mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
     return;
   }
 
@@ -106,25 +134,25 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
     // a) no waiters available, and we enqueued the completed task to readyQueue
     // b) successfully claim a waiter to complete with this task
     assert(assumed.pendingTasks() && "offered to group with no pending tasks!");
-    if (fragment->statusCompleteReadyPendingWaitingTasks(assumed)) {
+    if (statusCompleteReadyPendingWaitingTasks(assumed)) {
         // ==== b) run waiter --------------------------------------------------
         // We are the "first" completed task to arrive, since old status had zero
         //
         // If old status had no tasks, it means we are the first to arrive,
         // and as such may directly get and signal the first waiting task.
         // We only signal *one* waiter and relink the waiter queue.
-        auto waitHead = fragment->waitQueue.load(std::memory_order_acquire);
+        auto waitHead = waitQueue.load(std::memory_order_acquire);
         while (auto waitingTask = waitHead.getTask()) {
           // Find the next waiting task.
           auto nextWaitingTask = waitingTask->getNextWaitingTask();
-          auto nextWaitQueueItem = GroupFragment::WaitQueueItem::get(
-              GroupFragment::WaitStatus::Waiting,
+          auto nextWaitQueueItem = TaskGroup::WaitQueueItem::get(
+              TaskGroup::WaitStatus::Waiting,
               nextWaitingTask
           );
 
           // Attempt to claim it, we are the future that is going to complete it.
           // TODO: there may be other futures trying to do the same right now? FIXME: not really because the status right?
-          if (fragment->waitQueue.compare_exchange_weak(
+          if (waitQueue.compare_exchange_weak(
               waitHead, nextWaitQueueItem,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_acquire)) {
@@ -132,7 +160,7 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
             auto result = GroupPollResult::get(
                 completedTask, hadErrorResult, /*needsRelease*/ false);
 
-            fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
+            mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
             swift::runTaskWithGroupPollResult(waitingTask, executor, result);
             return;
           } else {
@@ -148,7 +176,7 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
     } // else, status-cas failed and we need to try again
   }
 
-  llvm_unreachable("groupOffer must successfully complete it's cas-loop enqueue!");
+  llvm_unreachable("offer must successfully complete it's cas-loop enqueue!");
 }
 
 // =============================================================================
@@ -161,12 +189,16 @@ void swift::swift_task_group_wait_next(
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
-  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  auto context = static_cast<TaskGroupNextWaitAsyncContext *>(rawContext);
+//  fprintf(stderr, "[%s:%d] (%s): context %d\n", __FILE__, __LINE__, __FUNCTION__, context);
   auto task = context->task;
-  assert(task->isTaskGroup());
+  auto group = context->group;
+//  fprintf(stderr, "[%s:%d] (%s): task %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+//  fprintf(stderr, "[%s:%d] (%s): waitingTask %d\n", __FILE__, __LINE__, __FUNCTION__, waitingTask);
+//  fprintf(stderr, "[%s:%d] (%s): group %d\n", __FILE__, __LINE__, __FUNCTION__, group);
+  GroupPollResult polled = group->poll(waitingTask);
 
-  GroupPollResult polled = task->groupPoll(waitingTask);
-  if (polled.status == GroupFragment::GroupPollStatus::Waiting) {
+  if (polled.status == TaskGroup::GroupPollStatus::Waiting) {
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
     return;
@@ -175,9 +207,8 @@ void swift::swift_task_group_wait_next(
   runTaskWithGroupPollResult(waitingTask, executor, polled);
 }
 
-GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
-  assert(isTaskGroup());
-  auto fragment = groupFragment();
+TaskGroup::GroupPollResult TaskGroup::poll(AsyncTask *waitingTask) {
+  auto fragment = this;
   fragment->mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
 
   // immediately update the status counter
@@ -194,7 +225,7 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
     //    Bail out and return `nil` from `group.next()`.
     fragment->statusRemoveWaitingTask(); // "revert" our eager +1 we just did
 
-    result.status = GroupFragment::GroupPollStatus::Empty;
+    result.status = TaskGroup::GroupPollStatus::Empty;
     fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
     return result;
   }
@@ -204,8 +235,8 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
     // Put the waiting task at the beginning of the wait queue.
     auto waitHead = fragment->waitQueue.load(std::memory_order_acquire);
     waitingTask->getNextWaitingTask() = waitHead.getTask();
-    auto newWaitHead = GroupFragment::WaitQueueItem::get(
-        GroupFragment::WaitStatus::Waiting, waitingTask);
+    auto newWaitHead = TaskGroup::WaitQueueItem::get(
+        TaskGroup::WaitStatus::Waiting, waitingTask);
 
     if (fragment->waitQueue.compare_exchange_weak(
         waitHead, newWaitHead,
@@ -215,8 +246,8 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
       // we can attempt to escalate group task here. // TODO: does this make sense?
       // Note that we cannot escalate the specific future (child) task we'd
       // like to complete, since we don't know which one that might be.
-      swift_task_escalate(this, waitingTask->Flags.getPriority());
-      result.status = GroupFragment::GroupPollStatus::Waiting;
+      // swift_task_escalate(this, waitingTask->Flags.getPriority()); // FIXME!!!!!!!!!!
+      result.status = TaskGroup::GroupPollStatus::Waiting;
       // return result;
       break;
     } // else, try again
@@ -225,7 +256,7 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
   // ==== 3) Ready task was polled, return with it immediately -----------------
   auto assumedStatus = assumed.status;
   while (assumed.readyTasks()) {
-    auto newStatus = GroupFragment::GroupStatus{assumedStatus};
+    auto newStatus = TaskGroup::GroupStatus{assumedStatus};
     if (fragment->status.compare_exchange_weak(
         assumedStatus, newStatus.completingReadyPendingWaitingTask().status,
         /*success*/ std::memory_order_relaxed,
@@ -235,7 +266,7 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
       ReadyQueueItem item;
       bool taskDequeued = fragment->readyQueue.dequeue(item);
       if (!taskDequeued) {
-        result.status = GroupFragment::GroupPollStatus::Waiting;
+        result.status = TaskGroup::GroupPollStatus::Waiting;
         result.storage = nullptr;
         result.retainedTask = nullptr;
         fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -253,7 +284,7 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
       switch (item.getStatus()) {
         case ReadyStatus::Success:
           // Immediately return the polled value
-          result.status = GroupFragment::GroupPollStatus::Success;
+          result.status = TaskGroup::GroupPollStatus::Success;
           result.storage = futureFragment->getStoragePtr();
           assert(result.retainedTask && "polled a task, it must be not null");
           fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -261,7 +292,7 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
 
         case ReadyStatus::Error:
           // Immediately return the polled value
-          result.status = GroupFragment::GroupPollStatus::Error;
+          result.status = TaskGroup::GroupPollStatus::Error;
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
           assert(result.retainedTask && "polled a task, it must be not null");
@@ -269,7 +300,7 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
           return result;
 
         case ReadyStatus::Empty:
-          result.status = GroupFragment::GroupPollStatus::Empty;
+          result.status = TaskGroup::GroupPollStatus::Empty;
           result.storage = nullptr;
           result.retainedTask = nullptr;
           fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -280,7 +311,7 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
   } // no more ready tasks
 
   // no ready tasks, so we must wait.
-  result.status = GroupFragment::GroupPollStatus::Waiting;
+  result.status = TaskGroup::GroupPollStatus::Waiting;
   fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
   return result;
 }
@@ -288,15 +319,42 @@ GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {
 // =============================================================================
 // ==== isEmpty ----------------------------------------------------------------
 
-bool swift::swift_task_group_is_empty(AsyncTask *task) {
-  assert(task->isTaskGroup());
-  return task->groupFragment()->isEmpty();
+bool swift::swift_task_group_is_empty(TaskGroup *group) {
+  return group->isEmpty();
 }
 
 // =============================================================================
-// ==== internal utils ---------------------------------------------------------
+// ==== isEmpty ----------------------------------------------------------------
 
-void swift::swift_task_group_add_pending(AsyncTask *task) {
-  assert(task->isTaskGroup());
-  task->groupFragment()->statusAddPendingTaskRelaxed();
+bool swift::swift_task_group_is_cancelled(TaskGroup *group) {
+  return group->isCancelled();
+}
+
+// =============================================================================
+// ==== cancelAll --------------------------------------------------------------
+
+void swift::swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group) {
+  group->cancelAll(task);
+}
+
+bool TaskGroup::cancelAll(AsyncTask *task) {
+  // store the cancelled bit
+  auto old = status.fetch_or(GroupStatus::cancelled, std::memory_order_acquire);
+  auto o = GroupStatus { old };
+
+  if (o.isCancelled()) {
+    // already was cancelled previously, nothing to do?
+    return false;
+  }
+
+  // first time this group is being called cancelAll on, so we must cancel all tasks
+  // TODO: iterate over all children and cancel them
+}
+
+
+// =============================================================================
+// ==== internal ---------------------------------------------------------------
+
+void swift::swift_task_group_add_pending(AsyncTask *pendingTask, TaskGroup *group) {
+  group->statusAddPendingTaskRelaxed(pendingTask);
 }

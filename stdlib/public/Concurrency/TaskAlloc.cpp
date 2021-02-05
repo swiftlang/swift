@@ -70,5 +70,5 @@ void *swift::swift_task_alloc(AsyncTask *task, size_t size) {
 }
 
 void swift::swift_task_dealloc(AsyncTask *task, void *ptr) {
-  return allocator(task).dealloc(ptr);
+  allocator(task).dealloc(ptr);
 }

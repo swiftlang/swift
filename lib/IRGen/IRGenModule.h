@@ -731,6 +731,7 @@ public:
   llvm::PointerType *AsyncFunctionPointerPtrTy;
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
+  llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::PointerType *SwiftExecutorPtrTy;
   llvm::FunctionType *TaskContinuationFunctionTy;

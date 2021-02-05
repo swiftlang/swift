@@ -612,6 +612,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
   SwiftJobTy = createStructType(*this, "swift.job", {
     SizeTy,               // flags

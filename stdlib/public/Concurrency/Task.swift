@@ -324,8 +324,8 @@ extension Task {
       }
     }
 
-    /// Whether this is a task group.
-    var isTaskGroup: Bool {
+    /// Whether this is a group child.
+    var isGroupChildTask: Bool {
       get {
         (bits & (1 << 26)) != 0
       }
@@ -642,37 +642,6 @@ public func _runChildTask<T>(
   var flags = Task.JobFlags()
   flags.kind = .task
   flags.priority = getJobFlags(currentTask).priority
-  flags.isFuture = true
-  flags.isChildTask = true
-
-  // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(
-      flags.bits, currentTask, operation)
-
-  // Enqueue the resulting job.
-  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-  return task
-}
-class StringLike: CustomStringConvertible {
-  let value: String
-  init(_ value: String) {
-    self.value = value
-  }
-  var description: String { value }
-}
-
-public func _runGroupChildTask<T>(
-  overridingPriority priorityOverride: Task.Priority? = nil,
-  withLocalValues hasLocalValues: Bool = false,
-  operation: @concurrent @escaping () async throws -> T
-) async -> Builtin.NativeObject {
-  let currentTask = Builtin.getCurrentAsyncTask()
-
-  // Set up the job flags for a new task.
-  var flags = Task.JobFlags()
-  flags.kind = .task
-  flags.priority = priorityOverride ?? getJobFlags(currentTask).priority
   flags.isFuture = true
   flags.isChildTask = true
 

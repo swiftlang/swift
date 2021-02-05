@@ -152,7 +152,7 @@ func test_taskGroup_quorum_thenCancel() async {
       }
 
       defer {
-        group.cancelAll()
+        await group.cancelAll()
       }
 
       var yays: Int = 0

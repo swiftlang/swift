@@ -19,12 +19,14 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
+#include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 
 namespace swift {
 
 class AsyncTask;
+class TaskGroup;
 
 /// Initialize the task-local allocator in the given task.
 void _swift_task_alloc_initialize(AsyncTask *task);
@@ -52,11 +54,9 @@ void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 namespace {
 
 /// An asynchronous context within a task that describes a general "Future".
-/// task.
 ///
 /// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
-/// futures.
+/// is the type used by `Task.runDetached`.
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   // Error result is always present.
@@ -66,12 +66,34 @@ public:
 
   TaskFutureWaitResult result;
 
-  // FIXME: Currently, this is always here, but it isn't technically
-  // necessary.
+  // FIXME: Currently, this is always here, but it isn't technically necessary.
   void* Self;
 
   // Arguments.
   AsyncTask *task;
+
+  using AsyncContext::AsyncContext;
+};
+
+/// An asynchronous context used by `TaskGroup.next()` describing a "Future".
+///
+/// This type matches the ABI of a function `<T> () async throws -> T`,
+/// which is the type used by `TaskGroup.next()`.
+class TaskGroupNextWaitAsyncContext : public AsyncContext {
+public:
+  // Error result is always present.
+  SwiftError *errorResult = nullptr;
+
+  // No indirect results.
+
+  TaskFutureWaitResult result;
+
+  // FIXME: Currently, this is always here, but it isn't technically necessary.
+  void* Self;
+
+  // Arguments.
+  AsyncTask *task;
+  TaskGroup *group;
 
   using AsyncContext::AsyncContext;
 };
@@ -100,28 +122,28 @@ static void runTaskWithFutureResult(
 /// Run the given task, providing it with the result of the future.
 static void runTaskWithGroupPollResult(
     AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncTask::GroupFragment::GroupPollResult result) {
+    TaskGroup::GroupPollResult result) {
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
   // Was it an error or successful return?
   waitingTaskContext->result.hadErrorResult =
-      result.status == AsyncTask::GroupFragment::GroupPollStatus::Error;
+      result.status == TaskGroup::GroupPollStatus::Error;
 
   // Extract the stored value into the waiting task's result storage:
   switch (result.status) {
-    case AsyncTask::GroupFragment::GroupPollStatus::Success:
+    case TaskGroup::GroupPollStatus::Success:
       waitingTaskContext->result.storage = result.storage;
       break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Error:
+    case TaskGroup::GroupPollStatus::Error:
       waitingTaskContext->result.storage =
         reinterpret_cast<OpaqueValue *>(result.storage);
       break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Empty:
+    case TaskGroup::GroupPollStatus::Empty:
       // return a `nil` here (as result of the `group.next()`)
       waitingTaskContext->result.storage = nullptr;
       break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Waiting:
+    case TaskGroup::GroupPollStatus::Waiting:
       assert(false && "Must not attempt to run with a Waiting result.");
   }
 

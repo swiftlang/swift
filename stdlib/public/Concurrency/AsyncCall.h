@@ -159,6 +159,7 @@ pushAsyncContext(AsyncTask *task, ExecutorRef executor,
   assert(calleeContextSize >= sizeof(CalleeContext));
 
   void *rawCalleeContext = swift_task_alloc(task, calleeContextSize);
+  fprintf(stderr, "[%s:%d] (%s): alloc raw callee context %d\n", __FILE__, __LINE__, __FUNCTION__, rawCalleeContext);
   return new (rawCalleeContext) CalleeContext(resumeFunction, executor,
                                               callerContext, args...);
 }

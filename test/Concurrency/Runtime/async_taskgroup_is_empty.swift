@@ -18,26 +18,35 @@ func asyncEcho(_ value: Int) async -> Int {
 }
 
 func test_taskGroup_isEmpty() async {
-  _ = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
-    // CHECK: before add: isEmpty=true
-    print("before add: isEmpty=\(group.isEmpty)")
+  do {
+    pprint("before all")
+    let result = try await Task.withGroup(resultType: Int.self) {
+      (group) async -> Int in
+      // CHECK: before add: isEmpty=true
+      print("before add: isEmpty=\(group.isEmpty)")
 
-    await group.add {
-      sleep(2)
-      return await asyncEcho(1)
+      await group.add {
+        sleep(2)
+        return await asyncEcho(1)
+      }
+
+      // CHECK: while add running, outside: isEmpty=false
+      print("while add running, outside: isEmpty=\(group.isEmpty)")
+
+      // CHECK: next: 1
+      while let value = try! await group.next() {
+        print("next: \(value)")
+      }
+
+      // CHECK: after draining tasks: isEmpty=true
+      print("after draining tasks: isEmpty=\(group.isEmpty)")
+      return 42
     }
 
-    // CHECK: while add running, outside: isEmpty=false
-    print("while add running, outside: isEmpty=\(group.isEmpty)")
-
-    // CHECK: next: 1
-    while let value = try! await group.next() {
-      print("next: \(value)")
-    }
-
-    // CHECK: after draining tasks: isEmpty=true
-    print("after draining tasks: isEmpty=\(group.isEmpty)")
-    return 0
+    // CHECK: result: 42
+    print("result: \(result)")
+  } catch {
+    fatalError("\(error)")
   }
 }
 

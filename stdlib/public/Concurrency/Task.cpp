@@ -31,7 +31,7 @@
 
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
-using GroupFragment = AsyncTask::GroupFragment;
+using TaskGroup = swift::TaskGroup;
 using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
 using TaskLocalInheritance = AsyncTask::TaskLocalValuesFragment::TaskLocalInheritance;
 
@@ -111,12 +111,14 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   assert(queueHead.getStatus() == Status::Executing);
 
   // If this is task group child, notify the parent group about the completion.
-  if (isTaskGroupChild()) {
+  fprintf(stderr, "[%s:%d] (%s) complete task %d\n", __FILE__, __LINE__, __FUNCTION__, this);
+  if (hasGroupChildFragment()) {
+    fprintf(stderr, "[%s:%d] (%s) complete group child task %d\n", __FILE__, __LINE__, __FUNCTION__, this);
     // then we must offer into the parent group that we completed,
     // so it may `next()` poll completed child tasks in completion order.
-    auto parent = childFragment()->getParent();
-    assert(parent->isTaskGroup());
-    parent->groupOffer(this, context, executor);
+    auto group = groupChildFragment()->getGroup();
+    assert(group);
+    group->offer(this, context, executor);
   }
 
   // Schedule every waiting task on the executor.
@@ -136,11 +138,6 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
-
-  // For a group, destroy the queues and results.
-  if (task->isTaskGroup()) {
-    task->groupFragment()->destroy();
-  }
 
   // For a future, destroy the result.
   if (task->isFuture()) {
@@ -216,7 +213,8 @@ swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
 }
 
 AsyncTaskAndContext swift::swift_task_create_future(
-    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
+    JobFlags flags, AsyncTask *parent,
+    const Metadata *futureResultType,
     const FutureAsyncSignature::FunctionPointer *function) {
   return swift_task_create_future_f(
       flags, parent, futureResultType, function->Function.get(),
@@ -224,12 +222,25 @@ AsyncTaskAndContext swift::swift_task_create_future(
 }
 
 AsyncTaskAndContext swift::swift_task_create_future_f(
-    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
+    JobFlags flags, AsyncTask *parent,
+    const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
+  assert(!flags.task_isGroupChildTask() &&
+  "use swift_task_create_group_future_f to initialize task group child tasks");
+  return swift_task_create_group_future_f(
+      flags, parent, /*group=*/nullptr, futureResultType,
+      function, initialContextSize);
+}
+
+AsyncTaskAndContext swift::swift_task_create_group_future_f(
+    JobFlags flags, AsyncTask *parent, TaskGroup *group,
+    const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
   assert((parent != nullptr) == flags.task_isChildTask());
+  assert((group != nullptr) == flags.task_isGroupChildTask());
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -240,8 +251,8 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
 
   headerSize += sizeof(AsyncTask::TaskLocalValuesFragment);
 
-  if (flags.task_isTaskGroup()) {
-    headerSize += sizeof(AsyncTask::GroupFragment);
+  if (flags.task_isGroupChildTask()) {
+    headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
 
   if (futureResultType) {
@@ -275,14 +286,15 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
+  // Initialize task locals fragment if applicable.
   auto taskLocalsFragment = task->localValuesFragment();
   new (taskLocalsFragment) AsyncTask::TaskLocalValuesFragment();
   taskLocalsFragment->initializeLinkParent(task, parent);
 
-  // Initialize the task group fragment if applicable.
-    if (flags.task_isTaskGroup()) {
-    auto groupFragment = task->groupFragment();
-    new (groupFragment) GroupFragment();
+  // Initialize the group child fragment if applicable.
+  if (flags.task_isGroupChildTask()) {
+    auto groupChildFragment = task->groupChildFragment();
+    new (groupChildFragment) AsyncTask::GroupChildFragment(group);
   }
   
   // Initialize the future fragment if applicable.

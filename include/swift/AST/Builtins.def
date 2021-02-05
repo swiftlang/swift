@@ -764,6 +764,18 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask, "createAsyncTask", "", Speci
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
     "createAsyncTaskFuture", "", Special)
 
+/// createAsyncTaskGroupFuture(): (
+///     Int, // flags
+///     Builtin.NativeObject?, // parent
+///     Builtin.NativeObject?, // group
+///     @escaping () async throws -> T
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskGroupFuture,
+    "createAsyncTaskGroupFuture", "", Special)
+
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
 /// from string literals. We consider it effects as readnone meaning that it

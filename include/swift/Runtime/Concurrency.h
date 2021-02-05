@@ -83,6 +83,16 @@ AsyncTaskAndContext swift_task_create_future_f(
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize);
 
+/// Create a task object with a future which will run the given
+/// function, and offer its result to the task group
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create_group_future_f(
+    JobFlags flags,
+    AsyncTask *parent, TaskGroup *group,
+    const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function,
+    size_t initialContextSize);
+
 /// Allocate memory in a task.
 ///
 /// This must be called synchronously with the task.
@@ -153,34 +163,91 @@ swift_task_future_wait;
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_wait_next(on groupTask: Builtin.NativeObject) async
-///     -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+/// func swift_task_group_wait_next(
+///     waitingTask: Builtin.NativeObject, // current task
+///     group: Builtin.NativeObject,
+/// ) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitSignature::FunctionType
 swift_task_group_wait_next;
 
+/// Create a new `TaskGroup` using the task's allocator.
+/// The caller is responsible for retaining and managing the group's lifecycle.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_task_group_create(
+///     _ task: Builtin.NativeObject
+/// ) -> Builtin.NativeObject
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+swift::TaskGroup* swift_task_group_create(AsyncTask *task);
+
+/// Its Swift signature is
+///
+/// \code
+/// func swift_task_group_destroy(
+///     _ task: Builtin.NativeObject,
+///     _ group: Builtin.NativeObject
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_group_destroy(AsyncTask *task, TaskGroup *group);
+
+/// Before starting a task group child task, inform the group that there is one
+/// more 'pending' child to account for.
+///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
 /// func swift_task_group_add_pending(
-///     _ groupTask: Builtin.NativeObject)
+///     pending: Builtin.NativeObject,
+///     group: Builtin.NativeObject
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void
-swift_task_group_add_pending(AsyncTask *groupTask);
+void swift_task_group_add_pending(AsyncTask* pendingTask, TaskGroup *group);
 
-/// Check the readyQueue of a Channel, return true if it has no pending tasks.
+/// Cancel all tasks in the group.
+///
+/// TODO: also stop accepting new ones perhaps? We don't do this today.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_is_empty(on groupTask: Builtin.NativeObject) -> Bool
+/// func swift_task_group_cancel_all(
+///     task: Builtin.NativeObject,
+///     group: Builtin.NativeObject
+/// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool
-swift_task_group_is_empty(AsyncTask *task);
+void swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group);
+
+/// Check the readyQueue of a task group, return true if it has no pending tasks.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_is_empty(
+///     _ group: Builtin.NativeObject
+/// ) -> Bool
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_group_is_empty(TaskGroup *group);
+
+/// Check if the group was cancelled.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_is_cancelled(
+///     _ group: Builtin.NativeObject
+/// ) -> Bool
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_group_is_cancelled(TaskGroup *group);
 
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.

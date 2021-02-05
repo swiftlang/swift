@@ -3750,7 +3750,8 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 }
 
 llvm::Value *irgen::emitTaskCreate(
-    IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
+    IRGenFunction &IGF, llvm::Value *flags,
+    llvm::Value *parentTask, llvm::Value *taskGroup,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction, llvm::Value *localContextInfo,
     SubstitutionMap subs) {
@@ -3808,7 +3809,13 @@ llvm::Value *irgen::emitTaskCreate(
   theFunction = IGF.Builder.CreateBitOrPointerCast(
       theFunction, IGF.IGM.TaskContinuationFunctionPtrTy);
   theSize = IGF.Builder.CreateZExtOrBitCast(theSize, IGF.IGM.SizeTy);
-  if (futureResultType) {
+  if (taskGroup && futureResultType) {
+    taskGroup = IGF.Builder.CreateBitOrPointerCast(
+        taskGroup, IGF.IGM.SwiftTaskGroupPtrTy);
+    result = IGF.Builder.CreateCall(
+        IGF.IGM.getTaskCreateGroupFutureFuncFn(),
+        {flags, parentTask, taskGroup, futureResultType, theFunction, theSize});
+  } else if (futureResultType) {
     result = IGF.Builder.CreateCall(
       IGF.IGM.getTaskCreateFutureFuncFn(),
       { flags, parentTask, futureResultType, theFunction, theSize });

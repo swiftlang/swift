@@ -22,7 +22,7 @@ func test_skipCallingNext_butInvokeCancelAll() async {
       }
     }
 
-    group.cancelAll()
+    await group.cancelAll() // FIXME: must not be async, needs Task.unsafeCurrent
 
     // return immediately; the group should wait on the tasks anyway
     let c = await Task.__unsafeCurrentAsync().isCancelled

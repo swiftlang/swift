@@ -4,8 +4,6 @@
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
 
-// REQUIRES: rdar73267044
-
 import Dispatch
 
 #if canImport(Darwin)
@@ -35,9 +33,7 @@ func test_sum_nextOnCompleted() async {
         while let r = try await group.next() {
           fputs("error: \(#function)[\(#file):\(#line)]: next: \(r)\n", stderr)
           print("next: \(r)")
-//          DispatchQueue.main.sync { // TODO: remove once executors/actors are a thing
-            sum += r
-//          }
+          sum += r
           print("sum: \(sum)")
         }
       } catch {
