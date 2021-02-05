@@ -241,7 +241,9 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    return I->getForwardingOwnershipKind();                                    \
+    return I->getType().isTrivial(*I->getFunction())                           \
+               ? ValueOwnershipKind(OwnershipKind::None)                       \
+               : I->getForwardingOwnershipKind();                              \
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
