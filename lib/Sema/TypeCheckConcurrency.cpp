@@ -1001,11 +1001,13 @@ namespace {
 
     ConcurrentExecutionChecker concurrentExecutionChecker;
 
+    using MutableVarSource = llvm::PointerUnion<DeclRefExpr *, InOutExpr *>;
     using MutableVarParent = llvm::PointerUnion<InOutExpr *, LoadExpr *>;
 
-    /// Mapping from mutable local variables to the parent expression, when
-    /// that parent is either a load or a inout expression.
-    llvm::SmallDenseMap<DeclRefExpr *, MutableVarParent, 4> mutableLocalVarParent;
+    /// Mapping from mutable local variables or inout expressions to the
+    /// parent expression, when that parent is either a load or a inout expression.
+    llvm::SmallDenseMap<MutableVarSource, MutableVarParent, 4>
+      mutableLocalVarParent;
 
     const DeclContext *getDeclContext() const {
       return contextStack.back();
@@ -1022,28 +1024,66 @@ namespace {
     /// If the subexpression is a reference to a mutable local variable from a
     /// different context, record its parent. We'll query this as part of
     /// capture semantics in concurrent functions.
-    void recordMutableVarParent(MutableVarParent parent, Expr *subExpr) {
-      auto declRef = dyn_cast<DeclRefExpr>(subExpr);
-      if (!declRef)
-        return;
+    ///
+    /// \returns true if we recorded anything, false otherwise.
+    bool recordMutableVarParent(MutableVarParent parent, Expr *subExpr) {
+      subExpr = subExpr->getValueProvidingExpr();
 
-      auto var = dyn_cast_or_null<VarDecl>(declRef->getDecl());
-      if (!var)
-        return;
+      if (auto declRef = dyn_cast<DeclRefExpr>(subExpr)) {
+        auto var = dyn_cast_or_null<VarDecl>(declRef->getDecl());
+        if (!var)
+          return false;
 
-      // Only mutable variables matter.
-      if (!var->supportsMutation())
-        return;
+        // Only mutable variables matter.
+        if (!var->supportsMutation())
+          return false;
 
-      // Only mutable variables outside of the current context. This is an
-      // optimization, because the parent map won't be queried in this case, and
-      // it is the most common case for variables to be referenced in their
-      // own context.
-      if (var->getDeclContext() == getDeclContext())
-        return;
+        // Only mutable variables outside of the current context. This is an
+        // optimization, because the parent map won't be queried in this case, and
+        // it is the most common case for variables to be referenced in their
+        // own context.
+        if (var->getDeclContext() == getDeclContext())
+          return false;
 
-      assert(mutableLocalVarParent[declRef].isNull());
-      mutableLocalVarParent[declRef] = parent;
+        assert(mutableLocalVarParent[declRef].isNull());
+        mutableLocalVarParent[declRef] = parent;
+        return true;
+      }
+
+      // For a member reference, try to record a parent for the base
+      // expression.
+      if (auto memberRef = dyn_cast<MemberRefExpr>(subExpr)) {
+        return recordMutableVarParent(parent, memberRef->getBase());
+      }
+
+      // For a subscript, try to record a parent for the base expression.
+      if (auto subscript = dyn_cast<SubscriptExpr>(subExpr)) {
+        return recordMutableVarParent(parent, subscript->getBase());
+      }
+
+      // Look through postfix '!'.
+      if (auto force = dyn_cast<ForceValueExpr>(subExpr)) {
+        return recordMutableVarParent(parent, force->getSubExpr());
+      }
+
+      // Look through postfix '?'.
+      if (auto bindOpt = dyn_cast<BindOptionalExpr>(subExpr)) {
+        return recordMutableVarParent(parent, bindOpt->getSubExpr());
+      }
+
+      if (auto optEval = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+        return recordMutableVarParent(parent, optEval->getSubExpr());
+      }
+
+      // & expressions can be embedded for references to mutable variables
+      // or subscribes inside a struct/enum.
+      if (auto inout = dyn_cast<InOutExpr>(subExpr)) {
+        // Record the parent of the inout so we don't look at it again later.
+        mutableLocalVarParent[inout] = parent;
+        return recordMutableVarParent(parent, inout->getSubExpr());
+      }
+
+      return false;
     }
 
   public:
@@ -1127,7 +1167,8 @@ namespace {
         if (!applyStack.empty())
           diagnoseInOutArg(applyStack.back(), inout, false);
 
-        recordMutableVarParent(inout, inout->getSubExpr());
+        if (mutableLocalVarParent.count(inout) == 0)
+          recordMutableVarParent(inout, inout->getSubExpr());
       }
 
       if (auto load = dyn_cast<LoadExpr>(expr)) {
@@ -1224,6 +1265,9 @@ namespace {
       // Clear out the mutable local variable parent map on the way out.
       if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr)) {
         mutableLocalVarParent.erase(declRefExpr);
+      }
+      if (auto *inoutExpr = dyn_cast<InOutExpr>(expr)) {
+        mutableLocalVarParent.erase(inoutExpr);
       }
 
       return expr;

@@ -93,3 +93,28 @@ func mutationOfLocal() {
 
   localInt = 20
 }
+
+struct NonTrivialValueType {
+  var int: Int = 0
+  var array: [Int] = []
+  var optArray: [Int]? = nil
+}
+
+func testCaseNonTrivialValue() {
+  var i = NonTrivialValueType()
+  var j = 0
+  acceptsConcurrent { value in
+    print(i.int)
+    print(i.array[0])
+    print(i.array[j])
+    print(i.optArray?[j] ?? 0)
+    print(i.optArray![j])
+
+    i.int = 5 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
+    i.array[0] = 5 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
+
+    return value
+  }
+
+  j = 17
+}
