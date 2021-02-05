@@ -1056,3 +1056,64 @@ func test_inout_with_invalid_member_ref() {
   // expected-error@-1 {{value of tuple type 'Void' has no member 'createS'}}
   // expected-error@-2 {{cannot pass immutable value as inout argument: '$0' is immutable}}
 }
+
+struct SR12033<T> {
+  public static func capture(_ thunk: () -> T) -> SR12033<T> {
+      .init() 
+  }
+  public static func captureA(_ thunk: @autoclosure () -> T) -> SR12033<T> { // expected-note{{'captureA' declared here}}
+      .init() 
+  }
+  public static func captureE(_ thunk: @escaping () -> T) -> SR12033<T> {
+      .init() 
+  }
+  public static func captureAE(_ thunk: @autoclosure @escaping () -> T) -> SR12033<T> { // expected-note{{'captureAE' declared here}}
+      .init() 
+  }
+}
+
+var number = 1
+
+let t = SR12033<Int>.capture { number } // OK
+let t2 = SR12033<Int>.captureE { number } // OK
+let t3 = SR12033<Int>.captureA(number) // OK
+
+let e = SR12033<Int>.captureA { number } 
+// expected-error@-1{{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+let e2 = SR12033<Int>.captureAE { number } 
+// expected-error@-1{{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+
+struct SR12033_S {
+  public static var zero: SR12033_S { .init() }
+
+  // captureGenericFuncA
+  public static func f<T>(_ thunk: @autoclosure () -> T) -> SR12033_S { // expected-note 2{{'f' declared here}}
+  // expected-note@-1 2{{in call to function 'f'}}
+    .init()
+  }
+
+  public static func unwrap<T>(_ optional: T?, _ defaultValue: @autoclosure () throws -> T) {}
+
+  func test() {
+    let number = 1
+    _ = Self.f(number) // OK
+    _ = Self.f { number } // expected-error{{trailing closure passed to parameter of type '_' that does not accept a closure}}
+    // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+    _ = Self.f { _ in number } // expected-error{{trailing closure passed to parameter of type '_' that does not accept a closure}}
+    // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  }
+
+  // Inference with contextual type is OK `T` is infered as `() -> Int`
+  func test(_ o: (()-> Int)?) {
+    Self.unwrap(o, { 0 }) // Ok
+    Self.unwrap(o, { .zero }) // Ok
+    Self.unwrap(o, { _ in .zero }) // expected-error {{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
+  }
+
+  // `T` is infered as `() -> U`
+  func testGeneric<U>(_ o: (() -> U)?) where U: BinaryInteger {
+    Self.unwrap(o, { .zero }) // OK
+    Self.unwrap(o, { 0 }) // OK
+    Self.unwrap(o, { _ in .zero }) // expected-error {{contextual closure type '() -> U' expects 0 arguments, but 1 was used in closure body}}
+  }
+}
