@@ -1,3 +1,5 @@
+// rdar://problem/73984220
+// XFAIL: asan
 func simple(_ completion: (Result<String, Error>) -> Void) { }
 func noError(_ completion: (Result<String, Never>) -> Void) { }
 func test(_ str: String) -> Bool { return false }

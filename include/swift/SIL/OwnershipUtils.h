@@ -1030,6 +1030,23 @@ bool getAllOwnedValueIntroducers(SILValue value,
 
 OwnedValueIntroducer getSingleOwnedValueIntroducer(SILValue value);
 
+using BaseValueSet = SmallPtrSet<SILValue, 8>;
+
+/// Starting from \p initialScopeOperand, find all reborrows and their
+/// corresponding base values, and run the visitor function \p
+/// visitReborrowBaseValuePair on them.
+///  Note that a reborrow phi, can have different base values based on different
+/// control flow paths.
+void findTransitiveReborrowBaseValuePairs(
+    BorrowingOperand initialScopeOperand, SILValue origBaseValue,
+    function_ref<void(SILPhiArgument *, SILValue)> visitReborrowBaseValuePair);
+
+/// Given a begin_borrow visit all end_borrow users of the borrow or its
+/// reborrows.
+void visitTransitiveEndBorrows(
+    BeginBorrowInst *borrowInst,
+    function_ref<void(EndBorrowInst *)> visitEndBorrow);
+
 } // namespace swift
 
 #endif

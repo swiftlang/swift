@@ -413,6 +413,11 @@ class GenericContext3<T> {
   }
 }
 
+class GenericContext4<T> {
+  @objc
+  func foo() where T: Hashable { } // expected-error {{instance method cannot be marked @objc because it has a 'where' clause}}
+}
+
 @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' because they are not directly visible from Objective-C}} {{1-7=}}
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
