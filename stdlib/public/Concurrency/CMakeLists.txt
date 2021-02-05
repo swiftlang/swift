@@ -19,16 +19,17 @@ set(LLVM_OPTIONAL_SOURCES
 set(swift_concurrency_link_libraries
   swiftCore)
 
+set(swift_concurrency_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
+
 if(SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     include_directories(AFTER
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+    link_directories(AFTER
+                        ${SWIFT_PATH_TO_LIBDISPATCH_BUILD})
 
-    # FIXME: we can't rely on libdispatch having been built for the
-    # target at this point in the process.  Currently, we're relying
-    # on soft-linking.
-    #list(APPEND swift_concurrency_link_libraries
-    #  dispatch)
+    list(APPEND swift_concurrency_link_flags
+      "-ldispatch")
   endif()
 endif()
 
@@ -67,6 +68,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  LINK_FLAGS "${swift_concurrency_link_flags}"
   INSTALL_IN_COMPONENT stdlib
 )
