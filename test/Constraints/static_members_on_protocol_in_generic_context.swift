@@ -11,7 +11,7 @@ struct G<T> : P {
   var other: G<T> { fatalError() }
 }
 
-extension P where Self == S {
+extension P where Self == S { // expected-note 24 {{where 'Self' = 'P'}}
   static var property: S { S() }
 
   static var iuoProp: S! { S() }
@@ -31,11 +31,11 @@ extension P where Self == S {
 }
 
 extension P {
-  static func genericFn<T>(_: T) -> G<T> where Self == G<T> {
+  static func genericFn<T>(_: T) -> G<T> where Self == G<T> { // expected-note 5 {{where 'Self' = 'P', 'G<T>' = 'G<Int>}} expected-note 2 {{where 'Self' = 'P', 'G<T>' = 'G<String>'}}
     return G<T>()
   }
 
-  static subscript<T>(t t: T) -> G<T> where Self == G<T> {
+  static subscript<T>(t t: T) -> G<T> where Self == G<T> { // expected-note 5 {{where 'Self' = 'P', 'G<T>' = 'G<Int>'}} expected-note 2 {{where 'Self' = 'P', 'G<T>' = 'G<String>'}}
     get { G<T>() }
   }
 }
@@ -43,48 +43,86 @@ extension P {
 // References on protocol metatype are only allowed through a leading dot syntax
 
 _ = P.property // expected-error {{static member 'property' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'property' requires the types 'P' and 'S' be equivalent}}
 _ = P.property.other // expected-error {{static member 'property' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'property' requires the types 'P' and 'S' be equivalent}}
 _ = P.iuoProp // expected-error {{static member 'iuoProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'iuoProp' requires the types 'P' and 'S' be equivalent}}
 _ = P.iuoProp.other // expected-error {{static member 'iuoProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'iuoProp' requires the types 'P' and 'S' be equivalent}}
 _ = P.optProp // expected-error {{static member 'optProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'optProp' requires the types 'P' and 'S' be equivalent}}
 _ = P.optProp?.other // expected-error {{static member 'optProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'optProp' requires the types 'P' and 'S' be equivalent}}
 _ = P.fnProp // expected-error {{static member 'fnProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'fnProp' requires the types 'P' and 'S' be equivalent}}
 _ = P.fnProp() // expected-error {{static member 'fnProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'fnProp' requires the types 'P' and 'S' be equivalent}}
 _ = P.fnProp().other // expected-error {{static member 'fnProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'fnProp' requires the types 'P' and 'S' be equivalent}}
 _ = P.method() // expected-error {{static member 'method' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static method 'method()' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 _ = P.method   // expected-error {{static member 'method' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static method 'method()' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 _ = P.method().other // expected-error {{static member 'method' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static method 'method()' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 _ = P.genericFn(42) // expected-error {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static method 'genericFn' requires the types 'P' and 'G<Int>' be equivalent}}
 _ = P.genericFn(42).other // expected-error {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static method 'genericFn' requires the types 'P' and 'G<Int>' be equivalent}}
 _ = P[42] // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static subscript 'subscript(_:)' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 _ = P[42].other // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static subscript 'subscript(_:)' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 _ = P[t: 42] // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static subscript 'subscript(t:)' requires the types 'P' and 'G<Int>' be equivalent}}
 _ = P[t: 42].other // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static subscript 'subscript(t:)' requires the types 'P' and 'G<Int>' be equivalent}}
 
 let _: S = P.property // expected-error {{static member 'property' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'property' requires the types 'P' and 'S' be equivalent}}
 let _: S = P.property.other // expected-error {{static member 'property' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'property' requires the types 'P' and 'S' be equivalent}}
 let _: () -> S = P.fnProp // expected-error {{static member 'fnProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'fnProp' requires the types 'P' and 'S' be equivalent}}
 let _: S = P.fnProp() // expected-error {{static member 'fnProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'fnProp' requires the types 'P' and 'S' be equivalent}}
 let _: S = P.fnProp().other // expected-error {{static member 'fnProp' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static property 'fnProp' requires the types 'P' and 'S' be equivalent}}
 let _: () -> S = P.method // expected-error {{static member 'method' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static method 'method()' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 let _: S = P.method() // expected-error {{static member 'method' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static method 'method()' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 let _: S = P.method().other // expected-error {{static member 'method' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static method 'method()' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 let _: G<Int> = P.genericFn(42) // expected-error {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static method 'genericFn' requires the types 'P' and 'G<Int>' be equivalent}}
 let _: G = P.genericFn(42) // expected-error {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static method 'genericFn' requires the types 'P' and 'G<Int>' be equivalent}}
 let _: G<String> = P.genericFn(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 // expected-error@-1 {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-2 {{static method 'genericFn' requires the types 'P' and 'G<String>' be equivalent}}
 let _: G<Int> = P.genericFn(42).other // expected-error {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static method 'genericFn' requires the types 'P' and 'G<Int>' be equivalent}}
 let _: G<String> = P.genericFn(42).other // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
-// expected-error@-1 {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static method 'genericFn' requires the types 'P' and 'G<String>' be equivalent}}
+// expected-error@-2 {{static member 'genericFn' cannot be used on protocol metatype 'P.Protocol'}}
 let _: S = P[42] // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static subscript 'subscript(_:)' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 let _: S = P[42].other // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{referencing static subscript 'subscript(_:)' on 'static_members_on_protocol_in_generic_context.P' requires the types 'static_members_on_protocol_in_generic_context.P' and 'S' be equivalent}}
 let _: G<Int> = P[t: 42] // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static subscript 'subscript(t:)' requires the types 'P' and 'G<Int>' be equivalent}}
 let _: G = P[t: 42] // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static subscript 'subscript(t:)' requires the types 'P' and 'G<Int>' be equivalent}}
 let _: G<String> = P[t: 42] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 // expected-error@-1 {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-2 {{static subscript 'subscript(t:)' requires the types 'P' and 'G<String>' be equivalent}}
 let _: G<Int> = P[t: 42].other // expected-error {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-1 {{static subscript 'subscript(t:)' requires the types 'P' and 'G<Int>' be equivalent}}
 let _: G<String> = P[t: 42].other // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 // expected-error@-1 {{static member 'subscript' cannot be used on protocol metatype 'P.Protocol'}}
+// expected-error@-2 {{static subscript 'subscript(t:)' requires the types 'P' and 'G<String>' be equivalent}}
 
 func test<T: P>(_: T) {}
 
@@ -107,7 +145,7 @@ test(.genericFn(42).other) // Ok
 
 protocol Q {}
 
-func test_combo<T: P & Q>(_: T) {} // expected-note 2 {{where 'T' = 'G<Int>'}}
+func test_combo<T: P & Q>(_: T) {} // expected-note {{where 'T' = 'G<Int>'}}
 
 extension Q where Self == S {
   static var otherProperty: S { S() }
@@ -137,17 +175,17 @@ test_combo(.genericFn(42)) // expected-error {{global function 'test_combo' requ
 
 /* Invalid result types */
 
-extension P {
-  static func generic<T>(_: T) -> T where Self == T { fatalError() } // expected-note 3 {{'generic' declared here}}
-  static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q, Self == Q { // expected-note {{in call to function 'genericWithReqs'}} expected-note 2 {{'genericWithReqs' declared here}} expected-note 3 {{required by static method 'genericWithReqs' where 'T' = '()'}}
+extension P { // expected-note 13 {{missing same-type requirement on 'Self'}} {{12-12= where Self == <#Type#>}}
+  static func generic<T>(_: T) -> T { fatalError() }
+  static func genericWithReqs<T: Collection, Q>(_: T) -> Q where T.Element == Q { // expected-note {{in call to function 'genericWithReqs'}} expected-note {{required by static method 'genericWithReqs' where 'T' = '()'}}
     fatalError()
   }
 }
 
-extension P {
-  static var invalidProp: Int { 42 } // expected-note 3 {{'invalidProp' declared here}}
+extension P { // expected-note 6 {{missing same-type requirement on 'Self'}}
+  static var invalidProp: Int { 42 }
   static var selfProp: Self { fatalError() }
-  static func invalidMethod() -> Int { 42 } // expected-note 3 {{'invalidMethod()' declared here}}
+  static func invalidMethod() -> Int { 42 }
   static subscript(q q: String) -> Int { get { 42 } }
 }
 
@@ -189,43 +227,43 @@ _ = P[q: ""].other
 test(.doesntExist) // expected-error {{type 'P' has no member 'doesntExist'}}
 test(.doesnt.exist()) // expected-error {{type 'P' has no member 'doesnt'}}
 test(.invalidProp)
-// expected-error@-1 {{cannot reference static property 'invalidProp' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidProp'}}
 test(.invalidProp.other)
-// expected-error@-1 {{cannot reference static property 'invalidProp' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidProp'}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
 test(.invalidMethod())
-// expected-error@-1 {{cannot reference static method 'invalidMethod()' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidMethod()'}}
 test(.invalidMethod().other)
-// expected-error@-1 {{cannot reference static method 'invalidMethod()' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidMethod()'}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
 test(.generic(42))
-// expected-error@-1 {{cannot reference static method 'generic' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'generic'}}
 test(.generic(42).other)
-// expected-error@-1 {{cannot reference static method 'generic' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'generic'}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
-test(.generic(S())) // Ok
-test(.generic(G<Int>())) // Ok
-test(.genericWithReqs([S()])) // Ok
+test(.generic(S())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
+test(.generic(G<Int>())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
+test(.genericWithReqs([S()])) // expected-error {{cannot infer contextual base in reference to member 'genericWithReqs'}}
 test(.genericWithReqs([42]))
-// expected-error@-1 {{cannot reference static method 'genericWithReqs' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
 test(.genericWithReqs(()))
-// expected-error@-1 {{type '()' cannot conform to 'Collection'}} expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
 
 test_combo(.doesntExist) // expected-error {{reference to member 'doesntExist' cannot be resolved without a contextual type}}
 test_combo(.doesnt.exist()) // expected-error {{reference to member 'doesnt' cannot be resolved without a contextual type}}
 test_combo(.invalidProp)
-// expected-error@-1 {{cannot reference static property 'invalidProp' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidProp'}}
 test_combo(.invalidMethod())
-// expected-error@-1 {{cannot reference static method 'invalidMethod()' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidMethod()'}}
 test_combo(.generic(42))
-// expected-error@-1 {{cannot reference static method 'generic' on 'P.Protocol' with non-conforming result type 'Int'}}
-test_combo(.generic(S())) // Ok
-test_combo(.generic(G<Int>())) // expected-error {{global function 'test_combo' requires that 'G<Int>' conform to 'Q'}}
-test_combo(.genericWithReqs([S()])) // Ok
+// expected-error@-1 {{cannot infer contextual base in reference to member 'generic'}}
+test_combo(.generic(S())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
+test_combo(.generic(G<Int>())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
+test_combo(.genericWithReqs([S()])) // expected-error {{cannot infer contextual base in reference to member 'genericWithReqs'}}
 test_combo(.genericWithReqs([42]))
-// expected-error@-1 {{cannot reference static method 'genericWithReqs' on 'P.Protocol' with non-conforming result type 'Int'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
 test_combo(.genericWithReqs(()))
-// expected-error@-1 {{type '()' cannot conform to 'Collection'}} expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
 
 protocol Z {
   associatedtype T = Int
@@ -244,3 +282,20 @@ _ = Z.prop
 _ = Z.method()
 // expected-error@-1 {{member 'method' cannot be used on value of protocol type 'Z.Protocol'; use a generic constraint instead}}
 // expected-error@-2 {{protocol 'Z' can only be used as a generic constraint because it has Self or associated type requirements}}
+
+protocol TestWithAssoc {
+  associatedtype U
+}
+
+struct S_With_U : P {
+  typealias U = Int
+}
+
+extension TestWithAssoc where U == Int { // expected-note {{missing same-type requirement on 'Self'}} {{39-39=, Self == <#Type#> }}
+  static var intVar: Int { 42 }
+}
+
+func test_fixit_with_where_clause() {
+  func test_assoc<T: TestWithAssoc>(_: T) {}
+  test_assoc(.intVar) // expected-error {{cannot infer contextual base in reference to member 'intVar'}}
+}

@@ -1902,9 +1902,8 @@ ERROR(type_does_not_conform_owner,none,
 ERROR(type_does_not_conform_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 conform to %4",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
-ERROR(type_does_not_conform_in_member_ref_on_protocol_type,none,
-      "cannot reference %0 %1 on %2 with non-conforming result type %3",
-      (DescriptiveDeclKind, DeclName, Type, Type))
+NOTE(missing_sametype_requirement_on_self,none,
+      "missing same-type requirement on 'Self'", ())
 ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 be a class type",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))

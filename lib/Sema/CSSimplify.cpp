@@ -5972,6 +5972,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         // If this is a `Self` conformance requirement from a static member
         // reference on a protocol metatype, let's produce a tailored diagnostic.
         if (memberRef->isStatic()) {
+          if (hasFixFor(memberLoc,
+                        FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype))
+            return SolutionKind::Solved;
+
           if (auto *protocolDecl =
                   memberRef->getDeclContext()->getSelfProtocolDecl()) {
             auto selfTy = protocolDecl->getProtocolSelfType();
@@ -6869,8 +6873,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (getConcreteReplacementForProtocolSelfType(decl)) {
         result.addViable(candidate);
       } else {
-        result.addUnviable(candidate,
-                           MemberLookupResult::UR_TypeMemberOnInstance);
+        result.addUnviable(
+            candidate,
+            MemberLookupResult::UR_InvalidStaticMemberOnProtocolMetatype);
       }
 
       return;

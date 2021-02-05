@@ -7199,25 +7199,29 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
   if (!overload)
     return false;
 
-  auto resultTy = resolveType(overload->openedType);
-  if (auto *fnType = resultTy->getAs<FunctionType>())
-    resultTy = fnType->getResult();
-
   auto *member = overload->choice.getDeclOrNull();
   assert(member);
 
-  auto *DC = member->getDeclContext()->getSelfProtocolDecl();
-  auto protocolTy = DC->getDeclaredInterfaceType();
+  emitDiagnostic(diag::cannot_infer_base_of_unresolved_member,
+                 DeclNameRef(member->getName()));
 
-  emitDiagnostic(diag::type_does_not_conform_in_member_ref_on_protocol_type,
-                 member->getDescriptiveKind(), member->getName(),
-                 MetatypeType::get(protocolTy), resultTy);
+  auto *extension = dyn_cast<ExtensionDecl>(member->getDeclContext());
 
-  if (resultTy->is<FunctionType>() || resultTy->is<TupleType>() ||
-      resultTy->isExistentialType() || resultTy->is<AnyMetatypeType>())
-    emitDiagnostic(diag::only_concrete_types_conform_to_protocols);
+  // If this was a protocol requirement we can't suggest a fix-it.
+  if (!extension)
+    return true;
 
-  emitDiagnosticAt(member, diag::decl_declared_here, member->getName());
+  auto note =
+      emitDiagnosticAt(extension, diag::missing_sametype_requirement_on_self);
+
+  if (auto *whereClause = extension->getTrailingWhereClause()) {
+    auto sourceRange = whereClause->getSourceRange();
+    note.fixItInsertAfter(sourceRange.End, ", Self == <#Type#> ");
+  } else {
+    auto nameRepr = extension->getExtendedTypeRepr();
+    note.fixItInsertAfter(nameRepr->getEndLoc(), " where Self == <#Type#>");
+  }
+
   return true;
 }
 
