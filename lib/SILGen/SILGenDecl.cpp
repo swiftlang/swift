@@ -1227,14 +1227,15 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
     auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
     if (wrapperInfo && wrapperInfo.initializeFromOriginal)
       SGM.emitPropertyWrapperBackingInitializer(D);
-
-    D->visitAuxiliaryDecls([&](VarDecl *var) {
-      if (auto *patternBinding = var->getParentPatternBinding())
-        visitPatternBindingDecl(patternBinding);
-
-      visit(var);
-    });
   }
+
+  // Emit lazy and property wrapper backing storage.
+  D->visitAuxiliaryDecls([&](VarDecl *var) {
+    if (auto *patternBinding = var->getParentPatternBinding())
+      visitPatternBindingDecl(patternBinding);
+
+    visit(var);
+  });
 
   // Emit the variable's accessors.
   D->visitEmittedAccessors([&](AccessorDecl *accessor) {

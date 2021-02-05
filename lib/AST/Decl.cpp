@@ -5936,16 +5936,18 @@ void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) con
   if (getDeclContext()->isTypeContext())
     return;
 
-  // Avoid request evaluator overhead in the common case where there's
-  // no wrapper.
-  if (!getAttrs().hasAttribute<CustomAttr>())
-    return;
+  if (getAttrs().hasAttribute<LazyAttr>()) {
+    if (auto *backingVar = getLazyStorageProperty())
+      visit(backingVar);
+  }
 
-  if (auto *backingVar = getPropertyWrapperBackingProperty())
-    visit(backingVar);
+  if (getAttrs().hasAttribute<CustomAttr>()) {
+    if (auto *backingVar = getPropertyWrapperBackingProperty())
+      visit(backingVar);
 
-  if (auto *projectionVar = getPropertyWrapperProjectionVar())
-    visit(projectionVar);
+    if (auto *projectionVar = getPropertyWrapperProjectionVar())
+      visit(projectionVar);
+  }
 }
 
 VarDecl *VarDecl::getLazyStorageProperty() const {
