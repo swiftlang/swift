@@ -37,11 +37,8 @@ llvm::Constant *emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI);
 llvm::Constant *emitAddrOfConstantString(IRGenModule &IGM,
                                          StringLiteralInst *SLI);
 
-/// Construct a struct literal from a StructInst containing constant values.
-llvm::Constant *emitConstantStruct(IRGenModule &IGM, StructInst *SI);
-
-/// Construct a struct literal from a TupleInst containing constant values.
-llvm::Constant *emitConstantTuple(IRGenModule &IGM, TupleInst *TI);
+/// Construct a constant from a SILValue containing constant values.
+llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue value);
 
 /// Construct an object (with a HeapObject header) from an ObjectInst
 /// containing constant values.
