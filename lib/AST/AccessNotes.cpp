@@ -24,42 +24,6 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/YAMLTraits.h"
 
-// FIXME: Copied from MiscDiagnostics--don't do that.
-static llvm::Optional<swift::ObjCSelector>
-parseObjCSelector(swift::ASTContext &ctx, llvm::StringRef string) {
-  using namespace swift;
-
-  // Find the first colon.
-  auto colonPos = string.find(':');
-
-  // If there is no colon, we have a nullary selector.
-  if (colonPos == StringRef::npos) {
-    if (string.empty() || !Lexer::isIdentifier(string)) return None;
-    return ObjCSelector(ctx, 0, { ctx.getIdentifier(string) });
-  }
-
-  SmallVector<Identifier, 2> pieces;
-  do {
-    // Check whether we have a valid selector piece.
-    auto piece = string.substr(0, colonPos);
-    if (piece.empty()) {
-      pieces.push_back(Identifier());
-    } else {
-      if (!Lexer::isIdentifier(piece)) return None;
-      pieces.push_back(ctx.getIdentifier(piece));
-    }
-
-    // Move to the next piece.
-    string = string.substr(colonPos+1);
-    colonPos = string.find(':');
-  } while (colonPos != StringRef::npos);
-
-  // If anything remains of the string, it's not a selector.
-  if (!string.empty()) return None;
-
-  return ObjCSelector(ctx, pieces.size(), pieces);
-}
-
 namespace swift {
 
 AccessNoteDeclName::AccessNoteDeclName()
@@ -237,7 +201,7 @@ AccessNotes::load(ASTContext &ctx, llvm::MemoryBuffer *buffer) {
   AccessNotes notes;
   yamlIn >> notes;
 
-  if (yamlIn.error())
+  if (errors)
     return llvm::Expected<AccessNotes>(std::move(errors));
 
   return notes;
@@ -275,7 +239,7 @@ StringRef ScalarTraits<ObjCSelector>::input(StringRef str, void *ctxPtr,
                                             ObjCSelector &selector) {
   ASTContext &ctx = *static_cast<ASTContext *>(ctxPtr);
 
-  if (auto sel = parseObjCSelector(ctx, str)) {
+  if (auto sel = ObjCSelector::parse(ctx, str)) {
     selector = *sel;
     return "";
   }
