@@ -263,12 +263,12 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   }
   case OwnedValueIntroducerKind::Struct: {
     auto *si = cast<StructInst>(introducer.value);
-    si->setOwnershipKind(OwnershipKind::Guaranteed);
+    si->setForwardingOwnershipKind(OwnershipKind::Guaranteed);
     return si;
   }
   case OwnedValueIntroducerKind::Tuple: {
     auto *ti = cast<TupleInst>(introducer.value);
-    ti->setOwnershipKind(OwnershipKind::Guaranteed);
+    ti->setForwardingOwnershipKind(OwnershipKind::Guaranteed);
     return ti;
   }
   case OwnedValueIntroducerKind::Copy:
