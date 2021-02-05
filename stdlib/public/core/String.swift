@@ -383,6 +383,8 @@ public struct String {
   public init() { self.init(_StringGuts()) }
 }
 
+extension String: ConcurrentValue { }
+
 extension String {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}

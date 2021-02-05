@@ -59,3 +59,5 @@ public protocol _UnicodeParser {
 extension Unicode {
   public typealias Parser = _UnicodeParser
 }
+
+extension Unicode.ParseResult: ConcurrentValue where T: ConcurrentValue { }

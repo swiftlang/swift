@@ -1,4 +1,5 @@
 // Check that a failed process-tree emits nonzero failure counters
+// REQUIRES: rdar73834542
 // RUN: %empty-directory(%t)
 // RUN: echo zzz >%t/other.swift
 // RUN: not %target-swiftc_driver -continue-building-after-errors -D BROKEN -j 2 -typecheck -stats-output-dir %t %s %t/other.swift

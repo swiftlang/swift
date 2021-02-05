@@ -139,3 +139,7 @@ extension KeyValuePairs: CustomDebugStringConvertible {
     return _makeKeyValuePairDescription()
   }
 }
+
+// TODO: Remove UnsafeConcurrentValue when we have tuples conforming
+extension KeyValuePairs: ConcurrentValue, UnsafeConcurrentValue
+    where Key: ConcurrentValue, Value: ConcurrentValue { }

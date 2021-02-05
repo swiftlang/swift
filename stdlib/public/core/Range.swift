@@ -1017,3 +1017,9 @@ public typealias CountableRange<Bound: Strideable> = Range<Bound>
 // shorthand. TODO: Add documentation
 public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
   where Bound.Stride: SignedInteger
+
+extension Range: ConcurrentValue where Bound: ConcurrentValue { }
+extension PartialRangeUpTo: ConcurrentValue where Bound: ConcurrentValue { }
+extension PartialRangeThrough: ConcurrentValue where Bound: ConcurrentValue { }
+extension PartialRangeFrom: ConcurrentValue where Bound: ConcurrentValue { }
+extension PartialRangeFrom.Iterator: ConcurrentValue where Bound: ConcurrentValue { }

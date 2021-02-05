@@ -22,7 +22,7 @@ extension C2 {
 // a version of C2 that requires both sync and async methods (differing only by
 // completion handler) in ObjC, is not possible to conform to with 'async' in
 // a Swift protocol
-class C3 : NSObject, RequiredObserver {}
+class C3 : NSObject, RequiredObserver {} // expected-error {{type 'C3' does not conform to protocol 'RequiredObserver'}}
 extension C3 {
   func hello() -> Bool { true } // expected-note {{'hello()' previously declared here}}
   func hello() async -> Bool { true } // expected-error {{invalid redeclaration of 'hello()'}}

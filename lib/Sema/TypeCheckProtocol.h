@@ -815,6 +815,8 @@ public:
                      llvm::SetVector<MissingWitness> &GlobalMissingWitnesses,
                      bool suppressDiagnostics = true);
 
+  ~ConformanceChecker();
+
   /// Resolve all of the type witnesses.
   void resolveTypeWitnesses();
 

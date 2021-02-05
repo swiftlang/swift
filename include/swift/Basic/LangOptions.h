@@ -244,6 +244,9 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
+    /// Enable experimental ConcurrentValue checking.
+    bool EnableExperimentalConcurrentValueChecking = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
 

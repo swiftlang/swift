@@ -497,3 +497,6 @@ extension ClosedRange: Encodable where Bound: Encodable {
     try container.encode(self.upperBound)
   }
 }
+
+extension ClosedRange: ConcurrentValue where Bound: ConcurrentValue { }
+extension ClosedRange.Index: ConcurrentValue where Bound: ConcurrentValue { }
