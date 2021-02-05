@@ -242,6 +242,26 @@ public struct CheckedThrowingContinuation<T> {
       fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
     }
   }
+
+  /// Resume the task awaiting the continuation by having it either
+  /// return normally or throw an error based on the state of the given
+  /// `Result` value.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  public func resume<E: Error>(with x: __owned Result<T, E>) {
+    switch x {
+    case .success(let s):
+      return resume(returning: s)
+    case .failure(let e):
+      return resume(throwing: e)
+    }
+  }
 }
 
 public func withCheckedThrowingContinuation<T>(
