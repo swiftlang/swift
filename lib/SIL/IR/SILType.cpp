@@ -699,3 +699,11 @@ bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
   return decl->isEffectivelyExhaustive(f->getModule().getSwiftModule(),
                                        f->getResilienceExpansion());
 }
+
+SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
+  auto *boxTy = getASTType()->getAs<SILBoxType>();
+  if (!boxTy)
+    return SILType();
+  return ::getSILBoxFieldType(f->getTypeExpansionContext(), boxTy,
+                              f->getModule().Types, field);
+}
