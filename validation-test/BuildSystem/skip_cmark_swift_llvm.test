@@ -1,10 +1,5 @@
 # REQUIRES: standalone_build
 
-# UNSUPPORTED: OS=macosx
-# UNSUPPORTED: OS=ios
-# UNSUPPORTED: OS=tvos
-# UNSUPPORTED: OS=watchos
-
 # RUN: %empty-directory(%t)
 # RUN: mkdir -p %t
 # RUN: SWIFT_BUILD_ROOT=%t %swift_src_root/utils/build-script --dry-run --install-all --cmake %cmake --skip-build-cmark 2>&1 | %FileCheck --check-prefix=SKIP-CMARK-CHECK %s
@@ -22,7 +17,6 @@
 # SKIP-CMARK-CHECK: cmake --build {{.*}}swift-
 # SKIP-CMARK-CHECK-NOT: --- Installing cmark ---
 # SKIP-CMARK-CHECK: --- Installing llvm ---
-# SKIP-CMARK-CHECK: --- Installing libdispatch ---
 # SKIP-CMARK-CHECK: --- Installing swift ---
 
 # SKIP-LLVM-CHECK: cmake --build {{.*}}cmark-
@@ -30,7 +24,6 @@
 # SKIP-LLVM-CHECK: cmake --build {{.*}}swift-
 # SKIP-LLVM-CHECK: --- Installing cmark ---
 # SKIP-LLVM-CHECK-NOT: --- Installing llvm ---
-# SKIP-LLVM-CHECK: --- Installing libdispatch ---
 # SKIP-LLVM-CHECK: --- Installing swift ---
 
 # SKIP-SWIFT-CHECK: cmake --build {{.*}}cmark-

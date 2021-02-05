@@ -230,7 +230,6 @@ KNOWN_SETTINGS=(
 )
 
 components=(
-  clibdispatch
   cmark
   foundation
   libcxx
@@ -1163,7 +1162,6 @@ STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
 FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
-CLIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
@@ -1177,7 +1175,6 @@ PRODUCTS=(llvm)
 [[ "${SKIP_BUILD_CMARK}" ]] || PRODUCTS+=(cmark)
 [[ "${SKIP_BUILD_LIBCXX}" ]] || PRODUCTS+=(libcxx)
 [[ "${SKIP_BUILD_LIBICU}" ]] || PRODUCTS+=(libicu)
-[[ "${SKIP_BUILD_CLIBDISPATCH}" ]] || PRODUCTS+=(clibdispatch)
 [[ "${SKIP_BUILD_SWIFT}" ]] || PRODUCTS+=(swift)
 [[ "${SKIP_BUILD_LLDB}" ]] || PRODUCTS+=(lldb)
 [[ "${SKIP_BUILD_LIBDISPATCH}" ]] || PRODUCTS+=(libdispatch)
@@ -1262,7 +1259,7 @@ function build_directory_bin() {
             foundation|foundation_static)
                 echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
                 ;;
-            clibdispatch|libdispatch|libdispatch_static)
+            libdispatch|libdispatch_static)
                 echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
                 ;;
             libicu)
@@ -1380,7 +1377,7 @@ function cmake_config_opt() {
             foundation|foundation_static)
                 echo "--config ${FOUNDATION_BUILD_TYPE}"
                 ;;
-            clibdispatch|libdispatch|libdispatch_static)
+            libdispatch|libdispatch_static)
                 echo "--config ${LIBDISPATCH_BUILD_TYPE}"
                 ;;
             libicu)
@@ -1767,6 +1764,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 ;;
 
             swift)
+
                 if [[ "${ANDROID_API_LEVEL}" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
@@ -2322,18 +2320,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 )
 
                 ;;
-            clibdispatch|libdispatch|libdispatch_static)
+            libdispatch|libdispatch_static)
                 LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFT_BUILD_PATH="$(build_directory ${host} swift)"
-                ENABLE_SWIFT=YES
-                if [[ "${product}" = "clibdispatch" ]]; then
-                  if [[ "$(uname -s)" = "Darwin" ]]; then
-                    continue # We don't build clibdispatch on Darwin
-                  fi
-                  ENABLE_SWIFT=NO
-                  LIBDISPATCH_BUILD_DIR=$(build_directory ${host} libdispatch)
-                  build_dir=${LIBDISPATCH_BUILD_DIR}
-                fi
 
                 case "${host}" in
                 macosx-*)
@@ -2349,7 +2338,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   call rm -rf "${LIBDISPATCH_BUILD_DIR}"
 
                   cmake_options=(
-                    -DENABLE_SWIFT="${ENABLE_SWIFT}"
+                    -DENABLE_SWIFT=YES
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
@@ -2516,13 +2505,6 @@ for host in "${ALL_HOSTS[@]}"; do
         # stdlib can use compiler-rt builtins when targeting iOS/tvOS/watchOS.
         if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
             copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain "$(build_directory_bin ${host} llvm)/.."
-        fi
-
-        # We need to copy libdispatch.so into the swift lib directory
-        # so the tests can find it
-        if [[ "${product}" = "clibdispatch" ]] && [[ "uname -s" != "Darwin" ]]; then
-            clibdispatch_libdir="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-            call cp "${build_dir}/libdispatch.so" "${clibdispatch_libdir}"
         fi
     done
 done
@@ -2780,17 +2762,13 @@ for host in "${ALL_HOSTS[@]}"; do
             foundation_static)
               continue
             ;;
-            clibdispatch|libdispatch)
+            libdispatch)
                 if [[ "${SKIP_TEST_LIBDISPATCH}" ]]; then
                     continue
                 fi
 
                 case "${host}" in
                 macosx-*)
-                  if [[ "${product}" = clibdispatch ]]; then
-                    # we don't build clibdispatch on Darwin
-                    continue
-                  fi
                   LIBDISPATCH_BUILD_DIR=$(build_directory ${host} ${product})
                   echo "--- Running tests for ${product} ---"
                   with_pushd "${LIBDISPATCH_BUILD_DIR}" \
@@ -2799,9 +2777,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
-                  if [[ "${product}" = clibdispatch ]]; then
-                    product=libdispatch
-                  fi
                   results_targets=( "test" )
                   executable_target=""
                 ;;
@@ -2976,21 +2951,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 ;;
-            clibdispatch|libdispatch|libdispatch_static)
-                if [[ "${product}" = clibdispatch ]]; then
-                  if [[ -z "${INSTALL_CLIBDISPATCH}" ]]; then
-                    continue
-                  fi
-                elif [[ -z "${INSTALL_LIBDISPATCH}" ]]; then
+            libdispatch|libdispatch_static)
+                if [[ -z "${INSTALL_LIBDISPATCH}" ]] ; then
                     continue
                 fi
 
                 case "${host}" in
                 macosx-*)
-                  if [[ "${product}" = clibdispatch ]]; then
-                    # we don't build clibdispatch on Darwin
-                    continue
-                  fi
                   if [[ -z "${INSTALL_DESTDIR}" ]] ; then
                       echo "--install-destdir is required to install products."
                       exit 1
@@ -3009,9 +2976,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
-                  if [[ "${product}" = clibdispatch ]]; then
-                    product=libdispatch
-                  fi
                 ;;
                 esac
                 ;;
