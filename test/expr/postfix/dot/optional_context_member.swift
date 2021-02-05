@@ -82,7 +82,7 @@ protocol Horse {
 func rideAHorse(_ horse: Horse?) {}
 
 rideAHorse(.palomino)
-// expected-error@-1 {{cannot infer contextual base in reference to member 'palomino'}}
+// expected-error@-1 {{static member 'palomino' cannot be used on protocol metatype 'Horse.Protocol'}}
 
 // FIXME: This should work if the static member is part of a class though
 class Donkey {

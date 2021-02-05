@@ -227,43 +227,43 @@ _ = P[q: ""].other
 test(.doesntExist) // expected-error {{type 'P' has no member 'doesntExist'}}
 test(.doesnt.exist()) // expected-error {{type 'P' has no member 'doesnt'}}
 test(.invalidProp)
-// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidProp'}}
+// expected-error@-1 {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
 test(.invalidProp.other)
-// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidProp'}}
+// expected-error@-1 {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
 test(.invalidMethod())
-// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidMethod()'}}
+// expected-error@-1 {{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
 test(.invalidMethod().other)
-// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidMethod()'}}
+// expected-error@-1 {{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
 test(.generic(42))
-// expected-error@-1 {{cannot infer contextual base in reference to member 'generic'}}
+// expected-error@-1 {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
 test(.generic(42).other)
-// expected-error@-1 {{cannot infer contextual base in reference to member 'generic'}}
+// expected-error@-1 {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
 // expected-error@-2 {{value of type 'Int' has no member 'other'}}
-test(.generic(S())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
-test(.generic(G<Int>())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
-test(.genericWithReqs([S()])) // expected-error {{cannot infer contextual base in reference to member 'genericWithReqs'}}
+test(.generic(S())) // expected-error {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
+test(.generic(G<Int>())) // expected-error {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
+test(.genericWithReqs([S()])) // expected-error {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 test(.genericWithReqs([42]))
-// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
+// expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 test(.genericWithReqs(()))
-// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
+// expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
 test_combo(.doesntExist) // expected-error {{reference to member 'doesntExist' cannot be resolved without a contextual type}}
 test_combo(.doesnt.exist()) // expected-error {{reference to member 'doesnt' cannot be resolved without a contextual type}}
 test_combo(.invalidProp)
-// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidProp'}}
+// expected-error@-1 {{contextual member reference to static property 'invalidProp' requires 'Self' constraint in the protocol extension}}
 test_combo(.invalidMethod())
-// expected-error@-1 {{cannot infer contextual base in reference to member 'invalidMethod()'}}
+// expected-error@-1 {{contextual member reference to static method 'invalidMethod()' requires 'Self' constraint in the protocol extension}}
 test_combo(.generic(42))
-// expected-error@-1 {{cannot infer contextual base in reference to member 'generic'}}
-test_combo(.generic(S())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
-test_combo(.generic(G<Int>())) // expected-error {{cannot infer contextual base in reference to member 'generic'}}
-test_combo(.genericWithReqs([S()])) // expected-error {{cannot infer contextual base in reference to member 'genericWithReqs'}}
+// expected-error@-1 {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
+test_combo(.generic(S())) // expected-error {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
+test_combo(.generic(G<Int>())) // expected-error {{contextual member reference to static method 'generic' requires 'Self' constraint in the protocol extension}}
+test_combo(.genericWithReqs([S()])) // expected-error {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 test_combo(.genericWithReqs([42]))
-// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
+// expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 test_combo(.genericWithReqs(()))
-// expected-error@-1 {{cannot infer contextual base in reference to member 'genericWithReqs'}}
+// expected-error@-1 {{contextual member reference to static method 'genericWithReqs' requires 'Self' constraint in the protocol extension}}
 
 protocol Z {
   associatedtype T = Int
@@ -297,5 +297,5 @@ extension TestWithAssoc where U == Int { // expected-note {{missing same-type re
 
 func test_fixit_with_where_clause() {
   func test_assoc<T: TestWithAssoc>(_: T) {}
-  test_assoc(.intVar) // expected-error {{cannot infer contextual base in reference to member 'intVar'}}
+  test_assoc(.intVar) // expected-error {{contextual member reference to static property 'intVar' requires 'Self' constraint in the protocol extension}}
 }

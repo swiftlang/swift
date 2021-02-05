@@ -7202,8 +7202,9 @@ bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
   auto *member = overload->choice.getDeclOrNull();
   assert(member);
 
-  emitDiagnostic(diag::cannot_infer_base_of_unresolved_member,
-                 DeclNameRef(member->getName()));
+  emitDiagnostic(
+      diag::contextual_member_ref_on_protocol_requires_self_requirement,
+      member->getDescriptiveKind(), member->getName());
 
   auto *extension = dyn_cast<ExtensionDecl>(member->getDeclContext());
 

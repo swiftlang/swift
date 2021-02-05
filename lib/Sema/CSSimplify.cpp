@@ -6861,6 +6861,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       // type via same-type requirement, otherwise it would be
       // impossible to find a witness for this member.
 
+      if (!isa<ExtensionDecl>(decl->getDeclContext())) {
+        result.addUnviable(candidate,
+                           MemberLookupResult::UR_TypeMemberOnInstance);
+        return;
+      }
+
       // Cannot instantiate a protocol or reference a member on
       // protocol composition type.
       if (isa<ConstructorDecl>(decl) ||
