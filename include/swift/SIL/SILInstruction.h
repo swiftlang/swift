@@ -4815,7 +4815,7 @@ class ConvertFunctionInst final
 
   static ConvertFunctionInst *create(SILDebugLocation DebugLoc,
                                      SILValue Operand, SILType Ty,
-                                     SILFunction &F,
+                                     SILModule &Mod, SILFunction *F,
                                      SILOpenedArchetypesState &OpenedArchetypes,
                                      bool WithoutActuallyEscaping);
 
@@ -5165,8 +5165,8 @@ class ThinToThickFunctionInst final
             Operand.getOwnershipKind()) {}
 
   static ThinToThickFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
+         SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
   /// Return the callee of the thin_to_thick_function.
