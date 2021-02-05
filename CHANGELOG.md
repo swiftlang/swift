@@ -25,6 +25,30 @@ CHANGELOG
 
 </details>
 
+Swift Next
+----------
+* [SE-0296][]:
+
+	Asynchronous programming is now natively supported using async/await. Asynchronous functions can be defined using `async`:
+
+	```swift
+	func loadWebResource(_ path: String) async throws -> Resource { ... }
+  func decodeImage(_ r1: Resource, _ r2: Resource) async throws -> Image
+  func dewarpAndCleanupImage(_ i : Image) async -> Image
+	```
+
+	Calls to `async` functions may suspend, meaning that they give up the thread on which they are executing and will be scheduled to run again later. The potential for suspension on asynchronous calls requires the `await` keyword, similarly to the way in which `try` acknowledges a call to a `throws` function:
+
+	```swift
+  func processImageData() async throws -> Image {
+    let dataResource  = try await loadWebResource("dataprofile.txt")
+    let imageResource = try await loadWebResource("imagedata.dat")
+    let imageTmp      = try await decodeImage(dataResource, imageResource)
+    let imageResult   = await dewarpAndCleanupImage(imageTmp)
+    return imageResult
+  }
+  ```
+
 Swift 5.4
 ---------
 
@@ -8178,6 +8202,7 @@ Swift 1.0
 [SE-0284]: <https://github.com/apple/swift-evolution/blob/main/proposals/0284-multiple-variadic-parameters.md>
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
+[SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
