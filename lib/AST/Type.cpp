@@ -3403,11 +3403,9 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   SmallVector<Type, 4> CanTypes;
   if (Superclass)
     CanTypes.push_back(Superclass->getCanonicalType());
-  std::transform(Protocols.begin(), Protocols.end(),
-                 std::back_inserter(CanTypes),
-                 [](ProtocolDecl *Proto) {
-                   return Proto->getDeclaredInterfaceType();
-                 });
+  llvm::transform(
+      Protocols, std::back_inserter(CanTypes),
+      [](ProtocolDecl *Proto) { return Proto->getDeclaredInterfaceType(); });
 
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
   // by one of our member protocols.

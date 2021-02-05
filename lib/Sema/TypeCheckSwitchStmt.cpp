@@ -789,31 +789,32 @@ namespace {
         } else if (auto *E = tp->getEnumOrBoundGenericEnum()) {
           // Look into each case of the enum and decompose it in turn.
           auto children = E->getAllElements();
-          std::transform(children.begin(), children.end(),
-                         std::back_inserter(arr), [&](EnumElementDecl *eed) {
-            // Don't force people to match unavailable cases; they can't even
-            // write them.
-            if (AvailableAttr::isUnavailable(eed)) {
-              return Space();
-            }
+          llvm::transform(
+              children, std::back_inserter(arr), [&](EnumElementDecl *eed) {
+                // Don't force people to match unavailable cases; they can't
+                // even write them.
+                if (AvailableAttr::isUnavailable(eed)) {
+                  return Space();
+                }
 
-            // .e(a: X, b: X)   -> (a: X, b: X)
-            // .f((a: X, b: X)) -> ((a: X, b: X)
-            auto eedTy = tp->getCanonicalType()
-                           ->getTypeOfMember(E->getModuleContext(), eed,
-                                             eed->getArgumentInterfaceType());
-            SmallVector<Space, 4> constElemSpaces;
-            if (eedTy) {
-              if (auto *TTy = eedTy->getAs<TupleType>()) {
-                Space::getTupleTypeSpaces(eedTy, TTy, constElemSpaces);
-              } else if (auto *TTy = dyn_cast<ParenType>(eedTy.getPointer())) {
-                constElemSpaces.push_back(
-                    Space::forType(TTy->getUnderlyingType(), Identifier()));
-              }
-            }
-            return Space::forConstructor(tp, eed->getName(),
-                                         constElemSpaces);
-          });
+                // .e(a: X, b: X)   -> (a: X, b: X)
+                // .f((a: X, b: X)) -> ((a: X, b: X)
+                auto eedTy = tp->getCanonicalType()->getTypeOfMember(
+                    E->getModuleContext(), eed,
+                    eed->getArgumentInterfaceType());
+                SmallVector<Space, 4> constElemSpaces;
+                if (eedTy) {
+                  if (auto *TTy = eedTy->getAs<TupleType>()) {
+                    Space::getTupleTypeSpaces(eedTy, TTy, constElemSpaces);
+                  } else if (auto *TTy =
+                                 dyn_cast<ParenType>(eedTy.getPointer())) {
+                    constElemSpaces.push_back(
+                        Space::forType(TTy->getUnderlyingType(), Identifier()));
+                  }
+                }
+                return Space::forConstructor(tp, eed->getName(),
+                                             constElemSpaces);
+              });
 
           if (!E->isFormallyExhaustive(DC)) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/false));
@@ -1455,11 +1456,10 @@ namespace {
         switch (SP->getKind()) {
         case PatternKind::Tuple: {
           auto *TP = dyn_cast<TuplePattern>(SP);
-          std::transform(TP->getElements().begin(), TP->getElements().end(),
-                         std::back_inserter(conArgSpace),
-                         [&](TuplePatternElt pate) {
-                           return projectPattern(pate.getPattern());
-                         });
+          llvm::transform(TP->getElements(), std::back_inserter(conArgSpace),
+                          [&](TuplePatternElt pate) {
+                            return projectPattern(pate.getPattern());
+                          });
           // FIXME: Compound names.
           return Space::forConstructor(item->getType(),
                                        VP->getName().getBaseIdentifier(),
@@ -1508,11 +1508,10 @@ namespace {
       case PatternKind::Tuple: {
         auto *TP = cast<TuplePattern>(item);
         SmallVector<Space, 4> conArgSpace;
-        std::transform(TP->getElements().begin(), TP->getElements().end(),
-                       std::back_inserter(conArgSpace),
-                       [&](TuplePatternElt pate) {
-          return projectPattern(pate.getPattern());
-        });
+        llvm::transform(TP->getElements(), std::back_inserter(conArgSpace),
+                        [&](TuplePatternElt pate) {
+                          return projectPattern(pate.getPattern());
+                        });
         return Space::forConstructor(item->getType(), Identifier(),
                                      conArgSpace);
       }

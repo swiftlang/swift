@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/UUID.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 
 // WIN32 doesn't natively support <uuid/uuid.h>. Instead, we use Win32 APIs.
@@ -96,7 +97,7 @@ void swift::UUID::toString(llvm::SmallVectorImpl<char> &out) const {
 
   char* signedStr = reinterpret_cast<char*>(str);
   memcpy(out.data(), signedStr, StringBufferSize);
-  std::transform(std::begin(out), std::end(out), std::begin(out), toupper);
+  llvm::transform(out, std::begin(out), toupper);
 #else
   uuid_unparse_upper(Value, out.data());
 #endif
