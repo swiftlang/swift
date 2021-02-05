@@ -10,8 +10,8 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-
-// REQUIRES: OS=macosx
+// XFAIL: windows
+// XFAIL: linux
 
 import StdlibUnittest
 import resilient_class

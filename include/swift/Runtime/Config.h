@@ -327,6 +327,17 @@ static inline T swift_auth_data_non_address(T value, unsigned extra) {
 #endif
 }
 
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
+swift_auth_code(T value, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_function((void *)value,
+                                  ptrauth_key_process_independent_code, extra);
+#else
+  return value;
+#endif
+}
+
 #endif
 
 #endif // SWIFT_RUNTIME_CONFIG_H
