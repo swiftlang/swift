@@ -998,6 +998,7 @@ def create_argument_parser():
            help='skip testing iOS simulator targets')
     option('--skip-test-ios-32bit-simulator',
            toggle_false('test_ios_32bit_simulator'),
+           default=False,
            help='skip testing iOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),
