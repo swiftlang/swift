@@ -652,9 +652,6 @@ def create_argument_parser():
     option('--libdispatch', toggle_true('build_libdispatch'),
            help='build libdispatch')
 
-    option('--clibdispatch', toggle_true('build_clibdispatch'),
-           help='build clibdispatch')
-
     option('--libicu', toggle_true('build_libicu'),
            help='build libicu')
 
