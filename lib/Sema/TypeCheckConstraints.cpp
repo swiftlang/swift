@@ -592,17 +592,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   // check to see if the sequence expr is throwing (and async), if so require 
   // the stmt to have a try loc
   if (stmt->getAwaitLoc().isValid()) {
-    auto Ty = sequence->getType();
-    if (Ty.isNull()) { 
-      auto DRE = dyn_cast<DeclRefExpr>(sequence);
-      if (DRE) {
-        Ty = DRE->getDecl()->getInterfaceType();
-      }
-      if (Ty.isNull()) {
-        return failed();
-      }
-    }
-    
+    // fetch the sequence out of the statement
+    // else wise the value is potentially unresolved
+    auto Ty = stmt->getSequence()->getType();
     auto module = dc->getParentModule();
     auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
     
