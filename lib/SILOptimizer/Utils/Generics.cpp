@@ -2521,7 +2521,7 @@ void swift::trySpecializeApplyOfGeneric(
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
   auto *RefF =
-      cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunctionOrNull();
+      cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
 
   LLVM_DEBUG(llvm::dbgs() << "\n\n*** ApplyInst in function " << F->getName()
                           << ":\n";

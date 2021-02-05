@@ -416,7 +416,7 @@ static SILValue reapplyFunctionConversion(
     // `differentiable_function` of the function-typed thunk argument.
     auto isReabstractionThunkCallee = [&]() -> bool {
       auto *fri = dyn_cast<FunctionRefInst>(oldFunc);
-      return fri && fri->getReferencedFunctionOrNull()->isThunk() ==
+      return fri && fri->getReferencedFunction()->isThunk() ==
                         IsReabstractionThunk;
     };
     if (isReabstractionThunkCallee()) {
@@ -513,8 +513,7 @@ emitDerivativeFunctionReference(
   if (auto *originalFRI =
           peerThroughFunctionConversions<FunctionRefInst>(original)) {
     auto loc = originalFRI->getLoc();
-    auto *originalFn = originalFRI->getReferencedFunctionOrNull();
-    assert(originalFn);
+    auto *originalFn = originalFRI->getReferencedFunction();
     auto originalFnTy = originalFn->getLoweredFunctionType();
     auto *desiredParameterIndices = desiredConfig.parameterIndices;
     auto *desiredResultIndices = desiredConfig.resultIndices;
@@ -1005,7 +1004,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   auto *thunkRef = dyn_cast<FunctionRefInst>(ai->getCallee());
   if (!thunkRef)
     return nullptr;
-  auto *thunk = thunkRef->getReferencedFunctionOrNull();
+  auto *thunk = thunkRef->getReferencedFunction();
   auto thunkTy = thunk->getLoweredFunctionType();
   auto thunkResult = thunkTy->getSingleResult();
   auto resultFnTy = thunkResult.getInterfaceType()->getAs<SILFunctionType>();

@@ -241,7 +241,7 @@ SILFunction *swift::getCalleeOfOnceCall(BuiltinInst *BI) {
          "Expected C function representation!");
 
   if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
-    return FR->getReferencedFunctionOrNull();
+    return FR->getReferencedFunction();
 
   return nullptr;
 }

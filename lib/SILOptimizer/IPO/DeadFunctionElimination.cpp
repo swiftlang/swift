@@ -334,7 +334,7 @@ protected:
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
-          ensureAlive(FRI->getInitiallyReferencedFunction());
+          ensureAlive(FRI->getReferencedFunction());
         } else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(&I)) {
           ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(&I)) {

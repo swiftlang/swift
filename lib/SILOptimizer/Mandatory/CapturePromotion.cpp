@@ -539,7 +539,7 @@ SILFunction *ClosureCloner::constructClonedFunction(
   SILFunction *f = pai->getFunction();
 
   // Create the Cloned Name for the function.
-  SILFunction *origF = fri->getReferencedFunctionOrNull();
+  SILFunction *origF = fri->getReferencedFunction();
 
   IsSerialized_t isSerialized = IsNotSerialized;
   if (f->isSerialized() && origF->isSerialized())

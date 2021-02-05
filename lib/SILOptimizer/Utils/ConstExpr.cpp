@@ -287,7 +287,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getString(sli->getValue(), evaluator.getAllocator());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
-    return SymbolicValue::getFunction(fri->getInitiallyReferencedFunction());
+    return SymbolicValue::getFunction(fri->getReferencedFunction());
 
   // If we have a reference to a metatype, constant fold any substitutable
   // types.

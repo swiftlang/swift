@@ -2756,9 +2756,9 @@ public:
 };
 
 class FunctionRefBaseInst : public LiteralInst {
+protected:
   SILFunction *f;
 
-protected:
   FunctionRefBaseInst(SILInstructionKind Kind, SILDebugLocation DebugLoc,
                       SILFunction *F, TypeExpansionContext context);
 
@@ -2819,6 +2819,9 @@ class FunctionRefInst : public FunctionRefBaseInst {
                   TypeExpansionContext context);
 
 public:
+  /// Return the referenced function.
+  SILFunction *getReferencedFunction() const { return f; }
+
   static bool classof(SILNodePointer node) {
     return node->getKind() == SILNodeKind::FunctionRefInst;
   }

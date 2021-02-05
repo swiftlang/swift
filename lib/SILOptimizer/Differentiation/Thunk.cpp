@@ -852,7 +852,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   StringRef origName;
   if (auto *origFnRef =
           peerThroughFunctionConversions<FunctionRefInst>(origFnOperand)) {
-    origName = origFnRef->getInitiallyReferencedFunction()->getName();
+    origName = origFnRef->getReferencedFunction()->getName();
   } else if (auto *origMethodInst =
                  peerThroughFunctionConversions<MethodInst>(origFnOperand)) {
     origName = origMethodInst->getMember()
@@ -905,7 +905,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   SILValue assocRef;
   if (auto *derivativeFnRef =
           peerThroughFunctionConversions<FunctionRefInst>(derivativeFn)) {
-    auto *assoc = derivativeFnRef->getReferencedFunctionOrNull();
+    auto *assoc = derivativeFnRef->getReferencedFunction();
     assocRef = builder.createFunctionRef(loc, assoc);
   } else if (auto *assocMethodInst =
                  peerThroughFunctionConversions<WitnessMethodInst>(
