@@ -1342,11 +1342,26 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
           .getObjectType(),
       Values[0].second.getOwnershipKind());
 
+  SmallVector<SILPhiArgument *, 8> insertedPhis;
+  Updater.setInsertedPhis(&insertedPhis);
+
   for (auto V : Values) {
     Updater.addAvailableValue(V.first, V.second);
   }
 
   auto Val = Updater.getValueInMiddleOfBlock(BB);
+
+  for (auto *phi : insertedPhis) {
+    if (phi == Val) {
+      continue;
+    }
+    // Fix lifetime of intermediate phis
+    SmallVector<SILBasicBlock *, 4> userBBs;
+    for (auto use : phi->getUses()) {
+      userBBs.push_back(use->getParentBlock());
+    }
+    endLifetimeAtLeakingBlocks(phi, userBBs);
+  }
   return makeNewValueAvailable(Val, BB);
 }
 

@@ -4360,26 +4360,23 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
       (IsLoadablyByAddress) ? DirectValue : IndirectValue;
   VarInfo->Name = getVarName(i, IsAnonymous);
   auto *Addr = getLoweredAddress(SILVal).getAddress();
-  if (CurSILFn->isAsync() && VarInfo->ArgNo) {
-#ifndef NDEBUG
-    llvm::Value *Storage = Addr;
-    while (Storage) {
-      if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
-        Storage = LdInst->getOperand(0);
-      else if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Storage))
-        Storage = GEPInst->getOperand(0);
-      else if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Storage))
-        Storage = BCInst->getOperand(0);
-      else 
-        break;
-    }
-    assert(llvm::isa<llvm::Argument>(Storage) &&
-           "arg expected to be load from inside swift.context");
-#endif
-    Indirection = CoroIndirectValue;
-  }
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
+  if (CurSILFn->isAsync() && VarInfo->ArgNo) {
+    if (IGM.DebugInfo)
+      assert(IGM.DebugInfo->verifyCoroutineArgument(Addr) &&
+             "arg expected to be load from inside %swift.context");
+    Indirection = CoroIndirectValue;
+    if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
+      // Usually debug info only ever describes the *result* of a projectBox
+      // call. To allow the debugger to display a boxed parameter of an async
+      // continuation object, however, the debug info can only describe the box
+      // itself and thus also needs to emit a box type for it so the debugger
+      // knows to call into Remote Mirrors to unbox the value.
+      RealType = PBI->getOperand()->getType().getASTType();
+      assert(isa<SILBoxType>(RealType));
+    }
+  }
 
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       Decl, RealType, getTypeInfo(SILVal->getType()));

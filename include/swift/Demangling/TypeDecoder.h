@@ -19,14 +19,19 @@
 #define SWIFT_DEMANGLING_TYPEDECODER_H
 
 #include "TypeLookupError.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ABI/MetadataValues.h"
+#include "swift/AST/LayoutConstraintKind.h"
+#include "swift/AST/RequirementBase.h"
+#include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Runtime/Portability.h"
-#include "swift/Basic/Unreachable.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/StringSwitch.h"
 #include <vector>
 
 namespace swift {
@@ -341,6 +346,91 @@ getObjCClassOrProtocolName(NodePointer node) {
 }
 #endif
 
+template <typename BuiltType, typename BuiltRequirement,
+          typename BuiltLayoutConstraint, typename BuilderType>
+void decodeRequirement(NodePointer node,
+                       llvm::SmallVectorImpl<BuiltRequirement> &requirements,
+                       BuilderType &Builder) {
+  for (auto &child : *node) {
+    if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount)
+      continue;
+
+    if (child->getNumChildren() != 2)
+      return;
+    auto subjectType = Builder.decodeMangledType(child->getChild(0));
+    if (!subjectType)
+      return;
+
+    BuiltType constraintType;
+    if (child->getKind() ==
+            Demangle::Node::Kind::DependentGenericConformanceRequirement ||
+        child->getKind() ==
+            Demangle::Node::Kind::DependentGenericSameTypeRequirement) {
+      constraintType = Builder.decodeMangledType(child->getChild(1));
+      if (!constraintType)
+        return;
+    }
+
+    switch (child->getKind()) {
+    case Demangle::Node::Kind::DependentGenericConformanceRequirement: {
+      requirements.push_back(BuiltRequirement(
+          Builder.isExistential(constraintType) ? RequirementKind::Conformance
+                                                : RequirementKind::Superclass,
+          subjectType, constraintType));
+      break;
+    }
+    case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
+      requirements.push_back(BuiltRequirement(RequirementKind::SameType,
+                                              subjectType, constraintType));
+      break;
+    }
+    case Demangle::Node::Kind::DependentGenericLayoutRequirement: {
+      auto kindChild = child->getChild(1);
+      if (kindChild->getKind() != Demangle::Node::Kind::Identifier)
+        return;
+
+      auto kind =
+          llvm::StringSwitch<llvm::Optional<LayoutConstraintKind>>(
+              kindChild->getText())
+              .Case("U", LayoutConstraintKind::UnknownLayout)
+              .Case("R", LayoutConstraintKind::RefCountedObject)
+              .Case("N", LayoutConstraintKind::NativeRefCountedObject)
+              .Case("C", LayoutConstraintKind::Class)
+              .Case("D", LayoutConstraintKind::NativeClass)
+              .Case("T", LayoutConstraintKind::Trivial)
+              .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
+              .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
+              .Default(None);
+
+      if (!kind)
+        return;
+
+      BuiltLayoutConstraint layout;
+
+      if (kind != LayoutConstraintKind::TrivialOfExactSize &&
+          kind != LayoutConstraintKind::TrivialOfAtMostSize) {
+        layout = Builder.getLayoutConstraint(*kind);
+      } else {
+        auto size = child->getChild(2)->getIndex();
+        auto alignment = 0;
+
+        if (child->getNumChildren() == 4)
+          alignment = child->getChild(3)->getIndex();
+
+        layout =
+            Builder.getLayoutConstraintWithSizeAlign(*kind, size, alignment);
+      }
+
+      requirements.push_back(
+          BuiltRequirement(RequirementKind::Layout, subjectType, layout));
+      break;
+    }
+    default:
+      break;
+    }
+  }
+}
+
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
   TYPE_LOOKUP_ERROR_FMT("TypeDecoder.h:%u: Node kind %u \"%.*s\" - " Fmt,      \
                         __LINE__, (unsigned)Node->getKind(),                   \
@@ -357,6 +447,10 @@ class TypeDecoder {
   using BuiltType = typename BuilderType::BuiltType;
   using BuiltTypeDecl = typename BuilderType::BuiltTypeDecl;
   using BuiltProtocolDecl = typename BuilderType::BuiltProtocolDecl;
+  using Field = typename BuilderType::BuiltSILBoxField;
+  using BuiltSubstitution = typename BuilderType::BuiltSubstitution;
+  using BuiltRequirement = typename BuilderType::BuiltRequirement;
+  using BuiltLayoutConstraint = typename BuilderType::BuiltLayoutConstraint;
   using NodeKind = Demangle::Node::Kind;
 
   BuilderType &Builder;
@@ -930,9 +1024,88 @@ public:
       return Builder.createSILBoxType(base.getType());
     }
     case NodeKind::SILBoxTypeWithLayout: {
-      // TODO: Implement SILBoxTypeRefs with layout. As a stopgap, specify the
-      // NativeObject type ref.
-      return Builder.createBuiltinType("Builtin.NativeObject", "Bo");
+      llvm::SmallVector<Field, 4> fields;
+      llvm::SmallVector<BuiltSubstitution, 4> substitutions;
+      llvm::SmallVector<BuiltRequirement, 4> requirements;
+
+      if (Node->getNumChildren() < 1)
+        return MAKE_NODE_TYPE_ERROR0(Node, "no children");
+
+      auto fieldsNode = Node->getChild(0);
+      if (fieldsNode->getKind() != NodeKind::SILBoxLayout)
+        return MAKE_NODE_TYPE_ERROR0(fieldsNode, "expected layout");
+      for (auto *fieldNode : *fieldsNode) {
+        bool isMutable;
+        switch (fieldNode->getKind()) {
+        case NodeKind::SILBoxMutableField: isMutable = true; break;
+        case NodeKind::SILBoxImmutableField: isMutable = false; break;
+        default:
+          return MAKE_NODE_TYPE_ERROR0(fieldNode, "unhandled field type");
+        }
+        if (fieldNode->getNumChildren() < 1)
+          return MAKE_NODE_TYPE_ERROR0(fieldNode, "no children");
+        auto type = decodeMangledType(fieldNode->getChild(0));
+        if (type.isError())
+          return type;
+        fields.emplace_back(type.getType(), isMutable);
+      }
+
+      if (Node->getNumChildren() > 1) {
+        auto *substNode = Node->getChild(2);
+        if (substNode->getKind() != NodeKind::TypeList)
+          return MAKE_NODE_TYPE_ERROR0(substNode, "expected type list");
+
+        auto *dependentGenericSignatureNode = Node->getChild(1);
+        if (dependentGenericSignatureNode->getKind() !=
+            NodeKind::DependentGenericSignature)
+          return MAKE_NODE_TYPE_ERROR0(dependentGenericSignatureNode,
+                                       "expected dependent generic signature");
+        if (dependentGenericSignatureNode->getNumChildren() < 1)
+          return MAKE_NODE_TYPE_ERROR(
+              dependentGenericSignatureNode,
+              "fewer children (%zu) than required (1)",
+              dependentGenericSignatureNode->getNumChildren());
+        decodeRequirement<BuiltType, BuiltRequirement, BuiltLayoutConstraint,
+                          BuilderType>(
+            dependentGenericSignatureNode, requirements, Builder/*,
+            [&](NodePointer Node) -> BuiltType {
+              return decodeMangledType(Node).getType();
+            },
+            [&](LayoutConstraintKind Kind) -> BuiltLayoutConstraint {
+              return {}; // Not implemented!
+            },
+            [&](LayoutConstraintKind Kind, unsigned SizeInBits,
+                unsigned Alignment) -> BuiltLayoutConstraint {
+              return {}; // Not Implemented!
+              }*/);
+        // The number of generic parameters at each depth are in a mini
+        // state machine and come first.
+        llvm::SmallVector<unsigned, 4> genericParamsAtDepth;
+        for (auto *reqNode : *dependentGenericSignatureNode)
+          if (reqNode->getKind() == NodeKind::DependentGenericParamCount)
+            if (reqNode->hasIndex())
+              genericParamsAtDepth.push_back(reqNode->getIndex());
+        unsigned depth = 0;
+        unsigned index = 0;
+        for (auto *subst : *substNode) {
+          if (depth >= genericParamsAtDepth.size())
+            return MAKE_NODE_TYPE_ERROR0(
+                dependentGenericSignatureNode,
+                "more substitutions than generic params");
+          while (index >= genericParamsAtDepth[depth])
+            ++depth, index = 0;
+          auto substTy = decodeMangledType(subst);
+          if (substTy.isError())
+            return substTy;
+          substitutions.emplace_back(
+              Builder.createGenericTypeParameterType(depth, index),
+              substTy.getType());
+          ++index;
+        }
+      }
+
+      return Builder.createSILBoxTypeWithLayout(fields, substitutions,
+                                                requirements);
     }
     case NodeKind::SugaredOptional: {
       if (Node->getNumChildren() < 1)

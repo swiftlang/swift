@@ -26,6 +26,10 @@
 using namespace swift;
 using namespace reflection;
 
+TypeRefBuilder::BuiltType TypeRefBuilder::decodeMangledType(Node *node) {
+  return swift::Demangle::decodeMangledType(*this, node).getType();
+}
+
 RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
   // The remote address should point into one of the TypeRef or
   // ReflectionString references we already read out of the images.
@@ -135,8 +139,7 @@ lookupTypeWitness(const std::string &MangledTypeName,
         auto SubstitutedTypeName = readTypeRef(AssocTy,
                                                AssocTy->SubstitutedTypeName);
         auto Demangled = demangleTypeRef(SubstitutedTypeName);
-        auto *TypeWitness =
-            swift::Demangle::decodeMangledType(*this, Demangled).getType();
+        auto *TypeWitness = decodeMangledType(Demangled);
 
         AssociatedTypeCache.insert(std::make_pair(key, TypeWitness));
         return TypeWitness;
@@ -155,8 +158,7 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
     return nullptr;
 
   auto Demangled = demangleTypeRef(readTypeRef(FD, FD->Superclass));
-  auto Unsubstituted =
-      swift::Demangle::decodeMangledType(*this, Demangled).getType();
+  auto Unsubstituted = decodeMangledType(Demangled);
   if (!Unsubstituted)
     return nullptr;
 
@@ -227,8 +229,7 @@ bool TypeRefBuilder::getFieldTypeRefs(
     }
 
     auto Demangled = demangleTypeRef(readTypeRef(Field,Field->MangledTypeName));
-    auto Unsubstituted =
-        swift::Demangle::decodeMangledType(*this, Demangled).getType();
+    auto Unsubstituted = decodeMangledType(Demangled);
     if (!Unsubstituted)
       return false;
 
@@ -306,7 +307,7 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
     if (CR->hasMangledTypeName()) {
       auto MangledName = readTypeRef(CR, CR->MangledTypeName);
       auto DemangleTree = demangleTypeRef(MangledName);
-      TR = swift::Demangle::decodeMangledType(*this, DemangleTree).getType();
+      TR = decodeMangledType(DemangleTree);
     }
     Info.CaptureTypes.push_back(TR);
   }
@@ -318,7 +319,7 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
     if (MSR->hasMangledTypeName()) {
       auto MangledName = readTypeRef(MSR, MSR->MangledTypeName);
       auto DemangleTree = demangleTypeRef(MangledName);
-      TR = swift::Demangle::decodeMangledType(*this, DemangleTree).getType();
+      TR = decodeMangledType(DemangleTree);
     }
 
     const MetadataSource *MS = nullptr;

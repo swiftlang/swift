@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all -disable-llvm-optzns -disable-swift-specific-llvm-optzns | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 // RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir -sil-verify-all
 
 // REQUIRES: concurrency
@@ -27,7 +27,15 @@ bb0:
 //   Initialize the async  continuation context.
 // CHECK: [[context_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 0
 // CHECK: [[ctxt:%.*]] = load %swift.context*, %swift.context** [[ctxt_addr]]
-// CHECK: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
+
+// CHECK-arm64e: [[ctxt_addr_int:%[0-9]+]] = ptrtoint %swift.context** [[context_addr]] to i64
+// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[ctxt_addr_int]], i64 48546)
+// CHECK-arm64e: [[ctxt_int:%[0-9]+]]      = ptrtoint %swift.context* [[ctxt]] to i64
+// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[ctxt_int]], i32 2, i64 [[ptrauth_blend]])
+// CHECK-arm64e: [[signed_ctxt:%[0-9]+]]   = inttoptr i64 [[signed_int]] to %swift.context*
+// CHECK-arm64e: store %swift.context* [[signed_ctxt]], %swift.context** [[context_addr]]
+// CHECK-x86_64: store %swift.context* [[ctxt]], %swift.context** [[context_addr]]
+
 // CHECK: [[error_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 2
 // CHECK: store %swift.error* null, %swift.error** [[error_addr]]
 // CHECK: [[result_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 3
@@ -37,12 +45,28 @@ bb0:
 // CHECK:  [[exe:%.*]] = load %swift.executor*, %swift.executor** [[exe_addr]]
 // CHECK:  store %swift.executor* [[exe]], %swift.executor** [[exectuor_addr]]
 //   Initialize the async task with the continuation function and async continuation context.
-// CHECK: [[task_continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
+// CHECK: [[continuation_fn_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 4
 // CHECK: [[continuation_fn:%.*]] = call i8* @llvm.coro.async.resume()
-// CHECK: store i8* [[continuation_fn]], i8** [[task_continuation_fn_addr]]
+
+// CHECK-arm64e: [[continuation_fn_addr_int:%[0-9]+]] = ptrtoint i8** [[continuation_fn_addr]] to i64
+// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[continuation_fn_addr_int]], i64 11330)
+// CHECK-arm64e: [[continuation_fn_int:%[0-9]+]]      = ptrtoint i8* [[continuation_fn]] to i64
+// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[continuation_fn_int]], i32 0, i64 [[ptrauth_blend]])
+// CHECK-arm64e: [[signed_continuation_fn:%[0-9]+]]   = inttoptr i64 [[signed_int]] to i8*
+// CHECK-arm64e: store i8* [[signed_continuation_fn]], i8** [[continuation_fn_addr]]
+// CHECK-x86_64: store i8* [[continuation_fn]], i8** [[continuation_fn_addr]]
+
 // CHECK: [[task_resume_context_addr:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[tsk]], i32 0, i32 5
-// CHECK: [[cont_context2:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
-// CHECK: store %swift.context* [[cont_context2]], %swift.context** [[task_resume_context_addr]]
+// CHECK: [[task_resume_context:%.*]] = bitcast %swift.async_continuation_context* [[cont_context]] to %swift.context*
+
+// CHECK-arm64e: [[task_resume_context_addr_int:%[0-9]+]] = ptrtoint %swift.context** [[task_resume_context_addr]] to i64
+// CHECK-arm64e: [[ptrauth_blend:%[0-9]+]]   = call i64 @llvm.ptrauth.blend.i64(i64 [[task_resume_context_addr_int]], i64 30010)
+// CHECK-arm64e: [[task_resume_context_int:%[0-9]+]]      = ptrtoint %swift.context* [[task_resume_context]] to i64
+// CHECK-arm64e: [[signed_int:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[task_resume_context_int]], i32 2, i64 [[ptrauth_blend]])
+// CHECK-arm64e: [[signed_task_resume_context:%[0-9]+]]   = inttoptr i64 [[signed_int]] to %swift.context*
+// CHECK-arm64e: store %swift.context* [[signed_task_resume_context]], %swift.context** [[task_resume_context_addr]]
+// CHECK-x86_64: store %swift.context* [[task_resume_context]], %swift.context** [[task_resume_context_addr]]
+
 //  Initialize the synchronization variable.
 // CHECK: [[synchronization_addr:%.*]] = getelementptr inbounds %swift.async_continuation_context, %swift.async_continuation_context* [[cont_context]], i32 0, i32 1
 // CHECK: store atomic {{(i64|i32)}} 0, {{(i64|i32)}}* [[synchronization_addr]] release

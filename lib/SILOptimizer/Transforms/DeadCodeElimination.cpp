@@ -12,12 +12,13 @@
 
 #define DEBUG_TYPE "sil-dce"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBitfield.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/SILBitfield.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -43,21 +44,17 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // begin_access is defined to have side effects, but this is not relevant for
-  // DCE.
-  if (isa<BeginAccessInst>(I))
-    return false;
-
-  // Even though begin_borrow/destroy_value/copy_value have side-effects, they
+  // Even though begin_access/destroy_value/copy_value have side-effects, they
   // can be DCE'ed if they do not have useful dependencies/reverse dependencies
-  if (isa<BeginBorrowInst>(I))
+  if (isa<BeginAccessInst>(I) || isa<CopyValueInst>(I) ||
+      isa<DestroyValueInst>(I))
     return false;
 
-  if (isa<DestroyValueInst>(I))
-    return false;
-
-  if (isa<CopyValueInst>(I))
-    return false;
+  // A load [copy] is okay to be DCE'ed if there are no useful dependencies
+  if (auto *load = dyn_cast<LoadInst>(I)) {
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+      return false;
+  }
 
   if (I->mayHaveSideEffects())
     return true;
@@ -121,6 +118,14 @@ class DCE {
   llvm::DenseMap<SILValue, SmallPtrSet<SILInstruction *, 4>>
       ReverseDependencies;
 
+  // reborrowDependencies tracks the dependency of a reborrowed phiArg with its
+  // renamed base value.
+  // A reborrowed phiArg may have a new base value, if it's original base value
+  // was also passed as a branch operand. The renamed base value should then be
+  // live if the reborrow phiArg was also live.
+  using BaseValueSet = SmallPtrSet<SILValue, 8>;
+  llvm::DenseMap<SILPhiArgument *, BaseValueSet> reborrowDependencies;
+
   /// Tracks if the pass changed branches.
   bool BranchesChanged = false;
   /// Tracks if the pass changed ApplyInsts.
@@ -131,6 +136,9 @@ class DCE {
   /// Record a reverse dependency from \p from to \p to meaning \p to is live
   /// if \p from is also live.
   void addReverseDependency(SILValue from, SILInstruction *to);
+  /// Starting from \p borrowInst find all reborrow dependency of its reborrows
+  /// with their renamed base values.
+  void findReborrowDependencies(BeginBorrowInst *borrowInst);
   bool removeDead();
 
   void computeLevelNumbers(PostDomTreeNode *root);
@@ -256,6 +264,25 @@ void DCE::markLive() {
         addReverseDependency(I.getOperand(0), &I);
         break;
       }
+      case SILInstructionKind::BeginBorrowInst: {
+        // Currently we only support borrows of owned values.
+        // Nested borrow handling can be complex in the presence of reborrows.
+        // So it is not handled currently.
+        auto *borrowInst = cast<BeginBorrowInst>(&I);
+        if (borrowInst->getOperand().getOwnershipKind() !=
+            OwnershipKind::Owned) {
+          markInstructionLive(borrowInst);
+          // Visit all end_borrows and mark them live
+          auto visitEndBorrow = [&](EndBorrowInst *endBorrow) {
+            markInstructionLive(endBorrow);
+          };
+          visitTransitiveEndBorrows(borrowInst, visitEndBorrow);
+          continue;
+        }
+        // If not populate reborrowDependencies for this borrow
+        findReborrowDependencies(cast<BeginBorrowInst>(&I));
+        break;
+      }
       default:
         if (seemsUseful(&I))
           markInstructionLive(&I);
@@ -276,6 +303,21 @@ void DCE::addReverseDependency(SILValue from, SILInstruction *to) {
   LLVM_DEBUG(llvm::dbgs() << "Adding reverse dependency from " << from << " to "
                           << to);
   ReverseDependencies[from].insert(to);
+}
+
+void DCE::findReborrowDependencies(BeginBorrowInst *borrowInst) {
+  LLVM_DEBUG(llvm::dbgs() << "Finding reborrow dependencies of " << borrowInst
+                          << "\n");
+  BorrowingOperand initialScopedOperand(&borrowInst->getOperandRef());
+  auto visitReborrowBaseValuePair = [&](SILPhiArgument *phiArg,
+                                        SILValue baseValue) {
+    reborrowDependencies[phiArg].insert(baseValue);
+  };
+  // Find all reborrow dependencies starting from \p borrowInst and populate
+  // them in reborrowDependencies
+  findTransitiveReborrowBaseValuePairs(initialScopedOperand,
+                                       borrowInst->getOperand(),
+                                       visitReborrowBaseValuePair);
 }
 
 // Mark as live the terminator argument at index ArgIndex in Pred that
@@ -353,6 +395,12 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   // Mark all reverse dependencies on the Arg live
   for (auto *depInst : ReverseDependencies.lookup(Arg)) {
     markInstructionLive(depInst);
+  }
+
+  if (auto *phi = dyn_cast<SILPhiArgument>(Arg)) {
+    for (auto depVal : reborrowDependencies.lookup(phi)) {
+      markValueLive(depVal);
+    }
   }
 
   auto *Block = Arg->getParent();
@@ -523,6 +571,8 @@ bool DCE::removeDead() {
         BranchesChanged = true;
         continue;
       }
+
+      auto *phiArg = cast<SILPhiArgument>(arg);
       // In OSSA, we have to delete a dead phi argument and insert destroy or
       // end_borrow at its predecessors if the incoming values are live.
       // This is not necessary in non-OSSA, and will infact be incorrect.
@@ -530,8 +580,23 @@ bool DCE::removeDead() {
       // lifetime in non-OSSA.
       for (auto *pred : BB.getPredecessorBlocks()) {
         auto *predTerm = pred->getTerminator();
-        auto predArg = predTerm->getAllOperands()[i].get();
-        endLifetimeOfLiveValue(predArg, predTerm);
+        SILInstruction *insertPt = predTerm;
+        if (phiArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+          // If the phiArg is dead and had reborrow dependencies, its baseValue
+          // may also have been dead and a destroy_value of its baseValue may
+          // have been inserted before the pred's terminator. Make sure to
+          // adjust the insertPt before any destroy_value.
+          for (SILInstruction &predInst : llvm::reverse(*pred)) {
+            if (&predInst == predTerm)
+              continue;
+            if (!isa<DestroyValueInst>(&predInst)) {
+              insertPt = &*std::next(predInst.getIterator());
+              break;
+            }
+          }
+        }
+
+        endLifetimeOfLiveValue(phiArg->getIncomingPhiValue(pred), insertPt);
       }
       erasePhiArgument(&BB, i);
       Changed = true;
@@ -546,11 +611,16 @@ bool DCE::removeDead() {
 
       // We want to replace dead terminators with unconditional branches to
       // the nearest post-dominator that has useful instructions.
-      if (isa<TermInst>(Inst)) {
+      if (auto *termInst = dyn_cast<TermInst>(Inst)) {
         SILBasicBlock *postDom = nearestUsefulPostDominator(Inst->getParent());
         if (!postDom)
           continue;
 
+        for (auto &op : termInst->getAllOperands()) {
+          if (op.isLifetimeEnding()) {
+            endLifetimeOfLiveValue(op.get(), termInst);
+          }
+        }
         LLVM_DEBUG(llvm::dbgs() << "Replacing branch: ");
         LLVM_DEBUG(Inst->dump());
         LLVM_DEBUG(llvm::dbgs() << "with jump to: BB" << postDom->getDebugID());

@@ -771,3 +771,50 @@ bb7:
   return %val1 : $Klass
 }
 
+// CHECK-LABEL: @rle_fixlifetimeof_intermediate_phis :
+// CHECK: load
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'rle_fixlifetimeof_intermediate_phis'
+sil [ossa] @rle_fixlifetimeof_intermediate_phis : $@convention(thin) (@in NonTrivialStruct, @owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : $*NonTrivialStruct, %1 : @owned $Klass, %2 : @owned $Klass):
+  %ele = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %val1 = load [copy] %ele : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %2 to [assign] %ele : $*Klass
+  br bb3
+
+bb2:
+  destroy_value %2 : $Klass
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb8
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  %val2 = load [copy] %ele : $*Klass
+  destroy_value %val2 : $Klass
+  store %1 to [assign] %ele : $*Klass
+  br bb7
+
+bb6:
+  destroy_value %1 : $Klass
+  br bb7
+
+bb7:
+  br bb9
+
+bb8:
+  destroy_value %1 : $Klass
+  br bb9
+
+bb9:
+  %val3 = load [take] %ele : $*Klass
+  destroy_value %val3 : $Klass
+  return %val1 : $Klass
+}
+

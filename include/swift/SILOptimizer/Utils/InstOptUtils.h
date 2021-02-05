@@ -703,6 +703,10 @@ makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock);
 SILValue
 makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock);
 
+/// Given an ssa value \p value, create destroy_values at leaking blocks
+void endLifetimeAtLeakingBlocks(SILValue value,
+                                ArrayRef<SILBasicBlock *> userBBs);
+
 /// Given a forwarding instruction, eliminate it if all of its users are debug
 /// instructions and ownership uses.
 bool tryEliminateOnlyOwnershipUsedForwardingInst(
