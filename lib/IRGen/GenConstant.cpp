@@ -216,6 +216,40 @@ llvm::Constant *irgen::emitConstantValue(IRGenModule &IGM, SILValue operand) {
     auto *val = emitConstantValue(IGM, VTBI->getOperand());
     auto *sTy = IGM.getTypeInfo(VTBI->getType()).getStorageType();
     return llvm::ConstantExpr::getIntToPtr(val, sTy);
+
+  } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(operand)) {
+    return emitConstantValue(IGM, CFI->getOperand());
+
+  } else if (auto *T2TFI = dyn_cast<ThinToThickFunctionInst>(operand)) {
+    SILType type = operand->getType();
+    auto *sTy = cast<llvm::StructType>(IGM.getTypeInfo(type).getStorageType());
+
+    auto *function = llvm::ConstantExpr::getBitCast(
+        emitConstantValue(IGM, T2TFI->getCallee()),
+        sTy->getTypeAtIndex((unsigned)0));
+
+    auto *context = llvm::ConstantExpr::getBitCast(
+        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy),
+        sTy->getTypeAtIndex((unsigned)1));
+    
+    return llvm::ConstantStruct::get(sTy, {function, context});
+
+  } else if (auto *FRI = dyn_cast<FunctionRefInst>(operand)) {
+    SILFunction *fn = FRI->getReferencedFunction();
+
+    llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+    assert(!fn->isAsync() && "TODO: support async functions");
+
+    CanSILFunctionType fnType = FRI->getType().getAs<SILFunctionType>();
+    auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
+    if (authInfo.isSigned()) {
+      auto constantDiscriminator =
+          cast<llvm::Constant>(authInfo.getDiscriminator());
+      assert(!constantDiscriminator->getType()->isPointerTy());
+      fnPtr = IGM.getConstantSignedPointer(fnPtr, authInfo.getKey(), nullptr,
+        constantDiscriminator);
+    }
+    return fnPtr;
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
   }
