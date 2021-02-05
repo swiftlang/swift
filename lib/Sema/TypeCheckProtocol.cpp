@@ -2687,6 +2687,7 @@ bool ConformanceChecker::checkActorIsolation(
     ValueDecl *requirement, ValueDecl *witness) {
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
+  bool isCrossActor = false;
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
@@ -2719,6 +2720,14 @@ bool ConformanceChecker::checkActorIsolation(
 
     return true;
   }
+
+  case ActorIsolationRestriction::CrossActorSelf:
+    return diagnoseNonConcurrentTypesInReference(
+        witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
+
+  case ActorIsolationRestriction::CrossGlobalActor:
+    isCrossActor = true;
+    LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
     // Hang on to the global actor that's used for the witness. It will need
@@ -2762,6 +2771,22 @@ bool ConformanceChecker::checkActorIsolation(
   if (!witnessGlobalActor && !requirementGlobalActor)
     return false;
 
+  // If both have global actors and they are the same, we are done.
+  if (witnessGlobalActor && requirementGlobalActor &&
+      witnessGlobalActor->isEqual(requirementGlobalActor))
+    return false;
+
+  // For cross-actor references, check for non-concurrent types.
+  if (isCrossActor) {
+    // If the requirement was imported from Objective-C, it may not have been
+    // annotated appropriately. Allow the mismatch.
+    if (requirement->hasClangNode())
+      return false;
+
+    return diagnoseNonConcurrentTypesInReference(
+      witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
+  }
+
   // If the witness has a global actor but the requirement does not, we have
   // an isolation error.
   //
@@ -2785,6 +2810,11 @@ bool ConformanceChecker::checkActorIsolation(
   //
   // FIXME: Within a module, this will be an inference rule.
   if (requirementGlobalActor && !witnessGlobalActor) {
+    if (isCrossActor) {
+      return diagnoseNonConcurrentTypesInReference(
+        witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
+    }
+
     witness->diagnose(
         diag::global_actor_isolated_requirement, witness->getDescriptiveKind(),
         witness->getName(), requirementGlobalActor, Proto->getName())
@@ -2795,18 +2825,14 @@ bool ConformanceChecker::checkActorIsolation(
     return true;
   }
 
-  // If both have global actors but they differ, this is an isolation error.
-  if (!witnessGlobalActor->isEqual(requirementGlobalActor)) {
-    witness->diagnose(
-        diag::global_actor_isolated_requirement_witness_conflict,
-        witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
-        Proto->getName(), requirementGlobalActor);
-    requirement->diagnose(diag::decl_declared_here, requirement->getName());
-    return true;
-  }
-
-  // Everything is okay.
-  return false;
+  // Both have global actors but they differ, so this is an isolation error.
+  assert(!witnessGlobalActor->isEqual(requirementGlobalActor));
+  witness->diagnose(
+      diag::global_actor_isolated_requirement_witness_conflict,
+      witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
+      Proto->getName(), requirementGlobalActor);
+  requirement->diagnose(diag::decl_declared_here, requirement->getName());
+  return true;
 }
 
 bool ConformanceChecker::checkObjCTypeErasedGenerics(
@@ -5582,6 +5608,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto &Context = dc->getASTContext();
   MultiConformanceChecker groupChecker(Context);
 
+  ProtocolConformance *concurrentValueConformance = nullptr;
+  ProtocolConformance *unsafeConcurrentValueConformance = nullptr;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -5602,13 +5630,23 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     }
 
-    if (conformance->getProtocol()->
-          isSpecificProtocol(KnownProtocolKind::StringInterpolationProtocol)) {
+    auto proto = conformance->getProtocol();
+    if (proto->isSpecificProtocol(
+            KnownProtocolKind::StringInterpolationProtocol)) {
       if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
         diagnoseMissingAppendInterpolationMethod(typeDecl);
       }
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
+      concurrentValueConformance = conformance;
+    } else if (proto->isSpecificProtocol(
+                   KnownProtocolKind::UnsafeConcurrentValue)) {
+      unsafeConcurrentValueConformance = conformance;
     }
   }
+
+  // Check constraints of ConcurrentValue.
+  if (concurrentValueConformance && !unsafeConcurrentValueConformance)
+    checkConcurrentValueConformance(concurrentValueConformance);
 
   // Check all conformances.
   groupChecker.checkAllConformances();

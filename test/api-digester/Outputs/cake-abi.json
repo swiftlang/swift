@@ -1733,6 +1733,12 @@
         },
         {
           "kind": "Conformance",
+          "name": "ConcurrentValue",
+          "printedName": "ConcurrentValue",
+          "usr": "s:s15ConcurrentValueP"
+        },
+        {
+          "kind": "Conformance",
           "name": "SIMDScalar",
           "printedName": "SIMDScalar",
           "children": [

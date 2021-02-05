@@ -28,6 +28,8 @@
 @frozen
 public enum Never {}
 
+extension Never: ConcurrentValue { }
+
 extension Never: Error {}
 
 extension Never: Equatable, Comparable, Hashable {}

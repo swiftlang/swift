@@ -186,6 +186,10 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
   }
 }
 
+extension SIMD${n}: ConcurrentValue
+  where Scalar: ConcurrentValue,
+        Scalar.SIMD${storageN}Storage: ConcurrentValue { }
+
 %end
 
 extension SIMD3 {
@@ -217,7 +221,7 @@ extension ${Self}: SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} integers.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage {
+  public struct SIMD${n}Storage: SIMDStorage, ConcurrentValue {
 
     public var _value: Builtin.Vec${n}x${BuiltinName}
 
@@ -266,7 +270,7 @@ extension ${Self} : SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage {
+  public struct SIMD${n}Storage: SIMDStorage, ConcurrentValue {
 
     public var _value: Builtin.Vec${n}xFPIEEE${bits}
 

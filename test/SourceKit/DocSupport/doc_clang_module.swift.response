@@ -5591,6 +5591,11 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.ref.protocol,
         key.name: "_Pointer",
         key.usr: "s:s8_PointerP"
+      },
+      {
+        key.kind: source.lang.swift.ref.protocol,
+        key.name: "ConcurrentValue",
+        key.usr: "s:s15ConcurrentValueP"
       }
     ]
   },

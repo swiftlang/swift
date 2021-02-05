@@ -388,6 +388,14 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
 
   switch (auto restriction = ActorIsolationRestriction::forDeclaration(
               const_cast<ValueDecl *>(VD))) {
+  case ActorIsolationRestriction::CrossActorSelf:
+    if (Diagnose) {
+      // FIXME: Substitution map?
+      diagnoseNonConcurrentTypesInReference(
+          const_cast<ValueDecl *>(VD), VD->getDeclContext(), VD->getLoc(),
+          ConcurrentReferenceKind::CrossActor);
+    }
+    return false;
   case ActorIsolationRestriction::ActorSelf:
     // Actor-isolated functions cannot be @objc.
     if (Diagnose) {
@@ -400,6 +408,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
     }
     return true;
 
+  case ActorIsolationRestriction::CrossGlobalActor:
   case ActorIsolationRestriction::GlobalActor:
     // FIXME: Consider whether to limit @objc on global-actor-qualified
     // declarations.

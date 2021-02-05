@@ -2099,3 +2099,18 @@ public typealias DictionaryIndex<Key: Hashable, Value> =
   Dictionary<Key, Value>.Index
 public typealias DictionaryIterator<Key: Hashable, Value> =
   Dictionary<Key, Value>.Iterator
+
+extension Dictionary: ConcurrentValue, UnsafeConcurrentValue
+  where Key: ConcurrentValue, Value: ConcurrentValue { }
+extension Dictionary.Keys: ConcurrentValue, UnsafeConcurrentValue
+  where Key: ConcurrentValue, Value: ConcurrentValue { }
+extension Dictionary.Values: ConcurrentValue, UnsafeConcurrentValue
+  where Key: ConcurrentValue, Value: ConcurrentValue { }
+extension Dictionary.Keys.Iterator: ConcurrentValue, UnsafeConcurrentValue
+  where Key: ConcurrentValue, Value: ConcurrentValue { }
+extension Dictionary.Values.Iterator: ConcurrentValue, UnsafeConcurrentValue
+  where Key: ConcurrentValue, Value: ConcurrentValue { }
+extension Dictionary.Index: ConcurrentValue, UnsafeConcurrentValue
+  where Key: ConcurrentValue, Value: ConcurrentValue { }
+extension Dictionary.Iterator: ConcurrentValue, UnsafeConcurrentValue
+  where Key: ConcurrentValue, Value: ConcurrentValue { }

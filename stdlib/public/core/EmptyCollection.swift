@@ -172,3 +172,6 @@ extension EmptyCollection: Equatable {
     return true
   }
 }
+
+extension EmptyCollection: ConcurrentValue { }
+extension EmptyCollection.Iterator: ConcurrentValue { }

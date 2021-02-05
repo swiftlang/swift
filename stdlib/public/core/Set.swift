@@ -1629,3 +1629,10 @@ extension Set {
 
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
+
+extension Set: ConcurrentValue, UnsafeConcurrentValue
+  where Element: ConcurrentValue { }
+extension Set.Index: ConcurrentValue, UnsafeConcurrentValue
+  where Element: ConcurrentValue { }
+extension Set.Iterator: ConcurrentValue, UnsafeConcurrentValue
+  where Element: ConcurrentValue { }

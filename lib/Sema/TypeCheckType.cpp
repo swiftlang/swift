@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
@@ -2823,6 +2824,14 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   
   if (fnTy->hasError())
     return fnTy;
+
+  // Concurrent function types must be composed of concurrent-safe parameter
+  // and result types.
+  if (concurrent && resolution.getStage() > TypeResolutionStage::Structural) {
+    (void)diagnoseNonConcurrentTypesInFunctionType(
+         fnTy, resolution.getDeclContext(), repr->getLoc(),
+         /*isClosure=*/false);
+  }
 
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.

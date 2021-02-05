@@ -51,7 +51,7 @@ boundary.
 extension String {
   /// A position of a character or code unit in a string.
   @frozen
-  public struct Index {
+  public struct Index: ConcurrentValue {
     @usableFromInline
     internal var _rawBits: UInt64
 
