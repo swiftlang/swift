@@ -1000,6 +1000,7 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
 /// Walks over all fields of an aggregate and checks if a reference count
 /// operation for \p value is required. This differs from a simple `isTrivial`
 /// check, because it treats a value_to_bridge_object instruction as "trivial".
+/// It can also handle non-trivial enums with trivial cases.
 static bool isTrivial(SILValue value, SILFunction *function) {
   SmallVector<ValueBase *, 32> workList;
   SmallPtrSet<ValueBase *, 16> visited;
@@ -1015,6 +1016,11 @@ static bool isTrivial(SILValue value, SILFunction *function) {
         if (visited.insert(op).second)
           workList.push_back(op);
       }
+      continue;
+    }
+    if (auto *en = dyn_cast<EnumInst>(v)) {
+      if (en->hasOperand() && visited.insert(en->getOperand()).second)
+        workList.push_back(en->getOperand());
       continue;
     }
     return false;
