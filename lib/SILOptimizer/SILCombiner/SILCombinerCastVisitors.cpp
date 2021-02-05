@@ -747,28 +747,36 @@ SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
   return nullptr;
 }
 
-SILInstruction *
-SILCombiner::
-visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
+SILInstruction *SILCombiner::visitUncheckedTrivialBitCastInst(
+    UncheckedTrivialBitCastInst *utbci) {
   // (unchecked_trivial_bit_cast Y->Z
   //                                 (unchecked_trivial_bit_cast X->Y x))
   //   ->
   // (unchecked_trivial_bit_cast X->Z x)
-  SILValue Op = UTBCI->getOperand();
-  if (auto *OtherUTBCI = dyn_cast<UncheckedTrivialBitCastInst>(Op)) {
-    return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
-                                                 OtherUTBCI->getOperand(),
-                                                 UTBCI->getType());
+  SILValue operand = utbci->getOperand();
+  if (auto *otherUTBCI = dyn_cast<UncheckedTrivialBitCastInst>(operand)) {
+    return Builder.createUncheckedTrivialBitCast(
+        utbci->getLoc(), otherUTBCI->getOperand(), utbci->getType());
   }
 
-  // (unchecked_trivial_bit_cast Y->Z
-  //                                 (unchecked_ref_cast X->Y x))
+  // %y = unchecked_ref_cast %x X->Y
+  // ...
+  // %z = unchecked_trivial_bit_cast %y Y->Z
+  //
   //   ->
-  // (unchecked_trivial_bit_cast X->Z x)
-  if (auto *URBCI = dyn_cast<UncheckedRefCastInst>(Op)) {
-    return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
-                                                 URBCI->getOperand(),
-                                                 UTBCI->getType());
+  //
+  // %z = unchecked_trivial_bit_cast %x X->Z
+  // %y = unchecked_ref_cast %x X->Y
+  // ...
+  if (auto *urbci = dyn_cast<UncheckedRefCastInst>(operand)) {
+    // We just move the unchecked_trivial_bit_cast to before the
+    // unchecked_ref_cast and then make its operand the unchecked_ref_cast
+    // operand. Then we return the cast so we reprocess given that we changed
+    // its operands.
+    utbci->moveBefore(urbci);
+    utbci->setDebugLocation(urbci->getDebugLocation());
+    utbci->setOperand(urbci->getOperand());
+    return utbci;
   }
 
   return nullptr;

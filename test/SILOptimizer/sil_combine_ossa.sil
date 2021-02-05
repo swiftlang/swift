@@ -4769,3 +4769,34 @@ bb2(%6c : @guaranteed $__ContiguousArrayStorageBase):
   %14 = struct $MyInt (%13 : $Builtin.Int32)
   return %14 : $MyInt
 }
+
+// Make sure that we hoist the unchecked_trivial_bit_cast up the def-use chain
+// to before copy1 and make its operand copy1.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_trivial_bit_cast_hoist_up_def_use_chain : $@convention(thin) (@guaranteed AnyObject) -> UInt {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[RESULT:%.*]] = unchecked_trivial_bit_cast [[ARG_COPY]]
+// CHECK:   destroy_value [[ARG_COPY]]
+// CHECK:   cond_br undef, [[BB_UNREACHABLE:bb[0-9]*]], [[BB_RESULT:bb[0-9]*]]
+//
+// CHECK: [[BB_UNREACHABLE]]:
+// CHECK-NEXT:   unreachable
+//
+// CHECK: [[BB_RESULT]]:
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'unchecked_trivial_bit_cast_hoist_up_def_use_chain'
+sil [ossa] @unchecked_trivial_bit_cast_hoist_up_def_use_chain : $@convention(thin) (@guaranteed AnyObject) -> UInt {
+bb0(%0 : @guaranteed $AnyObject):
+  %copy1 = copy_value %0 : $AnyObject
+  %cast = unchecked_ref_cast %copy1 : $AnyObject to $Builtin.NativeObject
+  cond_br undef, bb3, bb4 
+
+bb3:
+  unreachable
+
+bb4:
+  %2 = unchecked_trivial_bit_cast %cast : $Builtin.NativeObject to $UInt
+  destroy_value %cast : $Builtin.NativeObject
+  return %2 : $UInt
+}
