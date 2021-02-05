@@ -69,7 +69,6 @@ namespace {
   typedef EquivalenceClass::DerivedSameTypeComponent DerivedSameTypeComponent;
   typedef GenericSignatureBuilder::DelayedRequirement DelayedRequirement;
   typedef GenericSignatureBuilder::ResolvedType ResolvedType;
-  typedef GenericSignatureBuilder::UnresolvedType GSBUnresolvedType;
   typedef GenericSignatureBuilder::RequirementRHS RequirementRHS;
 } // end anonymous namespace
 
@@ -545,20 +544,6 @@ void GenericSignatureBuilder::Implementation::deallocateEquivalenceClass(
   FreeEquivalenceClasses.push_back(equivClass);
 
   ++NumEquivalenceClassesFreed;
-}
-
-namespace {
-  /// Retrieve the type described by the given unresolved tyoe.
-  Type getUnresolvedType(GSBUnresolvedType type,
-                         TypeArrayView<GenericTypeParamType> genericParams) {
-    if (auto concrete = type.dyn_cast<Type>())
-      return concrete;
-
-    if (auto pa = type.dyn_cast<PotentialArchetype *>())
-      return pa->getDependentType(genericParams);
-
-    return Type();
-  }
 }
 
 #pragma mark Requirement sources
@@ -6006,8 +5991,7 @@ void GenericSignatureBuilder::checkConformanceConstraints(
 namespace swift {
   bool operator<(const DerivedSameTypeComponent &lhs,
                  const DerivedSameTypeComponent &rhs) {
-    return compareDependentTypes(getUnresolvedType(lhs.anchor, {}),
-                                 getUnresolvedType(rhs.anchor, {})) < 0;
+    return compareDependentTypes(lhs.type, rhs.type) < 0;
   }
 } // namespace swift
 
@@ -6117,17 +6101,18 @@ static void computeDerivedSameTypeComponents(
   auto &components = equivClass->derivedSameTypeComponents;
   for (unsigned i : indices(equivClass->members)) {
     auto pa = equivClass->members[i];
-    CanType depType = pa->getDependentType({ })->getCanonicalType();
+    auto depType = pa->getDependentType(builder.getGenericParams());
+    CanType canType = depType->getCanonicalType();
 
     // Find the representative of this set.
-    assert(parentIndices.count(depType) == 1 && "Unknown member?");
-    unsigned index = parentIndices[depType];
+    assert(parentIndices.count(canType) == 1 && "Unknown member?");
+    unsigned index = parentIndices[canType];
     unsigned representative = findRepresentative(parents, index);
 
     // If this is the representative, add a component for it.
     if (representative == index) {
-      componentOf[depType] = components.size();
-      components.push_back(DerivedSameTypeComponent{pa, nullptr});
+      componentOf[canType] = components.size();
+      components.push_back(DerivedSameTypeComponent{depType, nullptr});
       continue;
     }
 
@@ -6139,13 +6124,12 @@ static void computeDerivedSameTypeComponents(
     assert(componentOf.count(representativeDepTy) == 1 &&
            "Missing representative component?");
     unsigned componentIndex = componentOf[representativeDepTy];
-    componentOf[depType] = componentIndex;
+    componentOf[canType] = componentIndex;
 
     // If this is a better anchor, record it.
-    if (compareDependentTypes(
-            depType, getUnresolvedType(components[componentIndex].anchor, {})) <
-        0)
-      components[componentIndex].anchor = pa;
+    if (compareDependentTypes(depType, components[componentIndex].type) < 0) {
+      components[componentIndex].type = depType;
+    }
   }
 
   // If there is a concrete type, figure out the best concrete type anchor
@@ -6459,7 +6443,7 @@ static void collapseSameTypeComponents(
         unsigned newIndex = newComponents.size();
         newIndices[oldIndex] = newIndex;
         newComponents.push_back(
-          {oldComponent.anchor, oldComponent.concreteTypeSource});
+          {oldComponent.type, oldComponent.concreteTypeSource});
         continue;
       }
 
@@ -6471,9 +6455,9 @@ static void collapseSameTypeComponents(
       auto &newComponent = newComponents[newRepresentativeIndex];
 
       // If the old component has a better anchor, keep it.
-      if (compareDependentTypes(getUnresolvedType(oldComponent.anchor, {}),
-                                getUnresolvedType(newComponent.anchor, {})) < 0)
-        newComponent.anchor = oldComponent.anchor;
+      if (compareDependentTypes(oldComponent.type, newComponent.type) < 0) {
+        newComponent.type = oldComponent.type;
+      }
 
       // If the old component has a better concrete type source, keep it.
       if (!newComponent.concreteTypeSource ||
@@ -6957,12 +6941,8 @@ namespace {
 
 static int compareSameTypeComponents(const SameTypeComponentRef *lhsPtr,
                                      const SameTypeComponentRef *rhsPtr){
-  Type lhsType = getUnresolvedType(
-      lhsPtr->first->derivedSameTypeComponents[lhsPtr->second].anchor,
-      { });
-  Type rhsType = getUnresolvedType(
-      rhsPtr->first->derivedSameTypeComponents[rhsPtr->second].anchor,
-      { });
+  Type lhsType = lhsPtr->first->derivedSameTypeComponents[lhsPtr->second].type;
+  Type rhsType = rhsPtr->first->derivedSameTypeComponents[rhsPtr->second].type;
 
   return compareDependentTypes(lhsType, rhsType);
 }
@@ -6993,7 +6973,7 @@ void GenericSignatureBuilder::enumerateRequirements(
     // Dig out the subject type and its corresponding component.
     auto equivClass = subject.first;
     auto &component = equivClass->derivedSameTypeComponents[subject.second];
-    Type subjectType = getUnresolvedType(component.anchor, genericParams);
+    Type subjectType = component.type;
 
     // If this equivalence class is bound to a concrete type, equate the
     // anchor with a concrete type.
@@ -7031,8 +7011,7 @@ void GenericSignatureBuilder::enumerateRequirements(
       // FIXME: Distinguish between explicit and inferred here?
       auto &nextComponent =
         equivClass->derivedSameTypeComponents[subject.second + 1];
-      Type otherSubjectType =
-        getUnresolvedType(nextComponent.anchor, genericParams);
+      Type otherSubjectType = nextComponent.type;
       deferredSameTypeRequirement =
         [&f, subjectType, otherSubjectType, this] {
           f(RequirementKind::SameType, subjectType, otherSubjectType,

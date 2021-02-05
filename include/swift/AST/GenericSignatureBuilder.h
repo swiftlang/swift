@@ -160,8 +160,8 @@ public:
     /// Describes a component within the graph of same-type constraints within
     /// the equivalence class that is held together by derived constraints.
     struct DerivedSameTypeComponent {
-      /// The potential archetype that acts as the anchor for this component.
-      UnresolvedType anchor;
+      /// The type that acts as the anchor for this component.
+      Type type;
 
       /// The (best) requirement source within the component that makes the
       /// potential archetypes in this component equivalent to the concrete
