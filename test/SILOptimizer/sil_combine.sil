@@ -3855,6 +3855,49 @@ bb0(%0 : $UInt64):
   return %7 : $()
 }
 
+enum EnumWithPayload {
+  case A(UInt64)
+  case B(AnyObject)
+  case C
+}
+
+// CHECK-LABEL: sil @optimize_arc_with_trivial_payload_enum
+// CHECK:       bb0(%0 : $UInt64):
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'optimize_arc_with_trivial_payload_enum'
+sil @optimize_arc_with_trivial_payload_enum : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = enum $EnumWithPayload, #EnumWithPayload.A!enumelt, %0 : $UInt64
+  release_value %1 : $EnumWithPayload
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @optimize_arc_with_trivial_enum
+// CHECK:       bb0:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'optimize_arc_with_trivial_enum'
+sil @optimize_arc_with_trivial_enum : $@convention(thin) () -> () {
+bb0:
+  %1 = enum $EnumWithPayload, #EnumWithPayload.C!enumelt
+  release_value %1 : $EnumWithPayload
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_release_of_nontrivial_enum
+// CHECK:         strong_release %0
+// CHECK:       } // end sil function 'dont_remove_release_of_nontrivial_enum'
+sil @dont_remove_release_of_nontrivial_enum : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = enum $EnumWithPayload, #EnumWithPayload.B!enumelt, %0 : $AnyObject
+  release_value %1 : $EnumWithPayload
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // CHECK-LABEL: sil @optimize_stringObject_bit_operations
 // CHECK:      bb0:
 // CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 4611686018427387904
