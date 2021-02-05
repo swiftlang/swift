@@ -1,5 +1,3 @@
-// rdar://problem/73984220
-// XFAIL: asan
 enum CustomError: Error {
   case invalid
   case insecure

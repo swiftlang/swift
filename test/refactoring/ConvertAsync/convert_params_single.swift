@@ -1,5 +1,3 @@
-// rdar://problem/73984220
-// XFAIL: asan
 func withError(_ completion: (String?, Error?) -> Void) { }
 func test(_ str: String) -> Bool { return false }
 
