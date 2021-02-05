@@ -430,14 +430,22 @@ static void runAndBlock_start(AsyncTask *task, ExecutorRef executor,
   if (functionContext) {
     function = reinterpret_cast<RunAndBlockSignature::FunctionType*>(
                    const_cast<void*>(callerContext->Function));
+    function = swift_auth_code(
+        function, SpecialPointerAuthDiscriminators::AsyncRunAndBlockFunction);
     calleeContextSize =
       static_cast<ThickAsyncFunctionContext*>(functionContext)
         ->ExpectedContextSize;
 
   // Otherwise, the function pointer is an async function pointer.
   } else {
-    auto fnPtr = reinterpret_cast<const RunAndBlockSignature::FunctionPointer*>(
-                   callerContext->Function);
+    auto fnPtr =
+        reinterpret_cast<const RunAndBlockSignature::FunctionPointer *>(
+            const_cast<void *>(callerContext->Function));
+#if SWIFT_PTRAUTH
+    fnPtr = (const RunAndBlockSignature::FunctionPointer *)ptrauth_auth_data(
+        (void *)fnPtr, ptrauth_key_process_independent_code,
+        SpecialPointerAuthDiscriminators::AsyncRunAndBlockFunction);
+#endif
     function = fnPtr->Function;
     calleeContextSize = fnPtr->ExpectedContextSize;
   }
