@@ -1543,6 +1543,17 @@ class swift::MultiConformanceChecker {
 public:
   MultiConformanceChecker(ASTContext &ctx) : Context(ctx) {}
 
+  ~MultiConformanceChecker() {
+    // force-flush diagnostics in checkers that have not already complained
+    for (auto &checker : AllUsedCheckers) {
+      if (checker.AlreadyComplained)
+        continue;
+
+      checker.SuppressDiagnostics = false; // no need to restore to prev value
+      checker.emitDelayedDiags();
+    }
+  }
+
   ASTContext &getASTContext() const { return Context; }
 
   /// Add a conformance into the batched checker.
@@ -2545,6 +2556,13 @@ ConformanceChecker::ConformanceChecker(
       GlobalMissingWitnesses(GlobalMissingWitnesses),
       LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
       SuppressDiagnostics(suppressDiagnostics) {}
+
+ConformanceChecker::~ConformanceChecker() {
+  // its not OK to forget about error diagnostics, unless if we have already
+  // complained or are suppose to suppress diagnostics.
+  assert(AlreadyComplained || SuppressDiagnostics ||
+            !getASTContext().hasDelayedConformanceErrors(Conformance));
+}
 
 ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {

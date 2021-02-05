@@ -986,7 +986,13 @@ public:
 
   /// Check whether current context has any errors associated with
   /// ill-formed protocol conformances which haven't been produced yet.
-  bool hasDelayedConformanceErrors() const;
+  ///
+  /// @param conformance if non-null, will check only for errors specific to the
+  /// provided conformance. Otherwise, checks for _any_ errors.
+  ///
+  /// @returns true iff there are any delayed diagnostic errors
+  bool hasDelayedConformanceErrors(
+                  NormalProtocolConformance const* conformance = nullptr) const;
 
   /// Add a delayed diagnostic produced while type-checking a
   /// particular protocol conformance.
@@ -996,7 +1002,7 @@ public:
   /// Retrieve the delayed-conformance diagnostic callbacks for the
   /// given normal protocol conformance.
   std::vector<DelayedConformanceDiag>
-  takeDelayedConformanceDiags(NormalProtocolConformance *conformance);
+  takeDelayedConformanceDiags(NormalProtocolConformance const* conformance);
 
   /// Add delayed missing witnesses for the given normal protocol conformance.
   void addDelayedMissingWitnesses(
