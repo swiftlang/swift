@@ -11,6 +11,7 @@
 # ----------------------------------------------------------------------------
 
 from .benchmarks import Benchmarks
+from .clibdispatch import CLibDispatch
 from .cmark import CMark
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
@@ -39,6 +40,7 @@ __all__ = [
     'Ninja',
     'Foundation',
     'LibCXX',
+    'CLibDispatch',
     'LibDispatch',
     'LibICU',
     'LLBuild',

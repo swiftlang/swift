@@ -318,6 +318,10 @@ def apply_default_arguments(toolchain, args):
         args.stdlib_deployment_targets = [
             target.name for target in stdlib_targets]
 
+    if (args.build_swift and
+            platform.system() != "Darwin"):
+        args.build_clibdispatch = True
+
     # SwiftPM and XCTest have a dependency on Foundation.
     # On OS X, Foundation is built automatically using xcodebuild.
     # On Linux, we must ensure that it is built manually.
@@ -624,6 +628,7 @@ class BuildScriptInvocation(object):
             (args.build_llbuild, "llbuild"),
             (args.build_libcxx, "libcxx"),
             (args.build_libdispatch, "libdispatch"),
+            (args.build_clibdispatch, "clibdispatch"),
             (args.build_libicu, "libicu")
         ]
         for (should_build, string_name) in conditional_subproject_configs:
@@ -865,6 +870,8 @@ class BuildScriptInvocation(object):
             impl_product_classes.append(products.LibCXX)
         if self.args.build_libicu:
             impl_product_classes.append(products.LibICU)
+        if self.args.build_clibdispatch:
+            impl_product_classes.append(products.CLibDispatch)
         if self.args.build_swift:
             impl_product_classes.append(products.Swift)
         if self.args.build_lldb:

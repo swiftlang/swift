@@ -10,6 +10,7 @@
 #
 # ----------------------------------------------------------------------------
 
+from . import clibdispatch
 from . import cmark
 from . import libcxx
 from . import libicu
@@ -147,4 +148,5 @@ updated without updating swift.py?")
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU]
+                libicu.LibICU,
+                clibdispatch.CLibDispatch]
