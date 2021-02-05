@@ -5266,18 +5266,6 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
   auto genericParams = builder.getGenericParams();
   auto existingMembers = equivClass->members;
   for (auto pa : existingMembers) {
-    // Make sure that there are only associated types that chain up to the
-    // parent.
-    bool foundNonAssociatedType = false;
-    for (auto currentPA = pa; auto parentPA = currentPA->getParent();
-         currentPA = parentPA){
-      if (!currentPA->getResolvedType()) {
-        foundNonAssociatedType = true;
-        break;
-      }
-    }
-    if (foundNonAssociatedType) continue;
-
     auto dependentType = pa->getDependentType(genericParams);
     for (const auto &conforms : equivClass->conformsTo) {
       auto proto = conforms.first;
