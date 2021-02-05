@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenModule.h"
+#include "swift/AST/IRGenOptions.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclGroup.h"
 #include "clang/AST/GlobalDecl.h"
@@ -118,14 +119,20 @@ IRGenModule::getAddrOfClangGlobalDecl(clang::GlobalDecl global,
 }
 
 void IRGenModule::finalizeClangCodeGen() {
-  // Ensure that code is emitted for any `PragmaCommentDecl`s. (These are
-  // always guaranteed to be directly below the TranslationUnitDecl.)
-  // In Clang, this happens automatically during the Sema phase, but here we
-  // need to take care of it manually because our Clang CodeGenerator is not
-  // attached to Clang Sema as an ASTConsumer.
-  for (const auto *D : ClangASTContext->getTranslationUnitDecl()->decls()) {
-    if (const auto *PCD = dyn_cast<clang::PragmaCommentDecl>(D)) {
-      emitClangDecl(PCD);
+  // FIXME: We try to avoid looking for PragmaCommentDecls unless we need to,
+  // since clang::DeclContext::decls_begin() can trigger expensive
+  // de-serialization.
+  if (Triple.isWindowsMSVCEnvironment() || Triple.isWindowsItaniumEnvironment() ||
+      IRGen.Opts.LLVMLTOKind != IRGenLLVMLTOKind::None) {
+    // Ensure that code is emitted for any `PragmaCommentDecl`s. (These are
+    // always guaranteed to be directly below the TranslationUnitDecl.)
+    // In Clang, this happens automatically during the Sema phase, but here we
+    // need to take care of it manually because our Clang CodeGenerator is not
+    // attached to Clang Sema as an ASTConsumer.
+    for (const auto *D : ClangASTContext->getTranslationUnitDecl()->decls()) {
+      if (const auto *PCD = dyn_cast<clang::PragmaCommentDecl>(D)) {
+        emitClangDecl(PCD);
+      }
     }
   }
 
