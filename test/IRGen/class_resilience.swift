@@ -448,7 +448,7 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience26ClassWithResilientPropertyCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience26ClassWithResilientPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @{{.*}}swift_lookUp{{.*}}ClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience26ClassWithResilientPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
@@ -528,7 +528,7 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @{{.*}}swift_lookUp{{.*}}ClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
@@ -547,7 +547,7 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience14ResilientChildCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience14ResilientChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @{{.*}}swift_lookUp{{.*}}ClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience14ResilientChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
 
@@ -601,6 +601,6 @@ public class ClassWithResilientThenEmpty {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @"$s16class_resilience21ResilientGenericChildCMu"(%swift.type* %0, %swift.method_descriptor* %1)
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience21ResilientGenericChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
+// CHECK-NEXT:   [[RESULT:%.*]] = call i8* @{{.*}}swift_lookUp{{.*}}ClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast ({{.*}}* @"$s16class_resilience21ResilientGenericChildCMn{{(\.ptrauth.*)?}}" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
