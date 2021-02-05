@@ -1,5 +1,7 @@
 // RUN: %scale-test -parse --begin 0 --end 10 --step 1 --select NumASTBytes %s
 
+// REQUIRES: rdar73834542
+
  %for i in range(1, N + 1):
  [
  %end
