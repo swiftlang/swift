@@ -1161,14 +1161,14 @@ public:
   void checkOwnershipForwardingInst(SILInstruction *i) {
     if (auto *o = dyn_cast<OwnedFirstArgForwardingSingleValueInst>(i)) {
       ValueOwnershipKind kind = OwnershipKind::Owned;
-      require(kind.isCompatibleWith(o->getOwnershipKind()),
+      require(kind.isCompatibleWith(o->getForwardingOwnershipKind()),
               "OwnedFirstArgForwardingSingleValueInst's ownership kind must be "
               "compatible with owned");
     }
 
     if (auto *o = dyn_cast<GuaranteedFirstArgForwardingSingleValueInst>(i)) {
       ValueOwnershipKind kind = OwnershipKind::Guaranteed;
-      require(kind.isCompatibleWith(o->getOwnershipKind()),
+      require(kind.isCompatibleWith(o->getForwardingOwnershipKind()),
               "GuaranteedFirstArgForwardingSingleValueInst's ownership kind "
               "must be compatible with guaranteed");
     }
@@ -2997,7 +2997,7 @@ public:
       // compatible with our destructure_struct's ownership kind /and/ that if
       // our destructure ownership kind is non-trivial then all non-trivial
       // results must have the same ownership kind as our operand.
-      auto parentKind = DSI->getOwnershipKind();
+      auto parentKind = DSI->getForwardingOwnershipKind();
       for (const DestructureStructResult &result : DSI->getAllResultsBuffer()) {
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
@@ -3016,7 +3016,7 @@ public:
       // compatible with our destructure_struct's ownership kind /and/ that if
       // our destructure ownership kind is non-trivial then all non-trivial
       // results must have the same ownership kind as our operand.
-      auto parentKind = dti->getOwnershipKind();
+      auto parentKind = dti->getForwardingOwnershipKind();
       for (const auto &result : dti->getAllResultsBuffer()) {
         require(parentKind.isCompatibleWith(result.getOwnershipKind()),
                 "destructure result with ownership that is incompatible with "
@@ -4407,7 +4407,7 @@ public:
           if (!dest->getArgument(0)->getType().isTrivial(*SOI->getFunction())) {
             require(
                 dest->getArgument(0)->getOwnershipKind().isCompatibleWith(
-                    SOI->getOwnershipKind()),
+                    SOI->getForwardingOwnershipKind()),
                 "Switch enum non-trivial destination arg must have ownership "
                 "kind that is compatible with the switch_enum's operand");
           }

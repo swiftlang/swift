@@ -178,7 +178,8 @@ struct OwnershipModelEliminatorVisitor
 
 #define HANDLE_FORWARDING_INST(Cls)                                            \
   bool visit##Cls##Inst(Cls##Inst *i) {                                        \
-    OwnershipForwardingMixin::get(i)->setOwnershipKind(OwnershipKind::None);   \
+    OwnershipForwardingMixin::get(i)->setForwardingOwnershipKind(              \
+        OwnershipKind::None);                                                  \
     return true;                                                               \
   }
   HANDLE_FORWARDING_INST(ConvertFunction)
@@ -337,7 +338,7 @@ bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
 
 bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
     CheckedCastBranchInst *cbi) {
-  cbi->setOwnershipKind(OwnershipKind::None);
+  cbi->setForwardingOwnershipKind(OwnershipKind::None);
 
   // In ownership qualified SIL, checked_cast_br must pass its argument to the
   // fail case so we can clean it up. In non-ownership qualified SIL, we expect
@@ -357,7 +358,7 @@ bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
 
 bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
     SwitchEnumInst *swei) {
-  swei->setOwnershipKind(OwnershipKind::None);
+  swei->setForwardingOwnershipKind(OwnershipKind::None);
 
   // In ownership qualified SIL, switch_enum must pass its argument to the fail
   // case so we can clean it up. In non-ownership qualified SIL, we expect no

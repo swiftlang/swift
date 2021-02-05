@@ -2530,18 +2530,14 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   removeRedundantAndSort(Overloads);
   if (options::OutputInJson) {
     std::vector<APIDiffItem*> TotalItems;
-    std::transform(AllItems.begin(), AllItems.end(),
-                   std::back_inserter(TotalItems),
-                   [](CommonDiffItem &Item) { return &Item; });
-    std::transform(typeMemberDiffs.begin(), typeMemberDiffs.end(),
-                   std::back_inserter(TotalItems),
-                   [](TypeMemberDiffItem &Item) { return &Item; });
-    std::transform(AllNoEscapingFuncs.begin(), AllNoEscapingFuncs.end(),
-                   std::back_inserter(TotalItems),
-                   [](NoEscapeFuncParam &Item) { return &Item; });
-    std::transform(Overloads.begin(), Overloads.end(),
-                   std::back_inserter(TotalItems),
-                   [](OverloadedFuncInfo &Item) { return &Item; });
+    llvm::transform(AllItems, std::back_inserter(TotalItems),
+                    [](CommonDiffItem &Item) { return &Item; });
+    llvm::transform(typeMemberDiffs, std::back_inserter(TotalItems),
+                    [](TypeMemberDiffItem &Item) { return &Item; });
+    llvm::transform(AllNoEscapingFuncs, std::back_inserter(TotalItems),
+                    [](NoEscapeFuncParam &Item) { return &Item; });
+    llvm::transform(Overloads, std::back_inserter(TotalItems),
+                    [](OverloadedFuncInfo &Item) { return &Item; });
     APIDiffItemStore::serialize(Fs, TotalItems);
     return 0;
   }

@@ -1188,10 +1188,9 @@ static bool passNameInfoForDecl(ResolvedCursorInfo CursorInfo,
     NameTranslatingInfo Result;
     Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
     Result.BaseName = Name.getBaseName().userFacingName();
-    std::transform(Name.getArgumentNames().begin(),
-                   Name.getArgumentNames().end(),
-                   std::back_inserter(Result.ArgNames),
-                   [](Identifier Id) { return Id.str(); });
+    llvm::transform(Name.getArgumentNames(),
+                    std::back_inserter(Result.ArgNames),
+                    [](Identifier Id) { return Id.str(); });
     Receiver(RequestResult<NameTranslatingInfo>::fromResult(Result));
     return true;
   }

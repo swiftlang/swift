@@ -91,9 +91,8 @@ std::vector<ResolvedLoc> NameMatcher::resolve(ArrayRef<UnresolvedLoc> Locs, Arra
 
   // Add the locs themselves
   LocsToResolve.clear();
-  std::transform(MapToOriginalIndex.begin(), MapToOriginalIndex.end(),
-                 std::back_inserter(LocsToResolve),
-                 [&](size_t index){ return Locs[index]; });
+  llvm::transform(MapToOriginalIndex, std::back_inserter(LocsToResolve),
+                  [&](size_t index) { return Locs[index]; });
 
   InactiveConfigRegionNestings = 0;
   SelectorNestings = 0;
@@ -918,7 +917,7 @@ getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind) {
   if (I != InfoVec.end())
     FirstTrailing = std::distance(InfoVec.begin(), I);
 
-  std::transform(InfoVec.begin(), InfoVec.end(), std::back_inserter(Ranges),
-                 [](CallArgInfo &Info) { return Info.LabelRange; });
+  llvm::transform(InfoVec, std::back_inserter(Ranges),
+                  [](CallArgInfo &Info) { return Info.LabelRange; });
   return {Ranges, FirstTrailing};
 }

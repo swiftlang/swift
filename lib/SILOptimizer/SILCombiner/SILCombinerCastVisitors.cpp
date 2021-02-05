@@ -471,7 +471,7 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *urci) {
   // can remove both the open_existential_ref and the init_existential_ref.
   if (auto *oer = dyn_cast<OpenExistentialRefInst>(urci->getOperand())) {
     if (auto *ier = dyn_cast<InitExistentialRefInst>(oer->getOperand())) {
-      if (ier->getOwnershipKind() != OwnershipKind::Owned) {
+      if (ier->getForwardingOwnershipKind() != OwnershipKind::Owned) {
         return Builder.createUncheckedRefCast(urci->getLoc(), ier->getOperand(),
                                               urci->getType());
       }
@@ -735,8 +735,8 @@ SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
         // contrast, for guaranteed, we are replacing a BitwiseEscape use
         // (ref_to_rawpointer) with a ForwardedBorrowingUse (unchecked_ref_cast)
         // which is safe.
-        if (newInst->getOwnershipKind() == OwnershipKind::Owned) {
-          newInst->setOwnershipKind(OwnershipKind::Unowned);
+        if (newInst->getForwardingOwnershipKind() == OwnershipKind::Owned) {
+          newInst->setForwardingOwnershipKind(OwnershipKind::Unowned);
         }
         helper.perform(newInst);
         return nullptr;
@@ -747,28 +747,36 @@ SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
   return nullptr;
 }
 
-SILInstruction *
-SILCombiner::
-visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
+SILInstruction *SILCombiner::visitUncheckedTrivialBitCastInst(
+    UncheckedTrivialBitCastInst *utbci) {
   // (unchecked_trivial_bit_cast Y->Z
   //                                 (unchecked_trivial_bit_cast X->Y x))
   //   ->
   // (unchecked_trivial_bit_cast X->Z x)
-  SILValue Op = UTBCI->getOperand();
-  if (auto *OtherUTBCI = dyn_cast<UncheckedTrivialBitCastInst>(Op)) {
-    return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
-                                                 OtherUTBCI->getOperand(),
-                                                 UTBCI->getType());
+  SILValue operand = utbci->getOperand();
+  if (auto *otherUTBCI = dyn_cast<UncheckedTrivialBitCastInst>(operand)) {
+    return Builder.createUncheckedTrivialBitCast(
+        utbci->getLoc(), otherUTBCI->getOperand(), utbci->getType());
   }
 
-  // (unchecked_trivial_bit_cast Y->Z
-  //                                 (unchecked_ref_cast X->Y x))
+  // %y = unchecked_ref_cast %x X->Y
+  // ...
+  // %z = unchecked_trivial_bit_cast %y Y->Z
+  //
   //   ->
-  // (unchecked_trivial_bit_cast X->Z x)
-  if (auto *URBCI = dyn_cast<UncheckedRefCastInst>(Op)) {
-    return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
-                                                 URBCI->getOperand(),
-                                                 UTBCI->getType());
+  //
+  // %z = unchecked_trivial_bit_cast %x X->Z
+  // %y = unchecked_ref_cast %x X->Y
+  // ...
+  if (auto *urbci = dyn_cast<UncheckedRefCastInst>(operand)) {
+    // We just move the unchecked_trivial_bit_cast to before the
+    // unchecked_ref_cast and then make its operand the unchecked_ref_cast
+    // operand. Then we return the cast so we reprocess given that we changed
+    // its operands.
+    utbci->moveBefore(urbci);
+    utbci->setDebugLocation(urbci->getDebugLocation());
+    utbci->setOperand(urbci->getOperand());
+    return utbci;
   }
 
   return nullptr;
@@ -825,8 +833,8 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
       // creating breaking OSSA. In contrast, if we have a guaranteed value, we
       // are going to be replacing an UnownedInstantaneousUse with an
       // InstantaneousUse which is always safe for a guaranteed value.
-      if (newInst->getOwnershipKind() == OwnershipKind::Owned) {
-        newInst->setOwnershipKind(OwnershipKind::Unowned);
+      if (newInst->getForwardingOwnershipKind() == OwnershipKind::Owned) {
+        newInst->setForwardingOwnershipKind(OwnershipKind::Unowned);
       }
       helper.perform(newInst);
       return nullptr;
@@ -1086,7 +1094,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
     // We handle the case of an identity conversion in inst simplify, so if we
     // see this pattern then we know that we don't have a round trip and thus
     // should just bypass the intermediate conversion.
-    if (cfi->getOwnershipKind() != OwnershipKind::Owned) {
+    if (cfi->getForwardingOwnershipKind() != OwnershipKind::Owned) {
       cfi->getOperandRef().set(subCFI->getConverted());
       // Return cfi to show we changed it.
       return cfi;
