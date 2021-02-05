@@ -209,11 +209,14 @@ set(SWIFTLIB_SOURCES
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
+  DiscontiguousSlice.swift
   Diffing.swift
   FloatingPointRandom.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
+  RangeSet.swift
+  RangeSetStorage.swift
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift
