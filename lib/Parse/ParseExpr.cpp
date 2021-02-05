@@ -398,10 +398,11 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  // A function called "async" is possible, so we don't want to replace it
-  // with await.
+  // Check whether the user mistyped "async" for "await", but only in cases
+  // where we are sure that "async" would be ill-formed as an identifier.
   bool isReplaceableAsync = Tok.isContextualKeyword("async") &&
-                            !peekToken().is(tok::l_paren);
+    !peekToken().isAtStartOfLine() &&
+    (peekToken().is(tok::identifier) || peekToken().is(tok::kw_try));
   if (Tok.isContextualKeyword("await") || isReplaceableAsync) {
     // Error on a replaceable async
     if (isReplaceableAsync) {
