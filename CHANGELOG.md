@@ -28,6 +28,19 @@ CHANGELOG
 Swift 5.4
 ---------
 
+* Property wrappers now work in local contexts, making the following valid:
+
+  ```swift
+  @propertyWrapper
+  struct Wrapper<T> {
+    var wrappedValue: T
+  }
+
+  func test() {
+    @Wrapper var value = 10
+  }
+  ```
+
 * [SR-10069][]:
 
   Function overloading now works in local contexts, making the following valid:
