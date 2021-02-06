@@ -78,6 +78,16 @@ func withGenericArg<T>(_ msg: T) async {
   // CHECK-arm64-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
   // CHECK-arm64: store i8* %2, i8** %[[ALLOCA]], align
 
+  // CHECK-aarch64: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA:[^,]+]],
+  // CHECK-aarch64-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-aarch64-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
+  // CHECK-aarch64-SAME:     DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
+  // CHECK-aarch64: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA]],
+  // CHECK-aarch64-SAME:   metadata ![[TAU_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-aarch64-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET]],
+  // CHECK-aarch64-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
+  // CHECK-aarch64: store i8* %2, i8** %[[ALLOCA]], align
+
   // CHECK-powerpc64: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA:[^,]+]],
   // CHECK-powerpc64-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
   // CHECK-powerpc64-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
