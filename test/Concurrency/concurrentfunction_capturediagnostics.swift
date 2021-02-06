@@ -143,10 +143,9 @@ struct NonTrivialValueType {
 func testCaseNonTrivialValue() {
   var i = NonTrivialValueType(17, Klass())
   f {
-    // Currently emits a typechecker level error due to some sort of bug in the type checker.
-//    print(i.i + 17)
-//    print(i.i + 18)
-//    print(i.i + 19)
+    print(i.i + 17)
+    print(i.i + 18)
+    print(i.i + 19)
   }
 
   i.i = 20
@@ -155,28 +154,27 @@ func testCaseNonTrivialValue() {
   // We only emit a warning here since we use the last write.
   //
   // TODO: Should we emit for all writes?
-  i.i.addOne() // xpected-warning {{'i' mutated after capture by concurrent closure}}
-               // xpected-note @-14 {{variable defined here}}
-               // xpected-note @-14 {{variable captured by concurrent closure}}
-               // xpected-note @-14 {{capturing use}}
-               // xpected-note @-14 {{capturing use}}
-               // xpected-note @-14 {{capturing use}}
+  i.i.addOne() // expected-warning {{'i' mutated after capture by concurrent closure}}
+               // expected-note @-14 {{variable defined here}}
+               // expected-note @-14 {{variable captured by concurrent closure}}
+               // expected-note @-14 {{capturing use}}
+               // expected-note @-14 {{capturing use}}
+               // expected-note @-14 {{capturing use}}
 }
 
 func testCaseNonTrivialValueInout() {
   var i = NonTrivialValueType(17, Klass())
   f {
-    // Currently emits a typechecker level error due to some sort of bug in the type checker.
-//    print(i.i + 17)
-//    print(i.k ?? "none")
+    print(i.i + 17)
+    print(i.k ?? "none")
   }
 
   // We only emit a warning here since we use the last write.
-  inoutUserOptKlass(&i.k) // xpected-warning {{'i' mutated after capture by concurrent closure}}
-                          // xpected-note @-8 {{variable defined here}}
-                          // xpected-note @-8 {{variable captured by concurrent closure}}
-                          // xpected-note @-8 {{capturing use}}
-                          // xpected-note @-8 {{capturing use}}
+  inoutUserOptKlass(&i.k) // expected-warning {{'i' mutated after capture by concurrent closure}}
+                          // expected-note @-8 {{variable defined here}}
+                          // expected-note @-8 {{variable captured by concurrent closure}}
+                          // expected-note @-8 {{capturing use}}
+                          // expected-note @-8 {{capturing use}}
 }
 
 protocol MyProt {
@@ -187,9 +185,8 @@ protocol MyProt {
 func testCaseAddressOnlyAllocBoxToStackable<T : MyProt>(i : T) {
   var i2 = i
   f {
-    // Currently emits an error due to some sort of bug in the type checker.
-//    print(i2.i + 17)
-//    print(i2.k ?? "none")
+    print(i2.i + 17)
+    print(i2.k ?? "none")
   }
 
   // TODO: Make sure we emit these once we support address only types!
@@ -206,9 +203,8 @@ func testCaseAddressOnlyNoAllocBoxToStackable<T : MyProt>(i : T) {
   let f2 = F()
   var i2 = i
   f2.useConcurrent {
-    // Currently emits a typechecker level error due to some sort of bug in the type checker.
-//    print(i2.i + 17)
-//    print(i2.k ?? "none")
+    print(i2.i + 17)
+    print(i2.k ?? "none")
   }
 
   // TODO: Make sure we emit these once we support address only types!
