@@ -2790,6 +2790,14 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             collectFunctionCaptures(accessor);
         };
 
+        // 'Lazy' properties don't fit into the below categorization,
+        // and they have a synthesized getter, not a parsed one.
+        if (capturedVar->getAttrs().hasAttribute<LazyAttr>()) {
+          if (auto *getter = capturedVar->getSynthesizedAccessor(
+                AccessorKind::Get))
+            collectFunctionCaptures(getter);
+        }
+
         if (!capture.isDirect()) {
           auto impl = capturedVar->getImplInfo();
 
