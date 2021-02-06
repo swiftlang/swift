@@ -29,3 +29,8 @@ func async() throws { }
     try async()
   }
 }
+
+func varNamedAsync(async: Bool) async {
+  if async { }
+  let _ = async
+}

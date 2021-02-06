@@ -5818,15 +5818,12 @@ static void addObserverKeywords(CodeCompletionResultSink &Sink) {
   addKeyword(Sink, "didSet", CodeCompletionKeywordKind::None);
 }
 
-static void addExprKeywords(CodeCompletionResultSink &Sink,
-                            bool IsConcurrencyEnabled) {
+static void addExprKeywords(CodeCompletionResultSink &Sink) {
   // Expr keywords.
   addKeyword(Sink, "try", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try!", CodeCompletionKeywordKind::kw_try);
   addKeyword(Sink, "try?", CodeCompletionKeywordKind::kw_try);
-  if (IsConcurrencyEnabled) {
-    addKeyword(Sink, "await", CodeCompletionKeywordKind::None);
-  }
+  addKeyword(Sink, "await", CodeCompletionKeywordKind::None);
 }
 
 static void addOpaqueTypeKeyword(CodeCompletionResultSink &Sink) {
@@ -5865,8 +5862,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
 
   case CompletionKind::EffectsSpecifier: {
-    if (!llvm::is_contained(ParsedKeywords, "async") &&
-        Context.LangOpts.EnableExperimentalConcurrency)
+    if (!llvm::is_contained(ParsedKeywords, "async"))
       addKeyword(Sink, "async", CodeCompletionKeywordKind::None);
     if (!llvm::is_contained(ParsedKeywords, "throws"))
       addKeyword(Sink, "throws", CodeCompletionKeywordKind::kw_throws);
@@ -5902,7 +5898,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::ForEachSequence:
     addSuperKeyword(Sink);
     addLetVarKeywords(Sink);
-    addExprKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
+    addExprKeywords(Sink);
     addAnyTypeKeyword(Sink, CurDeclContext->getASTContext().TheAnyType);
     break;
 
@@ -6729,7 +6725,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           addStmtKeywords(Sink, MaybeFuncBody);
           addSuperKeyword(Sink);
           addLetVarKeywords(Sink);
-          addExprKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
+          addExprKeywords(Sink);
           addAnyTypeKeyword(Sink, Context.TheAnyType);
           DoPostfixExprBeginning();
         }

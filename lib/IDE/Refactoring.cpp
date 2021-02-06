@@ -5219,9 +5219,6 @@ bool RefactoringActionConvertCallToAsyncAlternative::isApplicable(
     const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
   using namespace asyncrefactorings;
 
-  if (!CursorInfo.SF->getASTContext().LangOpts.EnableExperimentalConcurrency)
-    return false;
-
   // Currently doesn't check that the call is in an async context. This seems
   // possibly useful in some situations, so we'll see what the feedback is.
   // May need to change in the future
@@ -5264,9 +5261,6 @@ bool RefactoringActionConvertToAsync::isApplicable(
     const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
   using namespace asyncrefactorings;
 
-  if (!CursorInfo.SF->getASTContext().LangOpts.EnableExperimentalConcurrency)
-    return false;
-
   // As with the call refactoring, should possibly only apply if there's
   // actually calls to async alternatives. At the moment this will just add
   // `async` if there are no calls, which is probably fine.
@@ -5296,9 +5290,6 @@ bool RefactoringActionConvertToAsync::performChange() {
 bool RefactoringActionAddAsyncAlternative::isApplicable(
     const ResolvedCursorInfo &CursorInfo, DiagnosticEngine &Diag) {
   using namespace asyncrefactorings;
-
-  if (!CursorInfo.SF->getASTContext().LangOpts.EnableExperimentalConcurrency)
-    return false;
 
   auto *FD = findFunction(CursorInfo);
   if (!FD)
