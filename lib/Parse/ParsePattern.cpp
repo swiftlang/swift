@@ -825,8 +825,7 @@ bool Parser::isEffectsSpecifier(const Token &T) {
   // NOTE: If this returns 'true', that token must be handled in
   //       'parseEffectsSpecifiers()'.
 
-  if (shouldParseExperimentalConcurrency() &&
-      T.isContextualKeyword("async"))
+  if (T.isContextualKeyword("async"))
     return true;
 
   if (T.isAny(tok::kw_throws, tok::kw_rethrows) ||
@@ -844,8 +843,7 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
 
   while (true) {
     // 'async'
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("async")) {
+    if (Tok.isContextualKeyword("async")) {
 
       if (asyncLoc.isValid()) {
         diagnose(Tok, diag::duplicate_effects_specifier, Tok.getText())

@@ -337,8 +337,7 @@ parse_operator:
     case tok::identifier: {
       // 'async' followed by 'throws' or '->' implies that we have an arrow
       // expression.
-      if (!(shouldParseExperimentalConcurrency() &&
-            Tok.isContextualKeyword("async") &&
+      if (!(Tok.isContextualKeyword("async") &&
             peekToken().isAny(tok::arrow, tok::kw_throws)))
         goto done;
 
@@ -399,38 +398,33 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   SyntaxParsingContext ElementContext(SyntaxContext,
                                       SyntaxContextKind::Expr);
 
-  if (shouldParseExperimentalConcurrency()) {
-    // A function called "async" is possible, so we don't want to replace it
-    // with await.
-    bool isReplaceableAsync = Tok.isContextualKeyword("async") &&
-                              !peekToken().is(tok::l_paren);
-    if (Tok.isContextualKeyword("await") || isReplaceableAsync) {
-      // Error on a replaceable async
-      if (isReplaceableAsync) {
-        diagnose(Tok.getLoc(), diag::expected_await_not_async)
-          .fixItReplace(Tok.getLoc(), "await");
-      }
-      SourceLoc awaitLoc = consumeToken();
-      ParserResult<Expr> sub =
-        parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
-      if (!sub.hasCodeCompletion() && !sub.isNull()) {
-        if (auto anyTry = dyn_cast<AnyTryExpr>(sub.get())) {
-          // "try" must precede "await".
-          diagnose(awaitLoc, diag::await_before_try)
-            .fixItRemove(awaitLoc)
-            .fixItInsert(anyTry->getSubExpr()->getStartLoc(), "await ");
-        }
-
-        ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
-        sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
-      }
-
-     return sub;
+  // Check whether the user mistyped "async" for "await", but only in cases
+  // where we are sure that "async" would be ill-formed as an identifier.
+  bool isReplaceableAsync = Tok.isContextualKeyword("async") &&
+    !peekToken().isAtStartOfLine() &&
+    (peekToken().is(tok::identifier) || peekToken().is(tok::kw_try));
+  if (Tok.isContextualKeyword("await") || isReplaceableAsync) {
+    // Error on a replaceable async
+    if (isReplaceableAsync) {
+      diagnose(Tok.getLoc(), diag::expected_await_not_async)
+        .fixItReplace(Tok.getLoc(), "await");
     }
-  } else if (Tok.isContextualKeyword("await")) {
-    // warn that future versions of Swift will parse this token differently.
-    diagnose(Tok.getLoc(), diag::warn_await_keyword)
-      .fixItReplace(Tok.getLoc(), "`await`");
+    SourceLoc awaitLoc = consumeToken();
+    ParserResult<Expr> sub =
+      parseExprSequenceElement(diag::expected_expr_after_await, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      if (auto anyTry = dyn_cast<AnyTryExpr>(sub.get())) {
+        // "try" must precede "await".
+        diagnose(awaitLoc, diag::await_before_try)
+          .fixItRemove(awaitLoc)
+          .fixItInsert(anyTry->getSubExpr()->getStartLoc(), "await ");
+      }
+
+      ElementContext.setCreateSyntax(SyntaxKind::AwaitExpr);
+      sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
+    }
+
+   return sub;
   }
 
   SourceLoc tryLoc;

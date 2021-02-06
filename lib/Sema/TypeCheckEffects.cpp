@@ -528,6 +528,13 @@ public:
       }
 
       if (classifiedAsThrows) {
+        // multiple passes can occur, so ensure that any sub-expressions of this
+        // call are marked as throws to mimic the closure variant.
+        if (auto subExpr = dyn_cast<ApplyExpr>(E->getFn())) {
+          if (!subExpr->isThrowsSet()) {
+            subExpr->setThrows(true);
+          }
+        }
         return Classification::forRethrowingOnly(
           PotentialThrowReason::forRethrowsConformance(E), isAsync);
       }
@@ -2095,6 +2102,12 @@ private:
       checkThrowAsyncSite(S, /*requiresTry*/ false,
                         Classification::forThrow(PotentialThrowReason::forThrow(),
                                                  /*async*/false));
+    }
+    if (S->getAwaitLoc().isValid() && 
+        !Flags.has(ContextFlags::HasAnyAsyncSite)) {
+      if (!CurContext.handlesAsync()) {
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S);
+      }
     }
     return ShouldRecurse;
   }

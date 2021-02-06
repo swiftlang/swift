@@ -2128,10 +2128,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
   SourceLoc TryLoc;
 
   if (shouldParseExperimentalConcurrency() && 
-    Tok.isContextualKeyword("await")) {
+      Tok.isContextualKeyword("await")) {
     AwaitLoc = consumeToken();
-  } if (shouldParseExperimentalConcurrency() && 
-    Tok.is(tok::kw_try)) {
+  } else if (shouldParseExperimentalConcurrency() &&
+      Tok.is(tok::kw_try)) {
     TryLoc = consumeToken();
     if (Tok.isContextualKeyword("await")) {
       AwaitLoc = consumeToken();
