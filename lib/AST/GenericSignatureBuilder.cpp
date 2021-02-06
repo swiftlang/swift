@@ -6888,14 +6888,6 @@ namespace {
 
 } // end anonymous namespace
 
-static int compareSameTypeComponents(const SameTypeComponentRef *lhsPtr,
-                                     const SameTypeComponentRef *rhsPtr){
-  Type lhsType = lhsPtr->first->derivedSameTypeComponents[lhsPtr->second].type;
-  Type rhsType = rhsPtr->first->derivedSameTypeComponents[rhsPtr->second].type;
-
-  return compareDependentTypes(lhsType, rhsType);
-}
-
 void GenericSignatureBuilder::enumerateRequirements(
                    TypeArrayView<GenericTypeParamType> genericParams,
                    llvm::function_ref<
@@ -6913,10 +6905,6 @@ void GenericSignatureBuilder::enumerateRequirements(
     for (unsigned i : indices(equivClass.derivedSameTypeComponents))
       subjects.push_back({&equivClass, i});
   }
-
-  // Sort the subject types in canonical order.
-  llvm::array_pod_sort(subjects.begin(), subjects.end(),
-                       compareSameTypeComponents);
 
   for (const auto &subject : subjects) {
     // Dig out the subject type and its corresponding component.
@@ -7150,6 +7138,15 @@ static void collectRequirements(GenericSignatureBuilder &builder,
       return;
 
     requirements.push_back(Requirement(kind, depTy, repTy));
+  });
+
+  // Sort the subject types in canonical order. This needs to be a stable sort
+  // so that the relative order of requirements that have the same subject type
+  // is preserved.
+  std::stable_sort(requirements.begin(), requirements.end(),
+                   [](const Requirement &lhs, const Requirement &rhs) {
+    return compareDependentTypes(lhs.getFirstType(),
+                                 rhs.getFirstType()) < 0;
   });
 }
 
