@@ -314,12 +314,6 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
-  P.addCopyPropagation();
-  P.addSemanticARCOpts();
-  P.addNonTransparentFunctionOwnershipModelEliminator();
-
   addSimplifyCFGSILCombinePasses(P);
 
   P.addArrayElementPropagation();
@@ -350,6 +344,12 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Run devirtualizer after the specializer, because many
   // class_method/witness_method instructions may use concrete types now.
   P.addDevirtualizer();
+
+  // We earlier eliminated ownership if we are not compiling the stdlib. Now
+  // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+  P.addCopyPropagation();
+  P.addSemanticARCOpts();
+  P.addNonTransparentFunctionOwnershipModelEliminator();
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
