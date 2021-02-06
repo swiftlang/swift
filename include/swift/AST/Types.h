@@ -5659,8 +5659,7 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
-  static CanDependentMemberType get(CanType base, AssociatedTypeDecl *assocType,
-                                    const ASTContext &C) {
+  static CanDependentMemberType get(CanType base, AssociatedTypeDecl *assocType) {
     return CanDependentMemberType(DependentMemberType::get(base, assocType));
   }
 
