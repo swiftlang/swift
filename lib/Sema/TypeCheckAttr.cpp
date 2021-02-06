@@ -867,14 +867,8 @@ void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
 
   // 'lazy' is not allowed on a global variable or on a static property (which
   // are already lazily initialized).
-  // TODO: we can't currently support lazy properties on non-type-contexts.
-  if (VD->isStatic() ||
-      (varDC->isModuleScopeContext() &&
-       !varDC->getParentSourceFile()->isScriptMode())) {
+  if (VD->isStatic() || varDC->isModuleScopeContext())
     diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
-  } else if (!VD->getDeclContext()->isTypeContext()) {
-    diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
-  }
 }
 
 bool AttributeChecker::visitAbstractAccessControlAttr(

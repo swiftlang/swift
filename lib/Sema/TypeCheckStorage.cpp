@@ -1330,7 +1330,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
-  Get->getImplicitSelfDecl()->setDeclContext(Get);
+  if (Get->hasImplicitSelfDecl())
+    Get->getImplicitSelfDecl()->setDeclContext(Get);
 
   InitValue->walk(RecontextualizeClosures(Get));
 

@@ -3076,20 +3076,18 @@ ERROR(attr_MainType_without_main,none,
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
 ERROR(lazy_not_on_computed,none,
-      "'lazy' must not be used on a computed property", ())
+      "'lazy' cannot be used on a computed property", ())
 
 ERROR(lazy_on_already_lazy_global,none,
-      "'lazy' must not be used on an already-lazy global", ())
+      "'lazy' cannot be used on an already-lazy global", ())
 ERROR(lazy_not_in_protocol,none,
-      "'lazy' isn't allowed on a protocol requirement", ())
+      "'lazy' cannot be used on a protocol requirement", ())
 ERROR(lazy_requires_initializer,none,
       "lazy properties must have an initializer", ())
 
 ERROR(lazy_requires_single_var,none,
       "'lazy' cannot destructure an initializer", ())
 
-ERROR(lazy_must_be_property,none,
-      "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_strong,none,
       "lazy properties cannot be %0", (ReferenceOwnership))
 ERROR(lazy_var_storage_access,none,

@@ -49,8 +49,32 @@ Swift Next
   }
   ```
 
+* The 'lazy' keyword now works in local contexts, making the following valid:
+
+  ```swift
+  func test(useIt: Bool) {
+    lazy var result = getPotentiallyExpensiveResult()
+    if useIt {
+      doIt(result)
+    }
+  }
+  ```
+
 Swift 5.4
 ---------
+
+* Property wrappers now work in local contexts, making the following valid:
+
+  ```swift
+  @propertyWrapper
+  struct Wrapper<T> {
+    var wrappedValue: T
+  }
+
+  func test() {
+    @Wrapper var value = 10
+  }
+  ```
 
 * [SR-10069][]:
 
