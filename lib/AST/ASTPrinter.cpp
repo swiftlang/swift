@@ -36,6 +36,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
@@ -136,6 +137,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
+
+  // We should provide backward-compatible Swift interfaces when we can.
+  result.PrintCompatibilityFeatureChecks = true;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
@@ -955,9 +959,16 @@ public:
       }
     }
 
+    
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
+    bool haveFeatureChecks = Options.PrintCompatibilityFeatureChecks &&
+      printCompatibilityFeatureChecksPre(Printer, D);
+
     ASTVisitor::visit(D);
+
+    if (haveFeatureChecks)
+      printCompatibilityFeatureChecksPost(Printer);
 
     if (Synthesize) {
       Printer.setSynthesizedTarget({});
@@ -2372,6 +2383,123 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
                        Options.BracketOptions.shouldCloseExtension(decl));
   }
 }
+
+/// Functions to determine which features a particular declaration uses. The
+/// usesFeatureNNN functions correspond to the features in Features.def.
+
+static bool usesFeatureStaticAssert(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureAsyncAwait(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->hasAsync())
+      return true;
+  }
+
+  return false;
+}
+
+static bool usesFeatureMarkerProtocol(Decl *decl) {
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->isMarkerProtocol())
+      return true;
+  }
+
+  return false;
+}
+
+static bool usesFeatureActors(Decl *decl) {
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto classDecl = ext->getSelfClassDecl())
+      if (classDecl->isActor())
+        return true;
+  }
+
+  return false;
+}
+
+/// Determine the set of "new" features used on a given declaration.
+///
+/// Note: right now, all features we check for are "new". At some point, we'll
+/// want a baseline version.
+static std::vector<Feature> getFeaturesUsed(Decl *decl) {
+  std::vector<Feature> features;
+  
+  // Only type- and module-scope declarations have any features to speak of.
+  auto dc = decl->getDeclContext();
+  if (!dc->isTypeContext() && !dc->isModuleScopeContext())
+    return features;
+
+  // Go through each of the features, checking whether the declaration uses that
+  // feature. This also ensures that the resulting set is in sorted order.
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+  if (usesFeature##FeatureName(decl))                                 \
+    features.push_back(Feature::FeatureName);
+#include "swift/Basic/Features.def"
+  
+  return features;
+}
+
+/// Get the set of features that are uniquely used by this declaration, and are
+/// not part of the enclosing context.
+static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
+  auto features = getFeaturesUsed(decl);
+  if (features.empty())
+    return features;
+
+  auto enclosingDecl = decl->getDeclContext()->getAsDecl();
+  if (!enclosingDecl)
+    return features;
+
+  if (!isa<NominalTypeDecl>(enclosingDecl) &&
+      !isa<ExtensionDecl>(enclosingDecl))
+    return features;
+  
+  auto enclosingFeatures = getFeaturesUsed(enclosingDecl);
+  if (enclosingFeatures.empty())
+    return features;
+
+  // Remove any features from the enclosing context from this set of features so
+  // that we are left with a unique set.
+  std::vector<Feature> uniqueFeatures;
+  std::set_difference(
+      features.begin(), features.end(),
+      enclosingFeatures.begin(), enclosingFeatures.end(),
+      std::back_inserter(uniqueFeatures));
+  return uniqueFeatures;
+}
+
+
+bool swift::printCompatibilityFeatureChecksPre(
+    ASTPrinter &printer, Decl *decl) {
+  auto features = getUniqueFeaturesUsed(decl);
+  if (features.empty())
+    return false;
+
+  printer.printNewline();  
+  printer << "#if compiler(>=5.3) && ";
+  llvm::interleave(features.begin(), features.end(),
+    [&](Feature feature) {
+      printer << "$" << getFeatureName(feature);
+    },
+    [&] { printer << " && "; });
+  printer.printNewline();
+
+  return true;
+}
+
+void swift::printCompatibilityFeatureChecksPost(ASTPrinter &printer) {
+  printer.printNewline();
+  printer << "#endif";
+  printer.printNewline();
+}
+
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   if (Options.TransformContext &&
