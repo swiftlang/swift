@@ -41,6 +41,12 @@ enum AddressOnlyEnum {
   case AddressOnly(Any)
 }
 
+enum NonTrivialLoadableEnum {
+case noPayload
+case trivialPayload(Builtin.Int32)
+case nonTrivialPayload(Builtin.NativeObject)
+}
+
 protocol FakeProtocol {
   func requirement()
 }
@@ -4799,4 +4805,22 @@ bb4:
   %2 = unchecked_trivial_bit_cast %cast : $Builtin.NativeObject to $UInt
   destroy_value %cast : $Builtin.NativeObject
   return %2 : $UInt
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion_trivialpayload_nontrivial_enum : $@convention(thin) (@inout NonTrivialLoadableEnum) -> Builtin.Int32 {
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: unchecked_enum_data
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_promotion_trivialpayload_nontrivial_enum'
+sil [ossa] @unchecked_take_enum_data_addr_promotion_trivialpayload_nontrivial_enum : $@convention(thin) (@inout NonTrivialLoadableEnum) -> Builtin.Int32 {
+bb0(%0 : $*NonTrivialLoadableEnum):
+  switch_enum_addr %0 : $*NonTrivialLoadableEnum, case #NonTrivialLoadableEnum.trivialPayload!enumelt: bb1, default bb2
+
+bb1:
+  %2 = unchecked_take_enum_data_addr %0 : $*NonTrivialLoadableEnum, #NonTrivialLoadableEnum.trivialPayload!enumelt
+  %3 = load [trivial] %2 : $*Builtin.Int32
+  return %3 : $Builtin.Int32
+
+bb2:
+  unreachable
 }
