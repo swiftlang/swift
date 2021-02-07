@@ -1458,23 +1458,30 @@ static Type formProtocolRelativeType(ProtocolDecl *proto,
 
 const RequirementSource *FloatingRequirementSource::getSource(
                                               GenericSignatureBuilder &builder,
-                                              Type type) const {
+                                              ResolvedType type) const {
   switch (kind) {
   case Resolved:
     return storage.get<const RequirementSource *>();
 
-  case Explicit:
-    if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
-      return RequirementSource::forExplicit(builder, type, requirementRepr);
-    if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
-      return RequirementSource::forExplicit(builder, type, typeRepr);
-    return RequirementSource::forAbstract(builder, type);
+  case Explicit: {
+    auto depType = type.getDependentType(builder);
 
-  case Inferred:
-    return RequirementSource::forInferred(builder, type,
+    if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
+      return RequirementSource::forExplicit(builder, depType, requirementRepr);
+    if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
+      return RequirementSource::forExplicit(builder, depType, typeRepr);
+    return RequirementSource::forAbstract(builder, depType);
+  }
+
+  case Inferred: {
+    auto depType = type.getDependentType(builder);
+    return RequirementSource::forInferred(builder, depType,
                                           storage.get<const TypeRepr *>());
+  }
 
   case AbstractProtocol: {
+    auto depType = type.getDependentType();
+
     // Derive the dependent type on which this requirement was written. It is
     // the path from the requirement source on which this requirement is based
     // to the potential archetype on which the requirement is being placed.
@@ -1482,7 +1489,7 @@ const RequirementSource *FloatingRequirementSource::getSource(
     auto baseSourceType = baseSource->getAffectedType();
 
     auto dependentType =
-      formProtocolRelativeType(protocolReq.protocol, baseSourceType, type);
+      formProtocolRelativeType(protocolReq.protocol, baseSourceType, depType);
 
     return storage.get<const RequirementSource *>()
       ->viaProtocolRequirement(builder, dependentType,
@@ -1490,8 +1497,10 @@ const RequirementSource *FloatingRequirementSource::getSource(
                                protocolReq.written);
   }
 
-  case NestedTypeNameMatch:
-    return RequirementSource::forNestedTypeNameMatch(builder, type);
+  case NestedTypeNameMatch: {
+    auto depType = type.getDependentType(builder);
+    return RequirementSource::forNestedTypeNameMatch(builder, depType);
+  }
   }
 
   llvm_unreachable("Unhandled FloatingPointRequirementSourceKind in switch.");
@@ -1712,8 +1721,7 @@ bool EquivalenceClass::recordConformanceConstraint(
 
   // Record this conformance source.
   known->second.push_back({type.getUnresolvedType(), proto,
-                           source.getSource(builder,
-                                            type.getDependentType(builder))});
+                           source.getSource(builder, type)});
   ++NumConformanceConstraints;
 
   return inserted;
@@ -4131,8 +4139,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   if (!equivClass->recordConformanceConstraint(*this, type, proto, source))
     return ConstraintResult::Resolved;
 
-  auto resolvedSource = source.getSource(*this,
-                                         type.getDependentType(*this));
+  auto resolvedSource = source.getSource(*this, type);
   return expandConformanceRequirement(type, proto, resolvedSource,
                                       /*onlySameTypeRequirements=*/false);
 }
@@ -4159,7 +4166,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
 
   // Record this layout constraint.
   equivClass->layoutConstraints.push_back({type.getUnresolvedType(),
-    layout, source.getSource(*this, type.getDependentType(*this))});
+    layout, source.getSource(*this, type)});
   equivClass->modified(*this);
   ++NumLayoutConstraints;
   if (!anyChanges) ++NumLayoutConstraintsExtra;
@@ -4236,8 +4243,7 @@ bool GenericSignatureBuilder::updateSuperclass(
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
     auto layoutReqSource =
-      source.getSource(*this,
-                       type.getDependentType(*this))->viaDerived(*this);
+      source.getSource(*this, type)->viaDerived(*this);
     addLayoutRequirementDirect(type,
                          LayoutConstraint::getLayoutConstraint(
                              superclass->getClassOrBoundGenericClass()->isObjC()
@@ -4275,8 +4281,7 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
                                             ResolvedType type,
                                             Type superclass,
                                             FloatingRequirementSource source) {
-  auto resolvedSource =
-    source.getSource(*this, type.getDependentType(*this));
+  auto resolvedSource = source.getSource(*this, type);
 
   // Record the constraint.
   auto equivClass = type.getEquivalenceClass(*this);
@@ -4322,37 +4327,6 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     assert(constraintType && "No type to express resolved constraint?");
   }
 
-  // Check whether we have a reasonable constraint type at all.
-  if (!constraintType->isExistentialType() &&
-      !constraintType->getClassOrBoundGenericClass()) {
-    if (source.getLoc().isValid() && !constraintType->hasError()) {
-      auto subjectType = subject.dyn_cast<Type>();
-      if (!subjectType)
-        subjectType = subject.get<PotentialArchetype *>()
-                        ->getDependentType(getGenericParams());
-
-      Impl->HadAnyError = true;
-
-      if (subjectType->is<DependentMemberType>()) {
-        subjectType = resolveDependentMemberTypes(*this, subjectType);
-      }
-
-      if (!subjectType->is<DependentMemberType>()) {
-        // If we end up here, it means either the subject type was never a
-        // a dependent member type, or it was initially a dependent member
-        // type, but resolving it lead to some other type. Let's map this
-        // to an error type so we can emit correct diagnostics.
-        subjectType = ErrorType::get(subjectType);
-      }
-
-      auto invalidConstraint = Constraint<Type>(
-          {subject, constraintType, source.getSource(*this, subjectType)});
-      invalidIsaConstraints.push_back(invalidConstraint);
-    }
-
-    return ConstraintResult::Conflicting;
-  }
-
   // Resolve the subject. If we can't, delay the constraint.
   auto resolvedSubject = resolve(subject, source);
   if (!resolvedSubject) {
@@ -4392,7 +4366,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
     // One cannot explicitly write a constraint on a concrete type.
     if (source.isExplicit()) {
-      if (source.getLoc().isValid()) {
+      if (source.getLoc().isValid() && !subjectType->hasError()) {
         Impl->HadAnyError = true;
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
                        subjectType);
@@ -4402,6 +4376,20 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     }
 
     return ConstraintResult::Resolved;
+  }
+
+  // Check whether we have a reasonable constraint type at all.
+  if (!constraintType->isExistentialType() &&
+      !constraintType->getClassOrBoundGenericClass()) {
+    if (source.getLoc().isValid() && !constraintType->hasError()) {
+      Impl->HadAnyError = true;
+
+      auto invalidConstraint = Constraint<Type>(
+          {subject, constraintType, source.getSource(*this, resolvedSubject)});
+      invalidIsaConstraints.push_back(invalidConstraint);
+    }
+
+    return ConstraintResult::Conflicting;
   }
 
   // Protocol requirements.
@@ -4626,7 +4614,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
     const RequirementSource *source2;
     if (auto existingSource2 =
           equivClass2->findAnySuperclassConstraintAsWritten(
-            OrigT2->getDependentType(getGenericParams())))
+            OrigT2->getDependentType()))
       source2 = existingSource2->source;
     else
       source2 = equivClass2->superclassConstraints.front().source;
@@ -4859,17 +4847,17 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementDirect(
   // If one side is concrete, map the other side to that concrete type.
   if (concreteType1) {
     return addSameTypeRequirementToConcrete(type2, concreteType1,
-                       source.getSource(*this, type2.getDependentType(*this)));
+                                            source.getSource(*this, type2));
   }
 
   if (concreteType2) {
     return addSameTypeRequirementToConcrete(type1, concreteType2,
-                        source.getSource(*this, type1.getDependentType(*this)));
+                                            source.getSource(*this, type1));
   }
 
   return addSameTypeRequirementBetweenTypeParameters(
                      type1, type2,
-                     source.getSource(*this, type2.getDependentType(*this)));
+                     source.getSource(*this, type2));
 }
 
 ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
@@ -6900,14 +6888,6 @@ namespace {
 
 } // end anonymous namespace
 
-static int compareSameTypeComponents(const SameTypeComponentRef *lhsPtr,
-                                     const SameTypeComponentRef *rhsPtr){
-  Type lhsType = lhsPtr->first->derivedSameTypeComponents[lhsPtr->second].type;
-  Type rhsType = rhsPtr->first->derivedSameTypeComponents[rhsPtr->second].type;
-
-  return compareDependentTypes(lhsType, rhsType);
-}
-
 void GenericSignatureBuilder::enumerateRequirements(
                    TypeArrayView<GenericTypeParamType> genericParams,
                    llvm::function_ref<
@@ -6925,10 +6905,6 @@ void GenericSignatureBuilder::enumerateRequirements(
     for (unsigned i : indices(equivClass.derivedSameTypeComponents))
       subjects.push_back({&equivClass, i});
   }
-
-  // Sort the subject types in canonical order.
-  llvm::array_pod_sort(subjects.begin(), subjects.end(),
-                       compareSameTypeComponents);
 
   for (const auto &subject : subjects) {
     // Dig out the subject type and its corresponding component.
@@ -7162,6 +7138,15 @@ static void collectRequirements(GenericSignatureBuilder &builder,
       return;
 
     requirements.push_back(Requirement(kind, depTy, repTy));
+  });
+
+  // Sort the subject types in canonical order. This needs to be a stable sort
+  // so that the relative order of requirements that have the same subject type
+  // is preserved.
+  std::stable_sort(requirements.begin(), requirements.end(),
+                   [](const Requirement &lhs, const Requirement &rhs) {
+    return compareDependentTypes(lhs.getFirstType(),
+                                 rhs.getFirstType()) < 0;
   });
 }
 

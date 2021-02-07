@@ -1424,7 +1424,7 @@ public:
 
   /// Retrieve the complete requirement source rooted at the given type.
   const RequirementSource *getSource(GenericSignatureBuilder &builder,
-                                     Type type) const;
+                                     ResolvedType type) const;
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;
