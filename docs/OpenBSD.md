@@ -88,4 +88,4 @@ $ ./utils/build-script \
 
 You may wish to also supply the flag `--llvm-targets-to-build=host`, to speed up the LLVM build slightly.
 
-For debug builds especially, consider also installing the `llvm` package and setting `-DCMAKE_AR=/usr/local/bin/llvm-ar` with the `extra-cmake-options` flag, to work around problems creating indexes to archives containing object files with large numbers of section headers.
+For debug builds especially, consider also installing the `llvm` package and setting `-DCMAKE_AR=/usr/local/bin/llvm-ar` and `-DCMAKE_RANLIB=/usr/local/bin/llvm-ranlib` with the `extra-cmake-options` flag, to work around problems creating indexes to archives containing object files with large numbers of section headers.
