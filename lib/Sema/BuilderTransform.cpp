@@ -288,6 +288,9 @@ protected:
             unhandledNode = patternBinding;
           return;
         }
+
+        // Also check for invalid attributes.
+        TypeChecker::checkDeclAttributes(var);
       }
     }
 
