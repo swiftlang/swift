@@ -945,6 +945,48 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Int):
   return %r1 : $Int
 }
 
+//=======================================================================
+// dont convert @owned => @guaranteed when there is a dealloc_partial_ref
+
+sil @test_dealloc_partial_ref_callee : $@convention(thin) () -> ((), @error Error)
+
+// CHECK-LABEL: sil hidden @test_dealloc_partial_ref : $@convention(thin) (@owned foo) -> (@owned foo, @error Error) {
+// CHECK-NOT: @guaranteed
+// CHECK:     function_ref @test_dealloc_partial_ref_callee   
+// CHECK-NOT: @guaranteed
+
+sil hidden @test_dealloc_partial_ref : $@convention(thin) (@owned foo) -> (@owned foo, @error Error) {
+bb0(%1 : $foo):
+  strong_retain %1 : $foo
+  %f = function_ref @test_dealloc_partial_ref_callee : $@convention(thin) () -> ((), @error Error)
+  try_apply %f() : $@convention(thin) () -> ((), @error Error), normal bb1, error bb2
+
+bb1(%27 : $()):
+  strong_release %1 : $foo
+  return %1 : $foo
+
+bb2(%157 : $Error):
+  strong_release %1 : $foo
+  %mt = metatype $@thick foo.Type
+  dealloc_partial_ref %1 : $foo, %mt : $@thick foo.Type
+  throw %157 : $Error
+}
+
+sil @test_dealloc_partial_ref_caller : $@convention(thin) () -> (@owned foo, @error Error) {
+bb0:
+  %2 = alloc_ref $foo
+  %3 = function_ref @test_dealloc_partial_ref : $@convention(thin) (@owned foo) -> (@owned foo, @error Error)
+  try_apply %3(%2) : $@convention(thin) (@owned foo) -> (@owned foo, @error Error), normal bb1, error bb2
+
+bb1(%5 : $foo):
+  return %5 : $foo
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK: } // end sil function 'test_dealloc_partial_ref_caller'
+
 //======================
 // @owned => @guaranteed
 
