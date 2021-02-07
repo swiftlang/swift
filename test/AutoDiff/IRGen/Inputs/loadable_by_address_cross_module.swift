@@ -11,7 +11,7 @@ public struct LargeLoadableType<T>: AdditiveArithmetic, Differentiable {
     self.e = 0
   }
 
-  @differentiable
+  @differentiable(reverse)
   public func externalLBAModifiedFunction(_ x: Float) -> Float {
     return x * a
   }

@@ -400,7 +400,7 @@ ArrayAutoDiffTests.test("Array.append") {
 }
 
 ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
-  @differentiable
+  @differentiable(reverse)
   func repeating(_ x: Float) -> [Float] {
     Array(repeating: x, count: 10)
   }
@@ -413,7 +413,7 @@ ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
 }
 
 ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
-  @differentiable
+  @differentiable(reverse)
   func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {
     return Array<Float>.DifferentiableView(x)
   }
@@ -425,7 +425,7 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
 }
 
 ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
-  @differentiable
+  @differentiable(reverse)
   func accessBase(_ x: Array<Float>.DifferentiableView) -> [Float] {
     return x.base
   }

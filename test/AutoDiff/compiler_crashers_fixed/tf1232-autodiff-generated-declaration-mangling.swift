@@ -20,7 +20,7 @@ extension Float {
   }
 }
 
-@differentiable
+@differentiable(reverse)
 func foo(_ x: Float) -> Float {
   let y = Float.add(x, x)
   return y

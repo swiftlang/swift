@@ -400,11 +400,10 @@ private:
     case Node::Kind::Index:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
-    case Node::Kind::ImplDifferentiable:
-    case Node::Kind::ImplLinear:
+    case Node::Kind::ImplDifferentiabilityKind:
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplConvention:
-    case Node::Kind::ImplDifferentiability:
+    case Node::Kind::ImplParameterResultDifferentiability:
     case Node::Kind::ImplFunctionAttribute:
     case Node::Kind::ImplFunctionConvention:
     case Node::Kind::ImplFunctionConventionName:
@@ -803,9 +802,9 @@ private:
     case Node::Kind::EscapingDifferentiableFunctionType:
       Printer << "@escaping @differentiable "; break;
     case Node::Kind::LinearFunctionType:
-      Printer << "@differentiable(linear) "; break;
+      Printer << "@differentiable(_linear) "; break;
     case Node::Kind::EscapingLinearFunctionType:
-      Printer << "@escaping @differentiable(linear) "; break;
+      Printer << "@escaping @differentiable(_linear) "; break;
     default:
       assert(false && "Unhandled function type in printFunctionType!");
     }
@@ -2177,11 +2176,23 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::LabelList:
     return nullptr;
-  case Node::Kind::ImplDifferentiable:
+  case Node::Kind::ImplDifferentiabilityKind:
     Printer << "@differentiable";
-    return nullptr;
-  case Node::Kind::ImplLinear:
-    Printer << "@differentiable(linear)";
+    switch ((MangledDifferentiabilityKind)Node->getIndex()) {
+    case MangledDifferentiabilityKind::Normal:
+      break;
+    case MangledDifferentiabilityKind::Linear:
+      Printer << "(_linear)";
+      break;
+    case MangledDifferentiabilityKind::Forward:
+      Printer << "(_forward)";
+      break;
+    case MangledDifferentiabilityKind::Reverse:
+      Printer << "(reverse)";
+      break;
+    case MangledDifferentiabilityKind::NonDifferentiable:
+      assert(false && "Impossible case 'NonDifferentiable'");
+    }
     return nullptr;
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
@@ -2189,7 +2200,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::ImplConvention:
     Printer << Node->getText();
     return nullptr;
-  case Node::Kind::ImplDifferentiability:
+  case Node::Kind::ImplParameterResultDifferentiability:
     // Skip if text is empty.
     if (Node->getText().empty())
       return nullptr;

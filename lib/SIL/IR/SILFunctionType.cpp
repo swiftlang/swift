@@ -804,7 +804,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     auto fnParamType = dyn_cast<SILFunctionType>(fnParam.getInterfaceType());
     assert(fnParamType);
     auto diffFnType = fnParamType->getWithDifferentiability(
-        DifferentiabilityKind::Normal, parameterIndices, resultIndices);
+        DifferentiabilityKind::Reverse, parameterIndices, resultIndices);
     newParameters.back() = fnParam.getWithInterfaceType(diffFnType);
   }
 

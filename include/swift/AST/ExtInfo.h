@@ -293,7 +293,7 @@ class ASTExtInfoBuilder {
   // and NumMaskBits must be updated, and they must match.
   //
   //   |representation|noEscape|concurrent|async|throws|differentiability|
-  //   |    0 .. 3    |    4   |    5     |  6  |   7  |      8 .. 9     |
+  //   |    0 .. 3    |    4   |    5     |  6  |   7  |     8 .. 10    |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -302,8 +302,8 @@ class ASTExtInfoBuilder {
     AsyncMask = 1 << 6,
     ThrowsMask = 1 << 7,
     DifferentiabilityMaskOffset = 8,
-    DifferentiabilityMask = 0x3 << DifferentiabilityMaskOffset,
-    NumMaskBits = 10
+    DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
+    NumMaskBits = 11
   };
 
   unsigned bits; // Naturally sized for speed.
@@ -615,8 +615,8 @@ class SILExtInfoBuilder {
   // If bits are added or removed, then TypeBase::SILFunctionTypeBits
   // and NumMaskBits must be updated, and they must match.
 
-  //   |representation|pseudogeneric| noescape | concurrent | async | differentiability|
-  //   |    0 .. 3    |      4      |     5    |     6      |   7   |      8 .. 9     |
+  //   |representation|pseudogeneric| noescape | concurrent | async |differentiability|
+  //   |    0 .. 3    |      4      |     5    |     6      |   7   |     8 .. 10     |
   //
   enum : unsigned {
     RepresentationMask = 0xF << 0,
@@ -625,8 +625,8 @@ class SILExtInfoBuilder {
     ConcurrentMask = 1 << 6,
     AsyncMask = 1 << 7,
     DifferentiabilityMaskOffset = 8,
-    DifferentiabilityMask = 0x3 << DifferentiabilityMaskOffset,
-    NumMaskBits = 10
+    DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
+    NumMaskBits = 11
   };
 
   unsigned bits; // Naturally sized for speed.

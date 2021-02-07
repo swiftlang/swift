@@ -499,9 +499,12 @@ Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
-  // Handle `@differentiable` and `@differentiable(linear)` functions.
+  // Handle `@differentiable` functions.
   switch (T->getDifferentiabilityKind()) {
+  // TODO: Ban `Normal` and `Forward` cases.
   case DifferentiabilityKind::Normal:
+  case DifferentiabilityKind::Reverse:
+  case DifferentiabilityKind::Forward:
     return convertNormalDifferentiableFunctionType(T);
   case DifferentiabilityKind::Linear:
     return convertLinearDifferentiableFunctionType(T);

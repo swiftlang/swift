@@ -25,11 +25,11 @@ struct Generic<T> {
 extension Generic: Differentiable where T: Differentiable {}
 
 func trigger<T: Differentiable>(_ x: T.Type) {
-  let _: @differentiable (Struct) -> Float = { $0.x }
-  let _: @differentiable (inout Struct, Float) -> Void = { $0.x = $1 }
+  let _: @differentiable(reverse) (Struct) -> Float = { $0.x }
+  let _: @differentiable(reverse) (inout Struct, Float) -> Void = { $0.x = $1 }
 
-  let _: @differentiable (Generic<T>) -> T = { $0.x }
-  let _: @differentiable (inout Generic<T>, T) -> Void = { $0.x = $1 }
+  let _: @differentiable(reverse) (Generic<T>) -> T = { $0.x }
+  let _: @differentiable(reverse) (inout Generic<T>, T) -> Void = { $0.x = $1 }
 }
 
 // CHECK-LABEL: // differentiability witness for Generic.x.setter

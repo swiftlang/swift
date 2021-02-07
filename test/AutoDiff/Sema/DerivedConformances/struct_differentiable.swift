@@ -260,7 +260,7 @@ public protocol TF_269_Layer: Differentiable {
 
 public struct TF_269: TF_269_Layer {
   public var filter: Float
-  public typealias Activation = @differentiable (Output) -> Output
+  public typealias Activation = @differentiable(reverse) (Output) -> Output
   @noDerivative public let activation: Activation
 
   public func applied(to input: Float) -> Float {
@@ -366,7 +366,7 @@ where T: Differentiable & AdditiveArithmetic {}
 struct SR_12793: Differentiable {
   var x: Float
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> Float { x }
 
   @derivative(of: method)
@@ -409,7 +409,7 @@ struct WrappedProperties: Differentiable {
   @Wrapper var float: Generic<Float>
   @ClassWrapper var float2: Generic<Float>
   // SR-13071: Test `@differentiable` wrapped property.
-  @differentiable @Wrapper var float3: Generic<Float>
+  @differentiable(reverse) @Wrapper var float3: Generic<Float>
 
   @noDerivative @ImmutableWrapper var nondiff: Generic<Int>
 

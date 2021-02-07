@@ -4657,7 +4657,7 @@ IndexSubset *DifferentiableAttributeTypeCheckRequest::evaluate(
     auto *getterDecl = asd->getOpaqueAccessor(AccessorKind::Get);
     auto *newAttr = DifferentiableAttr::create(
         getterDecl, /*implicit*/ true, attr->AtLoc, attr->getRange(),
-        attr->isLinear(), resolvedDiffParamIndices,
+        attr->getDifferentiabilityKind(), resolvedDiffParamIndices,
         attr->getDerivativeGenericSignature());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
         {getterDecl, resolvedDiffParamIndices}, newAttr);

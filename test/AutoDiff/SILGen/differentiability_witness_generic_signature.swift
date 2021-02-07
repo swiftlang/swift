@@ -32,7 +32,7 @@ extension AllConcrete {
   // Derivative generic signature: `<T where T == Float>`
   //    Witness generic signature: `<T where T == Float>`
   @_silgen_name("allconcrete_where_gensig_constrained")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignatureConstrained() -> AllConcrete {
     return self
   }
@@ -63,7 +63,7 @@ extension AllConcrete where T == Float {
   // Derivative generic signature: `<T where T == Float>`
   //    Witness generic signature: none
   @_silgen_name("allconcrete_original_gensig")
-  @differentiable
+  @differentiable(reverse)
   func originalGenericSignature() -> AllConcrete {
     return self
   }
@@ -84,7 +84,7 @@ extension AllConcrete where T == Float {
   // Derivative generic signature: `<T where T == Float>` (explicit `where` clause)
   //    Witness generic signature: none
   @_silgen_name("allconcrete_where_gensig")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignature() -> AllConcrete {
     return self
   }
@@ -113,7 +113,7 @@ extension NotAllConcrete {
   // Derivative generic signature: `<T, U where T == Float>`
   //    Witness generic signature: `<T, U where T == Float>` (not all concrete)
   @_silgen_name("notallconcrete_where_gensig_constrained")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignatureConstrained() -> NotAllConcrete {
     return self
   }
@@ -137,7 +137,7 @@ extension NotAllConcrete where T == Float {
   // Derivative generic signature: `<T, U where T == Float>`
   //    Witness generic signature: `<T, U where T == Float>` (not all concrete)
   @_silgen_name("notallconcrete_original_gensig")
-  @differentiable
+  @differentiable(reverse)
   func originalGenericSignature() -> NotAllConcrete {
     return self
   }
@@ -158,7 +158,7 @@ extension NotAllConcrete where T == Float {
   // Derivative generic signature: `<T, U where T == Float>` (explicit `where` clause)
   //    Witness generic signature: `<T, U where T == Float>` (not all concrete)
   @_silgen_name("notallconcrete_where_gensig")
-  @differentiable(where T == Float)
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignature() -> NotAllConcrete {
     return self
   }

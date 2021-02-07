@@ -13,35 +13,35 @@ var AddressOnlyTangentVectorTests = TestSuite("AddressOnlyTangentVector")
 
 AddressOnlyTangentVectorTests.test("LoadableClassAddressOnlyTangentVector") {
   final class LoadableClass<T: Differentiable>: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var stored: T
 
-    @differentiable
+    @differentiable(reverse)
     init(_ stored: T) {
       self.stored = stored
     }
 
-    @differentiable
+    @differentiable(reverse)
     func method(_ x: T) -> T {
       stored
     }
   }
 
-  @differentiable
+  @differentiable(reverse)
   func projection<T: Differentiable>(_ s: LoadableClass<T>) -> T {
     var x = s.stored
     return x
   }
   expectEqual(.init(stored: 1), gradient(at: LoadableClass<Float>(10), in: projection))
 
-  @differentiable
+  @differentiable(reverse)
   func tuple<T: Differentiable>(_ s: LoadableClass<T>) -> T {
     var tuple = (s, (s, s))
     return tuple.1.0.stored
   }
   expectEqual(.init(stored: 1), gradient(at: LoadableClass<Float>(10), in: tuple))
 
-  @differentiable
+  @differentiable(reverse)
   func conditional<T: Differentiable>(_ s: LoadableClass<T>) -> T {
     var tuple = (s, (s, s))
     if false {}
@@ -49,7 +49,7 @@ AddressOnlyTangentVectorTests.test("LoadableClassAddressOnlyTangentVector") {
   }
   expectEqual(.init(stored: 1), gradient(at: LoadableClass<Float>(10), in: conditional))
 
-  @differentiable
+  @differentiable(reverse)
   func loop<T: Differentiable>(_ array: [LoadableClass<T>]) -> T {
     var result: [LoadableClass<T>] = []
     for i in withoutDerivative(at: array.indices) {
@@ -59,7 +59,7 @@ AddressOnlyTangentVectorTests.test("LoadableClassAddressOnlyTangentVector") {
   }
   expectEqual([.init(stored: 1)], gradient(at: [LoadableClass<Float>(10)], in: loop))
 
-  @differentiable
+  @differentiable(reverse)
   func arrayLiteral<T: Differentiable>(_ s: LoadableClass<T>) -> T {
     var result: [[LoadableClass<T>]] = [[s, s]]
     return result[0][1].stored

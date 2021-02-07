@@ -13,11 +13,11 @@ public protocol Base {
   associatedtype Output: Differentiable
 
   // expected-error @+1 {{@differentiable attribute used without importing module '_Differentiation'}}
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func callAsFunction(_ input: Input) -> Output
 }
 public protocol Derived: Base {
   // expected-error @+1 {{@differentiable attribute used without importing module '_Differentiation'}}
-  @differentiable
+  @differentiable(reverse)
   func callAsFunction(_ input: Input) -> Output
 }

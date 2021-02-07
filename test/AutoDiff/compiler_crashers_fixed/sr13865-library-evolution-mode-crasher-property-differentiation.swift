@@ -8,17 +8,17 @@ public struct Struct: Differentiable {
   var stored: Float
 
   // Test property.
-  @differentiable
+  @differentiable(reverse)
   public var property: Float {
     stored
   }
 
-  @differentiable
+  @differentiable(reverse)
   public var property2: Float {
     stored + stored
   }
 
-  @differentiable
+  @differentiable(reverse)
   public var property3: Float {
     stored.squareRoot()
   }

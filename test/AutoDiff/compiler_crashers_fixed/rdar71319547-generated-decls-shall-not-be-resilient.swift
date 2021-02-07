@@ -14,7 +14,7 @@ import _Differentiation
 // 4.	While processing // differentiability witness for foo(_:)
 // sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s4main3fooyS2fF : $@convention(thin) (Float) -> Float {
 // }
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 public func i_have_a_pullback_struct(_ x: Float) -> Float {
   return x
 }
@@ -27,7 +27,7 @@ public func i_have_a_pullback_struct(_ x: Float) -> Float {
 // 4.	While processing // differentiability witness for i_have_a_branching_trace_enum(_:)
 // sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s4main29i_have_a_branching_trace_enumyS2fF : $@convention(thin) (Float) -> Float {
 // }
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 public func i_have_a_branching_trace_enum(_ x: Float) -> Float {
   if true {
     return x

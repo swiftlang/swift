@@ -390,8 +390,8 @@ public protocol TF_269_Layer: Differentiable & KeyPathIterable
 
 public class TF_269 : TF_269_Layer {
   public var filter: Float
-  public typealias Activation = @differentiable (Output) -> Output
-  @noDerivative public let activation: @differentiable (Output) -> Output
+  public typealias Activation = @differentiable(reverse) (Output) -> Output
+  @noDerivative public let activation: @differentiable(reverse) (Output) -> Output
 
   init(filter: Float, activation: @escaping Activation) {
     self.filter = filter
@@ -545,10 +545,10 @@ where T: Differentiable & AdditiveArithmetic {}
 // SR-12793: Test interaction with `@differentiable` and `@derivative` type-checking.
 
 class SR_12793: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   var x: Float = 0
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> Float { x }
 
   @derivative(of: method)
@@ -594,7 +594,7 @@ class WrappedProperties: Differentiable {
   @Wrapper var float: Generic<Float> = Generic()
   @ClassWrapper var float2: Generic<Float> = Generic()
   // SR-13071: Test `@differentiable` wrapped property.
-  @differentiable @Wrapper var float3: Generic<Float> = Generic()
+  @differentiable(reverse) @Wrapper var float3: Generic<Float> = Generic()
 
   @noDerivative @ImmutableWrapper var nondiff: Generic<Int> = Generic()
 

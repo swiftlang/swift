@@ -142,7 +142,10 @@ public:
         originalType(fnTy->getWithoutDifferentiability()),
         parameterIndices(fnTy->getDifferentiabilityParameterIndices()),
         resultIndices(fnTy->getDifferentiabilityResultIndices()) {
-    assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
+    // TODO: Ban 'Normal' and 'Forward'.
+    assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Reverse ||
+           fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal ||
+           fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Forward);
   }
 
   TypeInfo *createFixed(ArrayRef<DifferentiableFuncFieldInfo> fields,
@@ -191,7 +194,7 @@ public:
 } // end anonymous namespace
 
 //----------------------------------------------------------------------------//
-// `@differentiable(linear)` function type info
+// `@differentiable(_linear)` function type info
 //----------------------------------------------------------------------------//
 
 namespace {

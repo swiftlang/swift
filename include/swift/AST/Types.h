@@ -315,8 +315,8 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 10 };
-  enum { NumSILExtInfoBits = 10 };
+  enum { NumAFTExtInfoBits = 11 };
+  enum { NumSILExtInfoBits = 11 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -4382,21 +4382,18 @@ public:
 
   bool hasSameExtInfoAs(const SILFunctionType *otherFn);
 
-  /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
-  /// function type, returns an `IndexSubset` corresponding to the
-  /// differentiability/linearity parameters (e.g. all parameters except the
-  /// `@noDerivative` ones).
+  /// Given that `this` is a `@differentiable` function type, returns an
+  /// `IndexSubset` corresponding to the differentiability parameters
+  /// (e.g. all parameters except the `@noDerivative` ones).
   IndexSubset *getDifferentiabilityParameterIndices();
 
-  /// Given that `this` is a `@differentiable` or `@differentiable(linear)`
-  /// function type, returns an `IndexSubset` corresponding to the
-  /// differentiability/linearity results (e.g. all results except the
-  /// `@noDerivative` ones).
+  /// Given that `this` is a `@differentiable` function type, returns an
+  /// `IndexSubset` corresponding to the differentiability results
+  /// (e.g. all results except the `@noDerivative` ones).
   IndexSubset *getDifferentiabilityResultIndices();
 
-  /// Returns the `@differentiable` or `@differentiable(linear)` function type
-  /// for the given differentiability kind and differentiability/linearity
-  /// parameter/result indices.
+  /// Returns the `@differentiable` function type for the given
+  /// differentiability kind and differentiability parameter/result indices.
   CanSILFunctionType getWithDifferentiability(DifferentiabilityKind kind,
                                               IndexSubset *parameterIndices,
                                               IndexSubset *resultIndices);

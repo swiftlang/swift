@@ -6,12 +6,12 @@
 import _Differentiation
 
 protocol Protocol {
-  @differentiable
+  @differentiable(reverse)
   func method(_ x: Float) -> Float
 }
 
 class Class: Protocol {
-  @differentiable
+  @differentiable(reverse)
   public func method(_ x: Float) -> Float { x }
 }
 

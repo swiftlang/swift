@@ -293,9 +293,12 @@ namespace {
     RetTy visitSILFunctionType(CanSILFunctionType type,
                                AbstractionPattern origType,
                                IsTypeExpansionSensitive_t isSensitive) {
-      // Handle `@differentiable` and `@differentiable(linear)` functions.
+      // Handle `@differentiable` and `@differentiable(_linear)` functions.
       switch (type->getDifferentiabilityKind()) {
+      // TODO: Ban `Normal` and `Forward` cases.
       case DifferentiabilityKind::Normal:
+      case DifferentiabilityKind::Forward:
+      case DifferentiabilityKind::Reverse:
         return asImpl().visitNormalDifferentiableSILFunctionType(
             type, mergeIsTypeExpansionSensitive(
                       isSensitive,
@@ -305,7 +308,7 @@ namespace {
         return asImpl().visitLinearDifferentiableSILFunctionType(
             type, mergeIsTypeExpansionSensitive(
                       isSensitive,
-                      getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+                      getNormalDifferentiableSILFunctionTypeRecursiveProperties(
                           type, origType)));
       case DifferentiabilityKind::NonDifferentiable:
         break;
@@ -1341,7 +1344,7 @@ namespace {
     }
   };
 
-  /// A type lowering for `@differentiable(linear)` function types.
+  /// A type lowering for `@differentiable(_linear)` function types.
   class LinearDifferentiableSILFunctionTypeLowering final
       : public LoadableAggTypeLowering<
                    LinearDifferentiableSILFunctionTypeLowering,

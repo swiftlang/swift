@@ -1662,6 +1662,12 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   case DifferentiabilityKind::Linear:
     OpArgs.push_back('l');
     break;
+  case DifferentiabilityKind::Forward:
+    OpArgs.push_back('f');
+    break;
+  case DifferentiabilityKind::Reverse:
+    OpArgs.push_back('r');
+    break;
   }
 
   // <impl-callee-convention>
@@ -2327,7 +2333,7 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
+    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Reverse) {
       if (fn->isNoEscape())
         return appendOperator("XF");
       else
