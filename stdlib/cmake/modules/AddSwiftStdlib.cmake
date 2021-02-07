@@ -70,6 +70,10 @@ function(_add_target_variant_c_compile_link_flags)
     endif()
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
+  endif()
+
   # MSVC, clang-cl, gcc don't understand -target.
   if(CMAKE_C_COMPILER_ID MATCHES "^Clang|AppleClang$" AND
       NOT SWIFT_COMPILER_IS_MSVC_LIKE)
@@ -279,16 +283,6 @@ function(_add_target_variant_c_compile_flags)
      list(APPEND result -funwind-tables)
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND result -nostdinc++)
-    swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
-    swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
-    foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
-      list(APPEND result "SHELL:${CMAKE_INCLUDE_SYSTEM_FLAG_C}${path}")
-    endforeach()
-    list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
-  endif()
-
   if("${CFLAGS_SDK}" STREQUAL "LINUX")
     if(${CFLAGS_ARCH} STREQUAL x86_64)
       # this is the minimum architecture that supports 16 byte CAS, which is necessary to avoid a dependency to libatomic
@@ -401,7 +395,7 @@ function(_add_target_variant_link_flags)
       ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_I18N}
       ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
 
-    swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
+    swift_android_libgcc_for_arch_cross_compile(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
     endforeach()

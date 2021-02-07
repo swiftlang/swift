@@ -200,9 +200,7 @@ function(_add_target_variant_swift_compile_flags
     ${ARGN})
 
   # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
-  # On Android the sdk is split to two different paths for includes and libs, so these
-  # need to be set manually.
-  if (NOT "${sdk}" STREQUAL "WINDOWS" AND NOT "${sdk}" STREQUAL "ANDROID")
+  if (NOT "${sdk}" STREQUAL "WINDOWS")
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}")
   endif()
 
@@ -219,13 +217,6 @@ function(_add_target_variant_swift_compile_flags
   else()
     list(APPEND result
         "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
-  endif()
-
-  if("${sdk}" STREQUAL "ANDROID")
-    swift_android_include_for_arch(${arch} ${arch}_swift_include)
-    foreach(path IN LISTS ${arch}_swift_include)
-      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
-    endforeach()
   endif()
 
   if(NOT BUILD_STANDALONE)
