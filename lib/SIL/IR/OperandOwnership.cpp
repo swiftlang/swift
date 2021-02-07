@@ -391,7 +391,7 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
 OperandOwnership
 OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   if (getValue() == i->getSrc()) {
-    return OperandOwnership::ForwardingBorrow;
+    return OperandOwnership::InteriorPointer;
   }
   return OperandOwnership::TrivialUse;
 }

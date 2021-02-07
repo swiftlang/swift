@@ -618,10 +618,11 @@ BorrowedValue getSingleBorrowIntroducingValue(SILValue inputValue);
 class InteriorPointerOperandKind {
 public:
   enum Kind : uint8_t {
-    Invalid=0,
+    Invalid = 0,
     RefElementAddr,
     RefTailAddr,
     OpenExistentialBox,
+    StoreBorrow,
   };
 
 private:
@@ -648,6 +649,8 @@ public:
       return Kind::RefTailAddr;
     case SILInstructionKind::OpenExistentialBoxInst:
       return Kind::OpenExistentialBox;
+    case SILInstructionKind::StoreBorrowInst:
+      return Kind::StoreBorrow;
     }
   }
 
@@ -664,6 +667,8 @@ public:
       return Kind::RefTailAddr;
     case ValueKind::OpenExistentialBoxInst:
       return Kind::OpenExistentialBox;
+    case ValueKind::StoreBorrowInst:
+      return Kind::StoreBorrow;
     }
   }
 
@@ -714,7 +719,8 @@ struct InteriorPointerOperand {
       return {};
     case InteriorPointerOperandKind::RefElementAddr:
     case InteriorPointerOperandKind::RefTailAddr:
-    case InteriorPointerOperandKind::OpenExistentialBox: {
+    case InteriorPointerOperandKind::OpenExistentialBox:
+    case InteriorPointerOperandKind::StoreBorrow: {
       // Ok, we have a valid instruction. Return the relevant operand.
       auto *op =
           &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
@@ -754,6 +760,8 @@ struct InteriorPointerOperand {
       return cast<RefTailAddrInst>(operand->getUser());
     case InteriorPointerOperandKind::OpenExistentialBox:
       return cast<OpenExistentialBoxInst>(operand->getUser());
+    case InteriorPointerOperandKind::StoreBorrow:
+      return cast<StoreBorrowInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
