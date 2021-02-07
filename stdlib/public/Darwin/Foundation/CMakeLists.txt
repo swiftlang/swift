@@ -80,7 +80,7 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   GYB_SOURCES
     NSValue.swift.gyb
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "-Xllvm" "-sil-partial-specialization" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xllvm" "-sil-inline-generics" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreGraphics Dispatch CoreFoundation ObjectiveC # auto-updated
