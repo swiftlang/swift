@@ -2995,6 +2995,18 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
     }
 
+    if (isa<ParamDecl>(D)) {
+      // Check for unsupported declarations.
+      auto *context = D->getDeclContext()->getAsDecl();
+      if (context && isa<SubscriptDecl>(context)) {
+        diagnose(attr->getLocation(),
+                 diag::property_wrapper_param_not_supported,
+                 context->getDescriptiveKind());
+        attr->setInvalid();
+        return;
+      }
+    }
+
     return;
   }
 

@@ -5482,6 +5482,9 @@ ERROR(property_wrapper_dynamic_self_type, none,
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
       (Identifier))
+ERROR(property_wrapper_param_not_supported,none,
+      "property wrapper attribute on parameter not yet supported on %0",
+      (DescriptiveDeclKind))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (Identifier))
 ERROR(property_wrapper_param_no_projection,none,

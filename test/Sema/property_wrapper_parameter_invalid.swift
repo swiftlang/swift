@@ -68,3 +68,8 @@ func testWrapperAttributeArg(projection: Projection<Int>) {
   // expected-error@+1 {{cannot use property wrapper projection argument; pass wrapped value type 'Int' instead}}
   hasWrapperAttributeArg($value: projection)
 }
+
+struct S {
+  // expected-error@+1 {{property wrapper attribute on parameter not yet supported on subscript}}
+  subscript(@Wrapper position: Int) -> Int { 0 }
+}
