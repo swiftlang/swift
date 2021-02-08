@@ -1059,7 +1059,7 @@ public:
   /// Returns \c true if the lookup table has a complete accounting of the
   /// given name.
   bool isLazilyComplete(DeclBaseName name) const {
-    return LazilyCompleteNames.find(name) != LazilyCompleteNames.end();
+    return LazilyCompleteNames.contains(name);
   }
 
   /// Mark a given lazily-loaded name as being complete.

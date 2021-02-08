@@ -1620,8 +1620,7 @@ class DocFieldParser {
 
 public:
   DocFieldParser(StringRef text) : ptr(text.begin()), end(text.end()) {
-    assert(text.rtrim().find('\n') == StringRef::npos &&
-           "expected single line");
+    assert(!text.rtrim().contains('\n') && "expected single line");
   }
 
   // Case-insensitively match one of the following patterns:

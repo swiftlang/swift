@@ -921,8 +921,8 @@ void ide::collectModuleNames(StringRef SDKPath,
                                std::vector<std::string> &Modules) {
   std::string SDKName = getSDKName(SDKPath);
   std::string lowerSDKName = StringRef(SDKName).lower();
-  bool isOSXSDK = StringRef(lowerSDKName).find("macosx") != StringRef::npos;
-  bool isDeviceOnly = StringRef(lowerSDKName).find("iphoneos") != StringRef::npos;
+  bool isOSXSDK = StringRef(lowerSDKName).contains("macosx");
+  bool isDeviceOnly = StringRef(lowerSDKName).contains("iphoneos");
   auto Mods = isOSXSDK ? getOSXModuleList() : getiOSModuleList();
   Modules.insert(Modules.end(), Mods.begin(), Mods.end());
   if (isDeviceOnly) {

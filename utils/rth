@@ -83,6 +83,9 @@ class ResilienceTest(object):
     def is_windows_host(self):
         return self.triple.split('-')[2] == 'windows'
 
+    def is_openbsd_host(self):
+        return self.triple.split('-')[2].startswith('openbsd')
+
     def compile_library(self):
         for config in self.config_dir_map:
             lib_file = self.lib_prefix + self.lib_name + self.lib_suffix
@@ -198,6 +201,9 @@ class ResilienceTest(object):
                 # drives library searching on Windows
                 os.chdir(self.config_dir_map[config1])
             else:
+                if self.is_openbsd_host():
+                    compiler_flags.extend([
+                        '-Xlinker', '-z', '-Xlinker', 'origin'])
                 compiler_flags.extend([
                     '-Xlinker', '-rpath', '-Xlinker',
                     os.path.join(rpath_origin,

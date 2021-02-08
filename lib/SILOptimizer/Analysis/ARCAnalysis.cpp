@@ -697,7 +697,7 @@ findMatchingRetains(SILBasicBlock *BB) {
         SA = nullptr;
 
       for (auto X : R.first->getPredecessorBlocks()) {
-        if (HandledBBs.find(X) != HandledBBs.end())
+        if (HandledBBs.contains(X))
           continue;
         // Try to use the predecessor edge-value.
         if (SA && SA->getIncomingPhiValue(X)) {

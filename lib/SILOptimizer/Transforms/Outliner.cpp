@@ -1290,7 +1290,7 @@ public:
 
     // Dump function if requested.
     if (DumpFuncsBeforeOutliner.size() &&
-        Fun->getName().find(DumpFuncsBeforeOutliner, 0) != StringRef::npos) {
+        Fun->getName().contains(DumpFuncsBeforeOutliner)) {
       Fun->dump();
     }
 

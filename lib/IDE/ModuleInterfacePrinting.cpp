@@ -424,7 +424,7 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
         return false;
 
       // Ignore an imports of modules also imported by the underlying module.
-      if (PrevImported.find(Imported) != PrevImported.end())
+      if (PrevImported.contains(Imported))
         return false;
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
