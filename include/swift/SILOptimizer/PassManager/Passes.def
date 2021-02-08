@@ -140,8 +140,8 @@ PASS(DCE, "dce",
      "Dead Code Elimination")
 PASS(DeadArgSignatureOpt, "dead-arg-signature-opt",
      "Dead Argument Elimination via Function Specialization")
-PASS(DeadFunctionElimination, "sil-deadfuncelim",
-     "Dead Function Elimination")
+PASS(DeadFunctionAndGlobalElimination, "sil-deadfuncelim",
+     "Dead Function and Global Variable Elimination")
 PASS(DeadObjectElimination, "deadobject-elim",
      "Dead Object Elimination for Classes with Trivial Destruction")
 PASS(DefiniteInitialization, "definite-init",
@@ -220,8 +220,8 @@ PASS(LICM, "licm",
      "Loop Invariant Code Motion")
 PASS(LateCodeMotion, "late-codemotion",
      "Late Code Motion with Release Hoisting")
-PASS(LateDeadFunctionElimination, "late-deadfuncelim",
-     "Late Dead Function Elimination")
+PASS(LateDeadFunctionAndGlobalElimination, "late-deadfuncelim",
+     "Late Dead Function and Global Elimination")
 PASS(LateInliner, "late-inline",
      "Late Function Inlining")
 PASS(LoopCanonicalizer, "loop-canonicalizer",

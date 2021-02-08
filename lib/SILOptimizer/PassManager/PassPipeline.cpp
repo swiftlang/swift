@@ -451,7 +451,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   // Get rid of apparently dead functions as soon as possible so that
   // we do not spend time optimizing them.
-  P.addDeadFunctionElimination();
+  P.addDeadFunctionAndGlobalElimination();
 
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
@@ -525,7 +525,7 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
 // one round of module passes.
 static void addHighLevelModulePipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel,Module+StackPromote");
-  P.addDeadFunctionElimination();
+  P.addDeadFunctionAndGlobalElimination();
   P.addPerformanceSILLinker();
   P.addDeadObjectElimination();
   P.addGlobalPropertyOpt();
@@ -572,7 +572,7 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
-  P.addDeadFunctionElimination();
+  P.addDeadFunctionAndGlobalElimination();
   P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
@@ -639,7 +639,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // Delete dead code and drop the bodies of shared functions.
   // Also, remove externally available witness tables. They are not needed
   // anymore after the last devirtualizer run.
-  P.addLateDeadFunctionElimination();
+  P.addLateDeadFunctionAndGlobalElimination();
 
   // Perform the final lowering transformations.
   P.addCodeSinking();
