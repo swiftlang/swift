@@ -4,6 +4,8 @@
 // RUN:    --check-prefix=CHECK-%target-cpu
 // REQUIRES: concurrency
 
+// REQUIRES: rdar73983938
+
 func use<T>(_ t: T) {}
 func forceSplit() async {
 }
