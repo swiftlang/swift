@@ -72,9 +72,9 @@ extension Task {
 //    startingChildTasksOn executor: ExecutorRef? = nil, // TODO: actually respect it
     body: (inout Task.Group<TaskResult>) async throws -> BodyResult
   ) async throws -> BodyResult {
-    let parent = Builtin.getCurrentAsyncTask()
-    let _group = _taskGroupCreate(task: parent)
-    var group: Task.Group<TaskResult>! = Task.Group(group: _group)
+    let task = Builtin.getCurrentAsyncTask()
+    let _group = _taskGroupCreate(task: task)
+    var group: Task.Group<TaskResult>! = Task.Group(task: task, group: _group)
 
     // This defer handles both return/throw cases in the following way:
     // - body throws: all tasks must be cancelled immediately as we re-throw
@@ -87,12 +87,13 @@ extension Task {
       let result = try await body(&group)
       await group._tearDown()
       group = nil
-      _taskGroupDestroy(task: parent, group: _group)
+      _taskGroupDestroy(task: task, group: _group)
       return result
     } catch {
+      group.cancelAll()
       await group._tearDown()
       group = nil
-      _taskGroupDestroy(task: parent, group: _group)
+      _taskGroupDestroy(task: task, group: _group)
       throw error
     }
   }
@@ -102,12 +103,14 @@ extension Task {
   /// Its intended use is with the `Task.withGroup` function.
   /* @unmoveable */
   public struct Group<TaskResult> {
+    private let _task: Builtin.NativeObject
     /// Group task into which child tasks offer their results,
     /// and the `next()` function polls those results from.
     private let _group: Builtin.NativeObject
 
     /// No public initializers
-    init(group: Builtin.NativeObject) {
+    init(task: Builtin.NativeObject, group: Builtin.NativeObject) {
+      self._task = task
       self._group = group
     }
 
@@ -130,19 +133,32 @@ extension Task {
     public mutating func add(
       overridingPriority priorityOverride: Priority? = nil,
       operation: @concurrent @escaping () async throws -> TaskResult
-    ) async -> Task.Handle<TaskResult, Error> {
-      // FIXME: first create the child, then run it
-      let childTask = await _runGroupChildTask(
-        overridingPriority: priorityOverride,
-        group: _group,
-        operation: operation
-      )
+    ) async -> Bool {
+      let canAdd = _taskGroupAddPendingTask(group: _group)
 
-      _taskGroupAddPendingTask(pending: childTask, group: _group)
+      guard canAdd else {
+        // the group is cancelled and is not accepting any new work
+        return false
+      }
 
-      // TODO: only NOW run the child task
+      // Set up the job flags for a new task.
+      var flags = Task.JobFlags()
+      flags.kind = .task
+      flags.priority = priorityOverride ?? getJobFlags(_task).priority
+      flags.isFuture = true
+      flags.isChildTask = true
+      flags.isGroupChildTask = true
 
-      return Handle<TaskResult, Error>(childTask)
+      // Create the asynchronous task future.
+      let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
+        flags.bits, _task, _group, operation)
+
+      // Enqueue the resulting job.
+      _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+
+      // TODO: need to store task in the group too
+
+      return true
     }
 
     /// Wait for the a child task that was added to the group to complete,
@@ -167,6 +183,11 @@ extension Task {
     /// Awaiting on an empty group results in the immediate return of a `nil`
     /// value, without the group task having to suspend.
     ///
+    /// ### Thread-safety
+    /// Please note that the `group` object MUST NOT escape into another task.
+    /// The `group.next()` MUST be awaited from the task that had originally
+    /// created the group. It is not allowed to escape the group reference.
+    ///
     /// ### Ordering
     /// Order of values returned by next() is *completion order*, and not
     /// submission order. I.e. if tasks are added to the group one after another:
@@ -184,8 +205,17 @@ extension Task {
     /// It is possible to directly rethrow such error out of a `withGroup` body
     /// function's body, causing all remaining tasks to be implicitly cancelled.
     public mutating func next() async throws -> TaskResult? {
-      let task = Builtin.getCurrentAsyncTask()
-      let rawResult = await _taskGroupWaitNext(waitingTask: task, group: _group)
+      #if NDEBUG
+      let callingTask = Builtin.getCurrentAsyncTask() // can't inline into the assert sadly
+      assert(unsafeBitCast(callingTask, to: size_t.self) ==
+             unsafeBitCast(_task, to: size_t.self),
+        """
+        group.next() invoked from task other than the task which created the group! \
+        This means the group must have illegally escaped the withGroup{} scope.
+        """)
+      #endif
+
+      let rawResult = await _taskGroupWaitNext(waitingTask: _task, group: _group)
 
       if rawResult.hadErrorResult {
         // Throw the result on error.
@@ -226,9 +256,14 @@ extension Task {
     /// - SeeAlso: `Task.addCancellationHandler`
     /// - SeeAlso: `Task.checkCancelled`
     /// - SeeAlso: `Task.isCancelled`
-    public mutating func cancelAll() async { // FIXME SHOULD NOT BE ASYNC (!!!!!!)
-      let task = Builtin.getCurrentAsyncTask() // FIXME: needs the task
-      _taskGroupCancelAll(task: task, group: _group)
+    public mutating func cancelAll() {
+      _taskGroupCancelAll(task: _task, group: _group)
+    }
+
+    // Returns `true` if the group was cancelled, e.g. by `cancelAll`.
+    public var isCancelled: Bool {
+      return _taskIsCancelled(_task) ||
+        _taskGroupIsCancelled(task: _task, group: _group)
     }
   }
 }
@@ -251,8 +286,6 @@ extension Task.Group {
   /// If tasks should be cancelled before returning this must be done by an
   /// explicit `group.cancelAll()` call within the `withGroup`'s function body.
   mutating func _tearDown() async {
-    await self.cancelAll()
-
     // Drain any not next() awaited tasks if the group wasn't cancelled
     // If any of these tasks were to throw
     //
@@ -264,35 +297,9 @@ extension Task.Group {
       //       where one may have various decisions depending on use cases...
       continue // keep awaiting on all pending tasks
     }
+
+    self.cancelAll() // for good measure
   }
-}
-
-/// ==== -----------------------------------------------------------------------
-
-func _runGroupChildTask<T>(
-  overridingPriority priorityOverride: Task.Priority?,
-  group: Builtin.NativeObject,
-  // startingOn executor: ExecutorRef, // TODO: allow picking executor
-  operation: @concurrent @escaping () async throws -> T
-) async -> Builtin.NativeObject {
-  let currentTask = Builtin.getCurrentAsyncTask()
-
-  // Set up the job flags for a new task.
-  var flags = Task.JobFlags()
-  flags.kind = .task
-  flags.priority = priorityOverride ?? getJobFlags(currentTask).priority
-  flags.isFuture = true
-  flags.isChildTask = true
-  flags.isGroupChildTask = true
-
-  // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskGroupFuture(
-    flags.bits, currentTask, group, operation)
-
-  // Enqueue the resulting job.
-  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-  return task
 }
 
 /// ==== -----------------------------------------------------------------------
@@ -320,9 +327,8 @@ func _taskGroupDestroy(
 
 @_silgen_name("swift_task_group_add_pending")
 func _taskGroupAddPendingTask(
-  pending pendingTask: Builtin.NativeObject,
   group: Builtin.NativeObject
-)
+) -> Bool
 
 @_silgen_name("swift_task_group_cancel_all")
 func _taskGroupCancelAll(
@@ -330,11 +336,13 @@ func _taskGroupCancelAll(
   group: Builtin.NativeObject
 )
 
-@_silgen_name("swift_task_group_offer")
-func _taskGroupOffer(
-  group: Builtin.NativeObject,
-  completedTask: Builtin.NativeObject
-)
+/// Checks ONLY if the group was specifically cancelled.
+/// The task itself being cancelled must be checked separately.
+@_silgen_name("swift_task_group_is_cancelled")
+func _taskGroupIsCancelled(
+  task: Builtin.NativeObject,
+  group: Builtin.NativeObject
+) -> Bool
 
 @_silgen_name("swift_task_group_wait_next")
 func _taskGroupWaitNext(

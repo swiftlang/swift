@@ -19,7 +19,7 @@ func asyncEcho(_ value: Int) async -> Int {
 
 func test_taskGroup_isEmpty() async {
   do {
-    pprint("before all")
+    print("before all")
     let result = try await Task.withGroup(resultType: Int.self) {
       (group) async -> Int in
       // CHECK: before add: isEmpty=true

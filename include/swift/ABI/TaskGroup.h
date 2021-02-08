@@ -72,7 +72,7 @@ namespace swift {
     };
 
     /// The result of waiting on a Channel (TaskGroup).
-    struct GroupPollResult {
+    struct PollResult {
         GroupPollStatus status; // TODO: pack it into storage pointer or not worth it?
 
         /// Storage for the result of the future.
@@ -99,10 +99,10 @@ namespace swift {
               status == GroupPollStatus::Empty;
         }
 
-        static GroupPollResult get(AsyncTask *asyncTask, bool hadErrorResult,
+        static PollResult get(AsyncTask *asyncTask, bool hadErrorResult,
                                    bool needsSwiftRelease) {
           auto fragment = asyncTask->futureFragment();
-          return GroupPollResult{
+          return PollResult{
               /*status*/ hadErrorResult ?
                   TaskGroup::GroupPollStatus::Error :
                   TaskGroup::GroupPollStatus::Success,
@@ -152,39 +152,17 @@ namespace swift {
         }
     };
 
-    /// An item within the wait queue, which includes the status and the
-    /// head of the list of tasks.
-    struct WaitQueueItem { // TODO: reuse the future's wait queue instead?
-        /// Mask used for the low status bits in a wait queue item.
-        static const uintptr_t statusMask = 0x03;
-
-        uintptr_t storage;
-
-        WaitStatus getStatus() const {
-          return static_cast<WaitStatus>(storage & statusMask);
-        }
-
-        AsyncTask *getTask() const {
-          return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
-        }
-
-        static WaitQueueItem get(WaitStatus status, AsyncTask *task) {
-          return WaitQueueItem{
-              reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
-        }
-    };
-
     struct GroupStatus {
-        static const uint64_t cancelled      = 0x01000000000000000ll;
+        static const uint64_t cancelled      = 0b1000000000000000000000000000000000000000000000000000000000000000;
+        static const uint64_t waiting        = 0b0100000000000000000000000000000000000000000000000000000000000000;
 
-        static const uint64_t maskReady      = 0x00FFFFF0000000000ll;
-        static const uint64_t oneReadyTask   = 0x00000010000000000ll;
+        // 31 bits for ready tasks counter
+        static const uint64_t maskReady      = 0b0011111111111111111111111111111110000000000000000000000000000000;
+        static const uint64_t oneReadyTask   = 0b0000000000000000000000000000000010000000000000000000000000000000;
 
-        static const uint64_t maskPending    = 0x0000000FFFFF00000ll;
-        static const uint64_t onePendingTask = 0x00000000000100000ll;
-
-        static const uint64_t maskWaiting    = 0x000000000000FFFFFll;
-        static const uint64_t oneWaitingTask = 0x00000000000000001ll;
+        // 31 bits for pending tasks counter
+        static const uint64_t maskPending    = 0b0000000000000000000000000000000001111111111111111111111111111111;
+        static const uint64_t onePendingTask = 0b0000000000000000000000000000000000000000000000000000000000000001;
 
         uint64_t status;
 
@@ -192,16 +170,16 @@ namespace swift {
           return (status & cancelled) > 0;
         }
 
+        bool hasWaitingTask() {
+          return (status & waiting) > 0;
+        }
+
         unsigned int readyTasks() {
-          return (status & maskReady) >> 40;
+          return (status & maskReady) >> 31;
         }
 
         unsigned int pendingTasks() {
-          return (status & maskPending) >> 20;
-        }
-
-        unsigned int waitingTasks() {
-          return status & maskWaiting;
+          return (status & maskPending);
         }
 
         bool isEmpty() {
@@ -209,12 +187,16 @@ namespace swift {
         }
 
         /// Status value decrementing the Ready, Pending and Waiting counters by one.
-        GroupStatus completingReadyPendingWaitingTask() {
-          assert(pendingTasks() > 0 && "can only complete waiting tasks when pending tasks available");
-          assert(readyTasks() > 0 && "can only complete waiting tasks when ready tasks available");
-          assert(waitingTasks() > 0 && "can only complete waiting tasks when waiting tasks available");
-          // FIXME take into account cancelled !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          return GroupStatus { status - oneReadyTask - oneWaitingTask - onePendingTask };
+        GroupStatus completingPendingReadyWaiting() {
+          assert(pendingTasks() && "can only complete waiting task when pending tasks available");
+          assert(readyTasks() && "can only complete waiting task when ready tasks available");
+          assert(hasWaitingTask() && "can only complete waiting task when waiting task available");
+          return GroupStatus{status - waiting - oneReadyTask - onePendingTask};
+        }
+        GroupStatus completingPendingReady() {
+          assert(pendingTasks() && "can only complete waiting task when pending tasks available");
+          assert(readyTasks() && "can only complete waiting task when ready tasks available");
+          return GroupStatus{status - oneReadyTask - onePendingTask};
         }
 
         /// Pretty prints the status, as follows:
@@ -223,13 +205,13 @@ namespace swift {
           std::string str;
           str.append("GroupStatus{ ");
           str.append("C:"); // cancelled
-          str.append(isCancelled() ? "y" : "n");
-          str.append("R:");
+          str.append(isCancelled() ? "y " : "n ");
+          str.append("W:"); // has waiting task
+          str.append(hasWaitingTask() ? "y " : "n ");
+          str.append("R:"); // ready
           str.append(std::to_string(readyTasks()));
-          str.append(" P:");
+          str.append(" P:"); // pending
           str.append(std::to_string(pendingTasks()));
-          str.append(" W:");
-          str.append(std::to_string(waitingTasks()));
           str.append(" " + std::bitset<64>(status).to_string());
           str.append(" }");
           return str;
@@ -237,7 +219,7 @@ namespace swift {
 
         /// Initially there are no waiting and no pending tasks.
         static const GroupStatus initial() {
-          return GroupStatus { 0 };
+          return GroupStatus{0};
         };
     };
 
@@ -268,7 +250,6 @@ namespace swift {
         void enqueue(const T item) {
           queue.push(item);
         }
-
     };
 
   private:
@@ -289,14 +270,9 @@ namespace swift {
 //    /// Queue containing all pending tasks.
 //    NaiveQueue<PendingQueueItem> pendingQueue;
 
-    /// Queue containing all of the tasks that are waiting in `get()`.
-    ///
-    /// A task group is also a future, and awaits on the group's result *itself*
-    /// are enqueued on its future fragment.
-    ///
-    /// The low bits contain the status, the rest of the pointer is the
-    /// AsyncTask.
-    std::atomic<WaitQueueItem> waitQueue;
+    /// Single waiting `AsyncTask` currently waiting on `group.next()`,
+    /// or `nullptr` if no task is currently waiting.
+    std::atomic<AsyncTask*> waitQueue;
 
     friend class AsyncTask;
 
@@ -305,7 +281,7 @@ namespace swift {
         : status(GroupStatus::initial().status),
           readyQueue(),
 //          readyQueue(ReadyQueueItem::get(ReadyStatus::Empty, nullptr)),
-          waitQueue(WaitQueueItem::get(WaitStatus::Waiting, nullptr)) {}
+          waitQueue(nullptr) {}
 
     /// Destroy the storage associated with the channel.
     void destroy(AsyncTask *task);
@@ -325,8 +301,23 @@ namespace swift {
     /// Returns `true` if this is the first time cancelling the group, false otherwise.
     bool cancelAll(AsyncTask *task);
 
+    GroupStatus statusCancel() {
+      auto old = status.fetch_or(GroupStatus::cancelled, std::memory_order_relaxed);
+      return GroupStatus { old };
+    }
     /// Returns *assumed* new status, including the just performed +1.
-    GroupStatus statusAddReadyTaskAcquire() {
+    GroupStatus statusMarkWaitingAssumeAcquire() {
+      auto old = status.fetch_or(GroupStatus::waiting, std::memory_order_acquire);
+      return GroupStatus{old | GroupStatus::waiting};
+    }
+    GroupStatus statusRemoveWaiting() {
+      auto old = status.fetch_and(~GroupStatus::waiting, std::memory_order_release);
+      return GroupStatus{old};
+    }
+
+
+    /// Returns *assumed* new status, including the just performed +1.
+    GroupStatus statusAddReadyAssumeAcquire() {
       auto old = status.fetch_add(GroupStatus::oneReadyTask, std::memory_order_acquire);
       auto s = GroupStatus {old + GroupStatus::oneReadyTask };
       assert(s.readyTasks() <= s.pendingTasks());
@@ -334,36 +325,57 @@ namespace swift {
     }
 
     /// Returns *assumed* new status, including the just performed +1.
-    GroupStatus statusAddPendingTaskRelaxed(AsyncTask* pendingTask) {
-      assert(pendingTask->isFuture());
+    GroupStatus statusAddPendingTaskRelaxed(
+//        AsyncTask* pendingTask
+        ) {
+//      assert(pendingTask->isFuture());
+
       auto old = status.fetch_add(GroupStatus::onePendingTask, std::memory_order_relaxed);
+      auto s = GroupStatus {old + GroupStatus::onePendingTask };
+
+      if (s.isCancelled()) {
+        // revert that add, it was meaningless
+        auto o = status.fetch_sub(GroupStatus::onePendingTask, std::memory_order_relaxed);
+        s = GroupStatus {o - GroupStatus::onePendingTask };
+      }
+
+      fprintf(stderr, "[%s:%d] (%s): status %s\n", __FILE__, __LINE__, __FUNCTION__, s.to_string().c_str());
 
 //      // FIXME: we won't need the +1 in the status, just the queue?
 //      pendingQueue.enqueue(PendingQueueItem::get(pendingTask))
-
-      return GroupStatus {old + GroupStatus::onePendingTask };
+      return s;
     }
 
-    /// Returns *assumed* new status, including the just performed +1.
-    GroupStatus statusAddWaitingTaskAcquire() {
-      auto old = status.fetch_add(GroupStatus::oneWaitingTask, std::memory_order_acquire);
-      return GroupStatus { old + GroupStatus::oneWaitingTask };
+    GroupStatus statusLoadRelaxed() {
+      return GroupStatus{status.load(std::memory_order_relaxed)};
     }
 
-    /// Remove waiting task, without taking any pending task.
-    GroupStatus statusRemoveWaitingTask() {
-      return GroupStatus {
-          status.fetch_sub(GroupStatus::oneWaitingTask, std::memory_order_relaxed)
-      };
-    }
+//    /// Returns *assumed* new status, including the just performed +1.
+//    GroupStatus statusAddWaitingTaskAcquire() {
+//      auto old = status.fetch_add(GroupStatus::oneWaitingTask, std::memory_order_acquire);
+//      return GroupStatus { old + GroupStatus::oneWaitingTask };
+//    }
+
+//    /// Remove waiting task, without taking any pending task.
+//    GroupStatus statusRemoveWaitingTask() {
+//      return GroupStatus {
+//          status.fetch_sub(GroupStatus::oneWaitingTask, std::memory_order_relaxed)
+//      };
+//    }
 
     /// Compare-and-set old status to a status derived from the old one,
     /// by simultaneously decrementing one Pending and one Waiting tasks.
     ///
     /// This is used to atomically perform a waiting task completion.
-    bool statusCompleteReadyPendingWaitingTasks(GroupStatus& old) {
+    bool statusCompletePendingReadyWaiting(GroupStatus& old) {
       return status.compare_exchange_weak(
-          old.status, old.completingReadyPendingWaitingTask().status,
+          old.status, old.completingPendingReadyWaiting().status,
+          /*success*/ std::memory_order_relaxed,
+          /*failure*/ std::memory_order_relaxed);
+    }
+    bool statusCompletePendingReady(GroupStatus& old) {
+      return status.compare_exchange_weak(
+          old.status, old.completingPendingReady().status,
           /*success*/ std::memory_order_relaxed,
           /*failure*/ std::memory_order_relaxed);
     }
@@ -380,22 +392,9 @@ namespace swift {
     /// result if it is known that no pending tasks in the group,
     /// or a `GroupPollStatus::Waiting` result if there are tasks in flight
     /// and the waitingTask eventually be woken up by a completion.
-    TaskGroup::GroupPollResult poll(AsyncTask *waitingTask);
+    TaskGroup::PollResult poll(AsyncTask *waitingTask);
 
   };
-
-//  /// Offer result of a task into this channel.
-//  /// The value is enqueued at the end of the channel.
-//  void groupOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
-//
-//  /// Attempt to dequeue ready tasks and complete the waitingTask.
-//  ///
-//  /// If unable to complete the waiting task immediately (with an readily
-//  /// available completed task), either returns an `GroupPollStatus::Empty`
-//  /// result if it is known that no pending tasks in the group,
-//  /// or a `GroupPollStatus::Waiting` result if there are tasks in flight
-//  /// and the waitingTask eventually be woken up by a completion.
-//  TaskGroup::GroupPollResult groupPoll(AsyncTask *waitingTask);
 
 } // end namespace swift
 

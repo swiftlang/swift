@@ -120,9 +120,9 @@ static void runTaskWithFutureResult(
 }
 
 /// Run the given task, providing it with the result of the future.
-static void runTaskWithGroupPollResult(
+static void runTaskWithPollResult(
     AsyncTask *waitingTask, ExecutorRef executor,
-    TaskGroup::GroupPollResult result) {
+    TaskGroup::PollResult result) {
   auto waitingTaskContext =
       static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
 
@@ -148,7 +148,8 @@ static void runTaskWithGroupPollResult(
   }
 
   // TODO: schedule this task on the executor rather than running it directly.
-  waitingTask->run(executor);
+  // FIXME: or   waitingTask->run(executor); ?
+  waitingTask->run(waitingTaskContext->ResumeParentExecutor);
 
   // TODO: Not entirely sure when to release; we synchronously run the code above so we can't before
   // if we need to, release the now completed task so it can be destroyed

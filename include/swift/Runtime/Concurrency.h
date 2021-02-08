@@ -203,16 +203,14 @@ void swift_task_group_destroy(AsyncTask *task, TaskGroup *group);
 ///
 /// \code
 /// func swift_task_group_add_pending(
-///     pending: Builtin.NativeObject,
 ///     group: Builtin.NativeObject
-/// )
+/// ) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_group_add_pending(AsyncTask* pendingTask, TaskGroup *group);
+bool swift_task_group_add_pending(TaskGroup *group);
 
 /// Cancel all tasks in the group.
-///
-/// TODO: also stop accepting new ones perhaps? We don't do this today.
+/// This also prevents new tasks from being added.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
@@ -225,6 +223,22 @@ void swift_task_group_add_pending(AsyncTask* pendingTask, TaskGroup *group);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group);
 
+/// Check ONLY if the group was explicitly cancelled, e.g. by `cancelAll`.
+///
+/// This check DOES NOT take into account the task in which the group is running
+/// being cancelled or not.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_group_is_cancelled(
+///     task: Builtin.NativeObject,
+///     group: Builtin.NativeObject
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_group_is_cancelled(AsyncTask *task, TaskGroup *group);
+
 /// Check the readyQueue of a task group, return true if it has no pending tasks.
 ///
 /// This can be called from any thread. Its Swift signature is
@@ -236,18 +250,6 @@ void swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group);
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_group_is_empty(TaskGroup *group);
-
-/// Check if the group was cancelled.
-///
-/// This can be called from any thread. Its Swift signature is
-///
-/// \code
-/// func swift_task_group_is_cancelled(
-///     _ group: Builtin.NativeObject
-/// ) -> Bool
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_group_is_cancelled(TaskGroup *group);
 
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
