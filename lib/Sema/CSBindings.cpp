@@ -1106,18 +1106,6 @@ void PotentialBindings::infer(Constraint *constraint) {
           (void)addPotentialBinding(binding->withType(LValueType::get(type)));
           DelayedBy.push_back(constraint);
         }
-
-        // If this is a type variable representing closure result,
-        // which is on the right-side of some relational constraint
-        // let's have it try `Void` as well because there is an
-        // implicit conversion `() -> T` to `() -> Void` and this
-        // helps to avoid creating a thunk to support it.
-        auto voidType = CS.getASTContext().TheEmptyTupleType;
-        if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
-            binding->Kind == AllowedBindingKind::Supertypes) {
-          (void)addPotentialBinding({voidType, binding->Kind, constraint},
-                                    /*allowJoinMeet=*/false);
-        }
       }
     }
     break;
@@ -1476,6 +1464,17 @@ bool TypeVarBindingProducer::computeNext() {
     }
 
     if (binding.Kind == BindingKind::Supertypes) {
+      // If this is a type variable representing closure result,
+      // which is on the right-side of some relational constraint
+      // let's have it try `Void` as well because there is an
+      // implicit conversion `() -> T` to `() -> Void` and this
+      // helps to avoid creating a thunk to support it.
+      if (getLocator()->isLastElement<LocatorPathElt::ClosureResult>() &&
+          binding.Kind == AllowedBindingKind::Supertypes) {
+        auto voidType = CS.getASTContext().TheEmptyTupleType;
+        addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
+      }
+
       for (auto supertype : enumerateDirectSupertypes(type)) {
         // If we're not allowed to try this binding, skip it.
         if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype))
