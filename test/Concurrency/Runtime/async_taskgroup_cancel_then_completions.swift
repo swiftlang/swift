@@ -22,32 +22,6 @@ func pprint(_ m: String, file: String = #file, line: UInt = #line) {
   print(m)
 }
 
-//func test_taskGroup_cancel_then_add() async {
-//  // COM: CHECK: test_taskGroup_cancel_then_add
-//  pprint("\(#function)")
-//  let result: Int = try! await Task.withGroup(resultType: Int.self) { group in
-//
-//    let addedFirst = await group.add { 1 }
-//    pprint("added first: \(addedFirst)") // COM: CHECK: added first: true
-//
-//    let one = try! await group.next()!
-//    pprint("next first: \(one)") // COM: CHECK: next first: 1
-//
-//    await group.cancelAll() // FIXME: dont make it async
-//    pprint("cancelAll")
-//
-//    let addedSecond = await group.add { 1 }
-//    pprint("added second: \(addedSecond)") // COM: CHECK: added second: false
-//
-//    let none = try! await group.next()
-//    pprint("next second: \(none)") // COM: CHECK: next second: nil
-//
-//    return (one ?? 0) + (none ?? 0)
-//  }
-//
-//  pprint("result: \(result)") // COM: CHECK: result: 1
-//}
-
 func test_taskGroup_cancel_then_completions() async {
   // CHECK: test_taskGroup_cancel_then_completions
   pprint("before \(#function)")

@@ -76,12 +76,6 @@ extension Task {
     let _group = _taskGroupCreate(task: task)
     var group: Task.Group<TaskResult>! = Task.Group(task: task, group: _group)
 
-    // This defer handles both return/throw cases in the following way:
-    // - body throws: all tasks must be cancelled immediately as we re-throw
-    // - body returns: as good measure, cancel tasks after draining
-    //   (although there should be none left by that time)
-//    group.cancelAll()
-
     // Run the withGroup body.
     do {
       let result = try await body(&group)
@@ -110,6 +104,9 @@ extension Task {
 
     /// No public initializers
     init(task: Builtin.NativeObject, group: Builtin.NativeObject) {
+      // TODO: this feels slightly off, any other way to avoid the task being too eagerly released?
+      _swiftRetain(task) // to avoid the task being destroyed when the group is destroyed
+
       self._task = task
       self._group = group
     }
@@ -187,6 +184,10 @@ extension Task {
     /// Please note that the `group` object MUST NOT escape into another task.
     /// The `group.next()` MUST be awaited from the task that had originally
     /// created the group. It is not allowed to escape the group reference.
+    ///
+    /// Note also that this is generally prevented by Swift's type-system,
+    /// as the `add` operation is `mutating`, and those may not be performed
+    /// from concurrent execution contexts, such as child tasks.
     ///
     /// ### Ordering
     /// Order of values returned by next() is *completion order*, and not
@@ -286,6 +287,8 @@ extension Task.Group {
   /// If tasks should be cancelled before returning this must be done by an
   /// explicit `group.cancelAll()` call within the `withGroup`'s function body.
   mutating func _tearDown() async {
+    self.cancelAll()
+
     // Drain any not next() awaited tasks if the group wasn't cancelled
     // If any of these tasks were to throw
     //
@@ -297,8 +300,6 @@ extension Task.Group {
       //       where one may have various decisions depending on use cases...
       continue // keep awaiting on all pending tasks
     }
-
-    self.cancelAll() // for good measure
   }
 }
 

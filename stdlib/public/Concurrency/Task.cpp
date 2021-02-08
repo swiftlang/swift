@@ -141,6 +141,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
 
   // For a future, destroy the result.
   if (task->isFuture()) {
+    fprintf(stderr, "[%s:%d] (%s): task: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
     task->futureFragment()->destroy();
   }
 
@@ -325,6 +326,7 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   // Initialize the task-local allocator.
   // TODO: consider providing an initial pre-allocated first slab to the allocator.
   _swift_task_alloc_initialize(task);
+  fprintf(stderr, "[%s:%d] (%s): created task: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
 
   return {task, initialContext};
 }
