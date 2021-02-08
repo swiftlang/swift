@@ -1447,8 +1447,8 @@ void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
 }
 
 template<typename ...DiagIDAndArgs> InFlightDiagnostic
-diagnoseForAccessNote(DeclAttribute *attr, ValueDecl *VD,
-                      DiagIDAndArgs... idAndArgs) {
+diagnoseAtAttrOrDecl(DeclAttribute *attr, ValueDecl *VD,
+                     DiagIDAndArgs... idAndArgs) {
   ASTContext &ctx = VD->getASTContext();
   if (attr->getLocation().isValid())
     return ctx.Diags.diagnose(attr->getLocation(), idAndArgs...);
@@ -1457,7 +1457,7 @@ diagnoseForAccessNote(DeclAttribute *attr, ValueDecl *VD,
 }
 
 template <typename Attr>
-static void addOrRemoveAttr(ValueDecl *VD, const AccessNotes &notes,
+static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
                             Optional<bool> expected,
                             llvm::function_ref<Attr*()> willCreate) {
   if (!expected) return;
@@ -1470,9 +1470,9 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotes &notes,
           Diag<bool> fixitID) -> InFlightDiagnostic {
     bool isModifier = attr->isDeclModifier();
 
-    diagnoseForAccessNote(attr, VD, diagID, notes.reason, isModifier,
+    diagnoseAtAttrOrDecl(attr, VD, diagID, notes.Reason, isModifier,
                           attr->getAttrName(), VD->getDescriptiveKind());
-    return diagnoseForAccessNote(attr, VD, fixitID, isModifier);
+    return diagnoseAtAttrOrDecl(attr, VD, fixitID, isModifier);
   };
 
   if (*expected) {
@@ -1496,10 +1496,10 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotes &notes,
 }
 
 static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
-                            const AccessNotes &notes) {
+                            const AccessNotesFile &notes) {
   ASTContext &ctx = VD->getASTContext();
 
-  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]() {
+  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]{
     return ObjCAttr::create(ctx, note.ObjCName, false);
   });
 
@@ -1513,10 +1513,10 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
 
     if (!attr->hasName()) {
       attr->setName(*note.ObjCName, true);
-      diagnoseForAccessNote(attr, VD,
-                            diag::attr_objc_name_changed_by_access_note,
-                            notes.reason, VD->getDescriptiveKind(),
-                            *note.ObjCName);
+      diagnoseAtAttrOrDecl(attr, VD,
+                           diag::attr_objc_name_changed_by_access_note,
+                           notes.Reason, VD->getDescriptiveKind(),
+                           *note.ObjCName);
 
       SmallString<64> newNameString;
       llvm::raw_svector_ostream os(newNameString);
@@ -1524,7 +1524,7 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
       os << *note.ObjCName;
       os << ")";
 
-      auto note = diagnoseForAccessNote(attr, VD,
+      auto note = diagnoseAtAttrOrDecl(attr, VD,
                             diag::fixit_attr_objc_name_changed_by_access_note);
 
       if (attr->getLParenLoc().isValid())
@@ -1534,17 +1534,17 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
         note.fixItInsertAfter(attr->getLocation(), newNameString);
     }
     else if (attr->getName() != *note.ObjCName) {
-      diagnoseForAccessNote(attr, VD,
-                            diag::attr_objc_name_conflicts_with_access_note,
-                            notes.reason, VD->getDescriptiveKind(),
-                            *note.ObjCName, *attr->getName());
+      diagnoseAtAttrOrDecl(attr, VD,
+                           diag::attr_objc_name_conflicts_with_access_note,
+                           notes.Reason, VD->getDescriptiveKind(),
+                           *note.ObjCName, *attr->getName());
     }
   }
 }
 
 evaluator::SideEffect
 ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
-  AccessNotes &notes = VD->getModuleContext()->getAccessNotes();
+  AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
   if (auto note = notes.lookup(VD))
     applyAccessNote(VD, *note.get(), notes);
   return {};

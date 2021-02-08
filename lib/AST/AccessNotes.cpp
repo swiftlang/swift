@@ -56,7 +56,8 @@ AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
 }
 
 bool AccessNoteDeclName::matches(ValueDecl *VD) const {
-  // These are normally just `VD` and `name`, but not for accessors.
+  // The declaration whose name and context we ought to match. Usually `VD`, but
+  // when `VD` is an accessor, it becomes the accessor's storage instead.
   auto lookupVD = VD;
 
   // First, we check if the accessor-ness of `VD` matches the accessor-ness of
@@ -120,17 +121,17 @@ void AccessNoteDeclName::dump() const {
   llvm::errs() << '\n';
 }
 
-NullablePtr<const AccessNote> AccessNotes::lookup(ValueDecl *VD) const {
+NullablePtr<const AccessNote> AccessNotesFile::lookup(ValueDecl *VD) const {
   assert(VD != nullptr);
 
-  auto iter = llvm::find_if(notes, [&](const AccessNote &note) -> bool {
-    return note.name.matches(VD);
+  auto iter = llvm::find_if(Notes, [&](const AccessNote &note) -> bool {
+    return note.Name.matches(VD);
   });
 
-  return NullablePtr<const AccessNote>(iter == notes.end() ? nullptr : &*iter);
+  return NullablePtr<const AccessNote>(iter == Notes.end() ? nullptr : &*iter);
 }
 
-void AccessNotes::dump() const {
+void AccessNotesFile::dump() const {
   dump(llvm::dbgs());
   llvm::dbgs() << "\n";
 }
@@ -139,20 +140,21 @@ void AccessNote::dump() const {
   llvm::dbgs() << "\n";
 }
 
-void AccessNotes::dump(llvm::raw_ostream &os) const {
-  os << "(access_notes reason='" << reason << "'";
-  for (const auto &note : notes) {
+void AccessNotesFile::dump(llvm::raw_ostream &os) const {
+  os << "(access_notes reason='" << Reason << "'";
+  for (const auto &note : Notes) {
     os << "\n";
     note.dump(os, /*indent=*/2);
   }
+  os << ")";
 }
 
 void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
   os.indent(indent) << "(note name='";
-  name.print(os);
+  Name.print(os);
   os << "'";
 
-  if (name.name.getBaseName().isSpecial())
+  if (Name.name.getBaseName().isSpecial())
     os << " is_special_name";
 
   if (ObjC)
@@ -170,7 +172,7 @@ void AccessNote::dump(llvm::raw_ostream &os, int indent) const {
 LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::AccessNoteDeclName, QuotingType::Single);
 LLVM_YAML_DECLARE_SCALAR_TRAITS(swift::ObjCSelector, QuotingType::Single);
 LLVM_YAML_IS_SEQUENCE_VECTOR(swift::AccessNote)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::AccessNotes)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::AccessNotesFile)
 
 // Not using macro to avoid validation issues.
 template <> struct llvm::yaml::MappingTraits<swift::AccessNote> {
@@ -196,19 +198,19 @@ struct AccessNoteYAMLContext {
   std::set<std::string> unknownKeys;
 };
 
-llvm::Expected<AccessNotes>
-AccessNotes::load(ASTContext &ctx, llvm::MemoryBuffer *buffer) {
+llvm::Expected<AccessNotesFile>
+AccessNotesFile::load(ASTContext &ctx, llvm::MemoryBuffer *buffer) {
   llvm::Error errors = llvm::Error::success();
   AccessNoteYAMLContext yamlCtx = { ctx, {} };
 
   llvm::yaml::Input yamlIn(buffer->getBuffer(), (void *)&yamlCtx,
                            convertToErrorAndJoin, &errors);
 
-  AccessNotes notes;
+  AccessNotesFile notes;
   yamlIn >> notes;
 
   if (errors)
-    return llvm::Expected<AccessNotes>(std::move(errors));
+    return llvm::Expected<AccessNotesFile>(std::move(errors));
 
   notes.unknownKeys = std::move(yamlCtx.unknownKeys);
 
@@ -221,7 +223,7 @@ namespace llvm {
 namespace yaml {
 
 using AccessNote = swift::AccessNote;
-using AccessNotes = swift::AccessNotes;
+using AccessNotesFile = swift::AccessNotesFile;
 using AccessNoteYAMLContext = swift::AccessNoteYAMLContext;
 using AccessNoteDeclName = swift::AccessNoteDeclName;
 using ObjCSelector = swift::ObjCSelector;
@@ -286,7 +288,7 @@ static void diagnoseUnknownKeys(IO &io, ArrayRef<StringRef> expectedKeys) {
 void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {
   diagnoseUnknownKeys(io, { "Name", "ObjC", "Dynamic", "ObjCName" });
 
-  io.mapRequired("Name", note.name);
+  io.mapRequired("Name", note.Name);
   io.mapOptional("ObjC", note.ObjC);
   io.mapOptional("Dynamic", note.Dynamic);
   io.mapOptional("ObjCName", note.ObjCName);
@@ -303,11 +305,11 @@ StringRef MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {
   return "";
 }
 
-void MappingTraits<AccessNotes>::mapping(IO &io, AccessNotes &notes) {
+void MappingTraits<AccessNotesFile>::mapping(IO &io, AccessNotesFile &notes) {
   diagnoseUnknownKeys(io, { "Reason", "Notes" });
 
-  io.mapRequired("Reason", notes.reason);
-  io.mapRequired("Notes", notes.notes);
+  io.mapRequired("Reason", notes.Reason);
+  io.mapRequired("Notes", notes.Notes);
 }
 
 }

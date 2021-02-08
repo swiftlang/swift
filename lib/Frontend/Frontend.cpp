@@ -951,10 +951,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
           swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath));
 
       auto expectedAccessNotes =
-          flatMap<AccessNotes, std::unique_ptr<llvm::MemoryBuffer>>(
+          flatMap<AccessNotesFile, std::unique_ptr<llvm::MemoryBuffer>>(
               std::move(expectedBuffer),
               [&](auto &&buffer) -> auto {
-                return AccessNotes::load(*Context, buffer.get());
+                return AccessNotesFile::load(*Context, buffer.get());
               });
 
       if (expectedAccessNotes) {

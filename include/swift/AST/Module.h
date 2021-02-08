@@ -250,7 +250,7 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  AccessNotes accessNotes;
+  AccessNotesFile accessNotes;
 
   ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
 
@@ -282,8 +282,8 @@ public:
   /// imports.
   ImplicitImportList getImplicitImports() const;
 
-  AccessNotes &getAccessNotes() { return accessNotes; }
-  const AccessNotes &getAccessNotes() const { return accessNotes; }
+  AccessNotesFile &getAccessNotes() { return accessNotes; }
+  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());
