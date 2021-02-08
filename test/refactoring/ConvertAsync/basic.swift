@@ -108,6 +108,10 @@ func genericResult<T>(completion: (T?, Error?) -> Void) where T: Numeric { }
 func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
 // GENERIC-ERROR: func genericError<E>() async throws -> String where E: Error { }
 
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OTHER-NAME %s
+func otherName(execute: (String) -> Void) { }
+// OTHER-NAME: func otherName() async -> String { }
+
 struct MyStruct {
   var someVar: (Int) -> Void {
     get {
@@ -266,9 +270,13 @@ func testCalls() {
   let _: Void = simple { str in
     print("assigned")
   }
+  // CONVERT-FUNC: let _: Void = simple { str in{{$}}
+  // CONVERT-FUNC-NEXT: print("assigned"){{$}}
+  // CONVERT-FUNC-NEXT: }{{$}}
 
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3
   noParamAutoclosure(completion: print("autoclosure"))
+  // CONVERT-FUNC: noParamAutoclosure(completion: print("autoclosure")){{$}}
 
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=EMPTY-CAPTURE %s
   simple { [] str in
@@ -284,5 +292,15 @@ func testCalls() {
   }
   // CAPTURE: let str = await simple(){{$}}
   // CAPTURE-NEXT: {{^}}print("closure with capture list \(anything)")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=OTHER-DIRECT %s
+  otherName(execute: { str in
+    print("otherName")
+  })
+  // OTHER-DIRECT: let str = await otherName(){{$}}
+  // OTHER-DIRECT-NEXT: {{^}}print("otherName")
+  // CONVERT-FUNC: otherName(execute: { str in{{$}}
+  // CONVERT-FUNC-NEXT: print("otherName"){{$}}
+  // CONVERT-FUNC-NEXT: }){{$}}
 }
 // CONVERT-FUNC: {{^}}}

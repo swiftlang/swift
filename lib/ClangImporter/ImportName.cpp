@@ -1189,8 +1189,7 @@ Optional<ForeignErrorConvention::Info> NameImporter::considerErrorImport(
   return None;
 }
 
-/// Whether the given parameter name identifies a completion handler.
-static bool isCompletionHandlerParamName(StringRef paramName) {
+bool swift::isCompletionHandlerParamName(StringRef paramName) {
   return paramName == "completionHandler" ||
       paramName == "withCompletionHandler" ||
       paramName == "completion" || paramName == "withCompletion" ||
