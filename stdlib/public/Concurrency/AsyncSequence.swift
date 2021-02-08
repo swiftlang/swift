@@ -69,17 +69,26 @@ extension AsyncSequence {
   }
 }
 
+@inlinable
+@inline(__always)
+func _contains<Source: AsyncSequence>(
+  _ self: Source,
+  where predicate: (Source.Element) async throws -> Bool
+) async rethrows -> Bool {
+  for try await element in self {
+    if try await predicate(element) {
+      return true
+    }
+  }
+  return false
+}
+
 extension AsyncSequence {
   @inlinable
   public func contains(
     where predicate: (Element) async throws -> Bool
   ) async rethrows -> Bool {
-    for try await element in self {
-      if try await predicate(element) {
-        return true
-      }
-    }
-    return false
+    return try await _contains(self, where: predicate)
   }
 
   @inlinable
@@ -102,17 +111,26 @@ extension AsyncSequence where Element: Equatable {
   }
 }
 
+@inlinable
+@inline(__always)
+func _first<Source: AsyncSequence>(
+  _ self: Source,
+  where predicate: (Source.Element) async throws -> Bool
+) async rethrows -> Source.Element? {
+  for try await element in self {
+    if try await predicate(element) {
+      return element
+    }
+  }
+  return nil
+}
+
 extension AsyncSequence {
   @inlinable
   public func first(
     where predicate: (Element) async throws -> Bool
   ) async rethrows -> Element? {
-    for try await element in self {
-      if try await predicate(element) {
-        return element
-      }
-    }
-    return nil
+    return try await _first(self, where: predicate)
   }
 }
 
