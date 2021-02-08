@@ -151,6 +151,22 @@ public struct CheckedContinuation<T> {
   }
 }
 
+extension CheckedContinuation where T == Void {
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  public func resume() {
+    self.resume(returning: ())
+  }
+}
+
 public func withCheckedContinuation<T>(
     function: String = #function,
     _ body: (CheckedContinuation<T>) -> Void
@@ -241,6 +257,22 @@ public struct CheckedThrowingContinuation<T> {
     } else {
       fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
     }
+  }
+}
+
+extension CheckedThrowingContinuation where T == Void {
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  public func resume() {
+    self.resume(returning: ())
   }
 }
 
