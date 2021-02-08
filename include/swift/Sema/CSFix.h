@@ -2209,18 +2209,30 @@ public:
           MemberLookupResult result, ConstraintLocator *locator);
 };
 
-class AllowCheckedCastCoercibleOptionalType final : public ContextualMismatch {
+class CheckedCastContextualMismatchWarningBase : public ContextualMismatch {
+protected:
+  CheckedCastContextualMismatchWarningBase(ConstraintSystem &cs,
+                                           FixKind fixKind, Type fromType,
+                                           Type toType, CheckedCastKind kind,
+                                           ConstraintLocator *locator)
+      : ContextualMismatch(cs, fixKind, fromType, toType, locator,
+                           /*isWarning*/ true),
+        CastKind(kind) {}
+  CheckedCastKind CastKind;
+};
+
+class AllowCheckedCastCoercibleOptionalType final
+    : public CheckedCastContextualMismatchWarningBase {
   AllowCheckedCastCoercibleOptionalType(ConstraintSystem &cs, Type fromType,
                                         Type toType, CheckedCastKind kind,
                                         ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowCheckedCastCoercibleOptionalType,
-                           fromType, toType, locator, /*isWarning*/ true),
-        CastKind(kind) {}
-  CheckedCastKind CastKind;
+      : CheckedCastContextualMismatchWarningBase(
+            cs, FixKind::AllowCheckedCastCoercibleOptionalType, fromType,
+            toType, kind, locator) {}
 
 public:
   std::string getName() const override {
-    return "checked cast coecible optional";
+    return "checked cast coercible optional";
   }
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
@@ -2229,15 +2241,14 @@ public:
          ConstraintLocator *locator);
 };
 
-class AllowAlwaysSucceedCheckedCast final : public ContextualMismatch {
+class AllowAlwaysSucceedCheckedCast final
+    : public CheckedCastContextualMismatchWarningBase {
   AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
                                 Type toType, CheckedCastKind kind,
                                 ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowUnsupportedRuntimeCheckedCast,
-                           fromType, toType, locator,
-                           /*isWarning*/ true),
-        CastKind(kind) {}
-  CheckedCastKind CastKind;
+      : CheckedCastContextualMismatchWarningBase(
+            cs, FixKind::AllowUnsupportedRuntimeCheckedCast, fromType, toType,
+            kind, locator) {}
 
 public:
   std::string getName() const override { return "checked cast always succeed"; }
@@ -2249,15 +2260,14 @@ public:
                                                ConstraintLocator *locator);
 };
 
-class AllowUnsupportedRuntimeCheckedCast final : public ContextualMismatch {
+class AllowUnsupportedRuntimeCheckedCast final
+    : public CheckedCastContextualMismatchWarningBase {
   AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
                                      Type toType, CheckedCastKind kind,
                                      ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowUnsupportedRuntimeCheckedCast,
-                           fromType, toType, locator,
-                           /*isWarning*/ true),
-        CastKind(kind) {}
-  CheckedCastKind CastKind;
+      : CheckedCastContextualMismatchWarningBase(
+            cs, FixKind::AllowUnsupportedRuntimeCheckedCast, fromType, toType,
+            kind, locator) {}
 
 public:
   std::string getName() const override {
