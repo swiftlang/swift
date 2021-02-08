@@ -51,7 +51,10 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    var transform: ((Base.Element) async throws -> ElementOfResult?)?
+    let transform: (Base.Element) async throws -> ElementOfResult?
+
+    @usableFromInline
+    var finished = false
 
     @usableFromInline
     init(
@@ -64,12 +67,12 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async throws -> ElementOfResult? {
-      guard let transform = self.transform else {
+      guard !finished else {
         return nil
       }
       while true {
         guard let element = try await baseIterator.next() else {
-          self.transform = nil
+          finished = true
           return nil
         }
         do {
@@ -77,7 +80,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
             return transformed
           }
         } catch {
-          self.transform = nil
+          finished = true
           throw error
         }
       }

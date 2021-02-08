@@ -52,6 +52,9 @@ extension AsyncThrowingMapSequence: AsyncSequence {
     let transform: (Base.Element) async throws -> Transformed
 
     @usableFromInline
+    var finished = false
+
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       transform: @escaping (Base.Element) async throws -> Transformed
@@ -62,10 +65,15 @@ extension AsyncThrowingMapSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async throws -> Transformed? {
-      guard let element = try await baseIterator.next() else {
+      guard !finished, let element = try await baseIterator.next() else {
         return nil
       }
-      return try await transform(element)
+      do {
+        return try await transform(element)
+      } catch {
+        finished = true
+        throw error   
+      }
     }
   }
 

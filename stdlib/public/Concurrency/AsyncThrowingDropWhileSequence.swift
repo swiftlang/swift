@@ -49,7 +49,10 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    var predicate: ((Base.Element) async throws -> Bool)?
+    let predicate: (Base.Element) async throws -> Bool
+
+    @usableFromInline
+    var finished = false
 
     @usableFromInline
     init(
@@ -62,17 +65,17 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async throws -> Base.Element? {
-      while let predicate = self.predicate {
+      while !finished {
         guard let element = try await baseIterator.next() else {
           return nil
         }
         do {
           if try await predicate(element) == false {
-            self.predicate = nil
+            finished = true
             return element
           }
         } catch {
-          self.predicate = nil
+          finished = true
           throw error
         }
       }

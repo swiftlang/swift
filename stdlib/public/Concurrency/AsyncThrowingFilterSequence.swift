@@ -52,6 +52,9 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
     let isIncluded: (Base.Element) async throws -> Bool
 
     @usableFromInline
+    var finished = false
+
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
       isIncluded: @escaping (Base.Element) async throws -> Bool
@@ -62,14 +65,21 @@ extension AsyncThrowingFilterSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async throws -> Base.Element? {
-      while true {
+      while !finished {
         guard let element = try await baseIterator.next() else {
           return nil
         }
-        if try await isIncluded(element) {
-          return element
+        do {
+          if try await isIncluded(element) {
+            return element
+          }
+        } catch {
+          finished = true
+          throw error
         }
       }
+
+      return nil
     }
   }
 
