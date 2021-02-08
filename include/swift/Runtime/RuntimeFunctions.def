@@ -13,6 +13,9 @@
 // This file defines x-macros used for metaprogramming with the set of
 // runtime functions.
 //
+// Runtime functions that read from object arguments cannot be marked
+// ReadNone. Otherwise the objects may be freed before the runtime call.
+//
 //===----------------------------------------------------------------------===//
 
 /// FUNCTION(Id, Name, CC, Availability, ReturnTys, ArgTys, Attrs)
@@ -56,10 +59,11 @@ FUNCTION(DeallocBox, swift_deallocBox, C_CC, AlwaysAvailable,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// swift_projectBox reads object metadata so cannot be marked ReadNone.
 FUNCTION(ProjectBox, swift_projectBox, C_CC, AlwaysAvailable,
          RETURNS(OpaquePtrTy),
          ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 FUNCTION(AllocEmptyBox, swift_allocEmptyBox, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
@@ -795,11 +799,12 @@ FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata,
          ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getObjCClassFromObject(id object);
+// This reads object metadata so cannot be marked ReadNone.
 FUNCTION(GetObjCClassFromObject, swift_getObjCClassFromObject,
          C_CC, AlwaysAvailable,
          RETURNS(ObjCClassPtrTy),
          ARGS(ObjCPtrTy),
-         ATTRS(NoUnwind, ReadNone))
+         ATTRS(NoUnwind, ReadOnly, ArgMemOnly))
 
 // MetadataResponse swift_getTupleTypeMetadata(MetadataRequest request,
 //                                             TupleTypeFlags flags,
