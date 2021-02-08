@@ -1009,7 +1009,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       !baseHasOpenAccess &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
       !isa<ConstructorDecl>(decl)) {
-    // NSObject.hashValue and NSObject.hash(into:) is not overridable;
+    // NSObject.hashValue and NSObject.hash(into:) are not overridable;
     // one should override NSObject.hash instead.
     if (isNSObjectHashValue(baseDecl)) {
       diags.diagnose(decl, diag::override_nsobject_hashvalue_error)
@@ -1811,7 +1811,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       (isa<ExtensionDecl>(base->getDeclContext()) ||
        isa<ExtensionDecl>(override->getDeclContext())) &&
       !base->isObjC()) {
-    // Suppress this diagnostic for overrides of a non-open NSObject.Hashable
+    // Suppress this diagnostic for overrides of non-open NSObject.Hashable
     // interfaces; these are diagnosed elsewhere. An error message complaining
     // about extensions would be misleading in this case; the correct fix is to
     // override NSObject.hash instead.
