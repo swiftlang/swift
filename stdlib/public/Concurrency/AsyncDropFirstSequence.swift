@@ -22,57 +22,57 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncDropFirstSequence<Upstream: AsyncSequence> {
+public struct AsyncDropFirstSequence<Base: AsyncSequence> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
   let limit: Int
   
   @usableFromInline 
-  init(_ upstream: Upstream, dropping limit: Int) {
+  init(_ base: Base, dropping limit: Int) {
     precondition(limit >= 0, 
       "Can't drop a negative number of elements from an async sequence")
-    self.upstream = upstream
+    self.base = base
     self.limit = limit
   }
 }
 
 extension AsyncDropFirstSequence: AsyncSequence {
-  public typealias Element = Upstream.Element
+  public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
   @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
     
     @usableFromInline
     var count: Int
 
     @usableFromInline
-    init(_ upstreamIterator: Upstream.AsyncIterator, count: Int) {
-      self.upstreamIterator = upstreamIterator
+    init(_ baseIterator: Base.AsyncIterator, count: Int) {
+      self.baseIterator = baseIterator
       self.count = count
     }
 
     @inlinable
-    public mutating func next() async rethrows -> Upstream.Element? {
+    public mutating func next() async rethrows -> Base.Element? {
       var remainingToDrop = count
       while remainingToDrop > 0 {
-        guard try await upstreamIterator.next() != nil else {
+        guard try await baseIterator.next() != nil else {
           return nil
         }
         remainingToDrop -= 1
       }
       count = 0
-      return try await upstreamIterator.next()
+      return try await baseIterator.next()
     }
   }
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), count: limit)
+    return Iterator(base.makeAsyncIterator(), count: limit)
   }
 }
 
@@ -80,10 +80,10 @@ extension AsyncDropFirstSequence {
   @inlinable
   public __consuming func dropFirst(
     _ k: Int = 1
-  ) -> AsyncDropFirstSequence<Upstream> {
+  ) -> AsyncDropFirstSequence<Base> {
     precondition(k >= 0, 
       "Can't drop a negative number of elements from an async sequence")
-    return AsyncDropFirstSequence(upstream, dropping: limit + k)
+    return AsyncDropFirstSequence(base, dropping: limit + k)
   }
 }
 

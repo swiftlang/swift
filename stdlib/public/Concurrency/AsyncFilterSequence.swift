@@ -22,48 +22,48 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncFilterSequence<Upstream: AsyncSequence> {
+public struct AsyncFilterSequence<Base: AsyncSequence> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
   let isIncluded: (Element) async -> Bool
 
   @usableFromInline
   init(
-    _ upstream: Upstream, 
-    isIncluded: @escaping (Upstream.Element) async -> Bool
+    _ base: Base, 
+    isIncluded: @escaping (Base.Element) async -> Bool
   ) {
-    self.upstream = upstream
+    self.base = base
     self.isIncluded = isIncluded
   }
 }
 
 extension AsyncFilterSequence: AsyncSequence {
-  public typealias Element = Upstream.Element
+  public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
   @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let isIncluded: (Upstream.Element) async -> Bool
+    let isIncluded: (Base.Element) async -> Bool
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator,
-      isIncluded: @escaping (Upstream.Element) async -> Bool
+      _ baseIterator: Base.AsyncIterator,
+      isIncluded: @escaping (Base.Element) async -> Bool
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.isIncluded = isIncluded
     }
 
     @inlinable
-    public mutating func next() async rethrows -> Upstream.Element? {
+    public mutating func next() async rethrows -> Base.Element? {
       while true {
-        guard let element = try await upstreamIterator.next() else {
+        guard let element = try await baseIterator.next() else {
           return nil
         }
         if await isIncluded(element) {
@@ -75,6 +75,6 @@ extension AsyncFilterSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), isIncluded: isIncluded)
+    return Iterator(base.makeAsyncIterator(), isIncluded: isIncluded)
   }
 }

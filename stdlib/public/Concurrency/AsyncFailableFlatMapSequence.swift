@@ -22,19 +22,19 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncFailableFlatMapSequence<Upstream: AsyncSequence, SegmentOfResult: AsyncSequence> {
+public struct AsyncFailableFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
-  let transform: (Upstream.Element) async throws -> SegmentOfResult
+  let transform: (Base.Element) async throws -> SegmentOfResult
 
   @usableFromInline
   init(
-    _ upstream: Upstream,
-    transform: @escaping (Upstream.Element) async throws -> SegmentOfResult
+    _ base: Base,
+    transform: @escaping (Base.Element) async throws -> SegmentOfResult
   ) {
-    self.upstream = upstream
+    self.base = base
     self.transform = transform
   }
 }
@@ -46,20 +46,20 @@ extension AsyncFailableFlatMapSequence: AsyncSequence {
   @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Upstream.Element) async throws -> SegmentOfResult
+    let transform: (Base.Element) async throws -> SegmentOfResult
 
     @usableFromInline
     var currentIterator: SegmentOfResult.AsyncIterator?
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator,
-      transform: @escaping (Upstream.Element) async throws -> SegmentOfResult
+      _ baseIterator: Base.AsyncIterator,
+      transform: @escaping (Base.Element) async throws -> SegmentOfResult
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.transform = transform
     }
 
@@ -74,7 +74,7 @@ extension AsyncFailableFlatMapSequence: AsyncSequence {
           currentIterator = iterator
           return element
         } else {
-          guard let item = try await upstreamIterator.next() else {
+          guard let item = try await baseIterator.next() else {
             return nil
           }
           let segment = try await transform(item)
@@ -92,6 +92,6 @@ extension AsyncFailableFlatMapSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), transform: transform)
+    return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }

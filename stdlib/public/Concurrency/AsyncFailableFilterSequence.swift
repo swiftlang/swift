@@ -22,48 +22,48 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncFailableFilterSequence<Upstream: AsyncSequence> {
+public struct AsyncFailableFilterSequence<Base: AsyncSequence> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
   
   @usableFromInline
   let isIncluded: (Element) async throws -> Bool
 
   @usableFromInline
   init(
-    _ upstream: Upstream, 
-    isIncluded: @escaping (Upstream.Element) async throws -> Bool
+    _ base: Base, 
+    isIncluded: @escaping (Base.Element) async throws -> Bool
   ) {
-    self.upstream = upstream
+    self.base = base
     self.isIncluded = isIncluded
   }
 }
 
 extension AsyncFailableFilterSequence: AsyncSequence {
-  public typealias Element = Upstream.Element
+  public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
   @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let isIncluded: (Upstream.Element) async throws -> Bool
+    let isIncluded: (Base.Element) async throws -> Bool
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator,
-      isIncluded: @escaping (Upstream.Element) async throws -> Bool
+      _ baseIterator: Base.AsyncIterator,
+      isIncluded: @escaping (Base.Element) async throws -> Bool
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.isIncluded = isIncluded
     }
 
     @inlinable
-    public mutating func next() async throws -> Upstream.Element? {
+    public mutating func next() async throws -> Base.Element? {
       while true {
-        guard let element = try await upstreamIterator.next() else {
+        guard let element = try await baseIterator.next() else {
           return nil
         }
         if try await isIncluded(element) {
@@ -75,6 +75,6 @@ extension AsyncFailableFilterSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), isIncluded: isIncluded)
+    return Iterator(base.makeAsyncIterator(), isIncluded: isIncluded)
   }
 }

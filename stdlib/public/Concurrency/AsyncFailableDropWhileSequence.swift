@@ -22,48 +22,48 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncFailableDropWhileSequence<Upstream: AsyncSequence> {
+public struct AsyncFailableDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
-  let predicate: (Upstream.Element) async throws -> Bool
+  let predicate: (Base.Element) async throws -> Bool
 
   @usableFromInline
   init(
-    _ upstream: Upstream, 
-    predicate: @escaping (Upstream.Element) async throws -> Bool
+    _ base: Base, 
+    predicate: @escaping (Base.Element) async throws -> Bool
   ) {
-    self.upstream = upstream
+    self.base = base
     self.predicate = predicate
   }
 }
 
 extension AsyncFailableDropWhileSequence: AsyncSequence {
-  public typealias Element = Upstream.Element
+  public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
   @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    var predicate: ((Upstream.Element) async throws -> Bool)?
+    var predicate: ((Base.Element) async throws -> Bool)?
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator, 
-      predicate: @escaping (Upstream.Element) async throws -> Bool
+      _ baseIterator: Base.AsyncIterator, 
+      predicate: @escaping (Base.Element) async throws -> Bool
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.predicate = predicate
     }
 
     @inlinable
-    public mutating func next() async throws -> Upstream.Element? {
+    public mutating func next() async throws -> Base.Element? {
       while let predicate = self.predicate {
-        guard let element = try await upstreamIterator.next() else {
+        guard let element = try await baseIterator.next() else {
           return nil
         }
         do {
@@ -76,12 +76,12 @@ extension AsyncFailableDropWhileSequence: AsyncSequence {
           throw error
         }
       }
-      return try await upstreamIterator.next()
+      return try await baseIterator.next()
     }
   }
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), predicate: predicate)
+    return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }
 }

@@ -22,19 +22,19 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncFailableCompactMapSequence<Upstream: AsyncSequence, ElementOfResult> {
+public struct AsyncFailableCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
-  let transform: (Upstream.Element) async throws -> ElementOfResult?
+  let transform: (Base.Element) async throws -> ElementOfResult?
 
   @usableFromInline
   init(
-    _ upstream: Upstream, 
-    transform: @escaping (Upstream.Element) async throws -> ElementOfResult?
+    _ base: Base, 
+    transform: @escaping (Base.Element) async throws -> ElementOfResult?
   ) {
-    self.upstream = upstream
+    self.base = base
     self.transform = transform
   }
 }
@@ -48,17 +48,17 @@ extension AsyncFailableCompactMapSequence: AsyncSequence {
     public typealias Element = ElementOfResult
 
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    var transform: ((Upstream.Element) async throws -> ElementOfResult?)?
+    var transform: ((Base.Element) async throws -> ElementOfResult?)?
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator, 
-      transform: @escaping (Upstream.Element) async throws -> ElementOfResult?
+      _ baseIterator: Base.AsyncIterator, 
+      transform: @escaping (Base.Element) async throws -> ElementOfResult?
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.transform = transform
     }
 
@@ -68,7 +68,7 @@ extension AsyncFailableCompactMapSequence: AsyncSequence {
         return nil
       }
       while true {
-        guard let element = try await upstreamIterator.next() else {
+        guard let element = try await baseIterator.next() else {
           self.transform = nil
           return nil
         }
@@ -86,6 +86,6 @@ extension AsyncFailableCompactMapSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), transform: transform)
+    return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }

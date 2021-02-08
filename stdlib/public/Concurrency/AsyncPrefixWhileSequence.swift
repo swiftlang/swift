@@ -22,25 +22,25 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncPrefixWhileSequence<Upstream: AsyncSequence> {
+public struct AsyncPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
-  let predicate: (Upstream.Element) async -> Bool
+  let predicate: (Base.Element) async -> Bool
 
   @usableFromInline
   init(
-    _ upstream: Upstream, 
-    predicate: @escaping (Upstream.Element) async -> Bool
+    _ base: Base, 
+    predicate: @escaping (Base.Element) async -> Bool
   ) {
-    self.upstream = upstream
+    self.base = base
     self.predicate = predicate
   }
 }
 
 extension AsyncPrefixWhileSequence: AsyncSequence {
-  public typealias Element = Upstream.Element
+  public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
   @frozen
@@ -49,23 +49,23 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
     var predicateHasFailed = false
 
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let predicate: (Upstream.Element) async -> Bool
+    let predicate: (Base.Element) async -> Bool
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator, 
-      predicate: @escaping (Upstream.Element) async -> Bool
+      _ baseIterator: Base.AsyncIterator, 
+      predicate: @escaping (Base.Element) async -> Bool
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.predicate = predicate
     }
 
     @inlinable
-    public mutating func next() async rethrows -> Upstream.Element? {
-      if !predicateHasFailed, let nextElement = try await upstreamIterator.next() {
+    public mutating func next() async rethrows -> Base.Element? {
+      if !predicateHasFailed, let nextElement = try await baseIterator.next() {
         if await predicate(nextElement) {
           return nextElement
         } else {
@@ -78,6 +78,6 @@ extension AsyncPrefixWhileSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), predicate: predicate)
+    return Iterator(base.makeAsyncIterator(), predicate: predicate)
   }
 }

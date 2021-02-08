@@ -22,19 +22,19 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncCompactMapSequence<Upstream: AsyncSequence, ElementOfResult> {
+public struct AsyncCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
-  let transform: (Upstream.Element) async -> ElementOfResult?
+  let transform: (Base.Element) async -> ElementOfResult?
 
   @usableFromInline
   init(
-    _ upstream: Upstream, 
-    transform: @escaping (Upstream.Element) async -> ElementOfResult?
+    _ base: Base, 
+    transform: @escaping (Base.Element) async -> ElementOfResult?
   ) {
-    self.upstream = upstream
+    self.base = base
     self.transform = transform
   }
 }
@@ -48,24 +48,24 @@ extension AsyncCompactMapSequence: AsyncSequence {
     public typealias Element = ElementOfResult
 
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Upstream.Element) async -> ElementOfResult?
+    let transform: (Base.Element) async -> ElementOfResult?
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator, 
-      transform: @escaping (Upstream.Element) async -> ElementOfResult?
+      _ baseIterator: Base.AsyncIterator, 
+      transform: @escaping (Base.Element) async -> ElementOfResult?
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.transform = transform
     }
 
     @inlinable
     public mutating func next() async rethrows -> ElementOfResult? {
       while true {
-        guard let element = try await upstreamIterator.next() else {
+        guard let element = try await baseIterator.next() else {
           return nil
         }
 
@@ -78,6 +78,6 @@ extension AsyncCompactMapSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), transform: transform)
+    return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }

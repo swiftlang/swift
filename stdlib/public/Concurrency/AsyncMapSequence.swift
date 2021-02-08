@@ -22,19 +22,19 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncMapSequence<Upstream: AsyncSequence, Transformed> {
+public struct AsyncMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
-  let transform: (Upstream.Element) async -> Transformed
+  let transform: (Base.Element) async -> Transformed
 
   @usableFromInline
   init(
-    _ upstream: Upstream, 
-    transform: @escaping (Upstream.Element) async -> Transformed
+    _ base: Base, 
+    transform: @escaping (Base.Element) async -> Transformed
   ) {
-    self.upstream = upstream
+    self.base = base
     self.transform = transform
   }
 }
@@ -46,23 +46,23 @@ extension AsyncMapSequence: AsyncSequence {
   @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Upstream.Element) async -> Transformed
+    let transform: (Base.Element) async -> Transformed
 
     @usableFromInline
     init(
-      _ upstreamIterator: Upstream.AsyncIterator, 
-      transform: @escaping (Upstream.Element) async -> Transformed
+      _ baseIterator: Base.AsyncIterator, 
+      transform: @escaping (Base.Element) async -> Transformed
     ) {
-      self.upstreamIterator = upstreamIterator
+      self.baseIterator = baseIterator
       self.transform = transform
     }
 
     @inlinable
     public mutating func next() async rethrows -> Transformed? {
-      guard let element = try await upstreamIterator.next() else {
+      guard let element = try await baseIterator.next() else {
         return nil
       }
       return await transform(element)
@@ -71,6 +71,6 @@ extension AsyncMapSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), transform: transform)
+    return Iterator(base.makeAsyncIterator(), transform: transform)
   }
 }

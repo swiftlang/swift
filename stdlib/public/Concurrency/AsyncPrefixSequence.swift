@@ -22,43 +22,43 @@ extension AsyncSequence {
 }
 
 @frozen
-public struct AsyncPrefixSequence<Upstream: AsyncSequence> {
+public struct AsyncPrefixSequence<Base: AsyncSequence> {
   @usableFromInline
-  let upstream: Upstream
+  let base: Base
 
   @usableFromInline
   let maxLength: Int
 
   @usableFromInline
-  init(_ upstream: Upstream, maxLength: Int) {
-    self.upstream = upstream
+  init(_ base: Base, maxLength: Int) {
+    self.base = base
     self.maxLength = maxLength
   }
 }
 
 extension AsyncPrefixSequence: AsyncSequence {
-  public typealias Element = Upstream.Element
+  public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
   @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
-    var upstreamIterator: Upstream.AsyncIterator
+    var baseIterator: Base.AsyncIterator
 
     @usableFromInline
     var remaining: Int
 
     @usableFromInline
-    init(_ upstreamIterator: Upstream.AsyncIterator, maxLength: Int) {
-      self.upstreamIterator = upstreamIterator
+    init(_ baseIterator: Base.AsyncIterator, maxLength: Int) {
+      self.baseIterator = baseIterator
       self.remaining = maxLength
     }
 
     @inlinable
-    public mutating func next() async rethrows -> Upstream.Element? {
+    public mutating func next() async rethrows -> Base.Element? {
       if remaining != 0 {
         remaining &-= 1
-        return try await upstreamIterator.next()
+        return try await baseIterator.next()
       } else {
         return nil
       }
@@ -67,6 +67,6 @@ extension AsyncPrefixSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(upstream.makeAsyncIterator(), maxLength: maxLength)
+    return Iterator(base.makeAsyncIterator(), maxLength: maxLength)
   }
 }
