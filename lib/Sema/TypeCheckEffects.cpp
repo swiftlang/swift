@@ -207,39 +207,35 @@ private:
   unsigned TheKind : 2;
   unsigned ParamCount : 2;
   FunctionRethrowingKind RethrowingKind;
-  ConcreteDeclRef declRef;
+  SubstitutionMap Substitutions;
 
 public:
-  explicit AbstractFunction(Kind kind, Expr *fn, ConcreteDeclRef declRef)
+  explicit AbstractFunction(Kind kind, Expr *fn)
     : TheKind(kind),
       ParamCount(1),
-      RethrowingKind(FunctionRethrowingKind::None),
-      declRef(declRef) {
+      RethrowingKind(FunctionRethrowingKind::None) {
     TheExpr = fn;
   }
 
-  explicit AbstractFunction(AbstractFunctionDecl *fn, ConcreteDeclRef declRef)
+  explicit AbstractFunction(AbstractFunctionDecl *fn, SubstitutionMap subs)
     : TheKind(Kind::Function),
       ParamCount(fn->getNumCurryLevels()),
       RethrowingKind(fn->getRethrowingKind()),
-      declRef(declRef) {
+      Substitutions(subs) {
     TheFunction = fn;
   }
 
-  explicit AbstractFunction(AbstractClosureExpr *closure, 
-                            ConcreteDeclRef declRef)
+  explicit AbstractFunction(AbstractClosureExpr *closure)
     : TheKind(Kind::Closure),
       ParamCount(1),
-      RethrowingKind(FunctionRethrowingKind::None),
-      declRef(declRef) {
+      RethrowingKind(FunctionRethrowingKind::None) {
     TheClosure = closure;
   }
 
-  explicit AbstractFunction(ParamDecl *parameter, ConcreteDeclRef declRef)
+  explicit AbstractFunction(ParamDecl *parameter)
     : TheKind(Kind::Parameter),
       ParamCount(1),
-      RethrowingKind(FunctionRethrowingKind::None),
-      declRef(declRef) {
+      RethrowingKind(FunctionRethrowingKind::None) {
     TheParameter = parameter;
   }
 
@@ -300,29 +296,22 @@ public:
     return TheExpr;
   }
 
-  ConcreteDeclRef getDeclRef() {
-    return declRef;
+  SubstitutionMap getSubstitutions() const {
+    return Substitutions;
   }
 
   static AbstractFunction decomposeApply(ApplyExpr *apply,
                                          SmallVectorImpl<Expr*> &args) {
     Expr *fn;
-    ConcreteDeclRef declRef;
     do {
       args.push_back(apply->getArg());
-      auto applyFn = apply->getFn();
-      if (!declRef) {
-        if (auto DRE = dyn_cast<DeclRefExpr>(applyFn)) {
-          declRef = DRE->getDeclRef();
-        }
-      }
-      fn = applyFn->getValueProvidingExpr();
+      fn = apply->getFn()->getValueProvidingExpr();
     } while ((apply = dyn_cast<ApplyExpr>(fn)));
 
-    return decomposeFunction(fn, declRef);
+    return decomposeFunction(fn);
   }
 
-  static AbstractFunction decomposeFunction(Expr *fn, ConcreteDeclRef declRef = ConcreteDeclRef()) {
+  static AbstractFunction decomposeFunction(Expr *fn) {
     assert(fn->getValueProvidingExpr() == fn);
 
     while (true) {
@@ -353,25 +342,26 @@ public:
     
     // Constructor delegation.
     if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
-      return AbstractFunction(otherCtorDeclRef->getDecl(), declRef);
+      return AbstractFunction(otherCtorDeclRef->getDecl(),
+                              otherCtorDeclRef->getDeclRef().getSubstitutions());
     }
 
     // Normal function references.
     if (auto DRE = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = DRE->getDecl();
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-        return AbstractFunction(fn, declRef);
+        return AbstractFunction(fn, DRE->getDeclRef().getSubstitutions());
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
-        return AbstractFunction(param, declRef);
+        return AbstractFunction(param);
       }
 
     // Closures.
     } else if (auto closure = dyn_cast<AbstractClosureExpr>(fn)) {
-      return AbstractFunction(closure, declRef);
+      return AbstractFunction(closure);
     }
 
     // Everything else is opaque.
-    return AbstractFunction(Kind::Opaque, fn, declRef);
+    return AbstractFunction(Kind::Opaque, fn);
   }
 };
 
@@ -688,7 +678,7 @@ public:
     }
 
     if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
-      auto substitutions = fnRef.getDeclRef().getSubstitutions();
+      auto substitutions = fnRef.getSubstitutions();
       bool classifiedAsThrows = false;
       for (auto conformanceRef : substitutions.getConformances()) {
         if (conformanceRef.classifyAsThrows()) {
