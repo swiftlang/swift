@@ -9,3 +9,7 @@
 // RUN: %FileCheck --check-prefix=NEGATIVE-EXTRA %s <%t.txt
 // CHECK-EXTRA: <unknown>:0: remark: compiler ignored unknown key 'CorinthianLeather' in access notes at 'SOURCE_DIR/test/Sema/Inputs/extra.accessnotes'
 // NEGATIVE-EXTRA-NOT: <unknown>:0: warning: access notes at 'SOURCE_DIR/test/Sema/Inputs/extra.accessnotes' will be ignored due to an error while loading them
+
+// FIXME: Should diagnose multiple access notes for the same decl
+
+// FIXME: Should diagnose access notes that don't match a decl in the source code
