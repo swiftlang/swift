@@ -18,6 +18,7 @@
 #include "swift/AST/Effects.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -70,4 +71,11 @@ void swift::simple_display(llvm::raw_ostream &out,
     out << "invalid";
     break;
   }
+}
+
+bool ProtocolConformanceRef::classifyAsThrows() const {
+  if (!isConcrete()) { return true; }
+  return evaluateOrDefault(getRequirement()->getASTContext().evaluator,
+     ProtocolConformanceRefClassifyAsThrowsRequest{ *this }, 
+     true);
 }
