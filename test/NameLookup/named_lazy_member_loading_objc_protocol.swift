@@ -1,6 +1,5 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
-// REQUIRES: rdar73834542
 // RUN: rm -rf %t && mkdir -p %t/stats-pre && mkdir -p %t/stats-post
 //
 // Prime module cache

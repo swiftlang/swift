@@ -1,4 +1,3 @@
-// REQUIRES: rdar73834542
 // RUN: rm -rf %t && mkdir -p %t/stats-pre && mkdir -p %t/stats-post
 //
 // Compile swiftmodule with decl member name tables
