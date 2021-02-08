@@ -110,7 +110,7 @@ public:
 
     Fn(Context, Command::DestroyContext, nullptr);
     Fn = other.Fn;
-    Context = Fn(Context, Command::CopyContext, nullptr);
+    Context = Fn(other.Context, Command::CopyContext, nullptr);
 
     return *this;
   }
@@ -181,6 +181,8 @@ template <typename T> class TypeLookupErrorOr {
   TaggedUnion<T, TypeLookupError> Value;
 
 public:
+  TypeLookupErrorOr() : Value(TypeLookupError("freshly constructed error")) {}
+
   TypeLookupErrorOr(const T &t) : Value(t) {
     if (!t)
       Value = TypeLookupError("unknown error");
