@@ -814,6 +814,9 @@ namespace {
     /// Keep track of acceptable DiscardAssignmentExpr's.
     llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
+    /// The current number of nested \c SequenceExprs that we're within.
+    unsigned SequenceExprDepth = 0;
+
     /// Simplify expressions which are type sugar productions that got parsed
     /// as expressions due to the parser not knowing which identifiers are
     /// type names.
@@ -1145,6 +1148,9 @@ namespace {
       if (auto *assignment = dyn_cast<AssignExpr>(expr))
         markAcceptableDiscardExprs(assignment->getDest());
 
+      if (isa<SequenceExpr>(expr))
+        SequenceExprDepth++;
+
       return finish(true, expr);
     }
 
@@ -1160,6 +1166,7 @@ namespace {
       // Fold sequence expressions.
       if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
         auto result = TypeChecker::foldSequence(seqExpr, DC);
+        SequenceExprDepth--;
         return result->walk(*this);
       }
 
@@ -1279,6 +1286,19 @@ namespace {
       // TypeExpr, do it.
       if (auto *simplified = simplifyTypeExpr(expr))
         return simplified;
+
+      // Diagnose a '_' that isn't on the immediate LHS of an assignment. We
+      // skip diagnostics if we've explicitly marked the expression as valid,
+      // or if we're inside a SequenceExpr (since the whole tree will be
+      // re-checked when we finish folding anyway).
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
+        if (!CorrectDiscardAssignmentExprs.count(DAE) &&
+            SequenceExprDepth == 0) {
+          ctx.Diags.diagnose(expr->getLoc(),
+                             diag::discard_expr_outside_of_assignment);
+          return nullptr;
+        }
+      }
 
       if (auto KPE = dyn_cast<KeyPathExpr>(expr)) {
         resolveKeyPathExpr(KPE);
