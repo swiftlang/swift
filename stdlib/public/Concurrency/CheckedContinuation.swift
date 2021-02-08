@@ -162,6 +162,7 @@ extension CheckedContinuation where T == Void {
   /// After `resume` enqueues the task, control is immediately returned to
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
+  @inlinable
   public func resume() {
     self.resume(returning: ())
   }
@@ -271,6 +272,7 @@ extension CheckedThrowingContinuation where T == Void {
   /// After `resume` enqueues the task, control is immediately returned to
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
+  @inlinable
   public func resume() {
     self.resume(returning: ())
   }

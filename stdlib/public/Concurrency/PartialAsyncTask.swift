@@ -35,6 +35,7 @@ public struct UnsafeContinuation<T> {
 }
 
 extension UnsafeContinuation where T == Void {
+  @inlinable
   public func resume() {
       self.resume(returning: ())
   }
@@ -65,6 +66,7 @@ public struct UnsafeThrowingContinuation<T> {
 }
 
 extension UnsafeThrowingContinuation where T == Void {
+  @inlinable
   public func resume() {
       self.resume(returning: ())
   }
