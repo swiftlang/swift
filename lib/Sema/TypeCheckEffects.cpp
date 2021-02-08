@@ -366,10 +366,21 @@ public:
   }
 
   static AbstractFunction decomposeApply(ApplyExpr *apply,
-                                         SmallVectorImpl<Expr*> &args) {
+                           SmallVectorImpl<SmallVector<Expr *, 2>> &argLists) {
     Expr *fn;
     do {
-      args.push_back(apply->getArg());
+      auto *argExpr = apply->getArg();
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
+        auto args = tupleExpr->getElements();
+        argLists.emplace_back(args.begin(), args.end());
+      } else if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
+        argLists.emplace_back();
+        argLists.back().push_back(parenExpr->getSubExpr());
+      } else {
+        argLists.emplace_back();
+        argLists.back().push_back(argExpr);
+      }
+
       fn = apply->getFn()->getValueProvidingExpr();
     } while ((apply = dyn_cast<ApplyExpr>(fn)));
 
@@ -733,13 +744,15 @@ public:
 
     bool isAsync = fnType->isAsync() || E->implicitlyAsync();
     // Decompose the application.
-    SmallVector<Expr*, 4> args;
-    auto fnRef = AbstractFunction::decomposeApply(E, args);
+    SmallVector<SmallVector<Expr *, 2>, 2> argLists;
+    auto fnRef = AbstractFunction::decomposeApply(E, argLists);
 
     // If any of the arguments didn't type check, fail.
-    for (auto arg : args) {
-      if (!arg->getType() || arg->getType()->hasError())
-        return Classification::forInvalidCode();
+    for (auto argList : argLists) {
+      for (auto *arg : argList) {
+        if (!arg->getType() || arg->getType()->hasError())
+          return Classification::forInvalidCode();
+      }
     }
 
     if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
@@ -780,12 +793,12 @@ public:
     // If we're applying more arguments than the natural argument
     // count, then this is a call to the opaque value returned from
     // the function.
-    if (args.size() != fnRef.getNumArgumentsForFullApply()) {
+    if (argLists.size() != fnRef.getNumArgumentsForFullApply()) {
       // Special case: a reference to an operator within a type might be
       // missing 'self'.
       // FIXME: The issue here is that this is an ill-formed expression, but
       // we don't know it from the structure of the expression.
-      if (args.size() == 1 && fnRef.getKind() == AbstractFunction::Function &&
+      if (argLists.size() == 1 && fnRef.getKind() == AbstractFunction::Function &&
           isa<FuncDecl>(fnRef.getFunction()) &&
           cast<FuncDecl>(fnRef.getFunction())->isOperator() &&
           fnRef.getNumArgumentsForFullApply() == 2 &&
@@ -795,7 +808,7 @@ public:
         return Classification::forInvalidCode();
       }
 
-      assert(args.size() > fnRef.getNumArgumentsForFullApply() &&
+      assert(argLists.size() > fnRef.getNumArgumentsForFullApply() &&
              "partial application was throwing?");
       return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
                                       isAsync);
@@ -813,13 +826,20 @@ public:
       // Use the most significant result from the arguments.
       Classification result = isAsync ? Classification::forAsync() 
                                       : Classification();
-      for (auto arg : llvm::reverse(args)) {
+      for (auto argList : llvm::reverse(argLists)) {
         auto fnType = type->getAs<AnyFunctionType>();
-        if (!fnType) return Classification::forInvalidCode();
+        if (!fnType)
+          return Classification::forInvalidCode();
 
-        auto paramType = FunctionType::composeInput(fnType->getASTContext(),
-                                                    fnType->getParams(), false);
-        result.merge(classifyRethrowsArgument(arg, paramType));
+        auto params = fnType->getParams();
+        if (params.size() != argList.size())
+          return Classification::forInvalidCode();
+
+        for (unsigned i = 0, e = params.size(); i < e; ++i) {
+          result.merge(classifyRethrowsArgument(argList[i],
+                                                params[i].getParameterType()));
+        }
+
         type = fnType->getResult();
       }
       return result;
