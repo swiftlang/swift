@@ -1025,6 +1025,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::Statistics:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestStatistics);
     break;
+
+  case SourceKitRequest::DependencyUpdated:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestDependencyUpdated);
+    break;
   }
 
   if (!SourceFile.empty()) {
@@ -1223,6 +1228,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteSetPopularAPI:
     case SourceKitRequest::TypeContextInfo:
     case SourceKitRequest::ConformingMethodList:
+    case SourceKitRequest::DependencyUpdated:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 

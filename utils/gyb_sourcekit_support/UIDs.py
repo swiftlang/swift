@@ -244,7 +244,8 @@ UID_REQUESTS = [
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
     REQUEST('CollectExpressionType', 'source.request.expression.type'),
-    REQUEST('GlobalConfiguration', 'source.request.configuration.global')
+    REQUEST('GlobalConfiguration', 'source.request.configuration.global'),
+    REQUEST('DependencyUpdated', 'source.request.dependency_updated'),
 ]
 
 
