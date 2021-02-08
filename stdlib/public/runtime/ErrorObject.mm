@@ -554,7 +554,7 @@ isKindOfClass(HeapObject *object, Class cls) {
   IMP NSProxyLookupMethod = SWIFT_LAZY_CONSTANT(getNSProxyLookupMethod());
   // People sometimes fail to override `methodSignatureForSelector:` in their
   // NSProxy subclasses, which causes `isKindOfClass:` to crash.  Avoid that...
-  Class objectClass = object_getClass(object);
+  Class objectClass = object_getClass((id)object);
   IMP objectLookupMethod = class_getMethodImplementation(objectClass, @selector(methodSignatureForSelector:));
   if (objectLookupMethod == NSProxyLookupMethod) {
     return false;
