@@ -24,7 +24,7 @@ struct Failure: Error { }
 
 func failable<T, E: Error>(
   _ results: [Result<T, E>]
-) -> AsyncFailableMapSequence<AsyncLazySequence<[Result<T, E>]>, T> {
+) -> AsyncThrowingMapSequence<AsyncLazySequence<[Result<T, E>]>, T> {
   return results.async.map { try $0.get() }
 }
 
