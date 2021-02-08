@@ -20,6 +20,7 @@
 #define SWIFT_PARSE_PARSEDRAWSYNTAXRECORDER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Parse/ParsedRawSyntaxNode.h"
 #include <memory>
 
 namespace swift {
@@ -29,6 +30,7 @@ class ParsedRawSyntaxNode;
 struct ParsedTrivia;
 class ParsedTriviaPiece;
 class SyntaxParseActions;
+class SyntaxParsingContext;
 class SourceLoc;
 class Token;
 enum class tok;
@@ -66,6 +68,25 @@ public:
   /// if not missing.
   ParsedRawSyntaxNode recordEmptyRawSyntaxCollection(syntax::SyntaxKind kind,
                                                      SourceLoc loc);
+
+  /// Create a deferred layout node.
+  static ParsedRawSyntaxNode
+  makeDeferred(syntax::SyntaxKind k,
+               MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
+               SyntaxParsingContext &ctx);
+
+  /// Create a deferred token node.
+  static ParsedRawSyntaxNode makeDeferred(Token tok, StringRef leadingTrivia,
+                                          StringRef trailingTrivia);
+
+  /// Form a deferred missing token node.
+  static ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc) {
+    auto raw = ParsedRawSyntaxNode(tokKind, loc, /*tokLength=*/0,
+                                   /*leadingTrivia=*/StringRef(),
+                                   /*trailingTrivia=*/StringRef());
+    raw.IsMissing = true;
+    return raw;
+  }
 
   void discardRecordedNode(ParsedRawSyntaxNode &node);
 

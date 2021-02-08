@@ -98,7 +98,7 @@ SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         MutableArrayRef<ParsedRawSyntaxNode> Parts) {
   assert(isUnknownKind(Kind));
   if (shouldDefer())
-    return ParsedRawSyntaxNode::makeDeferred(Kind, Parts, *this);
+    return getRecorder().makeDeferred(Kind, Parts, *this);
   else
     return getRecorder().recordRawSyntax(Kind, Parts);
 }
@@ -112,7 +112,7 @@ SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
   auto &rec = getRecorder();
   auto formNode = [&](SyntaxKind kind, MutableArrayRef<ParsedRawSyntaxNode> layout) {
     if (nodeCreateK == SyntaxNodeCreationKind::Deferred || shouldDefer()) {
-      rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout, *this);
+      rawNode = getRecorder().makeDeferred(kind, layout, *this);
     } else {
       rawNode = rec.recordRawSyntax(kind, layout);
     }
@@ -210,8 +210,7 @@ void SyntaxParsingContext::addToken(Token &Tok, StringRef LeadingTrivia,
 
   ParsedRawSyntaxNode raw;
   if (shouldDefer()) {
-    raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
-                                            *this);
+    raw = getRecorder().makeDeferred(Tok, LeadingTrivia, TrailingTrivia);
   } else {
     raw = getRecorder().recordToken(Tok, LeadingTrivia, TrailingTrivia);
   }
@@ -339,7 +338,7 @@ void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {
 
   ParsedRawSyntaxNode raw;
   if (shouldDefer())
-    raw = ParsedRawSyntaxNode::makeDeferredMissing(Kind, Loc);
+    raw = getRecorder().makeDeferredMissing(Kind, Loc);
   else
     raw = getRecorder().recordMissingToken(Kind, Loc);
   getStorage().push_back(std::move(raw));
