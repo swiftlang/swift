@@ -4721,10 +4721,15 @@ public:
     Placeholders.insert(TopHandler.Handler);
   }
 
-  void replace(ASTNode Node, SourceEditConsumer &EditConsumer) {
-    CharSourceRange Range =
-        Lexer::getCharSourceRangeFromSourceRange(SM, Node.getSourceRange());
-    EditConsumer.accept(SM, Range, Buffer.str());
+  void replace(ASTNode Node, SourceEditConsumer &EditConsumer,
+               SourceLoc StartOverride = SourceLoc()) {
+    SourceRange Range = Node.getSourceRange();
+    if (StartOverride.isValid()) {
+      Range = SourceRange(StartOverride, Range.End);
+    }
+    CharSourceRange CharRange =
+        Lexer::getCharSourceRangeFromSourceRange(SM, Range);
+    EditConsumer.accept(SM, CharRange, Buffer.str());
     Buffer.clear();
   }
 
@@ -5285,7 +5290,7 @@ bool RefactoringActionConvertToAsync::performChange() {
   if (DiagEngine.hadAnyError())
     return true;
 
-  Builder.replace(FD, EditConsumer);
+  Builder.replace(FD, EditConsumer, FD->getSourceRangeIncludingAttrs().Start);
   return false;
 }
 
