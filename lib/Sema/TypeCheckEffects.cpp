@@ -205,26 +205,23 @@ private:
     Expr *TheExpr;
   };
   unsigned TheKind : 2;
-  unsigned IsRethrows : 1;
   unsigned ParamCount : 2;
-  FunctionRethrowingKind rethrowingKind;
+  FunctionRethrowingKind RethrowingKind;
   ConcreteDeclRef declRef;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn, ConcreteDeclRef declRef)
     : TheKind(kind),
-      IsRethrows(false),
       ParamCount(1),
-      rethrowingKind(FunctionRethrowingKind::Invalid),
+      RethrowingKind(FunctionRethrowingKind::None),
       declRef(declRef) {
     TheExpr = fn;
   }
 
   explicit AbstractFunction(AbstractFunctionDecl *fn, ConcreteDeclRef declRef)
     : TheKind(Kind::Function),
-      IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
       ParamCount(fn->getNumCurryLevels()),
-      rethrowingKind(fn->getRethrowingKind()),
+      RethrowingKind(fn->getRethrowingKind()),
       declRef(declRef) {
     TheFunction = fn;
   }
@@ -232,18 +229,16 @@ public:
   explicit AbstractFunction(AbstractClosureExpr *closure, 
                             ConcreteDeclRef declRef)
     : TheKind(Kind::Closure),
-      IsRethrows(false),
       ParamCount(1),
-      rethrowingKind(FunctionRethrowingKind::Invalid),
+      RethrowingKind(FunctionRethrowingKind::None),
       declRef(declRef) {
     TheClosure = closure;
   }
 
   explicit AbstractFunction(ParamDecl *parameter, ConcreteDeclRef declRef)
     : TheKind(Kind::Parameter),
-      IsRethrows(false),
       ParamCount(1),
-      rethrowingKind(FunctionRethrowingKind::Invalid),
+      RethrowingKind(FunctionRethrowingKind::None),
       declRef(declRef) {
     TheParameter = parameter;
   }
@@ -251,9 +246,22 @@ public:
   Kind getKind() const { return Kind(TheKind); }
 
   /// Whether the function is marked 'rethrows'.
-  bool isBodyRethrows() const { return IsRethrows; }
+  bool isBodyRethrows() const {
+    switch (RethrowingKind) {
+    case FunctionRethrowingKind::None:
+    case FunctionRethrowingKind::Throws:
+      return false;
 
-  FunctionRethrowingKind getRethrowingKind() const { return rethrowingKind; }
+    case FunctionRethrowingKind::ByClosure:
+    case FunctionRethrowingKind::ByConformance:
+    case FunctionRethrowingKind::Invalid:
+      return true;
+    }
+  }
+
+  FunctionRethrowingKind getRethrowingKind() const {
+    return RethrowingKind;
+  }
 
   unsigned getNumArgumentsForFullApply() const {
     return ParamCount;
