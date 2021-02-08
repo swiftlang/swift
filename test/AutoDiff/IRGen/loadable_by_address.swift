@@ -11,7 +11,7 @@
 // - `differentiable_function`
 // - `differentiable_function_extract`
 
-// TODO: Add tests for `@differentiable(linear)` functions.
+// TODO: Add tests for `@differentiable(_linear)` functions.
 
 import _Differentiation
 import StdlibUnittest
@@ -29,7 +29,7 @@ struct Large : Differentiable {
 }
 
 @_silgen_name("large2large")
-@differentiable
+@differentiable(reverse)
 func large2large(_ foo: Large) -> Large {
   foo
 }
@@ -40,7 +40,7 @@ func large2large(_ foo: Large) -> Large {
 // $@callee_guaranteed (@in_constant Large) -> (@out Large, @owned @callee_guaranteed (@in_constant Large.TangentVector) -> @out Large.TangentVector)
 
 @_silgen_name("large2small")
-@differentiable
+@differentiable(reverse)
 func large2small(_ foo: Large) -> Float {
   foo.a
 }

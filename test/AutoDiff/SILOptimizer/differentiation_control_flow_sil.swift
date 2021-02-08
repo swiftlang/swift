@@ -10,7 +10,7 @@ import _Differentiation
 // Conditionals
 //===----------------------------------------------------------------------===//
 
-@differentiable
+@differentiable(reverse)
 @_silgen_name("cond")
 func cond(_ x: Float) -> Float {
   if x > 0 {
@@ -100,7 +100,7 @@ func cond(_ x: Float) -> Float {
 // CHECK-SIL: bb7({{%.*}} : $Float, [[BB0_PB_STRUCT:%.*]] : $_AD__cond_bb0__PB__src_0_wrt_0):
 // CHECK-SIL:   return {{%.*}} : $Float
 
-@differentiable
+@differentiable(reverse)
 @_silgen_name("nested_cond")
 func nested_cond(_ x: Float, _ y: Float) -> Float {
   if x > 0 {
@@ -113,7 +113,7 @@ func nested_cond(_ x: Float, _ y: Float) -> Float {
   return y - x
 }
 
-@differentiable
+@differentiable(reverse)
 @_silgen_name("nested_cond_generic")
 func nested_cond_generic<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> T {
   if x > 0 {
@@ -126,7 +126,7 @@ func nested_cond_generic<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> 
   return y
 }
 
-@differentiable
+@differentiable(reverse)
 @_silgen_name("loop_generic")
 func loop_generic<T : Differentiable & FloatingPoint>(_ x: T) -> T {
   var result = x
@@ -146,7 +146,7 @@ enum Enum {
   case a(Float)
   case b(Float, Float)
 }
-@differentiable
+@differentiable(reverse)
 @_silgen_name("enum_notactive")
 func enum_notactive(_ e: Enum, _ x: Float) -> Float {
   switch e {
@@ -186,7 +186,7 @@ enum AddressOnlyEnum<T> {
   case some(T)
   case none
 }
-@differentiable
+@differentiable(reverse)
 @_silgen_name("enum_addr_notactive")
 func enum_addr_notactive<T>(_ e: AddressOnlyEnum<T>, _ x: Float) -> Float {
   switch e {
@@ -230,7 +230,7 @@ func enum_addr_notactive<T>(_ e: AddressOnlyEnum<T>, _ x: Float) -> Float {
 // Test control flow + tuple buffer.
 // Verify that pullback buffers are not allocated for address projections.
 
-@differentiable
+@differentiable(reverse)
 @_silgen_name("cond_tuple_var")
 func cond_tuple_var(_ x: Float) -> Float {
   // expected-warning @+1 {{variable 'y' was never mutated; consider changing to 'let' constant}}

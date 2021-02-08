@@ -42,6 +42,13 @@ SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
       Arena(std::move(arena)),
       SyntaxCache(syntaxCache),
       TokenCache(new RawSyntaxTokenCache()) {
+  StringRef BufferContent = SM.getEntireTextForBuffer(BufferID);
+  char *Data = (char *)Arena->Allocate(BufferContent.size(), alignof(char *));
+  std::uninitialized_copy(BufferContent.begin(), BufferContent.end(), Data);
+  ArenaSourceBuffer = StringRef(Data, BufferContent.size());
+  assert(ArenaSourceBuffer == BufferContent);
+  Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
+                               ArenaSourceBuffer.end());
 }
 
 SyntaxTreeCreator::~SyntaxTreeCreator() = default;
@@ -109,32 +116,29 @@ SyntaxTreeCreator::realizeSyntaxRoot(OpaqueSyntaxNode rootN,
   return rootNode;
 }
 
-OpaqueSyntaxNode
-SyntaxTreeCreator::recordToken(tok tokenKind,
-                               ArrayRef<ParsedTriviaPiece> leadingTriviaPieces,
-                               ArrayRef<ParsedTriviaPiece> trailingTriviaPieces,
-                               CharSourceRange range) {
-  size_t leadingTriviaLen =
-    ParsedTriviaPiece::getTotalLength(leadingTriviaPieces);
-  size_t trailingTriviaLen =
-    ParsedTriviaPiece::getTotalLength(trailingTriviaPieces);
-  SourceLoc tokLoc = range.getStart().getAdvancedLoc(leadingTriviaLen);
-  unsigned tokLength = range.getByteLength() -
-      leadingTriviaLen - trailingTriviaLen;
-  CharSourceRange tokRange = CharSourceRange{tokLoc, tokLength};
-  SourceLoc leadingTriviaLoc = range.getStart();
-  SourceLoc trailingTriviaLoc = tokLoc.getAdvancedLoc(tokLength);
-  Trivia syntaxLeadingTrivia =
-    ParsedTriviaPiece::convertToSyntaxTrivia(leadingTriviaPieces,
-                                             leadingTriviaLoc, SM, BufferID);
-  Trivia syntaxTrailingTrivia =
-    ParsedTriviaPiece::convertToSyntaxTrivia(trailingTriviaPieces,
-                                             trailingTriviaLoc, SM, BufferID);
-  StringRef tokenText = SM.extractText(tokRange, BufferID);
+OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
+                                                StringRef leadingTrivia,
+                                                StringRef trailingTrivia,
+                                                CharSourceRange range) {
+  unsigned tokLength =
+      range.getByteLength() - leadingTrivia.size() - trailingTrivia.size();
+  auto leadingTriviaStartOffset =
+      SM.getLocOffsetInBuffer(range.getStart(), BufferID);
+  auto tokStartOffset = leadingTriviaStartOffset + leadingTrivia.size();
+  auto trailingTriviaStartOffset = tokStartOffset + tokLength;
+
+  // Get StringRefs of the token's texts that point into the syntax arena's
+  // buffer.
+  StringRef leadingTriviaText =
+      ArenaSourceBuffer.substr(leadingTriviaStartOffset, leadingTrivia.size());
+  StringRef tokenText = ArenaSourceBuffer.substr(tokStartOffset, tokLength);
+  StringRef trailingTriviaText = ArenaSourceBuffer.substr(
+      trailingTriviaStartOffset, trailingTrivia.size());
+
   auto ownedText = OwnedString::makeRefCounted(tokenText);
-  auto raw = TokenCache->getToken(Arena, tokenKind, range.getByteLength(),
-                                  ownedText, syntaxLeadingTrivia.Pieces,
-                                  syntaxTrailingTrivia.Pieces);
+  auto raw =
+      TokenCache->getToken(Arena, tokenKind, range.getByteLength(), ownedText,
+                           leadingTriviaText, trailingTriviaText);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;

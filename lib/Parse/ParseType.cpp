@@ -400,11 +400,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         Builder.useAsyncKeyword(SyntaxContext->popToken());
 
       auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
+      if (InputNode.is<ParsedTupleTypeSyntax>()) {
+        auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>();
         // Decompose TupleTypeSyntax and repack into FunctionType.
-        auto LeftParen = TupleTypeNode->getDeferredLeftParen();
-        auto Arguments = TupleTypeNode->getDeferredElements();
-        auto RightParen = TupleTypeNode->getDeferredRightParen();
+        auto LeftParen = TupleTypeNode.getDeferredLeftParen();
+        auto Arguments = TupleTypeNode.getDeferredElements();
+        auto RightParen = TupleTypeNode.getDeferredRightParen();
         Builder
           .useLeftParen(std::move(LeftParen))
           .useArguments(std::move(Arguments))

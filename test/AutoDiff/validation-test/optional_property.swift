@@ -16,7 +16,7 @@ struct Struct: Differentiable {
   var stored: Float
   var optional: Float?
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> Float {
     let s: Struct
     do {
@@ -49,7 +49,7 @@ struct StructTracked: Differentiable {
   var stored: NonresilientTracked<Float>
   var optional: NonresilientTracked<Float>?
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> NonresilientTracked<Float> {
     let s: StructTracked
     do {
@@ -68,7 +68,7 @@ struct StructGeneric<T: Differentiable>: Differentiable {
   var stored: T
   var optional: T?
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> T {
     let s: StructGeneric
     do {
@@ -117,7 +117,7 @@ struct Class: Differentiable {
     self.optional = optional
   }
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> Float {
     let c: Class
     do {
@@ -141,7 +141,7 @@ struct ClassTracked: Differentiable {
     self.optional = optional
   }
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> NonresilientTracked<Float> {
     let c: ClassTracked
     do {
@@ -165,7 +165,7 @@ struct ClassGeneric<T: Differentiable>: Differentiable {
     self.optional = optional
   }
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> T {
     let c: ClassGeneric
     do {

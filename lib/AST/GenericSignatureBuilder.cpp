@@ -5025,11 +5025,11 @@ public:
       return Action::Continue;
     }
 
-    // Infer requirements from `@differentiable` or `@differentiable(linear)`
-    // function types.
+    // Infer requirements from `@differentiable` function types.
     // For all non-`@noDerivative` parameter and result types:
-    // - `@differentiable`: add `T: Differentiable` requirement.
-    // - `@differentiable(linear)`: add
+    // - `@differentiable`, `@differentiable(_forward)`, or
+    //   `@differentiable(reverse)`: add `T: Differentiable` requirement.
+    // - `@differentiable(_linear)`: add
     //   `T: Differentiable`, `T == T.TangentVector` requirements.
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
       auto &ctx = Builder.getASTContext();

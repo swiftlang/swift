@@ -10,8 +10,8 @@ using namespace swift::syntax;
 
 TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
   {
-    auto LiteralToken = SyntaxFactory::makeIntegerLiteral("100", {}, {});
-    auto Sign = SyntaxFactory::makePrefixOperator("-", {}, {});
+    auto LiteralToken = SyntaxFactory::makeIntegerLiteral("100", "", "");
+    auto Sign = SyntaxFactory::makePrefixOperator("-", "", "");
     auto Literal = SyntaxFactory::makePrefixOperatorExpr(Sign,
       SyntaxFactory::makeIntegerLiteralExpr(LiteralToken));
 
@@ -22,7 +22,7 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
     ASSERT_EQ(Literal.getKind(), SyntaxKind::PrefixOperatorExpr);
   }
   {
-    auto LiteralToken = SyntaxFactory::makeIntegerLiteral("1_000", {}, {});
+    auto LiteralToken = SyntaxFactory::makeIntegerLiteral("1_000", "", "");
     auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
     auto Literal = SyntaxFactory::makeIntegerLiteralExpr(LiteralToken);
 
@@ -32,10 +32,11 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "1_000");
   }
   {
-    auto Literal = SyntaxFactory::makeBlankPrefixOperatorExpr()
-    .withOperatorToken(TokenSyntax::missingToken(tok::oper_prefix, ""))
-    .withPostfixExpression(SyntaxFactory::makeIntegerLiteralExpr(
-      SyntaxFactory::makeIntegerLiteral("0", {}, { Trivia::spaces(4) })));
+    auto Literal =
+        SyntaxFactory::makeBlankPrefixOperatorExpr()
+            .withOperatorToken(TokenSyntax::missingToken(tok::oper_prefix, ""))
+            .withPostfixExpression(SyntaxFactory::makeIntegerLiteralExpr(
+                SyntaxFactory::makeIntegerLiteral("0", "", "    ")));
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
@@ -44,8 +45,8 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
   }
   {
     auto LiteralToken =
-      SyntaxFactory::makeIntegerLiteral("1_000_000_000_000", {}, {});
-    auto PlusSign = SyntaxFactory::makePrefixOperator("+", {}, {});
+        SyntaxFactory::makeIntegerLiteral("1_000_000_000_000", "", "");
+    auto PlusSign = SyntaxFactory::makePrefixOperator("+", "", "");
     auto OneThousand = SyntaxFactory::makePrefixOperatorExpr(PlusSign,
       SyntaxFactory::makeIntegerLiteralExpr(LiteralToken));
 
@@ -60,15 +61,14 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
 
 TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
   {
-    auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
-    auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
+    auto Array = SyntaxFactory::makeIdentifier("Array", "", "");
+    auto Int = SyntaxFactory::makeIdentifier("Int", "", "");
     auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
     auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
     GenericArgumentClauseSyntaxBuilder ArgBuilder;
-    ArgBuilder
-      .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
-      .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-      .addArgument(GenericArg);
+    ArgBuilder.useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken("", ""))
+        .useRightAngleBracket(SyntaxFactory::makeRightAngleToken("", ""))
+        .addArgument(GenericArg);
 
     auto GenericArgs = ArgBuilder.build();
 
@@ -90,15 +90,14 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprGetAPIs) {
 }
 
 TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
-  auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
-  auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
+  auto Array = SyntaxFactory::makeIdentifier("Array", "", "");
+  auto Int = SyntaxFactory::makeIdentifier("Int", "", "");
   auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
-  ArgBuilder
-    .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
-    .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addArgument(GenericArg);
+  ArgBuilder.useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken("", ""))
+      .useRightAngleBracket(SyntaxFactory::makeRightAngleToken("", ""))
+      .addArgument(GenericArg);
   auto GenericArgs = ArgBuilder.build();
 
   {
@@ -109,7 +108,7 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
   }
 
   {
-    auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
+    auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     auto BlankArgs = SyntaxFactory::makeBlankGenericArgumentClause();
@@ -127,15 +126,14 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprMakeAPIs) {
 }
 
 TEST(ExprSyntaxTests, SymbolicReferenceExprWithAPIs) {
-  auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
-  auto Int = SyntaxFactory::makeIdentifier("Int", {}, {});
+  auto Array = SyntaxFactory::makeIdentifier("Array", "", "");
+  auto Int = SyntaxFactory::makeIdentifier("Int", "", "");
   auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None);
   auto GenericArg = SyntaxFactory::makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder;
-  ArgBuilder
-    .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
-    .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addArgument(GenericArg);
+  ArgBuilder.useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken("", ""))
+      .useRightAngleBracket(SyntaxFactory::makeRightAngleToken("", ""))
+      .addArgument(GenericArg);
   auto GenericArgs = ArgBuilder.build();
 
   {
@@ -168,11 +166,11 @@ TEST(ExprSyntaxTests, SymbolicReferenceExprWithAPIs) {
 #pragma mark - function-call-argument
 
 TEST(ExprSyntaxTests, TupleExprElementGetAPIs) {
-  auto X = SyntaxFactory::makeIdentifier("x", {}, {});
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
-  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto X = SyntaxFactory::makeIdentifier("x", "", "");
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
+  auto Colon = SyntaxFactory::makeColonToken("", " ");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
 
   {
     auto Arg = SyntaxFactory::makeTupleExprElement(X, Colon, SymbolicRef,
@@ -194,11 +192,11 @@ TEST(ExprSyntaxTests, TupleExprElementGetAPIs) {
 }
 
 TEST(ExprSyntaxTests, TupleExprElementMakeAPIs) {
-  auto X = SyntaxFactory::makeIdentifier("x", {}, {});
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
-  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto X = SyntaxFactory::makeIdentifier("x", "", "");
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
+  auto Colon = SyntaxFactory::makeColonToken("", " ");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
 
   {
     llvm::SmallString<48> Scratch;
@@ -225,11 +223,11 @@ TEST(ExprSyntaxTests, TupleExprElementMakeAPIs) {
 }
 
 TEST(ExprSyntaxTests, TupleExprElementWithAPIs) {
-  auto X = SyntaxFactory::makeIdentifier("x", {}, {});
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
-  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto X = SyntaxFactory::makeIdentifier("x", "", "");
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
+  auto Colon = SyntaxFactory::makeColonToken("", " ");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
 
   {
     llvm::SmallString<48> Scratch;
@@ -248,13 +246,13 @@ TEST(ExprSyntaxTests, TupleExprElementWithAPIs) {
 
 namespace {
 TupleExprElementListSyntax getFullArgumentList() {
-  auto X = SyntaxFactory::makeIdentifier("x", {}, {});
-  auto Y = SyntaxFactory::makeIdentifier("y", {}, {});
-  auto Z = SyntaxFactory::makeIdentifier("z", {}, {});
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
-  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto X = SyntaxFactory::makeIdentifier("x", "", "");
+  auto Y = SyntaxFactory::makeIdentifier("y", "", "");
+  auto Z = SyntaxFactory::makeIdentifier("z", "", "");
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
+  auto Colon = SyntaxFactory::makeColonToken("", " ");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 
   auto Arg = SyntaxFactory::makeTupleExprElement(X, Colon, SymbolicRef,
@@ -269,13 +267,13 @@ TupleExprElementListSyntax getFullArgumentList() {
 
 TupleExprElementListSyntax getLabellessArgumentList() {
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
-  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto TwoDigits = SyntaxFactory::makeIntegerLiteral("2", {}, {});
-  auto ThreeDigits = SyntaxFactory::makeIntegerLiteral("3", {}, {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", "", "");
+  auto TwoDigits = SyntaxFactory::makeIntegerLiteral("2", "", "");
+  auto ThreeDigits = SyntaxFactory::makeIntegerLiteral("3", "", "");
   auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits);
   auto NoLabel = TokenSyntax::missingToken(tok::identifier, "");
   auto NoColon = TokenSyntax::missingToken(tok::colon, ":");
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
   auto Two = SyntaxFactory::makeIntegerLiteralExpr(TwoDigits);
   auto Three = SyntaxFactory::makeIntegerLiteralExpr(ThreeDigits);
@@ -296,13 +294,13 @@ TupleExprElementListSyntax getLabellessArgumentList() {
 } // end anonymous namespace
 
 TEST(ExprSyntaxTests, TupleExprElementListGetAPIs) {
-  auto X = SyntaxFactory::makeIdentifier("x", {}, {});
-  auto Y = SyntaxFactory::makeIdentifier("y", {}, {});
-  auto Z = SyntaxFactory::makeIdentifier("z", {}, {});
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
-  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto X = SyntaxFactory::makeIdentifier("x", "", "");
+  auto Y = SyntaxFactory::makeIdentifier("y", "", "");
+  auto Z = SyntaxFactory::makeIdentifier("z", "", "");
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
+  auto Colon = SyntaxFactory::makeColonToken("", " ");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 
   auto Arg = SyntaxFactory::makeTupleExprElement(X, Colon, SymbolicRef,
@@ -355,14 +353,14 @@ TEST(ExprSyntaxTests, TupleExprElementListMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "");
   }
   {
-    auto X = SyntaxFactory::makeIdentifier("x", {}, {});
-    auto Y = SyntaxFactory::makeIdentifier("y", {}, {});
-    auto Z = SyntaxFactory::makeIdentifier("z", {}, {});
-    auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
-    auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+    auto X = SyntaxFactory::makeIdentifier("x", "", "");
+    auto Y = SyntaxFactory::makeIdentifier("y", "", "");
+    auto Z = SyntaxFactory::makeIdentifier("z", "", "");
+    auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
+    auto Colon = SyntaxFactory::makeColonToken("", " ");
     auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo,
                                                                 llvm::None);
-    auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+    auto Comma = SyntaxFactory::makeCommaToken("", " ");
     auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
 
     auto Arg = SyntaxFactory::makeTupleExprElement(X, Colon, SymbolicRef,
@@ -394,11 +392,11 @@ TEST(ExprSyntaxTests, TupleExprElementListWithAPIs) {
 #pragma mark - function-call-expression
 
 TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto LeftParen = SyntaxFactory::makeLeftParenToken("", "");
   auto ArgList = getFullArgumentList();
-  auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
+  auto RightParen = SyntaxFactory::makeRightParenToken("", "");
 
   auto Call = SyntaxFactory::makeFunctionCallExpr(
       SymbolicRef, LeftParen, ArgList, RightParen, None, None);
@@ -428,11 +426,11 @@ TEST(ExprSyntaxTests, FunctionCallExprGetAPIs) {
 }
 
 TEST(ExprSyntaxTests, FunctionCallExprMakeAPIs) {
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto LeftParen = SyntaxFactory::makeLeftParenToken("", "");
   auto ArgList = getFullArgumentList();
-  auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
+  auto RightParen = SyntaxFactory::makeRightParenToken("", "");
 
   {
     auto Call = SyntaxFactory::makeFunctionCallExpr(
@@ -452,11 +450,11 @@ TEST(ExprSyntaxTests, FunctionCallExprMakeAPIs) {
 }
 
 TEST(ExprSyntaxTests, FunctionCallExprWithAPIs) {
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
+  auto LeftParen = SyntaxFactory::makeLeftParenToken("", "");
   auto ArgList = getFullArgumentList();
-  auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
+  auto RightParen = SyntaxFactory::makeRightParenToken("", "");
 
   {
     llvm::SmallString<64> Scratch;
@@ -491,8 +489,8 @@ TEST(ExprSyntaxTests, FunctionCallExprBuilderAPIs) {
     ASSERT_EQ(OS.str().str(), "");
   }
 
-  auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
-  auto RightParen = SyntaxFactory::makeRightParenToken({}, {});
+  auto LeftParen = SyntaxFactory::makeLeftParenToken("", "");
+  auto RightParen = SyntaxFactory::makeRightParenToken("", "");
 
   {
     llvm::SmallString<64> Scratch;
@@ -504,15 +502,15 @@ TEST(ExprSyntaxTests, FunctionCallExprBuilderAPIs) {
   }
 
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
-  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {});
-  auto TwoDigits = SyntaxFactory::makeIntegerLiteral("2", {}, {});
-  auto ThreeDigits = SyntaxFactory::makeIntegerLiteral("3", {}, {});
+  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", "", "");
+  auto TwoDigits = SyntaxFactory::makeIntegerLiteral("2", "", "");
+  auto ThreeDigits = SyntaxFactory::makeIntegerLiteral("3", "", "");
   auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits);
   auto NoLabel = TokenSyntax::missingToken(tok::identifier, "");
   auto NoColon = TokenSyntax::missingToken(tok::colon, ":");
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
 
   {

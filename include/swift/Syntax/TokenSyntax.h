@@ -39,22 +39,22 @@ public:
     return makeRoot<TokenSyntax>(RawSyntax::missing(Kind, Text));
   }
 
-  Trivia getLeadingTrivia() const {
-    return Trivia { getRaw()->getLeadingTrivia().vec() };
+  StringRef getLeadingTrivia() const { return getRaw()->getLeadingTrivia(); }
+  Trivia getLeadingTriviaPieces() const { return getRaw()->getLeadingTriviaPieces(); }
+
+  StringRef getTrailingTrivia() const { return getRaw()->getTrailingTrivia(); }
+  Trivia getTrailingTriviaPieces() const {
+    return getRaw()->getTrailingTriviaPieces();
   }
 
-  Trivia getTrailingTrivia() const {
-    return Trivia { getRaw()->getTrailingTrivia().vec() };
+  TokenSyntax withLeadingTrivia(StringRef Trivia) const {
+    auto NewRaw = getRaw()->withLeadingTrivia(Trivia);
+    return TokenSyntax(getData().replacingSelf(NewRaw));
   }
 
-  TokenSyntax withLeadingTrivia(const Trivia &Trivia) const {
-    auto NewRaw = getRaw()->withLeadingTrivia(Trivia.Pieces);
-    return TokenSyntax(Data.replacingSelf(NewRaw));
-  }
-
-  TokenSyntax withTrailingTrivia(const Trivia &Trivia) const {
-    auto NewRaw = getRaw()->withTrailingTrivia(Trivia.Pieces);
-    return TokenSyntax(Data.replacingSelf(NewRaw));
+  TokenSyntax withTrailingTrivia(StringRef Trivia) const {
+    auto NewRaw = getRaw()->withTrailingTrivia(Trivia);
+    return TokenSyntax(getData().replacingSelf(NewRaw));
   }
 
   /* TODO: If we really need them.

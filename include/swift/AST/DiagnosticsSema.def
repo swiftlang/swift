@@ -1282,14 +1282,11 @@ ERROR(c_function_pointer_from_method,none,
 ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
-ERROR(unsupported_linear_to_differentiable_conversion,none,
-      "conversion from '@differentiable(linear)' to '@differentiable' is not "
-      "yet supported", ())
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
 ERROR(invalid_differentiable_function_conversion_expr,none,
-      "a '@differentiable%select{|(linear)}0' function can only be formed from "
-      "a reference to a 'func' or 'init' or a literal closure", (bool))
+      "a '@differentiable' function can only be formed from "
+      "a reference to a 'func' or 'init' or a literal closure", ())
 NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_pointer_conversion,none,
@@ -3109,9 +3106,6 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
       (Identifier, Identifier))
 
 // @differentiable
-ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
-      "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
-      "attribute for transpose registration instead", ())
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclNameRef, Type))
 // TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
@@ -4551,14 +4545,14 @@ ERROR(attr_only_on_parameters_of_differentiable,none,
 ERROR(differentiable_function_type_invalid_parameter,none,
       "parameter type '%0' does not conform to 'Differentiable'"
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
-      "function type is '@differentiable%select{|(linear)}1'"
+      "function type is '@differentiable%select{|(_linear)}1'"
       "%select{|; did you want to add '@noDerivative' to this parameter?}2",
       (StringRef, /*isLinear*/ bool,
        /*hasValidDifferentiabilityParameter*/ bool))
 ERROR(differentiable_function_type_invalid_result,none,
       "result type '%0' does not conform to 'Differentiable'"
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
-      "function type is '@differentiable%select{|(linear)}1'",
+      "function type is '@differentiable%select{|(_linear)}1'",
       (StringRef, bool))
 ERROR(differentiable_function_type_no_differentiability_parameters, 
       none,

@@ -8956,7 +8956,7 @@ public:
 };
 
 /// LinearFunctionInst - given a function, its derivative and traspose functions,
-/// create an `@differentiable(linear)` function that represents a bundle of these.
+/// create an `@differentiable(_linear)` function that represents a bundle of these.
 class LinearFunctionInst final
     : public InstructionBaseWithTrailingOperands<
           SILInstructionKind::LinearFunctionInst, LinearFunctionInst,
@@ -9036,7 +9036,7 @@ public:
   bool hasExplicitExtracteeType() const { return HasExplicitExtracteeType; }
 };
 
-/// LinearFunctionExtractInst - given an `@differentiable(linear)` function
+/// LinearFunctionExtractInst - given an `@differentiable(_linear)` function
 /// representing a bundle of the original function and the transpose function,
 /// extract the specified function.
 class LinearFunctionExtractInst

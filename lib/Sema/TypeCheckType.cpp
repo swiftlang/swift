@@ -2279,8 +2279,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       if (attrs.has(TAK_differentiable)) {
         auto *SF = getDeclContext()->getParentSourceFile();
         if (SF && isDifferentiableProgrammingEnabled(*SF)) {
-          diffKind = attrs.linear ? DifferentiabilityKind::Linear
-                                  : DifferentiabilityKind::Normal;
+          diffKind = attrs.differentiabilityKind;
         } else {
           diagnoseInvalid(
               repr, attrs.getLoc(TAK_differentiable),
@@ -2329,8 +2328,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       if (attrs.has(TAK_differentiable)) {
         auto *SF = getDeclContext()->getParentSourceFile();
         if (SF && isDifferentiableProgrammingEnabled(*SF)) {
-          diffKind = attrs.linear ? DifferentiabilityKind::Linear
-                                  : DifferentiabilityKind::Normal;
+          diffKind = attrs.differentiabilityKind;
         } else {
           diagnoseInvalid(
               repr, attrs.getLoc(TAK_differentiable),
@@ -2654,14 +2652,14 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
-  // All non-`@noDerivative` parameters of `@differentiable` and
-  // `@differentiable(linear)` function types must be differentiable.
+  // All non-`@noDerivative` parameters of `@differentiable` function types must
+  // be differentiable.
   if (diffKind != DifferentiabilityKind::NonDifferentiable &&
       resolution.getStage() != TypeResolutionStage::Structural) {
     bool isLinear = diffKind == DifferentiabilityKind::Linear;
     // Emit `@noDerivative` fixit only if there is at least one valid
-    // differentiability/linearity parameter. Otherwise, adding `@noDerivative`
-    // produces an ill-formed function type.
+    // differentiability parameter. Otherwise, adding `@noDerivative` produces
+    // an ill-formed function type.
     auto hasValidDifferentiabilityParam =
         llvm::find_if(elements, [&](AnyFunctionType::Param param) {
           if (param.isNoDerivative())
@@ -2857,8 +2855,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     break;
   }
 
-  // `@differentiable` and `@differentiable(linear)` function types must return
-  // a differentiable type.
+  // `@differentiable` function types must return a differentiable type.
   if (extInfo.isDifferentiable() &&
       resolution.getStage() != TypeResolutionStage::Structural) {
     bool isLinear = diffKind == DifferentiabilityKind::Linear;

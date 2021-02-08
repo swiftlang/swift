@@ -19,9 +19,9 @@ func vjpInoutDirect(_ x: Float, _ y: inout Double, _ z: Float) -> (
 }
 
 SubsetParameterThunkTests.test("InoutParametersDirect") {
-  @differentiable(wrt: x)
-  @differentiable(wrt: y)
-  @differentiable(wrt: z)
+  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: y)
+  @differentiable(reverse, wrt: z)
   func inoutDirectCaller(_ x: Float, _ y: Double, _ z: Float) -> Double {
     var result = y
     inoutDirect(x, &result, z)
@@ -53,10 +53,10 @@ func vjpInoutIndirect<T: Differentiable, U: Differentiable, V: Differentiable>(
 }
 
 SubsetParameterThunkTests.test("InoutParametersIndirect") {
-  @differentiable(wrt: x)
-  @differentiable(wrt: y)
-  @differentiable(wrt: z)
-  @differentiable
+  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: y)
+  @differentiable(reverse, wrt: z)
+  @differentiable(reverse)
   func inoutIndirectCaller<T: Differentiable, U: Differentiable, V: Differentiable>(
     _ x: T, _ y: U, _ z: V
   ) -> U {

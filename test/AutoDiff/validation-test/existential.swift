@@ -7,7 +7,7 @@ import DifferentiationUnittest
 var ExistentialTests = TestSuite("Existential")
 
 protocol A {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func a(_ x: Tracked<Float>) -> Tracked<Float>
 }
 func b(g: A) -> Tracked<Float> {
@@ -15,7 +15,7 @@ func b(g: A) -> Tracked<Float> {
 }
 
 struct B : A {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func a(_ x: Tracked<Float>) -> Tracked<Float> { return x * 5 }
 }
 

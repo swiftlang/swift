@@ -549,8 +549,8 @@ Types
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
   FUNCTION-KIND ::= 'F'                      // @differentiable function type
   FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
-  FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
-  FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
+  FUNCTION-KIND ::= 'H'                      // @differentiable(_linear) function type
+  FUNCTION-KIND ::= 'I'                      // @differentiable(_linear) function type (escaping)
 
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
@@ -632,9 +632,10 @@ mangled in to disambiguate.
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
 
-  DIFFERENTIABILITY-KIND ::= DIFFERENTIABLE | LINEAR
-  DIFFERENTIABLE ::= 'd'                     // @differentiable
-  LINEAR ::= 'l'                             // @differentiable(linear)
+  DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable
+  DIFFERENTIABILITY-KIND ::= 'l'             // @differentiable(_linear)
+  DIFFERENTIABILITY-KIND ::= 'f'             // @differentiable(_forward)
+  DIFFERENTIABILITY-KIND ::= 'r'             // @differentiable(reverse)
 
   CALLEE-CONVENTION ::= 'y'                  // @callee_unowned
   CALLEE-CONVENTION ::= 'g'                  // @callee_guaranteed

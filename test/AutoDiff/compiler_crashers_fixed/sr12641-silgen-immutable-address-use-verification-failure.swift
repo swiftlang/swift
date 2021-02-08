@@ -39,7 +39,7 @@ class LoadableOriginal<T: Differentiable>: Differentiable {
   init(_ x: T) { self.x = x }
 }
 
-@differentiable
+@differentiable(reverse)
 func loadableOriginal<T: AdditiveArithmetic>(_ loadable: LoadableOriginal<T>) -> T {
   return T.zero
 }

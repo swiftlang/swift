@@ -6,7 +6,7 @@ import DifferentiationUnittest
 
 var SupersetVJPTests = TestSuite("SupersetVJP")
 
-@differentiable(wrt: (x, y))
+@differentiable(reverse, wrt: (x, y))
 func mulxy(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   // use control flow to prevent AD; NB fix when control flow is supported
   if x > 1000 {
@@ -39,7 +39,7 @@ SupersetVJPTests.testWithLeakChecking("CrossModuleClosure") {
 }
 
 SupersetVJPTests.testWithLeakChecking("SubsetOfSubset") {
-  @differentiable(wrt: (x, z))
+  @differentiable(reverse, wrt: (x, z))
   func foo(_ x: Tracked<Float>, _ y: Tracked<Float>, _ z: Tracked<Float>) -> Tracked<Float> {
     withoutDerivative(at: 0)
   }
@@ -48,8 +48,8 @@ SupersetVJPTests.testWithLeakChecking("SubsetOfSubset") {
 
 SupersetVJPTests.test("ApplySubset") {
   // TF-914
-  @differentiable(wrt: x)
-  func foo<T: Differentiable>(_ x: T, _ y: T, apply: @differentiable (T, T) -> T) -> T {
+  @differentiable(reverse, wrt: x)
+  func foo<T: Differentiable>(_ x: T, _ y: T, apply: @differentiable(reverse) (T, T) -> T) -> T {
     return apply(x, y)
   }
   expectEqual(1, gradient(at: Tracked<Float>(0)) { x in foo(x, 0) { $0 + $1 } })
@@ -60,7 +60,7 @@ SupersetVJPTests.test("CrossModule") {
   expectEqual(Float(1), grad)
 }
 
-@differentiable(wrt: (x, y))
+@differentiable(reverse, wrt: (x, y))
 func x_T<T : Differentiable>(_ x: Tracked<Float>, _ y: T) -> Tracked<Float> {
   if x > 1000 { return x }
   return x

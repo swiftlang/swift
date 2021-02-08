@@ -20,7 +20,7 @@ extension TangentSpace : Differentiable {
 struct Space {
   /// `x` is a computed property with a custom vjp.
   var x: Tracked<Float> {
-    @differentiable
+    @differentiable(reverse)
     get { storedX }
     set { storedX = newValue }
   }
@@ -32,7 +32,7 @@ struct Space {
 
   private var storedX: Tracked<Float>
 
-  @differentiable
+  @differentiable(reverse)
   var y: Tracked<Float>
 
   init(x: Tracked<Float>, y: Tracked<Float>) {
@@ -67,7 +67,7 @@ E2EDifferentiablePropertyTests.testWithLeakChecking("stored property") {
 
 struct GenericMemberWrapper<T : Differentiable> : Differentiable {
   // Stored property.
-  @differentiable
+  @differentiable(reverse)
   var x: T
 
   func vjpX() -> (T, (T.TangentVector) -> GenericMemberWrapper.TangentVector) {
@@ -132,7 +132,7 @@ E2EDifferentiablePropertyTests.testWithLeakChecking("fieldwise product space, ot
 E2EDifferentiablePropertyTests.testWithLeakChecking("computed property") {
   struct TF_544 : Differentiable {
     var value: Tracked<Float>
-    @differentiable
+    @differentiable(reverse)
     var computed: Tracked<Float> {
       get { value }
       set { value = newValue }

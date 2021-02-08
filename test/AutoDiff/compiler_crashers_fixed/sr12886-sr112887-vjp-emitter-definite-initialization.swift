@@ -30,7 +30,7 @@ struct Tensor<T>: Differentiable {
   }
 
   // Definite initialization triggers for this initializer.
-  @differentiable
+  @differentiable(reverse)
   init(_ x: T, _ other: Self) {
     self = Self(x, Enum.a)
   }

@@ -756,11 +756,13 @@ enum class FunctionMetadataConvention: uint8_t {
 };
 
 /// Differentiability kind for function type metadata.
-/// Duplicates `DifferentiabilityKind` in AutoDiff.h.
+/// Duplicates `DifferentiabilityKind` in AST/AutoDiff.h.
 enum class FunctionMetadataDifferentiabilityKind: uint8_t {
-  NonDifferentiable = 0b00,
-  Normal = 0b01,
-  Linear = 0b11
+  NonDifferentiable = 0b00000,
+  Forward           = 0b00001,
+  Reverse           = 0b00010,
+  Normal            = 0b00011,
+  Linear            = 0b10000,
 };
 
 /// Flags in a function type metadata record.
@@ -770,16 +772,16 @@ class TargetFunctionTypeFlags {
   // one of the flag bits could be used to identify that the rest of
   // the flags is going to be stored somewhere else in the metadata.
   enum : int_type {
-    NumParametersMask = 0x0000FFFFU,
-    ConventionMask    = 0x00FF0000U,
-    ConventionShift   = 16U,
-    ThrowsMask        = 0x01000000U,
-    ParamFlagsMask    = 0x02000000U,
-    EscapingMask      = 0x04000000U,
-    DifferentiableMask = 0x08000000U,
-    LinearMask        = 0x10000000U,
-    AsyncMask         = 0x20000000U,
-    ConcurrentMask    = 0x40000000U,
+    NumParametersMask      = 0x0000FFFFU,
+    ConventionMask         = 0x00FF0000U,
+    ConventionShift        = 16U,
+    ThrowsMask             = 0x01000000U,
+    ParamFlagsMask         = 0x02000000U,
+    EscapingMask           = 0x04000000U,
+    DifferentiabilityMask  = 0x98000000U,
+    DifferentiabilityShift = 27U,
+    AsyncMask              = 0x20000000U,
+    ConcurrentMask         = 0x40000000U,
   };
   int_type Data;
   
@@ -811,13 +813,9 @@ public:
   }
 
   constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
-      FunctionMetadataDifferentiabilityKind differentiability) const {
-    return TargetFunctionTypeFlags<int_type>(
-        (Data & ~DifferentiableMask & ~LinearMask) |
-        (differentiability == FunctionMetadataDifferentiabilityKind::Normal
-             ? DifferentiableMask : 0) |
-        (differentiability == FunctionMetadataDifferentiabilityKind::Linear
-             ? LinearMask : 0));
+      FunctionMetadataDifferentiabilityKind differentiabilityKind) const {
+    return TargetFunctionTypeFlags((Data & ~DifferentiabilityMask)
+        | (int_type(differentiabilityKind) << DifferentiabilityShift));
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
@@ -860,16 +858,13 @@ public:
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
 
   bool isDifferentiable() const {
-    return getDifferentiabilityKind() >=
-        FunctionMetadataDifferentiabilityKind::Normal;
+    return getDifferentiabilityKind() !=
+        FunctionMetadataDifferentiabilityKind::NonDifferentiable;
   }
 
   FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
-    if (bool(Data & DifferentiableMask))
-      return FunctionMetadataDifferentiabilityKind::Normal;
-    if (bool(Data & LinearMask))
-      return FunctionMetadataDifferentiabilityKind::Linear;
-    return FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+    return FunctionMetadataDifferentiabilityKind(
+        (Data & DifferentiabilityMask) >> DifferentiabilityShift);
   }
 
   int_type getIntValue() const {

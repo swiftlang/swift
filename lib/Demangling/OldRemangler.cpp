@@ -1325,14 +1325,9 @@ void Remangler::mangleImplYield(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
-void Remangler::mangleImplDifferentiable(Node *node) {
+void Remangler::mangleImplDifferentiabilityKind(Node *node) {
   // TODO(TF-750): Check if this code path actually triggers and add a test.
-  Buffer << 'd';
-}
-
-void Remangler::mangleImplLinear(Node *node) {
-  // TODO(TF-750): Check if this code path actually triggers and add a test.
-  Buffer << 'l';
+  Buffer << (char)node->getIndex();
 }
 
 void Remangler::mangleImplEscaping(Node *node) {
@@ -1373,8 +1368,8 @@ void Remangler::mangleImplConvention(Node *node) {
   }
 }
 
-void Remangler::mangleImplDifferentiability(Node *node) {
-  assert(node->getKind() == Node::Kind::ImplDifferentiability);
+void Remangler::mangleImplParameterResultDifferentiability(Node *node) {
+  assert(node->getKind() == Node::Kind::ImplDifferentiabilityKind);
   StringRef text = node->getText();
   // Empty string represents default differentiability.
   if (text.empty())

@@ -360,7 +360,7 @@ extension Wrapper where T: Differentiable, T == T.TangentVector {
 // Test class methods.
 
 class Super {
-  @differentiable
+  @differentiable(reverse)
   // expected-note @+1 {{candidate instance method is not defined in the current type context}}
   func foo(_ x: Float) -> Float {
     return x

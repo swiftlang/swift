@@ -54,8 +54,7 @@ func CheckParameterList(arg1: String..., arg2: Int) {
 // CHECK: "kind":"r_brace"
 }
 
-// CHECK: "leadingTrivia":[
-// CHECK: "kind":"LineComment",
-// CHECK: "value":"\/\/ Comment at the end of the file"
+// CHECK: "leadingTrivia":"\n\/\/ Comment at the end of the file\n"
 
+func separator() {}
 // Comment at the end of the file

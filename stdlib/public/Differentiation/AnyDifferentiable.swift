@@ -74,7 +74,7 @@ public struct AnyDifferentiable: Differentiable {
   }
 
   /// Creates a type-erased derivative from the given derivative.
-  @differentiable
+  @differentiable(reverse)
   public init<T: Differentiable>(_ base: T) {
     self._box = _ConcreteDifferentiableBox<T>(base)
   }
@@ -254,7 +254,7 @@ public struct AnyDerivative: Differentiable & AdditiveArithmetic {
 
   /// Creates a type-erased derivative from the given derivative.
   @inlinable
-  @differentiable
+  @differentiable(reverse)
   public init<T>(_ base: T) where T: Differentiable, T.TangentVector == T {
     self._box = _ConcreteDerivativeBox<T>(base)
   }

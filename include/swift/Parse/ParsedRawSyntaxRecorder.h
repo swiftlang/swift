@@ -37,20 +37,19 @@ namespace syntax {
   enum class SyntaxKind;
 }
 
-class ParsedRawSyntaxRecorder {
+class ParsedRawSyntaxRecorder final {
   std::shared_ptr<SyntaxParseActions> SPActions;
 
 public:
   explicit ParsedRawSyntaxRecorder(std::shared_ptr<SyntaxParseActions> spActions)
     : SPActions(std::move(spActions)) {}
 
-  ParsedRawSyntaxNode recordToken(const Token &tok,
-                                  const ParsedTrivia &leadingTrivia,
-                                  const ParsedTrivia &trailingTrivia);
+  ParsedRawSyntaxNode recordToken(const Token &tok, StringRef leadingTrivia,
+                                  StringRef trailingTrivia);
 
   ParsedRawSyntaxNode recordToken(tok tokenKind, CharSourceRange tokenRange,
-                                  ArrayRef<ParsedTriviaPiece> leadingTrivia,
-                                  ArrayRef<ParsedTriviaPiece> trailingTrivia);
+                                  StringRef leadingTrivia,
+                                  StringRef trailingTrivia);
 
   /// Record a missing token. \p loc can be invalid or an approximate location
   /// of where the token would be if not missing.

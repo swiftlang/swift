@@ -44,7 +44,7 @@ public:
       : Obj(Obj), IDRef(IDRef) {}
 
   /// Retrieve assciated RawSyntax.
-  RC<syntax::RawSyntax> get() { return Obj; }
+  const RC<syntax::RawSyntax> &get() { return Obj; }
 
   // Only allow allocation of Node using the allocator in SyntaxArena.
   void *operator new(size_t Bytes, RC<syntax::SyntaxArena> &Arena,
@@ -63,8 +63,8 @@ class RawSyntaxTokenCache {
 public:
   RC<syntax::RawSyntax> getToken(RC<syntax::SyntaxArena> &Arena, tok TokKind,
                                  size_t TextLength, OwnedString Text,
-                                 ArrayRef<syntax::TriviaPiece> LeadingTrivia,
-                                 ArrayRef<syntax::TriviaPiece> TrailingTrivia);
+                                 StringRef LeadingTrivia,
+                                 StringRef TrailingTrivia);
 
   ~RawSyntaxTokenCache();
 };

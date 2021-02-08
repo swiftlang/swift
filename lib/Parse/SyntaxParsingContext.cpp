@@ -18,8 +18,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Parse/ParsedSyntax.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
+#include "swift/Parse/ParsedSyntax.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingCache.h"
@@ -203,18 +203,18 @@ ParsedTokenSyntax SyntaxParsingContext::popToken() {
 }
 
 /// Add Token with Trivia to the parts.
-void SyntaxParsingContext::addToken(Token &Tok,
-                                    const ParsedTrivia &LeadingTrivia,
-                                    const ParsedTrivia &TrailingTrivia) {
+void SyntaxParsingContext::addToken(Token &Tok, StringRef LeadingTrivia,
+                                    StringRef TrailingTrivia) {
   if (!Enabled)
     return;
 
   ParsedRawSyntaxNode raw;
-  if (shouldDefer())
+  if (shouldDefer()) {
     raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
                                             *this);
-  else
+  } else {
     raw = getRecorder().recordToken(Tok, LeadingTrivia, TrailingTrivia);
+  }
   addRawSyntax(std::move(raw));
 }
 

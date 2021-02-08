@@ -7,10 +7,10 @@ import DifferentiationUnittest
 var SimpleModelTests = TestSuite("SimpleModel")
 
 struct DenseLayer : Equatable {
-  @differentiable
+  @differentiable(reverse)
   let w: Tracked<Float>
 
-  @differentiable
+  @differentiable(reverse)
   let b: Tracked<Float>
 }
 
@@ -41,13 +41,13 @@ extension DenseLayer {
 }
 
 struct Model : Equatable {
-  @differentiable
+  @differentiable(reverse)
   let l1: DenseLayer
 
-  @differentiable
+  @differentiable(reverse)
   let l2: DenseLayer
 
-  @differentiable
+  @differentiable(reverse)
   let l3: DenseLayer
 }
 

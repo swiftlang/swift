@@ -7,11 +7,11 @@
 
 import _Differentiation
 
-func a(_ f: @differentiable (Float) -> Float) {}
-// CHECK: func a(_ f: @differentiable (Float) -> Float)
+func a(_ f: @differentiable(reverse) (Float) -> Float) {}
+// CHECK: func a(_ f: @differentiable(reverse) (Float) -> Float)
 
-func b(_ f: @differentiable(linear) (Float) -> Float) {}
-// CHECK: func b(_ f: @differentiable(linear) (Float) -> Float)
+func b(_ f: @differentiable(_linear) (Float) -> Float) {}
+// CHECK: func b(_ f: @differentiable(_linear) (Float) -> Float)
 
-func c(_ f: @differentiable (Float, @noDerivative Float) -> Float) {}
-// CHECK: func c(_ f: @differentiable (Float, @noDerivative Float) -> Float)
+func c(_ f: @differentiable(reverse) (Float, @noDerivative Float) -> Float) {}
+// CHECK: func c(_ f: @differentiable(reverse) (Float, @noDerivative Float) -> Float)

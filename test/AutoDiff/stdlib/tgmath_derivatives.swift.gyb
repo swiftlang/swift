@@ -50,7 +50,7 @@ func computeDividedDifference<T: BinaryFloatingPoint> (
 }
 
 func checkGradient<T: BinaryFloatingPoint & Differentiable>(
-  _ f: @differentiable (T, T) -> T,
+  _ f: @differentiable(reverse) (T, T) -> T,
   _ x: T,
   _ y: T,
   ulps: T = 192)
@@ -63,7 +63,7 @@ where T == T.TangentVector {
 }
 
 func checkDerivative<T: BinaryFloatingPoint & Differentiable>(
-  _ f: @differentiable (T, T) -> T,
+  _ f: @differentiable(reverse) (T, T) -> T,
   _ x: T,
   _ y: T,
   ulps: T = 192)

@@ -435,7 +435,7 @@ ERROR(autodiff_differentiation_module_not_imported,none,
       "Automatic differentiation requires the '_Differentiation' module to be "
       "imported", ())
 ERROR(autodiff_conversion_to_linear_function_not_supported,none,
-      "conversion to '@differentiable(linear)' function type is not yet "
+      "conversion to '@differentiable(_linear)' function type is not yet "
       "supported", ())
 ERROR(autodiff_function_not_differentiable_error,none,
       "function is not differentiable", ())
