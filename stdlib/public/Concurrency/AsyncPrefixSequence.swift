@@ -23,11 +23,14 @@ extension AsyncSequence {
 
 @frozen
 public struct AsyncPrefixSequence<Upstream: AsyncSequence> {
-  public let upstream: Upstream
-  public let maxLength: Int
+  @usableFromInline
+  let upstream: Upstream
 
-  @inlinable
-  public init(_ upstream: Upstream, maxLength: Int) {
+  @usableFromInline
+  let maxLength: Int
+
+  @usableFromInline
+  init(_ upstream: Upstream, maxLength: Int) {
     self.upstream = upstream
     self.maxLength = maxLength
   }

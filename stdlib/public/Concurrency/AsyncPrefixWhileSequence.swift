@@ -23,11 +23,14 @@ extension AsyncSequence {
 
 @frozen
 public struct AsyncPrefixWhileSequence<Upstream: AsyncSequence> {
-  public let upstream: Upstream
-  public let predicate: (Upstream.Element) async -> Bool
+  @usableFromInline
+  let upstream: Upstream
 
-  @inlinable
-  public init(
+  @usableFromInline
+  let predicate: (Upstream.Element) async -> Bool
+
+  @usableFromInline
+  init(
     _ upstream: Upstream, 
     predicate: @escaping (Upstream.Element) async -> Bool
   ) {

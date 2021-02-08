@@ -23,11 +23,14 @@ extension AsyncSequence {
 
 @frozen
 public struct AsyncFilterSequence<Upstream: AsyncSequence> {
-  public let upstream: Upstream
-  public let isIncluded: (Element) async -> Bool
+  @usableFromInline
+  let upstream: Upstream
 
-  @inlinable
-  public init(
+  @usableFromInline
+  let isIncluded: (Element) async -> Bool
+
+  @usableFromInline
+  init(
     _ upstream: Upstream, 
     isIncluded: @escaping (Upstream.Element) async -> Bool
   ) {

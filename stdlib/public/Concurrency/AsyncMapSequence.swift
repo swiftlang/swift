@@ -23,11 +23,14 @@ extension AsyncSequence {
 
 @frozen
 public struct AsyncMapSequence<Upstream: AsyncSequence, Transformed> {
-  public let upstream: Upstream
-  public let transform: (Upstream.Element) async -> Transformed
+  @usableFromInline
+  let upstream: Upstream
 
-  @inlinable
-  public init(
+  @usableFromInline
+  let transform: (Upstream.Element) async -> Transformed
+
+  @usableFromInline
+  init(
     _ upstream: Upstream, 
     transform: @escaping (Upstream.Element) async -> Transformed
   ) {

@@ -23,11 +23,14 @@ extension AsyncSequence {
 
 @frozen
 public struct AsyncDropFirstSequence<Upstream: AsyncSequence> {
-  public let upstream: Upstream
-  public let limit: Int
+  @usableFromInline
+  let upstream: Upstream
+
+  @usableFromInline
+  let limit: Int
   
-  @inlinable 
-  public init(_ upstream: Upstream, dropping limit: Int) {
+  @usableFromInline 
+  init(_ upstream: Upstream, dropping limit: Int) {
     precondition(limit >= 0, 
       "Can't drop a negative number of elements from an async sequence")
     self.upstream = upstream

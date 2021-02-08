@@ -23,11 +23,14 @@ extension AsyncSequence {
 
 @frozen
 public struct AsyncFailableCompactMapSequence<Upstream: AsyncSequence, ElementOfResult> {
-  public let upstream: Upstream
-  public let transform: (Upstream.Element) async throws -> ElementOfResult?
+  @usableFromInline
+  let upstream: Upstream
 
-  @inlinable
-  public init(
+  @usableFromInline
+  let transform: (Upstream.Element) async throws -> ElementOfResult?
+
+  @usableFromInline
+  init(
     _ upstream: Upstream, 
     transform: @escaping (Upstream.Element) async throws -> ElementOfResult?
   ) {
