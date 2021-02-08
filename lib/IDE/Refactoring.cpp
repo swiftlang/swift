@@ -4991,7 +4991,12 @@ private:
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;
     }
+
     auto Callback = dyn_cast<ClosureExpr>(ArgList.ref()[HandlerDesc.Index]);
+    auto Capture = dyn_cast<CaptureListExpr>(ArgList.ref()[HandlerDesc.Index]);
+    if (Capture) {
+      Callback = Capture->getClosureBody();
+    }
     if (!Callback) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;

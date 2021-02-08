@@ -171,7 +171,7 @@ func noParamAutoclosure(completion: @autoclosure () -> Void) { }
 // 2. Check that the various ways to call a function (and the positions the
 //    refactoring is called from) are handled correctly
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,TRAILING-ARG %s
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,CALL-ARG,MANY-CALL,MEMBER-CALL,MEMBER-CALL2,MEMBER-PARENS,EMPTY-CAPTURE,CAPTURE %s
 func testCalls() {
 // CONVERT-FUNC: {{^}}func testCalls() async {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+4):3 | %FileCheck -check-prefix=CALL %s
@@ -269,5 +269,20 @@ func testCalls() {
 
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3
   noParamAutoclosure(completion: print("autoclosure"))
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=EMPTY-CAPTURE %s
+  simple { [] str in
+    print("closure with empty capture list")
+  }
+  // EMPTY-CAPTURE: let str = await simple(){{$}}
+  // EMPTY-CAPTURE-NEXT: {{^}}print("closure with empty capture list")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=CAPTURE %s
+  let anything = "anything"
+  simple { [unowned anything] str in
+    print("closure with capture list \(anything)")
+  }
+  // CAPTURE: let str = await simple(){{$}}
+  // CAPTURE-NEXT: {{^}}print("closure with capture list \(anything)")
 }
 // CONVERT-FUNC: {{^}}}
