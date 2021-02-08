@@ -62,6 +62,11 @@ SILGlobalVariable::~SILGlobalVariable() {
   StaticInitializerBlock.clearStaticInitializerBlock(Module);
 }
 
+bool SILGlobalVariable::isPossiblyUsedExternally() const {
+  SILLinkage linkage = getLinkage();
+  return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+}
+
 /// Get this global variable's fragile attribute.
 IsSerialized_t SILGlobalVariable::isSerialized() const {
   return Serialized ? IsSerialized : IsNotSerialized;

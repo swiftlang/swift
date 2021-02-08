@@ -27,6 +27,7 @@
 using namespace swift;
 
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
+STATISTIC(NumDeadGlobals, "Number of dead global variables eliminated");
 
 namespace {
 
@@ -115,11 +116,6 @@ protected:
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
       return true;
 
-    // Global initializers are always emitted into the defining module and
-    // their bodies are never SIL serialized.
-    if (F->isGlobalInit())
-      return true;
-
     return false;
   }
 
@@ -143,6 +139,11 @@ protected:
   /// Returns true if a witness table is marked as alive.
   bool isAlive(SILWitnessTable *WT) {
     return AliveFunctionsAndTables.count(WT) != 0;
+  }
+
+  /// Returns true if a global variable is marked as alive.
+  bool isAlive(SILGlobalVariable *global) {
+    return AliveFunctionsAndTables.count(global) != 0;
   }
 
   /// Marks a function as alive.
@@ -204,6 +205,16 @@ protected:
     }
   }
 
+  /// Marks the \p global and all functions, which are referenced from its
+  /// initializer as alive.
+  void makeAlive(SILGlobalVariable *global) {
+    AliveFunctionsAndTables.insert(global);
+    for (const SILInstruction &initInst : *global) {
+      if (auto *fRef = dyn_cast<FunctionRefInst>(&initInst))
+        ensureAlive(fRef->getReferencedFunction());
+    }
+  }
+
   /// Marks the declarations referenced by a key path pattern as alive if they
   /// aren't yet.
   void
@@ -237,6 +248,12 @@ protected:
   void ensureAlive(SILFunction *F) {
     if (!isAlive(F))
       makeAlive(F);
+  }
+
+  /// Marks a global variable as alive if it is not alive yet.
+  void ensureAlive(SILGlobalVariable *global) {
+    if (!isAlive(global))
+      makeAlive(global);
   }
 
   /// Marks a witness table as alive if it is not alive yet.
@@ -342,6 +359,10 @@ protected:
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           for (auto &component : KPI->getPattern()->getComponents())
             ensureKeyPathComponentIsAlive(component);
+        } else if (auto *GA = dyn_cast<GlobalAddrInst>(&I)) {
+          ensureAlive(GA->getReferencedGlobal());
+        } else if (auto *GV = dyn_cast<GlobalValueInst>(&I)) {
+          ensureAlive(GV->getReferencedGlobal());
         }
       }
     }
@@ -406,6 +427,11 @@ protected:
                                 << F.getName() << "\n");
         ensureAlive(&F);
       }
+    }
+    
+    for (SILGlobalVariable &global : Module->getSILGlobals()) {
+      if (global.isPossiblyUsedExternally())
+        ensureAlive(&global);
     }
   }
 
@@ -675,11 +701,19 @@ public:
 
     // First drop all references so that we don't get problems with non-zero
     // reference counts of dead functions.
-    std::vector<SILFunction *> DeadFunctions;
+    llvm::SmallVector<SILFunction *, 16> DeadFunctions;
+    llvm::SmallVector<SILGlobalVariable *, 16> DeadGlobals;
     for (SILFunction &F : *Module) {
       if (!isAlive(&F)) {
         F.dropAllReferences();
         DeadFunctions.push_back(&F);
+      }
+    }
+    
+    for (SILGlobalVariable &global : Module->getSILGlobals()) {
+      if (!isAlive(&global)) {
+        global.dropAllReferences();
+        DeadGlobals.push_back(&global);
       }
     }
 
@@ -706,6 +740,11 @@ public:
       DFEPass->notifyWillDeleteFunction(F);
       Module->eraseFunction(F);
     }
+    for (SILGlobalVariable *deadGlobal : DeadGlobals) {
+      ++NumDeadGlobals;
+      Module->eraseGlobalVariable(deadGlobal);
+    }
+    
     if (changedTables)
       DFEPass->invalidateFunctionTables();
   }
