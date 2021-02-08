@@ -711,6 +711,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (!options.is(TypeResolverContext::TypeAliasDecl)) {
         // If the resolution object carries an opener, attempt to open
         // the unbound generic type.
+        // TODO: We should be able to just open the generic arguments as N
+        // different PlaceholderTypes.
         if (const auto openerFn = resolution.getUnboundTypeOpener())
           if (const auto boundTy = openerFn(unboundTy))
             return boundTy;

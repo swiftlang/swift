@@ -1476,12 +1476,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     return simplifyNestedTypeExpr(UDE);
   }
 
-  // Fold '_' into a placeholder type.
-  if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
-    auto *placeholderRepr =
-        new (getASTContext()) PlaceholderTypeRepr(DAE->getLoc());
-    return new (getASTContext()) TypeExpr(placeholderRepr);
-  }
+  // TODO: Fold DiscardAssignmentExpr into a placeholder type here once parsing
+  // them is supported.
 
   // Fold T? into an optional type when T is a TypeExpr.
   if (isa<OptionalEvaluationExpr>(E) || isa<BindOptionalExpr>(E)) {
@@ -1688,8 +1684,6 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return nullptr;
       if (auto *TyE = dyn_cast<TypeExpr>(E))
         return TyE->getTypeRepr();
-      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
-        return new (getASTContext()) PlaceholderTypeRepr(DAE->getLoc());
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
           return TupleTypeRepr::createEmpty(ctx, TE->getSourceRange());
