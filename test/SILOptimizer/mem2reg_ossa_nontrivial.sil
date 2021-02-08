@@ -188,6 +188,84 @@ bb3:
   return %ret : $()
 }
 
+// CHECK-LABEL: sil [ossa] @multiple_store_vals6 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals6'
+sil [ossa] @multiple_store_vals6 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  br bb1
+
+bb1:
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  store %1 to [assign] %2 : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %2 : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %2 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals7 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals7'
+sil [ossa] @multiple_store_vals7 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  br bb1
+
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  store %2 to [assign] %stk : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %stk : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %stk : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_store_vals8 :
+// CHECK-NOT: alloc_stack
+// CHECK-LABEL: } // end sil function 'multiple_store_vals8'
+sil [ossa] @multiple_store_vals8 : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass):
+  %stk = alloc_stack $Klass
+  store %0 to [init] %stk : $*Klass
+  %3 = integer_literal $Builtin.Int1, 0
+  cond_fail %3 : $Builtin.Int1
+  br bb1
+
+bb1:
+  store %1 to [assign] %stk : $*Klass
+  destroy_addr %stk : $*Klass
+  store %2 to [init] %stk : $*Klass
+  br bb2
+
+bb2:
+  %4 = function_ref @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = load [take] %stk : $*Klass
+  %6 = apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  dealloc_stack %stk : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @with_loads :
 // CHECK-NOT: alloc_stack
 // CHECK-LABEL: } // end sil function 'with_loads'
@@ -676,3 +754,4 @@ bbret(%new : @owned $Klass):
   dealloc_stack %stk1 : $*Klass
   return %new : $Klass
 }
+
