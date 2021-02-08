@@ -1,4 +1,4 @@
-// RUN: not %target-swift-emit-sil %s -I %S/Inputs -enable-cxx-interop 2>&1 | %FileCheck %s
+// RUN: not %target-swift-emit-ir %s -I %S/Inputs -enable-cxx-interop 2>&1 | %FileCheck %s
 
 import ClassTemplateInstantiationErrors
 
@@ -7,8 +7,17 @@ func swiftTemplateArgNotSupported() {
   var _ = MagicWrapper<Optional>(t: "asdf")
 }
 
-// CHECK: class-template-instantiation-errors.h:18:7: error: no member named 'doesNotExist' in 'IntWrapper'
-// CHECK: class-template-instantiation-errors.h:16:8: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::willFailInstantiating' requested here
-func clangErrorReportedOnInstantiation() {
-    var _ = CannotBeInstantianted<IntWrapper>()
+// CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
+// CHECK: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::CannotBeInstantianted' requested here
+
+// CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
+// CHECK: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::memberWrongType' requested here
+
+// CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
+// CHECK: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::argWrongType' requested here
+public func clangErrorReportedOnInstantiation() {
+  _ = CannotBeInstantianted<IntWrapper>(CChar(0), IntWrapper())
+  var z = CannotBeInstantianted<IntWrapper>(IntWrapper())
+  z.memberWrongType()
+  z.argWrongType(IntWrapper())
 }

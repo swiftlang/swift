@@ -181,6 +181,21 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto subst = computeSubstitutions(sig, locator);
 
+  // Lazily instantiate function definitions for class template specializations.
+  // Members of a class template specialization will be instantiated here (not
+  // when imported). If this method has already be instantiated, then this is a
+  // no-op.
+  if (const auto *constMethod =
+          dyn_cast_or_null<clang::CXXMethodDecl>(decl->getClangDecl())) {
+    auto method = const_cast<clang::CXXMethodDecl *>(constMethod);
+    // Make sure that this method is part of a class template specialization.
+    if (method->getTemplateInstantiationPattern())
+      decl->getASTContext()
+          .getClangModuleLoader()
+          ->getClangSema()
+          .InstantiateFunctionDefinition(method->getLocation(), method);
+  }
+
   // If this is a C++ function template, get it's specialization for the given
   // substitution map and update the decl accordingly.
   if (decl->getClangDecl() &&
