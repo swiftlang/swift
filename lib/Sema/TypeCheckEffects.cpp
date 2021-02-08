@@ -169,19 +169,28 @@ FunctionRethrowingKindRequest::evaluate(Evaluator &evaluator,
       return FunctionRethrowingKind::ByConformance;
     }
     if (markedRethrows) {
-      GenericSignature genericSig = decl->getGenericSignature();
-      FunctionRethrowingKind kind = getParameterThrowingKind(decl, genericSig);
-      // since we have checked all arguments, if we still havent found anything
-      // check the self parameter
-      if (kind == FunctionRethrowingKind::Invalid && 
-          decl->hasImplicitSelfDecl()) {
-        auto selfParam = decl->getImplicitSelfDecl();
-        if (selfParam) {
-          auto interfaceTy = selfParam->getInterfaceType();
-          kind = getTypeThrowingKind(interfaceTy, genericSig);
+      if (auto genericSig = decl->getGenericSignature()) {
+        for (auto req : genericSig->getRequirements()) {
+          if (req.getKind() == RequirementKind::Conformance) {
+            if (req.getSecondType()->castTo<ProtocolType>()
+                                   ->getDecl()
+                                   ->isRethrowingProtocol()) {
+              return FunctionRethrowingKind::ByConformance;
+            }
+          }
         }
       }
-      return kind;
+
+      for (auto param : *decl->getParameters()) {
+        auto interfaceTy = param->getInterfaceType();
+        if (hasThrowingFunctionClosureParameter(interfaceTy
+              ->lookThroughAllOptionalTypes()
+              ->getCanonicalType())) {
+          return FunctionRethrowingKind::ByClosure;
+        }
+      }
+
+      return FunctionRethrowingKind::Invalid;
     }
     return FunctionRethrowingKind::Throws;
   }
