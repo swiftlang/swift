@@ -3,3 +3,9 @@
 
 // RUN: %target-swift-frontend -typecheck -primary-file %s -access-notes-path %S/Inputs/bad.accessnotes 2>&1 | %FileCheck --check-prefix=CHECK-BAD %s
 // CHECK-BAD: <unknown>:0: warning: access notes at 'SOURCE_DIR/test/Sema/Inputs/bad.accessnotes' will be ignored due to an error while loading them: not a mapping at line 1, column 0{{$}}
+
+// RUN: %target-swift-frontend -typecheck -primary-file %s -access-notes-path %S/Inputs/extra.accessnotes >%t.txt 2>&1 
+// RUN: %FileCheck --check-prefix=CHECK-EXTRA %s <%t.txt
+// RUN: %FileCheck --check-prefix=NEGATIVE-EXTRA %s <%t.txt
+// CHECK-EXTRA: <unknown>:0: remark: compiler ignored unknown key 'CorinthianLeather' in access notes at 'SOURCE_DIR/test/Sema/Inputs/extra.accessnotes'
+// NEGATIVE-EXTRA-NOT: <unknown>:0: warning: access notes at 'SOURCE_DIR/test/Sema/Inputs/extra.accessnotes' will be ignored due to an error while loading them

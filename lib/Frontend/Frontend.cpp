@@ -957,8 +957,25 @@ ModuleDecl *CompilerInstance::getMainModule() const {
                 return AccessNotes::load(*Context, buffer.get());
               });
 
-      if (expectedAccessNotes)
-        MainModule->getAccessNotes() = std::move(expectedAccessNotes).get();
+      if (expectedAccessNotes) {
+        auto &notes = std::move(expectedAccessNotes).get();
+
+        // If there were unknown keys in the file, diagnose that.
+        if (!notes.unknownKeys.empty()) {
+          // Create a string like "key1', 'key2', 'key3". The diagnostic itself
+          // provides the leading and trailing single quotes.
+          SmallString<64> scratch;
+          llvm::raw_svector_ostream scratchOS(scratch);
+          llvm::interleave(notes.unknownKeys, scratchOS, "', '");
+
+          Context->Diags.diagnose(SourceLoc(),
+                                  diag::unknown_keys_in_access_notes_file,
+                                  notes.unknownKeys.size(), scratch,
+                                  accessNotesPath);
+        }
+
+        MainModule->getAccessNotes() = std::move(notes);
+      }
       else
         llvm::handleAllErrors(expectedAccessNotes.takeError(),
                               [&](const llvm::ErrorInfoBase &error) {

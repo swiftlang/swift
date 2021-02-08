@@ -191,11 +191,17 @@ convertToErrorAndJoin(const llvm::SMDiagnostic &diag, void *Context) {
   errors = llvm::joinErrors(std::move(errors), std::move(newError));
 }
 
+struct AccessNoteYAMLContext {
+  ASTContext &ctx;
+  std::set<std::string> unknownKeys;
+};
+
 llvm::Expected<AccessNotes>
 AccessNotes::load(ASTContext &ctx, llvm::MemoryBuffer *buffer) {
   llvm::Error errors = llvm::Error::success();
+  AccessNoteYAMLContext yamlCtx = { ctx, {} };
 
-  llvm::yaml::Input yamlIn(buffer->getBuffer(), (void *)&ctx,
+  llvm::yaml::Input yamlIn(buffer->getBuffer(), (void *)&yamlCtx,
                            convertToErrorAndJoin, &errors);
 
   AccessNotes notes;
@@ -203,6 +209,8 @@ AccessNotes::load(ASTContext &ctx, llvm::MemoryBuffer *buffer) {
 
   if (errors)
     return llvm::Expected<AccessNotes>(std::move(errors));
+
+  notes.unknownKeys = std::move(yamlCtx.unknownKeys);
 
   return notes;
 }
@@ -214,7 +222,7 @@ namespace yaml {
 
 using AccessNote = swift::AccessNote;
 using AccessNotes = swift::AccessNotes;
-using ASTContext = swift::ASTContext;
+using AccessNoteYAMLContext = swift::AccessNoteYAMLContext;
 using AccessNoteDeclName = swift::AccessNoteDeclName;
 using ObjCSelector = swift::ObjCSelector;
 
@@ -225,8 +233,9 @@ output(const AccessNoteDeclName &name, void *ctxPtr, raw_ostream &os) {
 
 StringRef ScalarTraits<AccessNoteDeclName>::
 input(StringRef str, void *ctxPtr, AccessNoteDeclName &name) {
-  ASTContext &ctx = *static_cast<ASTContext *>(ctxPtr);
-  name = AccessNoteDeclName(ctx, str);
+  auto &yamlCtx = *static_cast<swift::AccessNoteYAMLContext *>(ctxPtr);
+
+  name = AccessNoteDeclName(yamlCtx.ctx, str);
   return name.empty() ? "invalid declaration name" : "";
 }
 
@@ -237,9 +246,9 @@ void ScalarTraits<ObjCSelector>::output(const ObjCSelector &selector,
 
 StringRef ScalarTraits<ObjCSelector>::input(StringRef str, void *ctxPtr,
                                             ObjCSelector &selector) {
-  ASTContext &ctx = *static_cast<ASTContext *>(ctxPtr);
+  auto &yamlCtx = *static_cast<swift::AccessNoteYAMLContext *>(ctxPtr);
 
-  if (auto sel = ObjCSelector::parse(ctx, str)) {
+  if (auto sel = ObjCSelector::parse(yamlCtx.ctx, str)) {
     selector = *sel;
     return "";
   }
@@ -247,7 +256,36 @@ StringRef ScalarTraits<ObjCSelector>::input(StringRef str, void *ctxPtr,
   return "invalid selector";
 }
 
+/// If \p io is outputting, mark all keys in the current mapping as used.
+static void diagnoseUnknownKeys(IO &io, ArrayRef<StringRef> expectedKeys) {
+  if (io.outputting())
+    return;
+
+  auto &yamlCtx = *static_cast<swift::AccessNoteYAMLContext *>(io.getContext());
+
+  for (auto key : io.keys()) {
+    if (is_contained(expectedKeys, key))
+      continue;
+
+    // "Use" this key without actually doing anything with it to suppress the
+    // error llvm::yaml::Input will otherwise generate.
+    bool useDefault;
+    void *saveInfo;
+    if (io.preflightKey((const char *)key.bytes_begin(), /*required=*/false,
+                        /*sameAsDefault=*/false, useDefault, saveInfo)) {
+      // FIXME: We should diagnose these with locations, but llvm::yaml::Input
+      // encapsulates all of the necessary details. Instead, we are currently
+      // just building a list that the frontend will display.
+      yamlCtx.unknownKeys.insert(key.str());
+
+      io.postflightKey(saveInfo);
+    }
+  }
+}
+
 void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {
+  diagnoseUnknownKeys(io, { "Name", "ObjC", "Dynamic", "ObjCName" });
+
   io.mapRequired("Name", note.name);
   io.mapOptional("ObjC", note.ObjC);
   io.mapOptional("Dynamic", note.Dynamic);
@@ -266,6 +304,8 @@ StringRef MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {
 }
 
 void MappingTraits<AccessNotes>::mapping(IO &io, AccessNotes &notes) {
+  diagnoseUnknownKeys(io, { "Reason", "Notes" });
+
   io.mapRequired("Reason", notes.reason);
   io.mapRequired("Notes", notes.notes);
 }

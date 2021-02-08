@@ -24,6 +24,8 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include <set>
+#include <string>
 #include <vector>
 
 namespace swift {
@@ -62,6 +64,11 @@ class AccessNotes {
 public:
   std::string reason;
   std::vector<AccessNote> notes;
+
+  /// Contains keys which were present in the JSON file but were not recognized
+  /// by the compiler. Has no functional effect, but can be used for error
+  /// handling.
+  std::set<std::string> unknownKeys;
 
   static llvm::Expected<AccessNotes> load(ASTContext &ctx,
                                           llvm::MemoryBuffer *buffer);
