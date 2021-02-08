@@ -2455,8 +2455,8 @@ NOTE(overridden_near_match_here,none,
       (DescriptiveDeclKind, DeclName))
 ERROR(override_decl_extension,none,
       "%select{|non-@objc}0 %2 %3 %select{"
-      "is declared in extension of %4 and cannot be overriden|"
-      "declared in %4 cannot be overriden from extension}1", 
+      "is declared in extension of %4 and cannot be overridden|"
+      "declared in %4 cannot be overridden from extension}1", 
       (bool, bool, DescriptiveDeclKind, DeclName, DeclName))
 NOTE(overridden_here,none,
      "overridden declaration is here", ())
