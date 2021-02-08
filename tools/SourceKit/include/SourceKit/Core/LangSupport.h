@@ -659,6 +659,8 @@ public:
 
   virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
+  virtual void dependencyUpdated() {}
+
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;
