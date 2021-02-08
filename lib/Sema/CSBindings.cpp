@@ -57,9 +57,6 @@ bool PotentialBinding::isViableForJoin() const {
 }
 
 bool PotentialBindings::isDelayed() const {
-  if (!DelayedBy.empty())
-    return true;
-
   if (isHole()) {
     auto *locator = TypeVar->getImpl().getLocator();
     assert(locator && "a hole without locator?");
@@ -76,9 +73,32 @@ bool PotentialBindings::isDelayed() const {
     // relies solely on contextual information.
     if (locator->directlyAt<NilLiteralExpr>())
       return true;
+
+    // It's possible that type of member couldn't be determined,
+    // and if so it would be beneficial to bind member to a hole
+    // early to propagate that information down to arguments,
+    // result type of a call that references such a member.
+    //
+    // Note: This is done here instead of during binding inference,
+    // because it's possible that variable is marked as a "hole"
+    // (or that status is propagated to it) after constraints
+    // mentioned below are recorded.
+    return llvm::any_of(DelayedBy, [&](Constraint *constraint) {
+      switch (constraint->getKind()) {
+      case ConstraintKind::ApplicableFunction:
+      case ConstraintKind::DynamicCallableApplicableFunction:
+      case ConstraintKind::BindOverload: {
+        return !ConstraintSystem::typeVarOccursInType(
+            TypeVar, CS.simplifyType(constraint->getSecondType()));
+      }
+
+      default:
+        return true;
+      }
+    });
   }
 
-  return false;
+  return !DelayedBy.empty();
 }
 
 bool PotentialBindings::involvesTypeVariables() const {
@@ -1182,16 +1202,6 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload: {
-    // It's possible that type of member couldn't be determined,
-    // and if so it would be beneficial to bind member to a hole
-    // early to propagate that information down to arguments,
-    // result type of a call that references such a member.
-    if (CS.shouldAttemptFixes() && TypeVar->getImpl().canBindToHole()) {
-      if (ConstraintSystem::typeVarOccursInType(
-              TypeVar, CS.simplifyType(constraint->getSecondType())))
-        break;
-    }
-
     DelayedBy.push_back(constraint);
     break;
   }
