@@ -755,36 +755,6 @@ public:
       }
     }
 
-    if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
-      auto substitutions = fnRef.getSubstitutions();
-      bool classifiedAsThrows = false;
-      for (auto conformanceRef : substitutions.getConformances()) {
-        if (conformanceRef.classifyAsThrows()) {
-          classifiedAsThrows = true;
-          break;
-        }
-      }
-
-      if (classifiedAsThrows) {
-        // multiple passes can occur, so ensure that any sub-expressions of this
-        // call are marked as throws to mimic the closure variant.
-        if (auto subExpr = dyn_cast<ApplyExpr>(E->getFn())) {
-          if (!subExpr->isThrowsSet()) {
-            subExpr->setThrows(true);
-          }
-        }
-        return Classification::forRethrowingOnly(
-          PotentialThrowReason::forRethrowsConformance(E), isAsync);
-      }
-    } else if (fnRef.isBodyRethrows() && 
-               fnRef.getRethrowingKind() == FunctionRethrowingKind::Throws) {
-      return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
-                                      isAsync);
-    } else if (fnRef.isBodyRethrows() &&
-               fnRef.getRethrowingKind() == FunctionRethrowingKind::None) {
-      return isAsync ? Classification::forAsync() : Classification();
-    }
-
     // If the function doesn't throw at all, we're done here.
     if (!fnType->isThrowing()) {
       return isAsync ? Classification::forAsync() : Classification();
@@ -812,6 +782,16 @@ public:
              "partial application was throwing?");
       return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
                                       isAsync);
+    }
+
+    if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
+      auto substitutions = fnRef.getSubstitutions();
+      for (auto conformanceRef : substitutions.getConformances()) {
+        if (conformanceRef.classifyAsThrows()) {
+          return Classification::forRethrowingOnly(
+            PotentialThrowReason::forRethrowsConformance(E), isAsync);
+        }
+      }
     }
 
     // If the function's body is 'rethrows' for the number of
