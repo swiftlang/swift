@@ -1012,10 +1012,12 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     // NSObject.hashValue and NSObject.hash(into:) are not overridable;
     // one should override NSObject.hash instead.
     if (isNSObjectHashValue(baseDecl)) {
-      diags.diagnose(decl, diag::override_nsobject_hashvalue_error)
+      decl->diagnose(diag::override_nsobject_hashvalue_error)
         .fixItReplace(SourceRange(decl->getNameLoc()), "hash");
     } else if (isNSObjectHashMethod(baseDecl)) {
-      diags.diagnose(decl, diag::override_nsobject_hash_error);
+      decl->diagnose(diag::override_nsobject_hash_error)
+        .fixItReplace(cast<FuncDecl>(decl)->getFuncLoc(), getTokenText(tok::kw_var))
+        .fixItReplace(cast<FuncDecl>(decl)->getParameters()->getSourceRange(), ": Int");
     } else {
       diags.diagnose(decl, diag::override_of_non_open,
                      decl->getDescriptiveKind());

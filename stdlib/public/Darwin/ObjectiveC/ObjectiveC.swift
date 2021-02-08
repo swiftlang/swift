@@ -231,7 +231,7 @@ extension NSObject : Equatable, Hashable {
   ///
   /// NSObject implements this by feeding `self.hash` to the hasher.
   ///
-  /// 'NSObject.hash(into:)' is not overridable; subclasses can customize
+  /// `NSObject.hash(into:)` is not overridable; subclasses can customize
   /// hashing by overriding the `hash` property.
   public func hash(into hasher: inout Hasher) {
     hasher.combine(self.hash)
