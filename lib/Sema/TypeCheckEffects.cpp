@@ -53,55 +53,6 @@ static bool hasThrowingFunctionClosureParameter(CanType type) {
   return false;
 }
 
-static FunctionRethrowingKind
-getTypeThrowingKind(Type interfaceTy, GenericSignature genericSig) {
-  if (interfaceTy->isTypeParameter()) {
-    for (auto proto : genericSig->getRequiredProtocols(interfaceTy)) {
-      if (proto->isRethrowingProtocol()) {
-        return FunctionRethrowingKind::ByConformance;
-      }
-    }
-  } else if (auto NTD = interfaceTy->getNominalOrBoundGenericNominal()) {
-    if (auto genericSig = NTD->getGenericSignature()) {
-      for (auto req : genericSig->getRequirements()) {
-        if (req.getKind() == RequirementKind::Conformance) {
-          if (req.getSecondType()->castTo<ProtocolType>()
-                                 ->getDecl()
-                                 ->isRethrowingProtocol()) {
-            return FunctionRethrowingKind::ByConformance;
-          }
-        }
-      }
-    }
-  }
-  return FunctionRethrowingKind::Invalid;
-}
-
-static FunctionRethrowingKind 
-getParameterThrowingKind(AbstractFunctionDecl *decl, 
-                         GenericSignature genericSig) {
-  FunctionRethrowingKind kind = FunctionRethrowingKind::Invalid;
-  // check all parameters to determine if any are closures that throw
-  bool foundThrowingClosure = false;
-  for (auto param : *decl->getParameters()) {
-    auto interfaceTy = param->getInterfaceType();
-    if (hasThrowingFunctionClosureParameter(interfaceTy
-          ->lookThroughAllOptionalTypes()
-          ->getCanonicalType())) {
-      foundThrowingClosure = true;
-    }
-
-    if (kind == FunctionRethrowingKind::Invalid) {
-      kind = getTypeThrowingKind(interfaceTy, genericSig);
-    }
-  }
-  if (kind == FunctionRethrowingKind::Invalid &&
-      foundThrowingClosure) {
-    return FunctionRethrowingKind::ByClosure;
-  }
-  return kind;
-}
-
 ProtocolRethrowsRequirementList
 ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
                                               ProtocolDecl *decl) const {
@@ -115,25 +66,12 @@ ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
     return ProtocolRethrowsRequirementList(ctx.AllocateCopy(found));
   }
 
-  // check if immediate members of protocol are 'rethrows'
+  // check if immediate members of protocol are 'throws'
   for (auto member : decl->getMembers()) {
     auto fnDecl = dyn_cast<AbstractFunctionDecl>(member);
-    // it must be a function
-    // it must have a rethrows attribute
-    // it must not have any parameters that are closures that cause rethrowing
-    if (!fnDecl || 
-        !fnDecl->hasThrows()) {
+    if (!fnDecl || !fnDecl->hasThrows())
       continue;
-    }
 
-    GenericSignature genericSig = fnDecl->getGenericSignature();
-    auto kind = getParameterThrowingKind(fnDecl, genericSig);
-    // skip closure based rethrowing cases
-    if (kind == FunctionRethrowingKind::ByClosure) {
-      continue;
-    }
-    // we now have a protocol member that has a rethrows and no closure 
-    // parameters contributing to it's rethrowing-ness
     found.push_back(
       std::pair<Type, ValueDecl*>(decl->getSelfInterfaceType(), fnDecl));
   }

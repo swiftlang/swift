@@ -97,3 +97,20 @@ try NonThrows().closureAndSelfRethrowing { () throws -> Void in }
 
 try Throws().closureAndSelfRethrowing { }
 try Throws().closureAndSelfRethrowing { () throws -> Void in }
+
+// Soundness hole
+@rethrows protocol ThrowsClosure {
+  func doIt() throws
+  func doIt(_: () throws -> ()) throws
+}
+
+struct ThrowsClosureWitness : ThrowsClosure {
+  func doIt() {}
+  func doIt(_: () throws -> ()) throws {}
+}
+
+func rethrowsWithThrowsClosure<T : ThrowsClosure>(_ t: T) rethrows {
+  try t.doIt() {}
+}
+
+try rethrowsWithThrowsClosure(ThrowsClosureWitness())
