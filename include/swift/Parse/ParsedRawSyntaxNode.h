@@ -56,11 +56,10 @@ class ParsedRawSyntaxNode {
     CharSourceRange Range;
   };
   struct DeferredTokenNode {
-    const ParsedTriviaPiece *TriviaPieces;
     SourceLoc TokLoc;
     unsigned TokLength;
-    uint16_t NumLeadingTrivia;
-    uint16_t NumTrailingTrivia;
+    StringRef LeadingTrivia;
+    StringRef TrailingTrivia;
   };
 
   union {
@@ -83,21 +82,11 @@ class ParsedRawSyntaxNode {
   }
 
   ParsedRawSyntaxNode(tok tokKind, SourceLoc tokLoc, unsigned tokLength,
-                      const ParsedTriviaPiece *triviaPieces,
-                      unsigned numLeadingTrivia,
-                      unsigned numTrailingTrivia)
-    : DeferredToken{triviaPieces,
-                    tokLoc, tokLength,
-                    uint16_t(numLeadingTrivia),
-                    uint16_t(numTrailingTrivia)},
-      SynKind(uint16_t(syntax::SyntaxKind::Token)),
-      TokKind(uint16_t(tokKind)),
-      DK(DataKind::DeferredToken) {
+                      StringRef leadingTrivia, StringRef trailingTrivia)
+      : DeferredToken{tokLoc, tokLength, leadingTrivia, trailingTrivia},
+        SynKind(uint16_t(syntax::SyntaxKind::Token)),
+        TokKind(uint16_t(tokKind)), DK(DataKind::DeferredToken) {
     assert(getTokenKind() == tokKind && "Token kind is too large value!");
-    assert(DeferredToken.NumLeadingTrivia == numLeadingTrivia &&
-           "numLeadingTrivia is too large value!");
-    assert(DeferredToken.NumTrailingTrivia == numTrailingTrivia &&
-           "numLeadingTrivia is too large value!");
   }
   ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) = delete;
   ParsedRawSyntaxNode &operator=(const ParsedRawSyntaxNode &other) = delete;
@@ -280,11 +269,8 @@ public:
 
   CharSourceRange getDeferredTokenRangeWithTrivia() const {
     assert(DK == DataKind::DeferredToken);
-    auto leadTriviaPieces = getDeferredLeadingTriviaPieces();
-    auto trailTriviaPieces = getDeferredTrailingTriviaPieces();
-
-    auto leadTriviaLen = ParsedTriviaPiece::getTotalLength(leadTriviaPieces);
-    auto trailTriviaLen = ParsedTriviaPiece::getTotalLength(trailTriviaPieces);
+    auto leadTriviaLen = DeferredToken.LeadingTrivia.size();
+    auto trailTriviaLen = DeferredToken.TrailingTrivia.size();
 
     SourceLoc begin = DeferredToken.TokLoc.getAdvancedLoc(-leadTriviaLen);
     unsigned len = leadTriviaLen + DeferredToken.TokLength + trailTriviaLen;
@@ -295,16 +281,13 @@ public:
     assert(DK == DataKind::DeferredToken);
     return CharSourceRange{DeferredToken.TokLoc, DeferredToken.TokLength};
   }
-  ArrayRef<ParsedTriviaPiece> getDeferredLeadingTriviaPieces() const {
+  StringRef getDeferredLeadingTrivia() const {
     assert(DK == DataKind::DeferredToken);
-    return ArrayRef<ParsedTriviaPiece>(DeferredToken.TriviaPieces,
-                                       DeferredToken.NumLeadingTrivia);
+    return DeferredToken.LeadingTrivia;
   }
-  ArrayRef<ParsedTriviaPiece> getDeferredTrailingTriviaPieces() const {
+  StringRef getDeferredTrailingTrivia() const {
     assert(DK == DataKind::DeferredToken);
-    return ArrayRef<ParsedTriviaPiece>(
-      DeferredToken.TriviaPieces + DeferredToken.NumLeadingTrivia,
-      DeferredToken.NumTrailingTrivia);
+    return DeferredToken.TrailingTrivia;
   }
 
   //==========================================================================//
@@ -315,14 +298,15 @@ public:
                                           SyntaxParsingContext &ctx);
 
   /// Form a deferred token node.
-  static ParsedRawSyntaxNode makeDeferred(Token tok,
-                                          const ParsedTrivia &leadingTrivia,
-                                          const ParsedTrivia &trailingTrivia,
+  static ParsedRawSyntaxNode makeDeferred(Token tok, StringRef leadingTrivia,
+                                          StringRef trailingTrivia,
                                           SyntaxParsingContext &ctx);
 
   /// Form a deferred missing token node.
   static ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc) {
-    auto raw = ParsedRawSyntaxNode(tokKind, loc, 0, nullptr, 0, 0);
+    auto raw = ParsedRawSyntaxNode(tokKind, loc, /*tokLength=*/0,
+                                   /*leadingTrivia=*/StringRef(),
+                                   /*trailingTrivia=*/StringRef());
     raw.IsMissing = true;
     return raw;
   }

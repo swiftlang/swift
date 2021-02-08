@@ -46,8 +46,8 @@ class SyntaxArena;
 struct SyntaxFactory {
   /// Make any kind of token.
   static TokenSyntax makeToken(tok Kind,
-      OwnedString Text, const Trivia &LeadingTrivia,
-      const Trivia &TrailingTrivia, SourcePresence Presence,
+      OwnedString Text, StringRef LeadingTrivia, StringRef TrailingTrivia,
+      SourcePresence Presence,
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
 
@@ -100,16 +100,16 @@ struct SyntaxFactory {
 
 % for token in SYNTAX_TOKENS:
 %   if token.is_keyword:
-  static TokenSyntax make${token.name}Keyword(const Trivia &LeadingTrivia,
-      const Trivia &TrailingTrivia,
+  static TokenSyntax make${token.name}Keyword(StringRef LeadingTrivia,
+      StringRef TrailingTrivia,
       const RC<SyntaxArena> &Arena = SyntaxArena::make());
 %   elif token.text:
-  static TokenSyntax make${token.name}Token(const Trivia &LeadingTrivia,
-      const Trivia &TrailingTrivia,
+  static TokenSyntax make${token.name}Token(StringRef LeadingTrivia,
+            StringRef TrailingTrivia,
       const RC<SyntaxArena> &Arena = SyntaxArena::make());
 %   else:
   static TokenSyntax make${token.name}(OwnedString Text,
-      const Trivia &LeadingTrivia, const Trivia &TrailingTrivia,
+            StringRef LeadingTrivia, StringRef TrailingTrivia,
       const RC<SyntaxArena> &Arena = SyntaxArena::make());
 %   end
 % end
@@ -140,7 +140,7 @@ struct SyntaxFactory {
   /// Creates a TypeIdentifierSyntax with the provided name and leading/trailing
   /// trivia.
   static TypeSyntax makeTypeIdentifier(OwnedString TypeName,
-      const Trivia &LeadingTrivia = {}, const Trivia &TrailingTrivia = {},
+      StringRef LeadingTrivia = {}, StringRef TrailingTrivia = {},
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
 
@@ -153,32 +153,32 @@ struct SyntaxFactory {
   );
 
   /// Creates a TypeIdentifierSyntax for the `Any` type.
-  static TypeSyntax makeAnyTypeIdentifier(const Trivia &LeadingTrivia = {},
-      const Trivia &TrailingTrivia = {},
+  static TypeSyntax makeAnyTypeIdentifier(StringRef LeadingTrivia = {},
+      StringRef TrailingTrivia = {},
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
 
   /// Creates a TypeIdentifierSyntax for the `Self` type.
-  static TypeSyntax makeSelfTypeIdentifier(const Trivia &LeadingTrivia = {},
-      const Trivia &TrailingTrivia = {},
+  static TypeSyntax makeSelfTypeIdentifier(StringRef LeadingTrivia = {},
+      StringRef TrailingTrivia = {},
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
 
   /// Creates a TokenSyntax for the `Type` identifier.
-  static TokenSyntax makeTypeToken(const Trivia &LeadingTrivia = {},
-      const Trivia &TrailingTrivia = {},
+  static TokenSyntax makeTypeToken(StringRef LeadingTrivia = {},
+      StringRef TrailingTrivia = {},
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
 
   /// Creates a TokenSyntax for the `Protocol` identifier.
-  static TokenSyntax makeProtocolToken(const Trivia &LeadingTrivia = {},
-      const Trivia &TrailingTrivia = {},
+  static TokenSyntax makeProtocolToken(StringRef LeadingTrivia = {},
+      StringRef TrailingTrivia = {},
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
 
   /// Creates an `==` operator token.
-  static TokenSyntax makeEqualityOperator(const Trivia &LeadingTrivia = {},
-      const Trivia &TrailingTrivia = {},
+  static TokenSyntax makeEqualityOperator(StringRef LeadingTrivia = {},
+      StringRef TrailingTrivia = {},
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
 

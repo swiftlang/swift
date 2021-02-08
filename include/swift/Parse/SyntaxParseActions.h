@@ -41,10 +41,9 @@ class SyntaxParseActions {
 public:
   virtual ~SyntaxParseActions() = default;
 
-  virtual OpaqueSyntaxNode recordToken(tok tokenKind,
-                                    ArrayRef<ParsedTriviaPiece> leadingTrivia,
-                                    ArrayRef<ParsedTriviaPiece> trailingTrivia,
-                                    CharSourceRange range) = 0;
+  virtual OpaqueSyntaxNode recordToken(tok tokenKind, StringRef leadingTrivia,
+                                       StringRef trailingTrivia,
+                                       CharSourceRange range) = 0;
 
   /// Record a missing token. \c loc can be invalid or an approximate location
   /// of where the token would be if not missing.

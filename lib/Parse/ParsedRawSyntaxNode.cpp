@@ -52,23 +52,13 @@ ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
 }
 
 ParsedRawSyntaxNode
-ParsedRawSyntaxNode::makeDeferred(Token tok,
-                                  const ParsedTrivia &leadingTrivia,
-                                  const ParsedTrivia &trailingTrivia,
+ParsedRawSyntaxNode::makeDeferred(Token tok, StringRef leadingTrivia,
+                                  StringRef trailingTrivia,
                                   SyntaxParsingContext &ctx) {
   CharSourceRange tokRange = tok.getRange();
-  size_t piecesCount = leadingTrivia.size() + trailingTrivia.size();
-  ParsedTriviaPiece *piecesPtr = nullptr;
-  if (piecesCount > 0) {
-    piecesPtr = ctx.getScratchAlloc().Allocate<ParsedTriviaPiece>(piecesCount);
-    std::uninitialized_copy(leadingTrivia.begin(), leadingTrivia.end(),
-                            piecesPtr);
-    std::uninitialized_copy(trailingTrivia.begin(), trailingTrivia.end(),
-                            piecesPtr + leadingTrivia.size());
-  }
   return ParsedRawSyntaxNode(tok.getKind(), tokRange.getStart(),
-                             tokRange.getByteLength(), piecesPtr,
-                             leadingTrivia.size(), trailingTrivia.size());
+                             tokRange.getByteLength(), leadingTrivia,
+                             trailingTrivia);
 }
 
 void ParsedRawSyntaxNode::dump() const {
