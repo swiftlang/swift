@@ -42,12 +42,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
   AsyncDropWhileSequence.swift
-  AsyncFailableCompactMapSequence.swift
-  AsyncFailableDropWhileSequence.swift
-  AsyncFailableFilterSequence.swift
-  AsyncFailableFlatMapSequence.swift
-  AsyncFailableMapSequence.swift
-  AsyncFailablePrefixWhileSequence.swift
   AsyncFilterSequence.swift
   AsyncFlatMapSequence.swift
   AsyncIteratorProtocol.swift
@@ -55,6 +49,12 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncPrefixSequence.swift
   AsyncPrefixWhileSequence.swift
   AsyncSequence.swift
+  AsyncThrowingCompactMapSequence.swift
+  AsyncThrowingDropWhileSequence.swift
+  AsyncThrowingFilterSequence.swift
+  AsyncThrowingFlatMapSequence.swift
+  AsyncThrowingMapSequence.swift
+  AsyncThrowingPrefixWhileSequence.swift
   PartialAsyncTask.swift
   Task.cpp
   Task.swift

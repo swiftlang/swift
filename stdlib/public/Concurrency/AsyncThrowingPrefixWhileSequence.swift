@@ -16,13 +16,13 @@ extension AsyncSequence {
   @inlinable
   public __consuming func prefix(
     while predicate: @escaping (Element) async throws -> Bool
-  ) rethrows -> AsyncFailablePrefixWhileSequence<Self> {
-    return AsyncFailablePrefixWhileSequence(self, predicate: predicate)
+  ) rethrows -> AsyncThrowingPrefixWhileSequence<Self> {
+    return AsyncThrowingPrefixWhileSequence(self, predicate: predicate)
   }
 }
 
 @frozen
-public struct AsyncFailablePrefixWhileSequence<Base: AsyncSequence> {
+public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
 
@@ -39,7 +39,7 @@ public struct AsyncFailablePrefixWhileSequence<Base: AsyncSequence> {
   }
 }
 
-extension AsyncFailablePrefixWhileSequence: AsyncSequence {
+extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
   public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 

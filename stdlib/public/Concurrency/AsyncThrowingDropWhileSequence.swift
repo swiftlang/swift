@@ -16,13 +16,13 @@ extension AsyncSequence {
   @inlinable
   public __consuming func drop(
     while predicate: @escaping (Element) async throws -> Bool
-  ) -> AsyncFailableDropWhileSequence<Self> {
-    AsyncFailableDropWhileSequence(self, predicate: predicate)
+  ) -> AsyncThrowingDropWhileSequence<Self> {
+    AsyncThrowingDropWhileSequence(self, predicate: predicate)
   }
 }
 
 @frozen
-public struct AsyncFailableDropWhileSequence<Base: AsyncSequence> {
+public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
 
@@ -39,7 +39,7 @@ public struct AsyncFailableDropWhileSequence<Base: AsyncSequence> {
   }
 }
 
-extension AsyncFailableDropWhileSequence: AsyncSequence {
+extension AsyncThrowingDropWhileSequence: AsyncSequence {
   public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 

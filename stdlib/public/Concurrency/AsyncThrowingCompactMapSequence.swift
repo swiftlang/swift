@@ -16,13 +16,13 @@ extension AsyncSequence {
   @inlinable
   public __consuming func compactMap<ElementOfResult>(
     _ transform: @escaping (Element) async throws -> ElementOfResult?
-  ) -> AsyncFailableCompactMapSequence<Self, ElementOfResult> {
-    return AsyncFailableCompactMapSequence(self, transform: transform)
+  ) -> AsyncThrowingCompactMapSequence<Self, ElementOfResult> {
+    return AsyncThrowingCompactMapSequence(self, transform: transform)
   }
 }
 
 @frozen
-public struct AsyncFailableCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
+public struct AsyncThrowingCompactMapSequence<Base: AsyncSequence, ElementOfResult> {
   @usableFromInline
   let base: Base
 
@@ -39,7 +39,7 @@ public struct AsyncFailableCompactMapSequence<Base: AsyncSequence, ElementOfResu
   }
 }
 
-extension AsyncFailableCompactMapSequence: AsyncSequence {
+extension AsyncThrowingCompactMapSequence: AsyncSequence {
   public typealias Element = ElementOfResult
   public typealias AsyncIterator = Iterator
 

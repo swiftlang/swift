@@ -16,13 +16,13 @@ extension AsyncSequence {
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
     _ transform: @escaping (Element) async throws -> SegmentOfResult
-  ) -> AsyncFailableFlatMapSequence<Self, SegmentOfResult> {
-    return AsyncFailableFlatMapSequence(self, transform: transform)
+  ) -> AsyncThrowingFlatMapSequence<Self, SegmentOfResult> {
+    return AsyncThrowingFlatMapSequence(self, transform: transform)
   }
 }
 
 @frozen
-public struct AsyncFailableFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
+public struct AsyncThrowingFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
   let base: Base
 
@@ -39,7 +39,7 @@ public struct AsyncFailableFlatMapSequence<Base: AsyncSequence, SegmentOfResult:
   }
 }
 
-extension AsyncFailableFlatMapSequence: AsyncSequence {
+extension AsyncThrowingFlatMapSequence: AsyncSequence {
   public typealias Element = SegmentOfResult.Element
   public typealias AsyncIterator = Iterator
 

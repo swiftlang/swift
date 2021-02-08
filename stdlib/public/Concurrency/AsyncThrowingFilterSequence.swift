@@ -14,33 +14,33 @@ import Swift
 
 extension AsyncSequence {
   @inlinable
-  public __consuming func map<Transformed>(
-    _ transform: @escaping (Element) async throws -> Transformed
-  ) -> AsyncFailableMapSequence<Self, Transformed> {
-    return AsyncFailableMapSequence(self, transform: transform)
+  public __consuming func filter(
+    _ isIncluded: @escaping (Element) async throws -> Bool
+  ) -> AsyncThrowingFilterSequence<Self> {
+    return AsyncThrowingFilterSequence(self, isIncluded: isIncluded)
   }
 }
 
 @frozen
-public struct AsyncFailableMapSequence<Base: AsyncSequence, Transformed> {
+public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
-
+  
   @usableFromInline
-  let transform: (Base.Element) async throws -> Transformed
+  let isIncluded: (Element) async throws -> Bool
 
   @usableFromInline
   init(
     _ base: Base, 
-    transform: @escaping (Base.Element) async throws -> Transformed
+    isIncluded: @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
-    self.transform = transform
+    self.isIncluded = isIncluded
   }
 }
 
-extension AsyncFailableMapSequence: AsyncSequence {
-  public typealias Element = Transformed
+extension AsyncThrowingFilterSequence: AsyncSequence {
+  public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
   @frozen
@@ -49,28 +49,32 @@ extension AsyncFailableMapSequence: AsyncSequence {
     var baseIterator: Base.AsyncIterator
 
     @usableFromInline
-    let transform: (Base.Element) async throws -> Transformed
+    let isIncluded: (Base.Element) async throws -> Bool
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
-      transform: @escaping (Base.Element) async throws -> Transformed
+      _ baseIterator: Base.AsyncIterator,
+      isIncluded: @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
-      self.transform = transform
+      self.isIncluded = isIncluded
     }
 
     @inlinable
-    public mutating func next() async throws -> Transformed? {
-      guard let element = try await baseIterator.next() else {
-        return nil
+    public mutating func next() async throws -> Base.Element? {
+      while true {
+        guard let element = try await baseIterator.next() else {
+          return nil
+        }
+        if try await isIncluded(element) {
+          return element
+        }
       }
-      return try await transform(element)
     }
   }
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(base.makeAsyncIterator(), transform: transform)
+    return Iterator(base.makeAsyncIterator(), isIncluded: isIncluded)
   }
 }
