@@ -142,8 +142,8 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         // Have not encountered a strong retain/release. keep it in the
         // unknown retain/release list for now. It might get replaced
         // later.
-        if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
-           UnknownObjectRetains[ArgVal].push_back(&CI);
+        if (!NativeRefs.contains(ArgVal)) {
+          UnknownObjectRetains[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);
           B.createRetain(ArgVal, &CI);
@@ -189,7 +189,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
         // Have not encountered a strong retain/release. keep it in the
         // unknown retain/release list for now. It might get replaced
         // later.
-        if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
+        if (!NativeRefs.contains(ArgVal)) {
           UnknownObjectReleases[ArgVal].push_back(&CI);
         } else {
           B.setInsertPoint(&CI);

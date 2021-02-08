@@ -104,8 +104,8 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   // Otherwise, we have a program argument. If it looks like an option or a
   // path, then invoke in interactive mode with the arguments as given.
   StringRef FirstArg(Args[1]);
-  if (FirstArg.startswith("-") || FirstArg.find('.') != StringRef::npos ||
-      FirstArg.find('/') != StringRef::npos)
+  if (FirstArg.startswith("-") || FirstArg.contains('.') ||
+      FirstArg.contains('/'))
     return false;
 
   // Otherwise, we should have some sort of subcommand. Get the subcommand name

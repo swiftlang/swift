@@ -224,7 +224,7 @@ static void validateCompilationConditionArgs(DiagnosticEngine &diags,
                                              const ArgList &args) {
   for (const Arg *A : args.filtered(options::OPT_D)) {
     StringRef name = A->getValue();
-    if (name.find('=') != StringRef::npos) {
+    if (name.contains('=')) {
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
                      name);
@@ -660,7 +660,7 @@ static SmallVector<StringRef, 8> findRemovedInputs(
   SmallVector<StringRef, 8> missingInputs;
   for (auto &previousInput : previousInputs) {
     auto previousInputArg = previousInput.getKey();
-    if (inputArgs.find(previousInputArg) == inputArgs.end()) {
+    if (!inputArgs.contains(previousInputArg)) {
       missingInputs.push_back(previousInputArg);
     }
   }

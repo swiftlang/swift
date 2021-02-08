@@ -1163,7 +1163,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
   llvm::SmallString<32> buffer;
 
   if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
-    bool quote = library.find(' ') != StringRef::npos;
+    bool quote = library.contains(' ');
 
     buffer += "/DEFAULTLIB:";
     if (quote)
@@ -1174,7 +1174,7 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
     if (quote)
       buffer += '"';
   } else if (T.isPS4()) {
-    bool quote = library.find(' ') != StringRef::npos;
+    bool quote = library.contains(' ');
 
     buffer += "\01";
     if (quote)

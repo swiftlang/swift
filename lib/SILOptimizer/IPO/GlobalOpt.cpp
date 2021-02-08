@@ -236,7 +236,7 @@ static void removeToken(SILValue Op) {
     if (!(GAI->use_empty() || GAI->hasOneUse()))
       return;
     // If it is not a *_token global variable, bail.
-    if (!Global || Global->getName().find("_token") == StringRef::npos)
+    if (!Global || !Global->getName().contains("_token"))
       return;
     GAI->getModule().eraseGlobalVariable(Global);
     GAI->replaceAllUsesWithUndef();

@@ -40,8 +40,8 @@ void EpilogueARCContext::initializeDataflow() {
     SILValue CArg = ToProcess.pop_back_val();
     if (!CArg)
       continue;
-    if (Processed.find(CArg) != Processed.end())
-       continue;
+    if (Processed.contains(CArg))
+      continue;
     Processed.insert(CArg);
     if (auto *A = dyn_cast<SILPhiArgument>(CArg)) {
       // Find predecessor and break the SILArgument to predecessors.

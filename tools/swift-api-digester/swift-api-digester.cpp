@@ -2509,11 +2509,13 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   TypeAliasDiffFinder(RightModule, LeftModule, RevertAliasMap).search();
   populateAliasChanges(RevertAliasMap, AllItems, /*IsRevert*/true);
 
-  AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
-                                [&](CommonDiffItem &Item) {
-    return Item.DiffKind == NodeAnnotation::RemovedDecl &&
-      IgnoredRemoveUsrs.find(Item.LeftUsr) != IgnoredRemoveUsrs.end();
-  }), AllItems.end());
+  AllItems.erase(
+      std::remove_if(AllItems.begin(), AllItems.end(),
+                     [&](CommonDiffItem &Item) {
+                       return Item.DiffKind == NodeAnnotation::RemovedDecl &&
+                              IgnoredRemoveUsrs.contains(Item.LeftUsr);
+                     }),
+      AllItems.end());
 
   NoEscapeFuncParamVector AllNoEscapingFuncs;
   NoEscapingFuncEmitter::collectDiffItems(RightModule, AllNoEscapingFuncs);
