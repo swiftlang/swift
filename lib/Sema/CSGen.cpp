@@ -1014,7 +1014,7 @@ namespace {
       if (CS.containsCodeCompletionLoc(E))
         return nullptr;
 
-      return HoleType::get(CS.getASTContext(), E);
+      return PlaceholderType::get(CS.getASTContext(), E);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1224,7 +1224,7 @@ namespace {
             return hole;
           }
 
-          if (!knownType->hasHole()) {
+          if (!knownType->hasPlaceholder()) {
             // Set the favored type for this expression to the known type.
             CS.setFavoredType(E, knownType.getPointer());
           }
@@ -3407,7 +3407,7 @@ namespace {
       if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
         if (expr->getType()) {
           assert(!expr->getType()->hasTypeVariable());
-          assert(!expr->getType()->hasHole());
+          assert(!expr->getType()->hasPlaceholder());
           CG.getConstraintSystem().cacheType(expr);
           return { false, expr };
         }
@@ -3773,12 +3773,24 @@ bool ConstraintSystem::generateConstraints(
       auto *convertTypeLocator =
           getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
+      auto getLocator = [&](Type ty) -> ConstraintLocator * {
+        // If we have a placeholder originating from a PlaceholderTypeRepr,
+        // tack that on to the locator.
+        if (auto *placeholderTy = ty->getAs<PlaceholderType>())
+          if (auto *placeholderRepr = placeholderTy->getOriginator()
+                                          .dyn_cast<PlaceholderTypeRepr *>())
+            return getConstraintLocator(
+                convertTypeLocator,
+                LocatorPathElt::PlaceholderType(placeholderRepr));
+        return convertTypeLocator;
+      };
+
       // Substitute type variables in for placeholder types (and unresolved
       // types, if allowed).
       if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
         convertType = convertType.transform([&](Type type) -> Type {
           if (type->is<UnresolvedType>() || type->is<PlaceholderType>()) {
-            return createTypeVariable(convertTypeLocator,
+            return createTypeVariable(getLocator(type),
                                       TVO_CanBindToNoEscape |
                                           TVO_PrefersSubtypeBinding |
                                           TVO_CanBindToHole);
@@ -3788,7 +3800,7 @@ bool ConstraintSystem::generateConstraints(
       } else {
         convertType = convertType.transform([&](Type type) -> Type {
           if (type->is<PlaceholderType>()) {
-            return createTypeVariable(convertTypeLocator,
+            return createTypeVariable(getLocator(type),
                                       TVO_CanBindToNoEscape |
                                           TVO_PrefersSubtypeBinding |
                                           TVO_CanBindToHole);

@@ -3535,10 +3535,8 @@ namespace {
 
     TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
-    TRIVIAL_TYPE_PRINTER(Placeholder, placeholder)
-
-    void visitHoleType(HoleType *T, StringRef label) {
-      printCommon(label, "hole_type");
+    void visitPlaceholderType(PlaceholderType *T, StringRef label) {
+      printCommon(label, "placeholder_type");
       auto originator = T->getOriginator();
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         printRec("type_variable", typeVar);
@@ -3546,9 +3544,10 @@ namespace {
         VD->dumpRef(PrintWithColorRAII(OS, DeclColor).getOS());
       } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
         printFlag("error_expr");
+      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
+        printRec("dependent_member_type", DMT);
       } else {
-        printRec("dependent_member_type",
-                 originator.get<DependentMemberType *>());
+        printFlag("placeholder_type_repr");
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

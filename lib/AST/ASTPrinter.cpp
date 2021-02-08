@@ -4169,15 +4169,8 @@ public:
   }
 
   void visitPlaceholderType(PlaceholderType *T) {
-    if (Options.PrintTypesForDebugging)
-      Printer << "<<placeholdertype>>";
-    else
-      Printer << "_";
-  }
-
-  void visitHoleType(HoleType *T) {
     if (Options.PrintTypesForDebugging) {
-      Printer << "<<hole for ";
+      Printer << "<<placeholder for ";
       auto originator = T->getOriginator();
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         visit(typeVar);
@@ -4186,8 +4179,10 @@ public:
         Printer << VD->getName();
       } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
         Printer << "error_expr";
+      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
+        visit(DMT);
       } else {
-        visit(originator.get<DependentMemberType *>());
+        Printer << "placeholder_type_repr";
       }
       Printer << ">>";
     } else {

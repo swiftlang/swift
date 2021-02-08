@@ -467,15 +467,18 @@ public:
     auto *repr = IdentTypeRepr::create(Context, components);
 
     // See if the repr resolves to a type.
-    const auto resolution =
-        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+    const auto resolution = TypeResolution::forContextual(
+        DC, options,
+        [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
-        }, /*placeholderHandler*/ [&]() {
+        },
+        /*placeholderHandler*/
+        [&](auto placeholderRepr) {
           // FIXME: Don't let placeholder types escape type resolution.
           // For now, just return the placeholder type.
-          return Context.ThePlaceholderType;
+          return PlaceholderType::get(Context, placeholderRepr);
         });
     const auto ty = resolution.resolveType(repr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
@@ -589,15 +592,20 @@ public:
 
       // See first if the entire repr resolves to a type.
       const Type enumTy =
-          TypeResolution::forContextual(DC, options, [](auto unboundTy) {
-            // FIXME: Don't let unbound generic types escape type resolution.
-            // For now, just return the unbound generic type.
-            return unboundTy;
-          }, /*placeholderHandler*/ [&]() {
-            // FIXME: Don't let placeholder types escape type resolution.
-            // For now, just return the placeholder type.
-            return Context.ThePlaceholderType;
-          }).resolveType(prefixRepr);
+          TypeResolution::forContextual(
+              DC, options,
+              [](auto unboundTy) {
+                // FIXME: Don't let unbound generic types escape type
+                // resolution. For now, just return the unbound generic type.
+                return unboundTy;
+              },
+              /*placeholderHandler*/
+              [&](auto placeholderRepr) {
+                // FIXME: Don't let placeholder types escape type resolution.
+                // For now, just return the placeholder type.
+                return PlaceholderType::get(Context, placeholderRepr);
+              })
+              .resolveType(prefixRepr);
       auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
       if (!enumDecl)
         return nullptr;
@@ -800,10 +808,10 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
         // For now, just return the unbound generic type.
         return unboundTy;
       };
-      placeholderHandler = [&] {
+      placeholderHandler = [&](auto placeholderRepr) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        return Context.ThePlaceholderType;
+        return PlaceholderType::get(Context, placeholderRepr);
       };
     }
     return validateTypedPattern(
@@ -870,10 +878,10 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
           // For now, just return the unbound generic type.
           return unboundTy;
         };
-        placeholderHandler = [&]() {
+        placeholderHandler = [&](auto placeholderRepr) {
           // FIXME: Don't let placeholder types escape type resolution.
           // For now, just return the placeholder type.
-          return Context.ThePlaceholderType;
+          return PlaceholderType::get(Context, placeholderRepr);
         };
       }
       TypedPattern *TP = cast<TypedPattern>(somePat->getSubPattern());
@@ -1064,6 +1072,12 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
       if (!type->isEqual(patternType) && !type->hasError()) {
         if (options & TypeResolutionFlags::OverrideType) {
           TP->setType(type);
+          // If the pattern type has a placeholder, we need to resolve it here.
+          if (patternType->hasPlaceholder()) {
+            validateTypedPattern(
+                cast<TypedPattern>(TP),
+                TypeResolution::forContextual(dc, options, nullptr, nullptr));
+          }
         } else {
           diags.diagnose(P->getLoc(), diag::pattern_type_mismatch_context,
                          type);

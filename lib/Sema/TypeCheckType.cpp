@@ -2029,7 +2029,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Placeholder: {
     // Fill in the placeholder if there's an appropriate handler.
     if (const auto handlerFn = resolution.getPlaceholderHandler())
-      if (const auto ty = handlerFn())
+      if (const auto ty = handlerFn(cast<PlaceholderTypeRepr>(repr)))
         return ty;
 
     // Complain if we're allowed to and bail out with an error.

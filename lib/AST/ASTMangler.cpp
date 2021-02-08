@@ -958,7 +958,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
     case TypeKind::TypeVariable:
-    case TypeKind::Hole:
+    case TypeKind::Placeholder:
       llvm_unreachable("mangling type variable");
 
     case TypeKind::Module:
@@ -966,7 +966,6 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
 
     case TypeKind::Error:
     case TypeKind::Unresolved:
-    case TypeKind::Placeholder:
       appendOperator("Xe");
       return;
 

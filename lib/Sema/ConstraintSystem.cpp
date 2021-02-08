@@ -788,11 +788,16 @@ Type ConstraintSystem::convertInferableTypes(
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
                                       locator);
-      } else if (type->is<PlaceholderType>()) {
-        return createTypeVariable(getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape |
-                                      TVO_PrefersSubtypeBinding |
-                                      TVO_CanBindToHole);
+      } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
+        if (auto *placeholderRepr = placeholderTy->getOriginator()
+                                        .dyn_cast<PlaceholderTypeRepr *>()) {
+
+          return createTypeVariable(
+              getConstraintLocator(
+                  locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
+              TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+                  TVO_CanBindToHole);
+        }
       }
 
       return type;
@@ -2866,7 +2871,7 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
           if (shouldAttemptFixes() &&
               getPhase() == ConstraintSystemPhase::Solving) {
-            return HoleType::get(getASTContext(), memberTy);
+            return PlaceholderType::get(getASTContext(), memberTy);
           }
 
           return memberTy;
@@ -2901,7 +2906,7 @@ Type ConstraintSystem::simplifyType(Type type) const {
 }
 
 Type Solution::simplifyType(Type type) const {
-  if (!(type->hasTypeVariable() || type->hasHole()))
+  if (!(type->hasTypeVariable() || type->hasPlaceholder()))
     return type;
 
   // Map type variables to fixed types from bindings.
@@ -2909,11 +2914,12 @@ Type Solution::simplifyType(Type type) const {
   auto resolvedType = cs.simplifyTypeImpl(
       type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
 
-  // Holes shouldn't be reachable through a solution, they are only
+  // Placeholders shouldn't be reachable through a solution, they are only
   // useful to determine what went wrong exactly.
-  if (resolvedType->hasHole()) {
+  if (resolvedType->hasPlaceholder()) {
     return resolvedType.transform([&](Type type) {
-      return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType) : type;
+      return type->isPlaceholder() ? Type(cs.getASTContext().TheUnresolvedType)
+                                   : type;
     });
   }
 
@@ -5264,7 +5270,7 @@ void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
   }
 }
 
-// Replace any error types encountered with holes.
+// Replace any error types encountered with placeholders.
 Type ConstraintSystem::getVarType(const VarDecl *var) {
   auto type = var->getType();
 
@@ -5278,7 +5284,7 @@ Type ConstraintSystem::getVarType(const VarDecl *var) {
   return type.transform([&](Type type) {
     if (!type->is<ErrorType>())
       return type;
-    return HoleType::get(Context, const_cast<VarDecl *>(var));
+    return PlaceholderType::get(Context, const_cast<VarDecl *>(var));
   });
 }
 
@@ -5325,7 +5331,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(PotentialBindings &bindings)
   if (bindings.isDirectHole()) {
     auto *locator = getLocator();
     // If this type variable is associated with a code completion token
-    // and it failed to infer any bindings let's adjust hole's locator
+    // and it failed to infer any bindings let's adjust holes's locator
     // to point to a code completion token to avoid attempting to "fix"
     // this problem since its rooted in the fact that constraint system
     // is under-constrained.

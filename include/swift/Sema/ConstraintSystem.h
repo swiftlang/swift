@@ -255,7 +255,7 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to a non-escaping type or not.
   TVO_CanBindToNoEscape = 0x04,
 
-  /// Whether the type variable can be bound to a hole type or not.
+  /// Whether the type variable can be bound to a hole or not.
   TVO_CanBindToHole = 0x08,
 
   /// Whether a more specific deduction for this type variable implies a
@@ -327,7 +327,7 @@ public:
   /// Whether this type variable can bind to an inout type.
   bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
-  /// Whether this type variable can bind to a hole type.
+  /// Whether this type variable can bind to a hole.
   bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
@@ -5033,10 +5033,12 @@ public:
                                  const ConstraintLocatorBuilder &locator)
       : cs(cs), locator(locator) {}
 
-  Type operator()() const {
+  Type operator()(PlaceholderTypeRepr *placeholderRepr) const {
     return cs.createTypeVariable(
-        cs.getConstraintLocator(locator),
-        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding | TVO_CanBindToHole);
+        cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+            TVO_CanBindToHole);
   }
 };
 

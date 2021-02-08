@@ -1393,15 +1393,18 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     // Resolve the TypeRepr to get the base type for the lookup.
     const auto options =
         TypeResolutionOptions(TypeResolverContext::InExpression);
-    const auto resolution =
-        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+    const auto resolution = TypeResolution::forContextual(
+        DC, options,
+        [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
-        }, /*placeholderHandler*/ [&]() {
+        },
+        /*placeholderHandler*/
+        [&](auto placeholderRepr) {
           // FIXME: Don't let placeholder types escape type resolution.
           // For now, just return the placeholder type.
-          return getASTContext().ThePlaceholderType;
+          return PlaceholderType::get(getASTContext(), placeholderRepr);
         });
     const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
@@ -1933,15 +1936,18 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         TypeResolutionOptions(TypeResolverContext::InExpression) |
         TypeResolutionFlags::SilenceErrors;
 
-    const auto resolution =
-        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+    const auto resolution = TypeResolution::forContextual(
+        DC, options,
+        [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
-        }, /*placeholderHandler*/ [&]() {
+        },
+        /*placeholderHandler*/
+        [&](auto placeholderRepr) {
           // FIXME: Don't let placeholder types escape type resolution.
           // For now, just return the placeholder type.
-          return getASTContext().ThePlaceholderType;
+          return PlaceholderType::get(getASTContext(), placeholderRepr);
         });
     const auto result = resolution.resolveType(typeExpr->getTypeRepr());
     if (result->hasError())

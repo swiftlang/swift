@@ -2181,10 +2181,10 @@ static Type validateParameterType(ParamDecl *decl) {
       // For now, just return the unbound generic type.
       return unboundTy;
     };
-    placeholderHandler = [&]() {
+    placeholderHandler = [&](auto placeholderRepr) {
       // FIXME: Don't let placeholder types escape type resolution.
       // For now, just return the placeholder type.
-      return ctx.ThePlaceholderType;
+      return PlaceholderType::get(ctx, placeholderRepr);
     };
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
@@ -2782,10 +2782,12 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.
         return unboundTy;
-      }, /*placeholderHandler*/ [&]() {
+      },
+      /*placeholderHandler*/
+      [&](auto placeholderRepr) {
         // FIXME: Don't let placeholder types escape type resolution.
         // For now, just return the placeholder type.
-        return ext->getASTContext().ThePlaceholderType;
+        return PlaceholderType::get(ext->getASTContext(), placeholderRepr);
       });
 
   const auto extendedType = resolution.resolveType(extendedRepr);

@@ -595,8 +595,6 @@ ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
         ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
-    ThePlaceholderType(new (*this, AllocationArena::Permanent)
-                       PlaceholderType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
                                             /*HasExplicitAnyObject=*/false)),
@@ -1519,9 +1517,8 @@ bool ASTContext::hadError() const {
 /// Retrieve the arena from which we should allocate storage for a type.
 static AllocationArena getArena(RecursiveTypeProperties properties) {
   bool hasTypeVariable = properties.hasTypeVariable();
-  bool hasHole = properties.hasTypeHole();
-  return hasTypeVariable || hasHole ? AllocationArena::ConstraintSolver
-                                    : AllocationArena::Permanent;
+  return hasTypeVariable ? AllocationArena::ConstraintSolver
+                         : AllocationArena::Permanent;
 }
 
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
@@ -2497,11 +2494,10 @@ Type ErrorType::get(Type originalType) {
   return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
-Type HoleType::get(ASTContext &ctx, Originator originator) {
+Type PlaceholderType::get(ASTContext &ctx, Originator originator) {
   assert(originator);
-  auto arena = getArena(RecursiveTypeProperties::HasTypeHole);
-  return new (ctx, arena)
-      HoleType(ctx, originator, RecursiveTypeProperties::HasTypeHole);
+  return new (ctx, AllocationArena::Permanent)
+      PlaceholderType(ctx, originator, RecursiveTypeProperties::HasPlaceholder);
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
@@ -2945,7 +2941,7 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
                                                 ReferenceOwnership ownership,
                                                 const ASTContext &C) {
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
-  assert(!T->hasHole());
+  assert(!T->hasPlaceholder());
   switch (optionalityOf(ownership)) {
   case ReferenceOwnershipOptionality::Disallowed:
     assert(!T->getOptionalObjectType() && "optional type is disallowed");
@@ -3104,7 +3100,7 @@ isFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       Type result) {
-  static_assert(RecursiveTypeProperties::BitWidth == 13,
+  static_assert(RecursiveTypeProperties::BitWidth == 12,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
 
@@ -3332,7 +3328,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
-  assert(!result->hasHole());
+  assert(!result->hasPlaceholder());
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, result, info);
@@ -3678,7 +3674,7 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 13,
+  static_assert(RecursiveTypeProperties::BitWidth == 12,
                 "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
