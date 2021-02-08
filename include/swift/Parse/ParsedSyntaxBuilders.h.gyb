@@ -51,7 +51,7 @@ public:
     : SPCtx(SPCtx) {}
 
 %     for child in node.children:
-  Parsed${node.name}Builder &use${child.name}(Parsed${child.type_name} ${child.name});
+  Parsed${node.name}Builder &use${child.name}(Parsed${child.type_name} &&${child.name});
 %       child_node = NODE_MAP.get(child.syntax_kind)
 %       if child_node and child_node.is_syntax_collection():
 %         child_elt = child_node.collection_element_name

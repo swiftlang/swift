@@ -26,7 +26,7 @@ public:
     : RawNode(std::move(rawNode)) {}
 
   const ParsedRawSyntaxNode &getRaw() const { return RawNode; }
-  ParsedRawSyntaxNode takeRaw() { return std::move(RawNode); }
+  ParsedRawSyntaxNode &&takeRaw() { return std::move(RawNode); }
   syntax::SyntaxKind getKind() const { return RawNode.getKind(); }
 
   /// Returns true if the syntax node is of the given type.

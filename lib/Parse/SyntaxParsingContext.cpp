@@ -186,7 +186,7 @@ SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
 }
 
 /// Add RawSyntax to the parts.
-void SyntaxParsingContext::addRawSyntax(ParsedRawSyntaxNode Raw) {
+void SyntaxParsingContext::addRawSyntax(ParsedRawSyntaxNode &&Raw) {
   getStorage().emplace_back(std::move(Raw));
 }
 
@@ -219,7 +219,7 @@ void SyntaxParsingContext::addToken(Token &Tok, StringRef LeadingTrivia,
 }
 
 /// Add Syntax to the parts.
-void SyntaxParsingContext::addSyntax(ParsedSyntax Node) {
+void SyntaxParsingContext::addSyntax(ParsedSyntax &&Node) {
   if (!Enabled)
     return;
   addRawSyntax(Node.takeRaw());

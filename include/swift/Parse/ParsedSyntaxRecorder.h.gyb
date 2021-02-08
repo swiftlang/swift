@@ -39,7 +39,7 @@ struct ParsedSyntaxRecorder {
 %         if child.is_optional:
 %            param_type = "Optional<%s>" % param_type
 %         end
-%         child_params.append("%s %s" % (param_type, child.name))
+%         child_params.append("%s &&%s" % (param_type, child.name))
 %     end
 %     child_params = ', '.join(child_params)
 private:
