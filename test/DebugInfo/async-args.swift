@@ -4,8 +4,6 @@
 // RUN:    --check-prefix=CHECK-%target-cpu
 // REQUIRES: concurrency
 
-// REQUIRES: rdar73983938
-
 func use<T>(_ t: T) {}
 func forceSplit() async {
 }
@@ -30,15 +28,15 @@ func withGenericArg<T>(_ msg: T) async {
   // CHECK-arm64e: [[PTRAUTH_BLEND:%[0-9]+]] = call i64 @llvm.ptrauth.blend.i64(i64 [[CTXT_PTR_INT]], i64 48546)
   // CHECK-arm64e: [[SIGNED_CTXT_INT:%[0-9]+]] = ptrtoint i8* [[SIGNED_CTXT]] 
   // CHECK-arm64e: [[CTXT:%[0-9]+]] = call i64 @llvm.ptrauth.auth.i64(i64 [[SIGNED_CTXT_INT]], i32 2, i64 [[PTRAUTH_BLEND]])
-  // CHECK-arm64e:   %[[ALLOCA:[0-9+]]] = inttoptr i64 [[CTXT]] to i8*, !dbg !77
-  // CHECK-arm64e: call void @llvm.dbg.declare(metadata i8* %[[ALLOCA]],
-  // CHECK-arm64e-SAME:   metadata ![[TAU_R:[0-9]+]], metadata !DIExpression(
-  // CHECK-arm64e-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
-  // CHECK-arm64e-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
+  // CHECK-arm64e:   %[[ALLOCA:[0-9+]]] = inttoptr i64 [[CTXT]] to i8*
   // CHECK-arm64e: call void @llvm.dbg.declare(metadata i8* %[[ALLOCA]],
   // CHECK-arm64e-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
-  // CHECK-arm64e-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET]],
+  // CHECK-arm64e-SAME:     DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
   // CHECK-arm64e-SAME:     DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
+  // CHECK-arm64e: call void @llvm.dbg.declare(metadata i8* %[[ALLOCA]],
+  // CHECK-arm64e-SAME:   metadata ![[TAU_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-arm64e-SAME:     DW_OP_plus_uconst, [[OFFSET]],
+  // CHECK-arm64e-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
 
   // CHECK-i386: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA:[^,]+]],
   // CHECK-i386-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
@@ -69,6 +67,26 @@ func withGenericArg<T>(_ msg: T) async {
   // CHECK-armv7-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET]],
   // CHECK-armv7-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
   // CHECK-armv7: store i8* %2, i8** %[[ALLOCA]], align
+
+  // CHECK-armv7k: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA:[^,]+]],
+  // CHECK-armv7k-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-armv7k-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
+  // CHECK-armv7k-SAME:     DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
+  // CHECK-armv7k: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA]],
+  // CHECK-armv7k-SAME:   metadata ![[TAU_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-armv7k-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET]],
+  // CHECK-armv7k-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
+  // CHECK-armv7k: store i8* %2, i8** %[[ALLOCA]], align
+
+  // CHECK-armv7s: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA:[^,]+]],
+  // CHECK-armv7s-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-armv7s-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET:[0-9]+]],
+  // CHECK-armv7s-SAME:     DW_OP_plus_uconst, {{[0-9]+}}, DW_OP_deref))
+  // CHECK-armv7s: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA]],
+  // CHECK-armv7s-SAME:   metadata ![[TAU_R:[0-9]+]], metadata !DIExpression(
+  // CHECK-armv7s-SAME:     DW_OP_deref, DW_OP_plus_uconst, [[OFFSET]],
+  // CHECK-armv7s-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
+  // CHECK-armv7s: store i8* %2, i8** %[[ALLOCA]], align
 
   // CHECK-arm64: call void @llvm.dbg.declare(metadata i8** %[[ALLOCA:[^,]+]],
   // CHECK-arm64-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(
