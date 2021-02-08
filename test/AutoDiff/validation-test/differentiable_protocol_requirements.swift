@@ -17,7 +17,7 @@ var ProtocolRequirementAutodiffTests = TestSuite("ProtocolRequirementDifferentia
 // MARK: - Method requirements.
 
 protocol DiffReq: Differentiable {
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func f(_ x: Tracked<Float>) -> Tracked<Float>
 }
 
@@ -31,13 +31,13 @@ extension DiffReq where TangentVector: AdditiveArithmetic {
 struct Quadratic: DiffReq, AdditiveArithmetic {
   typealias TangentVector = Quadratic
 
-  @differentiable
+  @differentiable(reverse)
   let a: Tracked<Float>
 
-  @differentiable
+  @differentiable(reverse)
   let b: Tracked<Float>
 
-  @differentiable
+  @differentiable(reverse)
   let c: Tracked<Float>
 
   init(_ a: Tracked<Float>, _ b: Tracked<Float>, _ c: Tracked<Float>) {
@@ -46,7 +46,7 @@ struct Quadratic: DiffReq, AdditiveArithmetic {
     self.c = c
   }
 
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func f(_ x: Tracked<Float>) -> Tracked<Float> {
     return a * x * x + b * x + c
   }
@@ -63,24 +63,24 @@ ProtocolRequirementAutodiffTests.testWithLeakChecking("func") {
 // MARK: - Constructor, accessor, and subscript requirements.
 
 protocol FunctionsOfX: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   init(x: Tracked<Float>)
 
-  @differentiable
+  @differentiable(reverse)
   var x: Tracked<Float> { get }
 
-  @differentiable
+  @differentiable(reverse)
   var y: Tracked<Float> { get }
 
-  @differentiable
+  @differentiable(reverse)
   var z: Tracked<Float> { get }
 
-  @differentiable
+  @differentiable(reverse)
   subscript() -> Tracked<Float> { get }
 }
 
 struct TestFunctionsOfX: FunctionsOfX {
-  @differentiable
+  @differentiable(reverse)
   init(x: Tracked<Float>) {
     self.x = x
     self.y = x * x
@@ -97,7 +97,7 @@ struct TestFunctionsOfX: FunctionsOfX {
     return y + x
   }
 
-  @differentiable
+  @differentiable(reverse)
   subscript() -> Tracked<Float> {
     return z
   }
@@ -123,11 +123,11 @@ ProtocolRequirementAutodiffTests.testWithLeakChecking("constructor, accessor, su
 // MARK: - Test witness method SIL type computation.
 
 protocol P: Differentiable {
-  @differentiable(wrt: (x, y))
+  @differentiable(reverse, wrt: (x, y))
   func foo(_ x: Tracked<Float>, _ y: Double) -> Tracked<Float>
 }
 struct S: P {
-  @differentiable(wrt: (x, y))
+  @differentiable(reverse, wrt: (x, y))
   func foo(_ x: Tracked<Float>, _ y: Double) -> Tracked<Float> {
     return x
   }
@@ -141,18 +141,18 @@ public protocol Distribution {
 }
 
 public protocol DifferentiableDistribution: Differentiable, Distribution {
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func logProbability(of value: Value) -> Tracked<Float>
 }
 
 struct Foo: DifferentiableDistribution {
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func logProbability(of value: Tracked<Float>) -> Tracked<Float> {
     .zero
   }
 }
 
-@differentiable
+@differentiable(reverse)
 func blah<T: DifferentiableDistribution>(_ x: T) -> Tracked<Float>
 where T.Value: AdditiveArithmetic {
   x.logProbability(of: .zero)
@@ -162,12 +162,12 @@ where T.Value: AdditiveArithmetic {
 
 public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  @differentiable(wrt: self)
-  @differentiable(wrt: (self, value))
+  @differentiable(reverse, wrt: self)
+  @differentiable(reverse, wrt: (self, value))
   func logProbability(of value: Value) -> Tracked<Float>
 }
 
-@differentiable
+@differentiable(reverse)
 func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Tracked<Float>
 where T.Value: AdditiveArithmetic {
   x.logProbability(of: value)
@@ -177,17 +177,17 @@ where T.Value: AdditiveArithmetic {
 
 protocol DifferentiableFoo {
   associatedtype T: Differentiable
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func foo(_ x: T) -> Tracked<Float>
 }
 
 protocol MoreDifferentiableFoo: Differentiable, DifferentiableFoo {
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func foo(_ x: T) -> Tracked<Float>
 }
 
 struct MoreDifferentiableFooStruct: MoreDifferentiableFoo {
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func foo(_ x: Tracked<Float>) -> Tracked<Float> {
     x
   }
@@ -198,12 +198,12 @@ struct MoreDifferentiableFooStruct: MoreDifferentiableFoo {
 protocol ExtraDerivativeConstraint {}
 
 protocol HasExtraConstrainedDerivative {
-  @differentiable
+  @differentiable(reverse)
   func requirement<T: Differentiable & ExtraDerivativeConstraint>(_ x: T) -> T
 }
 
 struct SatisfiesDerivativeWithLessConstraint: HasExtraConstrainedDerivative {
-  @differentiable
+  @differentiable(reverse)
   func requirement<T: Differentiable>(_ x: T) -> T { x }
 }
 

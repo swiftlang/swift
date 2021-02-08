@@ -2223,6 +2223,28 @@ getActualAutoDiffDerivativeFunctionKind(uint8_t raw) {
   return None;
 }
 
+/// Translate from the Serialization differentiability kind enum values to the
+/// AST strongly-typed enum.
+///
+/// The former is guaranteed to be stable, but may not reflect this version of
+/// the AST.
+static Optional<swift::DifferentiabilityKind>
+getActualDifferentiabilityKind(uint8_t diffKind) {
+  switch (diffKind) {
+#define CASE(THE_DK) \
+  case (uint8_t)serialization::DifferentiabilityKind::THE_DK: \
+    return swift::DifferentiabilityKind::THE_DK;
+  CASE(NonDifferentiable)
+  CASE(Forward)
+  CASE(Reverse)
+  CASE(Normal)
+  CASE(Linear)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   uint8_t rawOpaqueReadOwnership,
                                   uint8_t rawReadImplKind,
@@ -4384,20 +4406,24 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
-        bool linear;
+        uint64_t rawDiffKind;
         GenericSignatureID derivativeGenSigId;
         ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, linear, derivativeGenSigId, parameters);
+            scratch, isImplicit, rawDiffKind, derivativeGenSigId,
+            parameters);
 
+        auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
+        if (!diffKind)
+          MF.fatal();
         auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
           parametersBitVector[i] = parameters[i];
         auto *indices = IndexSubset::get(ctx, parametersBitVector);
         auto *diffAttr = DifferentiableAttr::create(
-            ctx, isImplicit, SourceLoc(), SourceRange(), linear,
+            ctx, isImplicit, SourceLoc(), SourceRange(), *diffKind,
             /*parsedParameters*/ {}, /*trailingWhereClause*/ nullptr);
 
         // Cache parameter indices so that they can set later.
@@ -4648,26 +4674,6 @@ getActualFunctionTypeRepresentation(uint8_t rep) {
   CASE(Block)
   CASE(Thin)
   CASE(CFunctionPointer)
-#undef CASE
-  default:
-    return None;
-  }
-}
-
-/// Translate from the Serialization differentiability kind enum values to the
-/// AST strongly-typed enum.
-///
-/// The former is guaranteed to be stable, but may not reflect this version of
-/// the AST.
-static Optional<swift::DifferentiabilityKind>
-getActualDifferentiabilityKind(uint8_t rep) {
-  switch (rep) {
-#define CASE(THE_CC) \
-  case (uint8_t)serialization::DifferentiabilityKind::THE_CC: \
-    return swift::DifferentiabilityKind::THE_CC;
-  CASE(NonDifferentiable)
-  CASE(Normal)
-  CASE(Linear)
 #undef CASE
   default:
     return None;

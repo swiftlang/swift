@@ -7002,7 +7002,7 @@ linear_function
   linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
 
 Bundles a function with its transpose function into a
-``@differentiable(linear)`` function.
+``@differentiable(_linear)`` function.
 
 ``[parameters ...]`` specifies parameter indices that the original function is
 linear with respect to.
@@ -7051,11 +7051,11 @@ linear_function_extract
 
   sil-linear-function-extractee ::= 'original' | 'transpose'
 
-  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
-  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
+  linear_function_extract [original] %0 : $@differentiable(_linear) (T) -> T
+  linear_function_extract [transpose] %0 : $@differentiable(_linear) (T) -> T
 
 Extracts the original function or a transpose function from the given
-``@differentiable(linear)`` function. The extractee is one of the following:
+``@differentiable(_linear)`` function. The extractee is one of the following:
 ``[original]`` or ``[transpose]``.
 
 

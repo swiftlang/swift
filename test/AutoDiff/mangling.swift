@@ -2,21 +2,21 @@
 
 import _Differentiation
 
-@differentiable
+@differentiable(reverse)
 func foo(_ x: Float) -> Float { x }
 
 // CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] @$s8mangling3fooyS2fF : $@convention(thin) (Float) -> Float {
 // CHECK:  jvp: @$s8mangling3fooyS2fFTJfSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK:  vjp: @$s8mangling3fooyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 
-@differentiable
+@differentiable(reverse)
 func generic<T: Differentiable>(_ x: T) -> T { x }
 
 // CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] <T where T : Differentiable> @$s8mangling7genericyxx16_Differentiation14DifferentiableRzlF : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
 // CHECK:  jvp: @$s8mangling7genericyxx16_Differentiation14DifferentiableRzlFAcDRzlTJfSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
 // CHECK:  vjp: @$s8mangling7genericyxx16_Differentiation14DifferentiableRzlFAcDRzlTJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
 
-@differentiable(where T: Differentiable)
+@differentiable(reverse where T: Differentiable)
 func genericConstrained<T>(_ x: T) -> T { x }
 
 // CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] <T where T : Differentiable> @$s8mangling18genericConstrainedyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
@@ -24,8 +24,8 @@ func genericConstrained<T>(_ x: T) -> T { x }
 // CHECK:  vjp: @$s8mangling18genericConstrainedyxxlF16_Differentiation14DifferentiableRzlTJrSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_0.TangentVector, τ_0_0.TangentVector>)
 
 class Class: Differentiable {
-  @differentiable(wrt: (self, x))
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: (self, x))
+  @differentiable(reverse, wrt: x)
   func f(_ x: Float) -> Float { x }
 }
 

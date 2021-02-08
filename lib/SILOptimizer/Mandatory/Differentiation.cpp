@@ -58,7 +58,7 @@ using llvm::SmallDenseSet;
 using llvm::SmallMapVector;
 using llvm::SmallSet;
 
-/// This flag enables experimental `@differentiable(linear)` function
+/// This flag enables experimental `@differentiable(_linear)` function
 /// transposition.
 static llvm::cl::opt<bool> EnableExperimentalLinearMapTransposition(
     "enable-experimental-linear-map-transposition", llvm::cl::init(false));
@@ -1023,7 +1023,7 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   auto diffResultFnTy = resultFnTy->getWithExtInfo(
       resultFnTy->getExtInfo()
           .intoBuilder()
-          .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+          .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
           .build());
   auto newThunkResult = thunkResult.getWithInterfaceType(diffResultFnTy);
   auto thunkType = SILFunctionType::get(

@@ -41,8 +41,14 @@ class VarDecl;
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
   NonDifferentiable = 0,
-  Normal = 1,
-  Linear = 2
+  // '@differentiable(_forward)', rejected by parser.
+  Forward = 1,
+  // '@differentiable(reverse)', supported.
+  Reverse = 2,
+  // '@differentiable', unsupported.
+  Normal = 3,
+  // '@differentiable(_linear)', unsupported.
+  Linear = 4,
 };
 
 /// The kind of an linear map.
@@ -74,8 +80,14 @@ struct AutoDiffDerivativeFunctionKind {
       : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
   explicit AutoDiffDerivativeFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
-  AutoDiffLinearMapKind getLinearMapKind() {
+  AutoDiffLinearMapKind getLinearMapKind() const {
     return (AutoDiffLinearMapKind::innerty)rawValue;
+  }
+  DifferentiabilityKind getMinimalDifferentiabilityKind() const {
+    switch (rawValue) {
+    case JVP: return DifferentiabilityKind::Forward;
+    case VJP: return DifferentiabilityKind::Reverse;
+    }
   }
 };
 
@@ -98,7 +110,7 @@ struct NormalDifferentiableFunctionTypeComponent {
   Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
 };
 
-/// A component of a SIL `@differentiable(linear)` function-typed value.
+/// A component of a SIL `@differentiable(_linear)` function-typed value.
 struct LinearDifferentiableFunctionTypeComponent {
   enum innerty : unsigned {
     Original = 0,

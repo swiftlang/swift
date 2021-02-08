@@ -10,33 +10,33 @@ var ClassTests = TestSuite("ClassDifferentiation")
 
 ClassTests.test("TrivialMember") {
   final class C: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var float: Float
 
     @noDerivative
     final var noDerivative: Float = 1
 
-    @differentiable
+    @differentiable(reverse)
     init(_ float: Float) {
       self.float = float
     }
 
-    @differentiable
+    @differentiable(reverse)
     convenience init(convenience x: Float) {
       self.init(x)
     }
 
-    @differentiable
+    @differentiable(reverse)
     func method(_ x: Float) -> Float {
       x * float
     }
 
-    @differentiable
+    @differentiable(reverse)
     func testNoDerivative() -> Float {
       noDerivative
     }
 
-    @differentiable
+    @differentiable(reverse)
     static func controlFlow(_ c1: C, _ c2: C, _ flag: Bool) -> Float {
       var result: Float = 0
       if flag {
@@ -60,20 +60,20 @@ ClassTests.test("TrivialMember") {
 
 ClassTests.test("NontrivialMember") {
   final class C: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var float: Tracked<Float>
 
-    @differentiable
+    @differentiable(reverse)
     init(_ float: Tracked<Float>) {
       self.float = float
     }
 
-    @differentiable
+    @differentiable(reverse)
     func method(_ x: Tracked<Float>) -> Tracked<Float> {
       x * float
     }
 
-    @differentiable
+    @differentiable(reverse)
     static func controlFlow(_ c1: C, _ c2: C, _ flag: Bool) -> Tracked<Float> {
       var result: Tracked<Float> = 0
       if flag {
@@ -94,15 +94,15 @@ ClassTests.test("NontrivialMember") {
 
 ClassTests.test("GenericNontrivialMember") {
   final class C<T: Differentiable>: Differentiable where T == T.TangentVector {
-    @differentiable
+    @differentiable(reverse)
     var x: Tracked<T>
 
-    @differentiable
+    @differentiable(reverse)
     init(_ x: T) {
       self.x = Tracked(x)
     }
 
-    @differentiable
+    @differentiable(reverse)
     convenience init(convenience x: T) {
       self.init(x)
     }
@@ -115,15 +115,15 @@ ClassTests.test("GenericNontrivialMember") {
 // TF-1149: Test class with loadable type but address-only `TangentVector` type.
 ClassTests.test("AddressOnlyTangentVector") {
   final class C<T: Differentiable>: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var stored: T
 
-    @differentiable
+    @differentiable(reverse)
     init(_ stored: T) {
       self.stored = stored
     }
 
-    @differentiable
+    @differentiable(reverse)
     func method(_ x: T) -> T {
       stored
     }
@@ -138,7 +138,7 @@ ClassTests.test("AddressOnlyTangentVector") {
 // TF-1175: Test whether class-typed arguments are not marked active.
 ClassTests.test("ClassArgumentActivity") {
   class C: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var x: Float
 
     init(_ x: Float) {
@@ -180,7 +180,7 @@ ClassTests.test("FinalClassMethods") {
 
 ClassTests.test("ClassMethods") {
   class Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 2 * x
     }
@@ -201,14 +201,14 @@ ClassTests.test("ClassMethods") {
   }
 
   class SubOverride: Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
   class SubOverrideCustomDerivatives: Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
@@ -245,7 +245,7 @@ ClassTests.test("ClassMethods - wrt self") {
       self.base = base
     }
 
-    @differentiable(wrt: (self, x))
+    @differentiable(reverse, wrt: (self, x))
     func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return base * x
     }
@@ -269,19 +269,19 @@ ClassTests.test("ClassMethods - wrt self") {
   }
 
   final class SubOverride: Super {
-    @differentiable
+    @differentiable(reverse)
     override init(base: Tracked<Float>) {
       super.init(base: base)
     }
 
-    @differentiable(wrt: (self, x))
+    @differentiable(reverse, wrt: (self, x))
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
   final class SubOverrideCustomDerivatives: Super {
-    @differentiable
+    @differentiable(reverse)
     override init(base: Tracked<Float>) {
       super.init(base: base)
     }
@@ -293,8 +293,8 @@ ClassTests.test("ClassMethods - wrt self") {
       return (SubOverrideCustomDerivatives(base: base), { x in x.base * 2 })
     }
 
-    @differentiable(wrt: (self, x))
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: (self, x))
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
@@ -334,7 +334,7 @@ ClassTests.test("ClassMethods - wrt self") {
 
 ClassTests.test("ClassMethods - generic") {
   class Super<T: Differentiable & FloatingPoint> where T == T.TangentVector {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func f(_ x: Tracked<T>) -> Tracked<T> {
       return Tracked<T>(2) * x
     }
@@ -355,14 +355,14 @@ ClassTests.test("ClassMethods - generic") {
   }
 
   class SubOverride<T: Differentiable & FloatingPoint>: Super<T> where T == T.TangentVector {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<T>) -> Tracked<T> {
       return x
     }
   }
 
   class SubSpecializeOverride: Super<Float> {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
@@ -370,7 +370,7 @@ ClassTests.test("ClassMethods - generic") {
 
   class SubOverrideCustomDerivatives<T: Differentiable & FloatingPoint>: Super<T>
   where T == T.TangentVector {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<T>) -> Tracked<T> {
       return Tracked<T>(3) * x
     }
@@ -392,7 +392,7 @@ ClassTests.test("ClassMethods - generic") {
 
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   class SubSpecializeOverrideCustomDerivatives: Super<Float80> {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Tracked<Float80>) -> Tracked<Float80> {
       return 3 * x
     }
@@ -435,13 +435,13 @@ ClassTests.test("ClassMethods - closure captures") {
     }
 
     // Case 1: generated VJP.
-    @differentiable
+    @differentiable(reverse)
     func apply1(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
 
     // Case 2: custom VJP capturing `self`.
-    @differentiable(wrt: (x))
+    @differentiable(reverse, wrt: (x))
     func apply2(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
@@ -454,7 +454,7 @@ ClassTests.test("ClassMethods - closure captures") {
     }
 
     // Case 3: custom VJP capturing `self.coefficient`.
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func apply3(to x: Tracked<Float>) -> Tracked<Float> {
       return coefficient * x
     }
@@ -495,12 +495,12 @@ ClassTests.test("ClassMethods - closure captures") {
 
 ClassTests.test("ClassProperties") {
   class Super: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var base: Tracked<Float>
 
     init(base: Tracked<Float>) { self.base = base }
 
-    @differentiable
+    @differentiable(reverse)
     var squared: Tracked<Float> { base * base }
 
     @derivative(of: squared)
@@ -511,7 +511,7 @@ ClassTests.test("ClassProperties") {
   }
 
   class Sub1: Super {
-    @differentiable
+    @differentiable(reverse)
     override var squared: Tracked<Float> { base * base }
   }
 

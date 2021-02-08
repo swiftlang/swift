@@ -5,7 +5,7 @@
 
 import _Differentiation
 
-@differentiable
+@differentiable(reverse)
 public func topLevelDifferentiable(_ x: Float, _ y: Float) -> Float { x }
 
 public func topLevelHasDerivative<T: Differentiable>(_ x: T) -> T {
@@ -24,20 +24,20 @@ public struct Struct: Differentiable {
 
   // Test property: getter and setter.
   public var property: Float {
-    @differentiable
+    @differentiable(reverse)
     get { stored }
-    @differentiable
+    @differentiable(reverse)
     set { stored = newValue }
   }
 
   // Test initializer.
-  @differentiable
+  @differentiable(reverse)
   public init(_ x: Float) {
     stored = x.squareRoot()
   }
 
   // Test delegating initializer.
-  @differentiable
+  @differentiable(reverse)
   public init(blah x: Float) {
     self.init(x)
   }
@@ -54,10 +54,10 @@ public struct Struct: Differentiable {
 
   // Test subscript: getter and setter.
   public subscript(_ x: Float) -> Float {
-    @differentiable
+    @differentiable(reverse)
     get { x }
 
-    @differentiable
+    @differentiable(reverse)
     set { stored = newValue }
   }
 
@@ -77,7 +77,7 @@ public struct Struct: Differentiable {
 }
 
 extension Array where Element == Struct {
-  @differentiable
+  @differentiable(reverse)
   public func sum() -> Float {
     return 0
   }
@@ -85,15 +85,15 @@ extension Array where Element == Struct {
 
 // SR-13866: Dispatch thunks and method descriptor mangling.
 public protocol P: Differentiable {
-  @differentiable(wrt: self)
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: self)
+  @differentiable(reverse, wrt: (self, x))
   func method(_ x: Float) -> Float
 
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   var property: Float { get set }
 
-  @differentiable(wrt: self)
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: self)
+  @differentiable(reverse, wrt: (self, x))
   subscript(_ x: Float) -> Float { get set }
 }
 
@@ -103,13 +103,13 @@ public final class Class: Differentiable {
   var stored: Float
 
   // Test initializer.
-  @differentiable
+  @differentiable(reverse)
   public init(_ x: Float) {
     stored = x
   }
 
   // Test delegating initializer.
-  @differentiable
+  @differentiable(reverse)
   public convenience init(blah x: Float) {
     self.init(x)
   }
@@ -126,11 +126,11 @@ public final class Class: Differentiable {
 
   // Test subscript: getter and setter.
   public subscript(_ x: Float) -> Float {
-    @differentiable
+    @differentiable(reverse)
     get { x }
 
     // FIXME(SR-13096)
-    // @differentiable
+    // @differentiable(reverse)
     // set { stored = newValue }
   }
 

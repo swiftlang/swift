@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 593; // foreign async convention
+const uint16_t SWIFTMODULE_VERSION_MINOR = 594; // @differentiable(reverse) attr
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -237,10 +237,12 @@ using FunctionTypeRepresentationField = BCFixed<4>;
 // the module version.
 enum class DifferentiabilityKind : uint8_t {
   NonDifferentiable = 0,
+  Forward,
+  Reverse,
   Normal,
   Linear,
 };
-using DifferentiabilityKindField = BCFixed<2>;
+using DifferentiabilityKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing the
 // module version.
@@ -1884,7 +1886,7 @@ namespace decls_block {
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
-    BCFixed<1>, // Linear flag.
+    DifferentiabilityKindField, // Differentiability kind.
     GenericSignatureIDField, // Derivative generic signature.
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;

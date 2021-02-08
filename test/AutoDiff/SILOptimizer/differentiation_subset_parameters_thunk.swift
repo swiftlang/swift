@@ -14,7 +14,7 @@ func foo_vjp<T: NumericDifferentiable>(_ x: T, _ y: T) -> (
   (foo(x, y), { _ in (.zero, .zero) })
 }
 
-@differentiable
+@differentiable(reverse)
 func differentiate_foo_wrt_0(_ x: Float) -> Float {
   foo(x, 1)
 }
@@ -49,9 +49,9 @@ func vjpInoutIndirect<T: Differentiable, U: Differentiable, V: Differentiable>(
   })
 }
 
-@differentiable(wrt: x)
-@differentiable(wrt: y)
-@differentiable
+@differentiable(reverse, wrt: x)
+@differentiable(reverse, wrt: y)
+@differentiable(reverse)
 func inoutIndirectCaller<T: Differentiable, U: Differentiable, V: Differentiable>(
   _ x: T, _ y: U, _ z: V
 ) -> U {
@@ -60,7 +60,7 @@ func inoutIndirectCaller<T: Differentiable, U: Differentiable, V: Differentiable
   return result
 }
 
-@differentiable(wrt: (x, z))
+@differentiable(reverse, wrt: (x, z))
 func concreteInoutIndirectCaller(
   _ x: Float, _ y: Double, _ z: Float
 ) -> Double {

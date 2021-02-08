@@ -7,8 +7,8 @@
 import _Differentiation
 
 class Class: Differentiable {
-  @differentiable(wrt: (self, x))
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: (self, x))
+  @differentiable(reverse, wrt: x)
   func f(_ x: Float) -> Float { x }
 }
 

@@ -23,7 +23,7 @@ public struct ConditionallyDifferentiable<T> {
 extension ConditionallyDifferentiable: Differentiable where T: Differentiable {}
 
 // CHECK-AST-LABEL: public struct ConditionallyDifferentiable<T> {
-// CHECK-AST:         @differentiable(wrt: self where T : Differentiable)
+// CHECK-AST:         @differentiable(reverse, wrt: self where T : Differentiable)
 // CHECK-AST:         public var x: T
 // CHECK-AST:         internal init(x: T)
 // CHECK-AST:       }

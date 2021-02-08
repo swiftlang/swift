@@ -1420,6 +1420,14 @@ namespace {
         metadataDifferentiabilityKind =
             FunctionMetadataDifferentiabilityKind::Linear;
         break;
+      case DifferentiabilityKind::Forward:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Forward;
+        break;
+      case DifferentiabilityKind::Reverse:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Reverse;
+        break;
       }
 
       auto flagsVal = FunctionTypeFlags()

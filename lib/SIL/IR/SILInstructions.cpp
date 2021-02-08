@@ -616,7 +616,7 @@ SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
     IndexSubset *ResultIndices) {
   assert(!ResultIndices->isEmpty());
   auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
-  auto diffTy = fnTy->getWithDifferentiability(DifferentiabilityKind::Normal,
+  auto diffTy = fnTy->getWithDifferentiability(DifferentiabilityKind::Reverse,
                                                ParameterIndices, ResultIndices);
   return SILType::getPrimitiveObjectType(diffTy);
 }
@@ -707,7 +707,11 @@ SILType DifferentiableFunctionExtractInst::getExtracteeType(
     SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
     SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
-  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
+  // TODO: Ban 'Normal' and 'Forward'.
+  assert(
+      fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Reverse ||
+      fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal ||
+      fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Forward);
   auto originalFnTy = fnTy->getWithoutDifferentiability();
   auto kindOpt = extractee.getAsDerivativeFunctionKind();
   if (!kindOpt) {

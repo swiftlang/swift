@@ -5,19 +5,19 @@
 import _Differentiation
 
 protocol P {
-  @differentiable
+  @differentiable(reverse)
   func req(_ input: Float) -> Float
 }
 
 extension P {
-  @differentiable
+  @differentiable(reverse)
   func foo(_ input: Float) -> Float {
     return req(input)
   }
 }
 
 struct Dummy: P {
-  @differentiable
+  @differentiable(reverse)
   func req(_ input: Float) -> Float {
     input
   }
@@ -26,7 +26,7 @@ struct Dummy: P {
 struct DummyComposition: P {
   var layer = Dummy()
 
-  @differentiable
+  @differentiable(reverse)
   func req(_ input: Float) -> Float {
     layer.foo(input)
   }

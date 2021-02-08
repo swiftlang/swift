@@ -10,7 +10,7 @@ var MethodTests = TestSuite("Method")
 
 struct Parameter : Equatable {
   private let storedX: Tracked<Float>
-  @differentiable(wrt: (self))
+  @differentiable(reverse, wrt: (self))
   var x: Tracked<Float> {
       return storedX
   }
@@ -157,7 +157,7 @@ MethodTests.testWithLeakChecking("static method with generated adjoint, wrt all 
 
 // Test self-reordering thunk for jvp/vjp methods.
 struct DiffWrtSelf : Differentiable {
-  @differentiable(wrt: (self, x, y))
+  @differentiable(reverse, wrt: (self, x, y))
   func call<T : Differentiable, U : Differentiable>(_ x: T, _ y: U) -> T {
     return x
   }
@@ -175,7 +175,7 @@ struct DiffWrtSelf : Differentiable {
 
 struct CustomParameter : Equatable {
   let storedX: Tracked<Float>
-  @differentiable(wrt: (self))
+  @differentiable(reverse, wrt: (self))
   var x: Tracked<Float> {
       return storedX
   }
@@ -216,7 +216,7 @@ extension Tracked where T : FloatingPoint {
 }
 
 extension CustomParameter {
-  @differentiable(wrt: (self))
+  @differentiable(reverse, wrt: (self))
   func squared() -> Tracked<Float> {
     return x * x
   }
@@ -226,7 +226,7 @@ extension CustomParameter {
     return (squared(), { [x] v in CustomParameter(x: (2 * x).clamped(to: -10.0...10.0) * v) })
   }
 
-  @differentiable
+  @differentiable(reverse)
   static func squared(p: CustomParameter) -> Tracked<Float> {
     return p.x * p.x
   }
@@ -241,17 +241,17 @@ extension CustomParameter {
   // There is currently no way to define multiple custom VJPs wrt different
   // parameters on the same func, so we define a copy of this func per adjoint.
 
-  @differentiable(wrt: (self, other))
+  @differentiable(reverse, wrt: (self, other))
   func multiplied(with other: Tracked<Float>) -> Tracked<Float> {
     return x * other
   }
 
-  @differentiable(wrt: (other))
+  @differentiable(reverse, wrt: (other))
   func multiplied_constSelf(with other: Tracked<Float>) -> Tracked<Float> {
     return x * other
   }
 
-  @differentiable(wrt: (self))
+  @differentiable(reverse, wrt: (self))
   func multiplied_constOther(with other: Tracked<Float>) -> Tracked<Float> {
     return x * other
   }
@@ -281,13 +281,13 @@ extension CustomParameter {
     return (r, { v in pb(v).0 })
   }
 
-  @differentiable
+  @differentiable(reverse)
   static func multiply(_ lhs: CustomParameter, _ rhs: CustomParameter)
       -> Tracked<Float> {
     return lhs.x * rhs.x
   }
 
-  @differentiable(wrt: (rhs))
+  @differentiable(reverse, wrt: (rhs))
   static func multiply_constLhs(_ lhs: CustomParameter, _ rhs: CustomParameter) -> Tracked<Float> {
     return lhs.x * rhs.x
   }

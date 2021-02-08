@@ -124,6 +124,14 @@ enum class AutoDiffFunctionKind : char {
   Pullback = 'p',
 };
 
+enum class MangledDifferentiabilityKind : char {
+  NonDifferentiable = 0,
+  Forward = 'f',
+  Reverse = 'r',
+  Normal = 'd',
+  Linear = 'l',
+};
+
 /// The pass that caused the specialization to occur. We use this to make sure
 /// that two passes that generate similar changes do not yield the same
 /// mangling. This currently cannot happen, so this is just a safety measure

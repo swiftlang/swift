@@ -84,14 +84,14 @@ public struct Foo: Differentiable {
   public typealias TangentVector = DummyTangentVector
   public mutating func move(along _: TangentVector) {}
 
-  @differentiable
+  @differentiable(reverse)
   public var x: Float
 
 // CHECK-LABEL: // differentiability witness for Foo.x.getter
 // CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooV1xSfvg : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 
-  @differentiable
+  @differentiable(reverse)
   public init(_ x: Float) {
     self.x = x
   }
@@ -100,7 +100,7 @@ public struct Foo: Differentiable {
 // CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooVyACSfcfC : $@convention(method) (Float, @thin Foo.Type) -> Foo {
 // CHECK-NEXT: }
 
-  @differentiable
+  @differentiable(reverse)
   public func method() -> Float {
     x
   }
@@ -109,7 +109,7 @@ public struct Foo: Differentiable {
 // CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooV6methodSfyF : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 
-  @differentiable
+  @differentiable(reverse)
   public var computedProperty: Float {
     x
   }
@@ -118,7 +118,7 @@ public struct Foo: Differentiable {
 // CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s29sil_differentiability_witness3FooV16computedPropertySfvg : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 
-  @differentiable
+  @differentiable(reverse)
   public subscript() -> Float {
     x
   }
@@ -129,12 +129,12 @@ public struct Foo: Differentiable {
 }
 
 // Test function that is differentiable wrt subset of its parameters:
-// - wrt x: explicit @differentiable attribute, with no custom derivative specified
-// - wrt y: explicit @differentiable attribute, with custom derivative specified
-// - wrt x, y: custom deriviative specified, with no explicit @differentiable attribute
+// - wrt x: explicit @differentiable(reverse) attribute, with no custom derivative specified
+// - wrt y: explicit @differentiable(reverse) attribute, with custom derivative specified
+// - wrt x, y: custom deriviative specified, with no explicit @differentiable(reverse) attribute
 // Has a tuple argument to verify that indices are correctly lowered to SIL.
 
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 public func wrt_subset(_ tup: (Int, Int), _ x: Float, _ y: Float) -> Float {
   return 0
 }
@@ -179,7 +179,7 @@ public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) ->
 
 protocol P1: Differentiable {}
 extension P1 {
-  @differentiable // derivative generic signature: none
+  @differentiable(reverse) // derivative generic signature: none
   func foo() -> Float { 1 }
 }
 extension P1 {
@@ -196,7 +196,7 @@ extension P1 {
 
 // Test custom derivatives of functions with generic signatures and `@differentiable` attributes.
 
-@differentiable
+@differentiable(reverse)
 @_silgen_name("genericWithDiffAttr")
 public func genericWithDiffAttr<T: Differentiable>(_ x: T) -> T { fatalError() }
 
@@ -214,7 +214,7 @@ public func vjpGenericWithDiffAttr<T: Differentiable>(_ x: T)
 
 // CHECK-NOT: // differentiability witness for genericWithDiffAttr
 
-@differentiable(where T: Differentiable)
+@differentiable(reverse where T: Differentiable)
 @_silgen_name("genericWithConstrainedDifferentiable")
 public func genericWithConstrainedDifferentiable<T>(_ x: T) -> T { fatalError() }
 
@@ -233,7 +233,7 @@ public func vjpGenericWithConstrainedDifferentiable<T: Differentiable>(_ x: T)
 // CHECK-NOT: // differentiability witness for genericWithConstrainedDifferentiable
 
 public extension Differentiable {
-  @differentiable
+  @differentiable(reverse)
   @_silgen_name("protocolExtensionWithDiffAttr")
   func protocolExtensionWithDiffAttr() -> Self { self }
 

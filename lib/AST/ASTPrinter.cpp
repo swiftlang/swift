@@ -4156,12 +4156,22 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (!Options.excludeAttrKind(TAK_differentiable) &&
-        info.isDifferentiable()) {
-      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
-        Printer << "@differentiable(linear) ";
-      } else {
+    if (!Options.excludeAttrKind(TAK_differentiable)) {
+      switch (info.getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal:
         Printer << "@differentiable ";
+        break;
+      case DifferentiabilityKind::Linear:
+        Printer << "@differentiable(_linear) ";
+        break;
+      case DifferentiabilityKind::Forward:
+        Printer << "@differentiable(_forward) ";
+        break;
+      case DifferentiabilityKind::Reverse:
+        Printer << "@differentiable(reverse) ";
+        break;
+      case DifferentiabilityKind::NonDifferentiable:
+        break;
       }
     }
 
@@ -4230,15 +4240,24 @@ public:
     if (Options.SkipAttributes)
       return;
 
-    if (!Options.excludeAttrKind(TAK_differentiable) &&
-        info.isDifferentiable()) {
-      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
-        Printer << "@differentiable(linear) ";
-      } else {
+    if (!Options.excludeAttrKind(TAK_differentiable)) {
+      switch (info.getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal:
         Printer << "@differentiable ";
+        break;
+      case DifferentiabilityKind::Linear:
+        Printer << "@differentiable(_linear) ";
+        break;
+      case DifferentiabilityKind::Forward:
+        Printer << "@differentiable(_forward) ";
+        break;
+      case DifferentiabilityKind::Reverse:
+        Printer << "@differentiable(reverse) ";
+        break;
+      case DifferentiabilityKind::NonDifferentiable:
+        break;
       }
     }
-
 
     SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {

@@ -11,44 +11,44 @@ public struct DummyTangentVector: Differentiable & AdditiveArithmetic {
   public typealias TangentVector = Self
 }
 
-@differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+@differentiable(reverse) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 let globalConst: Float = 1
 
-@differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+@differentiable(reverse) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 var globalVar: Float = 1
 
 func testLocalVariables() {
   // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
-  @differentiable
+  @differentiable(reverse)
   var getter: Float {
     return 1
   }
 
   // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
-  @differentiable
+  @differentiable(reverse)
   var getterSetter: Float {
     get { return 1 }
     set {}
   }
 }
 
-@differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+@differentiable(reverse) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 protocol P {}
 
-@differentiable() // ok!
+@differentiable(reverse) // ok!
 func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
 // Test duplicate `@differentiable` attributes.
 
-@differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
-@differentiable // expected-note {{other attribute declared here}}
+@differentiable(reverse) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
+@differentiable(reverse) // expected-note {{other attribute declared here}}
 func dupe_attributes(arg: Float) -> Float { return arg }
 
-@differentiable(wrt: arg1)
-@differentiable(wrt: arg2) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
-@differentiable(wrt: arg2) // expected-note {{other attribute declared here}}
+@differentiable(reverse, wrt: arg1)
+@differentiable(reverse, wrt: arg2) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
+@differentiable(reverse, wrt: arg2) // expected-note {{other attribute declared here}}
 func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
 
 struct ComputedPropertyDupeAttributes<T: Differentiable>: Differentiable {
@@ -57,17 +57,17 @@ struct ComputedPropertyDupeAttributes<T: Differentiable>: Differentiable {
 
   var value: T
 
-  @differentiable // expected-note {{other attribute declared here}}
+  @differentiable(reverse) // expected-note {{other attribute declared here}}
   var computed1: T {
-    @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
+    @differentiable(reverse) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
     get { value }
     set { value = newValue }
   }
 
   // TODO(TF-482): Remove diagnostics when `@differentiable` attributes are
   // also uniqued based on generic requirements.
-  @differentiable(where T == Float) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
-  @differentiable(where T == Double) // expected-note {{other attribute declared here}}
+  @differentiable(reverse where T == Float) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
+  @differentiable(reverse where T == Double) // expected-note {{other attribute declared here}}
   var computed2: T {
     get { value }
     set { value = newValue }
@@ -76,10 +76,10 @@ struct ComputedPropertyDupeAttributes<T: Differentiable>: Differentiable {
 
 // Test TF-568.
 protocol WrtOnlySelfProtocol: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   var computedProperty: Float { get }
 
-  @differentiable
+  @differentiable(reverse)
   func method() -> Float
 }
 
@@ -87,57 +87,57 @@ class Class: Differentiable {
   typealias TangentVector = DummyTangentVector
   func move(along _: TangentVector) {}
 }
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func invalidDiffWrtClass(_ x: Class) -> Class {
   return x
 }
 
 protocol Proto {}
 // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x
 }
 
-// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but '@differentiable (Float) -> Float' does not conform to 'Differentiable'}}
-@differentiable(wrt: fn)
-func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but '@differentiable(reverse) (Float) -> Float' does not conform to 'Differentiable'}}
+@differentiable(reverse, wrt: fn)
+func invalidDiffWrtFunction(_ fn: @differentiable(reverse) (Float) -> Float) -> Float {
   return fn(.pi)
 }
 
 // expected-error @+1 {{'invalidDiffNoParams()' has no parameters to differentiate with respect to}}
-@differentiable
+@differentiable(reverse)
 func invalidDiffNoParams() -> Float {
   return 1
 }
 
 // expected-error @+1 {{cannot differentiate void function 'invalidDiffVoidResult(x:)'}}
-@differentiable
+@differentiable(reverse)
 func invalidDiffVoidResult(x: Float) {}
 
 // Test static methods.
 struct StaticMethod {
   // expected-error @+1 {{'invalidDiffNoParams()' has no parameters to differentiate with respect to}}
-  @differentiable
+  @differentiable(reverse)
   static func invalidDiffNoParams() -> Float {
     return 1
   }
 
   // expected-error @+1 {{cannot differentiate void function 'invalidDiffVoidResult(x:)'}}
-  @differentiable
+  @differentiable(reverse)
   static func invalidDiffVoidResult(x: Float) {}
 }
 
 // Test instance methods.
 struct InstanceMethod {
   // expected-error @+1 {{'invalidDiffNoParams()' has no parameters to differentiate with respect to}}
-  @differentiable
+  @differentiable(reverse)
   func invalidDiffNoParams() -> Float {
     return 1
   }
 
   // expected-error @+1 {{cannot differentiate void function 'invalidDiffVoidResult(x:)'}}
-  @differentiable
+  @differentiable(reverse)
   func invalidDiffVoidResult(x: Float) {}
 }
 
@@ -146,7 +146,7 @@ struct DifferentiableInstanceMethod: Differentiable {
   typealias TangentVector = DummyTangentVector
   mutating func move(along _: TangentVector) {}
 
-  @differentiable // ok
+  @differentiable(reverse) // ok
   func noParams() -> Float {
     return 1
   }
@@ -157,28 +157,28 @@ struct SubscriptMethod: Differentiable {
   typealias TangentVector = DummyTangentVector
   mutating func move(along _: TangentVector) {}
 
-  @differentiable // ok
+  @differentiable(reverse) // ok
   subscript(implicitGetter x: Float) -> Float {
     return x
   }
 
-  @differentiable // ok
+  @differentiable(reverse) // ok
   subscript(implicitGetterSetter x: Float) -> Float {
     get { return x }
     set {}
   }
 
   subscript(explicit x: Float) -> Float {
-    @differentiable // ok
+    @differentiable(reverse) // ok
     get { return x }
-    @differentiable
+    @differentiable(reverse)
     set {}
   }
 
   subscript(x: Float, y: Float) -> Float {
-    @differentiable // ok
+    @differentiable(reverse) // ok
     get { return x + y }
-    @differentiable
+    @differentiable(reverse)
     set {}
   }
 }
@@ -186,57 +186,57 @@ struct SubscriptMethod: Differentiable {
 // expected-error @+3 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
 // expected-error @+2 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
 // expected-note @+1 {{use 'Scalar == Float' to require 'Scalar' to be 'Float'}}
-@differentiable(where Scalar: Float)
+@differentiable(reverse where Scalar: Float)
 func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
-@differentiable(where T: AnyObject)
+@differentiable(reverse where T: AnyObject)
 func invalidAnyObjectRequirement<T: Differentiable>(x: T) -> T {
   return x
 }
 
 // expected-error @+1 {{'@differentiable' attribute does not yet support layout requirements}}
-@differentiable(where Scalar: _Trivial)
+@differentiable(reverse where Scalar: _Trivial)
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
 // expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
-@differentiable
+@differentiable(reverse)
 func missingConformance<T>(_ x: T) -> T {
   return x
 }
 
 protocol ProtocolRequirements: Differentiable {
   // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Float)'}}
-  @differentiable
+  @differentiable(reverse)
   init(x: Float, y: Float)
 
   // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Int)'}}
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   init(x: Float, y: Int)
 
   // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Float) -> Float';}}
-  @differentiable
+  @differentiable(reverse)
   func amb(x: Float, y: Float) -> Float
 
   // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Int) -> Float';}}
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func amb(x: Float, y: Int) -> Float
 
   // expected-note @+3 {{protocol requires function 'f1'}}
   // expected-note @+2 {{overridden declaration is here}}
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func f1(_ x: Float) -> Float
 
   // expected-note @+2 {{protocol requires function 'f2'}}
-  @differentiable(wrt: (self, x, y))
+  @differentiable(reverse, wrt: (self, x, y))
   func f2(_ x: Float, _ y: Float) -> Float
 }
 
 protocol ProtocolRequirementsRefined: ProtocolRequirements {
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(reverse)'}}
   func f1(_ x: Float) -> Float
 }
 
@@ -272,7 +272,7 @@ struct InternalDiffAttrConformance: ProtocolRequirements {
     return x
   }
 
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
   }
@@ -289,7 +289,7 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   var y: Float
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
   public init(x: Float, y: Float) {
     self.x = x
@@ -297,39 +297,39 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   }
 
   // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
   public init(x: Float, y: Int) {
     self.x = x
     self.y = Float(y)
   }
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}} {{10-10=@differentiable }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Float) -> Float'}}
   public func amb(x: Float, y: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(wrt: x)' attribute to satisfy requirement}} {{10-10=@differentiable(wrt: x) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse, wrt: x)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse, wrt: x) }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Int) -> Float'}}
   public func amb(x: Float, y: Int) -> Float {
     return x
   }
 
-  // expected-note @+1 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}}
   public func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable' attribute to satisfy requirement}}
-  @differentiable(wrt: (self, x))
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}}
+  @differentiable(reverse, wrt: (self, x))
   public func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
   }
 }
 
 protocol ProtocolRequirementsWithDefault_NoConformingTypes {
-  @differentiable
+  @differentiable(reverse)
   func f1(_ x: Float) -> Float
 }
 extension ProtocolRequirementsWithDefault_NoConformingTypes {
@@ -339,7 +339,7 @@ extension ProtocolRequirementsWithDefault_NoConformingTypes {
 }
 
 protocol ProtocolRequirementsWithDefault {
-  @differentiable
+  @differentiable(reverse)
   func f1(_ x: Float) -> Float
 }
 extension ProtocolRequirementsWithDefault {
@@ -350,7 +350,7 @@ struct DiffAttrConformanceErrors2: ProtocolRequirementsWithDefault {
 }
 
 protocol NotRefiningDiffable {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func a(_ x: Float) -> Float
 }
 
@@ -359,8 +359,8 @@ struct CertainlyNotDiffableWrtSelf: NotRefiningDiffable {
 }
 
 protocol TF285: Differentiable {
-  @differentiable(wrt: (x, y))
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: (x, y))
+  @differentiable(reverse, wrt: x)
   func foo(x: Float, y: Float) -> Float
 }
 
@@ -368,9 +368,9 @@ struct TF285MissingOneDiffAttr: TF285 {
   typealias TangentVector = DummyTangentVector
   mutating func move(along _: TangentVector) {}
 
-  // Requirement is missing the required `@differentiable(wrt: (x, y))` attribute.
+  // Requirement is missing the required `@differentiable(reverse, wrt: (x, y))` attribute.
   // Since `TF285MissingOneDiffAttr.foo` is internal, the attribute is implicitly created.
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func foo(x: Float, y: Float) -> Float {
     return x
   }
@@ -384,7 +384,7 @@ struct TF_521<T: FloatingPoint> {
   var imaginary: T
 
   // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'TF_521<T>' does not conform to 'Differentiable'}}
-  @differentiable(where T: Differentiable, T == T.TangentVector)
+  @differentiable(reverse where T: Differentiable, T == T.TangentVector)
   init(real: T = 0, imaginary: T = 0) {
     self.real = real
     self.imaginary = imaginary
@@ -396,19 +396,19 @@ extension TF_521: Differentiable where T: Differentiable {
   typealias TangentVector = TF_521
 }
 // expected-error @+1 {{result type 'TF_521<Float>' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
-let _: @differentiable(Float, Float) -> TF_521<Float> = { r, i in
+let _: @differentiable(reverse) (Float, Float) -> TF_521<Float> = { r, i in
   TF_521(real: r, imaginary: i)
 }
 
 // TF-296: Infer `@differentiable` wrt parameters to be to all parameters that conform to `Differentiable`.
 
-@differentiable
+@differentiable(reverse)
 func infer1(_ a: Float, _ b: Int) -> Float {
   return a + Float(b)
 }
 
-@differentiable
-func infer2(_ fn: @differentiable(Float) -> Float, x: Float) -> Float {
+@differentiable(reverse)
+func infer2(_ fn: @differentiable(reverse) (Float) -> Float, x: Float) -> Float {
   return fn(x)
 }
 
@@ -418,7 +418,7 @@ struct DiffableStruct: Differentiable {
 
   var a: Float
 
-  @differentiable
+  @differentiable(reverse)
   func fn(_ b: Float, _ c: Int) -> Float {
     return a + b + Float(c)
   }
@@ -427,7 +427,7 @@ struct DiffableStruct: Differentiable {
 struct NonDiffableStruct {
   var a: Float
 
-  @differentiable
+  @differentiable(reverse)
   func fn(_ b: Float) -> Float {
     return a + b
   }
@@ -441,84 +441,84 @@ struct NumberWrtStruct: Differentiable {
 
   var a, b: Float
 
-  @differentiable(wrt: 0) // ok
-  @differentiable(wrt: 1) // ok
+  @differentiable(reverse, wrt: 0) // ok
+  @differentiable(reverse, wrt: 1) // ok
   func foo1(_ x: Float, _ y: Float) -> Float {
     return a*x + b*y
   }
 
-  @differentiable(wrt: -1) // expected-error {{expected a parameter, which can be a function parameter name, parameter index, or 'self'}}
-  @differentiable(wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
+  @differentiable(reverse, wrt: -1) // expected-error {{expected a parameter, which can be a function parameter name, parameter index, or 'self'}}
+  @differentiable(reverse, wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
   func foo2(_ x: Float, _ y: Float) -> Float {
     return a*x + b*y
   }
 
-  @differentiable(wrt: (x, 1)) // ok
-  @differentiable(wrt: (0)) // ok
+  @differentiable(reverse, wrt: (x, 1)) // ok
+  @differentiable(reverse, wrt: (0)) // ok
   static func staticFoo1(_ x: Float, _ y: Float) -> Float {
     return x + y
   }
 
-  @differentiable(wrt: (1, 1)) // expected-error {{parameters must be specified in original order}}
-  @differentiable(wrt: (2)) // expected-error {{parameter index is larger than total number of parameters}}
+  @differentiable(reverse, wrt: (1, 1)) // expected-error {{parameters must be specified in original order}}
+  @differentiable(reverse, wrt: (2)) // expected-error {{parameter index is larger than total number of parameters}}
   static func staticFoo2(_ x: Float, _ y: Float) -> Float {
     return x + y
   }
 }
 
-@differentiable(wrt: y) // ok
+@differentiable(reverse, wrt: y) // ok
 func two1(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: (x, y)) // ok
+@differentiable(reverse, wrt: (x, y)) // ok
 func two2(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: (0, y)) // ok
+@differentiable(reverse, wrt: (0, y)) // ok
 func two3(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: (x, 1)) // ok
+@differentiable(reverse, wrt: (x, 1)) // ok
 func two4(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: (0, 1)) // ok
+@differentiable(reverse, wrt: (0, 1)) // ok
 func two5(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: 2) // expected-error {{parameter index is larger than total number of parameters}}
+@differentiable(reverse, wrt: 2) // expected-error {{parameter index is larger than total number of parameters}}
 func two6(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: (1, 0)) // expected-error {{parameters must be specified in original order}}
+@differentiable(reverse, wrt: (1, 0)) // expected-error {{parameters must be specified in original order}}
 func two7(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
+@differentiable(reverse, wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
 func two8(x: Float, y: Float) -> Float {
   return x + y
 }
 
-@differentiable(wrt: (y, 0)) // expected-error {{parameters must be specified in original order}}
+@differentiable(reverse, wrt: (y, 0)) // expected-error {{parameters must be specified in original order}}
 func two9(x: Float, y: Float) -> Float {
   return x + y
 }
 
 // Inout 'wrt:' arguments.
 
-@differentiable(wrt: y)
+@differentiable(reverse, wrt: y)
 func inout1(x: Float, y: inout Float) -> Void {
   let _ = x + y
 }
 // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-@differentiable(wrt: y)
+@differentiable(reverse, wrt: y)
 func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
 }
@@ -532,21 +532,21 @@ public protocol Distribution {
 
 public protocol DifferentiableDistribution: Differentiable, Distribution {
   // expected-note @+2 {{overridden declaration is here}}
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func logProbability(of value: Value) -> Float
 }
 
 // Adding a more general `@differentiable` attribute.
 public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(wrt: self)'}} {{3-3=@differentiable(wrt: self) }}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(reverse, wrt: self)'}} {{3-3=@differentiable(reverse, wrt: self) }}
   func logProbability(of value: Value) -> Float
 }
 
 // Test failure to satisfy protocol requirement's `@differentiable` attribute.
 
 public protocol HasRequirement {
-  @differentiable
+  @differentiable(reverse)
   // expected-note @+1 {{protocol requires function 'requirement' with type '<T> (T, T) -> T'; do you want to add a stub?}}
   func requirement<T: Differentiable>(_ x: T, _ y: T) -> T
 }
@@ -555,8 +555,8 @@ public protocol HasRequirement {
 public struct AttemptsToSatisfyRequirement: HasRequirement {
   // This `@differentiable` attribute does not satisfy the requirement because
   // it is mroe constrained than the requirement's `@differentiable` attribute.
-  @differentiable(where T: CustomStringConvertible)
-  // expected-note @+1 {{candidate is missing explicit '@differentiable(wrt: (x, y))' attribute to satisfy requirement}}
+  @differentiable(reverse where T: CustomStringConvertible)
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse, wrt: (x, y))' attribute to satisfy requirement}}
   public func requirement<T: Differentiable>(_ x: T, _ y: T) -> T { x }
 }
 
@@ -566,7 +566,7 @@ protocol ProtocolRequirementUnsupported: Differentiable {
   associatedtype Scalar
 
   // expected-error @+1 {{'@differentiable' attribute on protocol requirement cannot specify 'where' clause}}
-  @differentiable(where Scalar: Differentiable)
+  @differentiable(reverse where Scalar: Differentiable)
   func unsupportedWhereClause(value: Scalar) -> Float
 }
 extension ProtocolRequirementUnsupported {
@@ -584,7 +584,7 @@ class Super: Differentiable {
   var base: Float
 
   // expected-error @+1 {{'@differentiable' attribute cannot be declared on 'init' in a non-final class; consider making 'Super' final}}
-  @differentiable
+  @differentiable(reverse)
   init(base: Float) {
     self.base = base
   }
@@ -595,36 +595,36 @@ class Super: Differentiable {
   // - Adds JVP/VJP vtable entries for the class method.
   // There's currently no way using `@differentiable` to do only one of the
   // above.
-  @differentiable
+  @differentiable(reverse)
   func testClassMethod(_ x: Float) -> Float { x }
 
-  @differentiable
+  @differentiable(reverse)
   final func testFinalMethod(_ x: Float) -> Float { x }
 
-  @differentiable
+  @differentiable(reverse)
   static func testStaticMethod(_ x: Float) -> Float { x }
 
-  @differentiable(wrt: (self, x))
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: (self, x))
+  @differentiable(reverse, wrt: x)
   // expected-note @+1 2 {{overridden declaration is here}}
   func testMissingAttributes(_ x: Float) -> Float { x }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func testSuperclassDerivatives(_ x: Float) -> Float { x }
 
   // Test duplicate attributes with different derivative generic signatures.
   // expected-error @+1 {{duplicate '@differentiable' attribute with same parameters}}
-  @differentiable(wrt: x where T: Differentiable)
+  @differentiable(reverse, wrt: x where T: Differentiable)
   // expected-note @+1 {{other attribute declared here}}
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func instanceMethod<T>(_ x: Float, y: T) -> Float { x }
 
   // expected-error @+1 {{'@differentiable' attribute cannot be declared on class members returning 'Self'}}
-  @differentiable
+  @differentiable(reverse)
   func dynamicSelfResult() -> Self { self }
 
   // expected-error @+1 {{'@differentiable' attribute cannot be declared on class members returning 'Self'}}
-  @differentiable
+  @differentiable(reverse)
   var testDynamicSelfProperty: Self { self }
 
   // TODO(TF-632): Fix "'TangentVector' is not a member type of 'Self'" diagnostic.
@@ -637,8 +637,8 @@ class Super: Differentiable {
 }
 
 class Sub: Super {
-  // expected-error @+2 {{overriding declaration is missing attribute '@differentiable(wrt: x)'}}
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}}
+  // expected-error @+2 {{overriding declaration is missing attribute '@differentiable(reverse, wrt: x)'}}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(reverse)'}}
   override func testMissingAttributes(_ x: Float) -> Float { x }
 }
 
@@ -648,7 +648,7 @@ final class FinalClass: Differentiable {
 
   var base: Float
 
-  @differentiable
+  @differentiable(reverse)
   init(base: Float) {
     self.base = base
   }
@@ -656,15 +656,15 @@ final class FinalClass: Differentiable {
 
 // Test `inout` parameters.
 
-@differentiable(wrt: y)
+@differentiable(reverse, wrt: y)
 func inoutVoid(x: Float, y: inout Float) {}
 
 // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-@differentiable
+@differentiable(reverse)
 func multipleSemanticResults(_ x: inout Float) -> Float { x }
 
 // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-@differentiable(wrt: y)
+@differentiable(reverse, wrt: y)
 func swap(x: inout Float, y: inout Float) {}
 
 struct InoutParameters: Differentiable {
@@ -673,20 +673,20 @@ struct InoutParameters: Differentiable {
 }
 
 extension InoutParameters {
-  @differentiable
+  @differentiable(reverse)
   static func staticMethod(_ lhs: inout Self, rhs: Self) {}
 
   // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-  @differentiable
+  @differentiable(reverse)
   static func multipleSemanticResults(_ lhs: inout Self, rhs: Self) -> Self {}
 }
 
 extension InoutParameters {
-  @differentiable
+  @differentiable(reverse)
   mutating func mutatingMethod(_ other: Self) {}
 
   // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-  @differentiable
+  @differentiable(reverse)
   mutating func mutatingMethod(_ other: Self) -> Self {}
 }
 
@@ -698,21 +698,21 @@ struct Accessors: Differentiable {
 
   var stored: Float
   var computed: Float {
-    @differentiable
+    @differentiable(reverse)
     set { stored = newValue }
 
     // `_read` is a coroutine: `(Self) -> () -> ()`.
     // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
-    @differentiable
+    @differentiable(reverse)
     _read { yield stored }
 
     // `_modify` is a coroutine: `(inout Self) -> () -> ()`.
     // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
-    @differentiable
+    @differentiable(reverse)
     _modify { yield &stored }
   }
 }
 
 // expected-error @+1 {{cannot differentiate functions returning opaque result types}}
-@differentiable
+@differentiable(reverse)
 func opaqueResult(_ x: Float) -> some Differentiable { x }
