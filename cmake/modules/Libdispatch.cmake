@@ -109,7 +109,7 @@ foreach(sdk ${DISPATCH_SDKS})
                             IMPORTED_LOCATION
                               ${install_dir}/${LIBDISPATCH_RUNTIME_DIR}/${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX}
                             IMPORTED_IMPLIB
-                              ${install_dir}/lib/${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_SHARED_IMPORT_LIBRARY_SUFFIX}
+                              ${install_dir}/lib/${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_PREFIX}dispatch${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_SUFFIX}
                             INTERFACE_INCLUDE_DIRECTORIES
                               ${install_dir}/include
                             IMPORTED_NO_SONAME
