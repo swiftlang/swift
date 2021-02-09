@@ -2409,21 +2409,10 @@ static bool usesFeatureAsyncAwait(Decl *decl) {
 }
 
 static bool usesFeatureMarkerProtocol(Decl *decl) {
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (proto->isMarkerProtocol())
-      return true;
-  }
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    for (const auto &req: ext->getGenericRequirements()) {
-      if (req.getKind() == RequirementKind::Conformance &&
-          req.getSecondType()->castTo<ProtocolType>()->getDecl()
-              ->isMarkerProtocol())
-        return true;
-    }
-
-    for (const auto &inherited : ext->getInherited()) {
-      if (auto inheritedType = inherited.getType()) {
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
           for (ProtocolType *protoTy : layout.getProtocols()) {
@@ -2433,6 +2422,39 @@ static bool usesFeatureMarkerProtocol(Decl *decl) {
         }
       }
     }
+
+    return false;
+  };
+
+  // Check generic requirements for a marker protocol.
+  auto checkRequirements = [&](ArrayRef<Requirement> requirements) -> bool {
+    for (const auto &req: requirements) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl()
+              ->isMarkerProtocol())
+        return true;
+    }
+
+    return false;
+  };
+
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->isMarkerProtocol())
+      return true;
+
+    if (checkInherited(proto->getInherited()))
+      return true;
+
+    if (checkRequirements(proto->getRequirementSignature()))
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (checkRequirements(ext->getGenericRequirements()))
+      return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
   }
 
   return false;
@@ -5377,9 +5399,10 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
             return true;
 
           if (auto PD = dyn_cast<ProtocolDecl>(NTD)) {
-            // Marker protocols are unprintable on nominal types, but they're
-            // okay on extension declarations.
-            if (PD->isMarkerProtocol() && !isa<ExtensionDecl>(decl))
+            // Marker protocols are unprintable on concrete types, but they're
+            // okay on extension declarations and protocols.
+            if (PD->isMarkerProtocol() && !isa<ExtensionDecl>(decl) &&
+                !isa<ProtocolDecl>(decl))
               return true;
           }
         }

@@ -252,8 +252,8 @@ class InheritedProtocolCollector {
     if (!isPublicOrUsableFromInline(type))
       return false;
 
-    // Extensions can print marker protocols.
-    if (isa<ExtensionDecl>(D))
+    // Extensions and protocols can print marker protocols.
+    if (isa<ExtensionDecl>(D) || isa<ProtocolDecl>(D))
       return true;
 
     ExistentialLayout layout = type->getExistentialLayout();

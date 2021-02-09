@@ -31,6 +31,18 @@ public func globalAsync() async { }
 // CHECK-NEXT: public protocol MP
 @_marker public protocol MP { }
 
+// CHECK: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK-NEXT: @_marker public protocol MP2 : FeatureTest.MP {
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+@_marker public protocol MP2: MP { }
+
+// CHECK: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK-NEXT: public protocol MP3
+// CHECK-NEXT: }
+public protocol MP3: MP { }
+// CHECK-NEXT: #endif
+
 // CHECK: class OldSchool {
 public class OldSchool: MP {
   // CHECK: #if compiler(>=5.3) && $AsyncAwait
