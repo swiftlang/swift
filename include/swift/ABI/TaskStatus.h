@@ -165,8 +165,8 @@ class GroupChildTaskStatusRecord : public ChildTaskStatusRecord {
   TaskGroup *Group;
 public:
   GroupChildTaskStatusRecord(TaskGroup *group, AsyncTask *child)
-    : Group(group),
-      ChildTaskStatusRecord(child, TaskStatusRecordKind::GroupChildTask) {}
+    : ChildTaskStatusRecord(child, TaskStatusRecordKind::GroupChildTask),
+      Group(group) {}
 
   bool isGroup(TaskGroup *group) const {
     return Group == group;

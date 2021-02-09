@@ -437,8 +437,53 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // FIXME: allow dynamic extension/correction?
 }
 
+/// Perform any cancellation actions required by the given record.
+static void performGroupCancellationAction(TaskStatusRecord *record,
+                                           TaskGroup *group) {
+  fprintf(stderr, "[%s:%d] (%s) group cancel record kind: %d\n", __FILE__, __LINE__, __FUNCTION__, record->getKind());
+
+  switch (record->getKind()) {
+  // Deadlines don't require any special support.
+  case TaskStatusRecordKind::Deadline:
+    return;
+
+  // We only need to cancel specific GroupChildTasks, not arbitrary child tasks.
+  // A task may be parent to many tasks which are not part of a group after all.
+  case TaskStatusRecordKind::ChildTask:
+    return;
+
+  case TaskStatusRecordKind::GroupChildTask: {
+    fprintf(stderr, "[%s:%d] (%s) child task\n", __FILE__, __LINE__, __FUNCTION__);
+    auto groupChildRecord = cast<GroupChildTaskStatusRecord>(record);
+    for (AsyncTask *child: groupChildRecord->children())
+      swift_task_cancel(child);
+    return;
+  }
+
+  // Cancellation notifications need to be called.
+  case TaskStatusRecordKind::CancellationNotification: {
+    auto notification =
+      cast<CancellationNotificationStatusRecord>(record);
+    notification->run();
+    return;
+  }
+
+  // Escalation notifications can be ignored.
+  case TaskStatusRecordKind::EscalationNotification:
+    return;
+
+  // Record locks shouldn't be found this way, but they don't have
+  // anything to do anyway.
+  case TaskStatusRecordKind::Private_RecordLock:
+    return;
+}
+
+  // Other cases can fall through here and be ignored.
+  // FIXME: allow dynamic extension/correction?
+}
+
 void swift::swift_task_cancel(AsyncTask *task) {
-  fprintf(stderr, "[%s:%d] (%s): cancel: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+  fprintf(stderr, "[%s:%d] (%s): cancel task: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
@@ -467,6 +512,44 @@ void swift::swift_task_cancel(AsyncTask *task) {
   // the task is now cancelled.
   ActiveTaskStatus cancelledStatus(oldStatus.getInnermostRecord(),
                                    /*cancelled*/ true,
+                                   /*locked*/ false);
+  releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
+}
+
+void swift::swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *group) {
+  fprintf(stderr, "[%s:%d] (%s): cancel group task, task:%d group:\n", __FILE__, __LINE__, __FUNCTION__, task, group);
+  Optional<StatusRecordLockRecord> recordLockRecord;
+
+  // Acquire the status record lock.
+  //
+  // We purposefully DO NOT make this a cancellation by itself.
+  // We are cancelling the task group, and all tasks it contains.
+  // We are NOT cancelling the entire parent task though.
+  auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
+                                           /*forCancellation*/ false);
+//  assert(!oldStatus.isLocked());
+//
+//  // If we were already cancelled or were able to cancel without acquiring
+//  // the lock, there's nothing else to do.
+//  if (oldStatus.isCancelled()) {
+//    fprintf(stderr, "[%s:%d] (%s): task was already cancelled: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+//    return;
+//  }
+//
+//  // Otherwise, we've installed the lock record and are now the
+//  // locking thread.
+
+  // Carry out the cancellation operations associated with all
+  // the active records.
+  for (auto cur: oldStatus.records()) {
+    fprintf(stderr, "[%s:%d] (%s): group cancel record:%d type: %d\n", __FILE__, __LINE__, __FUNCTION__, cur, cur->getKind());
+    performGroupCancellationAction(cur, group);
+  }
+
+  // Release the status record lock, being sure to flag that
+  // the task is now cancelled.
+  ActiveTaskStatus cancelledStatus(oldStatus.getInnermostRecord(),
+                                   /*cancelled*/ oldStatus.isCancelled(), // FIXME???
                                    /*locked*/ false);
   releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
 }

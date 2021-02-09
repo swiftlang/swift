@@ -328,7 +328,15 @@ bool swift::swift_task_group_is_cancelled(AsyncTask *task, TaskGroup *group) {
 // ==== cancelAll --------------------------------------------------------------
 
 void swift::swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group) {
+  fprintf(stderr, "[%s:%d] (%s): cancel all child tasks %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+  // cancel the group, it will not accept any more calls to `add` tasks.
   group->cancelAll(task);
+
+  if (group->isEmpty())
+    return;
+
+  // cancel all existing tasks within the group
+  swift_task_cancel_group_child_tasks(task, group);
 }
 
 bool TaskGroup::cancelAll(AsyncTask *task) {

@@ -316,10 +316,12 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     // TODO: Do we need to delete it manually or is the record infra handling this?
     if (flags.task_isGroupChildTask()) {
       // this task is a child of a task group
+      fprintf(stderr, "[%s:%d] (%s): create group child task record in parent [%d] to %d %d\n", __FILE__, __LINE__, __FUNCTION__, parent, task);
       swift_task_addStatusRecord(parent,
                                  new GroupChildTaskStatusRecord(group, task));
     } else {
       // just a normal child task
+      fprintf(stderr, "[%s:%d] (%s): create child task record in parent [%d] to %d %d\n", __FILE__, __LINE__, __FUNCTION__, parent, task);
       swift_task_addStatusRecord(parent,
                                  new ChildTaskStatusRecord(task));
     }

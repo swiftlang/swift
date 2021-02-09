@@ -272,8 +272,8 @@ extension Task {
 /// ==== -----------------------------------------------------------------------
 
 extension Task.Group {
-  /// Invoked after a withGroup's body returns, and initiates an orderly
-  /// teardown of the task.group. No new tasks are accepted by the group // TODO: don't accept new tasks once body returned to avoid infinitely waiting on accident
+  /// Invoked after a withGroup's body exits, and initiates an orderly
+  /// teardown of the group.
   ///
   /// This function waits until all pending tasks have been processed before
   /// returning.
@@ -287,8 +287,6 @@ extension Task.Group {
   /// If tasks should be cancelled before returning this must be done by an
   /// explicit `group.cancelAll()` call within the `withGroup`'s function body.
   mutating func _tearDown() async {
-    self.cancelAll()
-
     // Drain any not next() awaited tasks if the group wasn't cancelled
     // If any of these tasks were to throw
     //

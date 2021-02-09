@@ -117,6 +117,10 @@ void swift_task_dealloc(AsyncTask *task, void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel(AsyncTask *task);
 
+/// Cancel all child tasks of `parent` that belong to the `group`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *group);
+
 /// Escalate the priority of a task and all of its child tasks.
 ///
 /// This can be called from any thread.
