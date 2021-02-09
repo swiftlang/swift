@@ -1,0 +1,33 @@
+// RUN: %target-swift-frontend -O -emit-ir %s | %FileCheck %s
+//
+// Test LLVM ARC Optimization
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Builtin
+
+typealias AnyObject = Builtin.AnyObject
+
+sil @getObject : $@convention(thin) <T where T : AnyObject> () -> T
+
+// Test swift_getObjCClassFromObject side-effects. It reads the object
+// argument. A release cannot be hoisted above it.
+//
+// CHECK-LABEL: define {{.*}}swiftcc %objc_class* @testGetObjCClassFromObjectSideEffect(%swift.type* %T)
+// CHECK:     entry:
+// CHECK-NEXT:  %0 = tail call swiftcc %objc_object* @getObject(%swift.type* %T)
+// CHECK-NEXT:  %.Type = tail call %objc_class* @swift_getObjCClassFromObject(%objc_object* %0)
+// CHECK-NEXT:  tail call void @swift_unknownObjectRelease(%objc_object* %0)
+// CHECK:       ret %objc_class* %.Type
+// CHECK:     }
+sil @testGetObjCClassFromObjectSideEffect : $@convention(thin) <T where T : AnyObject> () -> @objc_metatype T.Type {
+bb0:
+  %f = function_ref @getObject : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> () -> τ_0_0
+  %obj = apply %f<T>() : $@convention(thin) <τ_0_0 where τ_0_0 : AnyObject> () -> τ_0_0
+  %mt = value_metatype $@objc_metatype T.Type, %obj : $T
+  // Do not hoist this release.
+  strong_release %obj : $T
+  return %mt : $@objc_metatype T.Type
+}
