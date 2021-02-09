@@ -77,11 +77,34 @@ func testMethods(instance: S<String>, Metatype: S<String>.Type,
 }
 
 func testClosures() {
-  let _: (Int) -> Wrapper<Int> = { (@Wrapper value) in
-    _value
+  typealias PropertyWrapperTuple = (Wrapper<Int>, Int, Projection<Int>)
+
+  let _: (Int) -> PropertyWrapperTuple = { (@Wrapper value) in
+    (_value, value, $value)
   }
 
-  let _: (Projection<Int>) -> Wrapper<Int> = { (@Wrapper $value) in
-    _value
+  let _: (Projection<Int>) -> PropertyWrapperTuple = { (@Wrapper $value) in
+    (_value, value, $value)
+  }
+}
+
+@propertyWrapper
+struct ProjectionWrapper<Value> {
+  var wrappedValue: Value
+
+  var projectedValue: ProjectionWrapper<Value> { self }
+
+  init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
+
+  init(projectedValue: ProjectionWrapper<Value>) {
+    self.wrappedValue = projectedValue.wrappedValue
+  }
+}
+
+func testImplicitPropertyWrapper() {
+  typealias PropertyWrapperTuple = (ProjectionWrapper<Int>, Int, ProjectionWrapper<Int>)
+
+  let _: (ProjectionWrapper<Int>) -> PropertyWrapperTuple = { $value in
+    (_value, value, $value)
   }
 }

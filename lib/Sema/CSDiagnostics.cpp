@@ -3309,6 +3309,15 @@ bool MissingProjectedValueFailure::diagnoseAsError() {
   return true;
 }
 
+bool MissingPropertyWrapperAttributeFailure::diagnoseAsError() {
+  emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
+
+  // FIXME: emit a note and fix-it to add '@propertyWrapper' if the
+  // type is a nominal and in the same module.
+
+  return true;
+}
+
 bool SubscriptMisuseFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto &sourceMgr = getASTContext().SourceMgr;

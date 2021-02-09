@@ -5496,6 +5496,9 @@ ERROR(property_wrapper_param_projection_invalid,none,
 ERROR(property_wrapper_param_mutating,none,
       "property wrapper applied to parameter must have a nonmutating "
       "'wrappedValue' getter", ())
+ERROR(invalid_implicit_property_wrapper,none,
+      "inferred projection type %0 is not a property wrapper",
+      (Type))
 
 ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "

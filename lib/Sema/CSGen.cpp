@@ -2053,18 +2053,6 @@ namespace {
                 TVO_CanBindToInOut | TVO_CanBindToNoEscape | TVO_CanBindToHole);
           }
 
-          if (auto wrapperInfo = param->getPropertyWrapperBackingPropertyInfo()) {
-            auto *wrapperAttr = param->getAttachedPropertyWrappers().front();
-            auto wrapperType = param->getAttachedPropertyWrapperType(0);
-            auto backingType = CS.openUnboundGenericTypes(
-                wrapperType, CS.getConstraintLocator(wrapperAttr->getTypeRepr()));
-            CS.setType(wrapperInfo.backingVar, backingType);
-
-            CS.applyPropertyWrapperParameter(backingType, externalType, param,
-                                             param->getName(), ConstraintKind::Equal,
-                                             CS.getConstraintLocator(closure));
-          }
-
           closureParams.push_back(param->toFunctionParam(externalType));
         }
       }
@@ -4082,17 +4070,17 @@ ConstraintSystem::applyPropertyWrapperParameter(
       return getTypeMatchFailure(locator);
     };
 
-    auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+    auto typeInfo = wrapperType->getAnyNominal()->getPropertyWrapperTypeInfo();
     if (!typeInfo.projectedValueVar) {
       auto *fix = AddProjectedValue::create(*this, wrapperType, getConstraintLocator(locator));
       return attemptProjectedValueFix(fix);
     }
 
-    auto projectionType = wrapperType->getTypeOfMember(param->getModuleContext(),
-                                                       typeInfo.projectedValueVar);
+    Type projectionType = computeProjectedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, projectionType, locator);
 
-    if (param->getAttachedPropertyWrappers().front()->getArg()) {
+    if (!param->hasImplicitPropertyWrapper() &&
+        param->getAttachedPropertyWrappers().front()->getArg()) {
       auto *fix = UseWrappedValue::create(*this, param, /*base=*/Type(), wrapperType,
                                           getConstraintLocator(locator));
       return attemptProjectedValueFix(fix);

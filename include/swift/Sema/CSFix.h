@@ -123,6 +123,9 @@ enum class FixKind : uint8_t {
   /// a projection argument.
   AddProjectedValue,
 
+  /// Add '@propertyWrapper' to a nominal type declaration.
+  AddPropertyWrapperAttribute,
+
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
 
@@ -966,7 +969,7 @@ class AddProjectedValue final : public ConstraintFix {
 
   AddProjectedValue(ConstraintSystem &cs, Type wrapper,
                     ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::UseWrappedValue, locator), wrapperType(wrapper) {}
+      : ConstraintFix(cs, FixKind::AddProjectedValue, locator), wrapperType(wrapper) {}
 
 public:
   static AddProjectedValue *create(ConstraintSystem &cs, Type wrapper,
@@ -974,6 +977,24 @@ public:
 
   std::string getName() const override {
     return "add 'var projectedValue' to pass a projection argument";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+};
+
+class AddPropertyWrapperAttribute final : public ConstraintFix {
+  Type wrapperType;
+
+  AddPropertyWrapperAttribute(ConstraintSystem &cs, Type wrapper,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddPropertyWrapperAttribute, locator), wrapperType(wrapper) {}
+
+public:
+  static AddPropertyWrapperAttribute *create(ConstraintSystem &cs, Type wrapper,
+                                             ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "add '@propertyWrapper'";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;

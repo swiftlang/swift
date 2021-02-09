@@ -7831,22 +7831,22 @@ namespace {
         if (!param->hasAttachedPropertyWrapper())
           continue;
 
-        auto wrapperInfo = param->getPropertyWrapperBackingPropertyInfo();
-        auto *backingVar = wrapperInfo.backingVar;
-        auto wrapperType = solution.simplifyType(solution.getType(backingVar));
-        backingVar->setInterfaceType(wrapperType->mapTypeOutOfContext());
+        // Set the interface type of each property wrapper synthesized var
+        auto *backingVar = param->getPropertyWrapperBackingProperty();
+        backingVar->setInterfaceType(
+            solution.simplifyType(solution.getType(backingVar))->mapTypeOutOfContext());
 
-        if (auto *projection = wrapperInfo.projectionVar) {
-          auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
-          auto projectionType = wrapperType->getTypeOfMember(param->getModuleContext(),
-                                                             typeInfo.projectedValueVar);
-          projection->setInterfaceType(projectionType);
+        if (auto *projectionVar = param->getPropertyWrapperProjectionVar()) {
+          projectionVar->setInterfaceType(
+              solution.simplifyType(solution.getType(projectionVar)));
         }
 
         auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
-        auto wrappedValueType = computeWrappedValueType(param, wrapperType);
-        wrappedValueVar->setInterfaceType(wrappedValueType);
+        wrappedValueVar->setInterfaceType(
+            solution.simplifyType(solution.getType(wrappedValueVar)));
       }
+
+      TypeChecker::checkParameterList(closure->getParameters(), closure);
 
       auto &appliedWrappers = Rewriter.solution.appliedPropertyWrappers[closure];
       return Rewriter.buildPropertyWrapperFnThunk(closure, closureFnType, closure,

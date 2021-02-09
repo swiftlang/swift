@@ -2081,13 +2081,6 @@ bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
   TypeChecker::checkClosureAttributes(closure);
   TypeChecker::checkParameterList(closure->getParameters(), closure);
 
-  for (auto *param : *closure->getParameters()) {
-    if (!param->isImplicit() && param->getName().hasDollarPrefix() &&
-        !param->hasAttachedPropertyWrapper()) {
-      param->diagnose(diag::dollar_identifier_decl, param->getName());
-    }
-  }
-
   BraceStmt *body = closure->getBody();
 
   Optional<FunctionBodyTimer> timer;

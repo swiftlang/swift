@@ -8197,6 +8197,54 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         param = param.withFlags(contextualParam->getParameterFlags());
     }
 
+    if (paramDecl->hasAttachedPropertyWrapper()) {
+      bool hasError = false;
+      Type backingType;
+
+      if (paramDecl->hasImplicitPropertyWrapper()) {
+        backingType = getContextualParamAt(i)->getPlainType();
+
+        // If the contextual type is not a property wrapper, record a fix.
+        auto *nominal = backingType->getAnyNominal();
+        if (!(nominal && nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())) {
+          if (!shouldAttemptFixes())
+            return false;
+
+          paramDecl->visitAuxiliaryDecls([](VarDecl *var) {
+            var->setInvalid();
+          });
+
+          auto *fix = AddPropertyWrapperAttribute::create(*this, backingType,
+                                                          getConstraintLocator(paramDecl));
+          recordFix(fix);
+          hasError = true;
+        }
+      } else {
+        auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
+        auto wrapperType = paramDecl->getAttachedPropertyWrapperType(0);
+        backingType = replaceInferableTypesWithTypeVars(
+            wrapperType, getConstraintLocator(wrapperAttr->getTypeRepr()));
+      }
+
+      if (!hasError) {
+        auto result = applyPropertyWrapperParameter(backingType, param.getParameterType(),
+                                                    paramDecl, paramDecl->getName(),
+                                                    ConstraintKind::Equal, locator);
+        if (result.isFailure())
+          return false;
+
+        auto *backingVar = paramDecl->getPropertyWrapperBackingProperty();
+        setType(backingVar, backingType);
+
+        auto *localWrappedVar = paramDecl->getPropertyWrapperWrappedValueVar();
+        setType(localWrappedVar, computeWrappedValueType(paramDecl, backingType));
+
+        if (auto *projection = paramDecl->getPropertyWrapperProjectionVar()) {
+          setType(projection, computeProjectedValueType(paramDecl, backingType));
+        }
+      }
+    }
+
     Type internalType;
     if (paramDecl->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
@@ -10665,6 +10713,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
   case FixKind::AddProjectedValue:
+  case FixKind::AddPropertyWrapperAttribute:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
   case FixKind::ExplicitlyConstructRawRepresentable:
