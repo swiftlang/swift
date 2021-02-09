@@ -27,19 +27,20 @@ CHANGELOG
 
 Swift Next
 ----------
+
 * [SE-0296][]:
 
-	Asynchronous programming is now natively supported using async/await. Asynchronous functions can be defined using `async`:
+  Asynchronous programming is now natively supported using async/await. Asynchronous functions can be defined using `async`:
 
-	```swift
-	func loadWebResource(_ path: String) async throws -> Resource { ... }
+  ```swift
+  func loadWebResource(_ path: String) async throws -> Resource { ... }
   func decodeImage(_ r1: Resource, _ r2: Resource) async throws -> Image
   func dewarpAndCleanupImage(_ i : Image) async -> Image
-	```
+  ```
 
-	Calls to `async` functions may suspend, meaning that they give up the thread on which they are executing and will be scheduled to run again later. The potential for suspension on asynchronous calls requires the `await` keyword, similarly to the way in which `try` acknowledges a call to a `throws` function:
+  Calls to `async` functions may suspend, meaning that they give up the thread on which they are executing and will be scheduled to run again later. The potential for suspension on asynchronous calls requires the `await` keyword, similarly to the way in which `try` acknowledges a call to a `throws` function:
 
-	```swift
+  ```swift
   func processImageData() async throws -> Image {
     let dataResource  = try await loadWebResource("dataprofile.txt")
     let imageResource = try await loadWebResource("imagedata.dat")
@@ -59,6 +60,8 @@ Swift Next
     }
   }
   ```
+
+**Add new entries to the top of this section, not here!**
 
 Swift 5.4
 ---------
@@ -364,8 +367,6 @@ Swift 5.3
   This proposal also introduces new diagnostics for inserting `self` into the
   closure's capture list in addition to the existing 'use `self.` explicitly'
   fix-it.
-
-**Add new entries to the top of this section, not here!**
 
 Swift 5.2
 ---------
@@ -1385,10 +1386,10 @@ Swift 4.1
   types, such as `index(of:)`.
 
 * [SE-0157][] is implemented. Associated types can now declare "recursive"
-	constraints, which require that the associated type conform to the enclosing
-	protocol. The standard library protocols have been updated to make use of
-	recursive constraints. For example, the `SubSequence` associated type of
-	`Sequence` follows the enclosing protocol:
+  constraints, which require that the associated type conform to the enclosing
+  protocol. The standard library protocols have been updated to make use of
+  recursive constraints. For example, the `SubSequence` associated type of
+  `Sequence` follows the enclosing protocol:
 
   ```swift
   protocol Sequence {
@@ -1405,16 +1406,15 @@ Swift 4.1
   ```
 
   As a result, a number of new constraints have been introduced into the
-	standard library protocols:
+  standard library protocols:
 
-	* Make the `Indices` associated type have the same traversal requirements as
-	its enclosing protocol, e.g., `Collection.Indices` conforms to
-	`Collection`, `BidirectionalCollection.Indices` conforms to
-	`BidirectionalCollection`, and so on
-	* Make `Numeric.Magnitude` conform to `Numeric`
-	* Use more efficient `SubSequence` types for lazy filter and map
-	* Eliminate the `*Indexable` protocols
-
+  * Make the `Indices` associated type have the same traversal requirements as
+    its enclosing protocol, e.g., `Collection.Indices` conforms to
+    `Collection`, `BidirectionalCollection.Indices` conforms to
+    `BidirectionalCollection`, and so on
+  * Make `Numeric.Magnitude` conform to `Numeric`
+  * Use more efficient `SubSequence` types for lazy filter and map
+  * Eliminate the `*Indexable` protocols
 
 * [SE-0161][] is fully implemented. KeyPaths now support subscript, optional
   chaining, and optional force-unwrapping components.
