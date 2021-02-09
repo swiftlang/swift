@@ -398,7 +398,7 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 
 /// Perform any cancellation actions required by the given record.
 static void performCancellationAction(TaskStatusRecord *record) {
-  fprintf(stderr, "[%s:%d] (%s) \n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) cancel record kind: %d\n", __FILE__, __LINE__, __FUNCTION__, record->getKind());
 
   switch (record->getKind()) {
   // Deadlines don't require any special support.
@@ -459,7 +459,7 @@ void swift::swift_task_cancel(AsyncTask *task) {
   // Carry out the cancellation operations associated with all
   // the active records.
   for (auto cur: oldStatus.records()) {
-    assert(false);
+    fprintf(stderr, "[%s:%d] (%s): record:%d type: %d\n", __FILE__, __LINE__, __FUNCTION__, cur, cur->getKind());
     performCancellationAction(cur);
   }
 
@@ -469,13 +469,6 @@ void swift::swift_task_cancel(AsyncTask *task) {
                                    /*cancelled*/ true,
                                    /*locked*/ false);
   releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
-
-  auto newStatus = acquireStatusRecordLock(task, recordLockRecord,
-      /*forCancellation*/ true);
-  assert(newStatus.isCancelled());
-  releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
-  fprintf(stderr, "[%s:%d] (%s): ok was cancelled: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
-
 }
 
 /**************************************************************************/

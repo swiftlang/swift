@@ -287,8 +287,11 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     new (childFragment) AsyncTask::ChildFragment(parent);
 
     fprintf(stderr, "[%s:%d] (%s): add child [%d] to parent [%d]\n", __FILE__, __LINE__, __FUNCTION__, task, parent);
-    ChildTaskStatusRecord childRecord(task);
-    swift_task_addStatusRecord(parent, &childRecord);
+    // FIXME: can we allocate this in the task local allocator?
+    ChildTaskStatusRecord *childRecord = new ChildTaskStatusRecord(task);
+    fprintf(stderr, "[%s:%d] (%s):   record:%d kind: %d\n", __FILE__, __LINE__, __FUNCTION__,
+            childRecord, childRecord->getKind());
+    swift_task_addStatusRecord(parent, childRecord);
 
     // while this should not happen
     if (swift_task_isCancelled(parent))
