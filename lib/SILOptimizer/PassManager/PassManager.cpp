@@ -60,11 +60,11 @@ llvm::cl::opt<std::string> SILBreakOnPass(
     llvm::cl::desc("Break before running a particular function pass"));
 
 llvm::cl::list<std::string>
-    SILPrintOnlyFun("sil-print-only-function", llvm::cl::CommaSeparated,
+    SILPrintFunction("sil-print-function", llvm::cl::CommaSeparated,
                     llvm::cl::desc("Only print out the sil for this function"));
 
 llvm::cl::opt<std::string>
-    SILPrintOnlyFuns("sil-print-only-functions", llvm::cl::init(""),
+    SILPrintFunctions("sil-print-functions", llvm::cl::init(""),
                      llvm::cl::desc("Only print out the sil for the functions "
                                     "whose name contains this substring"));
 
@@ -157,13 +157,23 @@ static llvm::cl::opt<DebugOnlyPassNumberOpt, true,
               llvm::cl::location(DebugOnlyPassNumberOptLoc),
               llvm::cl::ValueRequired);
 
-static bool doPrintBefore(SILTransform *T, SILFunction *F) {
-  if (!SILPrintOnlyFun.empty() && F && SILPrintOnlyFun.end() ==
-      std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F->getName()))
+static bool isFunctionSelectedForPrinting(SILFunction *F) {
+  if (!SILPrintFunction.empty() && SILPrintFunction.end() ==
+      std::find(SILPrintFunction.begin(), SILPrintFunction.end(), F->getName()))
     return false;
 
-  if (!SILPrintOnlyFuns.empty() && F &&
-      !F->getName().contains(SILPrintOnlyFuns))
+  if (!F->getName().contains(SILPrintFunctions))
+    return false;
+
+  return true;
+}
+
+static bool functionSelectionEmpty() {
+  return SILPrintFunction.empty() && SILPrintFunctions.empty();
+}
+
+static bool doPrintBefore(SILTransform *T, SILFunction *F) {
+  if (F && !isFunctionSelectedForPrinting(F))
     return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
@@ -173,21 +183,20 @@ static bool doPrintBefore(SILTransform *T, SILFunction *F) {
   if (SILPrintBefore.end() !=
       std::find_if(SILPrintBefore.begin(), SILPrintBefore.end(), MatchFun))
     return true;
+  if (!SILPrintBefore.empty())
+    return false;
 
   if (SILPrintAround.end() !=
       std::find_if(SILPrintAround.begin(), SILPrintAround.end(), MatchFun))
     return true;
+  if (!SILPrintAround.empty())
+    return false;
 
   return false;
 }
 
-static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
-  if (!SILPrintOnlyFun.empty() && F && SILPrintOnlyFun.end() ==
-      std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F->getName()))
-    return false;
-
-  if (!SILPrintOnlyFuns.empty() && F &&
-      !F->getName().contains(SILPrintOnlyFuns))
+static bool doPrintAfter(SILTransform *T, SILFunction *F, bool PassChangedSIL) {
+  if (F && !isFunctionSelectedForPrinting(F))
     return false;
 
   auto MatchFun = [&](const std::string &Str) -> bool {
@@ -197,12 +206,16 @@ static bool doPrintAfter(SILTransform *T, SILFunction *F, bool Default) {
   if (SILPrintAfter.end() !=
       std::find_if(SILPrintAfter.begin(), SILPrintAfter.end(), MatchFun))
     return true;
+  if (!SILPrintAfter.empty())
+    return false;
 
   if (SILPrintAround.end() !=
       std::find_if(SILPrintAround.begin(), SILPrintAround.end(), MatchFun))
     return true;
+  if (!SILPrintAround.empty())
+    return false;
 
-  return Default;
+  return PassChangedSIL && (SILPrintAll || !functionSelectionEmpty());
 }
 
 static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
@@ -221,16 +234,12 @@ static bool isDisabled(SILTransform *T, SILFunction *F = nullptr) {
 }
 
 static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
-  if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
+  if (functionSelectionEmpty()) {
     Mod->dump();
     return;
   }
   for (auto &F : *Mod) {
-    if (!SILPrintOnlyFun.empty() && SILPrintOnlyFun.end() !=
-        std::find(SILPrintOnlyFun.begin(), SILPrintOnlyFun.end(), F.getName()))
-      F.dump(EmitVerboseSIL);
-
-    if (!SILPrintOnlyFuns.empty() && F.getName().contains(SILPrintOnlyFuns))
+    if (isFunctionSelectedForPrinting(&F))
       F.dump(EmitVerboseSIL);
   }
 }
@@ -472,7 +481,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
   }
 
   // If this pass invalidated anything, print and verify.
-  if (doPrintAfter(SFT, F, CurrentPassHasInvalidated && SILPrintAll)) {
+  if (doPrintAfter(SFT, F, CurrentPassHasInvalidated)) {
     dumpPassInfo("*** SIL function after ", TransIdx);
     F->dump(getOptions().EmitVerboseSIL);
   }
@@ -617,8 +626,7 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   }
 
   // If this pass invalidated anything, print and verify.
-  if (doPrintAfter(SMT, nullptr,
-                   CurrentPassHasInvalidated && SILPrintAll)) {
+  if (doPrintAfter(SMT, nullptr, CurrentPassHasInvalidated)) {
     dumpPassInfo("*** SIL module after", TransIdx);
     printModule(Mod, Options.EmitVerboseSIL);
   }
@@ -731,7 +739,7 @@ SILPassManager::~SILPassManager() {
 }
 
 void SILPassManager::notifyOfNewFunction(SILFunction *F, SILTransform *T) {
-  if (doPrintAfter(T, F, SILPrintAll)) {
+  if (doPrintAfter(T, F, /*PassChangedSIL*/ true)) {
     dumpPassInfo("*** New SIL function in ", T, F);
     F->dump(getOptions().EmitVerboseSIL);
   }
