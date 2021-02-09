@@ -81,21 +81,21 @@ enum Bar8: Foo8 {
 // Witness does not have argument label, but requirement does
 
 protocol Foo9 {
-  static func bar(f: Int) -> Self // expected-note {{protocol requires function 'bar(f:)' with type '(Int) -> Bar9'; do you want to add a stub?}}
+  static func bar(f: Int) -> Self // expected-note {{requirement 'bar(f:)' declared here}}
 }
 
-enum Bar9: Foo9 { // expected-error {{type 'Bar9' does not conform to protocol 'Foo9'}}
-  case bar(_ f: Int) // expected-note {{candidate has non-matching type '(Bar9.Type) -> (Int) -> Bar9'}}
+enum Bar9: Foo9 {
+  case bar(_ f: Int) // expected-error {{enum case 'bar' has different argument labels from those required by protocol 'Foo9' ('bar(f:)')}}
 }
 
 // Witness does not have any labels, but requirement does
 
 protocol Foo10 {
-  static func bar(g: Int) -> Self // expected-note {{protocol requires function 'bar(g:)' with type '(Int) -> Bar10'; do you want to add a stub?}}
+  static func bar(g: Int) -> Self // expected-note {{requirement 'bar(g:)' declared here}}
 }
 
-enum Bar10: Foo10 { // expected-error {{type 'Bar10' does not conform to protocol 'Foo10'}}
-  case bar(Int) // expected-note {{candidate has non-matching type '(Bar10.Type) -> (Int) -> Bar10'}}
+enum Bar10: Foo10 {
+  case bar(Int) // expected-error {{enum case 'bar' has different argument labels from those required by protocol 'Foo10' ('bar(g:)')}}
 }
 
 // Witness does not have a payload, but requirement is a function
@@ -128,4 +128,14 @@ protocol Foo13 {
 enum Bar13: Foo13 {
   case bar(j: Int) // Okay
   case baz(_ k: String) // Okay
+}
+
+////// REQUIREMENT IS A THROWING FUNCTION //////
+
+protocol ThrowingFactory {
+  static func horse(_: Int) throws -> Self
+}
+
+enum HorseFactory : ThrowingFactory {
+  case horse(Int)
 }
