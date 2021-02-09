@@ -1241,6 +1241,7 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   values.erase(newEnd, values.end());
 }
 
+/// Look for nested types in all files of \p extensionModule except from the \p thisFile.
 static TypeDecl *
 findNestedTypeDeclInModule(FileUnit *thisFile, ModuleDecl *extensionModule,
                            Identifier name, NominalTypeDecl *parent)  {
@@ -1254,6 +1255,13 @@ findNestedTypeDeclInModule(FileUnit *thisFile, ModuleDecl *extensionModule,
     }
   }
   return nullptr;
+}
+
+/// Look for nested types in all files of \p extensionModule.
+static TypeDecl *
+findNestedTypeDeclInModule(ModuleDecl *extensionModule,
+                           Identifier name, NominalTypeDecl *parent)  {
+  return findNestedTypeDeclInModule(nullptr, extensionModule, name, parent);
 }
 
 Expected<Decl *>
@@ -1502,10 +1510,11 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
           extensionModule = baseType->getModuleContext();
 
         // Fault in extensions, then ask every file in the module.
+        // We include the current file in the search because the cross reference
+        // may involve a nested type of this file.
         (void)baseType->getExtensions();
         auto *nestedType =
-            findNestedTypeDeclInModule(getFile(), extensionModule,
-                                       memberName, baseType);
+            findNestedTypeDeclInModule(extensionModule, memberName, baseType);
 
         // For clang module units, also search tables in the overlays.
         if (!nestedType) {
