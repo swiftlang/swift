@@ -48,7 +48,7 @@ fileprivate func _registerMainActor(actor: AnyObject)
 @globalActor public final class MainActor {
   public static let shared = _Impl()
   
-  public actor class _Impl {
+  public actor _Impl {
     init() { _registerMainActor(actor: self) }
   }
 }
