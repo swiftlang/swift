@@ -114,6 +114,22 @@ public:
   using typename super::StoredSignedPointer;
   using typename super::StoredSize;
 
+  struct AsyncTaskAllocationChunk {
+    enum class ChunkKind {
+      Unknown,
+      NonPointer,
+      RawPointer,
+      StrongReference,
+      UnownedReference,
+      WeakReference,
+      UnmanagedReference
+    };
+
+    StoredPointer Start;
+    unsigned Length;
+    ChunkKind Kind;
+  };
+
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader), *this)
   {}
@@ -1162,6 +1178,48 @@ public:
 
       BacktraceListNext = RemoteAddress(HeaderPtr->Next);
     }
+    return llvm::None;
+  }
+
+  llvm::Optional<std::string> iterateAsyncTaskAllocations(
+      StoredPointer AsyncTaskPtr,
+      std::function<void(StoredPointer, unsigned, AsyncTaskAllocationChunk[])>
+          Call) {
+    using AsyncTask = AsyncTask<Runtime>;
+    using StackAllocator = StackAllocator<Runtime>;
+
+    auto AsyncTaskBytes =
+        getReader().readBytes(RemoteAddress(AsyncTaskPtr), sizeof(AsyncTask));
+    auto *AsyncTaskObj =
+        reinterpret_cast<const AsyncTask *>(AsyncTaskBytes.get());
+    if (!AsyncTaskObj)
+      return std::string("failure reading async task");
+
+    auto *Allocator = reinterpret_cast<const StackAllocator *>(
+        &AsyncTaskObj->AllocatorPrivate);
+    StoredPointer SlabPtr = Allocator->FirstSlab;
+    while (SlabPtr) {
+      auto SlabBytes = getReader().readBytes(
+          RemoteAddress(SlabPtr), sizeof(typename StackAllocator::Slab));
+      auto Slab = reinterpret_cast<const typename StackAllocator::Slab *>(
+          SlabBytes.get());
+      if (!Slab)
+        return std::string("failure reading slab");
+
+      // For now, we won't try to walk the allocations in the slab, we'll just
+      // provide the whole thing as one big chunk.
+      size_t HeaderSize =
+          llvm::alignTo(sizeof(*Slab), llvm::Align(alignof(std::max_align_t)));
+      AsyncTaskAllocationChunk Chunk;
+
+      Chunk.Start = SlabPtr + HeaderSize;
+      Chunk.Length = Slab->CurrentOffset;
+      Chunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
+      Call(SlabPtr, 1, &Chunk);
+
+      SlabPtr = Slab->Next;
+    }
+
     return llvm::None;
   }
 

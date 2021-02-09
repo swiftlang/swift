@@ -189,6 +189,12 @@ typedef struct swift_metadata_cache_node {
   swift_reflection_ptr_t Right;
 } swift_metadata_cache_node_t;
 
+typedef struct swift_async_task_allocation_chunk {
+  swift_reflection_ptr_t Start;
+  unsigned Length;
+  swift_layout_kind_t Kind;
+} swift_async_task_allocation_chunk_t;
+
 /// An opaque pointer to a context which maintains state and
 /// caching of reflection structure for heap instances.
 typedef struct SwiftReflectionContext *SwiftReflectionContextRef;
