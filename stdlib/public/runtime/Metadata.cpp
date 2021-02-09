@@ -5006,7 +5006,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Demangle the associated type.
-  TypeLookupErrorOr<TypeInfo> result = TypeInfo();
+  TypeLookupErrorOr<TypeInfo> result;
   if (inProtocolContext) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
