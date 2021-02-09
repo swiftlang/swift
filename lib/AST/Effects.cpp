@@ -41,9 +41,8 @@ ProtocolDecl::getRethrowingRequirements() const {
     ProtocolRethrowsRequirementList());
 }
 
-bool 
-ProtocolDecl::isRethrowingProtocol() const {
-  return getRethrowingRequirements().size() > 0;
+bool ProtocolDecl::isRethrowingProtocol() const {
+  return getAttrs().hasAttribute<swift::AtRethrowsAttr>();
 }
 
 FunctionRethrowingKind AbstractFunctionDecl::getRethrowingKind() const {

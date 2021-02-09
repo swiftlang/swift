@@ -114,3 +114,11 @@ func rethrowsWithThrowsClosure<T : ThrowsClosure>(_ t: T) rethrows {
 }
 
 try rethrowsWithThrowsClosure(ThrowsClosureWitness())
+
+// Empty protocol
+@rethrows protocol Empty {}
+struct EmptyWitness : Empty {}
+
+func takesEmpty<T : Empty>(_: T) rethrows {}
+
+takesEmpty(EmptyWitness())
