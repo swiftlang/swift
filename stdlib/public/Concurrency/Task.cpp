@@ -281,21 +281,9 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
                               function, initialContext);
 
   // Initialize the child fragment if applicable.
-  // TODO: propagate information from the parent?
   if (parent) {
     auto childFragment = task->childFragment();
     new (childFragment) AsyncTask::ChildFragment(parent);
-
-    fprintf(stderr, "[%s:%d] (%s): add child [%d] to parent [%d]\n", __FILE__, __LINE__, __FUNCTION__, task, parent);
-    // FIXME: can we allocate this in the task local allocator?
-    ChildTaskStatusRecord *childRecord = new ChildTaskStatusRecord(task);
-    fprintf(stderr, "[%s:%d] (%s):   record:%d kind: %d\n", __FILE__, __LINE__, __FUNCTION__,
-            childRecord, childRecord->getKind());
-    swift_task_addStatusRecord(parent, childRecord);
-
-    // while this should not happen
-    if (swift_task_isCancelled(parent))
-      swift_task_cancel(task);
   }
 
   // Initialize task locals fragment if applicable.
@@ -320,6 +308,29 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
     futureContext->errorResult = &futureFragment->getError();
     futureContext->indirectResult = futureFragment->getStoragePtr();
+  }
+
+  // Perform additional linking between parent and child task.
+  if (parent) {
+    // FIXME: can we allocate this in the task local allocator?
+    // TODO: Do we need to delete it manually or is the record infra handling this?
+    if (flags.task_isGroupChildTask()) {
+      // this task is a child of a task group
+      swift_task_addStatusRecord(parent,
+                                 new GroupChildTaskStatusRecord(group, task));
+    } else {
+      // just a normal child task
+      swift_task_addStatusRecord(parent,
+                                 new ChildTaskStatusRecord(task));
+    }
+
+    // if the parent was already cancelled, we carry this flag forward to the child.
+    //
+    // In a task group we would not have allowed the `add` to create a child anymore,
+    // however better safe than sorry and `async let` are not expressed as task groups,
+    // so they may have been spawned in any case still.
+    if (swift_task_isCancelled(parent))
+      swift_task_cancel(task);
   }
 
   // Configure the initial context.

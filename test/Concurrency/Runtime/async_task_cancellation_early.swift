@@ -12,8 +12,8 @@ import Darwin
 import Glibc
 #endif
 
-func test_runDetached_cancel_child_from_cancelled() async {
-  print(#function) // CHECK: test_runDetached_cancel_child_from_cancelled
+func test_runDetached_cancel_child_early() async {
+  print(#function) // CHECK: test_runDetached_cancel_child_early
   let h: Task.Handle<Bool> = Task.runDetached {
     async let childCancelled: Bool = { () -> Bool in
       sleep(2)
@@ -36,33 +36,8 @@ func test_runDetached_cancel_child_from_cancelled() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
-func test_runDetached_cancel_and_child_too() async {
-  print(#function) // CHECK: test_runDetached_cancel_and_child_too
-  let h: Task.Handle<Bool> = Task.runDetached {
-    async let childCancelled: Bool = { () -> Bool in
-      sleep(3)
-      return await Task.isCancelled()
-    }()
-
-    let childWasCancelled = await childCancelled
-    print("child, cancelled: \(childWasCancelled)") // CHECK: child, cancelled: true
-    let selfWasCancelled =  await Task.isCancelled()
-    print("self, cancelled: \(selfWasCancelled )") // CHECK: self, cancelled: true
-    return selfWasCancelled
-  }
-
-  // sleep here, i.e. give the task a moment to start running
-  sleep(2)
-
-  h.cancel()
-  print("handle cancel")
-  let got = try! await h.get()
-  print("was cancelled: \(got)") // CHECK: was cancelled: true
-}
-
 @main struct Main {
   static func main() async {
-    await test_runDetached_cancel_child_from_cancelled()
-    await test_runDetached_cancel_and_child_too()
+    await test_runDetached_cancel_child_early()
   }
 }

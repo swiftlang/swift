@@ -162,10 +162,15 @@ public:
 /// A status record which states that a task has a task group, and potentially
 /// task group children inside it.
 class GroupChildTaskStatusRecord : public ChildTaskStatusRecord {
-
+  TaskGroup *Group;
 public:
-  GroupChildTaskStatusRecord(AsyncTask *child)
-    : ChildTaskStatusRecord(child, TaskStatusRecordKind::GroupChildTask) {}
+  GroupChildTaskStatusRecord(TaskGroup *group, AsyncTask *child)
+    : Group(group),
+      ChildTaskStatusRecord(child, TaskStatusRecordKind::GroupChildTask) {}
+
+  bool isGroup(TaskGroup *group) const {
+    return Group == group;
+  }
 
   // AsyncTask *getFirstChild() const
 
