@@ -102,6 +102,29 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   string(TOUPPER "${CMAKE_SYSTEM_NAME}" SOURCEKIT_DEFAULT_TARGET_SDK)
 endif()
 
+if(SWIFT_BUILD_HOST_DISPATCH)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    set(SOURCEKIT_RUNTIME_DIR bin)
+  else()
+    set(SOURCEKIT_RUNTIME_DIR lib)
+  endif()
+  add_dependencies(sourcekit-inproc BlocksRuntime dispatch)
+  if("${SWIFT_HOST_VARIANT_SDK}" MATCHES "OSX|WINDOWS")
+    swift_install_in_component(FILES
+      $<TARGET_FILE:dispatch>
+      $<TARGET_FILE:BlocksRuntime>
+      DESTINATION ${SOURCEKIT_RUNTIME_DIR}
+      COMPONENT sourcekit-inproc)
+  endif()
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL WINDOWS)
+    swift_install_in_component(FILES
+      $<TARGET_LINKER_FILE:dispatch>
+      $<TARGET_LINKER_FILE:BlocksRuntime>
+      DESTINATION lib
+      COMPONENT sourcekit-inproc)
+  endif()
+endif()
+
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
