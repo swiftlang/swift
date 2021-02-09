@@ -147,6 +147,11 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   if (var->isLet())
     return;
 
+  // If there's no parent pattern there's not enough structure to even perform
+  // this analysis. Just bail.
+  if (!var->getParentPattern())
+    return;
+
   // We can only provide default values for patterns binding a single variable.
   // i.e. var (a, b) = getSomeTuple() is not allowed.
   if (!var->getParentPattern()->getSingleVar())
