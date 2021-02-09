@@ -19,36 +19,6 @@ public protocol AsyncSequence {
   __consuming func makeAsyncIterator() -> AsyncIterator
 }
 
-@inlinable
-@inline(__always)
-func _reduce<Source: AsyncSequence, Result>(
-  _ self: Source,
-  _ initialResult: Result,
-  _ nextPartialResult:
-    (_ partialResult: Result, Source.Element) async throws -> Result
-) async rethrows -> Result {
-  var accumulator = initialResult
-    for try await element in self {
-      accumulator = try await nextPartialResult(accumulator, element)
-    }
-    return accumulator
-}
-
-@inlinable
-@inline(__always)
-func _reduce<Source: AsyncSequence, Result>(
-  _ self: Source,
-  into initialResult: __owned Result,
-  _ updateAccumulatingResult:
-    (_ partialResult: inout Result, Source.Element) async throws -> Void
-) async rethrows -> Result {
-  var accumulator = initialResult
-  for try await element in self {
-    try await updateAccumulatingResult(&accumulator, element)
-  }
-  return accumulator
-}
-
 extension AsyncSequence {
   @inlinable
   public func reduce<Result>(
@@ -56,7 +26,12 @@ extension AsyncSequence {
     _ nextPartialResult:
       (_ partialResult: Result, Element) async throws -> Result
   ) async rethrows -> Result {
-    return try await _reduce(self, initialResult, nextPartialResult)
+    var accumulator = initialResult
+    var iterator = makeAsyncIterator()
+    while let element = try await iterator.next() {
+      accumulator = try await nextPartialResult(accumulator, element)
+    }
+    return accumulator
   }
 
   @inlinable
@@ -65,7 +40,12 @@ extension AsyncSequence {
     _ updateAccumulatingResult:
       (_ partialResult: inout Result, Element) async throws -> Void
   ) async rethrows -> Result {
-    return try await _reduce(self, into: initialResult, updateAccumulatingResult)
+    var accumulator = initialResult
+    var iterator = makeAsyncIterator()
+    while let element = try await iterator.next() {
+      try await updateAccumulatingResult(&accumulator, element)
+    }
+    return accumulator
   }
 }
 
