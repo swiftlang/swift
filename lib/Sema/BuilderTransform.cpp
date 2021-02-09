@@ -268,14 +268,30 @@ protected:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *patternBinding) {
-    // If any of the entries lacks an initializer, don't handle this node.
-    if (!llvm::all_of(range(patternBinding->getNumPatternEntries()),
-                      [&](unsigned index) {
-            return patternBinding->isExplicitlyInitialized(index);
-        })) {
-      if (!unhandledNode)
-        unhandledNode = patternBinding;
-      return;
+    // Enforce some restrictions on local variables inside a result builder.
+    for (unsigned i : range(patternBinding->getNumPatternEntries())) {
+      // The pattern binding must have an initial value expression.
+      if (!patternBinding->isExplicitlyInitialized(i)) {
+        if (!unhandledNode)
+          unhandledNode = patternBinding;
+        return;
+      }
+
+      // Each variable bound by the pattern must be stored, and cannot
+      // have observers.
+      SmallVector<VarDecl *, 8> variables;
+      patternBinding->getPattern(i)->collectVariables(variables);
+
+      for (auto *var : variables) {
+        if (!var->getImplInfo().isSimpleStored()) {
+          if (!unhandledNode)
+            unhandledNode = patternBinding;
+          return;
+        }
+
+        // Also check for invalid attributes.
+        TypeChecker::checkDeclAttributes(var);
+      }
     }
 
     // If there is a constraint system, generate constraints for the pattern
