@@ -388,7 +388,8 @@ replaceLoadsByKnownValue(SILFunction *InitF, SILGlobalVariable *SILG,
     StaticInitCloner cloner(initCall);
     SmallVector<SILInstruction *, 8> insertedInsts;
     cloner.setTrackingList(&insertedInsts);
-    cloner.add(initVal);
+    if (!cloner.add(initVal))
+      continue;
 
     // Replace all loads from the addressor with the initial value of the global.
     replaceLoadsFromGlobal(initCall, initVal, cloner);
@@ -693,7 +694,8 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
       continue;
 
     StaticInitCloner cloner(globalAddr);
-    cloner.add(initVal);
+    if (!cloner.add(initVal))
+      continue;
 
     // Replace all loads from the addressor with the initial value of the global.
     replaceLoadsFromGlobal(globalAddr, initVal, cloner);

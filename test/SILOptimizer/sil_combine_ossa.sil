@@ -4497,6 +4497,31 @@ bb0:
   return %1 : $Int64
 }
 
+sil private [ossa] @somePrivateFunction : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 27
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  return %1 : $Int64
+}
+
+sil_global [let] @pointerToSomePrivateFunction : $@callee_guaranteed () -> Int64 = {
+  %0 = function_ref @somePrivateFunction: $@convention(thin) () -> Int64
+  %initval = thin_to_thick_function %0 : $@convention(thin) () -> Int64 to $@callee_guaranteed () -> Int64
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @dontInlinePrivateFunctionRefIntoSerializedFunction
+// CHECK:         [[GA:%[0-9]+]] = global_addr
+// CHECK:         [[L:%[0-9]+]] = load [copy] [[GA]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'dontInlinePrivateFunctionRefIntoSerializedFunction'
+sil [serialized] [ossa] @dontInlinePrivateFunctionRefIntoSerializedFunction : $@convention(thin) () -> @owned @callee_guaranteed () -> Int64 {
+bb0:
+  %0 = global_addr @pointerToSomePrivateFunction : $*@callee_guaranteed () -> Int64
+  %1 = load [copy] %0 : $*@callee_guaranteed () -> Int64
+  return %1 : $@callee_guaranteed () -> Int64
+}
+
+
 // Check for disabled optimization of unchecked_bitwise_cast to unchecked_ref_cast in ossa
 // This test can be optimized when ossa is supported in the SILCombine for unchecked_bitwise_cast
 // CHECK-LABEL: sil [ossa] @refcast :

@@ -959,8 +959,9 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // globals, which can occur with cross-module optimization.
   if (SingleValueInstruction *initVal = getValueFromStaticLet(LI->getOperand())) {
     StaticInitCloner cloner(LI);
-    cloner.add(initVal);
-    return cloner.clone(initVal);
+    if (cloner.add(initVal)) {
+      return cloner.clone(initVal);
+    }
   }
 
   // If we have a load [copy] whose only non-debug users are destroy_value, just

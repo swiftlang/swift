@@ -247,10 +247,19 @@ bool SinkAddressProjections::cloneProjections() {
   return true;
 }
 
-void StaticInitCloner::add(SILInstruction *initVal) {
+bool StaticInitCloner::add(SILInstruction *initVal) {
   // Don't schedule an instruction twice for cloning.
   if (numOpsToClone.count(initVal) != 0)
-    return;
+    return true;
+
+  if (auto *funcRef = dyn_cast<FunctionRefInst>(initVal)) {
+    // We cannot inline non-public functions into functions which are serialized.
+    if (!getBuilder().isInsertingIntoGlobal() &&
+        getBuilder().getFunction().isSerialized() &&
+        !funcRef->getReferencedFunction()->hasValidLinkageForFragileRef()) {
+      return false;
+    }
+  }
 
   ArrayRef<Operand> operands = initVal->getAllOperands();
   numOpsToClone[initVal] = operands.size();
@@ -261,9 +270,11 @@ void StaticInitCloner::add(SILInstruction *initVal) {
   } else {
     // Recursively add all operands.
     for (const Operand &operand : operands) {
-      add(cast<SingleValueInstruction>(operand.get()));
+      if (!add(cast<SingleValueInstruction>(operand.get())))
+        return false;
     }
   }
+  return true;
 }
 
 SingleValueInstruction *
