@@ -53,6 +53,8 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 
 // rdar://73798726
 - (void)getSomeObjectWithCompletionHandler:(nullable void (^)(NSObject *_Nullable x, NSError *_Nullable error))handler;
+
+-(void)oldAPIWithCompletionHandler:(void (^ _Nonnull)(NSString *_Nullable, NSError *_Nullable))handler __attribute__((availability(macosx, deprecated=10.14)));
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
