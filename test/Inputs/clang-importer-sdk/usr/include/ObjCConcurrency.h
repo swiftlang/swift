@@ -103,6 +103,11 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
 - (void) activateWithCompletion:(ObjCErrorHandler) inCompletion;
 @end
 
+@protocol LabellyProtocol
+  - (void) myMethod:(NSInteger)value1 newFoo:(NSInteger)value2 completion:(ObjCErrorHandler)completion;
+  - (void) myMethod:(NSInteger)value1 foo:(NSInteger)value2;
+@end
+
 #define MAGIC_NUMBER 42
 
 #pragma clang assume_nonnull end

@@ -72,6 +72,12 @@ class Rock : NSObject, Rollable {
   func roll() { roll(completionHandler: {}) }
 }
 
+// additional coverage for a situation where only an argument label differs, excluding the completion handler.
+final class Moon : LabellyProtocol {
+  func myMethod(_ value: Int, foo: Int) {}
+  func myMethod(_ value: Int, newFoo foo: Int, completion: @escaping (Error?) -> Void) {}
+}
+
 // Crash involving actor isolation checking.
 class C5 {
   @MainActor @objc var allOperations: [String] = []
