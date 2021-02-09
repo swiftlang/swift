@@ -2116,15 +2116,40 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
 
 void Remangler::mangleAutoDiffFunction(Node *node) {
   auto childIt = node->begin();
-  mangle(*childIt++); // original
-  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
-    mangleDependentGenericSignature(*childIt++);
+  while (childIt != node->end() &&
+         (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
+    mangle(*childIt++);
   Buffer << "TJ";
   mangle(*childIt++); // kind
   mangle(*childIt++); // parameter indices
   Buffer << 'p';
   mangle(*childIt++); // result indices
   Buffer << 'r';
+}
+
+void Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node) {
+  auto childIt = node->begin();
+  mangle(*childIt++); // from type
+  mangle(*childIt++); // to type
+  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
+    mangleDependentGenericSignature(*childIt++);
+  Buffer << "TJO";
+  mangle(*childIt++); // kind
+}
+
+void Remangler::mangleAutoDiffSubsetParametersThunk(Node *node) {
+  auto childIt = node->begin();
+  while (childIt != node->end() &&
+         (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
+    mangle(*childIt++);
+  Buffer << "TJS";
+  mangle(*childIt++); // kind
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
+  mangle(*childIt++); // to parameter indices
+  Buffer << 'P';
 }
 
 void Remangler::mangleAutoDiffFunctionKind(Node *node) {

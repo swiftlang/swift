@@ -220,7 +220,6 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
-  global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
   global ::= impl-function-type type 'Tz'     // objc-to-swift-async completion handler block implementation
   global ::= impl-function-type type 'TZ'     // objc-to-swift-async completion handler block implementation (predefined by runtime)
   global ::= from-type to-type self-type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
@@ -230,6 +229,9 @@ types where the metadata itself has unknown layout.)
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
   global ::= global generic-signature? 'TJ' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' // autodiff function
+  global ::= from-type to-type 'TJO' AUTODIFF-FUNCTION-KIND // autodiff self-reordering reabstraction thunk
+  global ::= from-type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff linear map subset parameters thunk
+  global ::= global to-type 'TJS' AUTODIFF-FUNCTION-KIND INDEX-SUBSET 'p' INDEX-SUBSET 'r' INDEX-SUBSET 'P' // autodiff derivative function subset parameters thunk
 
   global ::= protocol 'TL'               // protocol requirements base descriptor
   global ::= assoc-type-name 'Tl'        // associated type descriptor
