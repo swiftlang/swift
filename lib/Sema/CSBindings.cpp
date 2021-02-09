@@ -608,12 +608,12 @@ PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
   } while (true);
 }
 
-bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
+void PotentialBindings::addPotentialBinding(PotentialBinding binding,
                                             bool allowJoinMeet) {
   assert(!binding.BindingType->is<ErrorType>());
 
   if (Bindings.count(binding))
-    return false;
+    return;
 
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
@@ -652,7 +652,7 @@ bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
     // If new binding has been joined with at least one of existing
     // bindings, there is no reason to include it into the set.
     if (!joined.empty())
-      return false;
+      return;
   }
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -663,7 +663,7 @@ bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
   }
 
   if (!isViable(binding))
-    return false;
+    return;
 
   // Check whether the given binding covers any of the literal protocols
   // associated with this type variable.
@@ -698,7 +698,7 @@ bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
     }
   }
 
-  return Bindings.insert(std::move(binding));
+  Bindings.insert(std::move(binding));
 }
 
 void PotentialBindings::addLiteral(Constraint *constraint) {
