@@ -98,6 +98,19 @@ bool PotentialBindings::isDelayed() const {
     });
   }
 
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
+    // Since force unwrap preserves l-valueness, resulting
+    // type variable has to be delayed until either l-value
+    // binding becomes available or there are no other
+    // variables to attempt.
+    if (locator->directlyAt<ForceValueExpr>() &&
+        TypeVar->getImpl().canBindToLValue()) {
+      return llvm::none_of(Bindings, [](const PotentialBinding &binding) {
+        return binding.BindingType->is<LValueType>();
+      });
+    }
+  }
+
   return !DelayedBy.empty();
 }
 
@@ -1088,26 +1101,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     if (!binding)
       break;
 
-    auto type = binding->BindingType;
-    if (addPotentialBinding(*binding)) {
-      // Determines whether this type variable represents an object
-      // of the optional type extracted by force unwrap.
-      if (auto *locator = TypeVar->getImpl().getLocator()) {
-        auto anchor = locator->getAnchor();
-        // Result of force unwrap is always connected to its base
-        // optional type via `OptionalObject` constraint which
-        // preserves l-valueness, so in case where object type got
-        // inferred before optional type (because it got the
-        // type from context e.g. parameter type of a function call),
-        // we need to test type with and without l-value after
-        // delaying bindings for as long as possible.
-        if (isExpr<ForceValueExpr>(anchor) &&
-            TypeVar->getImpl().canBindToLValue() && !type->is<LValueType>()) {
-          (void)addPotentialBinding(binding->withType(LValueType::get(type)));
-          DelayedBy.push_back(constraint);
-        }
-      }
-    }
+    addPotentialBinding(*binding);
     break;
   }
   case ConstraintKind::KeyPathApplication: {
@@ -1422,6 +1416,19 @@ bool TypeVarBindingProducer::computeNext() {
       for (auto altType : CS.getAlternativeLiteralTypes(knownKind)) {
         addNewBinding(binding.withSameSource(altType, BindingKind::Subtypes));
       }
+    }
+
+    if (getLocator()->directlyAt<ForceValueExpr>() &&
+        TypeVar->getImpl().canBindToLValue() &&
+        !binding.BindingType->is<LValueType>()) {
+      // Result of force unwrap is always connected to its base
+      // optional type via `OptionalObject` constraint which
+      // preserves l-valueness, so in case where object type got
+      // inferred before optional type (because it got the
+      // type from context e.g. parameter type of a function call),
+      // we need to test type with and without l-value after
+      // delaying bindings for as long as possible.
+      addNewBinding(binding.withType(LValueType::get(binding.BindingType)));
     }
 
     // Allow solving for T even for a binding kind where that's invalid
