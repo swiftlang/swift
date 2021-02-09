@@ -1,3 +1,6 @@
+// REQUIRES: cplusplus_driver
+// swift-driver has swift-help with its own tests and the output has evolved.
+
 // Check that options printed with -help respect whether the driver is invoked
 // as 'swift' or as 'swiftc'.
 
