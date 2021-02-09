@@ -75,7 +75,7 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_LINKER=${CMAKE_LINKER}
                           -DCMAKE_RANLIB=${CMAKE_RANLIB}
                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-                          -DCMAKE_SYSTEM_NAME=${sdk}
+                          -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
                           -DCMAKE_SYSTEM_PROCESSOR=${arch}
                           -DBUILD_SHARED_LIBS=YES
                           -DENABLE_SWIFT=NO
