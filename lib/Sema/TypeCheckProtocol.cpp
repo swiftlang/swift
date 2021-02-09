@@ -502,18 +502,7 @@ swift::matchWitness(
 
   /// Make sure the witness is of the same kind as the requirement.
   if (req->getKind() != witness->getKind()) {
-    // An enum case can witness:
-    // 1. A static get-only property requirement, as long as the property's
-    //    type is `Self` or it matches the type of the enum explicitly.
-    // 2. A static function requirement, if the enum case has a payload
-    //    and the payload types and labels match the function and the
-    //    function returns `Self` or the type of the enum.
-    //
-    // If there are any discrepencies, we'll diagnose it later. For now,
-    // let's assume the match is valid.
-    if (!((isa<VarDecl>(req) || isa<FuncDecl>(req)) &&
-          isa<EnumElementDecl>(witness)))
-      return RequirementMatch(witness, MatchKind::KindConflict);
+    return RequirementMatch(witness, MatchKind::KindConflict);
   }
 
   // If we're currently validating the witness, bail out.
@@ -594,18 +583,6 @@ swift::matchWitness(
   } else if (isa<ConstructorDecl>(witness)) {
     decomposeFunctionType = true;
     ignoreReturnType = true;
-  } else if (isa<EnumElementDecl>(witness)) {
-    auto enumCase = cast<EnumElementDecl>(witness);
-    if (enumCase->hasAssociatedValues() && isa<VarDecl>(req))
-      return RequirementMatch(witness, MatchKind::EnumCaseWithAssociatedValues);
-    auto isValid = isa<VarDecl>(req) || isa<FuncDecl>(req);
-    if (!isValid)
-      return RequirementMatch(witness, MatchKind::KindConflict);
-    if (!cast<ValueDecl>(req)->isStatic())
-      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-    if (isa<VarDecl>(req) &&
-        cast<VarDecl>(req)->getParsedAccessor(AccessorKind::Set))
-      return RequirementMatch(witness, MatchKind::SettableConflict);
   }
 
   // If the requirement is @objc, the witness must not be marked with @nonobjc.
@@ -2291,8 +2268,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   if (match.Kind != MatchKind::RenamedMatch &&
       !match.Witness->getAttrs().hasAttribute<ImplementsAttr>() &&
       match.Witness->getName() &&
-      req->getName() != match.Witness->getName() &&
-      !isa<EnumElementDecl>(match.Witness))
+      req->getName() != match.Witness->getName())
     return;
 
   // Form a string describing the associated type deductions.
@@ -2344,7 +2320,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
-    if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
+    if (!isa<TypeDecl>(req)) {
       computeFixitsForOverridenDeclaration(match.Witness, req, [&](bool){
         return diags.diagnose(match.Witness,
                               diag::protocol_witness_type_conflict,
@@ -2393,8 +2369,6 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto witness = match.Witness;
     auto diag = diags.diagnose(witness, diag::protocol_witness_static_conflict,
                                !req->isInstanceMember());
-    if (isa<EnumElementDecl>(witness))
-      break;
     if (req->isInstanceMember()) {
       SourceLoc loc;
       if (auto FD = dyn_cast<FuncDecl>(witness)) {

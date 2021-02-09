@@ -589,25 +589,6 @@ struct SR_12707_Conform_P2: SR_12707_P2 {
   typealias A = Never
 }
 
-// SR-13172: Inference when witness is an enum case
-protocol SR_13172_P1 {
-  associatedtype Bar
-  static func bar(_ value: Bar) -> Self
-}
-
-enum SR_13172_E1: SR_13172_P1 {
-  case bar(String) // Okay
-}
-
-protocol SR_13172_P2 {
-  associatedtype Bar
-  static var bar: Bar { get }
-}
-
-enum SR_13172_E2: SR_13172_P2 {
-  case bar // Okay
-}
-
 /** References to type parameters in type witnesses. */
 
 // Circular reference through a fixed type witness.
