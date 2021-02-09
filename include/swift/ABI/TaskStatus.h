@@ -131,6 +131,13 @@ public:
     : TaskStatusRecord(TaskStatusRecordKind::ChildTask),
       FirstChild(child) {}
 
+  ChildTaskStatusRecord(AsyncTask *child, TaskStatusRecordKind kind)
+    : TaskStatusRecord(kind),
+      FirstChild(child) {
+    assert(kind == TaskStatusRecordKind::ChildTask ||
+           kind == TaskStatusRecordKind::GroupChildTask);
+  }
+
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy
   /// `isChildTask()`.
@@ -149,6 +156,28 @@ public:
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::ChildTask;
+  }
+};
+
+/// A status record which states that a task has a task group, and potentially
+/// task group children inside it.
+class GroupChildTaskStatusRecord : public ChildTaskStatusRecord {
+
+public:
+  GroupChildTaskStatusRecord(AsyncTask *child)
+    : ChildTaskStatusRecord(child, TaskStatusRecordKind::GroupChildTask) {}
+
+  // AsyncTask *getFirstChild() const
+
+  static AsyncTask *getNextChildTask(AsyncTask *task) {
+    return task->childFragment()->getNextChild();
+  }
+
+//  using child_iterator = LinkedListIterator<AsyncTask, getNextChildTask>;
+//  llvm::iterator_range<child_iterator> children() const
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::GroupChildTask;
   }
 };
 

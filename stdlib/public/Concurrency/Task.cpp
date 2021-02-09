@@ -285,6 +285,14 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   if (parent) {
     auto childFragment = task->childFragment();
     new (childFragment) AsyncTask::ChildFragment(parent);
+
+    fprintf(stderr, "[%s:%d] (%s): add child [%d] to parent [%d]\n", __FILE__, __LINE__, __FUNCTION__, task, parent);
+    ChildTaskStatusRecord childRecord(task);
+    swift_task_addStatusRecord(parent, &childRecord);
+
+    // while this should not happen
+    if (swift_task_isCancelled(parent))
+      swift_task_cancel(task);
   }
 
   // Initialize task locals fragment if applicable.

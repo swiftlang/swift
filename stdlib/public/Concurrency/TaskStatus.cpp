@@ -398,13 +398,17 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 
 /// Perform any cancellation actions required by the given record.
 static void performCancellationAction(TaskStatusRecord *record) {
+  fprintf(stderr, "[%s:%d] (%s) \n", __FILE__, __LINE__, __FUNCTION__);
+
   switch (record->getKind()) {
   // Deadlines don't require any special support.
   case TaskStatusRecordKind::Deadline:
     return;
 
   // Child tasks need to be recursively cancelled.
-  case TaskStatusRecordKind::ChildTask: {
+  case TaskStatusRecordKind::ChildTask:
+  case TaskStatusRecordKind::GroupChildTask: {
+    fprintf(stderr, "[%s:%d] (%s) child task\n", __FILE__, __LINE__, __FUNCTION__);
     auto childRecord = cast<ChildTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_cancel(child);
@@ -434,6 +438,7 @@ static void performCancellationAction(TaskStatusRecord *record) {
 }
 
 void swift::swift_task_cancel(AsyncTask *task) {
+  fprintf(stderr, "[%s:%d] (%s): cancel: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
@@ -443,8 +448,10 @@ void swift::swift_task_cancel(AsyncTask *task) {
 
   // If we were already cancelled or were able to cancel without acquiring
   // the lock, there's nothing else to do.
-  if (oldStatus.isCancelled())
+  if (oldStatus.isCancelled()) {
+    fprintf(stderr, "[%s:%d] (%s): was already cancelled: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
     return;
+  }
 
   // Otherwise, we've installed the lock record and are now the
   // locking thread.
@@ -452,6 +459,7 @@ void swift::swift_task_cancel(AsyncTask *task) {
   // Carry out the cancellation operations associated with all
   // the active records.
   for (auto cur: oldStatus.records()) {
+    assert(false);
     performCancellationAction(cur);
   }
 
@@ -461,6 +469,13 @@ void swift::swift_task_cancel(AsyncTask *task) {
                                    /*cancelled*/ true,
                                    /*locked*/ false);
   releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
+
+  auto newStatus = acquireStatusRecordLock(task, recordLockRecord,
+      /*forCancellation*/ true);
+  assert(newStatus.isCancelled());
+  releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
+  fprintf(stderr, "[%s:%d] (%s): ok was cancelled: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+
 }
 
 /**************************************************************************/
@@ -476,7 +491,8 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
 
   // Child tasks need to be recursively escalated.
-  case TaskStatusRecordKind::ChildTask: {
+  case TaskStatusRecordKind::ChildTask:
+  case TaskStatusRecordKind::GroupChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_escalate(child, newPriority);
