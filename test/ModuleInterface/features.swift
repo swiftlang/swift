@@ -63,6 +63,16 @@ extension OldSchool: UnsafeConcurrentValue { }
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 
+// CHECK: #if compiler(>=5.3) && $AsyncAwait
+// CHECK-NEXT: func runSomethingSomewhere
+// CHECK-NEXT: #endif
+public func runSomethingSomewhere(body: () async -> Void) { }
+
+// CHECK: #if compiler(>=5.3) && $Actors
+// CHECK-NEXT: func stage
+// CHECK-NEXT: #endif
+public func stage(with actor: MyActor) { }
+
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
 // CHECK-NEXT: extension FeatureTest.MyActor : Swift.ConcurrentValue {}
 // CHECK-NEXT: #endif

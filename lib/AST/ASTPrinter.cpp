@@ -2405,6 +2405,23 @@ static bool usesFeatureAsyncAwait(Decl *decl) {
       return true;
   }
 
+  // Check for async functions in the types of declarations.
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasAsync = type.findIf([](Type type) {
+        if (auto fnType = type->getAs<AnyFunctionType>()) {
+          if (fnType->isAsync())
+            return true;
+        }
+
+        return false;
+      });
+
+      if (hasAsync)
+        return true;
+    }
+  }
+
   return false;
 }
 
@@ -2472,6 +2489,23 @@ static bool usesFeatureActors(Decl *decl) {
         return true;
   }
 
+  // Check for actors in the types of declarations.
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasActor = type.findIf([](Type type) {
+        if (auto classDecl = type->getClassOrBoundGenericClass()) {
+          if (classDecl->isActor())
+            return true;
+        }
+
+        return false;
+      });
+
+      if (hasActor)
+        return true;
+    }
+  }
+
   return false;
 }
 
@@ -2482,11 +2516,6 @@ static bool usesFeatureActors(Decl *decl) {
 static std::vector<Feature> getFeaturesUsed(Decl *decl) {
   std::vector<Feature> features;
   
-  // Only type- and module-scope declarations have any features to speak of.
-  auto dc = decl->getDeclContext();
-  if (!dc->isTypeContext() && !dc->isModuleScopeContext())
-    return features;
-
   // Go through each of the features, checking whether the declaration uses that
   // feature. This also ensures that the resulting set is in sorted order.
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
