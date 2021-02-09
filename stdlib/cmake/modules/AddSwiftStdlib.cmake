@@ -2012,7 +2012,9 @@ function(add_swift_target_library name)
       if(NOT SWIFTLIB_OBJECT_LIBRARY)
         # Add dependencies on the (not-yet-created) custom lipo target.
         foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-          if (NOT "${DEP}" STREQUAL "icucore")
+          if (NOT "${DEP}" STREQUAL "icucore" AND
+              NOT "${DEP}" STREQUAL "dispatch" AND
+              NOT "${DEP}" STREQUAL "BlocksRuntime")
             add_dependencies(${VARIANT_NAME}
               "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
           endif()
@@ -2021,7 +2023,9 @@ function(add_swift_target_library name)
         if (SWIFTLIB_IS_STDLIB AND SWIFTLIB_STATIC)
           # Add dependencies on the (not-yet-created) custom lipo target.
           foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-            if (NOT "${DEP}" STREQUAL "icucore")
+            if (NOT "${DEP}" STREQUAL "icucore" AND
+                NOT "${DEP}" STREQUAL "dispatch" AND
+                NOT "${DEP}" STREQUAL "BlocksRuntime")
               add_dependencies("${VARIANT_NAME}-static"
                 "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
             endif()

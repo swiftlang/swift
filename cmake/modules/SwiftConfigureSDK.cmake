@@ -130,18 +130,20 @@ endfunction()
 # This macro attempts to configure a given SDK. When successful, it
 # defines a number of variables:
 #
-#   SWIFT_SDK_${prefix}_NAME                Display name for the SDK
-#   SWIFT_SDK_${prefix}_VERSION             SDK version number (e.g., 10.9, 7.0)
-#   SWIFT_SDK_${prefix}_BUILD_NUMBER        SDK build number (e.g., 14A389a)
-#   SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION  Deployment version (e.g., 10.9, 7.0)
-#   SWIFT_SDK_${prefix}_LIB_SUBDIR          Library subdir for this SDK
-#   SWIFT_SDK_${prefix}_TRIPLE_NAME         Triple name for this SDK
-#   SWIFT_SDK_${prefix}_OBJECT_FORMAT       The object file format (e.g. MACHO)
-#   SWIFT_SDK_${prefix}_USE_ISYSROOT        Whether to use -isysroot
-#   SWIFT_SDK_${prefix}_ARCHITECTURES       Architectures (as a list)
-#   SWIFT_SDK_${prefix}_IS_SIMULATOR        Whether this is a simulator target.
-#   SWIFT_SDK_${prefix}_ARCH_${ARCH}_TRIPLE Triple name
-#   SWIFT_SDK_${prefix}_ARCH_${ARCH}_MODULE Module triple name for this SDK
+#   SWIFT_SDK_${prefix}_NAME                    Display name for the SDK
+#   SWIFT_SDK_${prefix}_VERSION                 SDK version number (e.g., 10.9, 7.0)
+#   SWIFT_SDK_${prefix}_BUILD_NUMBER            SDK build number (e.g., 14A389a)
+#   SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION      Deployment version (e.g., 10.9, 7.0)
+#   SWIFT_SDK_${prefix}_LIB_SUBDIR              Library subdir for this SDK
+#   SWIFT_SDK_${prefix}_TRIPLE_NAME             Triple name for this SDK
+#   SWIFT_SDK_${prefix}_OBJECT_FORMAT           The object file format (e.g. MACHO)
+#   SWIFT_SDK_${prefix}_USE_ISYSROOT            Whether to use -isysroot
+#   SWIFT_SDK_${prefix}_SHARED_LIBRARY_PREFIX   Shared library prefix for this SDK (e.g. 'lib')
+#   SWIFT_SDK_${prefix}_SHARED_LIBRARY_SUFFIX   Shared library suffix for this SDK (e.g. 'dylib')
+#   SWIFT_SDK_${prefix}_ARCHITECTURES           Architectures (as a list)
+#   SWIFT_SDK_${prefix}_IS_SIMULATOR            Whether this is a simulator target.
+#   SWIFT_SDK_${prefix}_ARCH_${ARCH}_TRIPLE     Triple name
+#   SWIFT_SDK_${prefix}_ARCH_${ARCH}_MODULE     Module triple name for this SDK
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
     triple_name module_name architectures)
@@ -180,6 +182,12 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT TRUE)
+  set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_PREFIX "lib")
+  set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_SUFFIX ".dylib")
+  set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_PREFIX "lib")
+  set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".a")
+  set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
+  set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX "")
 
   set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
   if(SWIFT_DARWIN_SUPPORTED_ARCHS)
@@ -258,10 +266,28 @@ macro(configure_sdk_unix name architectures)
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   if("${prefix}" STREQUAL "CYGWIN")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
+    set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_PREFIX "")
+    set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_SUFFIX ".dll")
+    set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_PREFIX "")
+    set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".lib")
+    set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
+    set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX ".lib")
   elseif("${prefix}" STREQUAL "WASI")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "WASM")
+    set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_PREFIX "")
+    set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_SUFFIX ".wasm")
+    set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_PREFIX "")
+    set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".a")
+    set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
+    set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX "")
   else()
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "ELF")
+    set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_PREFIX "lib")
+    set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_SUFFIX ".so")
+    set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_PREFIX "lib")
+    set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".a")
+    set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
+    set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX "")
   endif()
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
 
@@ -383,6 +409,12 @@ macro(configure_sdk_windows name environment architectures)
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
   set(SWIFT_SDK_${prefix}_USE_ISYSROOT FALSE)
+  set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_PREFIX "")
+  set(SWIFT_SDK_${prefix}_SHARED_LIBRARY_SUFFIX ".dll")
+  set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_PREFIX "")
+  set(SWIFT_SDK_${prefix}_STATIC_LIBRARY_SUFFIX ".lib")
+  set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_PREFIX "")
+  set(SWIFT_SDK_${prefix}_IMPORT_LIBRARY_SUFFIX ".lib")
 
   foreach(arch ${architectures})
     if(arch STREQUAL armv7)
@@ -435,13 +467,19 @@ endmacro()
 #
 # FIXME: this is not wired up with anything yet.
 function(configure_target_variant prefix name sdk build_config lib_subdir)
-  set(SWIFT_VARIANT_${prefix}_NAME               ${name})
-  set(SWIFT_VARIANT_${prefix}_SDK_PATH           ${SWIFT_SDK_${sdk}_PATH})
-  set(SWIFT_VARIANT_${prefix}_VERSION            ${SWIFT_SDK_${sdk}_VERSION})
-  set(SWIFT_VARIANT_${prefix}_BUILD_NUMBER       ${SWIFT_SDK_${sdk}_BUILD_NUMBER})
-  set(SWIFT_VARIANT_${prefix}_DEPLOYMENT_VERSION ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
-  set(SWIFT_VARIANT_${prefix}_LIB_SUBDIR         "${lib_subdir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
-  set(SWIFT_VARIANT_${prefix}_TRIPLE_NAME        ${SWIFT_SDK_${sdk}_TRIPLE_NAME})
-  set(SWIFT_VARIANT_${prefix}_ARCHITECTURES      ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+  set(SWIFT_VARIANT_${prefix}_NAME                  ${name})
+  set(SWIFT_VARIANT_${prefix}_SDK_PATH              ${SWIFT_SDK_${sdk}_PATH})
+  set(SWIFT_VARIANT_${prefix}_VERSION               ${SWIFT_SDK_${sdk}_VERSION})
+  set(SWIFT_VARIANT_${prefix}_BUILD_NUMBER          ${SWIFT_SDK_${sdk}_BUILD_NUMBER})
+  set(SWIFT_VARIANT_${prefix}_DEPLOYMENT_VERSION    ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+  set(SWIFT_VARIANT_${prefix}_LIB_SUBDIR            "${lib_subdir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+  set(SWIFT_VARIANT_${prefix}_TRIPLE_NAME           ${SWIFT_SDK_${sdk}_TRIPLE_NAME})
+  set(SWIFT_VARIANT_${prefix}_ARCHITECTURES         ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+  set(SWIFT_VARIANT_${prefix}_SHARED_LIBRARY_PREFIX ${SWIFT_SDK_${sdk}_SHARED_LIBRARY_PREFIX})
+  set(SWIFT_VARIANT_${prefix}_SHARED_LIBRARY_SUFFIX ${SWIFT_SDK_${sdk}_SHARED_LIBRARY_SUFFIX})
+  set(SWIFT_VARIANT_${prefix}_STATIC_LIBRARY_PREFIX ${SWIFT_SDK_${sdk}_STATIC_LIBRARY_PREFIX})
+  set(SWIFT_VARIANT_${prefix}_STATIC_LIBRARY_SUFFIX ${SWIFT_SDK_${sdk}_STATIC_LIBRARY_SUFFIX})
+  set(SWIFT_VARIANT_${prefix}_IMPORT_LIBRARY_PREFIX ${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_PREFIX})
+  set(SWIFT_VARIANT_${prefix}_IMPORT_LIBRARY_SUFFIX ${SWIFT_SDK_${sdk}_IMPORT_LIBRARY_SUFFIX})
 endfunction()
 
