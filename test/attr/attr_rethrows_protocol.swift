@@ -192,3 +192,17 @@ struct ThirdWitness : Third {
 func takesFirst<T : First>(_: T) rethrows {}
 
 takesFirst(FirstWitness())
+
+// Crash with enum case
+@rethrows protocol WitnessedByEnumCase {
+  static func foo(_: Int) throws -> Self
+}
+
+enum MyEnum : WitnessedByEnumCase {
+  case foo(Int)
+  case bar
+}
+
+func takesWitnessedByEnumCase<T : WitnessedByEnumCase>(_: T) rethrows {}
+
+takesWitnessedByEnumCase(MyEnum.bar)

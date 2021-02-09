@@ -135,7 +135,18 @@ static bool classifyWitness(ModuleDecl *module,
                             ProtocolConformance *conformance, 
                             AbstractFunctionDecl *req) {
   auto declRef = conformance->getWitnessDeclRef(req);
-  auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
+  if (!declRef) {
+    // Invalid conformance.
+    return true;
+  }
+
+  auto witnessDecl = dyn_cast<AbstractFunctionDecl>(declRef.getDecl());
+  if (!witnessDecl) {
+    // Enum element constructors never throw.
+    assert(isa<EnumElementDecl>(declRef.getDecl()));
+    return false;
+  }
+
   switch (witnessDecl->getRethrowingKind()) {
     case FunctionRethrowingKind::None:
       // Witness doesn't throw at all, so it contributes nothing.
