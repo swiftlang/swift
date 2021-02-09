@@ -139,3 +139,10 @@ protocol ThrowingFactory {
 enum HorseFactory : ThrowingFactory {
   case horse(Int)
 }
+
+protocol MissingAccessorsVar {
+  static var bar: Self // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+}
+enum Bar14: MissingAccessorsVar { // OK
+  case bar
+}
