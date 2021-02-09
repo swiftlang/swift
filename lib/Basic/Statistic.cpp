@@ -703,7 +703,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   //    compile-time) so we sequence printing our own stats and LLVM's timers
   //    manually.
 
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_STATS)
+#if !defined(NDEBUG) || LLVM_ENABLE_STATS
   publishAlwaysOnStatsToLLVM();
   PrintStatisticsJSON(ostream);
   TimerGroup::clearAll();
