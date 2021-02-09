@@ -5861,7 +5861,17 @@ llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
 
 /// Whether this property has any attached property wrappers.
 bool VarDecl::hasAttachedPropertyWrapper() const {
-  return !getAttachedPropertyWrappers().empty();
+  return !getAttachedPropertyWrappers().empty() || hasImplicitPropertyWrapper();
+}
+
+bool VarDecl::hasImplicitPropertyWrapper() const {
+  if (!getAttachedPropertyWrappers().empty())
+    return false;
+
+  auto *dc = getDeclContext();
+  bool isClosureParam = isa<ParamDecl>(this) &&
+      dc->getContextKind() == DeclContextKind::AbstractClosureExpr;
+  return !isImplicit() && getName().hasDollarPrefix() && isClosureParam;
 }
 
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
@@ -5877,15 +5887,22 @@ bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
 
 PropertyWrapperTypeInfo
 VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
-  auto attrs = getAttachedPropertyWrappers();
-  if (i >= attrs.size())
-    return PropertyWrapperTypeInfo();
-  
-  auto attr = attrs[i];
-  auto dc = getDeclContext();
-  ASTContext &ctx = getASTContext();
-  auto nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  NominalTypeDecl *nominal;
+  if (hasImplicitPropertyWrapper()) {
+    assert(i == 0);
+    nominal = getInterfaceType()->getAnyNominal();
+  } else {
+    auto attrs = getAttachedPropertyWrappers();
+    if (i >= attrs.size())
+      return PropertyWrapperTypeInfo();
+
+    auto attr = attrs[i];
+    auto dc = getDeclContext();
+    ASTContext &ctx = getASTContext();
+    nominal = evaluateOrDefault(
+        ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  }
+
   if (!nominal)
     return PropertyWrapperTypeInfo();
 
@@ -5966,7 +5983,7 @@ void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) con
       visit(backingVar);
   }
 
-  if (getAttrs().hasAttribute<CustomAttr>()) {
+  if (getAttrs().hasAttribute<CustomAttr>() || hasImplicitPropertyWrapper()) {
     if (auto *backingVar = getPropertyWrapperBackingProperty())
       visit(backingVar);
 
@@ -6251,14 +6268,16 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 }
 
 AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
-  if (!type)
-    type = getInterfaceType();
+  if (!type) {
+    if (hasAttachedPropertyWrapper() && !hasImplicitPropertyWrapper()) {
+      type = getPropertyWrapperBackingPropertyType();
+    } else {
+      type = getInterfaceType();
+    }
+  }
 
   if (isVariadic())
     type = ParamDecl::getVarargBaseTy(type);
-
-  if (auto wrapperType = getPropertyWrapperBackingPropertyType())
-    type = wrapperType;
 
   auto label = getArgumentName();
   auto flags = ParameterTypeFlags::fromParameterType(

@@ -1248,6 +1248,10 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 Type computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
 
+/// Compute the projected value type for the given property that has attached
+/// property wrappers when the backing storage is known to have the given type.
+Type computeProjectedValueType(const VarDecl *var, Type backingStorageType);
+
 /// Build a call to the init(wrappedValue:) or init(projectedValue:)
 /// initializer of the property wrapper, filling in the given \c value
 /// as the wrapped or projected value argument.

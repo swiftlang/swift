@@ -4917,7 +4917,10 @@ public:
 
   /// Whether this property has any attached property wrappers.
   bool hasAttachedPropertyWrapper() const;
-  
+
+  /// Whether this var has an implicit property wrapper attribute.
+  bool hasImplicitPropertyWrapper() const;
+
   /// Whether all of the attached property wrappers have an init(wrappedValue:)
   /// initializer.
   bool allAttachedPropertyWrappersHaveWrappedValueInit() const;

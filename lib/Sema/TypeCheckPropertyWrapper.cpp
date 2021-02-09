@@ -516,6 +516,9 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
 Type
 PropertyWrapperBackingPropertyTypeRequest::evaluate(
     Evaluator &evaluator, VarDecl *var) const {
+  if (var->hasImplicitPropertyWrapper())
+    return var->getInterfaceType();
+
   Type rawType =
       evaluateOrDefault(evaluator,
                         AttachedPropertyWrapperTypeRequest{var, 0}, Type());
@@ -558,15 +561,19 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                                     Optional<unsigned> limit) {
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  unsigned realLimit = wrapperAttrs.size();
+  unsigned realLimit = var->hasImplicitPropertyWrapper() ? 1 : wrapperAttrs.size();
   if (limit)
     realLimit = std::min(*limit, realLimit);
                                     
   // Follow the chain of wrapped value properties.
   Type wrappedValueType = backingStorageType;
   DeclContext *dc = var->getDeclContext();
-  for (unsigned i : range(realLimit)) {
-    auto wrappedInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+  while (realLimit--) {
+    auto *nominal = wrappedValueType->getDesugaredType()->getAnyNominal();
+    if (!nominal)
+      return Type();
+
+    auto wrappedInfo = nominal->getPropertyWrapperTypeInfo();
     if (!wrappedInfo)
       return wrappedValueType;
 
@@ -581,6 +588,19 @@ Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
   return wrappedValueType;
 }
 
+Type swift::computeProjectedValueType(const VarDecl *var, Type backingStorageType) {
+  if (!var->hasAttachedPropertyWrapper())
+    return Type();
+
+  if (var->hasImplicitPropertyWrapper())
+    return backingStorageType;
+
+  DeclContext *dc = var->getDeclContext();
+  auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
+  return backingStorageType->getTypeOfMember(dc->getParentModule(),
+                                             wrapperInfo.projectedValueVar);
+}
+
 Expr *swift::buildPropertyWrapperInitCall(
     const VarDecl *var, Type backingStorageType, Expr *value,
     PropertyWrapperInitKind initKind,
@@ -590,6 +610,18 @@ Expr *swift::buildPropertyWrapperInitCall(
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
   ApplyExpr *innermostInit = nullptr;
+
+  // Projected-value initializers don't compose, so no need to iterate
+  // over the wrapper attributes.
+  if (initKind == PropertyWrapperInitKind::ProjectedValue) {
+    auto typeExpr = TypeExpr::createImplicit(backingStorageType, ctx);
+    auto argName = ctx.Id_projectedValue;
+    auto *init =
+        CallExpr::createImplicit(ctx, typeExpr, { initializer }, { argName });
+
+    innermostInitCallback(init);
+    return init;
+  }
 
   for (unsigned i : llvm::reverse(indices(wrapperAttrs))) {
     Type wrapperType =
@@ -613,20 +645,16 @@ Expr *swift::buildPropertyWrapperInitCall(
     auto attr = wrapperAttrs[i];
     if (!attr->getArg()) {
       Identifier argName;
-      if (initKind == PropertyWrapperInitKind::ProjectedValue) {
-        argName = ctx.Id_projectedValue;
-      } else {
-        assert(initKind == PropertyWrapperInitKind::WrappedValue);
-        switch (var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
-        case PropertyWrapperTypeInfo::HasInitialValueInit:
-          argName = ctx.Id_initialValue;
-          break;
+      assert(initKind == PropertyWrapperInitKind::WrappedValue);
+      switch (var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
+      case PropertyWrapperTypeInfo::HasInitialValueInit:
+        argName = ctx.Id_initialValue;
+        break;
 
-        case PropertyWrapperTypeInfo::HasWrappedValueInit:
-        case PropertyWrapperTypeInfo::NoWrappedValueInit:
-          argName = ctx.Id_wrappedValue;
-          break;
-        }
+      case PropertyWrapperTypeInfo::HasWrappedValueInit:
+      case PropertyWrapperTypeInfo::NoWrappedValueInit:
+        argName = ctx.Id_wrappedValue;
+        break;
       }
 
       auto endLoc = initializer->getEndLoc();
