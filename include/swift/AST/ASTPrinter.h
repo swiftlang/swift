@@ -355,6 +355,10 @@ void getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
                              llvm::SmallVectorImpl<TypeLoc> &Results);
 
 StringRef getAccessorKindString(AccessorKind value);
+
+bool printCompatibilityFeatureChecksPre(ASTPrinter &printer, Decl *decl);
+void printCompatibilityFeatureChecksPost(ASTPrinter &printer);
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H

@@ -460,6 +460,10 @@ struct PrintOptions {
   /// Whether to print inheritance lists for types.
   bool PrintInherited = true;
 
+  /// Whether to print feature checks for compatibility with older Swift
+  /// compilers that might parse the result.
+  bool PrintCompatibilityFeatureChecks = false;
+
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
     Never,
