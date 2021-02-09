@@ -115,6 +115,22 @@ func rethrowsWithThrowsClosure<T : ThrowsClosure>(_ t: T) rethrows {
 
 try rethrowsWithThrowsClosure(ThrowsClosureWitness())
 
+@rethrows protocol RethrowsClosure {
+  func doIt() throws
+  func doIt(_: () throws -> ()) rethrows
+}
+
+struct RethrowsClosureWitness : RethrowsClosure {
+  func doIt() {}
+  func doIt(_: () throws -> ()) rethrows {}
+}
+
+func rethrowsWithRethrowsClosure<T : RethrowsClosure>(_ t: T) rethrows {
+  try t.doIt() {}
+}
+
+try rethrowsWithRethrowsClosure(RethrowsClosureWitness())
+
 // Empty protocol
 @rethrows protocol Empty {}
 struct EmptyWitness : Empty {}
@@ -122,3 +138,28 @@ struct EmptyWitness : Empty {}
 func takesEmpty<T : Empty>(_: T) rethrows {}
 
 takesEmpty(EmptyWitness())
+
+// FIXME: Fix this soundness hole
+
+// Note: SimpleThrowsClosure is not @rethrows
+protocol SimpleThrowsClosure {
+  func doIt(_: () throws -> ()) rethrows
+}
+
+struct ConformsToSimpleThrowsClosure<T : RethrowingProtocol> : SimpleThrowsClosure {
+  let t: T
+
+  // This cannot witness SimpleThrowsClosure.doIt(), because the
+  // T : RethrowingProtocol conformance is a source here, but that
+  // is not captured in the protocol's requirement signature.
+  func doIt(_: () throws -> ()) rethrows {
+    try t.source()
+  }
+}
+
+func soundnessHole<T : SimpleThrowsClosure>(_ t: T) {
+  t.doIt {}
+}
+
+// This actually can throw...
+soundnessHole(ConformsToSimpleThrowsClosure(t: Throws()))
