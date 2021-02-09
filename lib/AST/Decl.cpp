@@ -3416,6 +3416,23 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
   llvm_unreachable("bad access level");
 }
 
+bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
+  auto scope = getFormalAccessScope();
+
+  // 'other' may have come from a @testable import, so we need to upgrade it's
+  // visibility to public here. That is not the same as whether 'other' is
+  // being built with -enable-testing though -- we don't want to treat it
+  // differently in that case.
+  auto otherScope = other->getFormalAccessScope(getDeclContext());
+
+  if (scope.isPublic())
+    return !otherScope.isPublic();
+  else if (scope.isInternal())
+    return !otherScope.isPublic() && !otherScope.isInternal();
+  else
+    return false;
+}
+
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
                                  bool forConformance,
                                  bool allowUsableFromInline) const {
