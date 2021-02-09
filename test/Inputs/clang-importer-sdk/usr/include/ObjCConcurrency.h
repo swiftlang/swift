@@ -97,6 +97,12 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 - (void)rollWithCompletionHandler: (void (^)(void))completionHandler;
 @end
 
+typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
+
+@protocol ObjCClub
+- (void) activateWithCompletion:(ObjCErrorHandler) inCompletion;
+@end
+
 #define MAGIC_NUMBER 42
 
 #pragma clang assume_nonnull end
