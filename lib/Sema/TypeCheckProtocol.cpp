@@ -620,6 +620,8 @@ swift::matchWitness(
     if (isa<VarDecl>(req) &&
         cast<VarDecl>(req)->getParsedAccessor(AccessorKind::Set))
       return RequirementMatch(witness, MatchKind::SettableConflict);
+
+    decomposeFunctionType = enumCase->hasAssociatedValues();
   }
 
   // If the requirement is @objc, the witness must not be marked with @nonobjc.
