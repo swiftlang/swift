@@ -3298,7 +3298,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
   case AccessLevel::Open:
-    return AccessScope::getPublic(VD->isSPI());
+    return AccessScope::getPublic();
   }
 
   llvm_unreachable("unknown access level");
