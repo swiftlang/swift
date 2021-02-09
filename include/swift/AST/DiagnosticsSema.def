@@ -5670,6 +5670,10 @@ WARNING(attr_objc_name_changed_by_access_note, none,
 WARNING(fixit_attr_objc_name_changed_by_access_note, none,
         "change '@objc' name in source code explicitly to silence this warning",
         ())
+WARNING(attr_objc_name_conflicts_with_access_note, none,
+        "access note for %0 changes the '@objc' name of this %1 to %2, but "
+        "source code specifies %3; the access note will be ignored",
+        (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

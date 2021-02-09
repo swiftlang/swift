@@ -456,9 +456,9 @@ class Wotsit<T> : Gizmo {
   // CHECK-NEXT: destroy_value [[SELF_COPY]] : $Wotsit<T>
   // CHECK-NEXT: return [[RESULT]] : $()
   // CHECK-NEXT: }
+  @objc(plain)
   func plain() { }
-  // expected-warning@-1 {{access note for fancy test suite adds attribute 'objc' to this instance method}}
-  // expected-note@-2 {{add attribute explicitly to silence this warning}} {{3-3=@objc }}
+  // expected-warning@-2 {{access note for fancy test suite changes the '@objc' name of this instance method to 'fancy', but source code specifies 'plain'; the access note will be ignored}}
 
   func generic<U>(_ x: U) {}
 

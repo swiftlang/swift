@@ -1534,9 +1534,10 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
         note.fixItInsertAfter(attr->getLocation(), newNameString);
     }
     else if (attr->getName() != *note.ObjCName) {
-      // TODO: diagnose conflict between explicit name in code and explicit
-      // name in access note
-      llvm::report_fatal_error("conflict between name in code and name in access note");
+      diagnoseForAccessNote(attr, VD,
+                            diag::attr_objc_name_conflicts_with_access_note,
+                            notes.reason, VD->getDescriptiveKind(),
+                            *note.ObjCName, *attr->getName());
     }
   }
 }

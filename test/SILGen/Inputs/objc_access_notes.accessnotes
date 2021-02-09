@@ -53,3 +53,4 @@ Notes:
   ObjC: true
 - Name: 'Wotsit.plain()'
   ObjC: true
+  ObjCName: 'fancy'
