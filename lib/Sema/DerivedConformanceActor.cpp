@@ -143,6 +143,7 @@ static ValueDecl *deriveActor_enqueuePartialTask(DerivedConformance &derived) {
       SourceLoc(), ctx.Id_partialTask, parentDC);
   partialTaskParamDecl->setInterfaceType(partialTaskType);
   partialTaskParamDecl->setSpecifier(ParamSpecifier::Default);
+  partialTaskParamDecl->setImplicit();
 
   // enqueue(partialTask:) method.
   ParameterList *params = ParameterList::createWithoutLoc(partialTaskParamDecl);
