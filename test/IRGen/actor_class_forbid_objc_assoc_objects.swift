@@ -7,19 +7,19 @@ import _Concurrency
 
 // CHECK: @_METACLASS_DATA__TtC37actor_class_forbid_objc_assoc_objects5Actor = internal constant { {{.*}} } { i32 [[METAFLAGS:1153]],
 // CHECK: @_DATA__TtC37actor_class_forbid_objc_assoc_objects5Actor = internal constant { {{.*}} } { i32 [[OBJECTFLAGS:1152|1216]],
-final actor class Actor {
+final actor Actor {
 }
 
 // CHECK: @_METACLASS_DATA__TtC37actor_class_forbid_objc_assoc_objects6Actor2 = internal constant { {{.*}} } { i32 [[METAFLAGS]],
 // CHECK: @_DATA__TtC37actor_class_forbid_objc_assoc_objects6Actor2 = internal constant { {{.*}} } { i32 [[OBJECTFLAGS]],
-actor class Actor2 {
+actor Actor2 {
 }
 
 // CHECK: @_METACLASS_DATA__TtC37actor_class_forbid_objc_assoc_objects6Actor3 = internal constant { {{.*}} } { i32 [[METAFLAGS]],
 // CHECK: @_DATA__TtC37actor_class_forbid_objc_assoc_objects6Actor3 = internal constant { {{.*}} } { i32 [[OBJECTFLAGS]],
 class Actor3 : Actor2 {}
 
-actor class GenericActor<T> {
+actor GenericActor<T> {
     var state: T
     init(state: T) { self.state = state }
 }

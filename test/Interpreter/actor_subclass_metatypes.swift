@@ -14,7 +14,7 @@ defer { runAllTests() }
 
 var Tests = TestSuite("Actor.SubClass.Metatype")
 
-actor class Actor5<T> {
+actor Actor5<T> {
   var state: T
   init(state: T) { self.state = state }
 }

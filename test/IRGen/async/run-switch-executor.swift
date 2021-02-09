@@ -16,7 +16,7 @@
 // Currently this test just checks if nothing crashes.
 // TODO: also check if the current executor is the correct one.
 
-final actor class MyActor {
+final actor MyActor {
   var p: Int
 
   @inline(never)

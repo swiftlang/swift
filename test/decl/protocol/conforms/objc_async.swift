@@ -54,7 +54,7 @@ extension C5: ConcurrentProtocol {
 }
 
 // Global actors.
-actor class SomeActor { }
+actor SomeActor { }
 
 @globalActor
 struct SomeGlobalActor {

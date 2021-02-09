@@ -22,7 +22,7 @@ struct Point {
   }
 }
 
-actor class TestActor {
+actor TestActor {
   // expected-note@+1{{mutable state is only available within the actor instance}}
   var position = Point(x: 0, y: 0)
   var nextPosition = Point(x: 0, y: 1)
@@ -122,7 +122,7 @@ extension TestActor {
 }
 
 // Check implicit async testing
-actor class DifferentActor {
+actor DifferentActor {
   func modify(_ state: inout Int) {}
 }
 
@@ -144,7 +144,7 @@ extension TestActor {
   }
 }
 
-actor class MyActor {
+actor MyActor {
   var points: [Point] = []
   var int: Int = 0
   var maybeInt: Int?

@@ -6,8 +6,8 @@
 
 // REQUIRES: concurrency
 
-// CHECK: actor public class SomeActor
-public actor class SomeActor {
+// CHECK: public actor SomeActor
+public actor SomeActor {
   @actorIndependent func maine() { }
 }
 
@@ -36,8 +36,8 @@ public class C2 { }
 // CHECK: @{{(Test.)?}}SomeGlobalActor public class C2
 public class C3: C2 { }
 
-// CHECK: actor public class SomeSubActor
+// CHECK: public actor SomeSubActor
 // CHECK-NEXT: @actorIndependent public func maine()
-public actor class SomeSubActor: SomeActor {
+public actor SomeSubActor: SomeActor {
   override public func maine() { }
 }

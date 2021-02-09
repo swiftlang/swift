@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-actor class SomeActor { }
+actor SomeActor { }
 
 @globalActor
 struct SomeGlobalActor {
@@ -140,7 +140,7 @@ class C6: P2, P3 {
 // ----------------------------------------------------------------------
 // Global actor checking for overrides
 // ----------------------------------------------------------------------
-actor class GenericSuper<T> {
+actor GenericSuper<T> {
   @GenericGlobalActor<T> func method() { }
 
   @GenericGlobalActor<T> func method2() { } // expected-note {{overridden declaration is here}}
@@ -149,7 +149,7 @@ actor class GenericSuper<T> {
   @GenericGlobalActor<T> func method5() { }
 }
 
-actor class GenericSub<T> : GenericSuper<[T]> {
+actor GenericSub<T> : GenericSuper<[T]> {
   override func method() { }  // expected-note{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}

@@ -6,7 +6,7 @@ import Foundation
 
 func g(_ selector: Selector) -> Int { }
 
-actor class A {
+actor A {
   func selectors() {
     _ = #selector(type(of: self).f) // expected-error{{argument of '#selector' refers to instance method 'f()' that is not exposed to Objective-C}}
     _ = #selector(type(of: self).g) // expected-error{{argument of '#selector' refers to instance method 'g()' that is not exposed to Objective-C}}

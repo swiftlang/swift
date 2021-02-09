@@ -37,7 +37,7 @@ func asyncHandlerBad4(result: inout Int) { }
 func asyncHandlerBad5(result: () -> Int) { }
 // expected-error@-1{{non-escaping closure parameter is not allowed in '@asyncHandler' function}}
 
-actor class X {
+actor X {
   @asyncHandler func asyncHandlerMethod() { }
 
   @asyncHandler init() { }
