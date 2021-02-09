@@ -73,6 +73,34 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIn('swift-test-stdlib-iphoneos-arm64',
                       hsc.swift_stdlib_build_targets)
 
+    def test_should_configure_and_build_cross_compiling_with_stdlib_targets(self):
+        args = self.default_args()
+        args.build_ios_device = True
+        args.host_target = 'macosx-x86_64'
+        args.stdlib_deployment_targets = ['iphoneos-arm64']
+
+        hsc = HostSpecificConfiguration('iphoneos-arm64', args)
+
+        self.assertEqual(len(hsc.sdks_to_configure), 1)
+        self.assertIn('IOS', hsc.sdks_to_configure)
+
+        self.assertEqual(len(hsc.swift_stdlib_build_targets), 1)
+        self.assertIn('swift-test-stdlib-iphoneos-arm64',
+                      hsc.swift_stdlib_build_targets)
+
+    def test_should_only_configure_when_cross_compiling_different_stdlib_targets(self):
+        args = self.default_args()
+        args.build_ios_device = True
+        args.host_target = 'macosx-x86_64'
+        args.stdlib_deployment_targets = ['iphonesimulator-arm64']
+
+        hsc = HostSpecificConfiguration('iphoneos-arm64', args)
+
+        self.assertEqual(len(hsc.sdks_to_configure), 1)
+        self.assertIn('IOS', hsc.sdks_to_configure)
+
+        self.assertEqual(len(hsc.swift_stdlib_build_targets), 0)
+
     def generate_should_skip_building_platform(
             host_target, sdk_name, build_target, build_arg_name):
         def test(self):
