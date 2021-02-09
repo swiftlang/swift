@@ -637,8 +637,8 @@ bool SILType::isDifferentiable(SILModule &M) const {
 
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
-  return Type(const_cast<TypeBase*>(this)).transform([&](Type t) -> Type {
-    if (auto f = t->getAs<SILFunctionType>()) {
+  return Type(const_cast<TypeBase *>(this)).transform([&](Type t) -> Type {
+    if (auto *f = t->getAs<SILFunctionType>()) {
       auto sft = f->getUnsubstitutedType(M);
       
       // Also eliminate substituted function types in the arguments, yields,
