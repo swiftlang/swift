@@ -129,7 +129,7 @@ func rethrowsWithRethrowsClosure<T : RethrowsClosure>(_ t: T) rethrows {
   try t.doIt() {}
 }
 
-try rethrowsWithRethrowsClosure(RethrowsClosureWitness())
+rethrowsWithRethrowsClosure(RethrowsClosureWitness())
 
 // Empty protocol
 @rethrows protocol Empty {}

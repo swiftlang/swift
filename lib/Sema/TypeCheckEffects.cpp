@@ -137,23 +137,35 @@ static bool classifyWitness(ModuleDecl *module,
   auto declRef = conformance->getWitnessDeclRef(req);
   auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
   switch (witnessDecl->getRethrowingKind()) {
+    case FunctionRethrowingKind::None:
+      // Witness doesn't throw at all, so it contributes nothing.
+      return false;
+
     case FunctionRethrowingKind::ByConformance: {
+      // Witness throws if the concrete type's @rethrows conformances
+      // recursively throw.
       auto substitutions = conformance->getSubstitutions(module);
       for (auto conformanceRef : substitutions.getConformances()) {
         if (conformanceRef.classifyAsThrows()) {
           return true;
         }
       }
-      break;
+      return false;
     }
-    case FunctionRethrowingKind::None:
-      break;
+
+    case FunctionRethrowingKind::ByClosure:
+      // Witness only throws if a closure argument throws, so it
+      // contributes nothng.
+      return false;
+
     case FunctionRethrowingKind::Throws:
+      // Witness always throws.
       return true;
-    default:
+
+    case FunctionRethrowingKind::Invalid:
+      // If the code is invalid, just assume it throws.
       return true;
   }
-  return false;
 }
 
 bool
