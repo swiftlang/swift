@@ -3,7 +3,11 @@
 // RUN: %target-swift-frontend -typecheck -swift-version 5 -module-name FeatureTest -emit-module-interface-path %t/FeatureTest.swiftinterface -enable-library-evolution -enable-experimental-concurrency %s
 // RUN: %FileCheck %s < %t/FeatureTest.swiftinterface --check-prefix CHECK
 
-// Make sure we can parse the file without concurrency enabled
+// REQUIRES: concurrency
+
+// Ensure that when we emit a Swift interface that makes use of new features,
+// the uses of those features are guarded by appropriate #if's that allow older
+// compilers to skip over the uses of newer features.
 
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: actor {{.*}} MyActor
