@@ -2209,12 +2209,12 @@ public:
           MemberLookupResult result, ConstraintLocator *locator);
 };
 
-class CheckedCastContextualMismatchWarningBase : public ContextualMismatch {
+class CheckedCastContextualMismatchWarning : public ContextualMismatch {
 protected:
-  CheckedCastContextualMismatchWarningBase(ConstraintSystem &cs,
-                                           FixKind fixKind, Type fromType,
-                                           Type toType, CheckedCastKind kind,
-                                           ConstraintLocator *locator)
+  CheckedCastContextualMismatchWarning(ConstraintSystem &cs, FixKind fixKind,
+                                       Type fromType, Type toType,
+                                       CheckedCastKind kind,
+                                       ConstraintLocator *locator)
       : ContextualMismatch(cs, fixKind, fromType, toType, locator,
                            /*isWarning*/ true),
         CastKind(kind) {}
@@ -2222,11 +2222,11 @@ protected:
 };
 
 class AllowCheckedCastCoercibleOptionalType final
-    : public CheckedCastContextualMismatchWarningBase {
+    : public CheckedCastContextualMismatchWarning {
   AllowCheckedCastCoercibleOptionalType(ConstraintSystem &cs, Type fromType,
                                         Type toType, CheckedCastKind kind,
                                         ConstraintLocator *locator)
-      : CheckedCastContextualMismatchWarningBase(
+      : CheckedCastContextualMismatchWarning(
             cs, FixKind::AllowCheckedCastCoercibleOptionalType, fromType,
             toType, kind, locator) {}
 
@@ -2242,11 +2242,11 @@ public:
 };
 
 class AllowAlwaysSucceedCheckedCast final
-    : public CheckedCastContextualMismatchWarningBase {
+    : public CheckedCastContextualMismatchWarning {
   AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
                                 Type toType, CheckedCastKind kind,
                                 ConstraintLocator *locator)
-      : CheckedCastContextualMismatchWarningBase(
+      : CheckedCastContextualMismatchWarning(
             cs, FixKind::AllowUnsupportedRuntimeCheckedCast, fromType, toType,
             kind, locator) {}
 
@@ -2261,11 +2261,11 @@ public:
 };
 
 class AllowUnsupportedRuntimeCheckedCast final
-    : public CheckedCastContextualMismatchWarningBase {
+    : public CheckedCastContextualMismatchWarning {
   AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
                                      Type toType, CheckedCastKind kind,
                                      ConstraintLocator *locator)
-      : CheckedCastContextualMismatchWarningBase(
+      : CheckedCastContextualMismatchWarning(
             cs, FixKind::AllowUnsupportedRuntimeCheckedCast, fromType, toType,
             kind, locator) {}
 

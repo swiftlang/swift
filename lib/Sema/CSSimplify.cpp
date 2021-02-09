@@ -5973,7 +5973,7 @@ static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
          fromType->getOptionalObjectType();
 }
 
-static ConstraintFix *attemptFixForCheckedConvertibleTypes(
+static ConstraintFix *maybeWarnAboutExtraneousCast(
     ConstraintSystem &cs, Type origFromType, Type origToType, Type fromType,
     Type toType, SmallVector<Type, 4> fromOptionals,
     SmallVector<Type, 4> toOptionals, ConstraintSystem::TypeMatchOptions flags,
@@ -6137,7 +6137,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     if (result != SolutionKind::Solved)
       return;
 
-    if (auto *fix = attemptFixForCheckedConvertibleTypes(
+    if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
             toOptionals, flags, locator)) {
       (void)recordFix(fix);
@@ -6197,7 +6197,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // Attempts to record warning fixes when both types are known by the
     // compiler and we can infer that the runtime checked cast will always
     // succeed or fail.
-    if (auto *fix = attemptFixForCheckedConvertibleTypes(
+    if (auto *fix = maybeWarnAboutExtraneousCast(
             *this, origFromType, origToType, fromType, toType, fromOptionals,
             toOptionals, flags, locator)) {
       (void)recordFix(fix);
