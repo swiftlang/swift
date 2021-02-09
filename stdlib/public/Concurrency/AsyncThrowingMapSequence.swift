@@ -21,7 +21,6 @@ extension AsyncSequence {
   }
 }
 
-@frozen
 public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
   @usableFromInline
   let base: Base
@@ -43,7 +42,6 @@ extension AsyncThrowingMapSequence: AsyncSequence {
   public typealias Element = Transformed
   public typealias AsyncIterator = Iterator
 
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator

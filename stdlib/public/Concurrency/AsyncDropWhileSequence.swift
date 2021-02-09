@@ -21,7 +21,6 @@ extension AsyncSequence {
   }
 }
 
-@frozen
 public struct AsyncDropWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -43,7 +42,6 @@ extension AsyncDropWhileSequence: AsyncSequence {
   public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator

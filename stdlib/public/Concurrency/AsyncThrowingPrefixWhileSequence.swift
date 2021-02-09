@@ -21,7 +21,6 @@ extension AsyncSequence {
   }
 }
 
-@frozen
 public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -43,7 +42,6 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
   public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator
 
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var predicateHasFailed = false

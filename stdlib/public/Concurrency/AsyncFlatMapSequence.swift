@@ -21,7 +21,6 @@ extension AsyncSequence {
   }
 }
 
-@frozen
 public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -43,7 +42,6 @@ extension AsyncFlatMapSequence: AsyncSequence {
   public typealias Element = SegmentOfResult.Element
   public typealias AsyncIterator = Iterator
 
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
