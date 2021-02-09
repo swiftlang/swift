@@ -22,6 +22,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericSignature.h"
@@ -36,6 +37,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
@@ -136,6 +138,9 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
+
+  // We should provide backward-compatible Swift interfaces when we can.
+  result.PrintCompatibilityFeatureChecks = true;
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
@@ -955,9 +960,16 @@ public:
       }
     }
 
+    
     Printer.callPrintDeclPre(D, Options.BracketOptions);
 
+    bool haveFeatureChecks = Options.PrintCompatibilityFeatureChecks &&
+      printCompatibilityFeatureChecksPre(Printer, D);
+
     ASTVisitor::visit(D);
+
+    if (haveFeatureChecks)
+      printCompatibilityFeatureChecksPost(Printer);
 
     if (Synthesize) {
       Printer.setSynthesizedTarget({});
@@ -2255,6 +2267,11 @@ static void printExtendedTypeName(Type ExtendedType, ASTPrinter &Printer,
 
 void PrintAST::printSynthesizedExtension(Type ExtendedType,
                                          ExtensionDecl *ExtDecl) {
+    // Print compatibility features checks first, if we need them.
+    bool haveFeatureChecks = Options.PrintCompatibilityFeatureChecks &&
+      Options.BracketOptions.shouldOpenExtension(ExtDecl) &&
+      Options.BracketOptions.shouldCloseExtension(ExtDecl) &&
+      printCompatibilityFeatureChecksPre(Printer, ExtDecl);
 
   auto printRequirementsFrom = [&](ExtensionDecl *ED, bool &IsFirst) {
     auto Sig = ED->getGenericSignature();
@@ -2297,7 +2314,6 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
     return true;
   };
 
-
   if (Options.BracketOptions.shouldOpenExtension(ExtDecl)) {
     printDocumentationComment(ExtDecl);
     printAttributes(ExtDecl);
@@ -2330,6 +2346,9 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
                        Options.BracketOptions.shouldOpenExtension(ExtDecl),
                        Options.BracketOptions.shouldCloseExtension(ExtDecl));
   }
+
+  if (haveFeatureChecks)
+    printCompatibilityFeatureChecksPost(Printer);
 }
 
 void PrintAST::printExtension(ExtensionDecl *decl) {
@@ -2372,6 +2391,194 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
                        Options.BracketOptions.shouldCloseExtension(decl));
   }
 }
+
+/// Functions to determine which features a particular declaration uses. The
+/// usesFeatureNNN functions correspond to the features in Features.def.
+
+static bool usesFeatureStaticAssert(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureAsyncAwait(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->hasAsync())
+      return true;
+  }
+
+  // Check for async functions in the types of declarations.
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasAsync = type.findIf([](Type type) {
+        if (auto fnType = type->getAs<AnyFunctionType>()) {
+          if (fnType->isAsync())
+            return true;
+        }
+
+        return false;
+      });
+
+      if (hasAsync)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+static bool usesFeatureMarkerProtocol(Decl *decl) {
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          for (ProtocolType *protoTy : layout.getProtocols()) {
+            if (protoTy->getDecl()->isMarkerProtocol())
+              return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  // Check generic requirements for a marker protocol.
+  auto checkRequirements = [&](ArrayRef<Requirement> requirements) -> bool {
+    for (const auto &req: requirements) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl()
+              ->isMarkerProtocol())
+        return true;
+    }
+
+    return false;
+  };
+
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->isMarkerProtocol())
+      return true;
+
+    if (checkInherited(proto->getInherited()))
+      return true;
+
+    if (checkRequirements(proto->getRequirementSignature()))
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (checkRequirements(ext->getGenericRequirements()))
+      return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
+  }
+
+  return false;
+}
+
+static bool usesFeatureActors(Decl *decl) {
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    if (classDecl->isActor())
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto classDecl = ext->getSelfClassDecl())
+      if (classDecl->isActor())
+        return true;
+  }
+
+  // Check for actors in the types of declarations.
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasActor = type.findIf([](Type type) {
+        if (auto classDecl = type->getClassOrBoundGenericClass()) {
+          if (classDecl->isActor())
+            return true;
+        }
+
+        return false;
+      });
+
+      if (hasActor)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+/// Determine the set of "new" features used on a given declaration.
+///
+/// Note: right now, all features we check for are "new". At some point, we'll
+/// want a baseline version.
+static std::vector<Feature> getFeaturesUsed(Decl *decl) {
+  std::vector<Feature> features;
+  
+  // Go through each of the features, checking whether the declaration uses that
+  // feature. This also ensures that the resulting set is in sorted order.
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)  \
+  if (usesFeature##FeatureName(decl))                                 \
+    features.push_back(Feature::FeatureName);
+#include "swift/Basic/Features.def"
+  
+  return features;
+}
+
+/// Get the set of features that are uniquely used by this declaration, and are
+/// not part of the enclosing context.
+static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
+  auto features = getFeaturesUsed(decl);
+  if (features.empty())
+    return features;
+
+  auto enclosingDecl = decl->getDeclContext()->getAsDecl();
+  if (!enclosingDecl)
+    return features;
+
+  if (!isa<NominalTypeDecl>(enclosingDecl) &&
+      !isa<ExtensionDecl>(enclosingDecl))
+    return features;
+  
+  auto enclosingFeatures = getFeaturesUsed(enclosingDecl);
+  if (enclosingFeatures.empty())
+    return features;
+
+  // Remove any features from the enclosing context from this set of features so
+  // that we are left with a unique set.
+  std::vector<Feature> uniqueFeatures;
+  std::set_difference(
+      features.begin(), features.end(),
+      enclosingFeatures.begin(), enclosingFeatures.end(),
+      std::back_inserter(uniqueFeatures));
+  return uniqueFeatures;
+}
+
+
+bool swift::printCompatibilityFeatureChecksPre(
+    ASTPrinter &printer, Decl *decl) {
+  auto features = getUniqueFeaturesUsed(decl);
+  if (features.empty())
+    return false;
+
+  printer.printNewline();  
+  printer << "#if compiler(>=5.3) && ";
+  llvm::interleave(features.begin(), features.end(),
+    [&](Feature feature) {
+      printer << "$" << getFeatureName(feature);
+    },
+    [&] { printer << " && "; });
+  printer.printNewline();
+
+  return true;
+}
+
+void swift::printCompatibilityFeatureChecksPost(ASTPrinter &printer) {
+  printer.printNewline();
+  printer << "#endif\n";
+}
+
 
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   if (Options.TransformContext &&
@@ -5232,11 +5439,21 @@ swift::getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
   // Collect explicit inherited types.
   for (auto TL: inherited) {
     if (auto ty = TL.getType()) {
-      bool foundUnprintable = ty.findIf([&options](Type subTy) {
+      bool foundUnprintable = ty.findIf([&](Type subTy) {
         if (auto aliasTy = dyn_cast<TypeAliasType>(subTy.getPointer()))
           return !options.shouldPrint(aliasTy->getDecl());
-        if (auto NTD = subTy->getAnyNominal())
-          return !options.shouldPrint(NTD);
+        if (auto NTD = subTy->getAnyNominal()) {
+          if (!options.shouldPrint(NTD))
+            return true;
+
+          if (auto PD = dyn_cast<ProtocolDecl>(NTD)) {
+            // Marker protocols are unprintable on concrete types, but they're
+            // okay on extension declarations and protocols.
+            if (PD->isMarkerProtocol() && !isa<ExtensionDecl>(decl) &&
+                !isa<ProtocolDecl>(decl))
+              return true;
+          }
+        }
         return false;
       });
       if (foundUnprintable)
