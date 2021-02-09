@@ -86,9 +86,11 @@ namespace swift {
   struct PropertyWrapperTypeInfo;
   struct PropertyWrapperMutability;
   class ProtocolDecl;
+  class ProtocolRethrowsRequirementList;
   class ProtocolType;
   struct RawComment;
   enum class ResilienceExpansion : unsigned;
+  enum class FunctionRethrowingKind : uint8_t;
   class TrailingWhereClause;
   class TypeAliasDecl;
   class Stmt;
@@ -3918,66 +3920,6 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Actor,
 };
 
-class ProtocolRethrowsRequirementList {
-public:
-  typedef std::pair<Type, ValueDecl *> Entry;
-
-private:
-  ArrayRef<Entry> entries;
-
-public:
-  ProtocolRethrowsRequirementList(ArrayRef<Entry> entries) : entries(entries) {}
-  ProtocolRethrowsRequirementList() : entries() {}
-
-  typedef const Entry *const_iterator;
-  typedef const_iterator iterator;
-
-  const_iterator begin() const { return entries.begin(); }
-  const_iterator end() const { return entries.end(); }
-
-  size_t size() const { return entries.size(); }
-
-  void print(raw_ostream &OS) const;
-
-  SWIFT_DEBUG_DUMP;
-
-  friend bool operator==(const ProtocolRethrowsRequirementList &lhs,
-                         const ProtocolRethrowsRequirementList &rhs) {
-    if (lhs.size() != rhs.size()) {
-      return false;
-    }
-    auto lhsIter = lhs.begin();
-    auto rhsIter = rhs.begin();
-    while (lhsIter != lhs.end() && rhsIter != rhs.end()) {
-      if (lhsIter->first->isEqual(rhsIter->first)) {
-        return false;
-      }
-      if (lhsIter->second != rhsIter->second) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  friend bool operator!=(const ProtocolRethrowsRequirementList &lhs,
-                         const ProtocolRethrowsRequirementList &rhs) {
-    return !(lhs == rhs);
-  }
-
-  friend llvm::hash_code hash_value(
-    const ProtocolRethrowsRequirementList &list) {
-    return llvm::hash_combine(list.size()); // it is good enought for
-    // llvm::hash_code hash;
-    // for (auto entry : list) {
-    //   hash = llvm::hash_combine(hash, entry.first->getCanonicalType());
-    //   hash = llvm::hash_combine(hash, entry.second);
-    // }
-    // return hash;
-  }
-};
-
-void simple_display(raw_ostream &out, const ProtocolRethrowsRequirementList reqs);
-
 /// ProtocolDecl - A declaration of a protocol, for example:
 ///
 ///   protocol Drawable {
@@ -5573,23 +5515,6 @@ public:
     assert(idx <= UINT8_MAX-2 && "out of bounds");
     rawValue = idx + 2;
   }
-};
-
-enum class FunctionRethrowingKind : uint8_t {
-  /// The function is not throwing
-  None,
-
-  /// The function rethrows by closure
-  ByClosure, 
-
-  /// The function rethrows by conformance
-  ByConformance, 
-
-  /// The function throws
-  Throws, 
-
-  /// The function throwing determinate is invalid
-  Invalid
 };
 
 /// Base class for function-like declarations.

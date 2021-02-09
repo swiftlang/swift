@@ -19,6 +19,7 @@
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
@@ -789,8 +790,6 @@ public:
   // Caching.
   bool isCached() const { return true; }
 };
-
-void simple_display(llvm::raw_ostream &out, FunctionRethrowingKind value);
 
 /// Request the custom attribute which attaches a result builder to the
 /// given declaration.
