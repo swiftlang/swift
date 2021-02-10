@@ -2319,10 +2319,8 @@ public:
   /// dynamic methods on generic classes (see above).
   bool isNativeMethodReplacement() const;
 
-  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
-    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
-            std::min(other->getEffectiveAccess(), AccessLevel::Public));
-  }
+  /// Returns if this declaration has more visible formal access than 'other'.
+  bool isMoreVisibleThan(ValueDecl *other) const;
 
   /// Set whether this type is 'dynamic' or not.
   void setIsDynamic(bool value);
