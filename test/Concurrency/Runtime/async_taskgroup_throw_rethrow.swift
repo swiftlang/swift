@@ -2,8 +2,6 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// REQUIRES: rdar73154198
-
 import Dispatch
 
 struct Boom: Error {}
@@ -24,6 +22,7 @@ func test_taskGroup_throws_rethrows() async {
           print("next: \(r)")
         }
       } catch {
+        // CHECK: error caught and rethrown in group: Boom()
         print("error caught and rethrown in group: \(error)")
         throw error
       }
@@ -34,13 +33,12 @@ func test_taskGroup_throws_rethrows() async {
       print("got: \(got)")
       fatalError("Expected error to be thrown, but got: \(got)")
   } catch {
+    // CHECK: rethrown: Boom()
     print("rethrown: \(error)")
   }
 }
 
 
-// CHECK: error caught and rethrown in group: Boom()
-// CHECK: rethrown: Boom()
 @main struct Main {
   static func main() async {
     await test_taskGroup_throws_rethrows()

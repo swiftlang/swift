@@ -168,7 +168,11 @@ public:
     : ChildTaskStatusRecord(child, TaskStatusRecordKind::GroupChildTask),
       Group(group) {}
 
-  bool isGroup(TaskGroup *group) const {
+  TaskGroup* getGroup() {
+    return Group;
+  }
+
+  bool is(TaskGroup *group) const {
     return Group == group;
   }
 

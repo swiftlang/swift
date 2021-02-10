@@ -293,9 +293,6 @@ extension Task.Group {
     // Failures of tasks are ignored.
     while !self.isEmpty {
       _ = try? await self.next()
-      // TODO: Should a failure cause a cancellation of the task group?
-      //       This looks very much like supervision trees,
-      //       where one may have various decisions depending on use cases...
       continue // keep awaiting on all pending tasks
     }
   }

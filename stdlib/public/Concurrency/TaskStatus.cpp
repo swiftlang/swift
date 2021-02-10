@@ -398,18 +398,23 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 
 /// Perform any cancellation actions required by the given record.
 static void performCancellationAction(TaskStatusRecord *record) {
-  fprintf(stderr, "[%s:%d] (%s) cancel record kind: %d\n", __FILE__, __LINE__, __FUNCTION__, record->getKind());
-
   switch (record->getKind()) {
   // Deadlines don't require any special support.
   case TaskStatusRecordKind::Deadline:
     return;
 
   // Child tasks need to be recursively cancelled.
-  case TaskStatusRecordKind::ChildTask:
-  case TaskStatusRecordKind::GroupChildTask: {
+  case TaskStatusRecordKind::ChildTask: {
     fprintf(stderr, "[%s:%d] (%s) child task\n", __FILE__, __LINE__, __FUNCTION__);
     auto childRecord = cast<ChildTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_cancel(child);
+    return;
+  }
+
+  case TaskStatusRecordKind::GroupChildTask: {
+    fprintf(stderr, "[%s:%d] (%s) group child task\n", __FILE__, __LINE__, __FUNCTION__);
+    auto childRecord = cast<GroupChildTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_cancel(child);
     return;
@@ -440,41 +445,32 @@ static void performCancellationAction(TaskStatusRecord *record) {
 /// Perform any cancellation actions required by the given record.
 static void performGroupCancellationAction(TaskStatusRecord *record,
                                            TaskGroup *group) {
-  fprintf(stderr, "[%s:%d] (%s) group cancel record kind: %d\n", __FILE__, __LINE__, __FUNCTION__, record->getKind());
-
   switch (record->getKind()) {
-  // Deadlines don't require any special support.
-  case TaskStatusRecordKind::Deadline:
-    return;
-
   // We only need to cancel specific GroupChildTasks, not arbitrary child tasks.
   // A task may be parent to many tasks which are not part of a group after all.
   case TaskStatusRecordKind::ChildTask:
     return;
 
   case TaskStatusRecordKind::GroupChildTask: {
-    fprintf(stderr, "[%s:%d] (%s) child task\n", __FILE__, __LINE__, __FUNCTION__);
     auto groupChildRecord = cast<GroupChildTaskStatusRecord>(record);
+    // since a task can only be running a single task group at the same time,
+    // we do not need to `group == groupChildRecord->getGroup()` filter here,
+    // however we assert this for good measure.
+    //
+    // A group enforces that tasks can not "escape" it, and as such once the group
+    // returns, all its task have been completed.
+    assert(group == groupChildRecord->getGroup());
     for (AsyncTask *child: groupChildRecord->children())
       swift_task_cancel(child);
     return;
   }
 
-  // Cancellation notifications need to be called.
-  case TaskStatusRecordKind::CancellationNotification: {
-    auto notification =
-      cast<CancellationNotificationStatusRecord>(record);
-    notification->run();
-    return;
-  }
-
-  // Escalation notifications can be ignored.
+  // All other kinds of records we handle the same way as in a normal cancellation
+  case TaskStatusRecordKind::Deadline:
+  case TaskStatusRecordKind::CancellationNotification:
   case TaskStatusRecordKind::EscalationNotification:
-    return;
-
-  // Record locks shouldn't be found this way, but they don't have
-  // anything to do anyway.
   case TaskStatusRecordKind::Private_RecordLock:
+    performCancellationAction(record);
     return;
 }
 
@@ -494,7 +490,6 @@ void swift::swift_task_cancel(AsyncTask *task) {
   // If we were already cancelled or were able to cancel without acquiring
   // the lock, there's nothing else to do.
   if (oldStatus.isCancelled()) {
-    fprintf(stderr, "[%s:%d] (%s): was already cancelled: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
     return;
   }
 
@@ -527,22 +522,9 @@ void swift::swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *grou
   // We are NOT cancelling the entire parent task though.
   auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
                                            /*forCancellation*/ false);
-//  assert(!oldStatus.isLocked());
-//
-//  // If we were already cancelled or were able to cancel without acquiring
-//  // the lock, there's nothing else to do.
-//  if (oldStatus.isCancelled()) {
-//    fprintf(stderr, "[%s:%d] (%s): task was already cancelled: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
-//    return;
-//  }
-//
-//  // Otherwise, we've installed the lock record and are now the
-//  // locking thread.
-
   // Carry out the cancellation operations associated with all
   // the active records.
   for (auto cur: oldStatus.records()) {
-    fprintf(stderr, "[%s:%d] (%s): group cancel record:%d type: %d\n", __FILE__, __LINE__, __FUNCTION__, cur, cur->getKind());
     performGroupCancellationAction(cur, group);
   }
 

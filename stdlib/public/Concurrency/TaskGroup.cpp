@@ -328,28 +328,28 @@ bool swift::swift_task_group_is_cancelled(AsyncTask *task, TaskGroup *group) {
 // ==== cancelAll --------------------------------------------------------------
 
 void swift::swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group) {
-  fprintf(stderr, "[%s:%d] (%s): cancel all child tasks %d\n", __FILE__, __LINE__, __FUNCTION__, task);
-  // cancel the group, it will not accept any more calls to `add` tasks.
   group->cancelAll(task);
-
-  if (group->isEmpty())
-    return;
-
-  // cancel all existing tasks within the group
-  swift_task_cancel_group_child_tasks(task, group);
 }
 
 bool TaskGroup::cancelAll(AsyncTask *task) {
+  fprintf(stderr, "[%s:%d] (%s): cancel all child tasks %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+
   // store the cancelled bit
   auto old = statusCancel();
-
   if (old.isCancelled()) {
+    fprintf(stderr, "[%s:%d] (%s): already was cancelled, group:%d\n", __FILE__, __LINE__, __FUNCTION__, this);
     // already was cancelled previously, nothing to do?
     return false;
   }
 
-  // first time this group is being called cancelAll on, so we must cancel all tasks
-  // TODO: iterate over all children and cancel them
+//  // first time this group is being called cancelAll on, so we must cancel all tasks
+//  if (this->isEmpty())
+//    return true;
+
+  fprintf(stderr, "[%s:%d] (%s): calling swift_task_cancel_group_child_tasks, group:%d\n", __FILE__, __LINE__, __FUNCTION__, this);
+  // cancel all existing tasks within the group
+  swift_task_cancel_group_child_tasks(task, this);
+  return true;
 }
 
 
