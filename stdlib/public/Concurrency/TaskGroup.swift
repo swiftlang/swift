@@ -96,7 +96,10 @@ extension Task {
   ///
   /// Its intended use is with the `Task.withGroup` function.
   /* @unmoveable */
-  public struct Group<TaskResult> {
+  public struct Group<TaskResult>: AsyncSequence {
+    public typealias AsyncIterator = GroupIterator
+    public typealias Element = TaskResult
+
     private let _task: Builtin.NativeObject
     /// Group task into which child tasks offer their results,
     /// and the `next()` function polls those results from.
@@ -265,6 +268,43 @@ extension Task {
     public var isCancelled: Bool {
       return _taskIsCancelled(_task) ||
         _taskGroupIsCancelled(task: _task, group: _group)
+    }
+  }
+}
+
+/// ==== TaskGroup: AsyncSequence.AsyncIterator --------------------------------
+
+extension Task.Group {
+
+  public func makeAsyncIterator() -> GroupIterator {
+    return GroupIterator(group: self)
+  }
+
+  /// Allows iterating over results of tasks added to the group.
+  ///
+  /// The order of elements returned by this iterator is the same as manually
+  /// invoking the `group.next()` function in a loop, meaning that results
+  /// are returned in *completion order*.
+  ///
+  /// - SeeAlso: `TaskGroup.next()`
+  public struct GroupIterator: AsyncIteratorProtocol {
+    public typealias Element = TaskResult
+
+    @usableFromInline
+    var group: Task.Group<TaskResult>
+
+    // no public constructors
+    init(group: Task.Group<TaskResult>) {
+      self.group = group
+    }
+
+    /// - SeeAlso: `TaskGroup.next()` for a detailed discussion its semantics.
+    public mutating func next() async throws -> Element? {
+      try await group.next()
+    }
+
+    public mutating func cancel() {
+      group.cancelAll()
     }
   }
 }
