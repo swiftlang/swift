@@ -94,15 +94,10 @@ public:
   /// Access notes to apply to the module.
   std::vector<AccessNote> Notes;
 
-  /// Contains keys which were present in the JSON file but were not recognized
-  /// by the compiler. Has no functional effect, but can be used for error
-  /// handling.
-  std::set<std::string> unknownKeys;
-
-  /// Load the access notes from \p buffer, or return an error if they cannot
-  /// be loaded.
-  static llvm::Expected<AccessNotesFile> load(ASTContext &ctx,
-                                              llvm::MemoryBuffer *buffer);
+  /// Load the access notes from \p buffer, or \c None if they cannot be loaded.
+  /// Diagnoses any parsing issues with the access notes file.
+  static llvm::Optional<AccessNotesFile>
+      load(ASTContext &ctx, const llvm::MemoryBuffer *buffer);
 
   /// Look up the access note in this file, if any, which applies to \p VD.
   NullablePtr<const AccessNote> lookup(ValueDecl *VD) const;

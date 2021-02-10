@@ -902,16 +902,6 @@ bool CompilerInstance::createFilesForMainModule(
   return false;
 }
 
-template<typename ExpectedOut, typename ExpectedIn>
-static llvm::Expected<ExpectedOut>
-flatMap(llvm::Expected<ExpectedIn> &&in,
-        llvm::function_ref<llvm::Expected<ExpectedOut>(ExpectedIn &&)> transform) {
-  if (!in)
-    return llvm::Expected<ExpectedOut>(in.takeError());
-
-  return transform(std::move(in.get()));
-}
-
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
@@ -943,46 +933,6 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       // into a partial module that failed to load.
       MainModule->setFailedToLoad();
     }
-
-    if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
-      auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
-
-      auto expectedBuffer = llvm::errorOrToExpected(
-          swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath));
-
-      auto expectedAccessNotes =
-          flatMap<AccessNotesFile, std::unique_ptr<llvm::MemoryBuffer>>(
-              std::move(expectedBuffer),
-              [&](auto &&buffer) -> auto {
-                return AccessNotesFile::load(*Context, buffer.get());
-              });
-
-      if (expectedAccessNotes) {
-        auto &notes = std::move(expectedAccessNotes).get();
-
-        // If there were unknown keys in the file, diagnose that.
-        if (!notes.unknownKeys.empty()) {
-          // Create a string like "key1', 'key2', 'key3". The diagnostic itself
-          // provides the leading and trailing single quotes.
-          SmallString<64> scratch;
-          llvm::raw_svector_ostream scratchOS(scratch);
-          llvm::interleave(notes.unknownKeys, scratchOS, "', '");
-
-          Context->Diags.diagnose(SourceLoc(),
-                                  diag::unknown_keys_in_access_notes_file,
-                                  notes.unknownKeys.size(), scratch,
-                                  accessNotesPath);
-        }
-
-        MainModule->getAccessNotes() = std::move(notes);
-      }
-      else
-        llvm::handleAllErrors(expectedAccessNotes.takeError(),
-                              [&](const llvm::ErrorInfoBase &error) {
-          Context->Diags.diagnose(SourceLoc(), diag::invalid_access_notes_file,
-                                  accessNotesPath, error.message());
-        });
-    }
   }
   return MainModule;
 }
@@ -996,8 +946,30 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
 bool CompilerInstance::performParseAndResolveImportsOnly() {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
-  // Resolve imports for all the source files.
   auto *mainModule = getMainModule();
+
+  // Load access notes.
+  if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
+    auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
+
+    auto bufferOrError =
+        swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
+    if (bufferOrError) {
+      int sourceID =
+          SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
+      auto buffer =
+          SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
+
+      if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
+        mainModule->getAccessNotes() = *accessNotesFile;
+    }
+    else {
+      Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
+                           accessNotesPath, bufferOrError.getError().message());
+    }
+  }
+
+  // Resolve imports for all the source files.
   for (auto *file : mainModule->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(file))
       performImportResolution(*SF);
