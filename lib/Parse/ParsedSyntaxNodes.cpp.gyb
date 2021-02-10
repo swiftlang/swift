@@ -27,15 +27,16 @@ using namespace swift::syntax;
 %   for child in node.children:
 %     if child.is_optional:
 Optional<Parsed${child.type_name}>
-Parsed${node.name}::getDeferred${child.name}() {
-  auto &RawChild = getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}];
-  if (RawChild.isNull())
+Parsed${node.name}::getDeferred${child.name}(const SyntaxParsingContext *SyntaxContext) {
+  auto Child = getRaw().getDeferredChild(${node.name}::Cursor::${child.name}, SyntaxContext);
+  if (Child.isNull())
     return None;
-  return Parsed${child.type_name} {RawChild.copyDeferred()};
+  return Parsed${child.type_name}(std::move(Child));
 }
 %     else:
-Parsed${child.type_name} Parsed${node.name}::getDeferred${child.name}() {
-  return Parsed${child.type_name} {getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}].copyDeferred()};
+Parsed${child.type_name} Parsed${node.name}::getDeferred${child.name}(const SyntaxParsingContext *SyntaxContext) {
+  auto Child = getRaw().getDeferredChild(${node.name}::Cursor::${child.name}, SyntaxContext);
+  return Parsed${child.type_name}(std::move(Child));
 }
 %     end
 

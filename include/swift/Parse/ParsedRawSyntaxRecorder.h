@@ -42,6 +42,10 @@ namespace syntax {
 class ParsedRawSyntaxRecorder final {
   std::shared_ptr<SyntaxParseActions> SPActions;
 
+  /// Assuming that \p node is a deferred layout or token node, record it and
+  /// return the recorded node.
+  ParsedRawSyntaxNode recordDeferredNode(const ParsedRawSyntaxNode &node);
+
 public:
   explicit ParsedRawSyntaxRecorder(std::shared_ptr<SyntaxParseActions> spActions)
     : SPActions(std::move(spActions)) {}
@@ -70,23 +74,22 @@ public:
                                                      SourceLoc loc);
 
   /// Create a deferred layout node.
-  static ParsedRawSyntaxNode
+  ParsedRawSyntaxNode
   makeDeferred(syntax::SyntaxKind k,
                MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
                SyntaxParsingContext &ctx);
 
   /// Create a deferred token node.
-  static ParsedRawSyntaxNode makeDeferred(Token tok, StringRef leadingTrivia,
-                                          StringRef trailingTrivia);
+  ParsedRawSyntaxNode makeDeferred(Token tok, StringRef leadingTrivia,
+                                   StringRef trailingTrivia);
 
   /// Form a deferred missing token node.
-  static ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc) {
-    auto raw = ParsedRawSyntaxNode(tokKind, loc, /*tokLength=*/0,
-                                   /*leadingTrivia=*/StringRef(),
-                                   /*trailingTrivia=*/StringRef());
-    raw.IsMissing = true;
-    return raw;
-  }
+  ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc);
+
+  /// For a deferred layout node \p parent, retrieve the deferred child node
+  /// at \p ChildIndex.
+  ParsedRawSyntaxNode getDeferredChild(const ParsedRawSyntaxNode &parent,
+                                       size_t ChildIndex) const;
 
   void discardRecordedNode(ParsedRawSyntaxNode &node);
 

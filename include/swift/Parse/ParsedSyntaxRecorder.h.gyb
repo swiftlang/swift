@@ -29,7 +29,7 @@ namespace swift {
 class ParsedRawSyntaxRecorder;
 class SyntaxParsingContext;
 
-struct ParsedSyntaxRecorder {
+struct ParsedSyntaxRecorder final {
 
 % for node in SYNTAX_NODES:
 %   if node.children:

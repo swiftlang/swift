@@ -471,8 +471,20 @@ public:
     return getLayout()[Index];
   }
 
+  /// Get a child based on a particular node's "Cursor", indicating
+  /// the position of the terms in the production of the Swift grammar.
+  ///
+  /// The caller is responsible for making sure the \c RawSyntax that the
+  /// returned pointer points to, stays alive for the duration of the use by
+  /// e.g. keeping the \c SyntaxArena alive in which the child lives or keeping
+  /// \c this node alive, which maintains a strong reference to the child.
+  RawSyntax *getChildRef(CursorIndex Index) const {
+    return getLayout()[Index].get();
+  }
+
   /// Return the number of bytes this node takes when spelled out in the source
-  size_t getTextLength() { return Bits.Common.TextLength; }
+  /// including trivia.
+  size_t getTextLength() const { return Bits.Common.TextLength; }
 
   /// @}
 

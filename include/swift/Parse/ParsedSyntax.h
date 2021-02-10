@@ -43,10 +43,6 @@ public:
     return T(std::move(RawNode));
   }
 
-  ParsedSyntax copyDeferred() const {
-    return ParsedSyntax { RawNode.copyDeferred() };
-  }
-
   static bool kindof(syntax::SyntaxKind Kind) {
     return true;
   }

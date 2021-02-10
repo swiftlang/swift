@@ -22,6 +22,8 @@
 
 namespace swift {
 
+/// A opaque syntax node. It has the requirement that nullptr must always
+/// represent a non-existent node.
 typedef void *OpaqueSyntaxNode;
 class SyntaxParsingContext;
 
@@ -40,53 +42,49 @@ class SyntaxParsingContext;
 /// there are instances that it's not clear what will be the final syntax node
 /// in the current parsing context.
 class ParsedRawSyntaxNode {
-  friend class ParsedRawSyntaxRecorder;
-  enum class DataKind: uint8_t {
+public:
+  enum class DataKind : uint8_t {
     Null,
     Recorded,
     DeferredLayout,
     DeferredToken,
+    /// The node has been destroyed because it has been moved somewhere else.
+    Destroyed,
   };
 
-  struct RecordedSyntaxNode {
-    OpaqueSyntaxNode OpaqueNode;
-    CharSourceRange Range;
-  };
-  struct DeferredLayoutNode {
-    MutableArrayRef<ParsedRawSyntaxNode> Children;
-    CharSourceRange Range;
-  };
-  struct DeferredTokenNode {
-    SourceLoc TokLoc;
-    unsigned TokLength;
-    StringRef LeadingTrivia;
-    StringRef TrailingTrivia;
-  };
+private:
+  friend class ParsedRawSyntaxRecorder;
 
-  union {
-    RecordedSyntaxNode RecordedData;
-    DeferredLayoutNode DeferredLayout;
-    DeferredTokenNode DeferredToken;
-  };
+  /// The opaque data created by \c SyntaxParseActions. Depending on \c DK, this
+  /// can be data required to record a deferred node or the deferred node
+  /// itself. The \c SyntaxParseActions that created this node need to be
+  /// consulted to interpret the data.
+  OpaqueSyntaxNode Data;
+
+  /// The range of the entire node, including trivia.
+  CharSourceRange Range;
+
   uint16_t SynKind;
   uint16_t TokKind;
   DataKind DK;
   /// Primary used for capturing a deferred missing token.
   bool IsMissing = false;
 
-  ParsedRawSyntaxNode(syntax::SyntaxKind k, CharSourceRange r,
-                      MutableArrayRef<ParsedRawSyntaxNode> deferredNodes)
-    : DeferredLayout({deferredNodes, r}),
-      SynKind(uint16_t(k)), TokKind(uint16_t(tok::unknown)),
-      DK(DataKind::DeferredLayout) {
+  /// Create a deferred layout node.
+  ParsedRawSyntaxNode(syntax::SyntaxKind k, CharSourceRange Range,
+                      OpaqueSyntaxNode Data, DataKind DK)
+      : Data(Data), Range(Range), SynKind(uint16_t(k)),
+        TokKind(uint16_t(tok::NUM_TOKENS)), DK(DK) {
+    assert(DK == DataKind::DeferredLayout);
     assert(getKind() == k && "Syntax kind with too large value!");
   }
 
-  ParsedRawSyntaxNode(tok tokKind, SourceLoc tokLoc, unsigned tokLength,
-                      StringRef leadingTrivia, StringRef trailingTrivia)
-      : DeferredToken{tokLoc, tokLength, leadingTrivia, trailingTrivia},
-        SynKind(uint16_t(syntax::SyntaxKind::Token)),
-        TokKind(uint16_t(tokKind)), DK(DataKind::DeferredToken) {
+  /// Create a deferred token node.
+  ParsedRawSyntaxNode(tok tokKind, SourceLoc tokLoc, CharSourceRange Range,
+                      bool IsMissing, OpaqueSyntaxNode Data, DataKind DK)
+      : Data(Data), Range(Range), SynKind(uint16_t(syntax::SyntaxKind::Token)),
+        TokKind(uint16_t(tokKind)), DK(DK), IsMissing(IsMissing) {
+    assert(DK == DataKind::DeferredToken);
     assert(getTokenKind() == tokKind && "Token kind is too large value!");
   }
   ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) = delete;
@@ -94,27 +92,31 @@ class ParsedRawSyntaxNode {
 
 public:
   ParsedRawSyntaxNode()
-    : RecordedData{},
-      SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
-      TokKind(uint16_t(tok::unknown)),
-      DK(DataKind::Null) {
-  }
+      : Data(nullptr), Range(), SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
+        TokKind(uint16_t(tok::unknown)), DK(DataKind::Null) {}
 
-  ParsedRawSyntaxNode(syntax::SyntaxKind k, tok tokKind,
-                      CharSourceRange r, OpaqueSyntaxNode n,
-                      bool IsMissing = false)
-    : RecordedData{n, r},
-      SynKind(uint16_t(k)), TokKind(uint16_t(tokKind)),
-      DK(DataKind::Recorded),
-      IsMissing(IsMissing) {
+  /// Create an arbitrary syntax node. If \p is \c Token, \p tokKind must be set
+  /// otherwise \p tokKind must be \c NUM_TOKENS.
+  ParsedRawSyntaxNode(syntax::SyntaxKind k, tok tokKind, CharSourceRange r,
+                      bool IsMissing, OpaqueSyntaxNode n, DataKind DK)
+      : Data(n), Range(r), SynKind(uint16_t(k)), TokKind(uint16_t(tokKind)),
+        DK(DK), IsMissing(IsMissing) {
     assert(getKind() == k && "Syntax kind with too large value!");
     assert(getTokenKind() == tokKind && "Token kind with too large value!");
+    if (k == syntax::SyntaxKind::Token) {
+      assert(tokKind != tok::NUM_TOKENS &&
+             "If node is a token, it must have a token kind");
+    } else {
+      assert(tokKind == tok::NUM_TOKENS &&
+             "If node is not a token, it cannot have a token kind");
+    }
   }
 
 #ifndef NDEBUG
   bool ensureDataIsNotRecorded() {
-    if (DK != DataKind::Recorded)
+    if (!isRecorded()) {
       return true;
+    }
     llvm::dbgs() << "Leaking node: ";
     dump(llvm::dbgs());
     llvm::dbgs() << "\n";
@@ -125,19 +127,8 @@ public:
   ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &&other) {
     assert(ensureDataIsNotRecorded() &&
            "recorded data is being destroyed by assignment");
-    switch (other.DK) {
-    case DataKind::Null:
-      break;
-    case DataKind::Recorded:
-      RecordedData = std::move(other.RecordedData);
-      break;
-    case DataKind::DeferredLayout:
-      DeferredLayout = std::move(other.DeferredLayout);
-      break;
-    case DataKind::DeferredToken:
-      DeferredToken = std::move(other.DeferredToken);
-      break;
-    }
+    Data = std::move(other.Data);
+    Range = std::move(other.Range);
     SynKind = std::move(other.SynKind);
     TokKind = std::move(other.TokKind);
     DK = std::move(other.DK);
@@ -145,15 +136,40 @@ public:
     other.reset();
     return *this;
   }
-  ParsedRawSyntaxNode(ParsedRawSyntaxNode &&other) : ParsedRawSyntaxNode() {
-    *this = std::move(other);
+  ParsedRawSyntaxNode(ParsedRawSyntaxNode &&other)
+      : Data(std::move(other.Data)), Range(std::move(other.Range)),
+        SynKind(std::move(other.SynKind)), TokKind(std::move(other.TokKind)),
+        DK(std::move(other.DK)), IsMissing(std::move(other.IsMissing)) {
+    other.reset();
   }
+
   ~ParsedRawSyntaxNode() {
     assert(ensureDataIsNotRecorded() && "recorded data is being destructed");
   }
 
   syntax::SyntaxKind getKind() const { return syntax::SyntaxKind(SynKind); }
   tok getTokenKind() const { return tok(TokKind); }
+
+  /// Retrieve the opaque data of this node. This does not transfer ownership
+  /// of the data. If the data is being consumed, use \p takeData to reset this
+  /// node and supress any warnings about recorded nodes being destructed.
+  OpaqueSyntaxNode getData() const { return Data; }
+
+  /// Return the data of this node and reset it.
+  OpaqueSyntaxNode takeData() {
+    OpaqueSyntaxNode Data = this->Data;
+    reset();
+    return Data;
+  }
+
+  /// If this node is a deferred layout node, return the child at index \p
+  /// ChildIndex.
+  /// Note that this may be an expensive operation since the \c
+  /// SyntaxParseAction, which created the node (implicitly passed via the
+  /// \p SyntaxContext) needs to be consulted to retrieve the child.
+  ParsedRawSyntaxNode
+  getDeferredChild(size_t ChildIndex,
+                   const SyntaxParsingContext *SyntaxContext) const;
 
   bool isToken() const {
     return getKind() == syntax::SyntaxKind::Token;
@@ -173,29 +189,12 @@ public:
   /// Primary used for a deferred missing token.
   bool isMissing() const { return IsMissing; }
 
-  void reset() {
-    RecordedData = {};
-    SynKind = uint16_t(syntax::SyntaxKind::Unknown);
-    TokKind = uint16_t(tok::unknown);
-    DK = DataKind::Null;
-    IsMissing = false;
-  }
+  void reset() { DK = DataKind::Destroyed; }
 
   ParsedRawSyntaxNode unsafeCopy() const {
     ParsedRawSyntaxNode copy;
-    switch (DK) {
-    case DataKind::DeferredLayout:
-      copy.DeferredLayout = DeferredLayout;
-      break;
-    case DataKind::DeferredToken:
-      copy.DeferredToken = DeferredToken;
-      break;
-    case DataKind::Recorded:
-      copy.RecordedData = RecordedData;
-      break;
-    case DataKind::Null:
-      break;
-    }
+    copy.Data = Data;
+    copy.Range = Range;
     copy.SynKind = SynKind;
     copy.TokKind = TokKind;
     copy.DK = DK;
@@ -203,93 +202,7 @@ public:
     return copy;
   }
 
-  CharSourceRange getDeferredRange() const {
-    switch (DK) {
-    case DataKind::DeferredLayout:
-      return getDeferredLayoutRange();
-    case DataKind::DeferredToken:
-      return getDeferredTokenRangeWithTrivia();
-    default:
-      llvm_unreachable("node not deferred");
-    }
-  }
-
-  // Recorded Data ===========================================================//
-
-  CharSourceRange getRecordedRange() const {
-    assert(isRecorded());
-    return RecordedData.Range;
-  }
-  const OpaqueSyntaxNode &getOpaqueNode() const {
-    assert(isRecorded());
-    return RecordedData.OpaqueNode;
-  }
-  OpaqueSyntaxNode takeOpaqueNode() {
-    assert(isRecorded());
-    auto opaque = RecordedData.OpaqueNode;
-    reset();
-    return opaque;
-  }
-
-  // Deferred Layout Data ====================================================//
-
-  CharSourceRange getDeferredLayoutRange() const {
-    assert(DK == DataKind::DeferredLayout);
-    return DeferredLayout.Range;
-  }
-  ArrayRef<ParsedRawSyntaxNode> getDeferredChildren() const {
-    assert(DK == DataKind::DeferredLayout);
-    return DeferredLayout.Children;
-  }
-
-  MutableArrayRef<ParsedRawSyntaxNode> getDeferredChildren() {
-    assert(DK == DataKind::DeferredLayout);
-    return DeferredLayout.Children;
-  }
-
-  ParsedRawSyntaxNode copyDeferred() const {
-    ParsedRawSyntaxNode copy;
-    switch (DK) {
-    case DataKind::DeferredLayout:
-      copy.DeferredLayout = DeferredLayout;
-      break;
-    case DataKind::DeferredToken:
-      copy.DeferredToken = DeferredToken;
-      break;
-    default:
-      llvm_unreachable("node not deferred");
-    }
-    copy.SynKind = SynKind;
-    copy.TokKind = TokKind;
-    copy.DK = DK;
-    copy.IsMissing = IsMissing;
-    return copy;
-  }
-
-  // Deferred Token Data =====================================================//
-
-  CharSourceRange getDeferredTokenRangeWithTrivia() const {
-    assert(DK == DataKind::DeferredToken);
-    auto leadTriviaLen = DeferredToken.LeadingTrivia.size();
-    auto trailTriviaLen = DeferredToken.TrailingTrivia.size();
-
-    SourceLoc begin = DeferredToken.TokLoc.getAdvancedLoc(-leadTriviaLen);
-    unsigned len = leadTriviaLen + DeferredToken.TokLength + trailTriviaLen;
-
-    return CharSourceRange{begin, len};
-  }
-  CharSourceRange getDeferredTokenRange() const {
-    assert(DK == DataKind::DeferredToken);
-    return CharSourceRange{DeferredToken.TokLoc, DeferredToken.TokLength};
-  }
-  StringRef getDeferredLeadingTrivia() const {
-    assert(DK == DataKind::DeferredToken);
-    return DeferredToken.LeadingTrivia;
-  }
-  StringRef getDeferredTrailingTrivia() const {
-    assert(DK == DataKind::DeferredToken);
-    return DeferredToken.TrailingTrivia;
-  }
+  CharSourceRange getRange() const { return Range; }
 
   //==========================================================================//
 

@@ -51,7 +51,13 @@ SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
                                ArenaSourceBuffer.end());
 }
 
-SyntaxTreeCreator::~SyntaxTreeCreator() = default;
+SyntaxTreeCreator::~SyntaxTreeCreator() {
+  // Release all deferred nodes that are being kept alive by this
+  for (auto node : DeferredNodes) {
+    static_cast<RawSyntax *>(node)->Release();
+  }
+  Arena.reset();
+}
 
 namespace {
 /// This verifier traverses a syntax node to emit proper diagnostics.
@@ -153,10 +159,9 @@ SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
   return opaqueN;
 }
 
-OpaqueSyntaxNode
-SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) {
+OpaqueSyntaxNode SyntaxTreeCreator::recordRawSyntax(
+    syntax::SyntaxKind kind, const SmallVector<OpaqueSyntaxNode, 4> &elements,
+    CharSourceRange range) {
   SmallVector<RC<RawSyntax>, 16> parts;
   parts.reserve(elements.size());
   for (OpaqueSyntaxNode opaqueN : elements) {
@@ -168,6 +173,92 @@ SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;
+}
+
+OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredToken(tok tokenKind,
+                                                      StringRef leadingTrivia,
+                                                      StringRef trailingTrivia,
+                                                      CharSourceRange range,
+                                                      bool isMissing) {
+  // Instead of creating dedicated deferred nodes that will be recorded only if
+  // needed, the SyntaxTreeCreator always records all nodes and forms RawSyntax
+  // nodes for them. This eliminates a bunch of copies that would otherwise
+  // be required to record the deferred nodes.
+  // Should a deferred node not be recorded, its data stays alive in the
+  // SyntaxArena. This causes a small memory leak but since most nodes are
+  // being recorded, it is acceptable.
+  if (isMissing) {
+    auto Node = recordMissingToken(tokenKind, range.getStart());
+    // The SyntaxTreeCreator still owns the deferred node. Record it so we can
+    // release it when the creator is being destructed.
+    DeferredNodes.push_back(Node);
+    return Node;
+  } else {
+    auto Node = recordToken(tokenKind, leadingTrivia, trailingTrivia, range);
+    // See comment above.
+    DeferredNodes.push_back(Node);
+    return Node;
+  }
+}
+
+OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredLayout(
+    syntax::SyntaxKind k, CharSourceRange Range, bool IsMissing,
+    const SmallVector<OpaqueSyntaxNode, 4> &children) {
+  // Also see comment in makeDeferredToken
+
+  for (auto child : children) {
+    if (child != nullptr) {
+      // With the deferred layout being created all of the child nodes are now
+      // being owned through the newly created deferred layout node.
+      // Technically, we should remove the child nodes from DeferredNodes.
+      // However, finding it in the vector is fairly expensive. Instead, we
+      // issue a Retain call that cancels with the Release call that will be
+      // issued once the creator is being destructed.
+      static_cast<RawSyntax *>(child)->Retain();
+    }
+  }
+  auto Node = recordRawSyntax(k, children, Range);
+  DeferredNodes.push_back(Node);
+  return Node;
+}
+
+OpaqueSyntaxNode
+SyntaxTreeCreator::recordDeferredToken(OpaqueSyntaxNode deferred) {
+  // The deferred node is currently being owned by the SyntaxTreeCreator and
+  // will be released when the creator is being destructed. We now pass
+  // ownership to whoever owns the recorded node. Technically, we should thus
+  // remove the node from DeferredNodes. However, finding it in the vector is
+  // fairly expensive. Instead, we issue a Retain call that cancels with the
+  // Release call that will be issued once the creator is being destructed.
+  // Also see comment in makeDeferredToken.
+  static_cast<RawSyntax *>(deferred)->Retain();
+  return deferred;
+}
+
+OpaqueSyntaxNode
+SyntaxTreeCreator::recordDeferredLayout(OpaqueSyntaxNode deferred) {
+  // Also see comment in recordDeferredToken
+  static_cast<RawSyntax *>(deferred)->Retain();
+  return deferred;
+}
+
+SyntaxParseActions::DeferredNodeInfo
+SyntaxTreeCreator::getDeferredChild(OpaqueSyntaxNode node, size_t ChildIndex,
+                                    SourceLoc ThisNodeLoc) {
+  RawSyntax *raw = static_cast<RawSyntax *>(node);
+  SourceLoc StartLoc = ThisNodeLoc;
+  for (size_t i = 0; i < ChildIndex; ++i) {
+    StartLoc = StartLoc.getAdvancedLoc(raw->getChildRef(i)->getTextLength());
+  }
+  RawSyntax *Child = raw->getChildRef(ChildIndex);
+  CharSourceRange Range(StartLoc, Child->getTextLength());
+  if (Child->isToken()) {
+    return DeferredNodeInfo(Child, Range, SyntaxKind::Token,
+                            Child->getTokenKind(), Child->isMissing());
+  } else {
+    return DeferredNodeInfo(Child, Range, Child->getKind(), tok::NUM_TOKENS,
+                            Child->isMissing());
+  }
 }
 
 std::pair<size_t, OpaqueSyntaxNode>

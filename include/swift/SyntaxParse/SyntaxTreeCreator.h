@@ -49,6 +49,12 @@ class SyntaxTreeCreator: public SyntaxParseActions {
   /// tree.
   SyntaxParsingCache *SyntaxCache;
 
+  /// Contains all the RawSyntax nodes that were initially created as deferred
+  /// nodes and are thus being kept alive by this \c SyntaxTreeCreator.
+  /// All of these nodes will receive a \c Release call when the \c
+  /// SyntaxTreeCreator is destructed.
+  std::vector<OpaqueSyntaxNode> DeferredNodes;
+
   /// Tokens nodes that have already been created and may be reused in other
   /// parts of the syntax tree.
   std::unique_ptr<RawSyntaxTokenCache> TokenCache;
@@ -69,9 +75,26 @@ private:
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override;
 
-  OpaqueSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) override;
+  OpaqueSyntaxNode
+  recordRawSyntax(syntax::SyntaxKind kind,
+                  const SmallVector<OpaqueSyntaxNode, 4> &elements,
+                  CharSourceRange range) override;
+
+  OpaqueSyntaxNode makeDeferredToken(tok tokenKind, StringRef leadingTrivia,
+                                     StringRef trailingTrivia,
+                                     CharSourceRange range,
+                                     bool isMissing) override;
+
+  OpaqueSyntaxNode
+  makeDeferredLayout(syntax::SyntaxKind k, CharSourceRange Range,
+                     bool IsMissing,
+                     const SmallVector<OpaqueSyntaxNode, 4> &children) override;
+
+  OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) override;
+  OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override;
+
+  DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node, size_t ChildIndex,
+                                    SourceLoc ThisNodeLoc) override;
 
   void discardRecordedNode(OpaqueSyntaxNode node) override;
 

@@ -255,6 +255,9 @@ public:
   const SyntaxParsingContext *getRoot() const;
 
   ParsedRawSyntaxRecorder &getRecorder() { return getRootData()->Recorder; }
+  const ParsedRawSyntaxRecorder &getRecorder() const {
+    return getRootData()->Recorder;
+  }
 
   llvm::BumpPtrAllocator &getScratchAlloc() {
     return getRootData()->ScratchAlloc;

@@ -21,9 +21,10 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Subsystems.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Subsystems.h"
+#include "llvm/Support/Allocator.h"
 #include <Block.h>
 
 using namespace swift;
@@ -99,9 +100,53 @@ public:
 };
 
 class CLibParseActions : public SyntaxParseActions {
+
+  /// A node whose creation has been deferred. It will only be sent to the
+  /// C actions once recoreded. Specialised into a deferred layout or token
+  /// node below
+  struct DeferredNode {
+    bool IsToken;
+    bool IsMissing;
+    CharSourceRange Range;
+
+    DeferredNode(bool IsToken, bool IsMissing, CharSourceRange Range)
+        : IsToken(IsToken), IsMissing(IsMissing), Range(Range) {}
+  };
+
+  struct DeferredLayoutNode : DeferredNode {
+    syntax::SyntaxKind Kind;
+    SmallVector<OpaqueSyntaxNode, 4> Children;
+
+    DeferredLayoutNode(syntax::SyntaxKind Kind, CharSourceRange Range,
+                       bool IsMissing,
+                       const SmallVector<OpaqueSyntaxNode, 4> &Children)
+        : DeferredNode(/*IsToken=*/false, IsMissing, Range), Kind(Kind),
+          Children(Children) {
+      assert(Kind != syntax::SyntaxKind::Token &&
+             "Create a DeferredTokenNode for tokens");
+    }
+  };
+
+  struct DeferredTokenNode : DeferredNode {
+    StringRef LeadingTrivia;
+    StringRef TrailingTrivia;
+    tok TokenKind;
+
+    DeferredTokenNode(StringRef LeadingTrivia, StringRef TrailingTrivia,
+                      tok TokenKind, CharSourceRange Range, bool IsMissing)
+        : DeferredNode(/*IsToken=*/true, IsMissing, Range),
+          LeadingTrivia(LeadingTrivia), TrailingTrivia(TrailingTrivia),
+          TokenKind(TokenKind) {
+      assert(TokenKind < tok::NUM_TOKENS && "Invalid token kind");
+    }
+  };
+
   SynParser &SynParse;
   SourceManager &SM;
   unsigned BufferID;
+
+  /// Allocator on which the deferred nodes are being allocated.
+  llvm::BumpPtrAllocator ScratchAlloc;
 
 public:
   CLibParseActions(SynParser &synParse, SourceManager &sm, unsigned bufID)
@@ -176,9 +221,10 @@ private:
     return getNodeHandler()(&node);
   }
 
-  OpaqueSyntaxNode recordRawSyntax(SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) override {
+  OpaqueSyntaxNode
+  recordRawSyntax(SyntaxKind kind,
+                  const SmallVector<OpaqueSyntaxNode, 4> &elements,
+                  CharSourceRange range) override {
     CRawSyntaxNode node;
     auto numValue = serialization::getNumericValue(kind);
     node.kind = numValue;
@@ -194,6 +240,68 @@ private:
                                                const SourceFile &SF) override {
     // We don't support realizing syntax nodes from the C layout.
     return None;
+  }
+
+  OpaqueSyntaxNode makeDeferredToken(tok tokenKind, StringRef leadingTrivia,
+                                     StringRef trailingTrivia,
+                                     CharSourceRange range,
+                                     bool isMissing) override {
+    return new (ScratchAlloc) DeferredTokenNode(leadingTrivia, trailingTrivia,
+                                                tokenKind, range, isMissing);
+  }
+
+  OpaqueSyntaxNode makeDeferredLayout(
+      syntax::SyntaxKind k, CharSourceRange range, bool isMissing,
+      const SmallVector<OpaqueSyntaxNode, 4> &children) override {
+    return new (ScratchAlloc) DeferredLayoutNode(k, range, isMissing, children);
+  }
+
+  OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) override {
+    auto Data = static_cast<DeferredTokenNode *>(deferred);
+    assert(Data->IsToken && "Not a deferred token?");
+    if (Data->IsMissing) {
+      return recordMissingToken(Data->TokenKind, Data->Range.getStart());
+    } else {
+      return recordToken(Data->TokenKind, Data->LeadingTrivia,
+                         Data->TrailingTrivia, Data->Range);
+    }
+  }
+  OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override {
+    auto Data = static_cast<DeferredLayoutNode *>(deferred);
+    assert(!Data->IsToken && "Not a deferred layout?");
+    assert(!Data->IsMissing &&
+           "CLibParseActions can't handle missing layout nodes");
+
+    SmallVector<OpaqueSyntaxNode, 4> subnodes;
+    if (!Data->Children.empty()) {
+      for (auto &subnode : Data->Children) {
+        auto ChildData = static_cast<DeferredNode *>(subnode);
+        if (ChildData == nullptr) {
+          subnodes.push_back(nullptr);
+        } else if (ChildData->IsToken) {
+          subnodes.push_back(recordDeferredToken(subnode));
+        } else {
+          subnodes.push_back(recordDeferredLayout(subnode));
+        }
+      }
+    }
+    return recordRawSyntax(Data->Kind, subnodes, Data->Range);
+  }
+
+  DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node, size_t ChildIndex,
+                                    SourceLoc ThisNodeLoc) override {
+    auto Data = static_cast<DeferredLayoutNode *>(node);
+    assert(!Data->IsToken && "Not a deferred layout?");
+    auto ChildData = static_cast<DeferredNode *>(Data->Children[ChildIndex]);
+    if (ChildData->IsToken) {
+      auto TokenData = static_cast<DeferredTokenNode *>(ChildData);
+      return DeferredNodeInfo(ChildData, ChildData->Range, SyntaxKind::Token,
+                              TokenData->TokenKind, TokenData->IsMissing);
+    } else {
+      auto LayoutData = static_cast<DeferredLayoutNode *>(ChildData);
+      return DeferredNodeInfo(ChildData, ChildData->Range, LayoutData->Kind,
+                              tok::NUM_TOKENS, LayoutData->IsMissing);
+    }
   }
 
   void discardRecordedNode(OpaqueSyntaxNode node) override {
