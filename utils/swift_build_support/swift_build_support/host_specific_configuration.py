@@ -39,7 +39,15 @@ class HostSpecificConfiguration(object):
             # Otherwise, this is a host we are building as part of
             # cross-compiling, so we only need the target itself.
             stdlib_targets_to_configure = [host_target]
-            stdlib_targets_to_build = set(stdlib_targets_to_configure)
+            if (hasattr(args, 'stdlib_deployment_targets')):
+                # there are some build configs that expect
+                # not to be building the stdlib for the target
+                # since it will be provided by different means
+                stdlib_targets_to_build = set(
+                    stdlib_targets_to_configure).intersection(
+                    set(args.stdlib_deployment_targets))
+            else:
+                stdlib_targets_to_build = set(stdlib_targets_to_configure)
 
         if (hasattr(args, 'stdlib_deployment_targets') and
                 args.stdlib_deployment_targets == []):
