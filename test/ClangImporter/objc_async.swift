@@ -45,7 +45,6 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   slowServer.repeatTrick("jump") // expected-error{{missing argument for parameter 'completionHandler' in call}}
 
-  _ = try await slowServer.oldAPI(); // expected-error{{'oldAPI()' is unavailable in macOS: APIs deprecated as of macOS 10.14 and earlier are not imported as 'async'}}
   _ = try await slowServer.someAsyncMethod()
 }
 
