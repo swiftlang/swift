@@ -3195,6 +3195,17 @@ public:
   /// declaration, or \c nullptr if it doesn't have one.
   ConstructorDecl *getDefaultInitializer() const;
 
+  /// Force the synthesis of all members named \c member requiring semantic
+  /// analysis and install them in the member list of this nominal type.
+  ///
+  /// \Note The use of this method in the compiler signals an architectural
+  /// problem with the caller. Use \c TypeChecker::lookup* instead of
+  /// introducing new usages.
+  ///
+  /// FIXME: This method presents a problem with respect to the consistency
+  /// and idempotency of lookups in the compiler. If we instead had a model
+  /// where lookup requests would explicitly return semantic members or parsed
+  /// members this function could disappear.
   void synthesizeSemanticMembersIfNeeded(DeclName member);
 
   /// Retrieves the static 'shared' property of a global actor type, which
