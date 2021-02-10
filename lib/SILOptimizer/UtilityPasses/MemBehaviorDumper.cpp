@@ -65,6 +65,8 @@ class MemBehaviorDumper : public SILModuleTransform {
     case SILInstructionKind::EndCOWMutationInst:
     case SILInstructionKind::CopyValueInst:
     case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::LoadBorrowInst:
+    case SILInstructionKind::BeginBorrowInst:
     case SILInstructionKind::EndBorrowInst:
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:

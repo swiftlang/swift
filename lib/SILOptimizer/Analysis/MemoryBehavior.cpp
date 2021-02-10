@@ -183,6 +183,9 @@ public:
   MemBehavior visitDestroyValueInst(DestroyValueInst *DVI);
   MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
   MemBehavior visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI);
+  MemBehavior visitLoadBorrowInst(LoadBorrowInst *lbi);
+  MemBehavior visitBeginBorrowInst(BeginBorrowInst *bbi);
+  MemBehavior visitEndBorrowInst(EndBorrowInst *ebi);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   MemBehavior visit##Name##ReleaseInst(Name##ReleaseInst *BI);
 #include "swift/AST/ReferenceStorage.def"
@@ -507,6 +510,34 @@ visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI) {
   // dependencies with instructions which retain the buffer operand.
   // But it never interferes with any memory address.
   return MemBehavior::None;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  if (!mayAlias(lbi->getOperand()))
+    return MemBehavior::None;
+  return MemBehavior::MayRead;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
+  return MemBehavior::None;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitEndBorrowInst(EndBorrowInst *ebi) {
+  auto borrowIntroducer = ebi->getOperand();
+  // An end_borrow is defined as a MemoryBehaviour::MayRead of the load borrowed
+  // address. This prevents other aliasing memory writes to be moved across the
+  // end_borrow.
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(borrowIntroducer)) {
+    if (!mayAlias(lbi->getOperand()))
+      return MemBehavior::None;
+  }
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(borrowIntroducer)) {
+    return MemBehavior::None;
+  }
+  // If we cannot identify the borrowIntroducer due to a reborrow, return
+  // MemBehaviour::MayRead. This is currently conservative to avoid additional
+  // complexity.
+  return MemBehavior::MayRead;
 }
 
 //===----------------------------------------------------------------------===//

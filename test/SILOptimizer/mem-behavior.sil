@@ -432,17 +432,21 @@ bb0(%0 : $*Int):
 // CHECK-LABEL: @testLetSideEffects
 //
 // The store does not affect the let-load (ref_element_addr).
-// CHECK: PAIR #2.
+// CHECK: PAIR #10.
 // CHECK-NEXT:    %6 = begin_access [modify] [static] %1 : $*Builtin.Int32
 // CHECK-NEXT:    %10 = ref_element_addr %9 : $C, #C.prop
 // CHECK-NEXT:  r=0,w=0
 //
 // Any unknown instructions with side effects does affect the let-load.
-// CHECK: PAIR #18.
+// CHECK: PAIR #30.
 // CHECK-NEXT:     end_borrow %{{.*}} : $C
 // CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
-// CHECK-NEXT:   r=1,w=1
-// CHECK: PAIR #30.
+// CHECK-NEXT:   r=0,w=0
+// CHECK: PAIR #34.
+// CHECK-NEXT:     end_borrow %{{.*}} : $C
+// CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
+// CHECK-NEXT:   r=1,w=0
+// CHECK: PAIR #42.
 // CHECK-NEXT:     destroy_value %0 : $Parent
 // CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
 // CHECK-NEXT:   r=1,w=1
@@ -619,11 +623,11 @@ bb0(%0 : @guaranteed $X):
 }
 
 // CHECK-LABEL: @testImmutableRefWithBorrow
-// CHECK:      PAIR #1.
+// CHECK:      PAIR #2.
 // CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %2 = ref_element_addr [immutable] %1 : $X, #X.a
 // CHECK-NEXT:   r=1,w=0
-// CHECK:      PAIR #3.
+// CHECK:      PAIR #4.
 // CHECK-NEXT:     %7 = apply %4() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %2 = ref_element_addr [immutable] %1 : $X, #X.a
 // CHECK-NEXT:   r=1,w=1
@@ -645,19 +649,19 @@ bb0(%0 : @owned $X):
 // CHECK-NEXT:     %2 = apply %1() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
 // CHECK-NEXT:   r=1,w=1
-// CHECK:      PAIR #2.
+// CHECK:      PAIR #3.
 // CHECK-NEXT:     %6 = apply %1() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
 // CHECK-NEXT:   r=1,w=0
-// CHECK:      PAIR #4.
+// CHECK:      PAIR #5.
 // CHECK-NEXT:     %9 = apply %1() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
 // CHECK-NEXT:   r=1,w=1
-// CHECK:      PAIR #5.
+// CHECK:      PAIR #6.
 // CHECK-NEXT:     %11 = apply %1() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
 // CHECK-NEXT:   r=1,w=0
-// CHECK:      PAIR #7.
+// CHECK:      PAIR #8.
 // CHECK-NEXT:     %14 = apply %1() : $@convention(thin) () -> ()
 // CHECK-NEXT:     %4 = ref_element_addr [immutable] %3 : $X, #X.a
 // CHECK-NEXT:   r=1,w=1
@@ -844,5 +848,88 @@ bb0 (%0 : $*C):
   destroy_addr %0 : $*C
   %3 = tuple()
   return %3 : $()
+}
+
+sil @use_C : $@convention(thin) (@guaranteed C) -> ()
+sil @get_C : $@convention(thin) () -> (@out C)
+
+// CHECK-LABEL: @test_load_borrow
+// CHECK: PAIR #0.
+// CHECK:   %1 = load_borrow %0 : $*C
+// CHECK:   %0 = argument of bb0 : $*C
+// CHECK:  r=1,w=0
+// CHECK: PAIR #2.
+// CHECK:   end_borrow %1 : $C
+// CHECK:   %0 = argument of bb0 : $*C
+// CHECK:   r=1,w=0
+sil [ossa] @test_load_borrow : $@convention(thin) (@in C) -> () {
+bb0 (%0 : $*C):
+  %1 = load_borrow %0 : $*C
+  %2 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_addr %0 : $*C
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @test_begin_borrow
+// CHECK: PAIR #2.
+// CHECK:   %4 = begin_borrow %3 : $C
+// CHECK:   %0 = alloc_stack $C
+// CHECK:   r=0,w=0
+// CHECK: PAIR #3.
+// CHECK:     end_borrow %4 : $C
+// CHECK:   %0 = alloc_stack $C
+// CHECK:   r=0,w=0
+sil [ossa] @test_begin_borrow : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = function_ref @get_C : $@convention(thin) () -> (@out C )
+  %2 = apply %1(%0) : $@convention(thin) () -> (@out C)
+  %3 = load [take] %0 : $*C
+  %4 = begin_borrow %3 : $C
+  end_borrow %4 : $C
+  destroy_value %3 : $C
+  dealloc_stack %0 : $*C
+  %res = tuple()
+  return %res : $()
+}
+
+// CHECK-LABEL: @test_multiple_borrow
+// CHECK: PAIR #0.
+// CHECK:   %3 = begin_borrow %0 : $C
+// CHECK:   %1 = argument of bb0 : $*C
+// CHECK:   r=0,w=0
+// CHECK: PAIR #2.
+// CHECK:   %7 = load_borrow %1 : $*C
+// CHECK:   %1 = argument of bb0 : $*C
+// CHECK:   r=1,w=0
+// CHECK: PAIR #4.
+// CHECK:   end_borrow %11 : $C
+// CHECK:   %1 = argument of bb0 : $*C
+// CHECK:   r=1,w=0
+sil [ossa] @test_multiple_borrow : $@convention(thin) (@owned C, @in C) -> () {
+bb0 (%0 : @owned $C, %1 : $*C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = begin_borrow %0 : $C
+  %3 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3(%2 : $C)
+
+bb2:
+  %4 = load_borrow %1 : $*C
+  %5 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3(%4 : $C)
+
+bb3(%arg : @guaranteed $C):
+  end_borrow %arg : $C
+  destroy_value %0 : $C
+  destroy_addr %1 : $*C
+  %6 = tuple()
+  return %6 : $()
 }
 
