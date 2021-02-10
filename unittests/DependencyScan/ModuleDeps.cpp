@@ -56,7 +56,6 @@ TEST_F(ScanTest, TestModuleDeps) {
   // Create test input file
   std::string TestPathStr = createFilename(tempDir, "foo.swift");
   ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", "import A\n"));
-  llvm::dbgs() << "Input File: " << TestPathStr << "\n";
 
   // Create includes
   std::string IncludeDirPath = createFilename(tempDir, "include");
@@ -172,10 +171,8 @@ export *\n\
   }
 
   std::vector<const char*> Command;
-  llvm::dbgs() << "Compiler Command: \n";
   for (auto &command : CommandStrArr) {
     Command.push_back(command.c_str());
-    llvm::dbgs() << command.c_str() << "\n";
   }
   auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
   ASSERT_FALSE(DependenciesOrErr.getError());

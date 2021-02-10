@@ -1284,6 +1284,7 @@ void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
   llvm::DenseMap<StringRef, StringRef> SourceFileNames;
+  bool HasVFS = Args.hasArg(options::OPT_vfsoverlay);
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
@@ -1305,7 +1306,7 @@ void Driver::buildInputs(const ToolChain &TC,
         }
       }
 
-      if (checkInputExistence(*this, Args, Diags, Value))
+      if (HasVFS || checkInputExistence(*this, Args, Diags, Value))
         Inputs.push_back(std::make_pair(Ty, A));
 
       if (Ty == file_types::TY_Swift) {
