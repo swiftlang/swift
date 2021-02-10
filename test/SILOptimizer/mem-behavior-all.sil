@@ -28,7 +28,7 @@ class Parent {
 // CHECK: PAIR #83.
 // CHECK-NEXT:     end_borrow %{{.*}} : $C
 // CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
-// CHECK-NEXT:   r=1,w=1
+// CHECK-NEXT:   r=1,w=0
 // CHECK: PAIR #103.
 // CHECK-NEXT:     destroy_value %0 : $Parent
 // CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
@@ -284,5 +284,95 @@ bb0 (%0 : $*C):
   destroy_addr %0 : $*C
   %3 = tuple()
   return %3 : $()
+}
+
+sil @use_C : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: @test_load_borrow
+// CHECK: PAIR #0.
+// CHECK:   %1 = load_borrow %0 : $*C
+// CHECK:   %0 = argument of bb0 : $*C
+// CHECK: PAIR #8.
+// CHECK:   end_borrow %1 : $C
+// CHECK:   %0 = argument of bb0 : $*C
+// CHECK:   r=1,w=0
+// CHECK: PAIR #9.
+// CHECK:   end_borrow %1 : $C
+// CHECK:   %1 = load_borrow %0 : $*C
+// CHECK:   r=1,w=0
+sil [ossa] @test_load_borrow : $@convention(thin) (@in C) -> () {
+bb0 (%0 : $*C):
+  %1 = load_borrow %0 : $*C
+  %2 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_addr %0 : $*C
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @test_begin_borrow
+// CHECK: PAIR #0.
+// CHECK:     %1 = begin_borrow %0 : $C
+// CHECK:   %0 = argument of bb0 : $C
+// CHECK:   r=0,w=0
+// CHECK: PAIR #8.
+// CHECK:     end_borrow %1 : $C
+// CHECK:   %0 = argument of bb0 : $C
+// CHECK:   r=0,w=0
+// CHECK: PAIR #9.
+// CHECK:     end_borrow %1 : $C
+// CHECK:     %1 = begin_borrow %0 : $C
+// CHECK:   r=0,w=0
+sil [ossa] @test_begin_borrow : $@convention(thin) (@owned C) -> () {
+bb0 (%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  %2 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %2(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1 : $C
+  destroy_value %0 : $C
+  %3 = tuple()
+  return %3 : $()
+}
+
+// CHECK-LABEL: @test_multiple_borrow
+// CHECK: PAIR #0.
+// CHECK:   %3 = begin_borrow %0 : $C
+// CHECK:   %0 = argument of bb0 : $C
+// CHECK:   r=0,w=0
+// CHECK: PAIR #19.
+// CHECK:   %7 = load_borrow %1 : $*C
+// CHECK:   %1 = argument of bb0 : $*C
+// CHECK:   r=1,w=0
+// CHECK: PAIR #36.
+// CHECK:   end_borrow %11 : $C
+// CHECK:   %0 = argument of bb0 : $C
+// CHECK:   r=1,w=0
+// CHECK: PAIR #37.
+// CHECK:   end_borrow %11 : $C
+// CHECK:   %1 = argument of bb0 : $*C
+// CHECK:   r=1,w=0
+sil [ossa] @test_multiple_borrow : $@convention(thin) (@owned C, @in C) -> () {
+bb0 (%0 : @owned $C, %1 : $*C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = begin_borrow %0 : $C
+  %3 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3(%2 : $C)
+
+bb2:
+  %4 = load_borrow %1 : $*C
+  %5 = function_ref @use_C : $@convention(thin) (@guaranteed C) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3(%4 : $C)
+
+bb3(%arg : @guaranteed $C):
+  end_borrow %arg : $C
+  destroy_value %0 : $C
+  destroy_addr %1 : $*C
+  %6 = tuple()
+  return %6 : $()
 }
 
