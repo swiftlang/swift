@@ -20,37 +20,27 @@ SyntaxData SyntaxData::make(AbsoluteRawSyntax AbsoluteRaw,
   return SyntaxData(AbsoluteRaw, Parent);
 }
 
-SyntaxData SyntaxData::replacingSelf(const RC<RawSyntax> &NewRaw) const {
-  if (hasParent()) {
-    auto NewRoot = getParent()->replacingChild(NewRaw, getIndexInParent());
-    auto NewRootBox = RefCountedBox<SyntaxData>::make(NewRoot);
-    auto NewSelf = AbsoluteRaw.replacingSelf(
-        NewRaw, NewRoot.AbsoluteRaw.getNodeId().getRootId());
-    return SyntaxData(NewSelf, NewRootBox);
-  } else {
-    auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
-    return SyntaxData(NewSelf, /*Parent=*/nullptr);
+Optional<SyntaxData>
+SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
+  if (!getRaw()->getChild(Index)) {
+    return None;
   }
+  AbsoluteSyntaxPosition Position =
+      AbsoluteRaw.getInfo().getPosition().advancedToFirstChild();
+  SyntaxIdentifier NodeId =
+      AbsoluteRaw.getInfo().getNodeId().advancedToFirstChild();
+
+  for (size_t I = 0; I < Index; ++I) {
+    Position = Position.advancedBy(getRaw()->getChild(I));
+    NodeId = NodeId.advancedBy(getRaw()->getChild(I));
+  }
+  AbsoluteSyntaxInfo Info(Position, NodeId);
+
+  const RC<RefCountedBox<SyntaxData>> RefCountedParent =
+      RefCountedBox<SyntaxData>::make(*this);
+  return SyntaxData(AbsoluteRawSyntax(getRaw()->getChild(Index), Info),
+                    RefCountedParent);
 }
-
-bool SyntaxData::isType() const { return getRaw()->isType(); }
-
-bool SyntaxData::isStmt() const { return getRaw()->isStmt(); }
-
-bool SyntaxData::isDecl() const { return getRaw()->isDecl(); }
-
-bool SyntaxData::isExpr() const { return getRaw()->isExpr(); }
-
-bool SyntaxData::isPattern() const { return getRaw()->isPattern(); }
-
-bool SyntaxData::isUnknown() const { return getRaw()->isUnknown(); }
-
-void SyntaxData::dump(llvm::raw_ostream &OS) const {
-  getRaw()->dump(OS, 0);
-  OS << '\n';
-}
-
-void SyntaxData::dump() const { dump(llvm::errs()); }
 
 Optional<SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
@@ -124,30 +114,6 @@ Optional<SyntaxData> SyntaxData::getLastToken() const {
   return None;
 }
 
-Optional<SyntaxData>
-SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
-  if (!getRaw()->getChild(Index)) {
-    return None;
-  }
-  /// FIXME: Start from the back (advancedToEndOfChildren) and reverse from
-  /// there if Index is closer to the end as a performance improvement?
-  AbsoluteSyntaxPosition Position =
-      AbsoluteRaw.getInfo().getPosition().advancedToFirstChild();
-  SyntaxIdentifier NodeId =
-      AbsoluteRaw.getInfo().getNodeId().advancedToFirstChild();
-
-  for (size_t I = 0; I < Index; ++I) {
-    Position = Position.advancedBy(getRaw()->getChild(I));
-    NodeId = NodeId.advancedBy(getRaw()->getChild(I));
-  }
-  AbsoluteSyntaxInfo Info(Position, NodeId);
-
-  const RC<RefCountedBox<SyntaxData>> RefCountedParent =
-      RefCountedBox<SyntaxData>::make(*this);
-  return SyntaxData(AbsoluteRawSyntax(getRaw()->getChild(Index), Info),
-                    RefCountedParent);
-}
-
 AbsoluteOffsetPosition
 SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {
   return AbsoluteRaw.getPosition();
@@ -178,3 +144,23 @@ SyntaxData::getAbsoluteEndPositionAfterTrailingTrivia() const {
   return getAbsolutePositionBeforeLeadingTrivia().advancedBy(
       getRaw()->getTextLength());
 }
+
+SyntaxData SyntaxData::replacingSelf(const RC<RawSyntax> &NewRaw) const {
+  if (hasParent()) {
+    auto NewRoot = getParent()->replacingChild(NewRaw, getIndexInParent());
+    auto NewRootBox = RefCountedBox<SyntaxData>::make(NewRoot);
+    auto NewSelf = AbsoluteRaw.replacingSelf(
+        NewRaw, NewRoot.AbsoluteRaw.getNodeId().getRootId());
+    return SyntaxData(NewSelf, NewRootBox);
+  } else {
+    auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
+    return SyntaxData(NewSelf, /*Parent=*/nullptr);
+  }
+}
+
+void SyntaxData::dump(llvm::raw_ostream &OS) const {
+  getRaw()->dump(OS, 0);
+  OS << '\n';
+}
+
+void SyntaxData::dump() const { dump(llvm::errs()); }

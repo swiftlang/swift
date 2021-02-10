@@ -81,34 +81,7 @@ class SyntaxData {
       : AbsoluteRaw(AbsoluteRaw), Parent(Parent) {}
 
 public:
-  /// With a new \c RawSyntax node, create a new node from this one and
-  /// recursively rebuild the parental chain up to the root.
-  SyntaxData replacingSelf(const RC<RawSyntax> &NewRaw) const;
-
-  /// Replace a child in the raw syntax and recursively rebuild the
-  /// parental chain up to the root.
-  template <typename CursorType>
-  SyntaxData replacingChild(const RC<RawSyntax> &RawChild,
-                            CursorType ChildCursor) const {
-    auto NewRaw = AbsoluteRaw.getRaw()->replacingChild(ChildCursor, RawChild);
-    return replacingSelf(NewRaw);
-  }
-
-  /// Get the node immediately before this current node that does contain a
-  /// non-missing token. Return \c None if we cannot find such node.
-  Optional<SyntaxData> getPreviousNode() const;
-
-  /// Get the node immediately after this current node that does contain a
-  /// non-missing token. Return \c None if we cannot find such node.
-  Optional<SyntaxData> getNextNode() const;
-
-  /// Get the first non-missing token node in this tree. Return \c None if
-  /// this node does not contain non-missing tokens.
-  Optional<SyntaxData> getFirstToken() const;
-
-  /// Get the last non-missing token node in this tree. Return \c None if
-  /// this node does not contain non-missing tokens.
-  Optional<SyntaxData> getLastToken() const;
+  // MARK: - Creating new SyntaxData
 
   /// Make a new \c SyntaxData node for the tree's root.
   static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw) {
@@ -117,13 +90,17 @@ public:
   static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw,
                          const RC<RefCountedBox<SyntaxData>> &Parent);
 
+  // MARK: - Retrieving underlying storage
+
   const AbsoluteRawSyntax &getAbsoluteRaw() const { return AbsoluteRaw; }
 
   /// Returns the raw syntax node for this syntax node.
   const RC<RawSyntax> &getRaw() const { return AbsoluteRaw.getRaw(); }
 
-  /// Returns the kind of syntax node this is.
-  SyntaxKind getKind() const { return AbsoluteRaw.getRaw()->getKind(); }
+  // MARK: - Retrieving related nodes
+
+  /// Returns true if this syntax node has a parent.
+  bool hasParent() const { return Parent != nullptr; }
 
   /// Return the parent syntax if there is one.
   Optional<SyntaxData> getParent() const {
@@ -132,17 +109,6 @@ public:
     } else {
       return None;
     }
-  }
-
-  /// Returns true if this syntax node has a parent.
-  bool hasParent() const {
-    return Parent != nullptr;
-  }
-
-  /// Returns the child index of this node in its parent, if it has a parent,
-  /// otherwise 0.
-  AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
-    return AbsoluteRaw.getPosition().getIndexInParent();
   }
 
   /// Returns the number of children this SyntaxData represents.
@@ -161,6 +127,30 @@ public:
   Optional<SyntaxData>
   getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const;
 
+  /// Returns the child index of this node in its parent, if it has a parent,
+  /// otherwise 0.
+  AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
+    return AbsoluteRaw.getPosition().getIndexInParent();
+  }
+
+  /// Get the node immediately before this current node that does contain a
+  /// non-missing token. Return \c None if we cannot find such node.
+  Optional<SyntaxData> getPreviousNode() const;
+
+  /// Get the node immediately after this current node that does contain a
+  /// non-missing token. Return \c None if we cannot find such node.
+  Optional<SyntaxData> getNextNode() const;
+
+  /// Get the first non-missing token node in this tree. Return \c None if
+  /// this node does not contain non-missing tokens.
+  Optional<SyntaxData> getFirstToken() const;
+
+  /// Get the last non-missing token node in this tree. Return \c None if
+  /// this node does not contain non-missing tokens.
+  Optional<SyntaxData> getLastToken() const;
+
+  // MARK: - Retrieving source locations
+
   /// Get the offset at which the leading trivia of this node starts.
   AbsoluteOffsetPosition getAbsolutePositionBeforeLeadingTrivia() const;
 
@@ -175,23 +165,45 @@ public:
   /// Get the offset at chiwh the trailing trivia of this node ends.
   AbsoluteOffsetPosition getAbsoluteEndPositionAfterTrailingTrivia() const;
 
+  // MARK: - Getting the node's kind
+
+  /// Returns the kind of syntax node this is.
+  SyntaxKind getKind() const { return AbsoluteRaw.getRaw()->getKind(); }
+
   /// Returns true if the data node represents type syntax.
-  bool isType() const;
+  bool isType() const { return getRaw()->isType(); }
 
   /// Returns true if the data node represents statement syntax.
-  bool isStmt() const;
+  bool isStmt() const { return getRaw()->isStmt(); }
 
   /// Returns true if the data node represents declaration syntax.
-  bool isDecl() const;
+  bool isDecl() const { return getRaw()->isDecl(); }
 
   /// Returns true if the data node represents expression syntax.
-  bool isExpr() const;
+  bool isExpr() const { return getRaw()->isExpr(); }
 
   /// Returns true if the data node represents pattern syntax.
-  bool isPattern() const;
+  bool isPattern() const { return getRaw()->isPattern(); }
 
   /// Returns true if this syntax is of some "unknown" kind.
-  bool isUnknown() const;
+  bool isUnknown() const { return getRaw()->isUnknown(); }
+
+  // MARK: - Modifying node
+
+  /// With a new \c RawSyntax node, create a new node from this one and
+  /// recursively rebuild the parental chain up to the root.
+  SyntaxData replacingSelf(const RC<RawSyntax> &NewRaw) const;
+
+  /// Replace a child in the raw syntax and recursively rebuild the
+  /// parental chain up to the root.
+  template <typename CursorType>
+  SyntaxData replacingChild(const RC<RawSyntax> &RawChild,
+                            CursorType ChildCursor) const {
+    auto NewRaw = AbsoluteRaw.getRaw()->replacingChild(ChildCursor, RawChild);
+    return replacingSelf(NewRaw);
+  }
+
+  // MARK: - Miscellaneous
 
   /// Dump a debug description of the syntax data for debugging to
   /// standard error.
