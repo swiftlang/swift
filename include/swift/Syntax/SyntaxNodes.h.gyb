@@ -58,8 +58,8 @@ class ${node.name} ${qualifier} : public ${node.base_type} {
 %     end
 %     if node.requires_validation():
   void validate() const;
-%     end
 
+%     end
 public:
 %     if node.children:
   enum Cursor : uint32_t {
@@ -71,9 +71,9 @@ public:
 
   ${node.name}(const SyntaxData Data) : ${node.base_type}(Data) {
 %     if node.requires_validation():
-      this->validate();
+    this->validate();
 %     end
-    }
+  }
 
 %     for child in node.children:
 %       for line in dedented_lines(child.description):
@@ -110,11 +110,11 @@ public:
 %     end
 
   static bool kindof(SyntaxKind Kind) {
-%   if node.is_base():
+%     if node.is_base():
     return is${node.syntax_kind}Kind(Kind);
-%   else:
+%     else:
     return Kind == SyntaxKind::${node.syntax_kind};
-%   end
+%     end
   }
 
   static bool classof(const Syntax *S) {
