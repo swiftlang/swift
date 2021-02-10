@@ -2657,6 +2657,8 @@ bool SimplifyCFG::simplifyBlocks() {
   for (auto &BB : Fn)
     addToWorklist(&BB);
 
+  bool hasOwnership = Fn.hasOwnership();
+
   // Iteratively simplify while there is still work to do.
   while (SILBasicBlock *BB = popWorklist()) {
     // If the block is dead, remove it.
@@ -2674,6 +2676,11 @@ bool SimplifyCFG::simplifyBlocks() {
         Changed = true;
         continue;
       }
+
+      // We do not jump thread at all now.
+      if (hasOwnership)
+        continue;
+
       // If this unconditional branch has BBArgs, check to see if duplicating
       // the destination would allow it to be simplified.  This is a simple form
       // of jump threading.
@@ -2686,10 +2693,14 @@ bool SimplifyCFG::simplifyBlocks() {
       Changed |= simplifyCondBrBlock(cast<CondBranchInst>(TI));
       break;
     case TermKind::SwitchValueInst:
+      if (hasOwnership)
+        continue;
       // FIXME: Optimize for known switch values.
       Changed |= simplifySwitchValueBlock(cast<SwitchValueInst>(TI));
       break;
     case TermKind::SwitchEnumInst: {
+      if (hasOwnership)
+        continue;
       auto *SEI = cast<SwitchEnumInst>(TI);
       if (simplifySwitchEnumBlock(SEI)) {
         Changed = true;
@@ -2705,19 +2716,29 @@ bool SimplifyCFG::simplifyBlocks() {
       Changed |= simplifyUnreachableBlock(cast<UnreachableInst>(TI));
       break;
     case TermKind::CheckedCastBranchInst:
+      if (hasOwnership)
+        continue;
       Changed |= simplifyCheckedCastBranchBlock(cast<CheckedCastBranchInst>(TI));
       break;
     case TermKind::CheckedCastValueBranchInst:
+      if (hasOwnership)
+        continue;
       Changed |= simplifyCheckedCastValueBranchBlock(
           cast<CheckedCastValueBranchInst>(TI));
       break;
     case TermKind::CheckedCastAddrBranchInst:
+      if (hasOwnership)
+        continue;
       Changed |= simplifyCheckedCastAddrBranchBlock(cast<CheckedCastAddrBranchInst>(TI));
       break;
     case TermKind::TryApplyInst:
+      if (hasOwnership)
+        continue;
       Changed |= simplifyTryApplyBlock(cast<TryApplyInst>(TI));
       break;
     case TermKind::SwitchEnumAddrInst:
+      if (hasOwnership)
+        continue;
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
     case TermKind::ThrowInst:
@@ -2725,11 +2746,19 @@ bool SimplifyCFG::simplifyBlocks() {
     case TermKind::ReturnInst:
     case TermKind::UnwindInst:
     case TermKind::YieldInst:
+      if (hasOwnership)
+        continue;
       break;
     case TermKind::AwaitAsyncContinuationInst:
+      if (hasOwnership)
+        continue;
       // TODO(async): Simplify AwaitAsyncContinuationInst
       break;
     }
+
+    if (hasOwnership)
+      continue;
+
     // If the block has a cond_fail, try to move it to the predecessors.
     Changed |= tryMoveCondFailToPreds(BB);
 
@@ -3170,9 +3199,16 @@ bool SimplifyCFG::run() {
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);
 
-  // If we have ownership bail. We jus4t want to remove unreachable blocks.
-  if (Fn.hasOwnership())
+  // If we have ownership bail. We just want to remove unreachable blocks and
+  // simplify.
+  if (Fn.hasOwnership()) {
+    DT = nullptr;
+    if (simplifyBlocks()) {
+      removeUnreachableBlocks(Fn);
+      Changed = true;
+    }
     return Changed;
+  }
 
   // Find the set of loop headers. We don't want to jump-thread through headers.
   findLoopHeaders();
@@ -3900,6 +3936,7 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
 #include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::StrongReleaseInst:
     case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DestroyValueInst:
     case SILInstructionKind::DestroyAddrInst:
       break;
     default:
@@ -3942,8 +3979,6 @@ class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
     // FIXME: Handle ownership.
-    if (getFunction()->hasOwnership())
-      return;
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/true)
             .run())
