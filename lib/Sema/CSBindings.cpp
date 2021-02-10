@@ -133,8 +133,8 @@ bool BindingSet::involvesTypeVariables() const {
   // on each step of the solver, but once bindings are computed
   // incrementally it becomes more important to double-check that
   // any adjacent type variables found previously are still unresolved.
-  return llvm::any_of(Info.AdjacentVars, [](const auto &adjacent) {
-    return !adjacent.first->getImpl().getFixedType(/*record=*/nullptr);
+  return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
+    return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
   });
 }
 
@@ -485,6 +485,27 @@ void BindingSet::addBinding(PotentialBinding binding) {
   if (Bindings.count(binding))
     return;
 
+  if (!isViable(binding))
+    return;
+
+  SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+  binding.BindingType->getTypeVariables(referencedTypeVars);
+
+  // If type variable is not allowed to bind to `lvalue`,
+  // let's check if type of potential binding has any
+  // type variables, which are allowed to bind to `lvalue`,
+  // and postpone such type from consideration.
+  //
+  // This check is done here and not in `checkTypeOfBinding`
+  // because the l-valueness of the variable might change during
+  // solving and that would not be reflected in the graph.
+  if (!TypeVar->getImpl().canBindToLValue()) {
+    for (auto *typeVar : referencedTypeVars) {
+      if (typeVar->getImpl().canBindToLValue())
+        return;
+    }
+  }
+
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
@@ -558,8 +579,10 @@ void BindingSet::addBinding(PotentialBinding binding) {
     }
   }
 
-  Bindings.insert(std::move(binding));
->>>>>>> [CSBindings] Separate inference from final product
+  for (auto *adjacentVar : referencedTypeVars)
+    AdjacentVars.insert(adjacentVar);
+
+  (void)Bindings.insert(std::move(binding));
 }
 
 void BindingSet::addLiteralRequirement(Constraint *constraint) {
@@ -674,8 +697,9 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
 
   // First, let's collect all of the possible bindings.
   for (auto *typeVar : getTypeVariables()) {
-    if (!typeVar->getImpl().hasRepresentativeOrFixed())
-      cache.insert({typeVar, inferBindingsFor(typeVar, /*finalize=*/false)});
+    if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
+      cache.insert({typeVar, getBindingsFor(typeVar)});
+    }
   }
 
   // Determine whether given type variable with its set of bindings is
@@ -711,7 +735,6 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
       continue;
 
     auto &bindings = cachedBindings->getSecond();
-
     // Before attempting to infer transitive bindings let's check
     // whether there are any viable "direct" bindings associated with
     // current type variable, if there are none - it means that this type
@@ -729,11 +752,9 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
     if (!bindings || !isViable)
       continue;
 
-    /*
     if (isDebugMode()) {
       bindings.dump(typeVar, llvm::errs(), solverState->depth * 2);
     }
-    */
 
     // If these are the first bindings, or they are better than what
     // we saw before, use them instead.
@@ -867,9 +888,6 @@ void PotentialBindings::addPotentialBinding(PotentialBinding binding) {
     binding = binding.withType(binding.BindingType->getRValueType());
   }
 
-  if (!isViable(binding))
-    return;
-
   Bindings.push_back(std::move(binding));
 }
 
@@ -877,7 +895,7 @@ void PotentialBindings::addLiteral(Constraint *constraint) {
   Literals.insert(constraint);
 }
 
-bool PotentialBindings::isViable(PotentialBinding &binding) const {
+bool BindingSet::isViable(PotentialBinding &binding) const {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
@@ -891,7 +909,7 @@ bool PotentialBindings::isViable(PotentialBinding &binding) const {
 
     for (auto &existing : Bindings) {
       auto *existingNTD = existing.BindingType->getAnyNominal();
-      if (existingNTD && NTD == existingNTD)
+      if (existingNTD && NTD == existingNTD && existing.Kind == binding.Kind)
         return false;
     }
   }
@@ -929,29 +947,12 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   return !involvesTypeVariables();
 }
 
-BindingSet ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
-                                              bool finalize) {
+BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
-  PotentialBindings bindings(*this, typeVar);
-
-  // Gather the constraints associated with this type variable.
-  auto constraints = CG.gatherConstraints(
-      typeVar, ConstraintGraph::GatheringKind::EquivalenceClass);
-
-  for (auto *constraint : constraints)
-    bindings.infer(constraint);
-
-  BindingSet result{bindings};
-
-  if (finalize) {
-    llvm::SmallDenseMap<TypeVariableType *, BindingSet> inferred;
-    result.finalize(inferred);
-  }
-
-  return result;
+  return {CG[typeVar].getCurrentBindings()};
 }
 
 /// Check whether the given type can be used as a binding for the given
@@ -960,20 +961,11 @@ BindingSet ConstraintSystem::inferBindingsFor(TypeVariableType *typeVar,
 /// \returns the type to bind to, if the binding is okay.
 static Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type) {
   // If the type references the type variable, don't permit the binding.
-  SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
-  type->getTypeVariables(referencedTypeVars);
-  if (referencedTypeVars.count(typeVar))
-    return None;
-
-  // If type variable is not allowed to bind to `lvalue`,
-  // let's check if type of potential binding has any
-  // type variables, which are allowed to bind to `lvalue`,
-  // and postpone such type from consideration.
-  if (!typeVar->getImpl().canBindToLValue()) {
-    for (auto *typeVar : referencedTypeVars) {
-      if (typeVar->getImpl().canBindToLValue())
-        return None;
-    }
+  if (type->hasTypeVariable()) {
+    SmallPtrSet<TypeVariableType *, 4> referencedTypeVars;
+    type->getTypeVariables(referencedTypeVars);
+    if (referencedTypeVars.count(typeVar))
+      return None;
   }
 
   {
@@ -1117,13 +1109,6 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   // Check whether we can perform this binding.
   if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
     type = *boundType;
-    if (type->hasTypeVariable()) {
-      llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
-      type->getTypeVariables(referencedVars);
-      for (auto *var : referencedVars) {
-        AdjacentVars.insert({var, constraint});
-      }
-    }
   } else {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 

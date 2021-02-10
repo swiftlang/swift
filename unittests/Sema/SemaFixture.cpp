@@ -127,7 +127,7 @@ BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
 
   for (auto *typeVar : cs.getTypeVariables()) {
     if (!typeVar->getImpl().hasRepresentativeOrFixed())
-      cache.insert({typeVar, cs.inferBindingsFor(typeVar, /*finalize=*/false)});
+      cache.insert({typeVar, cs.getBindingsFor(typeVar)});
   }
 
   for (auto *typeVar : cs.getTypeVariables()) {

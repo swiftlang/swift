@@ -4635,9 +4635,9 @@ public:
 
   Optional<BindingSet> determineBestBindings();
 
-  /// Infer bindings for the given type variable based on current
+  /// Get bindings for the given type variable based on current
   /// state of the constraint system.
-  BindingSet inferBindingsFor(TypeVariableType *typeVar, bool finalize = true);
+  BindingSet getBindingsFor(TypeVariableType *typeVar);
 
 private:
   /// Add a constraint to the constraint system.

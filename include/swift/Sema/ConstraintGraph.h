@@ -77,7 +77,7 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-  inference::PotentialBindings &getBindings() { return *Bindings; }
+  inference::PotentialBindings &getCurrentBindings();
 
 private:
   /// Determines whether the type variable associated with this node
@@ -118,6 +118,13 @@ private:
 
   /// Remove a type variable which used to reference this type variable.
   void removeReferencedBy(TypeVariableType *typeVar);
+
+  /// Experimental {
+  void introduceToInference(Constraint *constraint, bool notifyFixedBindings);
+  void retractFromInference(Constraint *constraint, bool notifyFixedBindings);
+  void reintroduceToInference(Constraint *constraint, bool notifyFixedBindings);
+  void resetBindingSet();
+  /// }
 
   /// The constraint graph this node belongs to.
   ConstraintGraph &CG;

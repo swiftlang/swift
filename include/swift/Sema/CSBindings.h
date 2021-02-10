@@ -260,9 +260,9 @@ struct PotentialBindings {
   /// is a subtype of, supertype of or is equivalent to. This is used
   /// to determine ordering inside of a chain of subtypes to help infer
   /// transitive bindings  and protocol requirements.
-  llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SubtypeOf;
-  llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SupertypeOf;
-  llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> EquivalentTo;
+  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
+  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
+  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
   PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
       : CS(cs), TypeVar(typeVar) {}
@@ -275,18 +275,15 @@ struct PotentialBindings {
   /// coalescing supertype bounds when we are able to compute the meet.
   void addPotentialBinding(PotentialBinding binding);
 
-  /// Check if this binding is viable for inclusion in the set.
-  bool isViable(PotentialBinding &binding) const;
-
   bool isGenericParameter() const;
 
   bool isSubtypeOf(TypeVariableType *typeVar) const {
-    auto result = SubtypeOf.find(typeVar);
-    if (result == SubtypeOf.end())
-      return false;
-
-    auto *constraint = result->second;
-    return constraint->getKind() == ConstraintKind::Subtype;
+    return llvm::any_of(
+        SubtypeOf,
+        [&typeVar](const std::pair<TypeVariableType *, Constraint *> &subtype) {
+          return subtype.first == typeVar &&
+                 subtype.second->getKind() == ConstraintKind::Subtype;
+        });
   }
 
 private:
@@ -314,7 +311,9 @@ class BindingSet {
 
   TypeVariableType *TypeVar;
 
-  PotentialBindings Info;
+  const PotentialBindings &Info;
+
+  llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
 
 public:
   llvm::SmallSetVector<PotentialBinding, 4> Bindings;
@@ -325,7 +324,7 @@ public:
   /// subtype/conversion/equivalence relations with other type variables.
   llvm::Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
-  BindingSet(const PotentialBindings info)
+  BindingSet(const PotentialBindings &info)
       : CS(info.CS), TypeVar(info.TypeVar), Info(info) {
     for (auto *literal : info.Literals)
       addLiteralRequirement(literal);
@@ -335,6 +334,9 @@ public:
 
     for (auto *constraint : info.Defaults)
       addDefault(constraint);
+
+    for (auto &entry : info.AdjacentVars)
+      AdjacentVars.insert(entry.first);
   }
 
   ConstraintSystem &getConstraintSystem() const { return CS; }
@@ -399,6 +401,9 @@ public:
              binding.Kind == AllowedBindingKind::Subtypes;
     });
   }
+
+  /// Check if this binding is viable for inclusion in the set.
+  bool isViable(PotentialBinding &binding) const;
 
   explicit operator bool() const {
     return hasViableBindings() || isDirectHole();
@@ -507,6 +512,7 @@ private:
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
+
   void finalize(
       llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
 
@@ -557,7 +563,7 @@ private:
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
   void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-            unsigned indent) const;
+            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
 
 private:
   void addBinding(PotentialBinding binding);

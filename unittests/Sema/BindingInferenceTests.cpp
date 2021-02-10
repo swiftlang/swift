@@ -41,7 +41,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
   auto intTy = getStdlibType("Int");
 
   {
-    auto bindings = cs.inferBindingsFor(literalTy);
+    auto bindings = cs.getBindingsFor(literalTy);
 
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
 
@@ -61,7 +61,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
                    cs.getConstraintLocator(intLiteral));
 
   {
-    auto bindings = cs.inferBindingsFor(literalTy);
+    auto bindings = cs.getBindingsFor(literalTy);
 
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
@@ -95,7 +95,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
                    cs.getConstraintLocator(intLiteral));
 
   {
-    auto bindings = cs.inferBindingsFor(floatLiteralTy);
+    auto bindings = cs.getBindingsFor(floatLiteralTy);
 
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)1);
@@ -118,7 +118,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
                    cs.getConstraintLocator({}));
 
   {
-    auto bindings = cs.inferBindingsFor(otherTy, /*finalize=*/false);
+    auto bindings = cs.getBindingsFor(otherTy);
 
     // Make sure that there are no direct bindings or protocol requirements.
 
@@ -126,7 +126,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
     ASSERT_EQ(bindings.Literals.size(), (unsigned)0);
 
     llvm::SmallDenseMap<TypeVariableType *, BindingSet> env;
-    env.insert({floatLiteralTy, cs.inferBindingsFor(floatLiteralTy)});
+    env.insert({floatLiteralTy, cs.getBindingsFor(floatLiteralTy)});
 
     bindings.finalize(env);
 
