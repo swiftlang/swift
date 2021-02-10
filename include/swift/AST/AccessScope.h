@@ -31,9 +31,9 @@ class AccessScope {
   llvm::PointerIntPair<const DeclContext *, 1, bool> Value;
 
 public:
-  AccessScope(const DeclContext *DC, bool isPrivate = false, bool isSPI = false);
+  AccessScope(const DeclContext *DC, bool isPrivate = false);
 
-  static AccessScope getPublic(bool isSPI = false) { return AccessScope(nullptr, false, isSPI); }
+  static AccessScope getPublic() { return AccessScope(nullptr, false); }
 
   /// Check if private access is allowed. This is a lexical scope check in Swift
   /// 3 mode. In Swift 4 mode, declarations and extensions of the same type will
@@ -54,20 +54,14 @@ public:
   bool isFileScope() const;
   bool isInternal() const;
 
-  // Is this a public scope
-  bool isSPI() const { return !Value.getPointer() && Value.getInt(); }
-
   /// Returns true if this is a child scope of the specified other access scope.
   ///
   /// \see DeclContext::isChildContextOf
   bool isChildOf(AccessScope AS) const {
     if (!isPublic() && !AS.isPublic())
       return allowsPrivateAccess(getDeclContext(), AS.getDeclContext());
-    if (isPublic() && AS.isPublic()) {
-      if (isSPI() != AS.isSPI())
-        return isSPI();
+    if (isPublic() && AS.isPublic())
       return false;
-    }
     return AS.isPublic();
   }
 
@@ -86,8 +80,6 @@ public:
   /// have common intersection, or None if scopes don't intersect.
   const Optional<AccessScope> intersectWith(AccessScope accessScope) const {
     if (hasEqualDeclContextWith(accessScope)) {
-      if (isSPI())
-        return *this;
       if (isPrivate())
         return *this;
       return accessScope;
