@@ -5963,6 +5963,98 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
   return CheckedCastKind::ValueCast;
 }
 
+// Optional types always conform to `ExpressibleByNilLiteral`.
+static bool isCastToExpressibleByNilLiteral(ConstraintSystem &cs, Type fromType,
+                                            Type toType) {
+  auto &ctx = cs.getASTContext();
+  auto *nilLiteral =
+      ctx.getProtocol(KnownProtocolKind::ExpressibleByNilLiteral);
+  return toType->isEqual(nilLiteral->getDeclaredType()) &&
+         fromType->getOptionalObjectType();
+}
+
+static ConstraintFix *maybeWarnAboutExtraneousCast(
+    ConstraintSystem &cs, Type origFromType, Type origToType, Type fromType,
+    Type toType, SmallVector<Type, 4> fromOptionals,
+    SmallVector<Type, 4> toOptionals, ConstraintSystem::TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+
+  if (flags.contains(ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix))
+    return nullptr;
+
+  // Both types have to be fixed.
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+    return nullptr;
+
+  SmallVector<LocatorPathElt, 4> path;
+  auto anchor = locator.getLocatorParts(path);
+
+  auto *castExpr = getAsExpr<ExplicitCastExpr>(anchor);
+  if (!castExpr)
+    return nullptr;
+
+  unsigned extraOptionals = fromOptionals.size() - toOptionals.size();
+  // Removing the optionality from to type when the force cast expr is an IUO.
+  const auto *const TR = castExpr->getCastTypeRepr();
+  if (isExpr<ForcedCheckedCastExpr>(anchor) && TR &&
+      TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
+    extraOptionals++;
+  }
+
+  // In cases of 'try?' where origFromType isn't optional that meaning
+  // sub-expression isn't optional, always adds one level of optionality
+  // because the result of the expression is always an optional type
+  // regardless of language mode.
+  auto *sub = castExpr->getSubExpr()->getSemanticsProvidingExpr();
+  if (isExpr<OptionalTryExpr>(sub) && !origFromType->getOptionalObjectType()) {
+    origFromType = OptionalType::get(fromType);
+    extraOptionals++;
+  }
+
+  // Except for forced cast expressions, if optionals are more than a single
+  // level difference, we don't need to record any fix.
+  if (!isExpr<ForcedCheckedCastExpr>(anchor) && extraOptionals > 1)
+    return nullptr;
+
+  // Always succeed
+  if (isCastToExpressibleByNilLiteral(cs, origFromType, toType)) {
+    return AllowAlwaysSucceedCheckedCast::create(
+        cs, fromType, toType, CheckedCastKind::Coercion,
+        cs.getConstraintLocator(locator));
+  }
+
+  // If both original are metatypes we have to use them because most of the
+  // logic on how correctly handle metatypes casting is on
+  // typeCheckCheckedCast.
+  if (origFromType->is<AnyMetatypeType>() &&
+      origToType->is<AnyMetatypeType>()) {
+    fromType = origFromType;
+    toType = origToType;
+  }
+
+  auto castKind = TypeChecker::typeCheckCheckedCast(
+      fromType, toType, CheckedCastContextKind::None, cs.DC, SourceLoc(),
+      nullptr, SourceRange());
+  if (!(castKind == CheckedCastKind::Coercion ||
+        castKind == CheckedCastKind::BridgingCoercion))
+    return nullptr;
+
+  if (auto *fix = AllowUnsupportedRuntimeCheckedCast::attempt(
+          cs, fromType, toType, castKind, cs.getConstraintLocator(locator))) {
+    return fix;
+  }
+  if (extraOptionals > 0) {
+    return AllowCheckedCastCoercibleOptionalType::create(
+        cs, origFromType, origToType, castKind,
+        cs.getConstraintLocator(locator));
+  } else {
+    // No optionals, just a trivial cast that always succeed.
+    return AllowAlwaysSucceedCheckedCast::create(
+        cs, origFromType, origToType, castKind,
+        cs.getConstraintLocator(locator));
+  }
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyCheckedCastConstraint(
                     Type fromType, Type toType,
@@ -5981,6 +6073,13 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     return SolutionKind::Unsolved;
   };
+
+  Type origFromType =
+      getFixedTypeRecursive(fromType, flags, /*wantRValue=*/true);
+  Type origToType = getFixedTypeRecursive(toType, flags, /*wantRValue=*/true);
+
+  SmallVector<Type, 4> fromOptionals;
+  SmallVector<Type, 4> toOptionals;
 
   do {
     // Dig out the fixed type this type refers to.
@@ -6004,8 +6103,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
     // Peel off optionals metatypes from the types, because we might cast through
     // them.
-    toType = toType->lookThroughAllOptionalTypes();
-    fromType = fromType->lookThroughAllOptionalTypes();
+    toType = toType->lookThroughAllOptionalTypes(toOptionals);
+    fromType = fromType->lookThroughAllOptionalTypes(fromOptionals);
 
     // Peel off metatypes, since if we can cast two types, we can cast their
     // metatypes.
@@ -6034,15 +6133,29 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       break;
   } while (true);
 
+  auto attemptRecordCastFixIfSolved = [&](SolutionKind result) {
+    if (result != SolutionKind::Solved)
+      return;
+
+    if (auto *fix = maybeWarnAboutExtraneousCast(
+            *this, origFromType, origToType, fromType, toType, fromOptionals,
+            toOptionals, flags, locator)) {
+      (void)recordFix(fix);
+    }
+  };
+
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
   case CheckedCastKind::ArrayDowncast: {
     auto fromBaseType = *isArrayType(fromType);
     auto toBaseType = *isArrayType(toType);
 
-    return simplifyCheckedCastConstraint(fromBaseType, toBaseType, subflags,
-                                         locator);
+    auto result = simplifyCheckedCastConstraint(
+        fromBaseType, toBaseType, subflags | TMF_ApplyingFix, locator);
+    attemptRecordCastFixIfSolved(result);
+    return result;
   }
+
   case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
     std::tie(fromKeyType, fromValueType) = *isDictionaryType(fromType);
@@ -6050,20 +6163,24 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     Type toKeyType, toValueType;
     std::tie(toKeyType, toValueType) = *isDictionaryType(toType);
 
-    if (simplifyCheckedCastConstraint(fromKeyType, toKeyType, subflags,
+    if (simplifyCheckedCastConstraint(fromKeyType, toKeyType,
+                                      subflags | TMF_ApplyingFix,
                                       locator) == SolutionKind::Error)
       return SolutionKind::Error;
 
-
-    return simplifyCheckedCastConstraint(fromValueType, toValueType, subflags,
-                                         locator);
+    auto result = simplifyCheckedCastConstraint(
+        fromValueType, toValueType, subflags | TMF_ApplyingFix, locator);
+    attemptRecordCastFixIfSolved(result);
+    return result;
   }
 
   case CheckedCastKind::SetDowncast: {
     auto fromBaseType = *isSetType(fromType);
     auto toBaseType = *isSetType(toType);
-    return simplifyCheckedCastConstraint(fromBaseType, toBaseType, subflags,
-                                         locator);
+    auto result = simplifyCheckedCastConstraint(
+        fromBaseType, toBaseType, subflags | TMF_ApplyingFix, locator);
+    attemptRecordCastFixIfSolved(result);
+    return result;
   }
 
   case CheckedCastKind::ValueCast: {
@@ -6076,7 +6193,16 @@ ConstraintSystem::simplifyCheckedCastConstraint(
       addConstraint(ConstraintKind::Subtype, toType, fromType,
                     getConstraintLocator(locator));
     }
-      
+
+    // Attempts to record warning fixes when both types are known by the
+    // compiler and we can infer that the runtime checked cast will always
+    // succeed or fail.
+    if (auto *fix = maybeWarnAboutExtraneousCast(
+            *this, origFromType, origToType, fromType, toType, fromOptionals,
+            toOptionals, flags, locator)) {
+      (void)recordFix(fix);
+    }
+
     return SolutionKind::Solved;
   }
 
@@ -10331,7 +10457,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidResultBuilderBody:
   case FixKind::SpecifyContextualTypeForNil:
   case FixKind::AllowRefToInvalidDecl:
-  case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember: {
+  case FixKind::SpecifyBaseTypeForOptionalUnresolvedMember:
+  case FixKind::AllowCheckedCastCoercibleOptionalType:
+  case FixKind::AllowUnsupportedRuntimeCheckedCast:
+  case FixKind::AllowAlwaysSucceedCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

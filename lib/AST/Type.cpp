@@ -5115,6 +5115,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
                                   getResult(), nonDiffExtInfo);
 }
 
+AnyFunctionType *AnyFunctionType::getWithoutThrowing() const {
+  auto info = getExtInfo().intoBuilder().withThrows(false).build();
+  return withExtInfo(info);
+}
+
 Optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
   assert(lookupConformance);
