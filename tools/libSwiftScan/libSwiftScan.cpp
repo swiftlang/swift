@@ -474,7 +474,6 @@ static void addFrontendFlagOption(llvm::opt::OptTable &table,
   }
 }
 
-// use" swiftscan_string_set_t *create_set(const std::vector<std::string> &strings) {
 swiftscan_string_set_t *
 swiftscan_compiler_supported_arguments_query() {
   std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
