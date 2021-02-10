@@ -3139,6 +3139,9 @@ public:
 
   AnyFunctionType *getWithoutDifferentiability() const;
 
+  /// Return the function type without the throwing.
+  AnyFunctionType *getWithoutThrowing() const;
+
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {

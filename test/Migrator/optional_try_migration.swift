@@ -69,7 +69,7 @@ func testOptionalChaining() {
     let _ = try? optThing!.fetchOptInt()
 
     // No migration needed, because of the explicit cast
-    let _ = (try? optThing?.fetchOptInt()) as? Int
+    let _ = (try? optThing?.fetchOptInt()) as? Int // expected-warning{{conditional downcast from 'Int?' to 'Int' does nothing}}
 
     // Migration needed
     let _ = try? thing.fetchInt()

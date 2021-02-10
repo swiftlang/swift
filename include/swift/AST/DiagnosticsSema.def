@@ -1019,6 +1019,13 @@ WARNING(isa_is_always_true,none, "'%0' test is always true",
 WARNING(isa_is_foreign_check,none,
       "'is' test is always true because %0 is a Core Foundation type",
       (Type))
+WARNING(checked_cast_not_supported,none,
+        "runtime conversion from %0 to %1 is not supported; "
+        "%select{'is' test|cast}2 always fails",
+        (Type, Type, unsigned))
+NOTE(checked_cast_not_supported_coerce_instead,none,
+     "consider using 'as' coercion instead", ())
+
 WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))

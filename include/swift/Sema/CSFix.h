@@ -294,6 +294,19 @@ enum class FixKind : uint8_t {
   /// Explicitly specify the type to disambiguate between possible member base
   /// types.
   SpecifyBaseTypeForOptionalUnresolvedMember,
+
+  /// Allow a runtime checked cast from an optional type where we statically
+  /// know the result is always succeed.
+  AllowCheckedCastCoercibleOptionalType,
+
+  /// Allow a runtime checked cast where we statically know the result
+  /// is always succeed.
+  AllowAlwaysSucceedCheckedCast,
+
+  /// Allow a runtime checked cast where at compile time the from is
+  /// convertible, but runtime does not support such convertions. e.g.
+  /// function type casts.
+  AllowUnsupportedRuntimeCheckedCast,
 };
 
 class ConstraintFix {
@@ -2194,6 +2207,80 @@ public:
   attempt(ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
           DeclNameRef memberName, FunctionRefKind functionRefKind,
           MemberLookupResult result, ConstraintLocator *locator);
+};
+
+class CheckedCastContextualMismatchWarning : public ContextualMismatch {
+protected:
+  CheckedCastContextualMismatchWarning(ConstraintSystem &cs, FixKind fixKind,
+                                       Type fromType, Type toType,
+                                       CheckedCastKind kind,
+                                       ConstraintLocator *locator)
+      : ContextualMismatch(cs, fixKind, fromType, toType, locator,
+                           /*isWarning*/ true),
+        CastKind(kind) {}
+  CheckedCastKind CastKind;
+};
+
+class AllowCheckedCastCoercibleOptionalType final
+    : public CheckedCastContextualMismatchWarning {
+  AllowCheckedCastCoercibleOptionalType(ConstraintSystem &cs, Type fromType,
+                                        Type toType, CheckedCastKind kind,
+                                        ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowCheckedCastCoercibleOptionalType, fromType,
+            toType, kind, locator) {}
+
+public:
+  std::string getName() const override {
+    return "checked cast coercible optional";
+  }
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowCheckedCastCoercibleOptionalType *
+  create(ConstraintSystem &cs, Type fromType, Type toType, CheckedCastKind kind,
+         ConstraintLocator *locator);
+};
+
+class AllowAlwaysSucceedCheckedCast final
+    : public CheckedCastContextualMismatchWarning {
+  AllowAlwaysSucceedCheckedCast(ConstraintSystem &cs, Type fromType,
+                                Type toType, CheckedCastKind kind,
+                                ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowUnsupportedRuntimeCheckedCast, fromType, toType,
+            kind, locator) {}
+
+public:
+  std::string getName() const override { return "checked cast always succeed"; }
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowAlwaysSucceedCheckedCast *create(ConstraintSystem &cs,
+                                               Type fromType, Type toType,
+                                               CheckedCastKind kind,
+                                               ConstraintLocator *locator);
+};
+
+class AllowUnsupportedRuntimeCheckedCast final
+    : public CheckedCastContextualMismatchWarning {
+  AllowUnsupportedRuntimeCheckedCast(ConstraintSystem &cs, Type fromType,
+                                     Type toType, CheckedCastKind kind,
+                                     ConstraintLocator *locator)
+      : CheckedCastContextualMismatchWarning(
+            cs, FixKind::AllowUnsupportedRuntimeCheckedCast, fromType, toType,
+            kind, locator) {}
+
+public:
+  std::string getName() const override {
+    return "runtime unsupported checked cast";
+  }
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static bool runtimeSupportedFunctionTypeCast(FunctionType *fnFromType,
+                                               FunctionType *fnToType);
+
+  static AllowUnsupportedRuntimeCheckedCast *
+  attempt(ConstraintSystem &cs, Type fromType, Type toType,
+          CheckedCastKind kind, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

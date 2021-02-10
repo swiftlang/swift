@@ -1331,7 +1331,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // Anything bridges to AnyObject.
   if (toType->isAnyObject())
     return CheckedCastKind::BridgingCoercion;
-  
+
   if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
     return CheckedCastKind::BridgingCoercion;
   }
@@ -1392,114 +1392,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  SourceLoc(), nullptr, SourceRange())) {
     case CheckedCastKind::Coercion:
     case CheckedCastKind::BridgingCoercion: {
-      // FIXME: Add a Fix-It, when the caller provides us with enough
-      // information.
-      if (!suppressDiagnostics) {
-        bool isBridged =
-          !fromType->isEqual(toType) && !isConvertibleTo(fromType, toType, dc);
-
-        switch (contextKind) {
-        case CheckedCastContextKind::None:
-        case CheckedCastContextKind::Coercion:
-          llvm_unreachable("suppressing diagnostics");
-
-        case CheckedCastContextKind::ForcedCast: {
-          std::string extraFromOptionalsStr(extraFromOptionals, '!');
-          auto diag = diags.diagnose(diagLoc, diag::downcast_same_type,
-                                     origFromType, origToType,
-                                     extraFromOptionalsStr,
-                                     isBridged);
-          diag.highlight(diagFromRange);
-          diag.highlight(diagToRange);
-
-          /// Add the '!''s needed to adjust the type.
-          diag.fixItInsertAfter(diagFromRange.End,
-                                std::string(extraFromOptionals, '!'));
-          if (isBridged) {
-            // If it's bridged, we still need the 'as' to perform the bridging.
-            diag.fixItReplaceChars(diagLoc, diagLoc.getAdvancedLocOrInvalid(3),
-                                   "as");
-          } else {
-            // Otherwise, implicit conversions will handle it in most cases.
-            SourceLoc afterExprLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                                diagFromRange.End);
-
-            diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
-          }
-          break;
-        }
-
-        case CheckedCastContextKind::ConditionalCast:
-          // If we're only unwrapping a single optional, that optional value is
-          // effectively carried through to the underlying conversion, making this
-          // the moral equivalent of a map. Complain that one can do this with
-          // 'as' more effectively.
-          if (extraFromOptionals == 1) {
-            // A single optional is carried through. It's better to use 'as' to
-            // the appropriate optional type.
-            auto diag = diags.diagnose(diagLoc,
-                                       diag::conditional_downcast_same_type,
-                                       origFromType, origToType,
-                                       fromType->isEqual(toType) ? 0
-                                                     : isBridged ? 2
-                                                     : 1);
-            diag.highlight(diagFromRange);
-            diag.highlight(diagToRange);
-
-            if (isBridged) {
-              // For a bridged cast, replace the 'as?' with 'as'.
-              diag.fixItReplaceChars(diagLoc, diagLoc.getAdvancedLocOrInvalid(3),
-                                     "as");
-
-              // Make sure we'll cast to the appropriately-optional type by adding
-              // the '?'.
-              // FIXME: Parenthesize!
-              diag.fixItInsertAfter(diagToRange.End, "?");
-            } else {
-              // Just remove the cast; implicit conversions will handle it.
-              SourceLoc afterExprLoc =
-                Lexer::getLocForEndOfToken(Context.SourceMgr, diagFromRange.End);
-
-              if (afterExprLoc.isValid() && diagToRange.isValid())
-                diag.fixItRemove(SourceRange(afterExprLoc, diagToRange.End));
-            }
-          }
-
-          // If there is more than one extra optional, don't do anything: this
-          // conditional cast is trying to unwrap some levels of optional;
-          // let the runtime handle it.
-          break;
-
-        case CheckedCastContextKind::IsExpr:
-          // If we're only unwrapping a single optional, we could have just
-          // checked for 'nil'.
-          if (extraFromOptionals == 1) {
-            auto diag = diags.diagnose(diagLoc, diag::is_expr_same_type,
-                                       origFromType, origToType);
-            diag.highlight(diagFromRange);
-            diag.highlight(diagToRange);
-
-            diag.fixItReplace(SourceRange(diagLoc, diagToRange.End), "!= nil");
-
-            // Add parentheses if needed.
-            if (!fromExpr->canAppendPostfixExpression()) {
-              diag.fixItInsert(fromExpr->getStartLoc(), "(");
-              diag.fixItInsertAfter(fromExpr->getEndLoc(), ")");
-            }
-          }
-
-          // If there is more than one extra optional, don't do anything: this
-          // is performing a deeper check that the runtime will handle.
-          break;
-
-        case CheckedCastContextKind::IsPattern:
-        case CheckedCastContextKind::EnumElementPattern:
-          // Note: Don't diagnose these, because the code is testing whether
-          // the optionals can be unwrapped.
-          break;
-        }
-      }
-
       // Treat this as a value cast so we preserve the semantics.
       return CheckedCastKind::ValueCast;
     }
@@ -1701,7 +1593,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       }
 
       return CheckedCastKind::ValueCast;
-      break;
 
     case CheckedCastContextKind::IsPattern:
     case CheckedCastContextKind::EnumElementPattern:
