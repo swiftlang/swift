@@ -2265,6 +2265,12 @@ bool AllocOptimize::canPromoteTake(
   if (!agg.canTake(loadTy, firstElt))
     return false;
 
+  // As a final check, make sure that we have an available value for each value,
+  // if not bail.
+  for (const auto &av : tmpList)
+    if (!av.Value)
+      return false;
+
   // Ok, we can promote this destroy_addr... move the temporary lists contents
   // into the final AvailableValues list.
   std::move(tmpList.begin(), tmpList.end(),
