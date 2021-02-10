@@ -77,8 +77,8 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                           -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
                           -DCMAKE_SYSTEM_PROCESSOR=${arch}
-                          -DCMAKE_ANDROID_NDK="${SWIFT_ANDROID_NDK_PATH}"
-                          -DCMAKE_ANDROID_ARCH_ABI=${arch}
+                          "-DCMAKE_ANDROID_NDK=${SWIFT_ANDROID_NDK_PATH}"
+                          -DCMAKE_ANDROID_ARCH_ABI=${SWIFT_SDK_ANDROID_ARCH_${arch}_ABI}
                           -DBUILD_SHARED_LIBS=YES
                           -DENABLE_SWIFT=NO
                           -DENABLE_TESTING=NO
@@ -153,8 +153,8 @@ foreach(sdk ${DISPATCH_SDKS})
                             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                             -DCMAKE_SYSTEM_NAME=${sdk}
                             -DCMAKE_SYSTEM_PROCESSOR=${arch}
-                            -DCMAKE_ANDROID_NDK="${SWIFT_ANDROID_NDK_PATH}"
-                            -DCMAKE_ANDROID_ARCH_ABI=${arch}
+                            "-DCMAKE_ANDROID_NDK=${SWIFT_ANDROID_NDK_PATH}"
+                            -DCMAKE_ANDROID_ARCH_ABI=${SWIFT_SDK_ANDROID_ARCH_${arch}_ABI}
                             -DBUILD_SHARED_LIBS=NO
                             -DENABLE_SWIFT=NO
                             -DENABLE_TESTING=NO
