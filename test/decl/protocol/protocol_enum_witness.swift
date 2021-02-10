@@ -146,3 +146,10 @@ protocol MissingAccessorsVar {
 enum Bar14: MissingAccessorsVar { // OK
   case bar
 }
+
+protocol MissingAccessorsLet {
+  static let bar: Self // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}}
+}
+enum Bar15: MissingAccessorsLet { // OK
+  case bar
+}
