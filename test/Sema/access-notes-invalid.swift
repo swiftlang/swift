@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -primary-file %s -access-notes-path %S/Inputs/missing.accessnotes 2>&1 | %FileCheck --check-prefix=CHECK-MISSING --enable-windows-compatibility %s
+// RUN: %target-swift-frontend -typecheck -primary-file %/s -access-notes-path %/S/Inputs/missing.accessnotes 2>&1 | %FileCheck --check-prefix=CHECK-MISSING %s
 // CHECK-MISSING: <unknown>:0: warning: ignored access notes file at 'SOURCE_DIR/test/Sema/Inputs/missing.accessnotes' because it cannot be read: No such file or directory{{$}}
 
 // RUN: %target-typecheck-verify-swift -access-notes-path %S/Inputs/bad.accessnotes -verify-additional-file %S/Inputs/bad.accessnotes
