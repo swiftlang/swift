@@ -220,23 +220,16 @@ private:
 };
 
 struct PotentialBindings {
-  using BindingScore =
-      std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
-
   /// The constraint system this type variable and its bindings belong to.
   ConstraintSystem &CS;
 
   TypeVariableType *TypeVar;
 
   /// The set of potential bindings.
-  llvm::SmallSetVector<PotentialBinding, 4> Bindings;
+  llvm::SmallVector<PotentialBinding, 4> Bindings;
 
   /// The set of protocol requirements placed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
-
-  /// The set of transitive protocol requirements inferred through
-  /// subtype/conversion/equivalence relations with other type variables.
-  llvm::Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
@@ -244,10 +237,10 @@ struct PotentialBindings {
   /// Note that ordering is important when it comes to bindings, we'd
   /// like to add any "direct" default types first to attempt them
   /// before transitive ones.
-  llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+  llvm::SmallPtrSet<Constraint *, 2> Literals;
 
   /// The set of constraints which would be used to infer default types.
-  llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
+  llvm::SmallPtrSet<Constraint *, 2> Defaults;
 
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
@@ -274,49 +267,81 @@ struct PotentialBindings {
   PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
       : CS(cs), TypeVar(typeVar) {}
 
-  /// Determine whether the set of bindings is non-empty.
-  explicit operator bool() const {
-    return hasViableBindings()|| isDirectHole();
+  void addDefault(Constraint *constraint);
+
+  void addLiteral(Constraint *constraint);
+
+  /// Add a potential binding to the list of bindings,
+  /// coalescing supertype bounds when we are able to compute the meet.
+  void addPotentialBinding(PotentialBinding binding);
+
+  /// Check if this binding is viable for inclusion in the set.
+  bool isViable(PotentialBinding &binding) const;
+
+  bool isGenericParameter() const;
+
+  bool isSubtypeOf(TypeVariableType *typeVar) const {
+    auto result = SubtypeOf.find(typeVar);
+    if (result == SubtypeOf.end())
+      return false;
+
+    auto *constraint = result->second;
+    return constraint->getKind() == ConstraintKind::Subtype;
   }
 
-  /// Determine whether this set has any "viable" (or non-hole) bindings.
+private:
+  /// Attempt to infer a new binding and other useful information
+  /// (i.e. whether bindings should be delayed) from the given
+  /// relational constraint.
+  Optional<PotentialBinding> inferFromRelational(Constraint *constraint);
+
+public:
+  void infer(Constraint *constraint);
+
+  /// Retract all bindings and other information related to a given
+  /// constraint from this binding set.
   ///
-  /// A viable binding could be - a direct or transitive binding
-  /// inferred from a constraint, literal binding, or defaltable
-  /// binding.
-  ///
-  /// A hole is not considered a viable binding since it doesn't
-  /// add any new type information to constraint system.
-  bool hasViableBindings() const {
-    return !Bindings.empty() || getNumViableLiteralBindings() > 0 ||
-           !Defaults.empty();
+  /// This would happen when constraint is simplified or solver backtracks
+  /// (either from overload choice or (some) type variable binding).
+  void retract(Constraint *constraint);
+};
+
+class BindingSet {
+  using BindingScore =
+      std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
+
+  ConstraintSystem &CS;
+
+  TypeVariableType *TypeVar;
+
+  PotentialBindings Info;
+
+public:
+  llvm::SmallSetVector<PotentialBinding, 4> Bindings;
+  llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+  llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
+
+  /// The set of transitive protocol requirements inferred through
+  /// subtype/conversion/equivalence relations with other type variables.
+  llvm::Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
+
+  BindingSet(const PotentialBindings info)
+      : CS(info.CS), TypeVar(info.TypeVar), Info(info) {
+    for (auto *literal : info.Literals)
+      addLiteralRequirement(literal);
+
+    for (const auto &binding : info.Bindings)
+      addBinding(binding);
+
+    for (auto *constraint : info.Defaults)
+      addDefault(constraint);
   }
 
-  /// Determines whether this type variable could be `nil`,
-  /// which means that all of its bindings should be optional.
+  ConstraintSystem &getConstraintSystem() const { return CS; }
+
+  TypeVariableType *getTypeVariable() const { return Info.TypeVar; }
+
   bool canBeNil() const;
-
-  /// Determine whether attempting this type variable should be
-  /// delayed until the rest of the constraint system is considered
-  /// "fully bound" meaning constraints, which affect completeness
-  /// of the binding set, for this type variable such as - member
-  /// constraint, disjunction, function application etc. - are simplified.
-  ///
-  /// Note that in some situations i.e. when there are no more
-  /// disjunctions or type variables left to attempt, it's still
-  /// okay to attempt "delayed" type variable to make forward progress.
-  bool isDelayed() const;
-
-  /// Whether the bindings of this type involve other type variables,
-  /// or the type variable itself is adjacent to other type variables
-  /// that could become valid bindings in the future.
-  bool involvesTypeVariables() const;
-
-  /// Whether the bindings represent (potentially) incomplete set,
-  /// there is no way to say with absolute certainty if that's the
-  /// case, but that could happen when certain constraints like
-  /// `bind param` are present in the system.
-  bool isPotentiallyIncomplete() const;
 
   /// If this type variable doesn't have any viable bindings, or
   /// if there is only one binding and it's a placeholder type, consider
@@ -340,6 +365,28 @@ struct PotentialBindings {
   /// bound to a placeholder type.
   bool isDirectHole() const;
 
+  /// Determine whether attempting this type variable should be
+  /// delayed until the rest of the constraint system is considered
+  /// "fully bound" meaning constraints, which affect completeness
+  /// of the binding set, for this type variable such as - member
+  /// constraint, disjunction, function application etc. - are simplified.
+  ///
+  /// Note that in some situations i.e. when there are no more
+  /// disjunctions or type variables left to attempt, it's still
+  /// okay to attempt "delayed" type variable to make forward progress.
+  bool isDelayed() const;
+
+  /// Whether the bindings of this type involve other type variables,
+  /// or the type variable itself is adjacent to other type variables
+  /// that could become valid bindings in the future.
+  bool involvesTypeVariables() const;
+
+  /// Whether the bindings represent (potentially) incomplete set,
+  /// there is no way to say with absolute certainty if that's the
+  /// case, but that could happen when certain constraints like
+  /// `bind param` are present in the system.
+  bool isPotentiallyIncomplete() const;
+
   /// Determine if the bindings only constrain the type variable from above
   /// with an existential type; such a binding is not very helpful because
   /// it's impossible to enumerate the existential type's subtypes.
@@ -351,6 +398,29 @@ struct PotentialBindings {
       return binding.BindingType->isExistentialType() &&
              binding.Kind == AllowedBindingKind::Subtypes;
     });
+  }
+
+  explicit operator bool() const {
+    return hasViableBindings() || isDirectHole();
+  }
+
+  /// Determine whether this set has any "viable" (or non-hole) bindings.
+  ///
+  /// A viable binding could be - a direct or transitive binding
+  /// inferred from a constraint, literal binding, or defaltable
+  /// binding.
+  ///
+  /// A hole is not considered a viable binding since it doesn't
+  /// add any new type information to constraint system.
+  bool hasViableBindings() const {
+    return !Bindings.empty() || getNumViableLiteralBindings() > 0 ||
+           !Defaults.empty();
+  }
+
+  LiteralBindingKind getLiteralKind() const;
+
+  ArrayRef<Constraint *> getConformanceRequirements() const {
+    return Info.Protocols;
   }
 
   unsigned getNumViableLiteralBindings() const;
@@ -383,46 +453,8 @@ struct PotentialBindings {
     return numDefaultable - unviable;
   }
 
-  static BindingScore formBindingScore(const PotentialBindings &b);
-
-  /// Compare two sets of bindings, where \c x < y indicates that
-  /// \c x is a better set of bindings that \c y.
-  friend bool operator<(const PotentialBindings &x,
-                        const PotentialBindings &y) {
-    auto xScore = formBindingScore(x);
-    auto yScore = formBindingScore(y);
-
-    if (xScore < yScore)
-      return true;
-
-    if (yScore < xScore)
-      return false;
-
-    auto xDefaults = x.getNumViableDefaultableBindings();
-    auto yDefaults = y.getNumViableDefaultableBindings();
-
-    // If there is a difference in number of default types,
-    // prioritize bindings with fewer of them.
-    if (xDefaults != yDefaults)
-      return xDefaults < yDefaults;
-
-    // If neither type variable is a "hole" let's check whether
-    // there is a subtype relationship between them and prefer
-    // type variable which represents superclass first in order
-    // for "subtype" type variable to attempt more bindings later.
-    // This is required because algorithm can't currently infer
-    // bindings for subtype transitively through superclass ones.
-    if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
-      if (x.isSubtypeOf(y.TypeVar))
-        return false;
-
-      if (y.isSubtypeOf(x.TypeVar))
-        return true;
-    }
-
-    // As a last resort, let's check if the bindings are
-    // potentially incomplete, and if so, let's de-prioritize them.
-    return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
+  ASTNode getAssociatedCodeCompletionToken() const {
+    return Info.AssociatedCodeCompletionToken;
   }
 
   LiteralBindingKind getLiteralKind() const;
@@ -464,41 +496,78 @@ private:
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
   void inferTransitiveBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
+      const llvm::SmallDenseMap<TypeVariableType *, BindingSet>
           &inferredBindings);
 
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol
   /// requirements down the subtype or equivalence chain.
   void inferTransitiveProtocolRequirements(
-      llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-          &inferredBindings);
-
-  /// Attempt to infer a new binding and other useful information
-  /// (i.e. whether bindings should be delayed) from the given
-  /// relational constraint.
-  Optional<PotentialBinding> inferFromRelational(Constraint *constraint);
-
-public:
-  void infer(Constraint *constraint);
-
-  /// Retract all bindings and other information related to a given
-  /// constraint from this binding set.
-  ///
-  /// This would happen when constraint is simplified or solver backtracks
-  /// (either from overload choice or (some) type variable binding).
-  void retract(Constraint *constraint);
+      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
-  void finalize(llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-                    &inferredBindings);
+  void finalize(
+      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
 
-  void dump(llvm::raw_ostream &out,
-            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
+  /// Check if this binding is favored over a disjunction e.g.
+  /// if it has only concrete types or would resolve a closure.
+  bool favoredOverDisjunction(Constraint *disjunction) const;
 
+  static BindingScore formBindingScore(const BindingSet &b);
+
+  /// Compare two sets of bindings, where \c x < y indicates that
+  /// \c x is a better set of bindings that \c y.
+  friend bool operator<(const BindingSet &x, const BindingSet &y) {
+    auto xScore = formBindingScore(x);
+    auto yScore = formBindingScore(y);
+
+    if (xScore < yScore)
+      return true;
+
+    if (yScore < xScore)
+      return false;
+
+    auto xDefaults = x.getNumViableDefaultableBindings();
+    auto yDefaults = y.getNumViableDefaultableBindings();
+
+    // If there is a difference in number of default types,
+    // prioritize bindings with fewer of them.
+    if (xDefaults != yDefaults)
+      return xDefaults < yDefaults;
+
+    // If neither type variable is a "hole" let's check whether
+    // there is a subtype relationship between them and prefer
+    // type variable which represents superclass first in order
+    // for "subtype" type variable to attempt more bindings later.
+    // This is required because algorithm can't currently infer
+    // bindings for subtype transitively through superclass ones.
+    if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
+      if (x.Info.isSubtypeOf(y.getTypeVariable()))
+        return false;
+
+      if (y.Info.isSubtypeOf(x.getTypeVariable()))
+        return true;
+    }
+
+    // As a last resort, let's check if the bindings are
+    // potentially incomplete, and if so, let's de-prioritize them.
+    return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
+  }
+
+  void dump(llvm::raw_ostream &out, unsigned indent) const;
   void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
-            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
+            unsigned indent) const;
+
+private:
+  void addBinding(PotentialBinding binding);
+
+  void addLiteralRequirement(Constraint *literal);
+
+  void addDefault(Constraint *constraint) {
+    auto defaultTy = constraint->getSecondType();
+    Defaults.insert({defaultTy->getCanonicalType(), constraint});
+  }
 };
 
 } // end namespace inference

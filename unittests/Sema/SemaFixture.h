@@ -76,8 +76,8 @@ protected:
   ProtocolType *createProtocol(llvm::StringRef protocolName,
                                Type parent = Type());
 
-  static PotentialBindings inferBindings(ConstraintSystem &cs,
-                                         TypeVariableType *typeVar);
+  static BindingSet inferBindings(ConstraintSystem &cs,
+                                  TypeVariableType *typeVar);
 };
 
 } // end namespace unittest

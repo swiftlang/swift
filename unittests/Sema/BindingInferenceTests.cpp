@@ -125,7 +125,7 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)0);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)0);
 
-    llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> env;
+    llvm::SmallDenseMap<TypeVariableType *, BindingSet> env;
     env.insert({floatLiteralTy, cs.inferBindingsFor(floatLiteralTy)});
 
     bindings.finalize(env);
@@ -192,7 +192,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
         cs.getConstraintLocator({}, LocatorPathElt::ContextualType()));
 
     auto bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.Protocols.empty());
+    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1});
@@ -214,7 +214,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInference) {
                      cs.getConstraintLocator({}));
 
     auto bindings = inferBindings(cs, typeVar);
-    ASSERT_TRUE(bindings.Protocols.empty());
+    ASSERT_TRUE(bindings.getConformanceRequirements().empty());
     ASSERT_TRUE(bool(bindings.TransitiveProtocols));
     verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
                                    {protocolTy1, protocolTy2});

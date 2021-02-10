@@ -5361,9 +5361,10 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   return false;
 }
 
-TypeVarBindingProducer::TypeVarBindingProducer(PotentialBindings &bindings)
-    : BindingProducer(bindings.CS, bindings.TypeVar->getImpl().getLocator()),
-      TypeVar(bindings.TypeVar), CanBeNil(bindings.canBeNil()) {
+TypeVarBindingProducer::TypeVarBindingProducer(BindingSet &bindings)
+    : BindingProducer(bindings.getConstraintSystem(),
+                      bindings.getTypeVariable()->getImpl().getLocator()),
+      TypeVar(bindings.getTypeVariable()), CanBeNil(bindings.canBeNil()) {
   if (bindings.isDirectHole()) {
     auto *locator = getLocator();
     // If this type variable is associated with a code completion token
@@ -5371,8 +5372,9 @@ TypeVarBindingProducer::TypeVarBindingProducer(PotentialBindings &bindings)
     // to point to a code completion token to avoid attempting to "fix"
     // this problem since its rooted in the fact that constraint system
     // is under-constrained.
-    if (bindings.AssociatedCodeCompletionToken) {
-      locator = CS.getConstraintLocator(bindings.AssociatedCodeCompletionToken);
+    if (bindings.getAssociatedCodeCompletionToken()) {
+      locator =
+          CS.getConstraintLocator(bindings.getAssociatedCodeCompletionToken());
     }
 
     Bindings.push_back(Binding::forHole(TypeVar, locator));

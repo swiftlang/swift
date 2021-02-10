@@ -565,7 +565,7 @@ protected:
 };
 
 class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
-  using BindingContainer = inference::PotentialBindings;
+  using BindingContainer = inference::BindingSet;
   using Binding = inference::PotentialBinding;
 
   TypeVariableType *TypeVar;
@@ -579,8 +579,8 @@ class TypeVariableStep final : public BindingStep<TypeVarBindingProducer> {
 public:
   TypeVariableStep(BindingContainer &bindings,
                    SmallVectorImpl<Solution> &solutions)
-      : BindingStep(bindings.CS, {bindings}, solutions),
-        TypeVar(bindings.TypeVar) {}
+      : BindingStep(bindings.getConstraintSystem(), {bindings}, solutions),
+        TypeVar(bindings.getTypeVariable()) {}
 
   void setup() override;
 
