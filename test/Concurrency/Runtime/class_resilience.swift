@@ -12,6 +12,7 @@
 // REQUIRES: concurrency
 // XFAIL: windows
 // XFAIL: linux
+// XFAIL: openbsd
 
 import StdlibUnittest
 import resilient_class
