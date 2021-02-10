@@ -793,4 +793,7 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
            "disabled. NOTE: Can not be used if enable-ast-verifier is used "
            "as well">;
 
+def new_driver_path
+  : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
+  HelpText<"Path of the new driver to be used">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

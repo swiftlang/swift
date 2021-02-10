@@ -199,10 +199,15 @@ static int run_driver(StringRef ExecName,
       }
       subCommandArgs.insert(subCommandArgs.end(), argv.begin() + 1, argv.end());
 
+      // Push these non-op frontend arguments so the build log can indicate
+      // the new driver is used.
+      subCommandArgs.push_back("-Xfrontend");
+      subCommandArgs.push_back("-new-driver-path");
+      subCommandArgs.push_back("-Xfrontend");
+      subCommandArgs.push_back(NewDriverPath.c_str());
+
       // Execute the subcommand.
       subCommandArgs.push_back(nullptr);
-      Diags.diagnose(SourceLoc(), diag::remark_forwarding_to_new_driver,
-                     NewDriverPath);
       ExecuteInPlace(NewDriverPath.c_str(), subCommandArgs.data());
 
       // If we reach here then an error occurred (typically a missing path).
