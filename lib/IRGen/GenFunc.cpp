@@ -823,6 +823,7 @@ public:
 
     // Forward the indirect return values. We might have to reabstract the
     // return value.
+    bool useSRet = true;
     if (nativeResultSchema.requiresIndirect()) {
       assert(origNativeSchema.requiresIndirect());
       auto resultAddr = origParams.claimNext();
@@ -830,6 +831,7 @@ public:
           resultAddr, IGM.getStoragePointerType(origConv.getSILResultType(
                           IGM.getMaximalTypeExpansionContext())));
       args.add(resultAddr);
+      useSRet = false;
     } else if (origNativeSchema.requiresIndirect()) {
       assert(!nativeResultSchema.requiresIndirect());
       auto stackAddr = outResultTI.allocateStack(
@@ -841,14 +843,22 @@ public:
           resultValueAddr, IGM.getStoragePointerType(origConv.getSILResultType(
                                IGM.getMaximalTypeExpansionContext())));
       args.add(resultAddr.getAddress());
+      useSRet = false;
+    } else if (!origNativeSchema.empty()) {
+      useSRet = false;
     }
-
+    useSRet = useSRet && origConv.getNumIndirectSILResults() == 1;
     for (auto resultType : origConv.getIndirectSILResultTypes(
              IGM.getMaximalTypeExpansionContext())) {
       auto addr = origParams.claimNext();
       addr = subIGF.Builder.CreateBitCast(
           addr, IGM.getStoragePointerType(resultType));
+      auto useOpaque =
+          useSRet && !isa<FixedTypeInfo>(IGM.getTypeInfo(resultType));
+      if (useOpaque)
+        addr = subIGF.Builder.CreateBitCast(addr, IGM.OpaquePtrTy);
       args.add(addr);
+      useSRet = false;
     }
 
     // Reemit the parameters as unsubstituted.

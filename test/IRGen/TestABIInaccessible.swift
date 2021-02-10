@@ -8,7 +8,7 @@ public struct AnotherType<T> {
 }
 
 // Don't pass the metadata of Private<T> to AnotherType<T>'s outlined destroy.
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s4main4copyyAA11AnotherTypeVyxGAElF"(%T4main11AnotherTypeV* noalias nocapture sret({{.*}}) %0, %T4main11AnotherTypeV* noalias nocapture %1, %swift.type* %T)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s4main4copyyAA11AnotherTypeVyxGAElF"(%swift.opaque* noalias nocapture sret({{.*}}) %0, %T4main11AnotherTypeV* noalias nocapture %1, %swift.type* %T)
 // CHECK:  [[MD:%.*]] = call swiftcc %swift.metadata_response @"$s4main11AnotherTypeVMa"(i{{.*}} 0, %swift.type* %T)
 // CHECK:  [[MD1:%.*]] = extractvalue %swift.metadata_response [[MD]], 0
 // CHECK:  [[MD2:%.*]] = call swiftcc %swift.metadata_response @"$s4main6PublicVMa"(i{{.*}} 0, %swift.type* %T)
