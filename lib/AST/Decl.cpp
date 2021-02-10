@@ -6986,7 +6986,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     }
 
     // For the first selector piece, attach either the first parameter,
-    // "withCompletionHandker", or "AndReturnError" to the base name,
+    // "withCompletionHandler", or "AndReturnError" to the base name,
     // if appropriate.
     auto firstPiece = baseName;
     llvm::SmallString<32> scratch;
@@ -7999,7 +7999,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     return getActorIsolation(vd);
 
   if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (auto *var = init->getBinding()->getSingleVar())
+    if (auto *var = init->getBinding()->getAnchoringVarDecl(
+            init->getBindingIndex()))
       return getActorIsolation(var);
   }
 

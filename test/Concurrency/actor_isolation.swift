@@ -446,3 +446,35 @@ extension SomeClassInActor.ID {
     object.inActor() // expected-error{{'async' in a function that does not support concurrency}}
   }
 }
+
+// ----------------------------------------------------------------------
+// Initializers
+// ----------------------------------------------------------------------
+actor class SomeActorWithInits {
+  var mutableState: Int = 17
+  var otherMutableState: Int
+
+  init() {
+    self.mutableState = 42
+    self.otherMutableState = 17
+
+    self.isolated()
+  }
+
+  func isolated() { }
+}
+
+@MainActor
+class SomeClassWithInits {
+  var mutableState: Int = 17
+  var otherMutableState: Int
+
+  init() {
+    self.mutableState = 42
+    self.otherMutableState = 17
+
+    self.isolated()
+  }
+
+  func isolated() { }
+}
