@@ -4,3 +4,7 @@
 func make<Result: B>(ofClass cls: Result.Type) -> Result {
     return cls.init(1)
 }
+
+func make(ofClass cls: (C & P).Type) -> C {
+    return cls.init(1)
+}

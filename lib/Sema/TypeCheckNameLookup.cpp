@@ -287,6 +287,13 @@ static void installSemanticMembersIfNeeded(Type type, DeclNameRef name) {
     }
   }
 
+  if (type->isExistentialType()) {
+    auto layout = type->getExistentialLayout();
+    if (auto super = layout.explicitSuperclass) {
+      type = super;
+    }
+  }
+
   if (auto *current = type->getAnyNominal()) {
     current->synthesizeSemanticMembersIfNeeded(name.getFullName());
   }
