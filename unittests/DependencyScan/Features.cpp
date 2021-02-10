@@ -44,6 +44,7 @@ TEST_F(ScanTest, TestHasArgumentQuery) {
     const char* data = static_cast<const char*>(option.data);
     optionSet.insert(std::string(data, option.length));
   }
+  swiftscan_string_set_dispose(supported_args_set);
 #define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
                HELPTEXT, METAVAR, VALUES)                                      \
   testHasOption(*table, swift::options::OPT_##ID, optionSet);
@@ -59,6 +60,7 @@ TEST_F(ScanTest, TestDoesNotHaveArgumentQuery) {
     const char* data = static_cast<const char*>(option.data);
     optionSet.insert(std::string(data, option.length));
   }
+  swiftscan_string_set_dispose(supported_args_set);
   bool hasOption;
   hasOption = optionSet.find("-clearly-not-a-compiler-flag") != optionSet.end();
   EXPECT_EQ(hasOption, false);

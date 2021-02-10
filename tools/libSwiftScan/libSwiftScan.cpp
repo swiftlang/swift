@@ -32,14 +32,6 @@ void swiftscan_string_dispose(swiftscan_string_ref_t string) {
     free(const_cast<void *>(string.data));
 }
 
-/// Free the given string set.
-void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
-  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
-    swiftscan_string_dispose(set->strings[SI]);
-  delete[] set->strings;
-  delete set;
-}
-
 void swiftscan_dependency_info_details_dispose(
     swiftscan_module_details_t details) {
   swiftscan_module_details_s *details_impl = details;
@@ -422,6 +414,13 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
 }
 
 //=== Public Cleanup Functions --------------------------------------------===//
+
+void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
+  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
+    swiftscan_string_dispose(set->strings[SI]);
+  delete[] set->strings;
+  delete set;
+}
 
 void swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result) {
   swiftscan_string_dispose(result->main_module_name);

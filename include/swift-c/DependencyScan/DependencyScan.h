@@ -275,6 +275,9 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation);
 //=== Cleanup Functions ---------------------------------------------------===//
 
 SWIFTSCAN_PUBLIC void
+swiftscan_string_set_dispose(swiftscan_string_set_t *set);
+
+SWIFTSCAN_PUBLIC void
 swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result);
 
 SWIFTSCAN_PUBLIC void
