@@ -413,11 +413,7 @@ struct PotentialBindings {
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
-  ///
-  /// \returns true if this binding has been added to the set,
-  /// false otherwise (e.g. because binding with this type is
-  /// already in the set).
-  bool addPotentialBinding(PotentialBinding binding, bool allowJoinMeet = true);
+  void addPotentialBinding(PotentialBinding binding, bool allowJoinMeet = true);
 
   /// Check if this binding is viable for inclusion in the set.
   bool isViable(PotentialBinding &binding) const;
