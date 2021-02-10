@@ -2485,7 +2485,22 @@ static CanSILFunctionType getNativeSILFunctionType(
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::Closure:
   case SILFunctionType::Representation::WitnessMethod: {
-    switch (constant ? constant->kind : SILDeclRef::Kind::Func) {
+    // FIXME: We should use origConstant unconditionally here, since in the
+    // case of protocol witness thunk type lowering, we want to lower the
+    // witness's calling convention according to the convention of the protocol
+    // requirement, even if the witness has a different kind. Previously we
+    // would base this on the witness `constant`, and this worked because
+    // witnesses had always been the same decl kind as the requirement, but
+    // enum cases as static witnesses broke this invariant.
+    //
+    // To minimize the change in behavior for Swift 5.4, we only consider
+    // origConstant when constant is an EnumElement, to avoid affecting other
+    // potential corner cases I'm not thinking of in the moment.
+    auto constantToTest = constant;
+    if (constant && constant->kind == SILDeclRef::Kind::EnumElement) {
+      constantToTest = origConstant;
+    }
+    switch (constantToTest ? constantToTest->kind : SILDeclRef::Kind::Func) {
     case SILDeclRef::Kind::Initializer:
     case SILDeclRef::Kind::EnumElement:
       return getSILFunctionTypeForConventions(DefaultInitializerConventions());
