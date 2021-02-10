@@ -3178,6 +3178,10 @@ bool SimplifyCFG::run() {
   // First remove any block not reachable from the entry.
   bool Changed = removeUnreachableBlocks(Fn);
 
+  // If we have ownership bail. We jus4t want to remove unreachable blocks.
+  if (Fn.hasOwnership())
+    return Changed;
+
   // Find the set of loop headers. We don't want to jump-thread through headers.
   findLoopHeaders();
 
@@ -3928,10 +3932,6 @@ namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
 public:
   void run() override {
-    // FIXME: We should be able to handle ownership.
-    if (getFunction()->hasOwnership())
-      return;
-
     if (SimplifyCFG(*getFunction(), *this, getOptions().VerifyAll,
                     /*EnableJumpThread=*/false)
             .run())
