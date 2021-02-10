@@ -3,7 +3,7 @@ sil_stage raw // CHECK: sil_stage canonical
 import Builtin
 import Swift
 
-actor class Act { }
+actor Act { }
 
 @_transparent public func serialize_all() {
 }

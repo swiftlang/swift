@@ -197,7 +197,7 @@ DECL_NODES = [
          ]),
 
     # class-declaration -> attributes? access-level-modifier?
-    #                      'class' class-name
+    #                      ('class' | 'actor') class-name
     #                      generic-parameter-clause?
     #                      type-inheritance-clause?
     #                      generic-where-clause?
@@ -210,7 +210,8 @@ DECL_NODES = [
                    collection_element_name='Attribute', is_optional=True),
              Child('Modifiers', kind='ModifierList',
                    collection_element_name='Modifier', is_optional=True),
-             Child('ClassKeyword', kind='ClassToken'),
+             Child('ClassOrActorKeyword', kind='Token',
+                    token_choices=['ClassToken', 'ContextualKeywordToken']),
              Child('Identifier', kind='IdentifierToken'),
              Child('GenericParameterClause', kind='GenericParameterClause',
                    is_optional=True),

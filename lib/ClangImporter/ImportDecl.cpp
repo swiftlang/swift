@@ -5146,7 +5146,8 @@ namespace {
                                                         AccessLevel::Public,
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
-                                                        nullptr, dc);
+                                                        nullptr, dc,
+                                                        /*isActor*/false);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
@@ -5236,7 +5237,8 @@ namespace {
       // Create the class declaration and record it.
       auto result = Impl.createDeclWithClangNode<ClassDecl>(
           decl, access, Impl.importSourceLoc(decl->getBeginLoc()), name,
-          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
+          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc,
+          /*isActor*/false);
 
       // Import generic arguments, if any.
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
@@ -5695,7 +5697,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
 
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
-      nullptr, dc);
+      nullptr, dc, /*isActor*/false);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setHasMissingVTableEntries(false);

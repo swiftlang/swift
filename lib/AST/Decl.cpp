@@ -4093,7 +4093,8 @@ VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      ArrayRef<TypeLoc> Inherited,
-                     GenericParamList *GenericParams, DeclContext *Parent)
+                     GenericParamList *GenericParams, DeclContext *Parent,
+                     bool isActor)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
                     GenericParams),
     ClassLoc(ClassLoc) {
@@ -4105,6 +4106,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.HasMissingVTableEntries = 0;
   Bits.ClassDecl.ComputedHasMissingVTableEntries = 0;
   Bits.ClassDecl.IsIncompatibleWithWeakReferences = 0;
+  Bits.ClassDecl.IsActor = isActor;
 }
 
 bool ClassDecl::hasResilientMetadata() const {

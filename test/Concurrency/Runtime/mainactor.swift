@@ -26,7 +26,7 @@ func checkIfMainQueue(expectedAnswer expected: Bool) -> Bool {
   return true
 }
 
-actor class A {
+actor A {
   func onCorrectQueue(_ count : Int) -> Int {
     if checkIfMainQueue(expectedAnswer: false) {
       print("on actor instance's queue")

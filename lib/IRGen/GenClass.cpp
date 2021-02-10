@@ -2415,7 +2415,8 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
   auto SwiftRootClass = new (Context) ClassDecl(SourceLoc(), name, SourceLoc(),
                                            ArrayRef<TypeLoc>(),
                                            /*generics*/ nullptr,
-                                           Context.TheBuiltinModule);
+                                           Context.TheBuiltinModule,
+                                           /*isActor*/false);
   SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
   SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
     /*isNameImplicit=*/true));

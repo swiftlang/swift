@@ -39,7 +39,7 @@ class C {
   func f() { }
 }
 
-actor class A {
+actor A {
   var property: Int = 5
 
   // expected-error@+1{{'@actorIndependent' can not be applied to stored properties}}
@@ -80,7 +80,7 @@ actor class A {
   @actorIndependent static func staticFunc() { }
 }
 
-actor class FromProperty {
+actor FromProperty {
   // expected-note@+3{{mutable state is only available within the actor instance}}
   // expected-note@+2{{mutable state is only available within the actor instance}}
   // expected-note@+1{{mutable state is only available within the actor instance}}

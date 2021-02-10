@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-actor class SomeActor { }
+actor SomeActor { }
 
 @globalActor
 struct GlobalActor {

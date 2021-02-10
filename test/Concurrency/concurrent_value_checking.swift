@@ -7,13 +7,13 @@ class NotConcurrent { }
 // ConcurrentValue restriction on actor operations
 // ----------------------------------------------------------------------
 
-actor class A1 {
+actor A1 {
   let localLet: NotConcurrent = NotConcurrent()
   func synchronous() -> NotConcurrent? { nil }
   func asynchronous(_: NotConcurrent?) async { }
 }
 
-actor class A2 {
+actor A2 {
   var localVar: NotConcurrent
 
   init(value: NotConcurrent) {
@@ -46,7 +46,7 @@ extension A1 {
 // ----------------------------------------------------------------------
 // ConcurrentValue restriction on global actor operations
 // ----------------------------------------------------------------------
-actor class TestActor {}
+actor TestActor {}
 
 @globalActor
 struct SomeGlobalActor {

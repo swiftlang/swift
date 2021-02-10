@@ -8,7 +8,7 @@
 
 //////////////////////////
 // 1 -- basic unsafe methods / properties accessing var member without annotation
-actor class Actor1 {
+actor Actor1 {
   var counter : Int = 42
   
   @actorIndependent(unsafe)
@@ -27,7 +27,7 @@ let _ = a1.computedProp == a1.computedProp
 
 //////////////////////////
 // 2 -- more unsafe methods / properties accessing var member without annotation
-actor class WeatherActor1 {
+actor WeatherActor1 {
   var tempCelsius : Double = 5.0
   
   var tempFahrenheit : Double { 
@@ -73,7 +73,7 @@ wa1.tempCelsiusUnsafe2 = wa1.tempCelsiusUnsafe2 + 2
 
 //////////////////////////
 // 3 -- basic actorIndependent accessing actorIndependent(unsafe) member
-actor class Actor2 {
+actor Actor2 {
   
   @actorIndependent(unsafe)
   var counter : Int = 42
@@ -94,7 +94,7 @@ let _ = a2.computedProp
 
 //////////////////////////
 // 4 -- more actorIndependent accessing actorIndependent(unsafe) member
-actor class WeatherActor2 {
+actor WeatherActor2 {
   @actorIndependent(unsafe)
   var tempCelsius : Double = 5.0
   
@@ -135,7 +135,7 @@ wa2.tempCelsiusUnsafe2 = wa2.tempCelsiusUnsafe2 + 2
 
 //////////////////////////
 // 5 -- even more actorIndependent accessing actorIndependent(unsafe) member
-actor class WeatherActor3 {
+actor WeatherActor3 {
   
   @actorIndependent(unsafe)
   var tempCelsius : Double = 5.0
@@ -183,7 +183,7 @@ wa3.tempCelsius -= 1
 //////////////////////////
 // 6 -- accesses to static members
 
-actor class Actor3 {
+actor Actor3 {
   @actorIndependent(unsafe)
   static var pi : Double = 3.0
 
@@ -205,14 +205,14 @@ let _ = Actor3.pi + Actor3.e
 @actorIndependent(unsafe)
 var time = 1.12
 
-actor class Actor4 {
+actor Actor4 {
   var currentTime : Double {
     get { time }
     set { time = newValue }
   }
 }
 
-actor class SomeActor { }
+actor SomeActor { }
 
 @globalActor
 struct SomeGlobalActor {

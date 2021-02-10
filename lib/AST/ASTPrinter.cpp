@@ -2832,8 +2832,13 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
     printSourceRange(CharSourceRange(Ctx.SourceMgr, decl->getStartLoc(),
                               decl->getBraces().Start.getAdvancedLoc(-1)), Ctx);
   } else {
-    if (!Options.SkipIntroducerKeywords)
-      Printer << tok::kw_class << " ";
+    if (!Options.SkipIntroducerKeywords) {
+      if (decl->isExplicitActor()) {
+        Printer.printKeyword("actor", Options, " ");
+      } else {
+        Printer << tok::kw_class << " ";
+      }
+    }
     printContextIfNeeded(decl);
     recordDeclLoc(decl,
       [&]{
