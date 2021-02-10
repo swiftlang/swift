@@ -177,7 +177,7 @@ LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::AccessNotesFile)
 // Not using macro to avoid validation issues.
 template <> struct llvm::yaml::MappingTraits<swift::AccessNote> {
   static void mapping(IO &IO, swift::AccessNote &Obj);
-  static StringRef validate(IO &IO, swift::AccessNote &Obj);
+  static std::string validate(IO &IO, swift::AccessNote &Obj);
 };
 
 namespace swift {
@@ -294,7 +294,7 @@ void MappingTraits<AccessNote>::mapping(IO &io, AccessNote &note) {
   io.mapOptional("ObjCName", note.ObjCName);
 }
 
-StringRef MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {
+std::string MappingTraits<AccessNote>::validate(IO &io, AccessNote &note) {
   if (note.ObjCName.hasValue()) {
     if (!note.ObjC)
       note.ObjC = true;
