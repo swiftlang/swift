@@ -13,6 +13,18 @@ actor class A1 {
   func asynchronous(_: NotConcurrent?) async { }
 }
 
+actor class A2 {
+  var localVar: NotConcurrent
+
+  init(value: NotConcurrent) {
+    self.localVar = value
+  }
+}
+
+func testActorCreation(value: NotConcurrent) {
+  _ = A2(value: value) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent' across actors}}
+}
+
 extension A1 {
   func testIsolation(other: A1) async {
     // All within the same actor domain, so the ConcurrentValue restriction
@@ -65,17 +77,29 @@ struct HasSubscript {
   subscript (i: Int) -> NotConcurrent? { nil }
 }
 
+class ClassWithGlobalActorInits {
+  @SomeGlobalActor
+  init(_: NotConcurrent) { }
+
+  @SomeGlobalActor
+  init() { }
+}
+
+
 @MainActor
-func globalTestMain() async {
+func globalTestMain(nc: NotConcurrent) async {
   let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-concurrent-value type 'NotConcurrent?' across actors}}
   await globalAsync(a) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
   await globalSync(a)  // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
+  _ = await ClassWithGlobalActorInits(nc) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent' across actors}}
+  _ = await ClassWithGlobalActorInits()
 }
 
 @SomeGlobalActor
-func someGlobalTest() {
+func someGlobalTest(nc: NotConcurrent) {
   let hs = HasSubscript()
   let _ = hs[0] // okay
+  _ = ClassWithGlobalActorInits(nc)
 }
 
 // ----------------------------------------------------------------------

@@ -491,11 +491,9 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     // Types are always available.
     return forUnrestricted();
 
-  case DeclKind::Constructor:
   case DeclKind::EnumCase:
   case DeclKind::EnumElement:
     // Type-level entities don't require isolation.
-    // FIXME: This is incorrect due to global actors.
     return forUnrestricted();
 
   case DeclKind::IfConfig:
@@ -519,6 +517,7 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
   case DeclKind::Param:
   case DeclKind::Var:
   case DeclKind::Accessor:
+  case DeclKind::Constructor:
   case DeclKind::Func:
   case DeclKind::Subscript: {
     // Local captures can only be referenced in their local context or a
@@ -551,7 +550,8 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     switch (auto isolation = getActorIsolation(cast<ValueDecl>(decl))) {
     case ActorIsolation::ActorInstance:
       // Protected actor instance members can only be accessed on 'self'.
-      return forActorSelf(isolation.getActor(), isAccessibleAcrossActors);
+      return forActorSelf(isolation.getActor(),
+          isAccessibleAcrossActors || isa<ConstructorDecl>(decl));
 
     case ActorIsolation::GlobalActor: {
       Type actorType = isolation.getGlobalActor();
@@ -2275,10 +2275,11 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Check for instance members of actor classes, which are part of
-  // actor-isolated state.
+  // Check for instance members and initializers of actor classes,
+  // which are part of actor-isolated state.
   auto classDecl = value->getDeclContext()->getSelfClassDecl();
-  if (classDecl && classDecl->isActor() && value->isInstanceMember()) {
+  if (classDecl && classDecl->isActor() &&
+      (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
     defaultIsolation = ActorIsolation::forActorInstance(classDecl);
   }
 
@@ -2366,8 +2367,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Instance members can infer isolation from their context.
-  if (value->isInstanceMember()) {
+  // Instance members and initializers can infer isolation from their context.
+  if (value->isInstanceMember() || isa<ConstructorDecl>(value)) {
     // If the declaration is in an extension that has one of the isolation
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
