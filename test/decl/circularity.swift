@@ -61,7 +61,6 @@ extension SIMD3 where SIMD3.Scalar == Float {
 protocol P {
     associatedtype A
     // expected-note@-1 {{protocol requires nested type 'A'; do you want to add it?}}
-    // expected-note@-2 {{through reference here}}
     func run(a: A)
 }
 
@@ -70,6 +69,7 @@ class C1 {
 }
 
 class C2: C1, P {
+    // expected-note@-1 {{through reference here}}
     override func run(a: A) {}
     // expected-error@-1 {{circular reference}}
     // expected-note@-2 {{while resolving type 'A'}}
@@ -90,7 +90,7 @@ class C3: G1<A>, P {
 
 // Another case that triggers circular override checking.
 protocol P1 {
-  associatedtype X = Int // expected-note {{through reference here}}
+  associatedtype X = Int
   init(x: X)
 }
 
@@ -98,7 +98,7 @@ class C4 {
   required init(x: Int) {}
 }
 
-class D4 : C4, P1 { // expected-note 2 {{through reference here}}
+class D4 : C4, P1 { // expected-note 3 {{through reference here}}
   required init(x: X) { // expected-error {{circular reference}}
     // expected-note@-1 {{while resolving type 'X'}}
     // expected-note@-2 2{{through reference here}}
