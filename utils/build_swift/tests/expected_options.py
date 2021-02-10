@@ -215,7 +215,7 @@ EXPECTED_DEFAULTS = {
     'test_cygwin': False,
     'test_freebsd': False,
     'test_ios': False,
-    'test_ios_32bit_simulator': True,
+    'test_ios_32bit_simulator': False,
     'test_ios_host': False,
     'test_ios_simulator': False,
     'test_linux': False,
