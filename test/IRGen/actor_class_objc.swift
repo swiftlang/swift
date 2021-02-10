@@ -32,7 +32,7 @@ import Foundation
 // CHECK-64-SAME: i64 96,
 // CHECK-32-SAME: i32 48,
 
-public actor class MyClass: NSObject {
+public actor MyClass: NSObject {
   public var x: Int
   public override init() { self.x = 0 }
 }

@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-actor class BankAccount {
+actor BankAccount {
 
   private var curBalance : Int
 
@@ -61,7 +61,7 @@ actor class BankAccount {
     _ = deposit(withdraw(deposit(withdraw(balance()))))
   }
 
-} // end actor class
+} // end actor
 
 func someAsyncFunc() async {
   let deposit1 = 120, deposit2 = 45
@@ -136,7 +136,7 @@ func regularFunc() {
 }
 
 
-actor class TestActor {}
+actor TestActor {}
 
 @globalActor
 struct BananaActor {
@@ -189,7 +189,7 @@ func blender(_ peeler : () -> Void) {
 ///////////
 // check various curried applications to ensure we mark the right expression.
 
-actor class Calculator {
+actor Calculator {
   func addCurried(_ x : Int) -> ((Int) -> Int) { 
     return { (_ y : Int) in x + y }
   }

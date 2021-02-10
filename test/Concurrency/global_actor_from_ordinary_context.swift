@@ -3,7 +3,7 @@
 
 // provides coverage for rdar://71548470
 
-actor class TestActor {}
+actor TestActor {}
 
 @globalActor
 struct SomeGlobalActor {
@@ -14,7 +14,7 @@ struct SomeGlobalActor {
 @SomeGlobalActor func syncGlobActorFn() { }
 @SomeGlobalActor func asyncGlobalActFn() async { }
 
-actor class Alex {
+actor Alex {
   @SomeGlobalActor let const_memb = 20
   @SomeGlobalActor var mut_memb = 30 // expected-note 2 {{mutable state is only available within the actor instance}}
   @SomeGlobalActor func method() {} // expected-note 2 {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}

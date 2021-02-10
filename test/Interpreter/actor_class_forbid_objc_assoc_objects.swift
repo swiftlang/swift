@@ -15,7 +15,7 @@ defer { runAllTests() }
 var Tests = TestSuite("Actor.AssocObject")
 
 @available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
-final actor class Actor {
+final actor Actor {
 }
 
 if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
@@ -29,7 +29,7 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 }
 
 @available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
-actor class Actor2 {
+actor Actor2 {
 }
 
 if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
@@ -85,7 +85,7 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 }
 
 @available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
-actor class Actor5<T> {
+actor Actor5<T> {
   var state: T
   init(state: T) { self.state = state }
 }
@@ -153,7 +153,7 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 }
 
 @available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
-actor class ActorNSObjectSubKlass : NSObject {}
+actor ActorNSObjectSubKlass : NSObject {}
 
 if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
   Tests.test("no crash when inherit from nsobject")
@@ -164,7 +164,7 @@ if #available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *) {
 }
 
 @available(macOS 10.4.4, iOS 12.2, watchOS 5.2, tvOS 12.2, *)
-actor class ActorNSObjectSubKlassGeneric<T> : NSObject {
+actor ActorNSObjectSubKlassGeneric<T> : NSObject {
   var state: T
   init(state: T) { self.state = state }
 }

@@ -212,8 +212,8 @@ bool CanBeAsyncHandlerRequest::evaluate(
 
 bool IsActorRequest::evaluate(
     Evaluator &evaluator, ClassDecl *classDecl) const {
-  // If concurrency is not enabled, we don't have actors.
-  auto actorAttr = classDecl->getAttrs().getAttribute<ActorAttr>();
+  bool isExplicitActor = classDecl->isExplicitActor() ||
+    classDecl->getAttrs().getAttribute<ActorAttr>();
 
   // If there is a superclass, we can infer actor-ness from it.
   if (auto superclassDecl = classDecl->getSuperclassDecl()) {
@@ -223,21 +223,21 @@ bool IsActorRequest::evaluate(
 
     // The superclass is 'NSObject', which is known to have no state and no
     // superclass.
-    if (superclassDecl->isNSObject() && actorAttr != nullptr)
+    if (superclassDecl->isNSObject() && isExplicitActor)
       return true;
 
     // This class cannot be an actor; complain if the 'actor' modifier was
     // provided.
-    if (actorAttr) {
-      classDecl->diagnose(
-          diag::actor_with_nonactor_superclass, superclassDecl->getName())
-        .highlight(actorAttr->getRange());
+    if (isExplicitActor) {
+      classDecl->diagnose(diag::actor_with_nonactor_superclass,
+                          superclassDecl->getName())
+        .highlight(classDecl->getStartLoc());
     }
 
     return false;
   }
 
-  return actorAttr != nullptr;
+  return isExplicitActor;
 }
 
 bool IsDefaultActorRequest::evaluate(

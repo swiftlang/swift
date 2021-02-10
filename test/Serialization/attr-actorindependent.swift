@@ -13,7 +13,7 @@
 
 // look for correct annotation after first deserialization's module print:
 
-// MODULE-CHECK:      actor class UnsafeCounter {
+// MODULE-CHECK:      actor UnsafeCounter {
 // MODULE-CHECK-NEXT:   @actorIndependent(unsafe) func enqueue(partialTask: PartialAsyncTask)
 // MODULE-CHECK-NEXT:   @actorIndependent(unsafe) var storage: Int
 // MODULE-CHECK-NEXT:   @actorIndependent var count: Int
@@ -28,7 +28,7 @@
 // BC-CHECK: <ActorIndependent_DECL_ATTR abbrevid={{[0-9]+}} op0=0/>
 
 
-actor class UnsafeCounter {
+actor UnsafeCounter {
 
   @actorIndependent(unsafe)
   private var storage : Int = 0

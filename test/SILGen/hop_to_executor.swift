@@ -2,7 +2,7 @@
 // REQUIRES: concurrency
 
 
-actor class MyActor {
+actor MyActor {
 
   private var p: Int
 
@@ -119,14 +119,14 @@ func testGenericGlobalActorWithGetter() async {
 }
 
 
-actor class RedActorImpl {
+actor RedActorImpl {
   // CHECK-LABEL: sil hidden [ossa] @$s4test12RedActorImplC5helloyySiF : $@convention(method) (Int, @guaranteed RedActorImpl) -> () {
   // CHECK-NOT: hop_to_executor
   // CHECK: } // end sil function '$s4test12RedActorImplC5helloyySiF'
   func hello(_ x : Int) {}
 }
 
-actor class BlueActorImpl {
+actor BlueActorImpl {
 // CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC4poke6personyAA03RedcD0C_tYF : $@convention(method) @async (@guaranteed RedActorImpl, @guaranteed BlueActorImpl) -> () {
 // CHECK:       bb0([[RED:%[0-9]+]] : @guaranteed $RedActorImpl, [[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
 // CHECK:         hop_to_executor [[BLUE]] : $BlueActorImpl

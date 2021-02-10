@@ -71,7 +71,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 // Check import of attributes
 func globalAsync() async { }
 
-actor class MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
+actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   func independentMethod() {

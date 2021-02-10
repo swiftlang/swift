@@ -17,7 +17,7 @@ func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
 // ----------------------------------------------------------------------
 // Actor state isolation restrictions
 // ----------------------------------------------------------------------
-actor class MySuperActor {
+actor MySuperActor {
   var superState: Int = 25 // expected-note {{mutable state is only available within the actor instance}}
 
   func superMethod() { } // expected-note 3 {{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
@@ -28,7 +28,7 @@ actor class MySuperActor {
   }
 }
 
-actor class MyActor: MySuperActor {
+actor MyActor: MySuperActor {
   let immutable: Int = 17
   var text: [String] = [] // expected-note 10{{mutable state is only available within the actor instance}}
 
@@ -199,7 +199,7 @@ extension MyActor {
 // ----------------------------------------------------------------------
 // Global actor isolation restrictions
 // ----------------------------------------------------------------------
-actor class SomeActor { }
+actor SomeActor { }
 
 @globalActor
 struct SomeGlobalActor {
@@ -395,7 +395,7 @@ func checkLocalFunctions() async {
 // Lazy properties with initializers referencing 'self'
 // ----------------------------------------------------------------------
 
-actor class LazyActor {
+actor LazyActor {
     var v: Int = 0
     // expected-note@-1 6 {{mutable state is only available within the actor instance}}
 
@@ -450,7 +450,7 @@ extension SomeClassInActor.ID {
 // ----------------------------------------------------------------------
 // Initializers
 // ----------------------------------------------------------------------
-actor class SomeActorWithInits {
+actor SomeActorWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
 

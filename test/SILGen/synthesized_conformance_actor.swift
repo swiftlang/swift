@@ -5,7 +5,7 @@ public protocol DefaultInit {
   init()
 }
 
-public actor class A1<T: DefaultInit> {
+public actor A1<T: DefaultInit> {
   var x: Int = 17
   var y: T = T()
 
@@ -14,7 +14,7 @@ public actor class A1<T: DefaultInit> {
 
 extension Int: DefaultInit { }
 
-public actor class A2 {
+public actor A2 {
   func f() { }
   @actorIndependent public func enqueue(partialTask: PartialAsyncTask) { }
 }

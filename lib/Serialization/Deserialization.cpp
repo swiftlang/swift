@@ -3584,6 +3584,7 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC;
+    bool isExplicitActorDecl;
     bool inheritsSuperclassInitializers;
     bool hasMissingDesignatedInits;
     GenericSignatureID genericSigID;
@@ -3593,6 +3594,7 @@ public:
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
+                                         isExplicitActorDecl,
                                          inheritsSuperclassInitializers,
                                          hasMissingDesignatedInits,
                                          genericSigID, superclassID,
@@ -3621,7 +3623,8 @@ public:
       return declOrOffset;
 
     auto theClass = MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(),
-                                             None, genericParams, DC);
+                                             None, genericParams, DC,
+                                             isExplicitActorDecl);
     declOrOffset = theClass;
 
     theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
