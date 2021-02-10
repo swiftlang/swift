@@ -7,8 +7,9 @@ import Swift
 ///////////////
 // CSE Tests //
 ///////////////
-class Klass {
-}
+class SuperKlass {}
+
+class Klass : SuperKlass {}
 
 struct NonTrivialStruct {
   var val:Klass
@@ -34,6 +35,7 @@ struct StructWithEnum2 {
 
 sil @use_nontrivialstruct1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
 sil @use_nontrivialstruct2 : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
 
 // CHECK-LABEL: sil [ossa] @structliteral1 :
 // CHECK: struct $NonTrivialStruct
@@ -764,6 +766,33 @@ bb0(%0 : @guaranteed $WrapperKlass):
   apply %func(%2) : $@convention(thin) (Builtin.BridgeObject) -> ()
   end_borrow %borrow : $WrapperKlass
   %res  = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cse_upcast_loop :
+// CHECK: upcast
+// CHECK-NOT: upcast
+// CHECK-LABEL: } // end sil function 'cse_upcast_loop'
+sil [ossa] @cse_upcast_loop : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %func  = function_ref @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %copy0 : $Klass to $SuperKlass
+  apply %func(%1) : $@convention(thin) (@owned SuperKlass) -> ()
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %copy1 = copy_value %0 : $Klass
+  %2 = upcast %copy1 : $Klass to $SuperKlass
+  apply %func(%2) : $@convention(thin) (@owned SuperKlass) -> ()
+  br bb1
+
+bb3:
+  destroy_value %0 : $Klass
+  %res = tuple ()
   return %res : $()
 }
 
