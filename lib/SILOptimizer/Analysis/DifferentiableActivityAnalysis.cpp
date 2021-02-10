@@ -29,7 +29,7 @@ using namespace swift::autodiff;
 
 static bool isWithoutDerivative(SILValue v) {
   if (auto *fnRef = dyn_cast<FunctionRefInst>(v))
-    return fnRef->getReferencedFunctionOrNull()->hasSemanticsAttr(
+    return fnRef->getReferencedFunction()->hasSemanticsAttr(
         "autodiff.nonvarying");
   return false;
 }

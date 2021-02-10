@@ -66,7 +66,7 @@ ArrayCallKind swift::getArraySemanticsKind(SILFunction *f) {
 static ParameterConvention
 getSelfParameterConvention(ApplyInst *SemanticsCall) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
-  SILFunction *F = FRI->getInitiallyReferencedFunction();
+  SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
 
   return FnTy->getSelfParameter().getConvention();
@@ -78,7 +78,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   assert(SemanticsCall && getKind() != ArrayCallKind::kNone &&
          "Need an array semantic call");
   FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
-  SILFunction *F = FRI->getInitiallyReferencedFunction();
+  SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
   auto &Mod = F->getModule();
 
@@ -203,7 +203,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
     return ArrayCallKind::kNone;
 
   auto F = cast<FunctionRefInst>(SemanticsCall->getCallee())
-               ->getInitiallyReferencedFunction();
+               ->getReferencedFunction();
 
   return getArraySemanticsKind(F);
 }

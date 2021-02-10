@@ -9,6 +9,11 @@
 
 // Check if the optimizer is able to convert array literals to statically initialized arrays.
 
+// CHECK-LABEL: sil_global @$s4test4FStrV10globalFuncyS2icvpZ : $@callee_guaranteed (Int) -> Int = {
+// CHECK:         %0 = function_ref @$s4test3fooyS2iF : $@convention(thin) (Int) -> Int
+// CHECK-NEXT:    %initval = thin_to_thick_function %0
+// CHECK-NEXT:  }
+
 // CHECK-LABEL: outlined variable #0 of arrayLookup(_:)
 // CHECK-NEXT:  sil_global private @{{.*}}arrayLookup{{.*}} = {
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 10
@@ -49,6 +54,20 @@
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 227
 // CHECK-DAG:     integer_literal $Builtin.Int{{[0-9]+}}, 228
 // CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems] {{[^,]*}}, {{[^,]*}})
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: outlined variable #0 of functionArray()
+// CHECK-NEXT:  sil_global private @{{.*functionArray.*}} = {
+// CHECK:         function_ref
+// CHECK:         thin_to_thick_function
+// CHECK:         convert_function
+// CHECK:         function_ref
+// CHECK:         thin_to_thick_function
+// CHECK:         convert_function
+// CHECK:         function_ref
+// CHECK:         thin_to_thick_function
+// CHECK:         convert_function
+// CHECK:         object {{.*}} ({{[^,]*}}, [tail_elems]
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: outlined variable #0 of returnDictionary()
@@ -154,6 +173,22 @@ public func returnStringDictionary() -> [String:String] {
   return ["1":"2", "3":"4", "5":"6"]
 }
 
+func foo(_ i: Int) -> Int { return i }
+
+// CHECK-LABEL: sil {{.*functionArray.*}} : $@convention(thin) () -> @owned Array<(Int) -> Int> {
+// CHECK:   global_value @{{.*functionArray.*}}
+// CHECK: } // end sil function '{{.*functionArray.*}}'
+@inline(never)
+func functionArray() -> [(Int) -> Int] {
+  func bar(_ i: Int) -> Int { return i + 1 }
+  return [foo, bar, { $0 + 10 }]
+}
+
+public struct FStr {
+  // Not an array, but also tested here.
+  public static var globalFunc = foo
+}
+
 // CHECK-OUTPUT:      [100, 101, 102]
 print(globalVariable)
 // CHECK-OUTPUT-NEXT: 11
@@ -168,6 +203,10 @@ print(gg!)
 storeArray()
 // CHECK-OUTPUT-NEXT: [227, 228]
 print(gg!)
+// CHECK-OUTPUT-NEXT: 311
+print(functionArray()[0](100) + functionArray()[1](100) + functionArray()[2](100))
+// CHECK-OUTPUT-NEXT: 27
+print(FStr.globalFunc(27))
 
 let dict = returnDictionary()
 // CHECK-OUTPUT-NEXT: dict 3: 2, 4, 6

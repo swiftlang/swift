@@ -144,8 +144,7 @@ public:
   }
 
   hash_code visitFunctionRefInst(FunctionRefInst *X) {
-    return llvm::hash_combine(X->getKind(),
-                              X->getInitiallyReferencedFunction());
+    return llvm::hash_combine(X->getKind(), X->getReferencedFunction());
   }
 
   hash_code visitGlobalAddrInst(GlobalAddrInst *X) {

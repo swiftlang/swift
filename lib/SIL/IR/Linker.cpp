@@ -175,7 +175,7 @@ void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
 }
 
 void SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
-  maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction());
+  maybeAddFunctionToWorklist(FRI->getReferencedFunction());
 }
 
 void SILLinkerVisitor::visitDynamicFunctionRefInst(

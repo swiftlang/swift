@@ -1422,7 +1422,7 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Call->getCallee());
   if (!FRI)
     return false;
-  SILFunction *F = FRI->getReferencedFunctionOrNull();
+  SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
 
   // Look at the result type.
@@ -1445,7 +1445,7 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
 /// Add reference counting operations equal to the effect of the call.
 static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
-  SILFunction *F = FRI->getReferencedFunctionOrNull();
+  SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
   assert(FnTy->getNumResults() == 1);
   auto ResultInfo = FnTy->getResults()[0];
