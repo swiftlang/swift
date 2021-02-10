@@ -888,7 +888,7 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
                     AllocBoxToStackState &pass) {
   auto *FRI = cast<FunctionRefInst>(Apply.getCallee());
   assert(FRI && "Expected a direct ApplySite");
-  auto *F = FRI->getReferencedFunctionOrNull();
+  auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
   IsSerialized_t Serialized = IsNotSerialized;

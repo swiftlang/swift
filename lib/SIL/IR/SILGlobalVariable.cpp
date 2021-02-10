@@ -62,6 +62,11 @@ SILGlobalVariable::~SILGlobalVariable() {
   StaticInitializerBlock.clearStaticInitializerBlock(Module);
 }
 
+bool SILGlobalVariable::isPossiblyUsedExternally() const {
+  SILLinkage linkage = getLinkage();
+  return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+}
+
 /// Get this global variable's fragile attribute.
 IsSerialized_t SILGlobalVariable::isSerialized() const {
   return Serialized ? IsSerialized : IsNotSerialized;
@@ -165,12 +170,19 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           return false;
       }
       return false;
+    case SILInstructionKind::FunctionRefInst:
+      // TODO: support async function pointers in static globals.
+      if (cast<FunctionRefInst>(I)->getReferencedFunction()->isAsync())
+        return false;
+      return true;
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
     case SILInstructionKind::IntegerLiteralInst:
     case SILInstructionKind::FloatLiteralInst:
     case SILInstructionKind::ObjectInst:
     case SILInstructionKind::ValueToBridgeObjectInst:
+    case SILInstructionKind::ConvertFunctionInst:
+    case SILInstructionKind::ThinToThickFunctionInst:
       return true;
     default:
       return false;
@@ -241,7 +253,7 @@ SILFunction *swift::getCalleeOfOnceCall(BuiltinInst *BI) {
          "Expected C function representation!");
 
   if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
-    return FR->getReferencedFunctionOrNull();
+    return FR->getReferencedFunction();
 
   return nullptr;
 }
@@ -305,13 +317,7 @@ swift::getVariableOfStaticInitializer(SILFunction *InitFunc,
       if (HasStore || SI->getDest() != SGA)
         return nullptr;
       HasStore = true;
-      SILValue value = SI->getSrc();
-
-      // We only handle StructInst and TupleInst being stored to a
-      // global variable for now.
-      if (!isa<StructInst>(value) && !isa<TupleInst>(value))
-        return nullptr;
-      InitVal = cast<SingleValueInstruction>(value);
+      InitVal = cast<SingleValueInstruction>(SI->getSrc());
     } else if (!SILGlobalVariable::isValidStaticInitializerInst(&I,
                                                              I.getModule())) {
       return nullptr;

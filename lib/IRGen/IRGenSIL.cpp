@@ -6414,17 +6414,8 @@ void IRGenModule::emitSILStaticInitializers() {
       continue;
     }
 
-    // Set the IR global's initializer to the constant for this SIL
-    // struct.
-    if (auto *SI = dyn_cast<StructInst>(InitValue)) {
-      IRGlobal->setInitializer(emitConstantStruct(*this, SI));
-      continue;
-    }
-
-    // Set the IR global's initializer to the constant for this SIL
-    // tuple.
-    auto *TI = cast<TupleInst>(InitValue);
-    IRGlobal->setInitializer(emitConstantTuple(*this, TI));
+    IRGlobal->setInitializer(
+      emitConstantValue(*this, cast<SingleValueInstruction>(InitValue)));
   }
 }
 

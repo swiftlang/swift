@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -O -wmo -enable-sil-verify-all -sil-disable-pass=DeadFunctionElimination %s | %FileCheck %s
+// RUN: %target-sil-opt -O -wmo -enable-sil-verify-all -sil-disable-pass=DeadFunctionAndGlobalElimination %s | %FileCheck %s
 
 sil_stage canonical
 

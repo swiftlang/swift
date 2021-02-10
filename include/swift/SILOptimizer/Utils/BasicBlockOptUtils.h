@@ -320,7 +320,9 @@ public:
   /// Add \p InitVal and all its operands (transitively) for cloning.
   ///
   /// Note: all init values must are added, before calling clone().
-  void add(SILInstruction *initVal);
+  /// Returns false if cloning is not possible, e.g. if we would end up cloning
+  /// a reference to a private function into a function which is serialized.
+  bool add(SILInstruction *initVal);
 
   /// Clone \p InitVal and all its operands into the initializer of the
   /// SILGlobalVariable.
@@ -332,7 +334,9 @@ public:
   static void appendToInitializer(SILGlobalVariable *gVar,
                                   SingleValueInstruction *initVal) {
     StaticInitCloner cloner(gVar);
-    cloner.add(initVal);
+    bool success = cloner.add(initVal);
+    (void)success;
+    assert(success && "adding initVal cannot fail for a global variable");
     cloner.clone(initVal);
   }
 
