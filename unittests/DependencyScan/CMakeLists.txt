@@ -1,5 +1,6 @@
 add_swift_unittest(swiftScanTests
   ScanFixture.cpp
+  Features.cpp
   ModuleDeps.cpp)
 
 target_link_libraries(swiftScanTests

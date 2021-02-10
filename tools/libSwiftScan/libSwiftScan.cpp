@@ -18,6 +18,7 @@
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/StringUtils.h"
+#include "swift/Option/Options.h"
 
 using namespace swift::dependencies;
 
@@ -460,4 +461,35 @@ void swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation) {
   swiftscan_string_dispose(invocation->working_directory);
   swiftscan_string_set_dispose(invocation->argv);
   delete invocation;
+}
+
+//=== Feature-Query Functions -----------------------------------------===//
+static void addFrontendFlagOption(llvm::opt::OptTable &table,
+                                  swift::options::ID id,
+                                  std::vector<std::string> &frontendOptions) {
+  if (table.getOption(id).hasFlag(swift::options::FrontendOption)) {
+    auto name = table.getOptionName(id);
+    if (strlen(name) > 0) {
+      frontendOptions.push_back(std::string(name));
+    }
+  }
+}
+
+// use" swiftscan_string_set_t *create_set(const std::vector<std::string> &strings) {
+swiftscan_string_set_t *
+swiftscan_compiler_supported_arguments_query() {
+  std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
+  std::vector<std::string> frontendFlags;
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  addFrontendFlagOption(*table, swift::options::OPT_##ID, frontendFlags);
+#include "swift/Option/Options.inc"
+#undef OPTION
+  return create_set(frontendFlags);
+}
+
+swiftscan_string_set_t *
+swiftscan_compiler_supported_features_query() {
+  // TODO: We are yet to figure out how "Features" will be organized.
+  return nullptr;
 }
