@@ -27,8 +27,8 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
     # FIXME: we can't rely on libdispatch having been built for the
     # target at this point in the process.  Currently, we're relying
     # on soft-linking.
-    #list(APPEND swift_concurrency_link_libraries
-    #  dispatch)
+    list(APPEND swift_concurrency_link_libraries
+      dispatch)
   endif()
 endif()
 
