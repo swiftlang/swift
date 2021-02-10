@@ -7919,6 +7919,11 @@ void ClangImporter::Implementation::importAttributes(
     if (maybeDefinition.getValue())
       ClangDecl = cast<clang::NamedDecl>(maybeDefinition.getValue());
 
+  // Determine whether this is an async import.
+  bool isAsync = false;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(MappedDecl))
+    isAsync = func->hasAsync();
+
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
   bool AnyUnavailable = MappedDecl->getAttrs().isUnavailable(C);
@@ -8023,12 +8028,18 @@ void ClangImporter::Implementation::importAttributes(
       llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
-        if (platformAvailability.treatDeprecatedAsUnavailable(ClangDecl,
-                                                              deprecated)) {
+        if (platformAvailability.treatDeprecatedAsUnavailable(
+                ClangDecl, deprecated, isAsync)) {
           AnyUnavailable = true;
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
-          if (message.empty())
-            message = platformAvailability.deprecatedAsUnavailableMessage;
+          if (message.empty()) {
+            if (isAsync) {
+              message =
+                  platformAvailability.asyncDeprecatedAsUnavailableMessage;
+            } else {
+              message = platformAvailability.deprecatedAsUnavailableMessage;
+            }
+          }
         }
       }
 
