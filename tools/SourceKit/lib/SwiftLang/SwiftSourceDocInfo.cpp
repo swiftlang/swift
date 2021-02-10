@@ -485,7 +485,7 @@ void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
 }
 
 template <typename FnTy>
-void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
+static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.
 
@@ -834,7 +834,11 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   }
   unsigned DeclEnd = SS.size();
 
+
+  SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
+  SmallVector<ParentInfo, 4> Parents;
   unsigned SymbolGraphBegin = SS.size();
+  unsigned SymbolGraphEnd = SymbolGraphBegin;
   if (SymbolGraph) {
     symbolgraphgen::SymbolGraphOptions Options {
       "",
@@ -845,10 +849,18 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     };
     llvm::raw_svector_ostream OS(SS);
     symbolgraphgen::printSymbolGraphForDecl(VD, BaseType,
-                                            InSynthesizedExtension,
-                                            Options, OS);
+                                            InSynthesizedExtension, Options, OS,
+                                            PathComponents);
+    SymbolGraphEnd = SS.size();
+
+    for (auto &Component: PathComponents) {
+      unsigned USRStart = SS.size();
+      if (SwiftLangSupport::printUSR(Component.VD, OS))
+        continue;
+      StringRef USR{SS.begin()+USRStart, SS.size() - USRStart};
+      Parents.push_back({Component.Title, Component.Kind, USR});
+    }
   }
-  unsigned SymbolGraphEnd = SS.size();
 
   unsigned FullDeclBegin = SS.size();
   {
@@ -1043,6 +1055,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   Info.AvailableActions = llvm::makeArrayRef(RefactoringInfoBuffer);
   Info.ParentNameOffset = getParamParentNameOffset(VD, CursorLoc);
   Info.SymbolGraph = SymbolGraphJSON;
+  Info.ParentContexts = llvm::makeArrayRef(Parents);
   Receiver(RequestResult<CursorInfoData>::fromResult(Info));
   return true;
 }

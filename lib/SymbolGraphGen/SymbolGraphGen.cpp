@@ -104,7 +104,8 @@ int symbolgraphgen::
 printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
                         bool InSynthesizedExtension,
                         const SymbolGraphOptions &Options,
-                        llvm::raw_ostream &OS) {
+                        llvm::raw_ostream &OS,
+                        SmallVectorImpl<PathComponent> &ParentContexts) {
   if (!Symbol::supportsKind(D->getKind()))
     return EXIT_FAILURE;
 
@@ -119,6 +120,11 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
       : nullptr;
 
   Symbol MySym(&Graph, D, NTD, BaseTy);
+
+  MySym.getPathComponents(ParentContexts);
+  assert(!ParentContexts.empty() && "doesn't have node for MySym?");
+  ParentContexts.pop_back();
+
   Graph.recordNode(MySym);
   Graph.serialize(JOS);
   return EXIT_SUCCESS;
