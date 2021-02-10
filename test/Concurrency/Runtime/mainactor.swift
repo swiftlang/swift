@@ -1,28 +1,19 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
 
-// REQUIRES: OS=macosx || OS=ios
-// FIXME: should not require Darwin to run this test once we have async main!
-
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-  import Dispatch
-#endif
+import Dispatch
 
 /// @returns true iff the expected answer is actually the case, i.e., correct.
 /// If the current queue does not match expectations, this function may return
 /// false or just crash the program with non-zero exit code, depending on SDK.
 func checkIfMainQueue(expectedAnswer expected: Bool) -> Bool {
-  // FIXME: until we start using dispatch on Linux, we only check
-  // which queue we're on with Darwin platforms.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   if #available(macOS 10.12, iOS 10, tvOS 10, watchOS 3, *) {
     dispatchPrecondition(condition: expected ? .onQueue(DispatchQueue.main) 
                                              : .notOnQueue(DispatchQueue.main))
-    
   }
-#endif
   return true
 }
 
