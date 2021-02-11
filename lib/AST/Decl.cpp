@@ -6107,6 +6107,9 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
 
   Clone->setSpecifier(PD->getSpecifier());
   Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  if (PD->isImplicit()) {
+    Clone->setImplicit();
+  }
   return Clone;
 }
 

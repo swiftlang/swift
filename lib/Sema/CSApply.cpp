@@ -1481,6 +1481,7 @@ namespace {
         selfParamDecl->setSpecifier(
           ParamDecl::getParameterSpecifierForValueOwnership(
             selfParam.getValueOwnership()));
+        selfParamDecl->setImplicit();
 
         auto *outerParams =
             ParameterList::create(context, SourceLoc(), selfParamDecl,
@@ -4785,6 +4786,7 @@ namespace {
           /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
       param->setSpecifier(ParamSpecifier::Default);
+      param->setImplicit();
 
       // The outer closure.
       //
@@ -4801,6 +4803,7 @@ namespace {
                               ctx.getIdentifier("$kp$"), outerClosure);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
       outerParam->setSpecifier(ParamSpecifier::Default);
+      outerParam->setImplicit();
 
       // let paramRef = "$0"
       auto *paramRef = new (ctx)

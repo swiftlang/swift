@@ -181,6 +181,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
                           C.getIdentifier(name), parentDC);
     param->setSpecifier(ParamDecl::Specifier::Default);
     param->setInterfaceType(type);
+    param->setImplicit();
     return param;
   };
 

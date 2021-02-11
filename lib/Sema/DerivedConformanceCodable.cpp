@@ -627,6 +627,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
                 SourceLoc(), C.Id_encoder, conformanceDC);
   encoderParam->setSpecifier(ParamSpecifier::Default);
   encoderParam->setInterfaceType(encoderType);
+  encoderParam->setImplicit();
 
   ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
 

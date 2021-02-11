@@ -995,16 +995,24 @@ bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
 }
 
 bool RangeResolver::walkToExprPost(Expr *E) {
+  if (!Impl->shouldEnter(E))
+    return true;
   Impl->leave(E);
   return !Impl->hasResult();
 }
 
 bool RangeResolver::walkToStmtPost(Stmt *S) {
+  if (!Impl->shouldEnter(S))
+    return true;
   Impl->leave(S);
   return !Impl->hasResult();
 };
 
 bool RangeResolver::walkToDeclPost(Decl *D) {
+  if (D->isImplicit())
+    return true;
+  if (!Impl->shouldEnter(D))
+    return true;
   Impl->leave(D);
   return !Impl->hasResult();
 }

@@ -305,6 +305,7 @@ static ValueDecl *deriveDifferentiable_method(
                                   SourceLoc(), parameterName, parentDC);
   param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
+  param->setImplicit();
   ParameterList *params = ParameterList::create(C, {param});
 
   DeclName declName(C, methodName, params);

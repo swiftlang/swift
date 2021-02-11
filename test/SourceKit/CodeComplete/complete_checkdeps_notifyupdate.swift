@@ -6,9 +6,7 @@ func foo() {
 }
 
 // REQUIRES: shell
-// UNSUPPORTED: OS=ios
-// UNSUPPORTED: OS=tvos
-// UNSUPPORTED: OS=watchos
+// REQUIRES: rdar74150023
 
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)
