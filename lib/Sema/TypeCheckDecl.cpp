@@ -1022,7 +1022,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   // If the base is less visible than the override, we might need a vtable
   // entry since callers of the override might not be able to see the base
   // at all.
-  if (decl->isEffectiveLinkageMoreVisibleThan(base))
+  if (decl->isMoreVisibleThan(base))
     return true;
 
   using Direction = ASTContext::OverrideGenericSignatureReqCheck;
