@@ -303,6 +303,15 @@ AsyncSequenceTests.test("contains false") {
   expectFalse(result)
 }
 
+AsyncSequenceTests.test("contains throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async.throw(Failure(value: 42), on: 2).contains(4)
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
 AsyncSequenceTests.test("contains empty") {
   let result = await [Int]().async.contains(4)
   expectFalse(result)
@@ -439,6 +448,15 @@ AsyncSequenceTests.test("max empty") {
 AsyncSequenceTests.test("collect") {
   let result = await [1, 2, 3].async.collect()
   expectEqual(result, [1, 2, 3])
+}
+
+AsyncSequenceTests.test("collect throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async.throw(Failure(value: 42), on: 2).collect()
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
 }
 
 AsyncSequenceTests.test("collect empty") {
