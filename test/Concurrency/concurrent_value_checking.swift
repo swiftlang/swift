@@ -118,7 +118,7 @@ func testConcurrency() {
   }
   acceptConcurrent {
     print(x) // expected-warning{{cannot use let 'x' with a non-concurrent-value type 'NotConcurrent' from concurrently-executed code}}
-    print(y) // expected-warning{{cannot use var 'y' with a non-concurrent-value type 'NotConcurrent' from concurrently-executed code}}
+    print(y) // expected-error{{reference to captured var 'y' in concurrently-executing code}}
   }
 }
 

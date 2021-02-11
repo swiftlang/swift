@@ -387,6 +387,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_enable_experimental_concurrency);
   Opts.EnableExperimentalConcurrentValueChecking |=
     Args.hasArg(OPT_enable_experimental_concurrent_value_checking);
+  Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
+    Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
