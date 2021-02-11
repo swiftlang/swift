@@ -520,14 +520,8 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
   case DeclKind::Constructor:
   case DeclKind::Func:
   case DeclKind::Subscript: {
-    // Local captures can only be referenced in their local context or a
-    // context that is guaranteed not to run concurrently with it.
+    // Local captures are checked separately.
     if (cast<ValueDecl>(decl)->isLocalCapture()) {
-      // Local functions are safe to capture; their bodies are checked based on
-      // where that capture is used.
-      if (isa<FuncDecl>(decl))
-        return forUnrestricted();
-
       return forLocalCapture(decl->getDeclContext());
     }
 
@@ -968,38 +962,12 @@ bool swift::diagnoseNonConcurrentTypesInFunctionType(
 }
 
 namespace {
-  /// Check whether a particular context may execute concurrently within
-  /// another context.
-  class ConcurrentExecutionChecker {
-    /// Keeps track of the first location at which a given local function is
-    /// referenced from a context that may execute concurrently with the
-    /// context in which it was introduced.
-    llvm::SmallDenseMap<const FuncDecl *, SourceLoc, 4> concurrentRefs;
-
-  public:
-    /// Determine whether (and where) a given local function is referenced
-    /// from a context that may execute concurrently with the context in
-    /// which it is declared.
-    ///
-    /// \returns the source location of the first reference to the local
-    /// function that may be concurrent. If the result is an invalid
-    /// source location, there are no such references.
-    SourceLoc getConcurrentReferenceLoc(const FuncDecl *localFunc);
-
-    /// Determine whether code in the given use context might execute
-    /// concurrently with code in the definition context.
-    bool mayExecuteConcurrentlyWith(
-      const DeclContext *useContext, const DeclContext *defContext);
-  };
-
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
   class ActorIsolationChecker : public ASTWalker {
     ASTContext &ctx;
     SmallVector<const DeclContext *, 4> contextStack;
     SmallVector<ApplyExpr*, 4> applyStack;
-
-    ConcurrentExecutionChecker concurrentExecutionChecker;
 
     using MutableVarSource = llvm::PointerUnion<DeclRefExpr *, InOutExpr *>;
     using MutableVarParent = llvm::PointerUnion<InOutExpr *, LoadExpr *>;
@@ -1016,10 +984,7 @@ namespace {
     /// Determine whether code in the given use context might execute
     /// concurrently with code in the definition context.
     bool mayExecuteConcurrentlyWith(
-      const DeclContext *useContext, const DeclContext *defContext) {
-      return concurrentExecutionChecker.mayExecuteConcurrentlyWith(
-          useContext, defContext);
-    }
+        const DeclContext *useContext, const DeclContext *defContext);
 
     /// If the subexpression is a reference to a mutable local variable from a
     /// different context, record its parent. We'll query this as part of
@@ -1689,6 +1654,22 @@ namespace {
           return true;
         }
 
+        if (auto func = dyn_cast<FuncDecl>(value)) {
+          if (func->isConcurrent())
+            return false;
+
+          func->diagnose(
+              diag::local_function_executed_concurrently,
+              func->getDescriptiveKind(), func->getName())
+            .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
+
+          // Add the @concurrent attribute implicitly, so we don't diagnose
+          // again.
+          const_cast<FuncDecl *>(func)->getAttrs().add(
+              new (ctx) ConcurrentAttr(true));
+          return true;
+        }
+
         // Concurrent access to some other local.
         ctx.Diags.diagnose(
             loc, diag::concurrent_access_local,
@@ -1910,111 +1891,7 @@ namespace {
   };
 }
 
-SourceLoc ConcurrentExecutionChecker::getConcurrentReferenceLoc(
-    const FuncDecl *localFunc) {
-
-  // If we've already computed a result, we're done.
-  auto known = concurrentRefs.find(localFunc);
-  if (known != concurrentRefs.end())
-    return known->second;
-
-  // Record that there are no concurrent references to this local function. This
-  // prevents infinite recursion if two local functions call each other.
-  concurrentRefs[localFunc] = SourceLoc();
-
-  class ConcurrentLocalRefWalker : public ASTWalker {
-    ConcurrentExecutionChecker &checker;
-    const FuncDecl *targetFunc;
-    SmallVector<const DeclContext *, 4> contextStack;
-
-    const DeclContext *getDeclContext() const {
-      return contextStack.back();
-    }
-
-  public:
-    ConcurrentLocalRefWalker(
-      ConcurrentExecutionChecker &checker, const FuncDecl *targetFunc
-    ) : checker(checker), targetFunc(targetFunc) {
-      contextStack.push_back(targetFunc->getDeclContext());
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
-        contextStack.push_back(closure);
-        return { true, expr };
-      }
-
-      if (auto *declRef = dyn_cast<DeclRefExpr>(expr)) {
-        // If this is a reference to the target function from a context
-        // that may execute concurrently with the context where the target
-        // function was declared, record the location.
-        if (declRef->getDecl() == targetFunc &&
-            checker.mayExecuteConcurrentlyWith(
-              getDeclContext(), contextStack.front())) {
-          SourceLoc &loc = checker.concurrentRefs[targetFunc];
-          if (loc.isInvalid())
-            loc = declRef->getLoc();
-
-          return { false, expr };
-        }
-
-        return { true, expr };
-      }
-
-      return { true, expr };
-    }
-
-    Expr *walkToExprPost(Expr *expr) override {
-      if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
-        assert(contextStack.back() == closure);
-        contextStack.pop_back();
-      }
-
-      return expr;
-    }
-
-    bool walkToDeclPre(Decl *decl) override {
-      if (isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl))
-        return false;
-
-      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        contextStack.push_back(func);
-      }
-
-      return true;
-    }
-
-    bool walkToDeclPost(Decl *decl) override {
-      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        assert(contextStack.back() == func);
-        contextStack.pop_back();
-      }
-
-      return true;
-    }
-  };
-
-  // Walk the body of the enclosing function, where all references to the
-  // given local function would occur.
-  Stmt *enclosingBody = nullptr;
-  DeclContext *enclosingDC = localFunc->getDeclContext();
-  if (auto enclosingFunc = dyn_cast<AbstractFunctionDecl>(enclosingDC))
-    enclosingBody = enclosingFunc->getBody();
-  else if (auto enclosingClosure = dyn_cast<ClosureExpr>(enclosingDC))
-    enclosingBody = enclosingClosure->getBody();
-  else if (auto enclosingTopLevelCode = dyn_cast<TopLevelCodeDecl>(enclosingDC))
-    enclosingBody = enclosingTopLevelCode->getBody();
-  else
-    return SourceLoc();
-
-  assert(enclosingBody && "Cannot have a local function here");
-  ConcurrentLocalRefWalker walker(*this, localFunc);
-  enclosingBody->walk(walker);
-
-  return concurrentRefs[localFunc];
-}
-
-bool ConcurrentExecutionChecker::mayExecuteConcurrentlyWith(
+bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
     const DeclContext *useContext, const DeclContext *defContext) {
   // Walk the context chain from the use to the definition.
   while (useContext != defContext) {
@@ -2029,25 +1906,6 @@ bool ConcurrentExecutionChecker::mayExecuteConcurrentlyWith(
         // If the function is @concurrent... it can be run concurrently.
         if (func->isConcurrent())
           return true;
-
-        // If we find a local function that was referenced in code that can be
-        // executed concurrently with where the local function was declared, the
-        // local function can be run concurrently.
-        SourceLoc concurrentLoc = getConcurrentReferenceLoc(func);
-        if (concurrentLoc.isValid()) {
-          ASTContext &ctx = func->getASTContext();
-          func->diagnose(
-              diag::local_function_executed_concurrently,
-              func->getDescriptiveKind(), func->getName())
-            .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
-          ctx.Diags.diagnose(concurrentLoc, diag::concurrent_access_here);
-
-          // Add the @concurrent attribute implicitly, so we don't diagnose
-          // again.
-          const_cast<FuncDecl *>(func)->getAttrs().add(
-              new (ctx) ConcurrentAttr(true));
-          return true;
-        }
       }
     }
 

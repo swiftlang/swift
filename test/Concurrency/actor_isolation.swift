@@ -356,7 +356,7 @@ func checkLocalFunctions() async {
   }
 
   func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@concurrent'}}{{3-3=@concurrent }}
-    j = 42 // expected-error{{mutation of captured var 'j' in concurrently-executing code}}
+    j = 42
   }
 
   // Okay to call locally.
@@ -371,7 +371,7 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptConcurrentClosure {
-    local2() // expected-note{{access in concurrently-executed code here}}
+    local2()
   }
 
   print(i)
@@ -380,7 +380,7 @@ func checkLocalFunctions() async {
   var k = 17
   func local4() {
     acceptConcurrentClosure {
-      local3() // expected-note{{access in concurrently-executed code here}}
+      local3()
     }
   }
 

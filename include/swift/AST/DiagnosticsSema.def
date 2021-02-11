@@ -4277,8 +4277,6 @@ ERROR(local_function_executed_concurrently,none,
 ERROR(concurrent_mutation_of_local_capture,none,
       "mutation of captured %0 %1 in concurrently-executing code",
       (DescriptiveDeclKind, DeclName))
-NOTE(concurrent_access_here,none,
-     "access in concurrently-executed code here", ())
 NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",

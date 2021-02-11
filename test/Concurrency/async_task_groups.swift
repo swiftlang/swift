@@ -87,8 +87,8 @@ func first_allMustSucceed() async throws {
 }
 
 func first_ignoreFailures() async throws {
-  func work() async -> Int { 42 }
-  func boom() async throws -> Int { throw Boom() }
+  @concurrent func work() async -> Int { 42 }
+  @concurrent func boom() async throws -> Int { throw Boom() }
 
   let first: Int = try await Task.withGroup(resultType: Int.self) { group in
     await group.add { await work() }
