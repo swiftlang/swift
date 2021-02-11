@@ -4265,10 +4265,11 @@ bool SILGenModule::shouldEmitSelfAsRValue(FuncDecl *fn, CanType selfType) {
 
 bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
   auto method = methodRef.getFuncDecl();
-  assert(method->getDeclContext()->isTypeContext());
-  assert(method->isNonMutating());
   if (method->isStatic())
     return false;
+
+  assert(method->getDeclContext()->isTypeContext());
+  assert(method->isNonMutating() || method->isConsuming());
 
   auto fnType = M.Types.getConstantFunctionType(TypeExpansionContext::minimal(),
                                                 methodRef);
