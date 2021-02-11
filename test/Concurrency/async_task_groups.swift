@@ -4,8 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-import Dispatch
-
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
