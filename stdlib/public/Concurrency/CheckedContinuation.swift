@@ -95,7 +95,7 @@ internal final class CheckedContinuationCanary {
 /// of `withCheckedContinuation` or `withCheckedThrowingContinuation` should be
 /// enough to obtain the extra checking without further source modification in
 /// most circumstances.
-public struct CheckedContinuation<T, E: Error>: _Continuation {
+public struct CheckedContinuation<T, E: Error> {
   private let canary: CheckedContinuationCanary
   
   /// Initialize a `CheckedContinuation` wrapper around an
@@ -119,6 +119,18 @@ public struct CheckedContinuation<T, E: Error>: _Continuation {
       function: function)
   }
   
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point.
+  ///
+  /// - Parameter value: The value to return from the continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
   public func resume(returning x: __owned T) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(returning: x)
@@ -127,12 +139,89 @@ public struct CheckedContinuation<T, E: Error>: _Continuation {
     }
   }
   
+  /// Resume the task awaiting the continuation by having it throw an error
+  /// from its suspension point.
+  ///
+  /// - Parameter error: The error to throw from the continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
   public func resume(throwing x: __owned E) {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(throwing: x)
     } else {
       fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
     }
+  }
+}
+
+extension CheckedContinuation {
+  /// Resume the task awaiting the continuation by having it either
+  /// return normally or throw an error based on the state of the given
+  /// `Result` value.
+  ///
+  /// - Parameter result: A value to either return or throw from the
+  ///   continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
+    switch result {
+      case .success(let val):
+        self.resume(returning: val)
+      case .failure(let err):
+        self.resume(throwing: err)
+    }
+  }
+
+  /// Resume the task awaiting the continuation by having it either
+  /// return normally or throw an error based on the state of the given
+  /// `Result` value.
+  ///
+  /// - Parameter result: A value to either return or throw from the
+  ///   continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume(with result: Result<T, E>) {
+    switch result {
+      case .success(let val):
+        self.resume(returning: val)
+      case .failure(let err):
+        self.resume(throwing: err)
+    }
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume() where T == Void {
+    self.resume(returning: ())
   }
 }
 
