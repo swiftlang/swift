@@ -46,7 +46,7 @@ class SyntaxArena;
 struct SyntaxFactory {
   /// Make any kind of token.
   static TokenSyntax makeToken(tok Kind,
-      OwnedString Text, StringRef LeadingTrivia, StringRef TrailingTrivia,
+      StringRef Text, StringRef LeadingTrivia, StringRef TrailingTrivia,
       SourcePresence Presence,
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );
@@ -108,7 +108,7 @@ struct SyntaxFactory {
             StringRef TrailingTrivia,
       const RC<SyntaxArena> &Arena = SyntaxArena::make());
 %   else:
-  static TokenSyntax make${token.name}(OwnedString Text,
+  static TokenSyntax make${token.name}(StringRef Text,
             StringRef LeadingTrivia, StringRef TrailingTrivia,
       const RC<SyntaxArena> &Arena = SyntaxArena::make());
 %   end
@@ -139,7 +139,7 @@ struct SyntaxFactory {
 
   /// Creates a TypeIdentifierSyntax with the provided name and leading/trailing
   /// trivia.
-  static TypeSyntax makeTypeIdentifier(OwnedString TypeName,
+  static TypeSyntax makeTypeIdentifier(StringRef TypeName,
       StringRef LeadingTrivia = {}, StringRef TrailingTrivia = {},
       const RC<SyntaxArena> &Arena = SyntaxArena::make()
   );

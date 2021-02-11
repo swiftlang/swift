@@ -135,9 +135,8 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
   StringRef trailingTriviaText = ArenaSourceBuffer.substr(
       trailingTriviaStartOffset, trailingTrivia.size());
 
-  auto ownedText = OwnedString::makeRefCounted(tokenText);
   auto raw =
-      TokenCache->getToken(Arena, tokenKind, range.getByteLength(), ownedText,
+      TokenCache->getToken(Arena, tokenKind, range.getByteLength(), tokenText,
                            leadingTriviaText, trailingTriviaText);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
@@ -146,8 +145,7 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
-  auto ownedText = OwnedString::makeRefCounted(getTokenText(kind));
-  auto raw = RawSyntax::missing(kind, ownedText, Arena);
+  auto raw = RawSyntax::missing(kind, getTokenText(kind), Arena);
   OpaqueSyntaxNode opaqueN = raw.get();
   raw.resetWithoutRelease();
   return opaqueN;

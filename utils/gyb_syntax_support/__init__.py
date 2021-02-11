@@ -38,7 +38,7 @@ def make_missing_child(child):
         tok_kind = token.kind if token else "unknown"
         tok_text = token.text if token else ""
         return \
-            'RawSyntax::missing(tok::%s, OwnedString::makeUnowned("%s"))' % \
+            'RawSyntax::missing(tok::%s, "%s")' % \
             (tok_kind, tok_text)
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
