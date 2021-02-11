@@ -38,12 +38,10 @@ extension Sequence {
   }
 }
 
-@frozen
 public struct AsyncLazySequence<S: Sequence>: AsyncSequence {
   public typealias Element = S.Element
   public typealias AsyncIterator = Iterator
 
-  @frozen
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var iterator: S.Iterator
@@ -61,13 +59,13 @@ public struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 
   public let sequence: S
 
-  @inlinable
-  public init(_ sequence: S) {
+  @usableFromInline
+  init(_ sequence: S) {
     self.sequence = sequence
   }
 
   @inlinable
-  public __consuming func makeAsyncIterator() -> Iterator {
+  public func makeAsyncIterator() -> Iterator {
     return Iterator(sequence.makeIterator())
   }
 }

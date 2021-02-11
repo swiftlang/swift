@@ -53,6 +53,9 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
     var currentIterator: SegmentOfResult.AsyncIterator?
 
     @usableFromInline
+    var finished = false
+
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async throws -> SegmentOfResult
@@ -63,19 +66,27 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async throws -> SegmentOfResult.Element? {
-      while true {
+      while !finished {
         if var iterator = currentIterator {
           guard let element = try await iterator.next() else {
             currentIterator = nil
             continue
           }
+          // restore the iterator since we just mutated it with next
           currentIterator = iterator
           return element
         } else {
           guard let item = try await baseIterator.next() else {
             return nil
           }
-          let segment = try await transform(item)
+          let segment: SegmentOfResult
+          do {
+            segment = try await transform(item)
+          } catch {
+            finished = true
+            currentIterator = nil
+            throw error
+          }
           var iterator = segment.makeAsyncIterator()
           guard let element = try await iterator.next() else {
             currentIterator = nil
@@ -85,6 +96,7 @@ extension AsyncThrowingFlatMapSequence: AsyncSequence {
           return element
         }
       }
+      return nil
     }
   }
 

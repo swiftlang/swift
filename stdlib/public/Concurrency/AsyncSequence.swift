@@ -154,30 +154,12 @@ extension AsyncSequence where Element: Comparable {
   @inlinable
   @warn_unqualified_access
   public func min() async rethrows -> Element? {
-    var it = makeAsyncIterator()
-    guard var result = try await it.next() else { 
-      return nil 
-    }
-    while let e = try await it.next() {
-      if e < result { 
-        result = e 
-      }
-    }
-    return result
+    return try await self.min(by: <)
   }
 
   @inlinable
   @warn_unqualified_access
   public func max() async rethrows -> Element? {
-    var it = makeAsyncIterator()
-    guard var result = try await it.next() else { 
-      return nil 
-    }
-    while let e = try await it.next() {
-      if result < e { 
-        result = e 
-      }
-    }
-    return result
+    return try await self.max(by: <)
   }
 }

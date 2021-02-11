@@ -65,10 +65,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async throws -> ElementOfResult? {
-      guard !finished else {
-        return nil
-      }
-      while true {
+      while !finished {
         guard let element = try await baseIterator.next() else {
           finished = true
           return nil
@@ -82,6 +79,7 @@ extension AsyncThrowingCompactMapSequence: AsyncSequence {
           throw error
         }
       }
+      return nil
     }
   }
 

@@ -69,6 +69,7 @@ extension AsyncFlatMapSequence: AsyncSequence {
             currentIterator = nil
             continue
           }
+          // restore the iterator since we just mutated it with next
           currentIterator = iterator
           return element
         } else {

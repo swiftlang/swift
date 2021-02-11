@@ -53,6 +53,9 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
     var finished = false
 
     @usableFromInline
+    var doneDropping = false
+
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator, 
       predicate: @escaping (Base.Element) async throws -> Bool
@@ -63,19 +66,22 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async throws -> Base.Element? {
-      while !finished {
+      while !finished && !doneDropping {
         guard let element = try await baseIterator.next() else {
           return nil
         }
         do {
           if try await predicate(element) == false {
-            finished = true
+            doneDropping = true
             return element
           }
         } catch {
           finished = true
           throw error
         }
+      }
+      guard !finished else { 
+        return nil
       }
       return try await baseIterator.next()
     }
