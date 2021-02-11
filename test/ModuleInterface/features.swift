@@ -77,9 +77,7 @@ public func runSomethingSomewhere(body: () async -> Void) { }
 // CHECK-NEXT: #endif
 public func stage(with actor: MyActor) { }
 
-// CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension FeatureTest.MyActor : Swift.ConcurrentValue {}
-// CHECK-NEXT: #endif
+// CHECK-NOT: extension FeatureTest.MyActor : Swift.ConcurrentValue
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
 // CHECK-NEXT: extension FeatureTest.OldSchool : FeatureTest.MP {

@@ -2283,10 +2283,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
     defaultIsolation = ActorIsolation::forActorInstance(classDecl);
   }
 
-  // Disable inference of actor attributes outside of normal Swift source files.
-  if (!shouldInferAttributeInContext(value->getDeclContext()))
-    return defaultIsolation;
-
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred) {
     // Add an implicit attribute to capture the actor isolation that was
@@ -2340,29 +2336,31 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return getActorIsolation(accessor->getStorage());
   }
 
-  // If the declaration witnesses a protocol requirement that is isolated,
-  // use that.
-  if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
-    return inferredIsolation(*witnessedIsolation);
-  }
+  if (shouldInferAttributeInContext(value->getDeclContext())) {
+    // If the declaration witnesses a protocol requirement that is isolated,
+    // use that.
+    if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
+      return inferredIsolation(*witnessedIsolation);
+    }
 
-  // If the declaration is a class with a superclass that has specified
-  // isolation, use that.
-  if (auto classDecl = dyn_cast<ClassDecl>(value)) {
-    if (auto superclassDecl = classDecl->getSuperclassDecl()) {
-      auto superclassIsolation = getActorIsolation(superclassDecl);
-      if (!superclassIsolation.isUnspecified()) {
-        if (superclassIsolation.requiresSubstitution()) {
-          Type superclassType = classDecl->getSuperclass();
-          if (!superclassType)
-            return ActorIsolation::forUnspecified();
+    // If the declaration is a class with a superclass that has specified
+    // isolation, use that.
+    if (auto classDecl = dyn_cast<ClassDecl>(value)) {
+      if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+        auto superclassIsolation = getActorIsolation(superclassDecl);
+        if (!superclassIsolation.isUnspecified()) {
+          if (superclassIsolation.requiresSubstitution()) {
+            Type superclassType = classDecl->getSuperclass();
+            if (!superclassType)
+              return ActorIsolation::forUnspecified();
 
-          SubstitutionMap subs = superclassType->getMemberSubstitutionMap(
-              classDecl->getModuleContext(), classDecl);
-          superclassIsolation = superclassIsolation.subst(subs);
+            SubstitutionMap subs = superclassType->getMemberSubstitutionMap(
+                classDecl->getModuleContext(), classDecl);
+            superclassIsolation = superclassIsolation.subst(subs);
+          }
+
+          return inferredIsolation(superclassIsolation);
         }
-
-        return inferredIsolation(superclassIsolation);
       }
     }
   }
