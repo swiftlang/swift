@@ -17,7 +17,8 @@ extension AsyncSequence {
   public __consuming func prefix(
     _ count: Int
   ) -> AsyncPrefixSequence<Self> {
-    precondition(count >= 0)
+    precondition(count >= 0
+      "Can't prefix a negative number of elements from an async sequence")
     return AsyncPrefixSequence(self, count: count)
   }
 }
