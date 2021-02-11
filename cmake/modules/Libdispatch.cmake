@@ -55,6 +55,12 @@ foreach(sdk ${DISPATCH_SDKS})
       list(APPEND ARCHS "${SWIFT_HOST_VARIANT_ARCH}")
     endif()
   endif()
+  
+  if(sdk STREQUAL ANDROID)
+    set(SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS)
+  else()
+    set(SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS -DCMAKE_C_COMPILER=${SWIFT_LIBDISPATCH_C_COMPILER};-DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER})
+  endif()
 
   foreach(arch ${ARCHS})
     set(LIBDISPATCH_VARIANT_NAME "libdispatch-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
@@ -65,9 +71,8 @@ foreach(sdk ${DISPATCH_SDKS})
                         CMAKE_ARGS
                           -DCMAKE_AR=${CMAKE_AR}
                           -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                          -DCMAKE_C_COMPILER=${SWIFT_LIBDISPATCH_C_COMPILER}
+                          ${SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS}
                           -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                          -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                           -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                           -DCMAKE_INSTALL_LIBDIR=lib
@@ -77,6 +82,9 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                           -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
                           -DCMAKE_SYSTEM_PROCESSOR=${arch}
+                          "-DCMAKE_ANDROID_NDK=${SWIFT_ANDROID_NDK_PATH}"
+                          -DCMAKE_ANDROID_ARCH_ABI=${SWIFT_SDK_ANDROID_ARCH_${arch}_ABI}
+                          -DCMAKE_ANDROID_API=${SWIFT_ANDROID_API_LEVEL}
                           -DBUILD_SHARED_LIBS=YES
                           -DENABLE_SWIFT=NO
                           -DENABLE_TESTING=NO
@@ -139,9 +147,8 @@ foreach(sdk ${DISPATCH_SDKS})
                           CMAKE_ARGS
                             -DCMAKE_AR=${CMAKE_AR}
                             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                            -DCMAKE_C_COMPILER=${SWIFT_LIBDISPATCH_C_COMPILER}
+                            ${SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS}
                             -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                            -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                             -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                             -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                             -DCMAKE_INSTALL_LIBDIR=lib
@@ -149,8 +156,11 @@ foreach(sdk ${DISPATCH_SDKS})
                             -DCMAKE_LINKER=${CMAKE_LINKER}
                             -DCMAKE_RANLIB=${CMAKE_RANLIB}
                             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-                            -DCMAKE_SYSTEM_NAME=${sdk}
+                            -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
                             -DCMAKE_SYSTEM_PROCESSOR=${arch}
+                            "-DCMAKE_ANDROID_NDK=${SWIFT_ANDROID_NDK_PATH}"
+                            -DCMAKE_ANDROID_ARCH_ABI=${SWIFT_SDK_ANDROID_ARCH_${arch}_ABI}
+                            -DCMAKE_ANDROID_API=${SWIFT_ANDROID_API_LEVEL}
                             -DBUILD_SHARED_LIBS=NO
                             -DENABLE_SWIFT=NO
                             -DENABLE_TESTING=NO
