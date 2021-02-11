@@ -1235,6 +1235,8 @@ NameImporter::considerAsyncImport(
     bool isInitializer,
     Optional<unsigned> explicitCompletionHandlerParamIndex,
     CustomAsyncName customName,
+    Optional<unsigned> completionHandlerFlagParamIndex,
+    bool completionHandlerFlagIsZeroOnError,
     Optional<ForeignErrorConvention::Info> errorInfo) {
   // If there are no unclaimed parameters, there's no .
   unsigned errorParamAdjust = errorInfo ? 1 : 0;
@@ -1388,7 +1390,8 @@ NameImporter::considerAsyncImport(
   }
 
   return ForeignAsyncConvention::Info(
-      completionHandlerParamIndex, completionHandlerErrorParamIndex);
+      completionHandlerParamIndex, completionHandlerErrorParamIndex,
+      completionHandlerFlagParamIndex, completionHandlerFlagIsZeroOnError);
 }
 
 bool NameImporter::hasErrorMethodNameCollision(
@@ -1482,6 +1485,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
   // Gather information from the swift_async attribute, if there is one.
   Optional<unsigned> completionHandlerParamIndex;
+  bool completionHandlerFlagIsZeroOnError = false;
+  Optional<unsigned> completionHandlerFlagParamIndex;
   if (version.supportsConcurrency()) {
     if (const auto *swiftAsyncAttr = D->getAttr<clang::SwiftAsyncAttr>()) {
       // If this is swift_async(none), don't import as async at all.
@@ -1492,6 +1497,9 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       completionHandlerParamIndex =
           swiftAsyncAttr->getCompletionHandlerIndex().getASTIndex();
     }
+    
+    // TODO: Check for the swift_async_error attribute here when Clang
+    // implements it
   }
 
   // FIXME: ugly to check here, instead perform unified check up front in
@@ -1646,6 +1654,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                   completionHandlerParamIndex,
                   nameAttr->isAsync ? CustomAsyncName::SwiftAsyncName
                                     : CustomAsyncName::SwiftName,
+                  completionHandlerFlagParamIndex,
+                  completionHandlerFlagIsZeroOnError,
                   result.getErrorInfo())) {
             result.info.hasAsyncInfo = true;
             result.info.asyncInfo = *asyncInfo;
@@ -1934,6 +1944,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       if (auto asyncInfo = considerAsyncImport(
               objcMethod, baseName, argumentNames, params, isInitializer,
               completionHandlerParamIndex, CustomAsyncName::None,
+              completionHandlerFlagParamIndex,
+              completionHandlerFlagIsZeroOnError,
               result.getErrorInfo())) {
         result.info.hasAsyncInfo = true;
         result.info.asyncInfo = *asyncInfo;

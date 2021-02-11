@@ -762,7 +762,8 @@ bool swift::isRepresentableInObjC(
 
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType->getCanonicalType(), completionHandlerParamIndex,
-        completionHandlerErrorParamIndex);
+        completionHandlerErrorParamIndex,
+        /* no flag argument */ None, false);
   } else if (AFD->hasThrows()) {
     // Synchronous throwing functions must map to a particular error convention.
     DeclContext *dc = const_cast<AbstractFunctionDecl *>(AFD);
