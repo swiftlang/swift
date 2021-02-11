@@ -909,7 +909,7 @@ bool BindingSet::isViable(PotentialBinding &binding) const {
 
     for (auto &existing : Bindings) {
       auto *existingNTD = existing.BindingType->getAnyNominal();
-      if (existingNTD && NTD == existingNTD && existing.Kind == binding.Kind)
+      if (existingNTD && NTD == existingNTD)
         return false;
     }
   }
