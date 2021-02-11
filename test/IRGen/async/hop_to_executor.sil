@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-concurrency -primary-file %s -module-name=test -disable-llvm-optzns -disable-swift-specific-llvm-optzns -emit-ir -sil-verify-all | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: concurrency
+// REQUIRES: rdar74098395
 
 sil_stage canonical
 
