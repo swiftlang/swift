@@ -524,7 +524,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
         llvm::any_of(Bindings, [](const PotentialBinding &binding) {
           return binding.BindingType->isDoubleType();
         }))
-      return false;
+      return;
 
     if (type->isDoubleType()) {
       auto inferredCGFloat =
@@ -535,7 +535,7 @@ void BindingSet::addBinding(PotentialBinding binding) {
       if (inferredCGFloat != Bindings.end()) {
         Bindings.erase(inferredCGFloat);
         Bindings.insert(inferredCGFloat->withType(type));
-        return false;
+        return;
       }
     }
   }
