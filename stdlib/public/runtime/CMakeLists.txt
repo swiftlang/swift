@@ -102,6 +102,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
                              DESTINATION "lib/swift_static/${lowercase_sdk}"
                              COMPONENT stdlib)
+  add_dependencies(stdlib ${static_binary_lnk_file_list})
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
 endif()
 
