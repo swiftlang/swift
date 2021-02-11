@@ -467,15 +467,7 @@ public:
         // not extensions of that 'actor class'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::Continue; 
-
-#if false
-        // If the protocol is a marker protocol, print it separately.
-        if (inherited->isMarkerProtocol()) {
-          protocolsToPrint.push_back({inherited, protoAndAvailability.second});
           return TypeWalker::Action::SkipChildren;
-        }
-#endif
 
         if (inherited->isSPI() && !printOptions.PrintSPIs)
           return TypeWalker::Action::Continue;

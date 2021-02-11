@@ -8,39 +8,11 @@
 // RUN: %target-swift-frontend -typecheck-module-from-interface -module-name Test %t/TestFromModule.swiftinterface
 
 // REQUIRES: concurrency
+// REQUIRES: objc_interop
 
-// CHECK: public actor SomeActor
-public actor SomeActor {
-  @actorIndependent func maine() { }
-}
+import Foundation
 
-// CHECK: @globalActor public struct SomeGlobalActor
-@globalActor
-public struct SomeGlobalActor {
-  public static let shared = SomeActor()
-}
-
-// CHECK: @{{(Test.)?}}SomeGlobalActor public protocol P1
-// CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor func method()
-@SomeGlobalActor
-public protocol P1 {
-  func method()
-}
-
-// CHECK: class C1
-// CHECK-NEXT: @{{(Test.)?}}SomeGlobalActor public func method()
-public class C1: P1 {
-  public func method() { }
-}
-
-@SomeGlobalActor
-public class C2 { }
-
-// CHECK: @{{(Test.)?}}SomeGlobalActor public class C2
-public class C3: C2 { }
-
-// CHECK: public actor SomeSubActor
-// CHECK-NEXT: @actorIndependent public func maine()
-public actor SomeSubActor: SomeActor {
-  override public func maine() { }
+// CHECK-LABEL: @objc @_inheritsConvenienceInitializers public actor SomeActor : ObjectiveC.NSObject {
+// CHECK: @objc override dynamic public init()
+public actor SomeActor: NSObject {
 }
