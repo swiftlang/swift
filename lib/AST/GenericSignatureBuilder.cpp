@@ -1821,6 +1821,18 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
   return 0;
 }
 
+static void lookupConcreteNestedType(NominalTypeDecl *decl,
+                                     Identifier name,
+                                     SmallVectorImpl<TypeDecl *> &concreteDecls) {
+  SmallVector<ValueDecl *, 2> foundMembers;
+  decl->getParentModule()->lookupQualified(
+      decl, DeclNameRef(name),
+      NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
+      foundMembers);
+  for (auto member : foundMembers)
+    concreteDecls.push_back(cast<TypeDecl>(member));
+}
+
 TypeDecl *EquivalenceClass::lookupNestedType(
                              GenericSignatureBuilder &builder,
                              Identifier name,
@@ -1893,19 +1905,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   // FIXME: Shouldn't we always look here?
   if (!bestAssocType && concreteDecls.empty()) {
     Type typeToSearch = concreteType ? concreteType : superclass;
-    auto *decl = typeToSearch ? typeToSearch->getAnyNominal() : nullptr;
-    if (decl) {
-      SmallVector<ValueDecl *, 2> foundMembers;
-      decl->getParentModule()->lookupQualified(
-          decl, DeclNameRef(name),
-          NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
-          foundMembers);
-      for (auto member : foundMembers) {
-        if (auto type = dyn_cast<TypeDecl>(member)) {
-          concreteDecls.push_back(type);
-        }
-      }
-    }
+    if (typeToSearch)
+      if (auto *decl = typeToSearch->getAnyNominal())
+        lookupConcreteNestedType(decl, name, concreteDecls);
   }
 
   // Infer same-type constraints among same-named associated type anchors.
@@ -3560,8 +3562,6 @@ static Type substituteConcreteType(Type parentType,
   if (parentType->is<ErrorType>())
     return parentType;
 
-  assert(concreteDecl);
-
   auto *dc = concreteDecl->getDeclContext();
 
   // Form an unsubstituted type referring to the given type declaration,
@@ -3598,10 +3598,31 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                    resolutionKind,
                                    wantExactPotentialArchetype);
     if (!resolvedBase) return resolvedBase;
+
     // If the base is concrete, so is this member.
     if (auto parentType = resolvedBase.getAsConcreteType()) {
-      auto concreteType = substituteConcreteType(parentType,
-                                                 depMemTy->getAssocType());
+      TypeDecl *concreteDecl = depMemTy->getAssocType();
+      if (!concreteDecl) {
+        // If we have an unresolved dependent member type, perform a
+        // name lookup.
+        if (auto *decl = parentType->getAnyNominal()) {
+          SmallVector<TypeDecl *, 2> concreteDecls;
+          lookupConcreteNestedType(decl, depMemTy->getName(), concreteDecls);
+
+          if (concreteDecls.empty())
+            return ResolvedType::forUnresolved(nullptr);
+
+          auto bestConcreteTypeIter =
+            std::min_element(concreteDecls.begin(), concreteDecls.end(),
+                             [](TypeDecl *type1, TypeDecl *type2) {
+                               return TypeDecl::compare(type1, type2) < 0;
+                             });
+
+          concreteDecl = *bestConcreteTypeIter;
+        }
+      }
+
+      auto concreteType = substituteConcreteType(parentType, concreteDecl);
       return ResolvedType::forConcrete(concreteType);
     }
 
