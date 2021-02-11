@@ -1265,8 +1265,9 @@ end:
   return %v : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_x(%T4enum20DynamicSinglePayloadO* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.type* %T) {{.*}} {
-// CHECK:   [[OPAQUE_ENUM:%.*]] = bitcast %T4enum20DynamicSinglePayloadO* %0 to %swift.opaque*
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_x(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.opaque* noalias nocapture %1, %swift.type* %T) {{.*}} {
+// CHECK:   [[ARG:%.*]] = bitcast %swift.opaque* %0 to %T4enum20DynamicSinglePayloadO*
+// CHECK:   [[OPAQUE_ENUM:%.*]] = bitcast %T4enum20DynamicSinglePayloadO* [[ARG]] to %swift.opaque*
 // CHECK:   [[TMP:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds i8**, i8*** [[TMP]], i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[TMP2]]
@@ -1281,8 +1282,9 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
   return %v : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_y(%T4enum20DynamicSinglePayloadO* noalias nocapture sret({{.*}}) %0, %swift.type* %T) {{.*}} {
-// CHECK:   [[OPAQUE_ENUM:%.*]] = bitcast %T4enum20DynamicSinglePayloadO* %0 to %swift.opaque*
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_single_payload_inject_y(%swift.opaque* noalias nocapture sret({{.*}}) %0, %swift.type* %T) {{.*}} {
+// CHECK:   [[ARG:%.*]] = bitcast %swift.opaque* %0 to %T4enum20DynamicSinglePayloadO*
+// CHECK:   [[OPAQUE_ENUM:%.*]] = bitcast %T4enum20DynamicSinglePayloadO* [[ARG]] to %swift.opaque*
 // CHECK:   [[TMP:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds i8**, i8*** [[TMP]], i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[TMP2]]

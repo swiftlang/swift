@@ -12,6 +12,7 @@
 // REQUIRES: concurrency
 // XFAIL: windows
 // UNSUPPORTED: linux
+// UNSUPPORTED: openbsd
 
 import StdlibUnittest
 import resilient_protocol
