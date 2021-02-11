@@ -34,19 +34,23 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
 endif()
 
 set(DISPATCH_SDKS)
+
+# Build the host libdispatch if needed.
 if(SWIFT_BUILD_HOST_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     if(NOT "${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_SDKS)
       list(APPEND DISPATCH_SDKS "${SWIFT_HOST_VARIANT_SDK}")
     endif()
   endif()
-
-  foreach(sdk ${SWIFT_SDKS})
-    if(NOT "${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
-      list(APPEND DISPATCH_SDKS "${sdk}")
-    endif()
-  endforeach()
 endif()
+
+# Build any target libdispatch if needed.
+foreach(sdk ${SWIFT_SDKS})
+  # Apple targets have libdispatch available, do not build it.
+  if(NOT "${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
+    list(APPEND DISPATCH_SDKS "${sdk}")
+  endif()
+endforeach()
 
 foreach(sdk ${DISPATCH_SDKS})
   set(ARCHS ${SWIFT_SDK_${sdk}_ARCHITECTURES})
