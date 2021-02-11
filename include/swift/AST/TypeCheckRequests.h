@@ -25,6 +25,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeResolutionStage.h"
@@ -331,9 +332,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class ProtocolConformanceRefClassifyAsThrowsRequest : 
-    public SimpleRequest<ProtocolConformanceRefClassifyAsThrowsRequest,
-                         bool(ProtocolConformanceRef),
+class ProtocolConformanceClassifyAsThrowsRequest : 
+    public SimpleRequest<ProtocolConformanceClassifyAsThrowsRequest,
+                         bool(ProtocolConformance *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -343,7 +344,7 @@ private:
 
   // Evaluation.
   bool 
-  evaluate(Evaluator &evaluator, ProtocolConformanceRef conformanceRef) const;
+  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
 
 public:
   // Caching.

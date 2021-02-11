@@ -270,7 +270,7 @@ SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
 SWIFT_REQUEST(TypeChecker, ProtocolRethrowsRequirementsRequest,
               ProtocolRethrowsRequirementList(ProtocolDecl *), 
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ProtocolConformanceRefClassifyAsThrowsRequest,
+SWIFT_REQUEST(TypeChecker, ProtocolConformanceClassifyAsThrowsRequest,
               bool(ProtocolConformanceRef), 
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,

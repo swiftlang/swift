@@ -56,44 +56,40 @@ static bool hasThrowingFunctionClosureParameter(CanType type) {
 ProtocolRethrowsRequirementList
 ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
                                               ProtocolDecl *decl) const {
-  SmallVector<std::pair<Type, ValueDecl*>, 2> found;
-  llvm::DenseSet<ProtocolDecl*> checkedProtocols;
-
   ASTContext &ctx = decl->getASTContext();
 
   // only allow rethrowing requirements to be determined from marked protocols
-  if (!decl->getAttrs().hasAttribute<swift::AtRethrowsAttr>()) {
-    return ProtocolRethrowsRequirementList(ctx.AllocateCopy(found));
+  if (!decl->isRethrowingProtocol()) {
+    return ProtocolRethrowsRequirementList();
   }
 
+  SmallVector<AbstractFunctionDecl *, 2> requirements;
+  SmallVector<std::pair<Type, ProtocolDecl *>, 2> conformances;
+  
   // check if immediate members of protocol are 'throws'
   for (auto member : decl->getMembers()) {
     auto fnDecl = dyn_cast<AbstractFunctionDecl>(member);
     if (!fnDecl || !fnDecl->hasThrows())
       continue;
 
-    found.push_back(
-      std::pair<Type, ValueDecl*>(decl->getSelfInterfaceType(), fnDecl));
+    requirements.push_back(fnDecl);
   }
-  checkedProtocols.insert(decl);
 
   // check associated conformances of associated types or inheritance
   for (auto requirement : decl->getRequirementSignature()) {
-    if (requirement.getKind() != RequirementKind::Conformance) {
+    if (requirement.getKind() != RequirementKind::Conformance)
       continue;
-    }
+
     auto protoTy = requirement.getSecondType()->castTo<ProtocolType>();
-    auto proto = protoTy->getDecl();
-    if (checkedProtocols.count(proto) != 0) {
+    auto protoDecl = protoTy->getDecl();
+    if (!protoDecl->isRethrowingProtocol())
       continue;
-    }
-    checkedProtocols.insert(proto);
-    for (auto entry : proto->getRethrowingRequirements()) {
-      found.emplace_back(requirement.getFirstType(), entry.second);
-    }
+
+    conformances.emplace_back(requirement.getFirstType(), protoDecl);
   }
   
-  return ProtocolRethrowsRequirementList(ctx.AllocateCopy(found));
+  return ProtocolRethrowsRequirementList(ctx.AllocateCopy(requirements),
+                                         ctx.AllocateCopy(conformances));
 }
 
 FunctionRethrowingKind
@@ -135,68 +131,90 @@ FunctionRethrowingKindRequest::evaluate(Evaluator &evaluator,
   return FunctionRethrowingKind::None;
 }
 
-static bool classifyRequirement(ModuleDecl *module, 
-                                ProtocolConformance *reqConformance, 
-                                ValueDecl *requiredFn) {
-  auto declRef = reqConformance->getWitnessDeclRef(requiredFn);
-  auto witnessDecl = cast<AbstractFunctionDecl>(declRef.getDecl());
+static bool classifyWitness(ModuleDecl *module, 
+                            ProtocolConformance *conformance, 
+                            AbstractFunctionDecl *req) {
+  auto declRef = conformance->getWitnessDeclRef(req);
+  if (!declRef) {
+    // Invalid conformance.
+    return true;
+  }
+
+  auto witnessDecl = dyn_cast<AbstractFunctionDecl>(declRef.getDecl());
+  if (!witnessDecl) {
+    // Enum element constructors never throw.
+    assert(isa<EnumElementDecl>(declRef.getDecl()));
+    return false;
+  }
+
   switch (witnessDecl->getRethrowingKind()) {
+    case FunctionRethrowingKind::None:
+      // Witness doesn't throw at all, so it contributes nothing.
+      return false;
+
     case FunctionRethrowingKind::ByConformance: {
-      auto substitutions = reqConformance->getSubstitutions(module);
+      // Witness throws if the concrete type's @rethrows conformances
+      // recursively throw.
+      auto substitutions = conformance->getSubstitutions(module);
       for (auto conformanceRef : substitutions.getConformances()) {
         if (conformanceRef.classifyAsThrows()) {
           return true;
         }
       }
-      break;
+      return false;
     }
-    case FunctionRethrowingKind::None:
-      break;
+
+    case FunctionRethrowingKind::ByClosure:
+      // Witness only throws if a closure argument throws, so it
+      // contributes nothng.
+      return false;
+
     case FunctionRethrowingKind::Throws:
+      // Witness always throws.
       return true;
-    default:
+
+    case FunctionRethrowingKind::Invalid:
+      // If the code is invalid, just assume it throws.
       return true;
   }
-  return false;
-}
-
-// classify the type requirements of a given protocol type with a function
-// requirement as throws or not. This will detect if the signature of the 
-// function is throwing or not depending on associated types.
-static bool classifyTypeRequirement(ModuleDecl *module, Type protoType, 
-                                    ValueDecl *requiredFn, 
-                                    ProtocolConformance *conformance,
-                                    ProtocolDecl *requiredProtocol) {
-  auto reqProtocol = cast<ProtocolDecl>(requiredFn->getDeclContext());
-  ProtocolConformance *reqConformance;
-
-  if(protoType->isEqual(reqProtocol->getSelfInterfaceType()) && 
-     requiredProtocol == reqProtocol) {
-    reqConformance = conformance;
-  } else {
-    auto reqConformanceRef = 
-      conformance->getAssociatedConformance(protoType, reqProtocol);
-    if (!reqConformanceRef.isConcrete()) {
-      return true;
-    }
-    reqConformance = reqConformanceRef.getConcrete();
-  }
-
-  return classifyRequirement(module, reqConformance, requiredFn);
 }
 
 bool
-ProtocolConformanceRefClassifyAsThrowsRequest::evaluate(
-  Evaluator &evaluator, ProtocolConformanceRef conformanceRef) const {
-  auto conformance = conformanceRef.getConcrete();
-  auto requiredProtocol = conformanceRef.getRequirement();
-  auto module = requiredProtocol->getModuleContext();
-  for (auto req : requiredProtocol->getRethrowingRequirements()) {
-    if (classifyTypeRequirement(module, req.first, req.second, 
-                                conformance, requiredProtocol)) {
-      return true;
+ProtocolConformanceClassifyAsThrowsRequest::evaluate(
+  Evaluator &evaluator, ProtocolConformance *conformance) const {
+  auto *module = conformance->getDeclContext()->getParentModule();
+
+  llvm::SmallDenseSet<ProtocolConformance *, 2> visited;
+  SmallVector<ProtocolConformance *, 2> worklist;
+
+  worklist.push_back(conformance);
+
+  while (!worklist.empty()) {
+    auto *current = worklist.back();
+    worklist.pop_back();
+
+    if (!visited.insert(current).second)
+      continue;
+
+    auto protoDecl = current->getProtocol();
+
+    auto list = protoDecl->getRethrowingRequirements();
+    for (auto req : list.getRequirements()) {
+      if (classifyWitness(module, current, req))
+        return true;
+    }
+
+    for (auto pair : list.getConformances()) {
+      auto assocConf = 
+          current->getAssociatedConformance(
+              pair.first, pair.second);
+      if (!assocConf.isConcrete())
+        return true;
+
+      worklist.push_back(assocConf.getConcrete());
     }
   }
+
   return false;
 }
 
