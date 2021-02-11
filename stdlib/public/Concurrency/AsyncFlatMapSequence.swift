@@ -53,6 +53,9 @@ extension AsyncFlatMapSequence: AsyncSequence {
     var currentIterator: SegmentOfResult.AsyncIterator?
 
     @usableFromInline
+    var finished = false
+
+    @usableFromInline
     init(
       _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async -> SegmentOfResult
@@ -63,29 +66,41 @@ extension AsyncFlatMapSequence: AsyncSequence {
 
     @inlinable
     public mutating func next() async rethrows -> SegmentOfResult.Element? {
-      while true {
+      while !finished {
         if var iterator = currentIterator {
-          guard let element = try await iterator.next() else {
-            currentIterator = nil
-            continue
+          do {
+            guard let element = try await iterator.next() else {
+              currentIterator = nil
+              continue
+            }
+            // restore the iterator since we just mutated it with next
+            currentIterator = iterator
+            return element
+          } catch {
+            finished = true
+            throw error
           }
-          // restore the iterator since we just mutated it with next
-          currentIterator = iterator
-          return element
         } else {
           guard let item = try await baseIterator.next() else {
+            finished = true
             return nil
           }
-          let segment = await transform(item)
-          var iterator = segment.makeAsyncIterator()
-          guard let element = try await iterator.next() else {
-            currentIterator = nil
-            continue
+          do { 
+            let segment = await transform(item)
+            var iterator = segment.makeAsyncIterator()
+            guard let element = try await iterator.next() else {
+              currentIterator = nil
+              continue
+            }
+            currentIterator = iterator
+            return element
+          } catch {
+            finished = true
+            throw error
           }
-          currentIterator = iterator
-          return element
         }
       }
+      return nil
     }
   }
 

@@ -59,6 +59,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
       var remainingToDrop = count
       while remainingToDrop > 0 {
         guard try await baseIterator.next() != nil else {
+          count = 0
           return nil
         }
         remainingToDrop -= 1

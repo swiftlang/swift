@@ -20,7 +20,9 @@ func asynchronousThrowing<T>(_ value: T) async throws -> T {
   return value
 }
 
-struct Failure: Error { }
+struct Failure: Error, Equatable { 
+  var value = 1
+}
 
 func failable<T, E: Error>(
   _ results: [Result<T, E>]
@@ -79,6 +81,15 @@ extension AsyncSequence {
       items.append(e)
     }
     return items
+  }
+}
+
+extension AsyncSequence where Element: Equatable {
+  func `throw`(_ error: Error, on element: Element) -> AsyncThrowingMapSequence<Self, Element> {
+    return map { (value: Element) throws -> Element in
+      if value == element { throw error }
+      return value
+    }
   }
 }
 
@@ -143,6 +154,31 @@ AsyncSequenceTests.test("reduce") {
   expectEqual(result, 1 + 2 + 3)
 }
 
+AsyncSequenceTests.test("reduce throws in closure") {
+  do {
+    _ = try await [1, 2, 3].async.reduce(0) { partial, element in
+      if element == 2 { throw Failure(value: 42) }
+      return partial + element
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
+AsyncSequenceTests.test("reduce throws upstream") {
+  do {
+    let _ = try await [1, 2, 3].async
+      .throw(Failure(value: 42), on: 2)
+      .reduce(0) { partial, element in
+        return partial + element
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
 AsyncSequenceTests.test("reduce into") {
   let result = await [1, 2, 3].async.reduce(into: 0) { partial, element in
     partial += element
@@ -150,10 +186,36 @@ AsyncSequenceTests.test("reduce into") {
   expectEqual(result, 1 + 2 + 3)
 }
 
+AsyncSequenceTests.test("reduce into throws in closure") {
+  do {
+    _ = try await [1, 2, 3].async.reduce(into: 0) { partial, element in
+      if element == 2 { throw Failure(value: 42) }
+      partial += element
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
+AsyncSequenceTests.test("reduce into throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async
+      .throw(Failure(value: 42), on: 2)
+      .reduce(into: 0) { partial, element in
+        partial += element
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
 AsyncSequenceTests.test("contains predicate true") {
   let result = await [1, 2, 3].async.contains { $0 == 2 }
   expectTrue(result)
 }
+
 AsyncSequenceTests.test("contains predicate false") {
   let result = await [1, 2, 3].async.contains { $0 == 4 }
   expectFalse(result)
@@ -164,9 +226,61 @@ AsyncSequenceTests.test("contains predicate empty") {
   expectFalse(result)
 }
 
+AsyncSequenceTests.test("contains throws in closure") {
+  do {
+    _ = try await [1, 2, 3].async
+      .contains { 
+        if $0 == 2 { throw Failure(value: 42) }
+        return $0 == 3 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
+AsyncSequenceTests.test("contains throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async
+      .throw(Failure(value: 42), on: 2)
+      .contains {
+        return $0 == 3 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
 AsyncSequenceTests.test("all satisfy true") {
   let result = await [1, 2, 3].async.allSatisfy { $0 < 10 }
   expectTrue(result)
+}
+
+AsyncSequenceTests.test("all satisfy throws in closure") {
+  do {
+    _ = try await [1, 2, 3].async
+      .allSatisfy { 
+        if $0 == 2 { throw Failure(value: 42) }
+        return $0 < 10
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
+AsyncSequenceTests.test("all satisfy throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async
+      .throw(Failure(value: 42), on: 2)
+      .allSatisfy {
+        return $0 < 10
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
 }
 
 AsyncSequenceTests.test("all satisfy false") {
@@ -199,28 +313,106 @@ AsyncSequenceTests.test("first found") {
   expectEqual(result, 2)
 }
 
+AsyncSequenceTests.test("first throws in closure") {
+  do {
+    _ = try await [1, 2, 3].async
+      .first {
+        if $0 == 2 { throw Failure(value: 42) }
+        return $0 > 2 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
+AsyncSequenceTests.test("first throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async
+      .throw(Failure(value: 42), on: 2)
+      .first {
+        return $0 > 2 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
 AsyncSequenceTests.test("first empty") {
   let result = await [Int]().async.first { $0 > 1 }
   expectEqual(result, nil)
 }
 
 AsyncSequenceTests.test("min by found") {
-  let result = await [1, 2, 3].async.min { $0 < $1}
+  let result = await [1, 2, 3].async.min { $0 < $1 }
   expectEqual(result, 1)
 }
 
+AsyncSequenceTests.test("min by throws in closure") {
+  do {
+    _ = try await [1, 2, 3].async
+      .min { 
+        if $0 == 2 { throw Failure(value: 42) }
+        return $0 < $1 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
+AsyncSequenceTests.test("min by throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async
+      .throw(Failure(value: 42), on: 2)
+      .min {
+        return $0 < $1 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
 AsyncSequenceTests.test("min by empty") {
-  let result = await [Int]().async.min { $0 < $1}
+  let result = await [Int]().async.min { $0 < $1 }
   expectEqual(result, nil)
 }
 
 AsyncSequenceTests.test("max by found") {
-  let result = await [1, 2, 3].async.max { $0 < $1}
+  let result = await [1, 2, 3].async.max { $0 < $1 }
   expectEqual(result, 3)
 }
 
+AsyncSequenceTests.test("max by throws in closure") {
+  do {
+    _ = try await [1, 2, 3].async
+      .max { 
+        if $0 == 2 { throw Failure(value: 42) }
+        return $0 < $1 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
+AsyncSequenceTests.test("max by throws upstream") {
+  do {
+    _ = try await [1, 2, 3].async
+      .throw(Failure(value: 42), on: 2)
+      .max {
+        return $0 < $1 
+      }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+}
+
 AsyncSequenceTests.test("max by empty") {
-  let result = await [Int]().async.max { $0 < $1}
+  let result = await [Int]().async.max { $0 < $1 }
   expectEqual(result, nil)
 }
 
@@ -319,19 +511,61 @@ AsyncCompactMapTests.test("nil values with async throw") {
   }
 }
 
-AsyncCompactMapTests.test("throwing") {
-  do {
-    _ = try await [1, nil, 2, nil, 3, nil].async
-      .compactMap { value throws -> Int? in
-        if value == 2 {
-          throw Failure()
-        }
-        return value
+AsyncCompactMapTests.test("throwing in closure") {
+  let seq = [1, nil, 2, nil, 3, nil].async
+    .compactMap { value throws -> Int? in
+      if value == 2 {
+        throw Failure(value: 42)
       }
-      .collect()
+      return value
+    }
+  var it = seq.makeAsyncIterator()
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
     expectUnreachable()
   } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
 
+  expectEqual(results, [1])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
+AsyncCompactMapTests.test("throwing upstream") {
+  let seq = [1, nil, 2, nil, 3, nil].async
+    .throw(Failure(value: 42), on: 2)
+    .compactMap { value throws -> Int? in
+      return value
+    }
+  var it = seq.makeAsyncIterator()
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [1])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
   }
 }
 
@@ -347,23 +581,61 @@ AsyncMapSequenceTests.test("map empty") {
   expectEqual(results, [])
 }
 
-AsyncMapSequenceTests.test("map throwing") {
+AsyncMapSequenceTests.test("map throwing in closure") {
   let seq = [1, 2, 3].async
     .map { value throws -> String in
       if value == 2 {
-        throw Failure()
+        throw Failure(value: 42)
       }
       return "\(value)" 
     }
   var it = seq.makeAsyncIterator()
   var results = [String]()
+
   do {
     while let value = try await it.next() {
       results.append(value)
     }
     expectUnreachable()
   } catch {
-    expectEqual(results, ["1"])
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, ["1"])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
+AsyncMapSequenceTests.test("map throwing upstream") {
+  let seq = [1, 2, 3].async
+    .throw(Failure(value: 42), on: 2)
+    .map { value throws -> String in
+      return "\(value)" 
+    }
+  var it = seq.makeAsyncIterator()
+  var results = [String]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, ["1"])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
   }
 }
 
@@ -411,6 +683,62 @@ AsyncFilterSequenceTests.test("filter out no items") {
   expectEqual(results, [1, 2, 3])
 }
 
+AsyncFilterSequenceTests.test("filter throwing in closure") {
+  let seq = [1, 2, 3].async
+    .filter { 
+      if $0 == 2 { throw Failure(value: 42) }
+      return $0 % 2 != 0
+    }
+  var it = seq.makeAsyncIterator()
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [1])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
+AsyncFilterSequenceTests.test("filter throwing upstream") {
+  let seq = [1, 2, 3].async
+    .throw(Failure(value: 42), on: 2)
+    .filter { 
+      return $0 % 2 != 0
+    }
+  var it = seq.makeAsyncIterator()
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [1])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
 var AsyncDropWhileSequenceTests = TestSuite("AsyncDropWhileSequence")
 
 AsyncDropWhileSequenceTests.test("drop one") {
@@ -418,6 +746,62 @@ AsyncDropWhileSequenceTests.test("drop one") {
     return value == 1
   }.collect()
   expectEqual(results, [2, 3])
+}
+
+AsyncDropWhileSequenceTests.test("drop throwing in closure") {
+  let seq = [1, 2, 3].async
+    .drop {
+      if $0 == 2 { throw Failure(value: 42) }
+      return $0 == 1
+    }
+  var it = seq.makeAsyncIterator()
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
+AsyncDropWhileSequenceTests.test("drop throwing upstream") {
+  let seq = [1, 2, 3].async
+    .throw(Failure(value: 42), on: 2)
+    .drop {
+      return $0 == 1
+    }
+  var it = seq.makeAsyncIterator()
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
 }
 
 AsyncDropWhileSequenceTests.test("drop one async") {
@@ -517,6 +901,132 @@ AsyncFlatMapSequenceTests.test("flat map") {
   let results = await [1, 2, 3].async.flatMap { ($0..<4).async }.collect()
   let expected = [1, 2, 3].flatMap { $0..<4 }
   expectEqual(results, expected)
+}
+
+AsyncFlatMapSequenceTests.test("flat map throwing in closure") {
+  let seq = [1, 2, 3].async
+    .flatMap { (value: Int) throws -> AsyncLazySequence<Range<Int>> in
+      if value == 2 { throw Failure(value: 42) }
+      return (value..<4).async 
+    }
+  var it = seq.makeAsyncIterator()
+
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [1, 2, 3])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
+AsyncFlatMapSequenceTests.test("flat map throwing upstream") {
+  let seq = [1, 2, 3].async
+    .throw(Failure(value: 42), on: 2)
+    .flatMap {
+      return ($0..<4).async 
+    }
+  var it = seq.makeAsyncIterator()
+
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [1, 2, 3])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
+AsyncFlatMapSequenceTests.test("flat map throwing inner") {
+  func buildSubSequence(
+    _ start: Int
+  ) -> AsyncThrowingMapSequence<AsyncLazySequence<Range<Int>>, Int> {
+    return (start..<4).async.map { (value: Int) throws -> Int in
+      if value == 2 { throw Failure(value: 42) }
+      return value
+    }
+  }
+  let seq = [1, 2, 3].async
+    .flatMap(buildSubSequence)
+  var it = seq.makeAsyncIterator()
+
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [1])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
+}
+
+AsyncFlatMapSequenceTests.test("flat map throwing inner on throwing outer") {
+  func buildSubSequence(
+    _ start: Int
+  ) throws -> AsyncThrowingMapSequence<AsyncLazySequence<Range<Int>>, Int> {
+    return (start..<4).async.map { (value: Int) throws -> Int in
+      if value == 2 { throw Failure(value: 42) }
+      return value
+    }
+  }
+  let seq = [1, 2, 3].async
+    .flatMap(buildSubSequence)
+  var it = seq.makeAsyncIterator()
+
+  var results = [Int]()
+
+  do {
+    while let value = try await it.next() {
+      results.append(value)
+    }
+    expectUnreachable()
+  } catch {
+    expectEqual(error as? Failure, Failure(value: 42))
+  }
+
+  expectEqual(results, [1])
+
+  do {
+    let result = try await it.next()
+    expectNil(result)
+  } catch {
+    expectUnreachable()
+  }
 }
 
 runAllTests()
