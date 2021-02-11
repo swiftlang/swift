@@ -107,6 +107,7 @@ func test2() {
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
+  // expected-warning@+4 {{weak reference will always be nil because the referenced object is deallocated here}}
   // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'w2' declared here}}
@@ -1336,7 +1337,7 @@ func testDontDiagnoseUnownedImmediateDeallocationThroughStrong() {
   weak var c1: SomeClass?
   do {
     let tmp = SomeClass()
-    c1 = tmp
+    c1 = tmp // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
   }
 
   unowned let c2: SomeClass
@@ -1347,7 +1348,7 @@ func testDontDiagnoseUnownedImmediateDeallocationThroughStrong() {
 
   weak var c3: SomeClass?
   let c3Tmp = SomeClass()
-  c3 = c3Tmp
+  c3 = c3Tmp // expected-warning {{weak reference will always be nil because the referenced object is deallocated here}}
 
   unowned let c4: SomeClass
   let c4Tmp = SomeClass()
