@@ -40,7 +40,7 @@ static bool shouldCacheNode(tok TokKind, size_t TextSize,
 }
 
 RC<RawSyntax> RawSyntaxTokenCache::getToken(RC<SyntaxArena> &Arena, tok TokKind,
-                                            size_t TextLength, OwnedString Text,
+                                            size_t TextLength, StringRef Text,
                                             StringRef LeadingTrivia,
                                             StringRef TrailingTrivia) {
   // Determine whether this token is worth to cache.
