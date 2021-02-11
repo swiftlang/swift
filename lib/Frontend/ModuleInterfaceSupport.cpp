@@ -36,24 +36,9 @@
 
 using namespace swift;
 
-version::Version swift::InterfaceFormatVersion({1, 0});
+// MARK: Module interface header comments
 
-/// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
-/// access path. These are not yet supported by module interfaces, since the
-/// information about the declaration kind is not preserved through the binary
-/// serialization that happens as an intermediate step in non-whole-module
-/// builds.
-///
-/// These come from declarations like `import class FooKit.MainFooController`.
-static void diagnoseScopedImports(DiagnosticEngine &diags,
-                                  ArrayRef<ImportedModule> imports){
-  for (const ImportedModule &importPair : imports) {
-    if (importPair.accessPath.empty())
-      continue;
-    diags.diagnose(importPair.accessPath.front().Loc,
-                   diag::module_interface_scoped_import_unsupported);
-  }
-}
+version::Version swift::InterfaceFormatVersion({1, 0});
 
 /// Prints to \p out a comment containing a format version number, tool version
 /// string as well as any relevant command-line flags in \p Opts used to
@@ -91,6 +76,25 @@ llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
 llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
   return llvm::Regex("^// " SWIFT_COMPILER_VERSION_KEY
                      ": (.+)$", llvm::Regex::Newline);
+}
+
+// MARK: Import statements
+
+/// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
+/// access path. These are not yet supported by module interfaces, since the
+/// information about the declaration kind is not preserved through the binary
+/// serialization that happens as an intermediate step in non-whole-module
+/// builds.
+///
+/// These come from declarations like `import class FooKit.MainFooController`.
+static void diagnoseScopedImports(DiagnosticEngine &diags,
+                                  ArrayRef<ImportedModule> imports){
+  for (const ImportedModule &importPair : imports) {
+    if (importPair.accessPath.empty())
+      continue;
+    diags.diagnose(importPair.accessPath.front().Loc,
+                   diag::module_interface_scoped_import_unsupported);
+  }
 }
 
 /// Prints the imported modules in \p M to \p out in the form of \c import
@@ -173,6 +177,8 @@ static void printImports(raw_ostream &out,
     out << "\n";
   }
 }
+
+// MARK: Dummy protocol conformances
 
 // FIXME: Copied from ASTPrinter.cpp...
 static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
@@ -560,6 +566,8 @@ public:
 const StringLiteral InheritedProtocolCollector::DummyProtocolName =
     "_ConstraintThatIsNotPartOfTheAPIOfThisLibrary";
 } // end anonymous namespace
+
+// MARK: Interface emission
 
 bool swift::emitSwiftInterface(raw_ostream &out,
                                ModuleInterfaceOptions const &Opts,
