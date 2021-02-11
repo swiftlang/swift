@@ -112,6 +112,10 @@ func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
 func otherName(execute: (String) -> Void) { }
 // OTHER-NAME: func otherName() async -> String { }
 
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=DEFAULT_ARGS %s
+func defaultArgs(a: Int, b: Int = 10, completion: (String) -> Void) { }
+// DEFAULT_ARGS: func defaultArgs(a: Int, b: Int = 10) async -> String { }
+
 struct MyStruct {
   var someVar: (Int) -> Void {
     get {
@@ -175,7 +179,7 @@ func noParamAutoclosure(completion: @autoclosure () -> Void) { }
 // 2. Check that the various ways to call a function (and the positions the
 //    refactoring is called from) are handled correctly
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,CALL-ARG,MANY-CALL,MEMBER-CALL,MEMBER-CALL2,MEMBER-PARENS,EMPTY-CAPTURE,CAPTURE %s
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,CALL-ARG,MANY-CALL,MEMBER-CALL,MEMBER-CALL2,MEMBER-PARENS,EMPTY-CAPTURE,CAPTURE,DEFAULT-ARGS-MISSING,DEFAULT-ARGS-CALL %s
 func testCalls() {
 // CONVERT-FUNC: {{^}}func testCalls() async {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+4):3 | %FileCheck -check-prefix=CALL %s
@@ -302,5 +306,19 @@ func testCalls() {
   // CONVERT-FUNC: otherName(execute: { str in{{$}}
   // CONVERT-FUNC-NEXT: print("otherName"){{$}}
   // CONVERT-FUNC-NEXT: }){{$}}
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=DEFAULT-ARGS-MISSING %s
+  defaultArgs(a: 1) { str in
+    print("defaultArgs missing")
+  }
+  // DEFAULT-ARGS-MISSING: let str = await defaultArgs(a: 1){{$}}
+  // DEFAULT-ARGS-MISSING-NEXT: {{^}}print("defaultArgs missing")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=DEFAULT-ARGS-CALL %s
+  defaultArgs(a: 1, b: 2) { str in
+    print("defaultArgs")
+  }
+  // DEFAULT-ARGS-CALL: let str = await defaultArgs(a: 1, b: 2){{$}}
+  // DEFAULT-ARGS-CALL-NEXT: {{^}}print("defaultArgs")
 }
 // CONVERT-FUNC: {{^}}}

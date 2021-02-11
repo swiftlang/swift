@@ -5155,12 +5155,17 @@ private:
              /*ToEndOfToken=*/true);
 
     OS << tok::l_paren;
+    size_t realArgCount = 0;
     for (size_t I = 0, E = Args.size() - 1; I < E; ++I) {
-      if (I > 0)
+      if (isa<DefaultArgumentExpr>(Args[I]))
+        continue;
+
+      if (realArgCount > 0)
         OS << tok::comma << " ";
       // Can't just add the range as we need to perform replacements
       convertNode(Args[I], /*StartOverride=*/CE->getArgumentLabelLoc(I),
                   /*ConvertCalls=*/false);
+      realArgCount++;
     }
     OS << tok::r_paren;
   }
