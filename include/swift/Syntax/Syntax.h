@@ -247,7 +247,7 @@ public:
   SyntaxData getData() const { return SyntaxData(getDataRef()); }
 
   /// Get the shared raw syntax.
-  const RC<RawSyntax> getRaw() const { return getData().getRaw(); }
+  RC<RawSyntax> getRaw() const { return getData().getRaw(); }
 
   /// Get the \p N -th child of this piece of syntax.
   llvm::Optional<Syntax> getChild(const size_t N) const;
