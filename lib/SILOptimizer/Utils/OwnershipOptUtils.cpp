@@ -264,24 +264,16 @@ struct OwnershipLifetimeExtender {
 CopyValueInst *
 OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
                                              SILInstruction *consumingPoint) {
-  auto *newValInsertPt = value->getDefiningInsertionPoint();
-  assert(newValInsertPt);
-  CopyValueInst *copy;
-  if (!isa<SILArgument>(value)) {
-    SILBuilderWithScope::insertAfter(newValInsertPt, [&](SILBuilder &builder) {
-      copy = builder.createCopyValue(builder.getInsertionPointLoc(), value);
-    });
-  } else {
-    SILBuilderWithScope builder(newValInsertPt);
-    copy = builder.createCopyValue(newValInsertPt->getLoc(), value);
-  }
+  auto *copyPoint = value->getNextInstruction();
+  auto loc = copyPoint->getLoc();
+  auto *copy = SILBuilderWithScope(copyPoint).createCopyValue(loc, value);
 
   auto &callbacks = ctx.callbacks;
   callbacks.createdNewInst(copy);
 
   auto *result = copy;
   findJointPostDominatingSet(
-      newValInsertPt->getParent(), consumingPoint->getParent(),
+      copyPoint->getParent(), consumingPoint->getParent(),
       // inputBlocksFoundDuringWalk.
       [&](SILBasicBlock *loopBlock) {
         // This must be consumingPoint->getParent() since we only have one
@@ -291,10 +283,16 @@ OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
         assert(loopBlock == consumingPoint->getParent());
         auto front = loopBlock->begin();
         SILBuilderWithScope newBuilder(front);
+
+        // Create an extra copy when the consuming point is inside a
+        // loop and both copyPoint and the destroy points are outside the
+        // loop. This copy will be consumed in the same block. The original
+        // value will be destroyed on all paths exiting the loop.
+        //
+        // Since copyPoint dominates consumingPoint, it must be outside the
+        // loop. Otherwise backward traversal would have stopped at copyPoint.
         result = newBuilder.createCopyValue(front->getLoc(), copy);
         callbacks.createdNewInst(result);
-
-        llvm_unreachable("Should never visit this!");
       },
       // Input blocks in joint post dom set. We don't care about thse.
       [&](SILBasicBlock *postDomBlock) {
