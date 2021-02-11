@@ -15,9 +15,10 @@ import Swift
 extension AsyncSequence {
   @inlinable
   public __consuming func prefix(
-    _ maxLength: Int
+    _ count: Int
   ) -> AsyncPrefixSequence<Self> {
-    return AsyncPrefixSequence(self, maxLength: maxLength)
+    precondition(count >= 0)
+    return AsyncPrefixSequence(self, count: count)
   }
 }
 
@@ -26,12 +27,12 @@ public struct AsyncPrefixSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let maxLength: Int
+  let count: Int
 
   @usableFromInline
-  init(_ base: Base, maxLength: Int) {
+  init(_ base: Base, count: Int) {
     self.base = base
-    self.maxLength = maxLength
+    self.count = count
   }
 }
 
@@ -47,9 +48,9 @@ extension AsyncPrefixSequence: AsyncSequence {
     var remaining: Int
 
     @usableFromInline
-    init(_ baseIterator: Base.AsyncIterator, maxLength: Int) {
+    init(_ baseIterator: Base.AsyncIterator, count: Int) {
       self.baseIterator = baseIterator
-      self.remaining = maxLength
+      self.remaining = count
     }
 
     @inlinable
@@ -65,6 +66,6 @@ extension AsyncPrefixSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(base.makeAsyncIterator(), maxLength: maxLength)
+    return Iterator(base.makeAsyncIterator(), count: count)
   }
 }

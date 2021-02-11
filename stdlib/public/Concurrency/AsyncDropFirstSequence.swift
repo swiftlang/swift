@@ -15,9 +15,11 @@ import Swift
 extension AsyncSequence {
   @inlinable
   public __consuming func dropFirst(
-    _ k: Int = 1
+    _ count: Int = 1
   ) -> AsyncDropFirstSequence<Self> {
-    return AsyncDropFirstSequence(self, dropping: k)
+    precondition(count >= 0, 
+      "Can't drop a negative number of elements from an async sequence")
+    return AsyncDropFirstSequence(self, dropping: count)
   }
 }
 
@@ -26,14 +28,12 @@ public struct AsyncDropFirstSequence<Base: AsyncSequence> {
   let base: Base
 
   @usableFromInline
-  let limit: Int
+  let count: Int
   
   @usableFromInline 
-  init(_ base: Base, dropping limit: Int) {
-    precondition(limit >= 0, 
-      "Can't drop a negative number of elements from an async sequence")
+  init(_ base: Base, dropping count: Int) {
     self.base = base
-    self.limit = limit
+    self.count = count
   }
 }
 
@@ -71,7 +71,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
 
   @inlinable
   public __consuming func makeAsyncIterator() -> Iterator {
-    return Iterator(base.makeAsyncIterator(), count: limit)
+    return Iterator(base.makeAsyncIterator(), count: count)
   }
 }
 
