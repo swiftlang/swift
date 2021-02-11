@@ -1262,23 +1262,15 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
 #ifndef NDEBUG
 /// Is the block reachable from the entry.
 static bool isReachable(SILBasicBlock *Block) {
-  BasicBlockSet Visited(Block->getParent());
-  llvm::SmallVector<SILBasicBlock *, 16> Worklist;
-  SILBasicBlock *EntryBB = &*Block->getParent()->begin();
-  Worklist.push_back(EntryBB);
-  Visited.insert(EntryBB);
+  BasicBlockWorklist<16> Worklist(Block->getParent()->getEntryBlock());
 
-  while (!Worklist.empty()) {
-    auto *CurBB = Worklist.back();
-    Worklist.pop_back();
-
+  while (SILBasicBlock *CurBB = Worklist.pop()) {
     if (CurBB == Block)
       return true;
 
-    for (auto &Succ : CurBB->getSuccessors())
-      // Second is true if the insertion took place.
-      if (Visited.insert(Succ))
-        Worklist.push_back(Succ);
+    for (SILBasicBlock *Succ : CurBB->getSuccessors()) {
+      Worklist.pushIfNotVisited(Succ);
+    }
   }
 
   return false;
