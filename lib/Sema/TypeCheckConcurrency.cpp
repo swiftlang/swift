@@ -1596,21 +1596,28 @@ namespace {
           return false;
 
         // Check whether this is a local variable, in which case we can
-        // determine whether it was captured by value.
+        // determine whether it was safe to access concurrently.
         if (auto var = dyn_cast<VarDecl>(value)) {
           auto parent = mutableLocalVarParent[declRefExpr];
 
-          // If we have an immediate load of this variable, or it's a let,
-          // we will separately ensure that this variable is not modified.
-          if (!var->supportsMutation() || parent.dyn_cast<LoadExpr *>()) {
+          // If the variable is immutable, it's fine so long as it involves
+          // ConcurrentValue types.
+          //
+          // When flow-sensitive concurrent captures are enabled, we also
+          // allow reads, depending on a SIL diagnostic pass to identify the
+          // remaining race conditions.
+          if (!var->supportsMutation() ||
+              (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
+               parent.dyn_cast<LoadExpr *>())) {
             return diagnoseNonConcurrentTypesInReference(
                 valueRef, getDeclContext(), loc,
                 ConcurrentReferenceKind::LocalCapture);
           }
 
-          // Otherwise, we have concurrent mutation. Complain.
+          // Otherwise, we have concurrent access. Complain.
           ctx.Diags.diagnose(
-              loc, diag::concurrent_mutation_of_local_capture,
+              loc, diag::concurrent_access_of_local_capture,
+              parent.dyn_cast<LoadExpr *>(),
               var->getDescriptiveKind(), var->getName());
           return true;
         }
