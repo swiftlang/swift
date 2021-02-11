@@ -4324,6 +4324,13 @@ ERROR(concurrent_value_outside_source_file,none,
       "conformance 'ConcurrentValue' must occur in the same source file as "
       "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
+ERROR(concurrent_value_open_class,none,
+      "open class %0 cannot conform to `ConcurrentValue`; "
+      "use `UnsafeConcurrentValue`", (DeclName))
+ERROR(concurrent_value_inherit,none,
+      "`ConcurrentValue` class %1 cannot inherit from another class"
+      "%select{| other than 'NSObject'}0",
+      (bool, DeclName))
 
 ERROR(actorindependent_let,none,
       "'@actorIndependent' is meaningless on 'let' declarations because "

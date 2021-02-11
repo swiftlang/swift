@@ -2305,10 +2305,12 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
   if (!nominal)
     return;
 
-  // Actors implicitly conform to ConcurrentValue and protect their state.
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  if (classDecl && classDecl->isActor())
-    return;
+  if (classDecl) {
+    // Actors implicitly conform to ConcurrentValue and protect their state.
+    if (classDecl->isActor())
+      return;
+  }
 
   // ConcurrentValue can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
@@ -2318,6 +2320,29 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
         diag::concurrent_value_outside_source_file,
         nominal->getDescriptiveKind(), nominal->getName());
     return;
+  }
+
+  if (classDecl) {
+    // An open class cannot conform to `ConcurrentValue`.
+    if (classDecl->getFormalAccess() == AccessLevel::Open) {
+      classDecl->diagnose(
+          diag::concurrent_value_open_class, classDecl->getName());
+      return;
+    }
+
+    // A 'ConcurrentValue' class cannot inherit from another class, although
+    // we allow `NSObject` for Objective-C interoperability.
+    if (!isa<InheritedProtocolConformance>(conformance)) {
+      if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+        if (!superclassDecl->isNSObject()) {
+          classDecl->diagnose(
+              diag::concurrent_value_inherit,
+              nominal->getASTContext().LangOpts.EnableObjCInterop,
+              classDecl->getName());
+          return;
+        }
+      }
+    }
   }
 
   // Stored properties of structs and classes must have
