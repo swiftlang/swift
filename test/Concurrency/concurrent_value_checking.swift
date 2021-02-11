@@ -147,8 +147,7 @@ class SomeClass: MainActorProto {
 // ConcurrentValue restriction on concurrent functions.
 // ----------------------------------------------------------------------
 
-// FIXME: poor diagnostic
-@concurrent func concurrentFunc() -> NotConcurrent? { nil } // expected-warning{{cannot call function returning non-concurrent-value type 'NotConcurrent?' across actors}}
+@concurrent func concurrentFunc() -> NotConcurrent? { nil }
 
 // ----------------------------------------------------------------------
 // No ConcurrentValue restriction on @concurrent function types.
