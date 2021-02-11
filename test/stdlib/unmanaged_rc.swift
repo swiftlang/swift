@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend %s -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend %s -emit-sil -O | %FileCheck -check-prefix=OPT %s
 
+// REQUIRES: optimized_stdlib
+
 // Make sure that when we invoke Unmanaged._withUnsafeGuaranteedRef, we do not
 // have any ref count overhead.
 public class Klass {}
