@@ -2359,9 +2359,6 @@ public:
       llvm::errs() << "\n";
     }
 
-    // Explicitly calculate this bit.
-    (void) PD->existentialTypeSupported();
-
     // Explicity compute the requirement signature to detect errors.
     (void) PD->getRequirementSignature();
 

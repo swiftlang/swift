@@ -4285,8 +4285,7 @@ bool SILGenModule::isNonMutatingSelfIndirect(SILDeclRef methodRef) {
   return self.isFormalIndirect();
 }
 
-Optional<SILValue> SILGenFunction::EmitLoadActorExecutorForCallee(
-                                                  SILGenFunction *SGF, 
+Optional<SILValue> SILGenFunction::emitLoadActorExecutorForCallee(
                                                   ValueDecl *calleeVD,
                                                   ArrayRef<ManagedValue> args) {
   if (auto *funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(calleeVD)) {
@@ -4300,11 +4299,11 @@ Optional<SILValue> SILGenFunction::EmitLoadActorExecutorForCallee(
       case ActorIsolation::ActorInstance: {
         assert(args.size() > 0 && "no self argument for actor-instance call?");
         auto calleeSelf = args.back();
-        return calleeSelf.borrow(*SGF, SGF->F.getLocation()).getValue();
+        return calleeSelf.borrow(*this, F.getLocation()).getValue();
       }
 
       case ActorIsolation::GlobalActor:
-        return SGF->emitLoadGlobalActorExecutor(actorIso.getGlobalActor());
+        return emitLoadGlobalActorExecutor(actorIso.getGlobalActor());
     }
   }
   return None;
@@ -4418,7 +4417,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
     assert(F.isAsync() && "cannot hop_to_executor in a non-async func!");
 
     auto calleeVD = implicitlyAsyncApply.getValue();
-    auto maybeExecutor = EmitLoadActorExecutorForCallee(this, calleeVD, args);
+    auto maybeExecutor = emitLoadActorExecutorForCallee(calleeVD, args);
 
     assert(maybeExecutor.hasValue());
     B.createHopToExecutor(loc, maybeExecutor.getValue());

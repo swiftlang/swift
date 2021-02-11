@@ -237,12 +237,6 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind);
 
-/// Diagnose the presence of any non-concurrent types within the given
-/// function type.
-bool diagnoseNonConcurrentTypesInFunctionType(
-    const AnyFunctionType *fnType, const DeclContext *dc, SourceLoc loc,
-    bool isClosure);
-
 /// Check the correctness of the given ConcurrentValue conformance.
 void checkConcurrentValueConformance(ProtocolConformance *conformance);
 
