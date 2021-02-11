@@ -511,8 +511,9 @@ sil public_external @generic_indirect_return : $@convention(thin) <T> (Int) -> @
 // CHECK: insertvalue {{.*}}$s23generic_indirect_returnTA
 
 // CHECK-LABEL: define internal swiftcc void @"$s23generic_indirect_returnTA"(%T13partial_apply11GenericEnumOySiG* noalias nocapture sret({{.*}}) %0, %swift.refcounted* swiftself
-// CHECK:  [[CASTEDRETURN:%.*]] = bitcast %T13partial_apply11GenericEnumOySiG* %0 to %T13partial_apply11GenericEnumO*
-// CHECK:  call swiftcc void @generic_indirect_return({{.*}}[[CASTEDRETURN]]
+// CHECK:  [[CASTEDRETURN:%.*]] = bitcast %T13partial_apply11GenericEnumOySiG* %0  to %T13partial_apply11GenericEnumO*
+// CHECK:  [[ARG:%.*]] = bitcast %T13partial_apply11GenericEnumO* [[CASTEDRETURN]] to %swift.opaque*
+// CHECK:  call swiftcc void @generic_indirect_return({{.*}}[[ARG]]
 // CHECK:  ret void
 sil @partial_apply_generic_indirect_return : $@convention(thin) (Int) -> @callee_owned () -> @owned GenericEnum<Int> {
   bb0(%0 : $Int):
@@ -541,7 +542,8 @@ sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> 
 
 // CHECK-LABEL: define internal swiftcc void @"$s24generic_indirect_return2TA"(%T13partial_apply12GenericEnum2OySiG* noalias nocapture sret({{.*}}) %0, %swift.refcounted* swiftself %1)
 // CHECK:  [[CASTED_ADDR:%.*]] = bitcast %T13partial_apply12GenericEnum2OySiG* %0 to %T13partial_apply12GenericEnum2O*
-// CHECK: call swiftcc void @generic_indirect_return2(%T13partial_apply12GenericEnum2O* noalias nocapture sret({{.*}}) [[CASTED_ADDR]]
+// CHECK:  [[ARG:%.*]] = bitcast %T13partial_apply12GenericEnum2O* [[CASTED_ADDR]] to %swift.opaque*
+// CHECK: call swiftcc void @generic_indirect_return2(%swift.opaque* noalias nocapture sret({{.*}}) [[ARG]]
 // CHECK:  ret void
 sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @callee_owned () -> @owned GenericEnum2<Int> {
   bb0(%0 : $Int):

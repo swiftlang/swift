@@ -668,7 +668,14 @@ void SignatureExpansion::expandResult() {
   for (auto indirectResultType :
        fnConv.getIndirectSILResultTypes(IGM.getMaximalTypeExpansionContext())) {
     auto storageTy = IGM.getStorageType(indirectResultType);
-    addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), claimSRet(), storageTy);
+    auto useSRet = claimSRet();
+    // We need to use opaque types or non fixed size storage types because llvm
+    // does type based analysis based on the type of sret arguments.
+    if (useSRet && !isa<FixedTypeInfo>(IGM.getTypeInfo(indirectResultType))) {
+      storageTy = IGM.OpaqueTy;
+    }
+    addIndirectResultAttributes(IGM, Attrs, ParamIRTypes.size(), useSRet,
+                                storageTy);
     addPointerParameter(storageTy);
   }
 }
@@ -2573,8 +2580,12 @@ void CallEmission::emitToUnmappedMemory(Address result) {
   llvm::Type *storageTy = Args[0]->getType()->getPointerElementType();;
   if (FnConv.getNumIndirectSILResults() == 1) {
     for (auto indirectResultType : FnConv.getIndirectSILResultTypes(
-             IGF.IGM.getMaximalTypeExpansionContext()))
-      storageTy = IGF.IGM.getStorageType(indirectResultType);
+             IGF.IGM.getMaximalTypeExpansionContext())) {
+      bool isFixedSize =
+          isa<FixedTypeInfo>(IGF.IGM.getTypeInfo(indirectResultType));
+      storageTy = isFixedSize ? IGF.IGM.getStorageType(indirectResultType)
+                              : IGF.IGM.OpaqueTy;
+    }
   }
   addIndirectResultAttributes(IGF.IGM, CurCallee.getMutableAttributes(), 0,
                               FnConv.getNumIndirectSILResults() <= 1,

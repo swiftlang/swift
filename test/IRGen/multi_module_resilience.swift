@@ -16,6 +16,7 @@
 import OtherModule
 
 // CHECK-LABEL: define {{(dllexport |protected )?}}swiftcc void @"$s4main7copyFoo3foo11OtherModule0C0VAF_tF"
+// CHECK: [[SRET:%.*]] = bitcast %swift.opaque* %0 to %T11OtherModule3FooV*
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s11OtherModule3FooVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
@@ -33,7 +34,7 @@ import OtherModule
 // CHECK: [[SRC:%.*]] = bitcast [[FOO]]* %1 to %swift.opaque*
 // CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
 //   Perform 'initializeWithCopy' via the VWT.
-// CHECK: [[DEST:%.*]] = bitcast [[FOO]]* %0 to %swift.opaque*
+// CHECK: [[DEST:%.*]] = bitcast [[FOO]]* [[SRET]] to %swift.opaque*
 // CHECK: [[SRC:%.*]] = bitcast [[FOO]]* [[COPY]] to %swift.opaque*
 // CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
 public func copyFoo(foo: Foo) -> Foo {
@@ -42,6 +43,7 @@ public func copyFoo(foo: Foo) -> Foo {
 }
 
 // CHECK-LABEL: define {{(dllexport |protected )?}}swiftcc void @"$s4main7copyBar3bar11OtherModule0C0VAF_tF"
+// CHECK: [[SRET:%.*]] = bitcast %swift.opaque* %0 to %T11OtherModule3BarV*
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s11OtherModule3BarVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
@@ -59,7 +61,7 @@ public func copyFoo(foo: Foo) -> Foo {
 // CHECK: [[SRC:%.*]] = bitcast [[BAR]]* %1 to %swift.opaque*
 // CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
 //   Perform 'initializeWithCopy' via the VWT.
-// CHECK: [[DEST:%.*]] = bitcast [[BAR]]* %0 to %swift.opaque*
+// CHECK: [[DEST:%.*]] = bitcast [[BAR]]* [[SRET]] to %swift.opaque*
 // CHECK: [[SRC:%.*]] = bitcast [[BAR]]* [[COPY]] to %swift.opaque*
 // CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
 public func copyBar(bar: Bar) -> Bar {
