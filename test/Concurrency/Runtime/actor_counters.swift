@@ -58,7 +58,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   }
 
   // Create a bunch of worker threads.
-  var workers: [Task.Handle<Void>] = []
+  var workers: [Task.Handle<Void, Error>] = []
   for i in 0..<numWorkers {
     workers.append(
       Task.runDetached {

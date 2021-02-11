@@ -19,7 +19,6 @@ import Glibc
 import CRT
 #endif
 
-
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
@@ -58,9 +57,11 @@ extension Task {
   /// this function was called.
   ///
   /// All functions available on the Task
-  // TODO: once Kavon's async properties land make this computed property
-  public static func current() async -> Task {
-    Task.unsafeCurrent!.task // !-safe, guaranteed to have a Task available.
+  // TODO: once we can have async properties land make this computed property
+  @available(*, deprecated, message: "Please use Builtin.getCurrentAsyncTask() or Task.__unsafeCurrentAsync() until this function becomes implemented.")
+  public static func current(file: StaticString = #file, line: UInt = #line) async -> Task {
+    fatalError("Task.current() is not implemented yet!", file: file, line: line)
+    Task.unsafeCurrent!.task // !-safe, guaranteed to have a Task available within an async function.
   }
 
 }
@@ -75,6 +76,7 @@ extension Task {
   ///
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.priority`
+  @available(*, deprecated, message: "Not implemented yet, until unsafeCurrent is ready. Please use Task.__unsafeCurrentAsync().priority instead.")
   public static var currentPriority: Priority {
     Task.unsafeCurrent?.priority ?? Priority.default
   }
@@ -389,6 +391,8 @@ extension Task {
     startingOn executor: ExecutorRef? = nil,
     operation: @concurrent @escaping () async -> T
   ) -> Handle<T, Never> {
+    assert(executor == nil, "Custom executor support is not implemented yet.") // FIXME
+
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -441,6 +445,8 @@ extension Task {
     startingOn executor: ExecutorRef? = nil,
     operation: @concurrent @escaping () async throws -> T
   ) -> Handle<T, Failure> {
+    assert(executor == nil, "Custom executor support is not implemented yet.") // FIXME
+
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -476,6 +482,7 @@ extension Task {
   /// This is not a perfect cure for starvation;
   /// if the task is the highest-priority task in the system, it might go
   /// immediately back to executing.
+  @available(*, deprecated, message: "Not implemented yet.")
   public static func yield() async {
     fatalError("\(#function) not implemented yet.")
   }
@@ -494,17 +501,18 @@ extension Task {
   /// asynchronous function present in this functions call stack.
   ///
   /// The returned value must not be accessed from tasks other than the current one.
+  @available(*, deprecated, message: "Not implemented yet, use Builtin.getCurrentAsyncTask() or Task.___unsafeCurrentAsync() until this function is implemented.")
   public static var unsafeCurrent: UnsafeCurrentTask? {
     // FIXME: rdar://70546948 implement this once getCurrentAsyncTask can be called from sync funcs
     //    guard let _task = Builtin.getCurrentAsyncTask() else {
     //      return nil
     //    }
     //    return UnsafeCurrentTask(_task)
-    fatalError("\(#function) is not implemented yet, can not (yet) get task from sync function")
+    fatalError("\(#function) is not implemented yet")
   }
 
-  @available(*, deprecated, message: "This should be removed", renamed: "unsafeCurrent()")
-  public static func unsafeCurrentASYNC() async -> UnsafeCurrentTask {
+  @available(*, deprecated, message: "This will be removed, and replaced by unsafeCurrent().", renamed: "unsafeCurrent()")
+  public static func __unsafeCurrentAsync() async -> UnsafeCurrentTask {
     let task = Builtin.getCurrentAsyncTask()
     _swiftRetain(task)
     return UnsafeCurrentTask(task)

@@ -13,12 +13,12 @@ import Glibc
 
 @main struct Main {
   static func main() async {
-    let one = await Task.unsafeCurrentASYNC().task // FIXME: replace with Task.current
-    let two = await Task.unsafeCurrentASYNC().task // FIXME: replace with Task.current
+    let one = await Task.__unsafeCurrentAsync().task // FIXME: replace with Task.current
+    let two = await Task.__unsafeCurrentAsync().task // FIXME: replace with Task.current
     print(one == two) // CHECK: true
     print("hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 
-    async let x = Task.unsafeCurrentASYNC().task // FIXME: replace with Task.current
+    async let x = Task.__unsafeCurrentAsync().task // FIXME: replace with Task.current
 
     let three = await x
     print(three == two) // CHECK: false
