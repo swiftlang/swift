@@ -129,7 +129,7 @@ func rethrowsWithRethrowsClosure<T : RethrowsClosure>(_ t: T) rethrows {
   try t.doIt() {}
 }
 
-try rethrowsWithRethrowsClosure(RethrowsClosureWitness())
+rethrowsWithRethrowsClosure(RethrowsClosureWitness())
 
 // Empty protocol
 @rethrows protocol Empty {}
@@ -163,3 +163,46 @@ func soundnessHole<T : SimpleThrowsClosure>(_ t: T) {
 
 // This actually can throw...
 soundnessHole(ConformsToSimpleThrowsClosure(t: Throws()))
+
+// Test deeply-nested associated conformances
+@rethrows protocol First {
+  associatedtype A : Second
+}
+
+@rethrows protocol Second {
+  associatedtype B : Third
+}
+
+@rethrows protocol Third {
+  func f() throws
+}
+
+struct FirstWitness : First {
+  typealias A = SecondWitness
+}
+
+struct SecondWitness : Second {
+  typealias B = ThirdWitness
+}
+
+struct ThirdWitness : Third {
+  func f() {}
+}
+
+func takesFirst<T : First>(_: T) rethrows {}
+
+takesFirst(FirstWitness())
+
+// Crash with enum case
+@rethrows protocol WitnessedByEnumCase {
+  static func foo(_: Int) throws -> Self
+}
+
+enum MyEnum : WitnessedByEnumCase {
+  case foo(Int)
+  case bar
+}
+
+func takesWitnessedByEnumCase<T : WitnessedByEnumCase>(_: T) rethrows {}
+
+takesWitnessedByEnumCase(MyEnum.bar)

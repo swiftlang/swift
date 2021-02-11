@@ -28,9 +28,16 @@ using namespace swift;
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const ProtocolRethrowsRequirementList list) {
-  for (auto entry : list) {
-    simple_display(out, entry.first);
-    simple_display(out, entry.second);
+  for (auto req : list.getRequirements()) {
+    simple_display(out, req);
+    out << "\n";
+  }
+
+  for (auto conf : list.getConformances()) {
+    simple_display(out, conf.first);
+    out << " : ";
+    simple_display(out, conf.second);
+    llvm::errs() << "\n";
   }
 }
 
@@ -75,6 +82,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 bool ProtocolConformanceRef::classifyAsThrows() const {
   if (!isConcrete()) { return true; }
   return evaluateOrDefault(getRequirement()->getASTContext().evaluator,
-     ProtocolConformanceRefClassifyAsThrowsRequest{ *this }, 
+     ProtocolConformanceClassifyAsThrowsRequest{getConcrete()}, 
      true);
 }

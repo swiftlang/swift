@@ -30,27 +30,25 @@ namespace swift {
 class ValueDecl;
 
 class ProtocolRethrowsRequirementList {
-public:
-  typedef std::pair<Type, ValueDecl *> Entry;
-
+  using ThrowingRequirements = ArrayRef<AbstractFunctionDecl *>;
+  using ThrowingConformances = ArrayRef<std::pair<Type, ProtocolDecl *>>;
 private:
-  ArrayRef<Entry> entries;
+  ThrowingRequirements requirements;
+  ThrowingConformances conformances;
 
 public:
-  ProtocolRethrowsRequirementList(ArrayRef<Entry> entries) : entries(entries) {}
-  ProtocolRethrowsRequirementList() : entries() {}
+  ProtocolRethrowsRequirementList(ThrowingRequirements requirements,
+                                  ThrowingConformances conformances)
+    : requirements(requirements), conformances(conformances) {}
+  ProtocolRethrowsRequirementList() {}
 
-  typedef const Entry *const_iterator;
-  typedef const_iterator iterator;
+  ThrowingRequirements getRequirements() const {
+    return requirements;
+  }
 
-  const_iterator begin() const { return entries.begin(); }
-  const_iterator end() const { return entries.end(); }
-
-  size_t size() const { return entries.size(); }
-
-  void print(raw_ostream &OS) const;
-
-  SWIFT_DEBUG_DUMP;
+  ThrowingConformances getConformances() const {
+    return conformances;
+  }
 };
 
 void simple_display(llvm::raw_ostream &out, const ProtocolRethrowsRequirementList reqs);

@@ -1531,6 +1531,10 @@ void swift::simple_display(llvm::raw_ostream &out,
   conf->printName(out);
 }
 
+SourceLoc swift::extractNearestSourceLoc(const ProtocolConformance *conformance) {
+  return extractNearestSourceLoc(conformance->getDeclContext());
+}
+
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {
   if (conformanceRef.isAbstract()) {
     simple_display(out, conformanceRef.getAbstract());
@@ -1543,7 +1547,7 @@ SourceLoc swift::extractNearestSourceLoc(const ProtocolConformanceRef conformanc
   if (conformanceRef.isAbstract()) {
     return extractNearestSourceLoc(conformanceRef.getAbstract());
   } else if (conformanceRef.isConcrete()) {
-    return extractNearestSourceLoc(conformanceRef.getConcrete()->getProtocol());
+    return extractNearestSourceLoc(conformanceRef.getConcrete());
   }
   return SourceLoc();
 }

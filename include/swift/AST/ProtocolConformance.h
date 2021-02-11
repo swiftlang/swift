@@ -1022,6 +1022,7 @@ inline bool ProtocolConformance::hasWitness(ValueDecl *requirement) const {
   return getRootConformance()->hasWitness(requirement);
 }
 
+SourceLoc extractNearestSourceLoc(const ProtocolConformance *conf);
 void simple_display(llvm::raw_ostream &out, const ProtocolConformance *conf);
 
 } // end namespace swift
