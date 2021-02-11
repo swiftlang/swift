@@ -4761,7 +4761,9 @@ public:
   }
 
 private:
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override { return false; }
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    return isa<PatternBindingDecl>(D);
+  }
 
 #define PLACEHOLDER_START "<#"
 #define PLACEHOLDER_END "#>"

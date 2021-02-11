@@ -235,6 +235,7 @@ deriveComparable_lt(
                                     C.getIdentifier(s), parentDC);
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
+    param->setImplicit();
     return param;
   };
 
