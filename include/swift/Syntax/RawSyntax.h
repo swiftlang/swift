@@ -160,7 +160,7 @@ class RawSyntax final
   /// An ID of this node that is stable across incremental parses
   SyntaxNodeId NodeId;
 
-  mutable std::atomic<int> RefCount;
+  mutable volatile int RefCount;
 
   /// If this node was allocated using a \c SyntaxArena's bump allocator, a
   /// reference to the arena to keep the underlying memory buffer of this node
@@ -246,13 +246,24 @@ class RawSyntax final
 public:
   ~RawSyntax();
 
-  // This is a copy-pased implementation of llvm::ThreadSafeRefCountedBase with
-  // the difference that we do not delete the RawSyntax node's memory if the
-  // node was allocated within a SyntaxArena and thus doesn't own its memory.
-  void Retain() const { RefCount.fetch_add(1, std::memory_order_relaxed); }
+  void Retain() const {
+    if (Arena->hasExclusiveAccess()) {
+      ++RefCount;
+    } else {
+      // See comment in SyntaxArena::Retain.
+      __atomic_fetch_add(&RefCount, 1, std::memory_order_relaxed);
+    }
+  }
 
   void Release() const {
-    int NewRefCount = RefCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
+    int NewRefCount;
+    if (Arena->hasExclusiveAccess()) {
+      NewRefCount = --RefCount;
+    } else {
+      // See comment in SyntaxArena::Retain.
+      NewRefCount =
+          __atomic_fetch_sub(&RefCount, 1, std::memory_order_relaxed) - 1;
+    }
     assert(NewRefCount >= 0 && "Reference count was already zero.");
     if (NewRefCount == 0) {
       // The node was allocated inside a SyntaxArena and thus doesn't own its

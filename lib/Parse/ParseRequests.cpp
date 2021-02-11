@@ -52,6 +52,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
   SourceFile *sf = idc->getAsGenericContext()->getParentSourceFile();
   ASTContext &ctx = idc->getDecl()->getASTContext();
+  WithExcluseiveSyntaxArenaAccessRAII exclusiveArena(ctx.getSyntaxArena());
   if (!sf) {
     // If there is no parent source file, this is a deserialized or synthesized
     // declaration context, in which case `getMembers()` has all of the members.
@@ -140,6 +141,7 @@ SourceFileParsingResult ParseSourceFileRequest::evaluate(Evaluator &evaluator,
                                                          SourceFile *SF) const {
   assert(SF);
   auto &ctx = SF->getASTContext();
+  WithExcluseiveSyntaxArenaAccessRAII exclusiveArena(ctx.getSyntaxArena());
   auto bufferID = SF->getBufferID();
 
   // If there's no buffer, there's nothing to parse.

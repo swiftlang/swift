@@ -25,7 +25,9 @@ namespace swift {
 namespace syntax {
 
 /// Memory manager for Syntax nodes.
-class SyntaxArena : public llvm::ThreadSafeRefCountedBase<SyntaxArena> {
+class SyntaxArena {
+  friend class WithExcluseiveSyntaxArenaAccessRAII;
+
   SyntaxArena(const SyntaxArena &) = delete;
   void operator=(const SyntaxArena &) = delete;
 
@@ -38,10 +40,46 @@ class SyntaxArena : public llvm::ThreadSafeRefCountedBase<SyntaxArena> {
   const void *HotUseMemoryRegionStart = nullptr;
   const void *HotUseMemoryRegionEnd = nullptr;
 
+  mutable volatile int RefCount = 0;
+
+  /// While \c HasExclusiveAccess is true, only a single thread accesses this
+  /// \c SyntaxArena and the \c RawSyntax nodes contained within. Thus, all
+  /// reference counting does not have to be thread-safe, which can
+  /// significantly improve performance.
+  bool HasExclusiveAccess = false;
+
 public:
   SyntaxArena() {}
 
   static RC<SyntaxArena> make() { return RC<SyntaxArena>(new SyntaxArena()); }
+
+  void Retain() const {
+    if (HasExclusiveAccess) {
+      ++RefCount;
+    } else {
+      // The storage of std::atomic<int> is simply an int, so we can
+      // reinterpret our unsafe ref-count as atomic<int> to perform an atomic
+      // operation on it.
+      __atomic_fetch_add(&RefCount, 1, std::memory_order_relaxed);
+    }
+  }
+
+  void Release() const {
+    int NewRefCount;
+    if (HasExclusiveAccess) {
+      NewRefCount = --RefCount;
+    } else {
+      // See comment in SyntaxArena::Retain.
+      NewRefCount =
+          __atomic_fetch_sub(&RefCount, 1, std::memory_order_relaxed) - 1;
+    }
+    assert(NewRefCount >= 0 && "Reference count was already zero.");
+    if (NewRefCount == 0) {
+      delete this;
+    }
+  }
+
+  bool hasExclusiveAccess() const { return HasExclusiveAccess; }
 
   void setHotUseMemoryRegion(const void *Start, const void *End) {
     assert(containsPointer(Start) &&
@@ -60,6 +98,27 @@ public:
       return true;
     }
     return getAllocator().identifyObject(Ptr) != llvm::None;
+  }
+};
+
+/// Having this RAII alive gives the current thread exclusive access to the
+/// passed \c SyntaxArena and all \c RawSyntax nodes stored within. Accessing
+/// any of the nodes from a different thread while the RAII is alive might lead
+/// to undefined behaviour regarding the nodes' reference counting.
+class WithExcluseiveSyntaxArenaAccessRAII {
+  RC<SyntaxArena> Arena;
+
+public:
+  WithExcluseiveSyntaxArenaAccessRAII(const RC<SyntaxArena> &Arena)
+      : Arena(Arena) {
+    assert(!Arena->HasExclusiveAccess && "Arena already has exclusive access?");
+    Arena->HasExclusiveAccess = true;
+  }
+
+  ~WithExcluseiveSyntaxArenaAccessRAII() {
+    assert(Arena->HasExclusiveAccess &&
+           "HasExclusiveAccess was changed while the RAII was alive.");
+    Arena->HasExclusiveAccess = false;
   }
 };
 
