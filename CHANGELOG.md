@@ -28,6 +28,101 @@ CHANGELOG
 Swift 5.4
 ---------
 
+* Protocol conformance checking now considers `where` clauses when evaluating if a `typealias` is a suitable witness for an associated type requirement. The following code is now rejected:
+
+  ```swift
+  protocol Holder {
+    associatedtype Contents
+  }
+
+  struct Box<T> : Holder {}
+  // error: type 'Box<T>' does not conform to protocol 'Holder'
+
+  extension Box where T : Hashable {
+    typealias Contents = T
+  }
+  ```
+
+  In most cases, the compiler would either crash or produce surprising results when making use of a `typealias` with an unsatisfied `where` clause, but it is possible that some previously-working code is now rejected. In the above example, the conformance can be fixed in one of various ways:
+
+  1) making it conditional (moving the `: Holder` from the definition of `Box` to the extension)
+  2) moving the `typealias` from the extension to the type itself
+  3) relaxing the `where` clause on the extension
+
+* Availability checking now rejects protocols that refine less available protocols. Previously, this was accepted by the compiler but could result in linker errors or runtime crashes:
+
+  ```swift
+  @available(macOS 11, *)
+  protocol Base {}
+
+  protocol Bad : Base {}
+  // error: 'Base' is only available in macOS 11 or newer
+
+  @available(macOS 11, *)
+  protocol Good : Base {} // OK
+  ```
+
+* The `@available` attribute is no longer permitted on generic parameters, where it had no effect:
+
+  ```swift
+  struct Bad<@available(macOS 11, *) T> {}
+  // error: '@available' attribute cannot be applied to this declaration
+
+  struct Good<T> {} // equivalent
+  ```
+
+* If a type is made to conform to a protocol via an extension, the availability of the extension is now taken into account when forming generic types that use this protocol conformance. For example, consider a `Box` type whose conformance to `Hashable` uses features only available on macOS 11:
+
+  ```swift
+  public struct Box {}
+
+  @available(macOS 11, *)
+  extension Box : Hashable {
+    func hash(into: inout Hasher) {
+      // call some new API to hash the value...
+    }
+  }
+
+  public func findBad(_: Set<Box>) -> Box {}
+  // warning: conformance of 'Box' to 'Hashable' is only available in macOS 11 or newer
+
+  @available(macOS 11, *)
+  public func findGood(_: Set<Box>) -> Box {} // OK
+  ```
+
+  In the above code, it is not valid for `findBad()` to take a `Set<Box>`, since `Set` requires that its element type conform to `Hashable`; however the conformance of `Box` to `Hashable` is not available prior to macOS 11.
+
+  Note that using an unavailable protocol conformance is a warning, not an error, to avoid potential source compatibility issues. This is because it was technically possible to write code in the past that made use of unavailable protocol conformances but worked anyway, if the optimizer had serendipitously eliminated all runtime dispatch through this conformance, or the code in question was entirely unreachable at runtime.
+
+  Protocol conformances can also be marked as completely unavailable or deprecated, by placing an appropriate `@available` attribute on the extension:
+
+  ```swift
+  @available(*, unavailable, message: "Not supported anymore")
+  extension Box : Hashable {}
+
+  @available(*, deprecated, message: "Suggest using something else")
+  extension Box : Hashable {}
+  ```
+
+  If a protocol conformance is defined on the type itself, it inherits availability from the type. You can move the protocol conformance to an extension if you need it to have narrower availability than the type.
+
+* When `swift` is run with no arguments, it starts a REPL (read eval print loop) that uses LLDB. The compiler also had a second REPL implementation, known as the "integrated REPL", formerly accessible by running `swift -frontend -repl`. The "integrated REPL" was only intended for use by compiler developers, and has now been removed.
+
+  Note that this does not take away the ability to put Swift code in a script and run it with `swift myScript.swift`. This so-called "script mode" is distinct from the integrated REPL, and continues to be supported.
+
+* Property wrappers now work in local contexts, making the following valid:
+
+  ```swift
+  @propertyWrapper
+  struct Wrapper<T> {
+    var wrappedValue: T
+  }
+
+  func test() {
+    @Wrapper var value = 10
+  }
+  ```
+
 * [SR-10069][]:
 
   Function overloading now works in local contexts, making the following valid:
