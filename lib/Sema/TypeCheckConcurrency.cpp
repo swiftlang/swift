@@ -542,6 +542,11 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
 
     // A function that provides an asynchronous context has no restrictions
     // on its access.
+    //
+    // FIXME: technically, synchronous functions are allowed to be cross-actor.
+    // The call-sites are just conditionally async based on where they appear
+    // (outside or inside the actor). This suggests that the implicitly-async
+    // concept could be merged into the CrossActorSelf concept.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
       if (func->isAsyncContext())
         isAccessibleAcrossActors = true;
