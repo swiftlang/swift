@@ -241,6 +241,12 @@ public:
       IsParent   = 0b11
     };
 
+    /// Values must match `TaskLocalInheritance` declared in `TaskLocal.swift`.
+    enum class TaskLocalInheritance : uint8_t {
+      Default = 0,
+      Never   = 1
+    };
+
     class TaskLocalItem {
     private:
       /// Mask used for the low status bits in a task local chain item.
@@ -325,7 +331,6 @@ public:
         size_t amountToAllocate = TaskLocalItem::itemSize(valueType);
         // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
         void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator
-        fprintf(stderr, "MALLOC link item: %d\n", allocation);
         TaskLocalItem *item =
             new(allocation) TaskLocalItem(keyType, valueType);
 
@@ -430,7 +435,7 @@ public:
 
     void popValue(AsyncTask *task);
 
-    OpaqueValue* get(const Metadata *keyType);
+    OpaqueValue* get(const Metadata *keType, TaskLocalInheritance inheritance);
   };
 
   TaskLocalValuesFragment *localValuesFragment() {
@@ -444,8 +449,9 @@ public:
     return reinterpret_cast<TaskLocalValuesFragment*>(offset);
   }
 
-  OpaqueValue* localValueGet(const Metadata *keyType) {
-    return localValuesFragment()->get(keyType);
+  OpaqueValue* localValueGet(const Metadata *keyType,
+                    TaskLocalValuesFragment::TaskLocalInheritance inheritance) {
+    return localValuesFragment()->get(keyType, inheritance);
   }
 
   // ==== TaskGroup ------------------------------------------------------------

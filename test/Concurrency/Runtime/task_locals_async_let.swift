@@ -1,17 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-
-import Dispatch
-import Foundation
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 class StringLike: CustomStringConvertible {
   let value: String
@@ -21,7 +12,6 @@ class StringLike: CustomStringConvertible {
 
   var description: String { value }
 }
-
 
 extension TaskLocalValues {
   struct NumberKey: TaskLocalKey {
@@ -49,21 +39,22 @@ func printTaskLocal<Key>(
 
 func async_let_nested() async {
   _ = try! await printTaskLocal(\.number) // COM: NumberKey: 0 {{.*}}
-  async let x1 = Task.withLocal(\.number, boundTo: 2) {
+  async let x1: () = Task.withLocal(\.number, boundTo: 2) {
     async let x2 = printTaskLocal(\.number) // COM: NumberKey: 2 {{.*}}
 
+    @concurrent
     func test() async {
       try! await printTaskLocal(\.number) // COM: NumberKey: 2 {{.*}}
       async let x31 = printTaskLocal(\.number) // COM: NumberKey: 2 {{.*}}
-      try! await x31
+      _ = try! await x31
     }
-    async let x3 = test()
+    async let x3: () = test()
 
-    try! await x2
-    try! await x3
+    _ = try! await x2
+    await x3
   }
 
-  _ = try! await x1
+  _ = await x1
   try! await printTaskLocal(\.number) // COM: NumberKey: 0 {{.*}}
 }
 
@@ -76,17 +67,21 @@ func async_let_nested_skip_optimization() async {
             async let xx = printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
             return try! await xx
           }()
-          return try! await x5
+          return await x5
         }()
-        return try! await x4
+        return await x4
       }()
-      return try! await x3
+      return await x3
     }()
-    return try! await x2
+    return await x2
   }
 
-  _ = try! await x1
+  _ = await x1
 }
 
-runAsyncAndBlock(async_let_nested)
-runAsyncAndBlock(async_let_nested_skip_optimization)
+@main struct Main {
+  static func main() async {
+    await async_let_nested()
+    await async_let_nested_skip_optimization()
+  }
+}

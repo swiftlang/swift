@@ -12,16 +12,6 @@
 
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif os(Windows)
-import CRT
-#else
-#error("Unsupported platform")
-#endif
-
 
 // ==== Task -------------------------------------------------------------------
 

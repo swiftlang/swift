@@ -1,17 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-
-import Dispatch
-import Foundation
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 class StringLike: CustomStringConvertible {
   let value: String
@@ -80,7 +71,7 @@ func simple() async {
 }
 
 func simple_deinit() async {
-  try! await Task.withLocal(\.clazz, boundTo: ClassTaskLocal()) {
+  await Task.withLocal(\.clazz, boundTo: ClassTaskLocal()) {
     // CHECK: clazz init [[C:.*]]
     try! await printTaskLocal(\.clazz) // CHECK: ClazzKey: Optional(main.ClassTaskLocal) {{.*}}
   }
@@ -136,8 +127,12 @@ func nested_3_onlyTopContributes() async {
   try! await printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
 }
 
-runAsyncAndBlock(simple)
-runAsyncAndBlock(simple_deinit)
-runAsyncAndBlock(nested)
-runAsyncAndBlock(nested_allContribute)
-runAsyncAndBlock(nested_3_onlyTopContributes)
+@main struct Main {
+  static func main() async {
+    await simple()
+    await simple_deinit()
+    await nested()
+    await nested_allContribute()
+    await nested_3_onlyTopContributes()
+  }
+}

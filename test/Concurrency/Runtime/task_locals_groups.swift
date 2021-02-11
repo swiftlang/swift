@@ -1,17 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency  %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-
-import Dispatch
-import Foundation
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 class StringLike: CustomStringConvertible {
   let value: String
@@ -54,14 +45,14 @@ func groups() async {
 
   // no value in parent, value in child
   let x1: Int = try! await Task.withGroup(resultType: Int.self) { group in
-    try! await group.add {
+    await group.add {
       try! await printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
       // inside the child task, set a value
-      try! await Task.withLocal(\.number, boundTo: 1) {
+      await Task.withLocal(\.number, boundTo: 1) {
         try! await printTaskLocal(\.number) // CHECK: NumberKey: 1 {{.*}}
       }
       try! await printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
-      return try! await Task.local(\.number) // 0
+      return await Task.local(\.number) // 0
     }
 
     return try! await group.next()!
@@ -69,7 +60,7 @@ func groups() async {
   assert(x1 == 0)
 
   // value in parent and in groups
-  try! await Task.withLocal(\.number, boundTo: 2) {
+  await Task.withLocal(\.number, boundTo: 2) {
     try! await printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 
     let x2: Int = try! await Task.withGroup(resultType: Int.self) { group in
@@ -87,4 +78,8 @@ func groups() async {
   }
 }
 
-runAsyncAndBlock(groups)
+@main struct Main {
+  static func main() async {
+    await groups()
+  }
+}

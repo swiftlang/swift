@@ -1,4 +1,4 @@
-//===--- TaskGroup.cpp - Task Group internal message channel ------------===//
+//===--- TaskGroup.cpp - Task Groups --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Object management for async child tasks that are children of a task group.
+// Object management for child tasks that are children of a task group.
 //
 //===----------------------------------------------------------------------===//
 

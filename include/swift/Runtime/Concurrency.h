@@ -18,7 +18,6 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/TaskStatus.h"
-#include "swift/Runtime/ExistentialContainer.h"
 
 namespace swift {
 class DefaultActor;
@@ -226,17 +225,21 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
+using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
+
 /// Get a task local value from the passed in task. Its Swift signature is
 ///
 /// \code
 /// func _taskLocalValueGet<Key>(
 ///   _ task: Builtin.NativeObject,
-///   keyType: Any.Type /*Key.Type*/
+///   keyType: Any.Type /*Key.Type*/,
+///   inheritance: UInt8/*TaskLocalInheritance*/
 /// ) -> UnsafeMutableRawPointer? where Key: TaskLocalKey
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue* swift_task_localValueGet(AsyncTask* task,
-                                 const Metadata *keyType);
+                                      const Metadata *keyType,
+                     TaskLocalValuesFragment::TaskLocalInheritance inheritance);
 
 /// Add a task local value to the passed in task.
 ///

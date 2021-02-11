@@ -32,6 +32,8 @@
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using GroupFragment = AsyncTask::GroupFragment;
+using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
+using TaskLocalInheritance = AsyncTask::TaskLocalValuesFragment::TaskLocalInheritance;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -237,8 +239,6 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   }
 
   headerSize += sizeof(AsyncTask::TaskLocalValuesFragment);
-  fprintf(stderr, "error: %s [%s:%d] adding values fragment size=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
-      sizeof(AsyncTask::TaskLocalValuesFragment));
 
   if (flags.task_isTaskGroup()) {
     headerSize += sizeof(AsyncTask::GroupFragment);
@@ -311,12 +311,8 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
   // Initialize the task-local allocator.
-  // TODO: consider providing an initial pre-allocated first slab to the
-  //       allocator.
+  // TODO: consider providing an initial pre-allocated first slab to the allocator.
   _swift_task_alloc_initialize(task);
-
-  fprintf(stderr, "error: %s [%s:%d] prepared task=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
-          task);
 
   return {task, initialContext};
 }
@@ -499,28 +495,21 @@ size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
 }
 
-void swift::swift_task_local_value_push(AsyncTask *task,
-                       const Metadata *keyType,
-                       /* +1 */ OpaqueValue *value, const Metadata *valueType) {
-  fprintf(stderr, "error: %s [%s:%d] PUSH keyType=%d value=%d *value=%d\n",
-          __FUNCTION__, __FILE_NAME__, __LINE__,
-          keyType, value, *reinterpret_cast<int*>(value));
+void swift::swift_task_localValuePush(AsyncTask *task,
+                                        const Metadata *keyType,
+                                        /* +1 */ OpaqueValue *value,
+                                        const Metadata *valueType) {
   task->localValuesFragment()->pushValue(task, keyType, value, valueType);
 }
 
-void swift::swift_task_local_value_pop(AsyncTask *task) {
-  fprintf(stderr, "error: %s [%s:%d] POP task=%d\n", __FUNCTION__, __FILE_NAME__, __LINE__,
-          task);
+void swift::swift_task_localValuePop(AsyncTask *task) {
   task->localValuesFragment()->popValue(task);
 }
 
-OpaqueValue* swift::swift_task_local_value_get(AsyncTask *task,
-                                             const Metadata *keyType) {
-  auto value = task->localValueGet(keyType);
-  fprintf(stderr, "error: %s [%s:%d] lookup keyType=%d value=%d\n",
-          __FUNCTION__, __FILE_NAME__, __LINE__,
-          keyType, value);
-  return value;
+OpaqueValue* swift::swift_task_localValueGet(AsyncTask *task,
+                                             const Metadata *keyType,
+                                             TaskLocalInheritance inheritance) {
+  return task->localValueGet(keyType, inheritance);
 }
 
 namespace {
