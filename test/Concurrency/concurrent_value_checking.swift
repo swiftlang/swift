@@ -151,13 +151,13 @@ class SomeClass: MainActorProto {
 @concurrent func concurrentFunc() -> NotConcurrent? { nil } // expected-warning{{cannot call function returning non-concurrent-value type 'NotConcurrent?' across actors}}
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on @concurrent types.
+// No ConcurrentValue restriction on @concurrent function types.
 // ----------------------------------------------------------------------
-typealias CF = @concurrent () -> NotConcurrent? // expected-warning{{`@concurrent` function type has non-concurrent-value result type 'NotConcurrent?'}}
-typealias BadGenericCF<T> = @concurrent () -> T? // expected-warning{{`@concurrent` function type has non-concurrent-value result type 'T?'}}
+typealias CF = @concurrent () -> NotConcurrent?
+typealias BadGenericCF<T> = @concurrent () -> T?
 typealias GoodGenericCF<T: ConcurrentValue> = @concurrent () -> T? // okay
 
-var concurrentFuncVar: (@concurrent (NotConcurrent) -> Void)? = nil // expected-warning{{`@concurrent` function type has non-concurrent-value parameter type 'NotConcurrent'}}
+var concurrentFuncVar: (@concurrent (NotConcurrent) -> Void)? = nil
 
 // ----------------------------------------------------------------------
 // ConcurrentValue restriction on @concurrent closures.
@@ -165,8 +165,9 @@ var concurrentFuncVar: (@concurrent (NotConcurrent) -> Void)? = nil // expected-
 func acceptConcurrentUnary<T>(_: @concurrent (T) -> T) { }
 
 func concurrentClosures<T>(_: T) {
-  acceptConcurrentUnary { (x: T) in // expected-warning{{`@concurrent` closure has non-concurrent-value parameter type 'T'}}
-    x
+  acceptConcurrentUnary { (x: T) in
+    _ = x // ok
+    acceptConcurrentUnary { _ in x } // expected-warning{{cannot use parameter 'x' with a non-concurrent-value type 'T' from concurrently-executed code}}
   }
 }
 
