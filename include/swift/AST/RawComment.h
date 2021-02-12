@@ -96,15 +96,51 @@ struct BasicDeclLocs {
   LineColumn EndLoc;
 };
 
-struct BasicSourceFileInfo {
+class BasicSourceFileInfo {
+  /// If this is non-null, fields other than 'FilePath' hasn't been populated.
+  /// The 'getInt()' part indicates this instance is constructed with a
+  /// SourceFile.
+  llvm::PointerIntPair<const SourceFile *, 1, bool> SFAndIsFromSF;
+
   StringRef FilePath;
-  Fingerprint InterfaceHash = Fingerprint::ZERO();
+  Fingerprint InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
   llvm::sys::TimePoint<> LastModified = {};
   uint64_t FileSize = 0;
 
-  BasicSourceFileInfo() {}
+  // Populate the from 'SF' member if exist. 'SF' will be cleared.
+  void populateWithSourceFileIfNeeded();
 
-  bool populate(const SourceFile *SF);
+public:
+  BasicSourceFileInfo(StringRef FilePath,
+                      Fingerprint InterfaceHashIncludingTypeMembers,
+                      llvm::sys::TimePoint<> LastModified, uint64_t FileSize)
+      : FilePath(FilePath),
+        InterfaceHashIncludingTypeMembers(InterfaceHashIncludingTypeMembers),
+        LastModified(LastModified), FileSize(FileSize) {}
+
+  ///  Construct with a 'SourceFile'. 'getInterfaceHashIncludingTypeMembers()',
+  ///  'getLastModified()' and 'getFileSize()' are laizily pupulated when
+  ///  accessed.
+  BasicSourceFileInfo(const SourceFile *SF);
+
+  bool isFromSourceFile() const;
+
+  StringRef getFilePath() const { return FilePath; }
+
+  Fingerprint getInterfaceHashIncludingTypeMembers() const {
+    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
+    return InterfaceHashIncludingTypeMembers;
+  }
+
+  llvm::sys::TimePoint<> getLastModified() const {
+    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
+    return LastModified;
+  }
+
+  uint64_t getFileSize() const {
+    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
+    return FileSize;
+  }
 };
 
 } // namespace swift
