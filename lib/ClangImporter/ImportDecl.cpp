@@ -2177,6 +2177,11 @@ namespace {
           if (!fd->getName().getArgumentNames().empty())
             continue;
 
+          // async methods don't conflict with properties because of sync/async
+          // overloading.
+          if (fd->hasAsync())
+            continue;
+
           foundMethod = true;
         } else if (auto *var = dyn_cast<VarDecl>(result)) {
           if (var->isInstanceMember() != decl->isInstanceProperty())
