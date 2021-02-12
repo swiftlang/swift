@@ -78,11 +78,11 @@ extension AsyncDropFirstSequence: AsyncSequence {
 extension AsyncDropFirstSequence {
   @inlinable
   public __consuming func dropFirst(
-    _ k: Int = 1
+    _ count: Int = 1
   ) -> AsyncDropFirstSequence<Base> {
-    precondition(k >= 0, 
+    precondition(count >= 0, 
       "Can't drop a negative number of elements from an async sequence")
-    return AsyncDropFirstSequence(base, dropping: limit + k)
+    return AsyncDropFirstSequence(base, dropping: self.count + count)
   }
 }
 
