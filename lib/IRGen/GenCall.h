@@ -436,6 +436,9 @@ namespace irgen {
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        CanSILFunctionType fnType);
 
+  void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
+                       CanSILFunctionType fnType, Explosion &result);
+
   Address emitAutoDiffCreateLinearMapContext(
       IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);
   Address emitAutoDiffProjectTopLevelSubcontext(
