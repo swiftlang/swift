@@ -1454,13 +1454,45 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     ASTContext &Ctx;
     SmallVector<AbstractClosureExpr *, 4> Closures;
+    SmallVector<ApplyExpr *, 4> ClosureCalls;
+
   public:
     explicit DiagnoseWalker(ASTContext &ctx, AbstractClosureExpr *ACE)
-        : Ctx(ctx), Closures() {
-          if (ACE)
-            Closures.push_back(ACE);
-        }
+        : Ctx(ctx), Closures(), ClosureCalls() {
+      if (ACE)
+        Closures.push_back(ACE);
+    }
 
+    static bool isImplicitSelfParameterUseInAutoclosureLikelyToCauseCycle(
+        Expr *E, SmallVector<AbstractClosureExpr *, 4> Closures,
+        SmallVector<ApplyExpr *, 4> ClosureCalls) {
+      auto *DRE = dyn_cast<DeclRefExpr>(E);
+      if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()))
+        return false;
+
+      // We are looking for an AutoClosureExpr that is a DoubleCurryThunk with
+      // the parent once capturing self. So there should be atleast 2 Closures
+      // for us to proceed
+      if (Closures.size() < 2)
+        return false;
+
+      auto *ACE = dyn_cast<AutoClosureExpr>(Closures[Closures.size() - 2]);
+
+      if (!ACE ||
+          ACE->getThunkKind() != AutoClosureExpr::Kind::DoubleCurryThunk)
+        return false;
+
+      for (auto i = ClosureCalls.begin(); i != ClosureCalls.end(); i++) {
+        auto *AE = *i;
+        if (AE->getFn() == ACE) {
+          auto *MayBeSelfParam = dyn_cast<DeclRefExpr>(AE->getArg());
+          return MayBeSelfParam && isa<VarDecl>(MayBeSelfParam->getDecl()) &&
+                 cast<VarDecl>(MayBeSelfParam->getDecl())->isSelfParameter();
+        }
+      }
+
+      return false;
+    }
     /// Return true if this is an implicit reference to self which is required
     /// to be explicit in an escaping closure. Metatype references and value
     /// type references are excluded.
@@ -1508,6 +1540,9 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       return true;
     }
 
+    static bool isAClosureCall(const ApplyExpr *AE) {
+      return isa<AbstractClosureExpr>(AE->getFn());
+    }
 
     // Don't walk into nested decls.
     bool walkToDeclPre(Decl *D) override {
@@ -1525,6 +1560,12 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     bool shouldWalkIntoTapExpression() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+
+      if (auto *AE = dyn_cast<ApplyExpr>(E)) {
+        if (isAClosureCall(AE))
+          ClosureCalls.push_back(AE);
+      }
+
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
@@ -1554,13 +1595,22 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase()) &&
-            isa<DeclRefExpr>(DSCE->getFn())) {
-          auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
-          memberLoc = DSCE->getLoc();
-          Diags.diagnose(DSCE->getLoc(),
-                         diag::method_call_in_closure_without_explicit_self,
-                         MethodExpr->getDecl()->getBaseIdentifier());
+        if (isa<DeclRefExpr>(DSCE->getFn())) {
+          if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase())) {
+            auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
+            memberLoc = DSCE->getLoc();
+            Diags.diagnose(DSCE->getLoc(),
+                           diag::method_call_in_closure_without_explicit_self,
+                           MethodExpr->getDecl()->getBaseIdentifier());
+          } else if (isImplicitSelfParameterUseInAutoclosureLikelyToCauseCycle(
+                         DSCE->getBase(), Closures, ClosureCalls)) {
+            auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
+            memberLoc = DSCE->getLoc();
+            Diags.diagnose(
+                DSCE->getLoc(),
+                diag::warn_method_call_in_autoclosure_without_explicit_self,
+                MethodExpr->getDecl()->getBaseIdentifier());
+          }
         }
 
       if (memberLoc.isValid()) {
@@ -1582,7 +1632,14 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
           Closures.pop_back();
         }
       }
-      
+
+      if (auto *AE = dyn_cast<ApplyExpr>(E)) {
+        if (isAClosureCall(AE)) {
+          assert(ClosureCalls.size() > 0);
+          ClosureCalls.pop_back();
+        }
+      }
+
       return E;
     }
 

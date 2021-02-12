@@ -528,3 +528,16 @@ class SR3186 {
     print("\(v)")
   }
 }
+
+var sr8536_closure: () -> () = {}
+
+class SR8536 {
+
+  func baz() {}
+
+  init() {
+    // expected-warning@+2{{call to method 'baz' in autoclosure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-note@+1{{reference 'self.' explicitly}}
+    sr8536_closure = baz
+  }
+}
