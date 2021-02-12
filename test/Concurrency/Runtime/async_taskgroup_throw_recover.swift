@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // XFAIL: windows
@@ -7,21 +7,12 @@
 
 import Dispatch
 
-struct Boom: Error {
-}
+struct Boom: Error {}
+struct IgnoredBoom: Error {}
 
-struct IgnoredBoom: Error {
-}
+func one() async -> Int { 1 }
 
-func one()
-
-async -> Int {
-  1
-}
-
-func boom()
-
-async throws -> Int {
+func boom() async throws -> Int {
   throw Boom()
 }
 
@@ -40,7 +31,8 @@ func test_taskGroup_throws() async {
         print("error caught in group: \(error)")
 
         await group.add { () async -> Int in
-          print("task 3 (cancelled: \(await Task.isCancelled()))")
+          let c = await Task.__unsafeCurrentAsync().isCancelled
+          print("task 3 (cancelled: \(c))")
           return 3
         }
 

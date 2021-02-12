@@ -19,13 +19,19 @@ extension Task {
 
   /// Returns `true` if the task is cancelled, and should stop executing.
   ///
-  /// ### Suspension
-  /// This function returns instantly and will never suspend.
+  /// If no current `Task` is available, returns `false`, as outside of a task
+  /// context no task cancellation may be observed.
   ///
   /// - SeeAlso: `checkCancellation()`
-  /* @instantaneous */
-  public static func isCancelled() async -> Bool {
-     _taskIsCancelled(Builtin.getCurrentAsyncTask())
+  public static var isCancelled: Bool {
+     Task.unsafeCurrent?.isCancelled ?? false
+  }
+
+  /// Returns `true` if the task is cancelled, and should stop executing.
+  ///
+  /// - SeeAlso: `checkCancellation()`
+  public var isCancelled: Bool {
+    _taskIsCancelled(_task)
   }
 
   /// Check if the task is cancelled and throw an `CancellationError` if it was.
@@ -42,9 +48,8 @@ extension Task {
   /// This function returns instantly and will never suspend.
   ///
   /// - SeeAlso: `isCancelled()`
-  /* @instantaneous */
-  public static func checkCancellation() async throws {
-    if await Task.isCancelled() {
+  public static func checkCancellation() throws {
+    if Task.isCancelled {
       throw CancellationError()
     }
   }
