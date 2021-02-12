@@ -214,10 +214,6 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
-  def enable_experimental_prespecialization :
-    Flag<["-"], "enable-experimental-prespecialization">,
-    HelpText<"Enable experimental pre-specialization support">;
-
 def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
