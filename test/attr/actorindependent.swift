@@ -81,9 +81,8 @@ actor A {
 }
 
 actor FromProperty {
-  // expected-note@+3{{mutable state is only available within the actor instance}}
-  // expected-note@+2{{mutable state is only available within the actor instance}}
-  // expected-note@+1{{mutable state is only available within the actor instance}}
+  // expected-note@+2 1{{mutation of this property is only permitted within the actor}}
+  // expected-note@+1 2{{property declared here}}
   var counter : Int = 0
 
   // expected-error@+2{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
@@ -94,7 +93,7 @@ actor FromProperty {
   var ticks : Int {
     // expected-error@+1{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
     get { counter }
-    // expected-error@+1{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+    // expected-error@+1{{actor-isolated property 'counter' can not be mutated from an '@actorIndependent' context}}
     set { counter = newValue }
   }
 }
