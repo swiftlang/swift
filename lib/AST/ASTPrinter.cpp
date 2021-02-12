@@ -2509,6 +2509,32 @@ static bool usesFeatureActors(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureConcurrentFunctions(Decl *decl) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (func->isConcurrent())
+      return true;
+  }
+
+  // Check for concurrent functions in the types of declarations.
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasConcurrent = type.findIf([](Type type) {
+        if (auto fnType = type->getAs<AnyFunctionType>()) {
+          if (fnType->isConcurrent())
+            return true;
+        }
+
+        return false;
+      });
+
+      if (hasConcurrent)
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll
