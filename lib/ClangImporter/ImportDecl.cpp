@@ -7823,32 +7823,6 @@ static bool hasAnyUnsafePointerParameters(FuncDecl *func) {
   return false;
 }
 
-/// Determine whether the given Objective-C method is likely to be an
-/// asynchronous handler based on its name.
-static bool isObjCMethodLikelyAsyncHandler(
-    const clang::ObjCMethodDecl *method) {
-  auto selector = method->getSelector();
-
-  for (unsigned argIdx : range(std::max(selector.getNumArgs(), 1u))) {
-    auto selectorPiece = selector.getNameForSlot(argIdx);
-    // For the first selector piece, look for the word "did" anywhere.
-    if (argIdx == 0) {
-      for (auto word : camel_case::getWords(selectorPiece)) {
-        if (word == "did" || word == "Did")
-          return true;
-      }
-
-      continue;
-    }
-
-    // Otherwise, check whether any subsequent selector piece starts with "did".
-    if (camel_case::getFirstWord(selectorPiece) == "did")
-      return true;
-  }
-
-  return false;
-}
-
 Type ClangImporter::Implementation::getMainActorType() {
   if (MainActorType)
     return *MainActorType;
@@ -8202,24 +8176,6 @@ void ClangImporter::Implementation::importAttributes(
   // Map __attribute__((pure)).
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
-  }
-
-  // Infer @asyncHandler on imported protocol methods that meet the semantic
-  // requirements.
-  if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    if (auto func = dyn_cast<FuncDecl>(MappedDecl)) {
-      if (auto proto = dyn_cast<ProtocolDecl>(func->getDeclContext())) {
-        if (proto->isObjC() && isa<clang::ObjCMethodDecl>(ClangDecl) &&
-            func->isInstanceMember() && !isa<AccessorDecl>(func) &&
-            isObjCMethodLikelyAsyncHandler(
-                cast<clang::ObjCMethodDecl>(ClangDecl)) &&
-            func->canBeAsyncHandler() &&
-            !hasAnyUnsafePointerParameters(func)) {
-          MappedDecl->getAttrs().add(
-              new (C) AsyncHandlerAttr(/*IsImplicit=*/false));
-        }
-      }
-    }
   }
 }
 
