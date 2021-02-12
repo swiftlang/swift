@@ -108,6 +108,14 @@ func genericResult<T>(completion: (T?, Error?) -> Void) where T: Numeric { }
 func genericError<E>(completion: (String?, E?) -> Void) where E: Error { }
 // GENERIC-ERROR: func genericError<E>() async throws -> String where E: Error { }
 
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=OTHER-NAME %s
+func otherName(execute: (String) -> Void) { }
+// OTHER-NAME: func otherName() async -> String { }
+
+// RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=DEFAULT_ARGS %s
+func defaultArgs(a: Int, b: Int = 10, completion: (String) -> Void) { }
+// DEFAULT_ARGS: func defaultArgs(a: Int, b: Int = 10) async -> String { }
+
 struct MyStruct {
   var someVar: (Int) -> Void {
     get {
@@ -171,7 +179,7 @@ func noParamAutoclosure(completion: @autoclosure () -> Void) { }
 // 2. Check that the various ways to call a function (and the positions the
 //    refactoring is called from) are handled correctly
 
-// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,TRAILING-ARG %s
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefixes=CONVERT-FUNC,CALL,CALL-NOLABEL,CALL-WRAPPED,TRAILING,TRAILING-PARENS,TRAILING-WRAPPED,CALL-ARG,MANY-CALL,MEMBER-CALL,MEMBER-CALL2,MEMBER-PARENS,EMPTY-CAPTURE,CAPTURE,DEFAULT-ARGS-MISSING,DEFAULT-ARGS-CALL %s
 func testCalls() {
 // CONVERT-FUNC: {{^}}func testCalls() async {
   // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+4):3 | %FileCheck -check-prefix=CALL %s
@@ -266,8 +274,51 @@ func testCalls() {
   let _: Void = simple { str in
     print("assigned")
   }
+  // CONVERT-FUNC: let _: Void = simple { str in{{$}}
+  // CONVERT-FUNC-NEXT: print("assigned"){{$}}
+  // CONVERT-FUNC-NEXT: }{{$}}
 
   // RUN: not %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3
   noParamAutoclosure(completion: print("autoclosure"))
+  // CONVERT-FUNC: noParamAutoclosure(completion: print("autoclosure")){{$}}
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=EMPTY-CAPTURE %s
+  simple { [] str in
+    print("closure with empty capture list")
+  }
+  // EMPTY-CAPTURE: let str = await simple(){{$}}
+  // EMPTY-CAPTURE-NEXT: {{^}}print("closure with empty capture list")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+2):3 | %FileCheck -check-prefix=CAPTURE %s
+  let anything = "anything"
+  simple { [unowned anything] str in
+    print("closure with capture list \(anything)")
+  }
+  // CAPTURE: let str = await simple(){{$}}
+  // CAPTURE-NEXT: {{^}}print("closure with capture list \(anything)")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=OTHER-DIRECT %s
+  otherName(execute: { str in
+    print("otherName")
+  })
+  // OTHER-DIRECT: let str = await otherName(){{$}}
+  // OTHER-DIRECT-NEXT: {{^}}print("otherName")
+  // CONVERT-FUNC: otherName(execute: { str in{{$}}
+  // CONVERT-FUNC-NEXT: print("otherName"){{$}}
+  // CONVERT-FUNC-NEXT: }){{$}}
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=DEFAULT-ARGS-MISSING %s
+  defaultArgs(a: 1) { str in
+    print("defaultArgs missing")
+  }
+  // DEFAULT-ARGS-MISSING: let str = await defaultArgs(a: 1){{$}}
+  // DEFAULT-ARGS-MISSING-NEXT: {{^}}print("defaultArgs missing")
+
+  // RUN: %refactor -convert-call-to-async-alternative -dump-text -source-filename %s -pos=%(line+1):3 | %FileCheck -check-prefix=DEFAULT-ARGS-CALL %s
+  defaultArgs(a: 1, b: 2) { str in
+    print("defaultArgs")
+  }
+  // DEFAULT-ARGS-CALL: let str = await defaultArgs(a: 1, b: 2){{$}}
+  // DEFAULT-ARGS-CALL-NEXT: {{^}}print("defaultArgs")
 }
 // CONVERT-FUNC: {{^}}}
