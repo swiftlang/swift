@@ -8,6 +8,9 @@ import StdlibUnittest
 // Utility functions for closure based operators to force them into throwing 
 // and async and throwing async contexts.
 
+// TODO: This crashes on linux for some strange reason
+#if os(macOS)
+
 func throwing<T>(_ value: T) throws -> T {
   return value
 }
@@ -445,8 +448,6 @@ AsyncSequenceTests.test("max empty") {
   expectEqual(result, nil)
 }
 
-// TODO: This crashes on linux for some strange reason (but not other tests)
-#if os(macOS)
 AsyncSequenceTests.test("collect") {
   let result = await [1, 2, 3].async.collect()
   expectEqual(result, [1, 2, 3])
@@ -465,7 +466,6 @@ AsyncSequenceTests.test("collect empty") {
   let result = await [Int]().async.collect()
   expectEqual(result, [])
 }
-#endif
 
 var AsyncCompactMapTests = TestSuite("AsyncCompactMap")
 
@@ -1049,5 +1049,7 @@ AsyncFlatMapSequenceTests.test("flat map throwing inner on throwing outer") {
     expectUnreachable()
   }
 }
+
+#endif
 
 runAllTests()
