@@ -45,7 +45,7 @@ extension MyActor {
     set { }
   }
 
-  // expected-note@+1 {{add 'async' to function 'actorIndependentFunc(otherActor:)' to make it asynchronous}} {{none}}
+  // expected-note@+1 {{add 'async' to function 'actorIndependentFunc(otherActor:)' to make it asynchronous}} {{67-67= async}}
   @actorIndependent func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
     _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from an '@actorIndependent' context}}
@@ -279,7 +279,7 @@ struct GenericStruct<T> {
   }
 
   // expected-note@+2 {{add '@asyncHandler' to function 'h()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
-  // expected-note@+1 {{add 'async' to function 'h()' to make it asynchronous}} {{none}}
+  // expected-note@+1 {{add 'async' to function 'h()' to make it asynchronous}} {{39-39= async}}
   @GenericGlobalActor<String> func h() {
     f() // expected-error{{'async' in a function that does not support concurrency}}
     _ = f // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
