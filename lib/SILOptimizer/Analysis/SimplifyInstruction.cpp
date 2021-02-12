@@ -348,8 +348,13 @@ static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
   for (Operand *op : Cast->getUses()) {
     switch (op->getUser()->getKind()) {
       case SILInstructionKind::DestroyValueInst:
+        break;
       case SILInstructionKind::StrongReleaseInst:
       case SILInstructionKind::StrongRetainInst:
+        // ref-casts can cast from an Optional<Classtype>. But strong_retain/
+        // strong_release don't accept an optional.
+        if (!Cast->getOperand(0)->getType().isReferenceCounted(Cast->getModule()))
+          return SILValue();
         break;
       default:
         return SILValue();
