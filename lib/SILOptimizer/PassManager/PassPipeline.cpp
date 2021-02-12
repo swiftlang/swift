@@ -345,6 +345,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // class_method/witness_method instructions may use concrete types now.
   P.addDevirtualizer();
 
+//!!! New Experimental Passes
+  P.addSemanticARCOpts();
+//!!! End new passes
+
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
     // Does not inline functions with defined semantics.
