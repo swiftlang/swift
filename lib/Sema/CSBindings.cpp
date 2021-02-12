@@ -436,6 +436,8 @@ void BindingSet::finalize(
   inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
 
+  determineLiteralCoverage();
+
   if (auto *locator = TypeVar->getImpl().getLocator()) {
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
       // If this is a base of an unresolved member chain, as a last
@@ -546,43 +548,67 @@ void BindingSet::addBinding(PotentialBinding binding) {
       return;
   }
 
-  // Check whether the given binding covers any of the literal protocols
-  // associated with this type variable.
-  {
-    bool allowsNil = canBeNil();
-
-    for (auto &literal : Literals) {
-      auto *protocol = literal.first;
-
-      // Skip conformance to `nil` protocol since it doesn't
-      // have a default type and can't affect binding set.
-      if (protocol->isSpecificProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral))
-        continue;
-
-      auto &info = literal.second;
-
-      if (!info.viableAsBinding())
-        continue;
-
-      bool isCovered = false;
-      Type adjustedTy;
-
-      std::tie(isCovered, adjustedTy) =
-          isLiteralCoveredBy(info, binding, allowsNil);
-
-      if (!isCovered)
-        continue;
-
-      binding = binding.withType(adjustedTy);
-      info.setCoveredBy(binding.getSource());
-    }
-  }
-
   for (auto *adjacentVar : referencedTypeVars)
     AdjacentVars.insert(adjacentVar);
 
   (void)Bindings.insert(std::move(binding));
+}
+
+void BindingSet::determineLiteralCoverage() {
+  if (Literals.empty())
+    return;
+
+  SmallVector<PotentialBinding, 4> adjustedBindings;
+
+  bool allowsNil = canBeNil();
+
+  for (auto binding = Bindings.begin(); binding != Bindings.end();) {
+    bool isCovered = false;
+    Type adjustedTy;
+
+    // Tracks the number of covered literal requirements,
+    // so checking could be stopped as soon as all of the
+    // requirements are satisfied.
+    unsigned numCoveredRequirements = 0;
+    for (auto &literalRequirement : Literals) {
+      auto &literalInfo = literalRequirement.second;
+
+      if (!literalInfo.viableAsBinding()) {
+        ++numCoveredRequirements;
+        continue;
+      }
+
+      std::tie(isCovered, adjustedTy) =
+          literalInfo.isCoveredBy(*binding, CS.DC, allowsNil);
+
+      if (isCovered) {
+        literalInfo.setCoveredBy(binding->getSource());
+        ++numCoveredRequirements;
+        break;
+      }
+    }
+
+    // If the type has been adjusted, we need to re-insert
+    // the binding but skip all of the previous checks.
+    //
+    // It's okay to do this here since iteration stops after
+    // first covering binding has been found.
+    if (isCovered && adjustedTy) {
+      binding = Bindings.erase(binding);
+      adjustedBindings.push_back(binding->withType(adjustedTy));
+      continue;
+    }
+
+    // If all of the literal requirements are now covered
+    // by existing bindings, there is nothing left to do.
+    if (numCoveredRequirements == Literals.size())
+      break;
+
+    ++binding;
+  }
+
+  for (auto &newBinding : adjustedBindings)
+    (void)Bindings.insert(std::move(newBinding));
 }
 
 void BindingSet::addLiteralRequirement(Constraint *constraint) {
@@ -636,36 +662,6 @@ void BindingSet::addLiteralRequirement(Constraint *constraint) {
   // protocol.
   LiteralRequirement literal(
       constraint, TypeChecker::getDefaultType(protocol, CS.DC), isDirect);
-
-  if (literal.viableAsBinding()) {
-    bool allowsNil = canBeNil();
-
-    for (auto binding = Bindings.begin(); binding != Bindings.end();
-         ++binding) {
-      bool isCovered = false;
-      Type adjustedTy;
-
-      std::tie(isCovered, adjustedTy) =
-          isLiteralCoveredBy(literal, *binding, allowsNil);
-
-      // No luck here, let's try next literal requirement.
-      if (!isCovered)
-        continue;
-
-      // If the type has been adjusted, we need to re-insert
-      // the binding but skip all of the previous checks.
-      //
-      // It's okay to do this here since iteration stops after
-      // first covering binding has been found.
-      if (adjustedTy) {
-        Bindings.erase(binding);
-        Bindings.insert(binding->withType(adjustedTy));
-      }
-
-      literal.setCoveredBy(binding->getSource());
-      break;
-    }
-  }
 
   Literals.insert({protocol, std::move(literal)});
 }

@@ -206,11 +206,6 @@ struct LiteralRequirement {
                                     bool canBeNil,
                                     DeclContext *useDC) const;
 
-  void resetCoverage() {
-    assert(isCovered() && "literal requirement is uncovered");
-    CoveredBy = nullptr;
-  }
-
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
@@ -326,11 +321,11 @@ public:
 
   BindingSet(const PotentialBindings &info)
       : CS(info.CS), TypeVar(info.TypeVar), Info(info) {
-    for (auto *literal : info.Literals)
-      addLiteralRequirement(literal);
-
     for (const auto &binding : info.Bindings)
       addBinding(binding);
+
+    for (auto *literal : info.Literals)
+      addLiteralRequirement(literal);
 
     for (auto *constraint : info.Defaults)
       addDefault(constraint);
@@ -512,7 +507,6 @@ private:
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
-
   void finalize(
       llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
 
@@ -574,6 +568,10 @@ private:
     auto defaultTy = constraint->getSecondType();
     Defaults.insert({defaultTy->getCanonicalType(), constraint});
   }
+
+  /// Check whether the given binding set covers any of the
+  /// literal protocols associated with this type variable.
+  void determineLiteralCoverage();
 };
 
 } // end namespace inference
