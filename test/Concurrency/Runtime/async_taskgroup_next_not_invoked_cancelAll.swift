@@ -16,7 +16,7 @@ func test_skipCallingNext_butInvokeCancelAll() async {
       await group.add { () async -> Int in
         sleep(1)
         print("  inside group.add { \(n) }")
-        let cancelled = await Task.isCancelled()
+        let cancelled = await Task.__unsafeCurrentAsync().isCancelled
         print("  inside group.add { \(n) } (canceled: \(cancelled))")
         return n
       }
@@ -25,7 +25,8 @@ func test_skipCallingNext_butInvokeCancelAll() async {
     group.cancelAll()
 
     // return immediately; the group should wait on the tasks anyway
-    print("return immediately 0 (canceled: \(await Task.isCancelled()))")
+    let c = await Task.__unsafeCurrentAsync().isCancelled
+    print("return immediately 0 (canceled: \(c))")
     return 0
   }
 
