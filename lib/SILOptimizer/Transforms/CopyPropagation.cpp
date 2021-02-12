@@ -75,13 +75,6 @@ void CopyPropagation::run() {
   auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
   auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
 
-  //!!!
-  if (f->hasName("$ss18_StringBreadcrumbsCyABSScfc")) {
-    llvm::DebugFlag = true;
-    llvm::setCurrentDebugType("copy-propagation");
-  }
-  SWIFT_DEFER { llvm::DebugFlag = false; };
-
   // Debug label for unit testing.
   LLVM_DEBUG(llvm::dbgs() << "*** CopyPropagation: " << f->getName() << "\n");
 
