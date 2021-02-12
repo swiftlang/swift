@@ -61,7 +61,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   var workers: [Task.Handle<Void>] = []
   for i in 0..<numWorkers {
     workers.append(
-      Task.runDetached {
+      Task.runDetached { [counters] in
         usleep(UInt32.random(in: 0..<100) * 1000)
         await worker(
           identity: i, counters: counters, numIterations: numIterations,

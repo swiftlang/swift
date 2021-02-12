@@ -118,7 +118,7 @@ func testConcurrency() {
   }
   acceptConcurrent {
     print(x) // expected-warning{{cannot use let 'x' with a non-concurrent-value type 'NotConcurrent' from concurrently-executed code}}
-    print(y) // expected-warning{{cannot use var 'y' with a non-concurrent-value type 'NotConcurrent' from concurrently-executed code}}
+    print(y) // expected-error{{reference to captured var 'y' in concurrently-executing code}}
   }
 }
 
@@ -147,8 +147,7 @@ class SomeClass: MainActorProto {
 // ConcurrentValue restriction on concurrent functions.
 // ----------------------------------------------------------------------
 
-// FIXME: poor diagnostic
-@concurrent func concurrentFunc() -> NotConcurrent? { nil } // expected-warning{{cannot call function returning non-concurrent-value type 'NotConcurrent?' across actors}}
+@concurrent func concurrentFunc() -> NotConcurrent? { nil }
 
 // ----------------------------------------------------------------------
 // No ConcurrentValue restriction on @concurrent function types.
@@ -222,9 +221,20 @@ class C5: UnsafeConcurrentValue {
 }
 
 class C6: C5 {
-  var y: Int = 0 // still okay
+  var y: Int = 0 // still okay, it's unsafe
 }
 
+class C7<T>: ConcurrentValue { }
+
+class C8: C7<Int> { } // okay
+
+open class C9: ConcurrentValue { } // expected-error{{open class 'C9' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
+
+public class C10: ConcurrentValue { }
+// expected-note@-1{{superclass is declared here}}
+open class C11: C10 { }
+// expected-error@-1{{superclass 'C10' of open class must be open}}
+// expected-error@-2{{open class 'C11' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 
 // ----------------------------------------------------------------------
 // UnsafeConcurrentValue disabling checking

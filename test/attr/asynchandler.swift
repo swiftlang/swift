@@ -60,7 +60,7 @@ class Y: P {
   // @asyncHandler is not inferred for classes
 
   func callback() {
-    // expected-note@-1{{add 'async' to function 'callback()' to make it asynchronous}} {{none}}
+    // expected-note@-1{{add 'async' to function 'callback()' to make it asynchronous}} {{18-18= async}}
     // expected-note@-2{{add '@asyncHandler' to function 'callback()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
 
     // okay, it's an async context

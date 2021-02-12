@@ -26,6 +26,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
+#include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1445,6 +1446,110 @@ void TypeChecker::diagnoseDuplicateCaptureVars(CaptureListExpr *expr) {
   diagnoseDuplicateDecls(captureListVars);
 }
 
+template<typename ...DiagIDAndArgs> InFlightDiagnostic
+diagnoseAtAttrOrDecl(DeclAttribute *attr, ValueDecl *VD,
+                     DiagIDAndArgs... idAndArgs) {
+  ASTContext &ctx = VD->getASTContext();
+  if (attr->getLocation().isValid())
+    return ctx.Diags.diagnose(attr->getLocation(), idAndArgs...);
+  else
+    return ctx.Diags.diagnose(VD, idAndArgs...);
+}
+
+template <typename Attr>
+static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
+                            Optional<bool> expected,
+                            llvm::function_ref<Attr*()> willCreate) {
+  if (!expected) return;
+
+  auto attr = VD->getAttrs().getAttribute<Attr>();
+  if (*expected == (attr != nullptr)) return;
+
+  auto diagnoseChangeByAccessNote =
+      [&](Diag<StringRef, bool, StringRef, DescriptiveDeclKind> diagID,
+          Diag<bool> fixitID) -> InFlightDiagnostic {
+    bool isModifier = attr->isDeclModifier();
+
+    diagnoseAtAttrOrDecl(attr, VD, diagID, notes.Reason, isModifier,
+                          attr->getAttrName(), VD->getDescriptiveKind());
+    return diagnoseAtAttrOrDecl(attr, VD, fixitID, isModifier);
+  };
+
+  if (*expected) {
+    attr = willCreate();
+    VD->getAttrs().add(attr);
+
+    SmallString<64> attrString;
+    llvm::raw_svector_ostream os(attrString);
+    attr->print(os, VD);
+
+    diagnoseChangeByAccessNote(diag::attr_added_by_access_note,
+                               diag::fixit_attr_added_by_access_note)
+      .fixItInsert(VD->getAttributeInsertionLoc(attr->isDeclModifier()),
+                   attrString);
+  } else {
+    VD->getAttrs().removeAttribute(attr);
+    diagnoseChangeByAccessNote(diag::attr_removed_by_access_note,
+                               diag::fixit_attr_removed_by_access_note)
+      .fixItRemove(attr->getRangeWithAt());
+  }
+}
+
+static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
+                            const AccessNotesFile &notes) {
+  ASTContext &ctx = VD->getASTContext();
+
+  addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]{
+    return ObjCAttr::create(ctx, note.ObjCName, false);
+  });
+
+  addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, [&]{
+    return new (ctx) DynamicAttr(true);
+  });
+
+  if (note.ObjCName) {
+    auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
+    assert(attr && "ObjCName set, but ObjCAttr not true or did not apply???");
+
+    if (!attr->hasName()) {
+      attr->setName(*note.ObjCName, true);
+      diagnoseAtAttrOrDecl(attr, VD,
+                           diag::attr_objc_name_changed_by_access_note,
+                           notes.Reason, VD->getDescriptiveKind(),
+                           *note.ObjCName);
+
+      SmallString<64> newNameString;
+      llvm::raw_svector_ostream os(newNameString);
+      os << "(";
+      os << *note.ObjCName;
+      os << ")";
+
+      auto note = diagnoseAtAttrOrDecl(attr, VD,
+                            diag::fixit_attr_objc_name_changed_by_access_note);
+
+      if (attr->getLParenLoc().isValid())
+        note.fixItReplace({ attr->getLParenLoc(), attr->getRParenLoc() },
+                          newNameString);
+      else
+        note.fixItInsertAfter(attr->getLocation(), newNameString);
+    }
+    else if (attr->getName() != *note.ObjCName) {
+      diagnoseAtAttrOrDecl(attr, VD,
+                           diag::attr_objc_name_conflicts_with_access_note,
+                           notes.Reason, VD->getDescriptiveKind(),
+                           *note.ObjCName, *attr->getName());
+    }
+  }
+}
+
+evaluator::SideEffect
+ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+  AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
+  if (auto note = notes.lookup(VD))
+    applyAccessNote(VD, *note.get(), notes);
+  return {};
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -1466,7 +1571,11 @@ public:
     FrontendStatsTracer StatsTracer(getASTContext().Stats,
                                     "typecheck-decl", decl);
     PrettyStackTraceDecl StackTrace("type-checking", decl);
-    
+
+    if (auto VD = dyn_cast<ValueDecl>(decl))
+      (void)evaluateOrDefault(VD->getASTContext().evaluator,
+                              ApplyAccessNoteRequest{VD}, {});
+
     DeclVisitor<DeclChecker>::visit(decl);
 
     TypeChecker::checkUnsupportedProtocolType(decl);

@@ -1472,6 +1472,9 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
 
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+  // Access notes may add attributes that affect this calculus.
+  (void)evaluateOrDefault(evaluator, ApplyAccessNoteRequest{VD}, {});
+
   auto dc = VD->getDeclContext();
   Optional<ObjCReason> isObjC;
   if (dc->getSelfClassDecl() && !isa<TypeDecl>(VD)) {
