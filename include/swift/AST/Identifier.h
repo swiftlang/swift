@@ -820,6 +820,13 @@ public:
   /// Construct an invalid ObjCSelector.
   ObjCSelector() : Storage() {}
 
+  /// Split \p string into selector pieces on colons to create an ObjCSelector.
+  ///
+  /// This should not be used to parse selectors written directly in Swift
+  /// source source code (e.g. the argument of an @objc attribute). Use the
+  /// parser for that.
+  static llvm::Optional<ObjCSelector> parse(ASTContext &ctx, StringRef string);
+
   /// Convert to true if the decl name is valid.
   explicit operator bool() const { return (bool)Storage; }
 

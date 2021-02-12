@@ -5653,5 +5653,35 @@ ERROR(atomics_ordering_must_be_constant, none,
       "ordering argument must be a static method or property of %0",
       (Identifier))
 
+//------------------------------------------------------------------------------
+// MARK: access notes
+//------------------------------------------------------------------------------
+
+REMARK(attr_added_by_access_note, none,
+       "access note for %0 adds %select{attribute|modifier}1 '%2' to this %3",
+       (StringRef, bool, StringRef, DescriptiveDeclKind))
+NOTE(fixit_attr_added_by_access_note, none,
+     "add %select{attribute|modifier}0 explicitly to silence this warning",
+     (bool))
+
+REMARK(attr_removed_by_access_note, none,
+       "access note for %0 removes %select{attribute|modifier}1 '%2' from "
+       "this %3",
+       (StringRef, bool, StringRef, DescriptiveDeclKind))
+NOTE(fixit_attr_removed_by_access_note, none,
+     "remove %select{attribute|modifier}0 explicitly to silence this warning",
+     (bool))
+
+REMARK(attr_objc_name_changed_by_access_note, none,
+        "access note for %0 changes the '@objc' name of this %1 to %2",
+        (StringRef, DescriptiveDeclKind, ObjCSelector))
+NOTE(fixit_attr_objc_name_changed_by_access_note, none,
+     "change '@objc' name in source code explicitly to silence this warning",
+     ())
+REMARK(attr_objc_name_conflicts_with_access_note, none,
+       "access note for %0 changes the '@objc' name of this %1 to %2, but "
+       "source code specifies %3; the access note will be ignored",
+       (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
