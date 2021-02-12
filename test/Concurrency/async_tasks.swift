@@ -82,12 +82,12 @@ func test_detached() async throws {
     await someAsyncFunc() // able to call async functions
   }
 
-  let result: String = try await handle.get()
+  let result: String = await handle.get()
   _ = result
 }
 
 func test_detached_throwing() async -> String {
-  let handle: Task.Handle<String> = Task.runDetached() {
+  let handle: Task.Handle<String, Error> = Task.runDetached() {
     try await someThrowingAsyncFunc() // able to call async functions
   }
 
