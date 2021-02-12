@@ -6527,22 +6527,31 @@ Optional<ForeignAsyncConvention> ModuleFile::maybeReadForeignAsyncConvention() {
   TypeID completionHandlerTypeID;
   unsigned completionHandlerParameterIndex;
   unsigned rawErrorParameterIndex;
+  unsigned rawErrorFlagParameterIndex;
+  bool errorFlagPolarity;
   ForeignAsyncConventionLayout::readRecord(scratch,
                                            completionHandlerTypeID,
                                            completionHandlerParameterIndex,
-                                           rawErrorParameterIndex);
+                                           rawErrorParameterIndex,
+                                           rawErrorFlagParameterIndex,
+                                           errorFlagPolarity);
 
   Type completionHandlerType = getType(completionHandlerTypeID);
   CanType canCompletionHandlerType;
   if (completionHandlerType)
     canCompletionHandlerType = completionHandlerType->getCanonicalType();
 
-  // Decode the error parameter.
+  // Decode the error and flag parameters.
   Optional<unsigned> completionHandlerErrorParamIndex;
   if (rawErrorParameterIndex > 0)
     completionHandlerErrorParamIndex = rawErrorParameterIndex - 1;
+  Optional<unsigned> completionHandlerErrorFlagParamIndex;
+  if (rawErrorFlagParameterIndex > 0)
+    completionHandlerErrorFlagParamIndex = rawErrorFlagParameterIndex - 1;
 
   return ForeignAsyncConvention(
       canCompletionHandlerType, completionHandlerParameterIndex,
-      completionHandlerErrorParamIndex);
+      completionHandlerErrorParamIndex,
+      completionHandlerErrorFlagParamIndex,
+      errorFlagPolarity);
 }

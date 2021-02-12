@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 595; // Adding Actor class decls
+const uint16_t SWIFTMODULE_VERSION_MINOR = 596; // Add flag parameter index to ForeignAsyncConvention
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1774,7 +1774,9 @@ namespace decls_block {
     FOREIGN_ASYNC_CONVENTION,
     TypeIDField, // completion handler type
     BCVBR<4>,    // completion handler parameter index
-    BCVBR<4>     // completion handler error parameter index (+1)
+    BCVBR<4>,    // completion handler error parameter index (+1)
+    BCVBR<4>,    // completion handler error flag parameter index (+1)
+    BCFixed<1>   // completion handler error flag polarity
   >;
 
   using AbstractClosureExprLayout = BCRecordLayout<
