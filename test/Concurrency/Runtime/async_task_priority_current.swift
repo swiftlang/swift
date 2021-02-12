@@ -8,6 +8,7 @@ import Darwin
 import Glibc
 #elseif os(Windows)
 import CRT
+import WinSDK
 #else
 #error("Unsupported platform")
 #endif
@@ -34,7 +35,11 @@ func test_multiple_lo_indirectly_escalated() async {
   @concurrent
   func loopUntil(priority: Task.Priority) async {
     while (await Task.__unsafeCurrentAsync().task.priority != priority) {
+#if os(Windows)
+      Sleep(1)
+#else
       sleep(1)
+#endif
     }
   }
 
