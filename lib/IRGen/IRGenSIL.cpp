@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/IR/Constant.h"
 #define DEBUG_TYPE "irgensil"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
@@ -47,6 +47,8 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
@@ -700,6 +702,10 @@ public:
   ///
   /// - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
   bool needsShadowCopy(llvm::Value *Storage) {
+    // If we have a constant data vector, we always need a shadow copy due to
+    // bugs in LLVM.
+    if (isa<llvm::ConstantDataVector>(Storage))
+      return true;
     return !isa<llvm::Constant>(Storage);
   }
 
