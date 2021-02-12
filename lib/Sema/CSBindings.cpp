@@ -694,7 +694,7 @@ Optional<BindingSet> ConstraintSystem::determineBestBindings() {
   // First, let's collect all of the possible bindings.
   for (auto *typeVar : getTypeVariables()) {
     if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
-      cache.insert({typeVar, getBindingsFor(typeVar)});
+      cache.insert({typeVar, getBindingsFor(typeVar, /*finalize=*/false)});
     }
   }
 
@@ -943,12 +943,20 @@ bool BindingSet::favoredOverDisjunction(Constraint *disjunction) const {
   return !involvesTypeVariables();
 }
 
-BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
+BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar,
+                                            bool finalize) {
   assert(typeVar->getImpl().getRepresentative(nullptr) == typeVar &&
          "not a representative");
   assert(!typeVar->getImpl().getFixedType(nullptr) && "has a fixed type");
 
-  return {CG[typeVar].getCurrentBindings()};
+  BindingSet bindings{CG[typeVar].getCurrentBindings()};
+
+  if (finalize) {
+    llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
+    bindings.finalize(cache);
+  }
+
+  return bindings;
 }
 
 /// Check whether the given type can be used as a binding for the given

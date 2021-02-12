@@ -4637,7 +4637,7 @@ public:
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
-  BindingSet getBindingsFor(TypeVariableType *typeVar);
+  BindingSet getBindingsFor(TypeVariableType *typeVar, bool finalize = true);
 
 private:
   /// Add a constraint to the constraint system.
