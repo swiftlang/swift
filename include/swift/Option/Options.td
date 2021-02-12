@@ -525,6 +525,13 @@ def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
 
+def access_notes_path : Separate<["-"], "access-notes-path">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Specify YAML file to override attributes on Swift declarations in this module">;
+def access_notes_path_EQ : Joined<["-"], "access-notes-path=">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  Alias<access_notes_path>;
+
 // Experimental feature options
 
 // Note: this flag will be removed when JVP/differential generation in the

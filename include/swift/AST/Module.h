@@ -17,6 +17,7 @@
 #ifndef SWIFT_MODULE_H
 #define SWIFT_MODULE_H
 
+#include "swift/AST/AccessNotes.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -249,6 +250,8 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
+  AccessNotesFile accessNotes;
+
   ModuleDecl(Identifier name, ASTContext &ctx, ImplicitImportInfo importInfo);
 
 public:
@@ -278,6 +281,9 @@ public:
   /// Retrieve a list of modules that each file of this module implicitly
   /// imports.
   ImplicitImportList getImplicitImports() const;
+
+  AccessNotesFile &getAccessNotes() { return accessNotes; }
+  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
 
   ArrayRef<FileUnit *> getFiles() {
     assert(!Files.empty() || failedToLoad());

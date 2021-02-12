@@ -116,13 +116,22 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
 
 void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   assert(func);
-  if (!isa<DestructorDecl>(func))
-    func->diagnose(diag::note_add_async_to_function, func->getName());
-    // TODO: we need a source location for effects attributes so that we 
-    // can also emit a fix-it that inserts 'async' in the right place for func.
-    // It's possibly a bit tricky to get the right source location from
-    // just the AbstractFunctionDecl, but it's important to circle-back
-    // to this.
+  if (!isa<DestructorDecl>(func)) {
+    auto note =
+        func->diagnose(diag::note_add_async_to_function, func->getName());
+
+    if (func->hasThrows()) {
+      auto replacement = func->getAttrs().hasAttribute<RethrowsAttr>()
+                        ? "async rethrows"
+                        : "async throws";
+
+      note.fixItReplace(SourceRange(func->getThrowsLoc()), replacement);
+
+    } else {
+      note.fixItInsert(func->getParameters()->getRParenLoc().getAdvancedLoc(1),
+                       " async");
+    }
+  }
 
   if (func->canBeAsyncHandler()) {
     func->diagnose(
@@ -1596,21 +1605,28 @@ namespace {
           return false;
 
         // Check whether this is a local variable, in which case we can
-        // determine whether it was captured by value.
+        // determine whether it was safe to access concurrently.
         if (auto var = dyn_cast<VarDecl>(value)) {
           auto parent = mutableLocalVarParent[declRefExpr];
 
-          // If we have an immediate load of this variable, or it's a let,
-          // we will separately ensure that this variable is not modified.
-          if (!var->supportsMutation() || parent.dyn_cast<LoadExpr *>()) {
+          // If the variable is immutable, it's fine so long as it involves
+          // ConcurrentValue types.
+          //
+          // When flow-sensitive concurrent captures are enabled, we also
+          // allow reads, depending on a SIL diagnostic pass to identify the
+          // remaining race conditions.
+          if (!var->supportsMutation() ||
+              (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
+               parent.dyn_cast<LoadExpr *>())) {
             return diagnoseNonConcurrentTypesInReference(
                 valueRef, getDeclContext(), loc,
                 ConcurrentReferenceKind::LocalCapture);
           }
 
-          // Otherwise, we have concurrent mutation. Complain.
+          // Otherwise, we have concurrent access. Complain.
           ctx.Diags.diagnose(
-              loc, diag::concurrent_mutation_of_local_capture,
+              loc, diag::concurrent_access_of_local_capture,
+              parent.dyn_cast<LoadExpr *>(),
               var->getDescriptiveKind(), var->getName());
           return true;
         }
@@ -2298,10 +2314,12 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
   if (!nominal)
     return;
 
-  // Actors implicitly conform to ConcurrentValue and protect their state.
   auto classDecl = dyn_cast<ClassDecl>(nominal);
-  if (classDecl && classDecl->isActor())
-    return;
+  if (classDecl) {
+    // Actors implicitly conform to ConcurrentValue and protect their state.
+    if (classDecl->isActor())
+      return;
+  }
 
   // ConcurrentValue can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
@@ -2311,6 +2329,29 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
         diag::concurrent_value_outside_source_file,
         nominal->getDescriptiveKind(), nominal->getName());
     return;
+  }
+
+  if (classDecl) {
+    // An open class cannot conform to `ConcurrentValue`.
+    if (classDecl->getFormalAccess() == AccessLevel::Open) {
+      classDecl->diagnose(
+          diag::concurrent_value_open_class, classDecl->getName());
+      return;
+    }
+
+    // A 'ConcurrentValue' class cannot inherit from another class, although
+    // we allow `NSObject` for Objective-C interoperability.
+    if (!isa<InheritedProtocolConformance>(conformance)) {
+      if (auto superclassDecl = classDecl->getSuperclassDecl()) {
+        if (!superclassDecl->isNSObject()) {
+          classDecl->diagnose(
+              diag::concurrent_value_inherit,
+              nominal->getASTContext().LangOpts.EnableObjCInterop,
+              classDecl->getName());
+          return;
+        }
+      }
+    }
   }
 
   // Stored properties of structs and classes must have

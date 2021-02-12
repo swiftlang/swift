@@ -3427,39 +3427,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   }
 }
 
-static Optional<ObjCSelector>
-parseObjCSelector(ASTContext &ctx, StringRef string) {
-  // Find the first colon.
-  auto colonPos = string.find(':');
-
-  // If there is no colon, we have a nullary selector.
-  if (colonPos == StringRef::npos) {
-    if (string.empty() || !Lexer::isIdentifier(string)) return None;
-    return ObjCSelector(ctx, 0, { ctx.getIdentifier(string) });
-  }
-
-  SmallVector<Identifier, 2> pieces;
-  do {
-    // Check whether we have a valid selector piece.
-    auto piece = string.substr(0, colonPos);
-    if (piece.empty()) {
-      pieces.push_back(Identifier());
-    } else {
-      if (!Lexer::isIdentifier(piece)) return None;
-      pieces.push_back(ctx.getIdentifier(piece));
-    }
-
-    // Move to the next piece.
-    string = string.substr(colonPos+1);
-    colonPos = string.find(':');
-  } while (colonPos != StringRef::npos);
-
-  // If anything remains of the string, it's not a selector.
-  if (!string.empty()) return None;
-
-  return ObjCSelector(ctx, pieces.size(), pieces);
-}
-
 
 namespace {
 
@@ -3627,7 +3594,7 @@ public:
 
     // Try to parse the string literal as an Objective-C selector, and complain
     // if it isn't one.
-    auto selector = parseObjCSelector(Ctx, stringLiteral->getValue());
+    auto selector = ObjCSelector::parse(Ctx, stringLiteral->getValue());
     if (!selector) {
       auto diag = Ctx.Diags.diagnose(stringLiteral->getLoc(),
                                      diag::selector_literal_invalid);

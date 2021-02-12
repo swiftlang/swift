@@ -22,6 +22,20 @@ func nested() {
 // NESTED-NEXT: print(str2)
 // NESTED-NEXT: }
 
+// RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+2):9 | %FileCheck -check-prefix=ATTRIBUTES %s
+@available(*, deprecated, message: "Deprecated")
+private func functionWithAttributes() {
+  simple { str in
+    print(str)
+  }
+}
+// ATTRIBUTES: convert_function.swift [[# @LINE-6]]:1 -> [[# @LINE-1]]:2
+// ATTRIBUTES-NEXT: @available(*, deprecated, message: "Deprecated")
+// ATTRIBUTES-NEXT: private func functionWithAttributes() async {
+// ATTRIBUTES-NEXT: let str = await simple()
+// ATTRIBUTES-NEXT: print(str)
+// ATTRIBUTES-NEXT: }
+
 // RUN: %refactor -convert-to-async -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=MANY-NESTED %s
 func manyNested() {
   simple { str1 in

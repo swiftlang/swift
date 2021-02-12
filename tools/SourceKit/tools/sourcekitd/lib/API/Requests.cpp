@@ -1825,6 +1825,15 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
     Elem.set(KeyContainerTypeUsr, Info.ContainerTypeUSR);
   if (!Info.SymbolGraph.empty())
     Elem.set(KeySymbolGraph, Info.SymbolGraph);
+  if (!Info.ParentContexts.empty()) {
+    auto Parents = Elem.setArray(KeyParentContexts);
+    for (const auto &ParentTy: Info.ParentContexts) {
+      auto Parent = Parents.appendDictionary();
+      Parent.set(KeyName, ParentTy.Title);
+      Parent.set(KeyKind, ParentTy.KindName);
+      Parent.set(KeyUSR, ParentTy.USR);
+    }
+  }
 
   return Rec(RespBuilder.createResponse());
 }
