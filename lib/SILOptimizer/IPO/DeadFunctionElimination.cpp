@@ -210,7 +210,7 @@ class DeadFunctionAndGlobalElimination {
     AliveFunctionsAndTables.insert(global);
     for (const SILInstruction &initInst : *global) {
       if (auto *fRef = dyn_cast<FunctionRefInst>(&initInst))
-        ensureAlive(fRef->getReferencedFunction());
+        ensureAlive(fRef->getReferencedFunction(), "referenced from initializer");
     }
   }
 
