@@ -1833,6 +1833,13 @@ static void lookupConcreteNestedType(NominalTypeDecl *decl,
     concreteDecls.push_back(cast<TypeDecl>(member));
 }
 
+static auto findBestConcreteNestedType(SmallVectorImpl<TypeDecl *> &concreteDecls) {
+  return std::min_element(concreteDecls.begin(), concreteDecls.end(),
+                          [](TypeDecl *type1, TypeDecl *type2) {
+                            return TypeDecl::compare(type1, type2) < 0;
+                          });
+}
+
 TypeDecl *EquivalenceClass::lookupNestedType(
                              GenericSignatureBuilder &builder,
                              Identifier name,
@@ -1940,11 +1947,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
            "Lookup should never keep a non-anchor associated type");
   } else if (!concreteDecls.empty()) {
     // Find the best concrete type.
-    auto bestConcreteTypeIter =
-      std::min_element(concreteDecls.begin(), concreteDecls.end(),
-                       [](TypeDecl *type1, TypeDecl *type2) {
-                         return TypeDecl::compare(type1, type2) < 0;
-                       });
+    auto bestConcreteTypeIter = findBestConcreteNestedType(concreteDecls);
 
     // Put the best concrete type first; the rest will follow.
     entry.types.push_back(*bestConcreteTypeIter);
@@ -3559,7 +3562,8 @@ static Type getStructuralType(TypeDecl *typeDecl, bool keepSugar) {
 
 static Type substituteConcreteType(Type parentType,
                                    TypeDecl *concreteDecl) {
-  if (parentType->is<ErrorType>())
+  if (parentType->is<ErrorType>() ||
+      parentType->is<UnresolvedType>())
     return parentType;
 
   auto *dc = concreteDecl->getDeclContext();
@@ -3612,18 +3616,14 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
           if (concreteDecls.empty())
             return ResolvedType::forUnresolved(nullptr);
 
-          auto bestConcreteTypeIter =
-            std::min_element(concreteDecls.begin(), concreteDecls.end(),
-                             [](TypeDecl *type1, TypeDecl *type2) {
-                               return TypeDecl::compare(type1, type2) < 0;
-                             });
-
+          auto bestConcreteTypeIter = findBestConcreteNestedType(concreteDecls);
           concreteDecl = *bestConcreteTypeIter;
         }
       }
 
       auto concreteType = substituteConcreteType(parentType, concreteDecl);
-      return ResolvedType::forConcrete(concreteType);
+      return maybeResolveEquivalenceClass(concreteType, resolutionKind,
+                                          wantExactPotentialArchetype);
     }
 
     // Find the nested type declaration for this.
