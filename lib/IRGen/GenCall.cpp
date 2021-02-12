@@ -4753,6 +4753,23 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   call->setTailCall();
 }
 
+void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
+                            CanSILFunctionType fnType, Explosion &result) {
+  llvm::Value *context = IGF.getAsyncContext();
+
+  Address dataAddr = asyncLayout.emitCastTo(IGF, context);
+  for (unsigned index = 0, count = asyncLayout.getDirectReturnCount();
+       index < count; ++index) {
+    auto fieldLayout = asyncLayout.getDirectReturnLayout(index);
+    Address fieldAddr =
+        fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    cast<LoadableTypeInfo>(fieldLayout.getType())
+        .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
+  }
+
+  emitAsyncReturn(IGF, asyncLayout, fnType);
+}
+
 FunctionPointer
 IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
   auto *fnTy = llvm::FunctionType::get(

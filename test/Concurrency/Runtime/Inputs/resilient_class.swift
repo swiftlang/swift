@@ -10,9 +10,15 @@ open class BaseClass<T> {
   }
 
   open func waitForNothing() async {}
+
   open func wait() async -> T {
     return value
   }
+
+  open func waitForInt() async -> Int {
+    return 123
+  }
+
   open func wait(orThrow: Bool) async throws {
     if orThrow {
       throw MyError.bad
