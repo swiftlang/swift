@@ -2716,11 +2716,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     TypeID completionHandlerTypeID = S.addTypeRef(fac.completionHandlerType());
     unsigned rawErrorParameterIndex = fac.completionHandlerErrorParamIndex()
       .map([](unsigned index) { return index + 1; }).getValueOr(0);
+    unsigned rawErrorFlagParameterIndex = fac.completionHandlerFlagParamIndex()
+      .map([](unsigned index) { return index + 1; }).getValueOr(0);
     auto abbrCode = S.DeclTypeAbbrCodes[ForeignAsyncConventionLayout::Code];
     ForeignAsyncConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                              completionHandlerTypeID,
                                              fac.completionHandlerParamIndex(),
-                                             rawErrorParameterIndex);
+                                             rawErrorParameterIndex,
+                                             rawErrorFlagParameterIndex,
+                                             fac.completionHandlerFlagIsErrorOnZero());
   }
 
   void writeGenericParams(const GenericParamList *genericParams) {
