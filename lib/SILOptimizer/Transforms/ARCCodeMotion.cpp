@@ -72,7 +72,7 @@
 #define DEBUG_TYPE "sil-rr-code-motion"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"

@@ -14,7 +14,7 @@
 #define SWIFT_SIL_BASICBLOCKUTILS_H
 
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"

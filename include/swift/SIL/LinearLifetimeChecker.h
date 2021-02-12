@@ -21,7 +21,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {

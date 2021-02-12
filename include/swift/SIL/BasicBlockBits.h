@@ -1,4 +1,4 @@
-//===--- SILBitField.h - Defines the bitfield utilities ---------*- C++ -*-===//
+//===--- BasicBlockBits.h - SILBasicBlock bit utilities ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the BasicBlockBitfield and BasicBlockFlag utilities.
+// This file defines utilities for BasicBlock bit fields and sets.
 //
 //===----------------------------------------------------------------------===//
 

@@ -18,7 +18,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockData.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
