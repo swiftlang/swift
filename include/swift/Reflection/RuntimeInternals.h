@@ -60,6 +60,40 @@ template <typename Runtime> struct ConformanceCacheEntry {
   typename Runtime::StoredPointer Witness;
 };
 
+template <typename Runtime>
+struct HeapObject {
+  typename Runtime::StoredPointer Metadata;
+  typename Runtime::StoredSize RefCounts;
+};
+
+template <typename Runtime>
+struct Job {
+  typename Runtime::StoredPointer Opaque[4];
+};
+
+template <typename Runtime>
+struct StackAllocator {
+  typename Runtime::StoredPointer LastAllocation;
+  typename Runtime::StoredPointer FirstSlab;
+  int32_t NumAllocatedSlabs;
+  bool FirstSlabIsPreallocated;
+
+  struct Slab {
+    typename Runtime::StoredPointer Next;
+    uint32_t Capacity;
+    uint32_t CurrentOffset;
+  };
+};
+
+template <typename Runtime>
+struct AsyncTask {
+  HeapObject<Runtime> HeapObject;
+  Job<Runtime> Job;
+  typename Runtime::StoredPointer ResumeContext;
+  typename Runtime::StoredSize Status;
+  typename Runtime::StoredPointer AllocatorPrivate[4];
+};
+
 } // end namespace reflection
 } // end namespace swift
 
