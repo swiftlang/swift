@@ -72,7 +72,7 @@ Android NDK, as well as the directories that contain the `libicuucswift.so` and
 `libicui18nswift.so` you downloaded or built in step one:
 
 ```
-$ ARM_DIR=path/to/libicu-libiconv-android
+$ ARM_DIR=path/to/libiconv-libicu-android/armeabi-v7a
 $ NDK_PATH=path/to/android-ndk-r21e
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
