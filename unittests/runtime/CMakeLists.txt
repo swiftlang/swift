@@ -69,6 +69,13 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       swift_Concurrency${SWIFT_PRIMARY_VARIANT_SUFFIX}
       )
+
+    if(NOT "${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
+      list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+        dispatch${SWIFT_PRIMARY_VARIANT_SUFFIX}
+        BlocksRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}
+        )
+    endif()
   endif()
 
   # Don't complain about these files not being in the sources list.

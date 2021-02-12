@@ -7,12 +7,12 @@ import _Differentiation
 // that should be treated as a differentiability result.
 
 protocol SR_13305_Protocol {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func method(x: Float, y: inout Float)
 }
 
 struct SR_13305_Struct: SR_13305_Protocol {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func method(x: Float, y: inout Float) {
     y = y * x
   }
@@ -25,7 +25,7 @@ struct SR_13305_Struct: SR_13305_Protocol {
 // 1.	Swift version 5.3-dev (LLVM f8bd914aadc2e7b, Swift ba9c433c81d51ea)
 // 2.	While evaluating request ASTLoweringRequest(Lowering AST to SIL for module main)
 // 3.	While generating SIL witness table protocol conformance to 'SR_13305_Protocol' (at sr-13305.swift:7:1) for type 'SR_13305_Struct' (declared at [sr-13305.swift:12:1 - line:17:1] RangeText="struct SR_13305_Struct: SR_13305_Protocol {
-//   @differentiable(wrt: x)
+//   @differentiable(reverse, wrt: x)
 //   func method(x: Float, y: inout Float) {
 //     y = y * x
 //   }

@@ -19,7 +19,7 @@ import Swift
 /// which involves enqueuing new partial tasks to be executed at some
 /// point. Actor classes implicitly conform to this protocol as part of their
 /// primary class definition.
-public protocol Actor: AnyObject {
+public protocol Actor: AnyObject, ConcurrentValue {
   /// Enqueue a new partial task that will be executed in the actor's context.
   func enqueue(partialTask: PartialAsyncTask)
 }
@@ -48,7 +48,7 @@ fileprivate func _registerMainActor(actor: AnyObject)
 @globalActor public final class MainActor {
   public static let shared = _Impl()
   
-  public actor class _Impl {
+  public actor _Impl {
     init() { _registerMainActor(actor: self) }
   }
 }

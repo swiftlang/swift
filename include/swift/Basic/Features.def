@@ -1,0 +1,42 @@
+//===--- Features.def - Swift Features Metaprogramming ----------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with language
+// features.
+//
+//
+// LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
+//
+//   The LANGUAGE_FEATURE macro describes each named feature that is
+//   introduced in Swift. It allows Swift code to check for a particular
+//   feature with "#if $FeatureName" in source code.
+//
+//     FeatureName: The name given to this feature to be used in source code,
+//       e.g., AsyncAwait.
+//     SENumber: The number assigned to this feature in the Swift Evolution
+//       process, or 0 if there isn't one.
+//     Description: A string literal describing the feature.
+//     Option: either a reference to a language option in the form
+//       "langOpts.<option name>" or "true" to indicate that it's always
+//       enabled.
+//===----------------------------------------------------------------------===//
+
+#ifndef LANGUAGE_FEATURE
+#  error define LANGUAGE_FEATURE before including Features.def
+#endif
+
+LANGUAGE_FEATURE(StaticAssert, 0, "#assert", langOpts.EnableExperimentalStaticAssert)
+LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
+LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
+LANGUAGE_FEATURE(Actors, 0, "actors", langOpts.EnableExperimentalConcurrency)
+
+#undef LANGUAGE_FEATURE

@@ -34,6 +34,13 @@ public struct UnsafeContinuation<T> {
   public func resume(returning value: __owned T)
 }
 
+extension UnsafeContinuation where T == Void {
+  @inlinable
+  public func resume() {
+    self.resume(returning: ())
+  }
+}
+
 @frozen
 public struct UnsafeThrowingContinuation<T> {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
@@ -55,6 +62,13 @@ public struct UnsafeThrowingContinuation<T> {
       case .failure(let err):
         self.resume(throwing: err)
     }
+  }
+}
+
+extension UnsafeThrowingContinuation where T == Void {
+  @inlinable
+  public func resume() {
+    self.resume(returning: ())
   }
 }
 

@@ -166,10 +166,8 @@ func hasCallToAsyncAlternative() {
 // RUN: %sourcekitd-test -req=cursor -pos=117:16  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=117:17  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 
-// RUN: %sourcekitd-test -req=cursor -pos=119:6  -cursor-action %s -- -Xfrontend -enable-experimental-concurrency %s | %FileCheck %s -check-prefix=CHECK-ASYNC
-// RUN: %sourcekitd-test -req=cursor -pos=121:3  -cursor-action %s -- -Xfrontend -enable-experimental-concurrency %s | %FileCheck %s -check-prefix=CHECK-CALLASYNC
-// RUN: %sourcekitd-test -req=cursor -pos=119:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NOASYNC
-// RUN: %sourcekitd-test -req=cursor -pos=121:3  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NOASYNC
+// RUN: %sourcekitd-test -req=cursor -pos=119:6  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-ASYNC
+// RUN: %sourcekitd-test -req=cursor -pos=121:3  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-CALLASYNC
 
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
 // RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
@@ -257,11 +255,5 @@ func hasCallToAsyncAlternative() {
 // CHECK-ASYNC-NOT: source.refactoring.kind.add.async-alternative
 // CHECK-ASYNC-NOT: source.refactoring.kind.convert.func-to-async
 // CHECK-CALLASYNC: ACTIONS END
-
-// CHECK-NOASYNC: ACTIONS BEGIN
-// CHECK-NOASYNC-NOT: source.refactoring.kind.add.async-alternative
-// CHECK-NOASYNC-NOT: source.refactoring.kind.convert.func-to-async
-// CHECK-NOASYNC-NOT: source.refactoring.kind.convert.call-to-async
-// CHECK-NOASYNC: ACTIONS END
 
 // REQUIRES: OS=macosx || OS=linux-gnu

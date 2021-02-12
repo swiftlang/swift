@@ -3133,7 +3133,7 @@ public protocol SingleValueDecodingContainer {
 //===----------------------------------------------------------------------===//
 
 /// A user-defined key for providing context during encoding and decoding.
-public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable {
+public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable, ConcurrentValue {
   public typealias RawValue = String
 
   /// The key's string value.
@@ -3367,7 +3367,7 @@ public enum DecodingError: Error {
 
 // The following extensions allow for easier error construction.
 
-internal struct _GenericIndexKey: CodingKey {
+internal struct _GenericIndexKey: CodingKey, ConcurrentValue {
     internal var stringValue: String
     internal var intValue: Int?
 

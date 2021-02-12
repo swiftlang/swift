@@ -13,7 +13,7 @@ import Darwin
 import Glibc
 #endif
 
-actor class Counter {
+actor Counter {
   private var value = 0
   private let scratchBuffer: UnsafeMutableBufferPointer<Int>
 

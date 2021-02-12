@@ -6,7 +6,7 @@ protocol AsyncProtocol {
   func asyncMethod() async -> Int
 }
 
-actor class MyActor {
+actor MyActor {
 }
 
 // Actors conforming to asynchronous program.
@@ -31,7 +31,7 @@ protocol SyncProtocol {
 }
 
 
-actor class OtherActor: SyncProtocol {
+actor OtherActor: SyncProtocol {
   var propertyB: Int = 17
   // expected-error@-1{{actor-isolated property 'propertyB' cannot be used to satisfy a protocol requirement}}
 

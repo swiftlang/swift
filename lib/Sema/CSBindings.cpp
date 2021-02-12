@@ -57,9 +57,6 @@ bool PotentialBinding::isViableForJoin() const {
 }
 
 bool PotentialBindings::isDelayed() const {
-  if (!DelayedBy.empty())
-    return true;
-
   if (isHole()) {
     auto *locator = TypeVar->getImpl().getLocator();
     assert(locator && "a hole without locator?");
@@ -76,9 +73,45 @@ bool PotentialBindings::isDelayed() const {
     // relies solely on contextual information.
     if (locator->directlyAt<NilLiteralExpr>())
       return true;
+
+    // It's possible that type of member couldn't be determined,
+    // and if so it would be beneficial to bind member to a hole
+    // early to propagate that information down to arguments,
+    // result type of a call that references such a member.
+    //
+    // Note: This is done here instead of during binding inference,
+    // because it's possible that variable is marked as a "hole"
+    // (or that status is propagated to it) after constraints
+    // mentioned below are recorded.
+    return llvm::any_of(DelayedBy, [&](Constraint *constraint) {
+      switch (constraint->getKind()) {
+      case ConstraintKind::ApplicableFunction:
+      case ConstraintKind::DynamicCallableApplicableFunction:
+      case ConstraintKind::BindOverload: {
+        return !ConstraintSystem::typeVarOccursInType(
+            TypeVar, CS.simplifyType(constraint->getSecondType()));
+      }
+
+      default:
+        return true;
+      }
+    });
   }
 
-  return false;
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
+    // Since force unwrap preserves l-valueness, resulting
+    // type variable has to be delayed until either l-value
+    // binding becomes available or there are no other
+    // variables to attempt.
+    if (locator->directlyAt<ForceValueExpr>() &&
+        TypeVar->getImpl().canBindToLValue()) {
+      return llvm::none_of(Bindings, [](const PotentialBinding &binding) {
+        return binding.BindingType->is<LValueType>();
+      });
+    }
+  }
+
+  return !DelayedBy.empty();
 }
 
 bool PotentialBindings::involvesTypeVariables() const {
@@ -336,8 +369,12 @@ void PotentialBindings::inferTransitiveBindings(
       addLiteral(literal.second.getSource());
 
     // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults)
+    for (const auto &def : bindings.Defaults) {
+      if (def.getSecond()->getKind() == ConstraintKind::DefaultClosureType)
+        continue;
+
       addDefault(def.second);
+    }
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
@@ -366,11 +403,45 @@ void PotentialBindings::inferTransitiveBindings(
   }
 }
 
+// If potential binding type variable is a closure that has a subtype relation
+// associated with argument conversion constraint located directly on an
+// autoclosure parameter.
+static bool
+isClosureInAutoClosureArgumentConversion(PotentialBindings &bindings) {
+
+  if (!bindings.TypeVar->getImpl().isClosureType())
+    return false;
+
+  return llvm::any_of(
+      bindings.SubtypeOf,
+      [](std::pair<TypeVariableType *, Constraint *> subType) {
+        if (subType.second->getKind() != ConstraintKind::ArgumentConversion)
+          return false;
+        return subType.second->getLocator()
+            ->isLastElement<LocatorPathElt::AutoclosureResult>();
+      });
+}
+
 void PotentialBindings::finalize(
     llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
         &inferredBindings) {
   inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
+
+  // For autoclosure parameters if we have a closure argument which could
+  // default to `() -> $T`, we avoid infering defaultable binding because
+  // an autoclosure cannot accept a closure paramenter unless the result `$T`
+  // is bound to a function type via another contextual binding. Also consider
+  // adjacent vars because they can also default transitively.
+  if (isClosureInAutoClosureArgumentConversion(*this)) {
+    auto closureDefault = llvm::find_if(
+        Defaults, [](const std::pair<CanType, Constraint *> &entry) {
+          return entry.second->getKind() == ConstraintKind::DefaultClosureType;
+        });
+    if (closureDefault != Defaults.end()) {
+      Defaults.erase(closureDefault);
+    }
+  }
 }
 
 PotentialBindings::BindingScore
@@ -575,12 +646,12 @@ PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
   } while (true);
 }
 
-bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
+void PotentialBindings::addPotentialBinding(PotentialBinding binding,
                                             bool allowJoinMeet) {
   assert(!binding.BindingType->is<ErrorType>());
 
   if (Bindings.count(binding))
-    return false;
+    return;
 
   // If this is a non-defaulted supertype binding,
   // check whether we can combine it with another
@@ -619,7 +690,7 @@ bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
     // If new binding has been joined with at least one of existing
     // bindings, there is no reason to include it into the set.
     if (!joined.empty())
-      return false;
+      return;
   }
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -630,7 +701,7 @@ bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
   }
 
   if (!isViable(binding))
-    return false;
+    return;
 
   // Check whether the given binding covers any of the literal protocols
   // associated with this type variable.
@@ -665,7 +736,7 @@ bool PotentialBindings::addPotentialBinding(PotentialBinding binding,
     }
   }
 
-  return Bindings.insert(std::move(binding));
+  Bindings.insert(std::move(binding));
 }
 
 void PotentialBindings::addLiteral(Constraint *constraint) {
@@ -1068,38 +1139,7 @@ void PotentialBindings::infer(Constraint *constraint) {
     if (!binding)
       break;
 
-    auto type = binding->BindingType;
-    if (addPotentialBinding(*binding)) {
-      // Determines whether this type variable represents an object
-      // of the optional type extracted by force unwrap.
-      if (auto *locator = TypeVar->getImpl().getLocator()) {
-        auto anchor = locator->getAnchor();
-        // Result of force unwrap is always connected to its base
-        // optional type via `OptionalObject` constraint which
-        // preserves l-valueness, so in case where object type got
-        // inferred before optional type (because it got the
-        // type from context e.g. parameter type of a function call),
-        // we need to test type with and without l-value after
-        // delaying bindings for as long as possible.
-        if (isExpr<ForceValueExpr>(anchor) &&
-            TypeVar->getImpl().canBindToLValue() && !type->is<LValueType>()) {
-          (void)addPotentialBinding(binding->withType(LValueType::get(type)));
-          DelayedBy.push_back(constraint);
-        }
-
-        // If this is a type variable representing closure result,
-        // which is on the right-side of some relational constraint
-        // let's have it try `Void` as well because there is an
-        // implicit conversion `() -> T` to `() -> Void` and this
-        // helps to avoid creating a thunk to support it.
-        auto voidType = CS.getASTContext().TheEmptyTupleType;
-        if (locator->isLastElement<LocatorPathElt::ClosureResult>() &&
-            binding->Kind == AllowedBindingKind::Supertypes) {
-          (void)addPotentialBinding({voidType, binding->Kind, constraint},
-                                    /*allowJoinMeet=*/false);
-        }
-      }
-    }
+    addPotentialBinding(*binding);
     break;
   }
   case ConstraintKind::KeyPathApplication: {
@@ -1182,16 +1222,6 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
   case ConstraintKind::BindOverload: {
-    // It's possible that type of member couldn't be determined,
-    // and if so it would be beneficial to bind member to a hole
-    // early to propagate that information down to arguments,
-    // result type of a call that references such a member.
-    if (CS.shouldAttemptFixes() && TypeVar->getImpl().canBindToHole()) {
-      if (ConstraintSystem::typeVarOccursInType(
-              TypeVar, CS.simplifyType(constraint->getSecondType())))
-        break;
-    }
-
     DelayedBy.push_back(constraint);
     break;
   }
@@ -1426,6 +1456,19 @@ bool TypeVarBindingProducer::computeNext() {
       }
     }
 
+    if (getLocator()->directlyAt<ForceValueExpr>() &&
+        TypeVar->getImpl().canBindToLValue() &&
+        !binding.BindingType->is<LValueType>()) {
+      // Result of force unwrap is always connected to its base
+      // optional type via `OptionalObject` constraint which
+      // preserves l-valueness, so in case where object type got
+      // inferred before optional type (because it got the
+      // type from context e.g. parameter type of a function call),
+      // we need to test type with and without l-value after
+      // delaying bindings for as long as possible.
+      addNewBinding(binding.withType(LValueType::get(binding.BindingType)));
+    }
+
     // Allow solving for T even for a binding kind where that's invalid
     // if fixes are allowed, because that gives us the opportunity to
     // match T? values to the T binding by adding an unwrap fix.
@@ -1466,6 +1509,17 @@ bool TypeVarBindingProducer::computeNext() {
     }
 
     if (binding.Kind == BindingKind::Supertypes) {
+      // If this is a type variable representing closure result,
+      // which is on the right-side of some relational constraint
+      // let's have it try `Void` as well because there is an
+      // implicit conversion `() -> T` to `() -> Void` and this
+      // helps to avoid creating a thunk to support it.
+      if (getLocator()->isLastElement<LocatorPathElt::ClosureResult>() &&
+          binding.Kind == AllowedBindingKind::Supertypes) {
+        auto voidType = CS.getASTContext().TheEmptyTupleType;
+        addNewBinding(binding.withSameSource(voidType, BindingKind::Exact));
+      }
+
       for (auto supertype : enumerateDirectSupertypes(type)) {
         // If we're not allowed to try this binding, skip it.
         if (auto simplifiedSuper = checkTypeOfBinding(TypeVar, supertype))

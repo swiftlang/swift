@@ -130,6 +130,9 @@ extension IndexingIterator: IteratorProtocol, Sequence {
   }
 }
 
+extension IndexingIterator: ConcurrentValue
+  where Elements: ConcurrentValue, Elements.Index: ConcurrentValue { }
+
 /// A sequence whose elements can be traversed multiple times,
 /// nondestructively, and accessed by an indexed subscript.
 ///

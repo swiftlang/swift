@@ -5,14 +5,14 @@
 import _Differentiation
 
 protocol Protocol: Differentiable {
-  @differentiable(wrt: (self, x, y))
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: (self, x, y))
+  @differentiable(reverse, wrt: x)
   func method(_ x: Float, _ y: Double) -> Float
 
-  @differentiable
+  @differentiable(reverse)
   var property: Float { get set }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   subscript(_ x: Float, _ y: Float) -> Float { get set }
 }
 
@@ -28,8 +28,8 @@ struct Struct: Protocol {
   typealias TangentVector = DummyTangentVector
   mutating func move(along _: TangentVector) {}
 
-  @differentiable(wrt: (self, x, y))
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: (self, x, y))
+  @differentiable(reverse, wrt: x)
   func method(_ x: Float, _ y: Double) -> Float {
     return x
   }
@@ -62,7 +62,7 @@ struct Struct: Protocol {
   // CHECK: apply [[VJP_FN]]
   // CHECK: }
 
-  @differentiable
+  @differentiable(reverse)
   var property: Float {
     get { 1 }
     set {}
@@ -82,7 +82,7 @@ struct Struct: Protocol {
   // CHECK: apply [[VJP_FN]]
   // CHECK: }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   subscript(_ x: Float, _ y: Float) -> Float {
     get { x }
     set {}

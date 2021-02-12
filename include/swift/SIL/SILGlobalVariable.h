@@ -128,6 +128,10 @@ public:
   SILLinkage getLinkage() const { return SILLinkage(Linkage); }
   void setLinkage(SILLinkage linkage) { Linkage = unsigned(linkage); }
 
+  /// Returns true if the linkage of the SILFunction indicates that the global
+  /// might be referenced from outside the current compilation unit.
+  bool isPossiblyUsedExternally() const;
+
   /// Get this global variable's serialized attribute.
   IsSerialized_t isSerialized() const;
   void setSerialized(IsSerialized_t isSerialized);

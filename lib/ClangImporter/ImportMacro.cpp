@@ -85,7 +85,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         Impl.getClangPreprocessor().getSpelling(tok, SpellingBuffer, &Invalid);
     if (Invalid)
       return nullptr;
-    if (TokSpelling.find('_') != StringRef::npos)
+    if (TokSpelling.contains('_'))
       return nullptr;
   }
 

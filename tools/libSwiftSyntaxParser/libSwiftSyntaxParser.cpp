@@ -154,13 +154,15 @@ private:
     node.present = true;
   }
 
-  OpaqueSyntaxNode recordToken(tok tokenKind,
-                               ArrayRef<ParsedTriviaPiece> leadingTrivia,
-                               ArrayRef<ParsedTriviaPiece> trailingTrivia,
+  OpaqueSyntaxNode recordToken(tok tokenKind, StringRef leadingTrivia,
+                               StringRef trailingTrivia,
                                CharSourceRange range) override {
+    auto leadingTriviaPieces = TriviaLexer::lexTrivia(leadingTrivia).Pieces;
+    auto trailingTriviaPieces = TriviaLexer::lexTrivia(trailingTrivia).Pieces;
+
     SmallVector<CTriviaPiece, 8> c_leadingTrivia, c_trailingTrivia;
-    makeCTrivia(c_leadingTrivia, leadingTrivia);
-    makeCTrivia(c_trailingTrivia, trailingTrivia);
+    makeCTrivia(c_leadingTrivia, leadingTriviaPieces);
+    makeCTrivia(c_trailingTrivia, trailingTriviaPieces);
     CRawSyntaxNode node;
     makeCRawToken(node, tokenKind, c_leadingTrivia, c_trailingTrivia,
                   range);

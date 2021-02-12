@@ -160,8 +160,8 @@ public:
     /// Describes a component within the graph of same-type constraints within
     /// the equivalence class that is held together by derived constraints.
     struct DerivedSameTypeComponent {
-      /// The potential archetype that acts as the anchor for this component.
-      UnresolvedType anchor;
+      /// The type that acts as the anchor for this component.
+      Type type;
 
       /// The (best) requirement source within the component that makes the
       /// potential archetypes in this component equivalent to the concrete
@@ -1424,7 +1424,7 @@ public:
 
   /// Retrieve the complete requirement source rooted at the given type.
   const RequirementSource *getSource(GenericSignatureBuilder &builder,
-                                     Type type) const;
+                                     ResolvedType type) const;
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;
@@ -1477,30 +1477,16 @@ struct GenericSignatureBuilder::Constraint {
 };
 
 class GenericSignatureBuilder::PotentialArchetype {
-  /// The parent of this potential archetype (for a nested type) or the
-  /// ASTContext in which the potential archetype resides.
-  llvm::PointerUnion<PotentialArchetype*, ASTContext*> parentOrContext;
-
-  /// The identifier describing this particular archetype.
-  ///
-  /// \c parentOrBuilder determines whether we have a nested type vs. a root.
-  union PAIdentifier {
-    /// The associated type for a resolved nested type.
-    AssociatedTypeDecl *assocType;
-
-    /// The generic parameter key for a root.
-    GenericParamKey genericParam;
-
-    PAIdentifier(AssociatedTypeDecl *assocType) : assocType(assocType) {}
-
-    PAIdentifier(GenericParamKey genericParam) : genericParam(genericParam) { }
-  } identifier;
+  /// The parent of this potential archetype, for a nested type.
+  PotentialArchetype* parent;
 
   /// The representative of the equivalence class of potential archetypes
   /// to which this potential archetype belongs, or (for the representative)
   /// the equivalence class itself.
   mutable llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
     representativeOrEquivClass;
+
+  mutable CanType depType;
 
   /// A stored nested type.
   struct StoredNestedType {
@@ -1539,7 +1525,7 @@ class GenericSignatureBuilder::PotentialArchetype {
   PotentialArchetype(PotentialArchetype *parent, AssociatedTypeDecl *assocType);
 
   /// Construct a new potential archetype for a generic parameter.
-  PotentialArchetype(ASTContext &ctx, GenericParamKey genericParam);
+  explicit PotentialArchetype(GenericTypeParamType *genericParam);
 
 public:
   /// Retrieve the representative for this archetype, performing
@@ -1558,42 +1544,17 @@ public:
   /// Retrieve the parent of this potential archetype, which will be non-null
   /// when this potential archetype is an associated type.
   PotentialArchetype *getParent() const { 
-    return parentOrContext.dyn_cast<PotentialArchetype *>();
+    return parent;
   }
 
   /// Retrieve the type declaration to which this nested type was resolved.
   AssociatedTypeDecl *getResolvedType() const {
-    assert(getParent() && "Not an associated type");
-    return identifier.assocType;
+    return cast<DependentMemberType>(depType)->getAssocType();
   }
 
   /// Determine whether this is a generic parameter.
   bool isGenericParam() const {
-    return parentOrContext.is<ASTContext *>();
-  }
-
-  /// Retrieve the generic parameter key for a potential archetype that
-  /// represents this potential archetype.
-  ///
-  /// \pre \c isGenericParam()
-  GenericParamKey getGenericParamKey() const {
-    assert(isGenericParam() && "Not a generic parameter");
-    return identifier.genericParam;
-  }
-
-  /// Retrieve the generic parameter key for the generic parameter at the
-  /// root of this potential archetype.
-  GenericParamKey getRootGenericParamKey() const {
-    if (auto parent = getParent())
-      return parent->getRootGenericParamKey();
-
-    return getGenericParamKey();
-  }
-
-  /// Retrieve the name of a nested potential archetype.
-  Identifier getNestedName() const {
-    assert(getParent() && "Not a nested type");
-    return identifier.assocType->getName();
+    return parent == nullptr;
   }
 
   /// Retrieve the set of nested types.
@@ -1645,10 +1606,16 @@ public:
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
+  CanType getDependentType() const {
+    return depType;
+  }
+
+  /// Retrieve the dependent type that describes this potential
+  /// archetype.
   ///
   /// \param genericParams The set of generic parameters to use in the resulting
   /// dependent type.
-  Type getDependentType(TypeArrayView<GenericTypeParamType> genericParams)const;
+  Type getDependentType(TypeArrayView<GenericTypeParamType> genericParams) const;
 
   /// True if the potential archetype has been bound by a concrete type
   /// constraint.
@@ -1658,9 +1625,6 @@ public:
 
     return false;
   }
-
-  /// Retrieve the AST context in which this potential archetype resides.
-  ASTContext &getASTContext() const;
 
   SWIFT_DEBUG_DUMP;
 

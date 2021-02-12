@@ -1,5 +1,8 @@
 // RUN: %target-swiftxx-frontend -I %S/Inputs -emit-ir -o - %s | %FileCheck %s
 
+// XFAIL: OS=linux-android
+// XFAIL: OS=linux-androideabi
+
 import MemoryLayout
 
 var v = PrivateMemberLayout()

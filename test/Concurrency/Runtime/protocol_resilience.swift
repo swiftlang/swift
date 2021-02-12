@@ -10,8 +10,9 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-
-// REQUIRES: OS=macosx
+// XFAIL: windows
+// UNSUPPORTED: linux
+// UNSUPPORTED: openbsd
 
 import StdlibUnittest
 import resilient_protocol

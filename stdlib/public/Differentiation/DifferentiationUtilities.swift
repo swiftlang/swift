@@ -49,7 +49,7 @@ public extension Differentiable {
   /// a context where it is differentiated with respect to, applies the given
   /// closure to the derivative of the return value.
   @inlinable
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func withDerivative(_ body: @escaping (inout TangentVector) -> Void) -> Self {
     return self
   }

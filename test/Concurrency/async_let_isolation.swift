@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-actor class MyActor {
+actor MyActor {
   let immutable: Int = 17
   var text: [String] = []
 

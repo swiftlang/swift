@@ -299,8 +299,8 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
 #define FORWARDING_OWNERSHIP(INST)                                             \
   OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
       INST##Inst *i) {                                                         \
-    return i->getOwnershipKind().getForwardingOperandOwnership(         \
-      /*allowUnowned*/false);                                           \
+    return i->getForwardingOwnershipKind().getForwardingOperandOwnership(      \
+        /*allowUnowned*/ false);                                               \
   }
 FORWARDING_OWNERSHIP(Object)
 FORWARDING_OWNERSHIP(OpenExistentialRef)
@@ -318,8 +318,8 @@ FORWARDING_OWNERSHIP(LinearFunction)
 #define FORWARDING_ANY_OWNERSHIP(INST)                                         \
   OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
       INST##Inst *i) {                                                         \
-    return i->getOwnershipKind().getForwardingOperandOwnership(         \
-      /*allowUnowned*/true);                                            \
+    return i->getForwardingOwnershipKind().getForwardingOperandOwnership(      \
+        /*allowUnowned*/ true);                                                \
   }
 FORWARDING_ANY_OWNERSHIP(Upcast)
 FORWARDING_ANY_OWNERSHIP(UncheckedRefCast)
@@ -338,8 +338,8 @@ FORWARDING_ANY_OWNERSHIP(CheckedCastBranch)
 #define AGGREGATE_OWNERSHIP(INST)                                              \
   OperandOwnership OperandOwnershipClassifier::visit##INST##Inst(              \
       INST##Inst *i) {                                                         \
-    return i->getOwnershipKind().getForwardingOperandOwnership(         \
-      /*allowUnowned*/true);                                            \
+    return i->getForwardingOwnershipKind().getForwardingOperandOwnership(      \
+        /*allowUnowned*/ true);                                                \
   }
 AGGREGATE_OWNERSHIP(Tuple)
 AGGREGATE_OWNERSHIP(Struct)
@@ -391,7 +391,7 @@ OperandOwnership OperandOwnershipClassifier::visitBranchInst(BranchInst *bi) {
 OperandOwnership
 OperandOwnershipClassifier::visitStoreBorrowInst(StoreBorrowInst *i) {
   if (getValue() == i->getSrc()) {
-    return OperandOwnership::ForwardingBorrow;
+    return OperandOwnership::InteriorPointer;
   }
   return OperandOwnership::TrivialUse;
 }

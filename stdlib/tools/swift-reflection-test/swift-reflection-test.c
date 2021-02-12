@@ -643,8 +643,15 @@ int doDumpHeapInstance(const char *BinaryFilename) {
       close(PipeMemoryReader_getParentReadFD(&Pipe));
       dup2(PipeMemoryReader_getChildReadFD(&Pipe), STDIN_FILENO);
       dup2(PipeMemoryReader_getChildWriteFD(&Pipe), STDOUT_FILENO);
-      _execv(BinaryFilename, NULL);
-      exit(EXIT_SUCCESS);
+
+      char *const argv[] = {strdup(BinaryFilename), NULL};
+      int r = _execv(BinaryFilename, argv);
+      int status = EXIT_SUCCESS;
+      if (r == -1) {
+        perror("child process");
+        status = EXIT_FAILURE;
+      }
+      exit(status);
     }
     default: { // Parent
       close(PipeMemoryReader_getChildReadFD(&Pipe));

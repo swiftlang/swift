@@ -22,6 +22,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/Unreachable.h"
+#include "llvm/ADT/DenseMap.h"
 #include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
@@ -470,6 +471,7 @@ swift_conformsToProtocolImpl(const Metadata *const type,
     return found.second;
 
   // Scan conformance records.
+  llvm::SmallDenseMap<const Metadata *, const WitnessTable *> foundWitnesses;
   auto processSection = [&](const ConformanceSection &section) {
     // Eagerly pull records for nondependent witnesses into our cache.
     auto processDescriptor = [&](const ProtocolConformanceDescriptor &descriptor) {
@@ -484,6 +486,7 @@ swift_conformsToProtocolImpl(const Metadata *const type,
       if (auto *matchingType = candidate.getMatchingType(type)) {
         auto witness = descriptor.getWitnessTable(matchingType);
         C.cacheResult(matchingType, protocol, witness, /*always cache*/ 0);
+        foundWitnesses.insert({matchingType, witness});
       }
     };
 
@@ -505,14 +508,23 @@ swift_conformsToProtocolImpl(const Metadata *const type,
       processSection(section);
   }
 
-  // Try the search again to look for the most specific cached conformance.
-  found = searchInConformanceCache(type, protocol);
+  // Find the most specific conformance that was scanned.
+  const WitnessTable *foundWitness = nullptr;
+  const Metadata *searchType = type;
+  while (!foundWitness && searchType) {
+    foundWitness = foundWitnesses.lookup(searchType);
 
-  // If it's not authoritative, then add an authoritative entry for this type.
-  if (!found.first)
-    C.cacheResult(type, protocol, found.second, snapshot.count());
+    // If there's no entry here, move up to the superclass (if any).
+    if (!foundWitness)
+      searchType = _swift_class_getSuperclass(searchType);
+  }
 
-  return found.second;
+  // If it's for a superclass or if we didn't find anything, then add an
+  // authoritative entry for this type.
+  if (searchType != type)
+    C.cacheResult(type, protocol, foundWitness, snapshot.count());
+
+  return foundWitness;
 }
 
 const ContextDescriptor *

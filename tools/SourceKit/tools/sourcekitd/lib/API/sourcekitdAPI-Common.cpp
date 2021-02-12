@@ -721,7 +721,7 @@ sourcekitd_object_t YAMLRequestParser::createObjFromNode(
     if (!Raw.getAsInteger(10, val))
       return sourcekitd_request_int64_create(val);
 
-    if (Raw.find(' ') != StringRef::npos)
+    if (Raw.contains(' '))
       return withError("Found space in non-string value", Value, Error);
 
     return sourcekitd_request_uid_create(

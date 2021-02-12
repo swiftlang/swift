@@ -17,6 +17,7 @@
 // rdar://39763787
 
 // CHECK-LABEL: define {{(dllexport |protected )?}}swiftcc void @"$s4main7copyFoo3fooAA0C0VAE_tF"
+// CHECK: [[ARG:%.*]] = bitcast %swift.opaque* %0 to %T4main3FooV
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s4main3FooVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
@@ -34,7 +35,7 @@
 // CHECK: [[SRC:%.*]] = bitcast [[FOO]]* %1 to %swift.opaque*
 // CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
 //   Perform 'initializeWithCopy' via the VWT.
-// CHECK: [[DEST:%.*]] = bitcast [[FOO]]* %0 to %swift.opaque*
+// CHECK: [[DEST:%.*]] = bitcast [[FOO]]* [[ARG]] to %swift.opaque*
 // CHECK: [[SRC:%.*]] = bitcast [[FOO]]* [[COPY]] to %swift.opaque*
 // CHECK: call %swift.opaque* [[COPYFN]](%swift.opaque* noalias [[DEST]], %swift.opaque* noalias [[SRC]], %swift.type* [[METADATA]])
 public func copyFoo(foo: Foo) -> Foo {

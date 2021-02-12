@@ -53,7 +53,7 @@ class Parsed${node.name} ${qualifier} : public Parsed${node.base_type} {
 %     end
 
 public:
-  explicit Parsed${node.name}(ParsedRawSyntaxNode rawNode)
+  explicit Parsed${node.name}(ParsedRawSyntaxNode &&rawNode)
     : Parsed${node.base_type}(std::move(rawNode)) {
   }
 

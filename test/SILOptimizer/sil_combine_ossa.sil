@@ -41,6 +41,12 @@ enum AddressOnlyEnum {
   case AddressOnly(Any)
 }
 
+enum NonTrivialLoadableEnum {
+case noPayload
+case trivialPayload(Builtin.Int32)
+case nonTrivialPayload(Builtin.NativeObject)
+}
+
 protocol FakeProtocol {
   func requirement()
 }
@@ -61,6 +67,11 @@ sil [ossa] @use_nativeobject_guaranteed : $@convention(thin) (@guaranteed Builti
 sil @use_anyobject_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
 sil @use_generic_obj_guaranteed : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
 sil [ossa] @unknown : $@convention(thin) () -> ()
+
+enum KlassNativeObjEither {
+case lhs(Klass)
+case rhs(Builtin.NativeObject)
+}
 
 //////////////////////
 // Simple DCE Tests //
@@ -4486,6 +4497,31 @@ bb0:
   return %1 : $Int64
 }
 
+sil private [ossa] @somePrivateFunction : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 27
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  return %1 : $Int64
+}
+
+sil_global [let] @pointerToSomePrivateFunction : $@callee_guaranteed () -> Int64 = {
+  %0 = function_ref @somePrivateFunction: $@convention(thin) () -> Int64
+  %initval = thin_to_thick_function %0 : $@convention(thin) () -> Int64 to $@callee_guaranteed () -> Int64
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @dontInlinePrivateFunctionRefIntoSerializedFunction
+// CHECK:         [[GA:%[0-9]+]] = global_addr
+// CHECK:         [[L:%[0-9]+]] = load [copy] [[GA]]
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'dontInlinePrivateFunctionRefIntoSerializedFunction'
+sil [serialized] [ossa] @dontInlinePrivateFunctionRefIntoSerializedFunction : $@convention(thin) () -> @owned @callee_guaranteed () -> Int64 {
+bb0:
+  %0 = global_addr @pointerToSomePrivateFunction : $*@callee_guaranteed () -> Int64
+  %1 = load [copy] %0 : $*@callee_guaranteed () -> Int64
+  return %1 : $@callee_guaranteed () -> Int64
+}
+
+
 // Check for disabled optimization of unchecked_bitwise_cast to unchecked_ref_cast in ossa
 // This test can be optimized when ossa is supported in the SILCombine for unchecked_bitwise_cast
 // CHECK-LABEL: sil [ossa] @refcast :
@@ -4769,3 +4805,99 @@ bb2(%6c : @guaranteed $__ContiguousArrayStorageBase):
   %14 = struct $MyInt (%13 : $Builtin.Int32)
   return %14 : $MyInt
 }
+
+// Make sure that we hoist the unchecked_trivial_bit_cast up the def-use chain
+// to before copy1 and make its operand copy1.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_trivial_bit_cast_hoist_up_def_use_chain : $@convention(thin) (@guaranteed AnyObject) -> UInt {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[RESULT:%.*]] = unchecked_trivial_bit_cast [[ARG_COPY]]
+// CHECK:   destroy_value [[ARG_COPY]]
+// CHECK:   cond_br undef, [[BB_UNREACHABLE:bb[0-9]*]], [[BB_RESULT:bb[0-9]*]]
+//
+// CHECK: [[BB_UNREACHABLE]]:
+// CHECK-NEXT:   unreachable
+//
+// CHECK: [[BB_RESULT]]:
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'unchecked_trivial_bit_cast_hoist_up_def_use_chain'
+sil [ossa] @unchecked_trivial_bit_cast_hoist_up_def_use_chain : $@convention(thin) (@guaranteed AnyObject) -> UInt {
+bb0(%0 : @guaranteed $AnyObject):
+  %copy1 = copy_value %0 : $AnyObject
+  %cast = unchecked_ref_cast %copy1 : $AnyObject to $Builtin.NativeObject
+  cond_br undef, bb3, bb4 
+
+bb3:
+  unreachable
+
+bb4:
+  %2 = unchecked_trivial_bit_cast %cast : $Builtin.NativeObject to $UInt
+  destroy_value %cast : $Builtin.NativeObject
+  return %2 : $UInt
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion_trivialpayload_nontrivial_enum : $@convention(thin) (@inout NonTrivialLoadableEnum) -> Builtin.Int32 {
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: unchecked_enum_data
+// CHECK-NOT: unchecked_take_enum_data_addr
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_promotion_trivialpayload_nontrivial_enum'
+sil [ossa] @unchecked_take_enum_data_addr_promotion_trivialpayload_nontrivial_enum : $@convention(thin) (@inout NonTrivialLoadableEnum) -> Builtin.Int32 {
+bb0(%0 : $*NonTrivialLoadableEnum):
+  switch_enum_addr %0 : $*NonTrivialLoadableEnum, case #NonTrivialLoadableEnum.trivialPayload!enumelt: bb1, default bb2
+
+bb1:
+  %2 = unchecked_take_enum_data_addr %0 : $*NonTrivialLoadableEnum, #NonTrivialLoadableEnum.trivialPayload!enumelt
+  %3 = load [trivial] %2 : $*Builtin.Int32
+  return %3 : $Builtin.Int32
+
+bb2:
+  unreachable
+}
+
+// Make sure that when we promote the unchecked_take_enum_data_uses in bb1, bb2,
+// we keep the loads in bb1, bb2 instead of hoisting them to the
+// unchecked_take_enum_data_addr that we are optimizing.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_promotion_host_load : $@convention(thin) (@inout FakeOptional<KlassNativeObjEither>) -> @owned KlassNativeObjEither {
+// CHECK: bb0([[ARG:%.*]] : $*
+// CHECK:   [[LOADED_ARG:%.*]] = load_borrow [[ARG]]
+// CHECK:   [[FOR_SWITCH:%.*]] = unchecked_enum_data [[LOADED_ARG]]
+// CHECK:   switch_enum [[FOR_SWITCH]] :
+//
+// CHECK: bb1(
+// CHECK-NEXT: end_borrow [[LOADED_ARG]]
+// CHECK-NEXT: [[LOADED_ARG_2:%.*]] = load [copy] [[ARG]]
+// CHECK-NEXT: [[LOADED_ARG_2_EXT:%.*]] = unchecked_enum_data [[LOADED_ARG_2]]
+// CHECK-NEXT: br bb3([[LOADED_ARG_2_EXT]] :
+//
+// CHECK: bb2(
+// CHECK-NEXT: end_borrow [[LOADED_ARG]]
+// CHECK-NEXT: [[LOADED_ARG_3:%.*]] = load [take] [[ARG]]
+// CHECK-NEXT: [[LOADED_ARG_3_EXT:%.*]] = unchecked_enum_data [[LOADED_ARG_3]]
+// CHECK-NEXT: [[NONE:%.*]] = enum $FakeOptional<
+// CHECK-NEXT: store [[NONE]] to [init] [[ARG]]
+// CHECK-NEXT: br bb3([[LOADED_ARG_3_EXT]] :
+//
+// CHECK: bb3([[RESULT:%.*]] : @owned
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'unchecked_take_enum_data_addr_promotion_host_load'
+sil [ossa] @unchecked_take_enum_data_addr_promotion_host_load : $@convention(thin) (@inout FakeOptional<KlassNativeObjEither>) -> @owned KlassNativeObjEither {
+bb0(%0 : $*FakeOptional<KlassNativeObjEither>):
+  %1 = unchecked_take_enum_data_addr %0 : $*FakeOptional<KlassNativeObjEither>, #FakeOptional.some!enumelt
+  switch_enum_addr %1 : $*KlassNativeObjEither, case #KlassNativeObjEither.lhs!enumelt: bb1, case #KlassNativeObjEither.rhs!enumelt: bb2
+
+bb1:
+  %2 = load [copy] %1 : $*KlassNativeObjEither
+  br bb3(%2 : $KlassNativeObjEither)
+
+bb2:
+  %3 = load [take] %1 : $*KlassNativeObjEither
+  %nil = enum $FakeOptional<KlassNativeObjEither>, #FakeOptional.none!enumelt
+  store %nil to [init] %0 : $*FakeOptional<KlassNativeObjEither>
+  br bb3(%3 : $KlassNativeObjEither)
+
+bb3(%4 : @owned $KlassNativeObjEither):
+  return %4 : $KlassNativeObjEither
+}
+

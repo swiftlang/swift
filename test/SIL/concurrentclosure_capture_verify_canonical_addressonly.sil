@@ -1,0 +1,95 @@
+// RUN: %target-sil-opt -enable-experimental-concurrency %s
+
+// REQUIRES: concurrency
+
+// This test ensures that the SILVerifier does not enforce (yet) that concurrent
+// functions must have non-box parameters in canonical SIL for address only
+// types.
+
+sil_stage canonical
+
+import Builtin
+
+func f(_: @escaping @concurrent () -> ())
+
+@_hasMissingDesignatedInitializers
+class F {
+  func useConcurrent(_: @escaping @concurrent () -> ())
+  init()
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+class Klass {}
+
+/////////////////////////////////////////
+// Address Only Type Success (For Now) //
+/////////////////////////////////////////
+
+protocol MyProt {
+  var i: Int { get set }
+  var k: FakeOptional<Klass> { get set }
+}
+
+sil @$s37concurrentfunction_capturediagnostics1FCACycfC : $@convention(method) (@thick F.Type) -> @owned F // user: %5
+sil @$s37concurrentfunction_capturediagnostics20testCaseAddressOnly21iyx_tAA6MyProtRzlFyyJcfU_ : $@convention(thin) @concurrent <τ_0_0 where τ_0_0 : MyProt> (@guaranteed <τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <τ_0_0>) -> () // user: %15
+sil @$s37concurrentfunction_capturediagnostics1FC13useConcurrentyyyyJcF : $@convention(method) (@guaranteed @concurrent @callee_guaranteed () -> (), @guaranteed F) -> () // user: %19
+sil @$s37concurrentfunction_capturediagnostics17inoutUserOptKlassyyAA0F0CSgzF : $@convention(thin) (@inout FakeOptional<Klass>) -> () // user: %29
+sil @$s37concurrentfunction_capturediagnostics1FCfD : $@convention(method) (@owned F) -> ()
+
+// This is address only so we shouldn't crash.
+sil hidden [ossa] @$s37concurrentfunction_capturediagnostics20testCaseAddressOnly21iyx_tAA6MyProtRzlF : $@convention(thin) <T where T : MyProt> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  debug_value_addr %0 : $*T, let, name "i", argno 1 // id: %1
+  %2 = alloc_stack $F, var, name "f2"             // users: %34, %33, %7
+  %3 = metatype $@thick F.Type                    // user: %5
+  // function_ref F.__allocating_init()
+  %4 = function_ref @$s37concurrentfunction_capturediagnostics1FCACycfC : $@convention(method) (@thick F.Type) -> @owned F // user: %5
+  %5 = apply %4(%3) : $@convention(method) (@thick F.Type) -> @owned F // users: %6, %7
+  %6 = copy_value %5 : $F                         // users: %11, %12
+  store %5 to [init] %2 : $*F                     // id: %7
+  %8 = alloc_box $<τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <T>, var, name "i2" // users: %32, %14, %9
+  %9 = project_box %8 : $<τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <T>, 0 // users: %24, %10
+  copy_addr %0 to [initialization] %9 : $*T       // id: %10
+  %11 = copy_value %6 : $F                        // users: %23, %18
+  destroy_value %6 : $F                           // id: %12
+  // function_ref closure #1 in testCaseAddressOnly2<A>(i:)
+  %13 = function_ref @$s37concurrentfunction_capturediagnostics20testCaseAddressOnly21iyx_tAA6MyProtRzlFyyJcfU_ : $@convention(thin) @concurrent <τ_0_0 where τ_0_0 : MyProt> (@guaranteed <τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <τ_0_0>) -> () // user: %15
+  %14 = copy_value %8 : $<τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <T> // user: %15
+  %15 = partial_apply [callee_guaranteed] %13<T>(%14) : $@convention(thin) @concurrent <τ_0_0 where τ_0_0 : MyProt> (@guaranteed <τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <τ_0_0>) -> () // users: %17, %22
+  // function_ref F.useConcurrent(_:)
+  %16 = function_ref @$s37concurrentfunction_capturediagnostics1FC13useConcurrentyyyyJcF : $@convention(method) (@guaranteed @concurrent @callee_guaranteed () -> (), @guaranteed F) -> () // user: %19
+  %17 = begin_borrow %15 : $@concurrent @callee_guaranteed () -> () // users: %20, %19
+  %18 = begin_borrow %11 : $F                     // users: %21, %19
+  %19 = apply %16(%17, %18) : $@convention(method) (@guaranteed @concurrent @callee_guaranteed () -> (), @guaranteed F) -> ()
+  end_borrow %17 : $@concurrent @callee_guaranteed () -> () // id: %20
+  end_borrow %18 : $F                             // id: %21
+  destroy_value %15 : $@concurrent @callee_guaranteed () -> () // id: %22
+  destroy_value %11 : $F                          // id: %23
+  %24 = begin_access [modify] [dynamic] %9 : $*T  // users: %31, %26
+  %25 = witness_method $T, #MyProt.k!modify : <Self where Self : MyProt> (inout Self) -> () -> () : $@yield_once @convention(witness_method: MyProt) <τ_0_0 where τ_0_0 : MyProt> (@inout τ_0_0) -> @yields @inout FakeOptional<Klass> // user: %26
+  (%26, %27) = begin_apply %25<T>(%24) : $@yield_once @convention(witness_method: MyProt) <τ_0_0 where τ_0_0 : MyProt> (@inout τ_0_0) -> @yields @inout FakeOptional<Klass> // users: %29, %30
+  // function_ref inoutUserOptKlass(_:)
+  %28 = function_ref @$s37concurrentfunction_capturediagnostics17inoutUserOptKlassyyAA0F0CSgzF : $@convention(thin) (@inout FakeOptional<Klass>) -> () // user: %29
+  %29 = apply %28(%26) : $@convention(thin) (@inout FakeOptional<Klass>) -> ()
+  end_apply %27                                   // id: %30
+  end_access %24 : $*T                            // id: %31
+  destroy_value %8 : $<τ_0_0 where τ_0_0 : MyProt> { var τ_0_0 } <T> // id: %32
+  destroy_addr %2 : $*F                           // id: %33
+  dealloc_stack %2 : $*F                          // id: %34
+  %35 = tuple ()                                  // user: %36
+  return %35 : $()                                // id: %36
+} // end sil function '$s37concurrentfunction_capturediagnostics20testCaseAddressOnly21iyx_tAA6MyProtRzlF'
+
+sil_vtable [serialized] F {
+  #F.useConcurrent: (F) -> (@escaping @concurrent () -> ()) -> () : @$s37concurrentfunction_capturediagnostics1FC13useConcurrentyyyyJcF	// F.useConcurrent(_:)
+  #F.init!allocator: (F.Type) -> () -> F : @$s37concurrentfunction_capturediagnostics1FCACycfC	// F.__allocating_init()
+  #F.deinit!deallocator: @$s37concurrentfunction_capturediagnostics1FCfD	// F.__deallocating_deinit
+}

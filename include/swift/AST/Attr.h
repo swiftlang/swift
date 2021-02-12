@@ -85,7 +85,8 @@ public:
 
   // Indicates whether the type's '@differentiable' attribute has a 'linear'
   // argument.
-  bool linear = false;
+  DifferentiabilityKind differentiabilityKind =
+      DifferentiabilityKind::NonDifferentiable;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
@@ -101,14 +102,6 @@ public:
   TypeAttributes() {}
   
   bool isValid() const { return AtLoc.isValid(); }
-
-  bool isLinear() const {
-    assert(
-        !linear ||
-        (linear && has(TAK_differentiable)) &&
-            "Linear shouldn't have been true if there's no `@differentiable`");
-    return linear;
-  }
 
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
@@ -1790,8 +1783,9 @@ public:
 /// Attribute that marks a function as differentiable.
 ///
 /// Examples:
-///   @differentiable(where T : FloatingPoint)
-///   @differentiable(wrt: (self, x, y))
+///   @differentiable(reverse)
+///   @differentiable(reverse, wrt: (self, x, y))
+///   @differentiable(reverse, wrt: (self, x, y) where T : FloatingPoint)
 class DifferentiableAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DifferentiableAttr,
@@ -1803,8 +1797,8 @@ class DifferentiableAttr final
   /// May not be a valid declaration for `@differentiable` attributes.
   /// Resolved during parsing and deserialization.
   Decl *OriginalDeclaration = nullptr;
-  /// Whether this function is linear (optional).
-  bool Linear;
+  /// The differentiability kind.
+  DifferentiabilityKind DifferentiabilityKind;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiability parameter indices, resolved by the type checker.
@@ -1830,25 +1824,28 @@ class DifferentiableAttr final
   SourceLoc ImplicitlyInheritedDifferentiableAttrLocation;
 
   explicit DifferentiableAttr(bool implicit, SourceLoc atLoc,
-                              SourceRange baseRange, bool linear,
+                              SourceRange baseRange,
+                              enum DifferentiabilityKind diffKind,
                               ArrayRef<ParsedAutoDiffParameter> parameters,
                               TrailingWhereClause *clause);
 
   explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
-                              SourceRange baseRange, bool linear,
+                              SourceRange baseRange,
+                              enum DifferentiabilityKind diffKind,
                               IndexSubset *parameterIndices,
                               GenericSignature derivativeGenericSignature);
 
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear,
+                                    enum DifferentiabilityKind diffKind,
                                     ArrayRef<ParsedAutoDiffParameter> params,
                                     TrailingWhereClause *clause);
 
   static DifferentiableAttr *create(AbstractFunctionDecl *original,
                                     bool implicit, SourceLoc atLoc,
-                                    SourceRange baseRange, bool linear,
+                                    SourceRange baseRange,
+                                    enum DifferentiabilityKind diffKind,
                                     IndexSubset *parameterIndices,
                                     GenericSignature derivativeGenSig);
 
@@ -1879,7 +1876,25 @@ public:
     return NumParsedParameters;
   }
 
-  bool isLinear() const { return Linear; }
+  enum DifferentiabilityKind getDifferentiabilityKind() const {
+    return DifferentiabilityKind;
+  }
+
+  bool isNormalDifferentiability() const {
+    return DifferentiabilityKind == DifferentiabilityKind::Normal;
+  }
+
+  bool isLinearDifferentiability() const {
+    return DifferentiabilityKind == DifferentiabilityKind::Linear;
+  }
+
+  bool isForwardDifferentiability() const {
+    return DifferentiabilityKind == DifferentiabilityKind::Forward;
+  }
+
+  bool isReverseDifferentiability() const {
+    return DifferentiabilityKind == DifferentiabilityKind::Reverse;
+  }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 

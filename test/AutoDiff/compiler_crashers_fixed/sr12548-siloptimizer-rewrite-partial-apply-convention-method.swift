@@ -7,18 +7,18 @@
 import _Differentiation
 
 protocol Protocol: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   func method() -> Self
 }
 
 extension Protocol {
-  @differentiable
+  @differentiable(reverse)
   func method() -> Self { self }
 }
 
 struct Struct: Protocol {}
 
-let _: @differentiable (Struct) -> Struct = { $0.method() }
+let _: @differentiable(reverse) (Struct) -> Struct = { $0.method() }
 
 // SIL verification failed: operand of thin_to_thick_function must be thin: opFTy->getRepresentation() == SILFunctionType::Representation::Thin
 // Verifying instruction:

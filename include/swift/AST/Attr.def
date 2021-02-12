@@ -570,6 +570,7 @@ SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   101)
 
+// TODO: Remove this once we don't need to support 'actor' as a modifier
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   DeclModifier | OnClass | ConcurrencyOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |

@@ -74,7 +74,7 @@ extension Float {
   // Custom version of `Float.*=`, implemented using `Float.*` and mutation.
   // Verify that its generated derivative has the same behavior as the
   // registered derivative for `Float.*=`.
-  @differentiable
+  @differentiable(reverse)
   static func multiplyAssign(_ lhs: inout Float, _ rhs: Float) {
     lhs = lhs * rhs
   }
@@ -120,10 +120,10 @@ InoutParameterAutoDiffTests.test("SetAccessor") {
 
     // Computed property with explicit `@differentiable` accessors.
     var doubled: Float {
-      @differentiable
+      @differentiable(reverse)
       get { x + x }
 
-      @differentiable
+      @differentiable(reverse)
       set { x = newValue / 2 }
     }
   }
@@ -153,7 +153,7 @@ InoutParameterAutoDiffTests.test("SetAccessor") {
 // Test differentiation wrt `inout` parameters that have a class type.
 InoutParameterAutoDiffTests.test("InoutClassParameter") {
   class Class: Differentiable {
-    @differentiable
+    @differentiable(reverse)
     var x: Float
 
     init(_ x: Float) {
@@ -196,34 +196,34 @@ InoutParameterAutoDiffTests.test("InoutClassParameter") {
 // treated as a differentiability result.
 
 protocol SR_13305_Protocol {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func method(_ x: Float, _ y: inout Float)
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func genericMethod<T: Differentiable>(_ x: T, _ y: inout T)
 }
 
 InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
   struct SR_13305_Struct: SR_13305_Protocol {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func method(_ x: Float, _ y: inout Float) {
       y = y * x
     }
 
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func genericMethod<T: Differentiable>(_ x: T, _ y: inout T) {
       y = x
     }
   }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func foo(_ s: SR_13305_Struct, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)
     return y
   }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func fooGeneric<T: SR_13305_Protocol>(_ s: T, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)

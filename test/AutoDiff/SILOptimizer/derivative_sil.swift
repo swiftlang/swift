@@ -20,7 +20,7 @@ extension Float {
 }
 
 @_silgen_name("foo")
-@differentiable
+@differentiable(reverse)
 func foo(_ x: Float) -> Float {
   let y = Float.add(x, x)
   return y
@@ -90,7 +90,7 @@ func foo(_ x: Float) -> Float {
 // Check the conventions of the generated functions for a method (SR-13945).
 struct ExampleStruct {
   @_silgen_name("fooMethod")
-  @differentiable
+  @differentiable(reverse)
   func fooMethod(_ x: Float) -> Float {
     let y = Float.add(x, x)
     return y

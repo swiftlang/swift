@@ -400,11 +400,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         Builder.useAsyncKeyword(SyntaxContext->popToken());
 
       auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
+      if (InputNode.is<ParsedTupleTypeSyntax>()) {
+        auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>();
         // Decompose TupleTypeSyntax and repack into FunctionType.
-        auto LeftParen = TupleTypeNode->getDeferredLeftParen();
-        auto Arguments = TupleTypeNode->getDeferredElements();
-        auto RightParen = TupleTypeNode->getDeferredRightParen();
+        auto LeftParen = TupleTypeNode.getDeferredLeftParen();
+        auto Arguments = TupleTypeNode.getDeferredElements();
+        auto RightParen = TupleTypeNode.getDeferredRightParen();
         Builder
           .useLeftParen(std::move(LeftParen))
           .useArguments(std::move(Arguments))
@@ -1108,8 +1109,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
 
   bool isFunctionType =
       Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows) ||
-      (shouldParseExperimentalConcurrency() &&
-       Tok.isContextualKeyword("async"));
+      Tok.isContextualKeyword("async");
 
   // If there were any labels, figure out which labels should go into the type
   // representation.

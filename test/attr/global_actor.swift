@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-actor class SomeActor { }
+actor SomeActor { }
 
 // -----------------------------------------------------------------------
 // @globalActor attribute itself.
@@ -83,7 +83,7 @@ class SomeClass {
 
 @GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
 
-@GA1 actor class ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
+@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
 

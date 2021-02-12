@@ -1906,6 +1906,8 @@ public:
     (void) TAD->getGenericSignature();
     (void) TAD->getUnderlyingType();
 
+    // Make sure to check the underlying type.
+    
     TypeChecker::checkDeclAttributes(TAD);
     checkAccessControl(TAD);
     checkGenericParams(TAD);
@@ -2356,9 +2358,6 @@ public:
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
-
-    // Explicitly calculate this bit.
-    (void) PD->existentialTypeSupported();
 
     // Explicity compute the requirement signature to detect errors.
     (void) PD->getRequirementSignature();

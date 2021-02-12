@@ -150,9 +150,9 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
     if (description.hasValue) {
       swift::tok tokenKind = description.Kind;
       StringRef text = description.Text;
-      std::vector<swift::TriviaPiece> leadingTrivia;
+      StringRef leadingTrivia;
       in.mapRequired("leadingTrivia", leadingTrivia);
-      std::vector<swift::TriviaPiece> trailingTrivia;
+      StringRef trailingTrivia;
       in.mapRequired("trailingTrivia", trailingTrivia);
       swift::SourcePresence presence;
       in.mapRequired("presence", presence);
@@ -163,8 +163,8 @@ template <> struct MappingTraits<swift::RC<swift::RawSyntax>> {
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
       value = swift::RawSyntax::makeAndCalcLength(
-          tokenKind, swift::OwnedString::makeRefCounted(text), leadingTrivia,
-          trailingTrivia, presence, swift::SyntaxArena::make(), nodeId);
+          tokenKind, text, leadingTrivia, trailingTrivia, presence,
+          swift::SyntaxArena::make(), nodeId);
     } else {
       swift::SyntaxKind kind;
       in.mapRequired("kind", kind);

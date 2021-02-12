@@ -589,6 +589,8 @@ extension UnsafeRawPointer {
   }
 }
 
+extension AutoreleasingUnsafeMutablePointer: ConcurrentValue { }
+
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
   internal var _item0: UnsafeRawPointer?
@@ -825,4 +827,3 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
 }
 
 #endif // !_runtime(_ObjC)
-

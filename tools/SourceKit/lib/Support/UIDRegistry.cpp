@@ -85,7 +85,7 @@ void UIdent::print(llvm::raw_ostream &OS) const {
 
 void *UIDRegistryImpl::get(StringRef Str) {
   assert(!Str.empty());
-  assert(Str.find(' ') == StringRef::npos);
+  assert(!Str.contains(' '));
   EntryTy *Ptr = 0;
   Queue.dispatchSync([&]{
     HashTableTy::iterator It = HashTable.find(Str);

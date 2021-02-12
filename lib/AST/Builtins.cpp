@@ -1165,10 +1165,10 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     unsigned arity, bool throws) {
   assert(arity >= 1);
   // JVP:
-  //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
+  //   <...T...(arity), R> (@differentiable(_forward) (...T) throws -> R, ...T)
   //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
   // VJP:
-  //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
+  //   <...T...(arity), R> (@differentiable(reverse) (...T) throws -> R, ...T)
   //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
   unsigned numGenericParams = 1 + arity;
   BuiltinFunctionBuilder builder(Context, numGenericParams);
@@ -1190,7 +1190,8 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
       [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
         auto extInfo =
             FunctionType::ExtInfoBuilder()
-                .withDifferentiabilityKind(DifferentiabilityKind::Normal)
+                // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
+                .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
                 .withNoEscape()
                 .withThrows(throws)
                 .build();
@@ -1230,7 +1231,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
     ASTContext &Context, Identifier Id, unsigned arity, bool throws) {
   assert(arity >= 1);
   // <...T...(arity), R>
-  //     (@differentiable (...T) throws -> R, ...R.TangentVector)
+  //     (@differentiable(_linear) (...T) throws -> R, ...R.TangentVector)
   //         rethrows -> (...T.TangentVector)
   unsigned numGenericParams = 1 + arity;
   BuiltinFunctionBuilder builder(Context, numGenericParams);
@@ -1248,7 +1249,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
     builder.addConformanceRequirement(T, addArithProto);
     linearFnParamGens.push_back(T);
   }
-  // Generator for the first argument, i.e. the `@differentiable(linear)`
+  // Generator for the first argument, i.e. the `@differentiable(_linear)`
   // function.
   BuiltinFunctionBuilder::LambdaGenerator firstArgGen {
     // Generator for the function type at the argument position, i.e. the

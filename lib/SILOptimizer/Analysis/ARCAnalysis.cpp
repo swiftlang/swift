@@ -697,7 +697,7 @@ findMatchingRetains(SILBasicBlock *BB) {
         SA = nullptr;
 
       for (auto X : R.first->getPredecessorBlocks()) {
-        if (HandledBBs.find(X) != HandledBBs.end())
+        if (HandledBBs.contains(X))
           continue;
         // Try to use the predecessor edge-value.
         if (SA && SA->getIncomingPhiValue(X)) {
@@ -912,7 +912,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingReleases(
     // If we do not have a release_value or strong_release. We can continue
     if (!isa<ReleaseValueInst>(inst) && !isa<StrongReleaseInst>(inst)) {
       // We cannot match a final release if it is followed by a dealloc_ref.
-      if (isa<DeallocRefInst>(inst))
+      if (isa<DeallocRefInst>(inst) || isa<DeallocPartialRefInst>(inst))
         break;
 
       // We do not know what this instruction is, do a simple check to make sure

@@ -815,6 +815,8 @@ public:
                      llvm::SetVector<MissingWitness> &GlobalMissingWitnesses,
                      bool suppressDiagnostics = true);
 
+  ~ConformanceChecker();
+
   /// Resolve all of the type witnesses.
   void resolveTypeWitnesses();
 
@@ -849,6 +851,14 @@ public:
   /// Retrieve the Objective-C requirements in this protocol that have the
   /// given Objective-C method key.
   ArrayRef<AbstractFunctionDecl *> getObjCRequirements(ObjCMethodKey key);
+
+  /// @returns a non-null requirement if the given requirement is part of a
+  /// group of ObjC requirements that share the same ObjC method key.
+  /// The first such requirement that the predicate function returns true for
+  /// is the requirement required by this function. Otherwise, nullptr is
+  /// returned.
+  ValueDecl *getObjCRequirementSibling(ValueDecl *requirement,
+                    llvm::function_ref<bool(AbstractFunctionDecl *)>predicate);
 };
 
 /// Captures the state needed to infer associated types.

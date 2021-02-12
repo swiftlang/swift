@@ -44,6 +44,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: String = await slowServer.__leap(17)
 
   slowServer.repeatTrick("jump") // expected-error{{missing argument for parameter 'completionHandler' in call}}
+
+  _ = try await slowServer.someAsyncMethod()
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
@@ -68,7 +70,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 // Check import of attributes
 func globalAsync() async { }
 
-actor class MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
+actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   func independentMethod() {

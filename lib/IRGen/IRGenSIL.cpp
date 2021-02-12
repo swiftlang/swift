@@ -1631,10 +1631,13 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
     auto &paramTI = IGF.IGM.getTypeInfo(inContextResultType);
 
     // The parameter's type might be different due to looking through opaque
-    // archetypes.
+    // archetypes or for non-fixed types (llvm likes to do type based analysis
+    // for sret arguments and so we use opaque storage types for them).
     llvm::Value *ptr = emission.getIndirectResult(idx);
-    if (paramTI.getStorageType() != retTI.getStorageType()) {
-      assert(inContextResultType.getASTType()->hasOpaqueArchetype());
+    bool isFixedSize = isa<FixedTypeInfo>(paramTI);
+    if (paramTI.getStorageType() != retTI.getStorageType() || !isFixedSize) {
+      assert(!isFixedSize ||
+             inContextResultType.getASTType()->hasOpaqueArchetype());
       ptr = IGF.Builder.CreateBitCast(ptr,
                                       retTI.getStorageType()->getPointerTo());
     }
@@ -6415,17 +6418,8 @@ void IRGenModule::emitSILStaticInitializers() {
       continue;
     }
 
-    // Set the IR global's initializer to the constant for this SIL
-    // struct.
-    if (auto *SI = dyn_cast<StructInst>(InitValue)) {
-      IRGlobal->setInitializer(emitConstantStruct(*this, SI));
-      continue;
-    }
-
-    // Set the IR global's initializer to the constant for this SIL
-    // tuple.
-    auto *TI = cast<TupleInst>(InitValue);
-    IRGlobal->setInitializer(emitConstantTuple(*this, TI));
+    IRGlobal->setInitializer(
+      emitConstantValue(*this, cast<SingleValueInstruction>(InitValue)));
   }
 }
 

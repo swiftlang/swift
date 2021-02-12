@@ -2295,6 +2295,13 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
         return { false, stmt };
       }
 
+      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
+        if (forEach->getTryLoc().isValid()) {
+          FoundThrow = true;
+          return { false, nullptr };
+        }
+      }
+
       return { true, stmt };
     }
 
@@ -2330,6 +2337,17 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
         return false;
 
       return true;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override { 
+      if (auto forEach = dyn_cast<ForEachStmt>(stmt)) {
+        if (forEach->getAwaitLoc().isValid()) {
+          FoundAsync = true;
+          return { false, nullptr };
+        }
+      }
+
+      return { true, stmt };
     }
 
   public:

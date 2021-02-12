@@ -11,11 +11,11 @@ import _Differentiation
 
 public struct Struct<Scalar>: Differentiable {}
 
-@differentiable
+@differentiable(reverse)
 public func foo<Scalar>(_ x: Struct<Scalar>) -> Struct<Scalar> { x }
 
 @inlinable
-@differentiable
+@differentiable(reverse)
 public func bar<Scalar>(_ x: Struct<Scalar>) -> Struct<Scalar> {
   foo(x)
 }
@@ -26,7 +26,7 @@ import _Differentiation
 import Library
 
 public func foo(
-  body: @differentiable (Struct<Float>) -> Struct<Float> = bar
+  body: @differentiable(reverse) (Struct<Float>) -> Struct<Float> = bar
 ) {
   fatalError()
 }

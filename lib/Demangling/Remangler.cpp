@@ -1432,12 +1432,8 @@ void Remangler::mangleIVarDestroyer(Node *node) {
   Buffer << "fE";
 }
 
-void Remangler::mangleImplDifferentiable(Node *node) {
-  Buffer << 'd';
-}
-
-void Remangler::mangleImplLinear(Node *node) {
-  Buffer << 'l';
+void Remangler::mangleImplDifferentiabilityKind(Node *node) {
+  Buffer << (char)node->getIndex();
 }
 
 void Remangler::mangleImplEscaping(Node *node) {
@@ -1454,7 +1450,7 @@ void Remangler::mangleImplConvention(Node *node) {
   Buffer << ConvCh;
 }
 
-void Remangler::mangleImplDifferentiability(Node *node) {
+void Remangler::mangleImplParameterResultDifferentiability(Node *node) {
   assert(node->hasText());
   // Empty string represents default differentiability.
   if (node->getText().empty())
@@ -1572,11 +1568,8 @@ void Remangler::mangleImplFunctionType(Node *node) {
   Buffer << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
-      case Node::Kind::ImplDifferentiable:
-        Buffer << 'd';
-        break;
-      case Node::Kind::ImplLinear:
-        Buffer << 'l';
+      case Node::Kind::ImplDifferentiabilityKind:
+        Buffer << (char)Child->getIndex();
         break;
       case Node::Kind::ImplEscaping:
         Buffer << 'e';
@@ -1628,7 +1621,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
         Buffer << ConvCh;
         // Mangle parameter differentiability, if it exists.
         if (Child->getNumChildren() == 3)
-          mangleImplDifferentiability(Child->getChild(1));
+          mangleImplParameterResultDifferentiability(Child->getChild(1));
         break;
       }
       case Node::Kind::ImplErrorResult:
@@ -1646,7 +1639,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
         Buffer << ConvCh;
         // Mangle result differentiability, if it exists.
         if (Child->getNumChildren() == 3)
-          mangleImplDifferentiability(Child->getChild(1));
+          mangleImplParameterResultDifferentiability(Child->getChild(1));
         break;
       }
       default:

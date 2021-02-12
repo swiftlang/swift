@@ -207,13 +207,13 @@ public:
   /// This is the current token being considered by the parser.
   Token Tok;
 
-  /// leading trivias for \c Tok.
+  /// Leading trivia for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
-  ParsedTrivia LeadingTrivia;
+  StringRef LeadingTrivia;
 
-  /// trailing trivias for \c Tok.
+  /// Trailing trivia for \c Tok.
   /// Always empty if !SF.shouldBuildSyntaxTree().
-  ParsedTrivia TrailingTrivia;
+  StringRef TrailingTrivia;
 
   /// The receiver to collect all consumed tokens.
   ConsumeTokenReceiver *TokReceiver;
@@ -549,7 +549,7 @@ public:
   }
 
   SourceLoc leadingTriviaLoc() {
-    return Tok.getLoc().getAdvancedLoc(-LeadingTrivia.getLength());
+    return Tok.getLoc().getAdvancedLoc(-LeadingTrivia.size());
   }
 
   SourceLoc consumeIdentifier(Identifier &Result, bool diagnoseDollarPrefix) {
@@ -1016,7 +1016,8 @@ public:
 
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
-      bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
+      DifferentiabilityKind &diffKind,
+      SmallVectorImpl<ParsedAutoDiffParameter> &params,
       TrailingWhereClause *&whereClause);
 
   /// Parse a differentiability parameters clause, i.e. the 'wrt:' clause in

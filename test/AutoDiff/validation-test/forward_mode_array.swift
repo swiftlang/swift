@@ -41,7 +41,7 @@ ForwardModeTests.test("Array.+") {
 }
 
 ForwardModeTests.test("Array.init(repeating:count:)") {
-  @differentiable
+  @differentiable(reverse)
   func repeating(_ x: Float) -> [Float] {
     Array(repeating: x, count: 10)
   }
@@ -54,7 +54,7 @@ ForwardModeTests.test("Array.init(repeating:count:)") {
 }
 
 ForwardModeTests.test("Array.DifferentiableView.init") {
-  @differentiable
+  @differentiable(reverse)
   func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {
     return Array<Float>.DifferentiableView(x)
   }
@@ -66,7 +66,7 @@ ForwardModeTests.test("Array.DifferentiableView.init") {
 }
 
 ForwardModeTests.test("Array.DifferentiableView.base") {
-  @differentiable
+  @differentiable(reverse)
   func accessBase(_ x: Array<Float>.DifferentiableView) -> [Float] {
     return x.base
   }

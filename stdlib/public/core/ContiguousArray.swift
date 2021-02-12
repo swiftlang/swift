@@ -1436,3 +1436,6 @@ extension ContiguousArray {
     }
   }
 }
+
+extension ContiguousArray: ConcurrentValue, UnsafeConcurrentValue
+  where Element: ConcurrentValue { }

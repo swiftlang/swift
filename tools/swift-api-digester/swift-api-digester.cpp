@@ -1168,7 +1168,8 @@ public:
         DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind::DAK_Available,
                                                     D->getDeclKind()) &&
         !D->getIntroducingVersion().hasOSAvailability() &&
-        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+        !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient) &&
+        !D->hasDeclAttribute(DeclAttrKind::DAK_Marker)) {
       D->emitDiag(D->getLoc(), diag::new_decl_without_intro);
     }
   }
@@ -2508,11 +2509,13 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   TypeAliasDiffFinder(RightModule, LeftModule, RevertAliasMap).search();
   populateAliasChanges(RevertAliasMap, AllItems, /*IsRevert*/true);
 
-  AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
-                                [&](CommonDiffItem &Item) {
-    return Item.DiffKind == NodeAnnotation::RemovedDecl &&
-      IgnoredRemoveUsrs.find(Item.LeftUsr) != IgnoredRemoveUsrs.end();
-  }), AllItems.end());
+  AllItems.erase(
+      std::remove_if(AllItems.begin(), AllItems.end(),
+                     [&](CommonDiffItem &Item) {
+                       return Item.DiffKind == NodeAnnotation::RemovedDecl &&
+                              IgnoredRemoveUsrs.contains(Item.LeftUsr);
+                     }),
+      AllItems.end());
 
   NoEscapeFuncParamVector AllNoEscapingFuncs;
   NoEscapingFuncEmitter::collectDiffItems(RightModule, AllNoEscapingFuncs);
@@ -2530,18 +2533,14 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   removeRedundantAndSort(Overloads);
   if (options::OutputInJson) {
     std::vector<APIDiffItem*> TotalItems;
-    std::transform(AllItems.begin(), AllItems.end(),
-                   std::back_inserter(TotalItems),
-                   [](CommonDiffItem &Item) { return &Item; });
-    std::transform(typeMemberDiffs.begin(), typeMemberDiffs.end(),
-                   std::back_inserter(TotalItems),
-                   [](TypeMemberDiffItem &Item) { return &Item; });
-    std::transform(AllNoEscapingFuncs.begin(), AllNoEscapingFuncs.end(),
-                   std::back_inserter(TotalItems),
-                   [](NoEscapeFuncParam &Item) { return &Item; });
-    std::transform(Overloads.begin(), Overloads.end(),
-                   std::back_inserter(TotalItems),
-                   [](OverloadedFuncInfo &Item) { return &Item; });
+    llvm::transform(AllItems, std::back_inserter(TotalItems),
+                    [](CommonDiffItem &Item) { return &Item; });
+    llvm::transform(typeMemberDiffs, std::back_inserter(TotalItems),
+                    [](TypeMemberDiffItem &Item) { return &Item; });
+    llvm::transform(AllNoEscapingFuncs, std::back_inserter(TotalItems),
+                    [](NoEscapeFuncParam &Item) { return &Item; });
+    llvm::transform(Overloads, std::back_inserter(TotalItems),
+                    [](OverloadedFuncInfo &Item) { return &Item; });
     APIDiffItemStore::serialize(Fs, TotalItems);
     return 0;
   }

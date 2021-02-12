@@ -22,9 +22,17 @@ func test2(
   print("foo")
 }
 
-func test3() { // expected-note{{add 'async' to function 'test3()' to make it asynchronous}} {{none}}
+func test3() { // expected-note{{add 'async' to function 'test3()' to make it asynchronous}} {{13-13= async}}
   // expected-note@-1{{add '@asyncHandler' to function 'test3()' to create an implicit asynchronous context}}{{1-1=@asyncHandler }}
   _ = await getInt() // expected-error{{'async' in a function that does not support concurrency}}
+}
+
+func test4()throws { // expected-note{{add 'async' to function 'test4()' to make it asynchronous}} {{13-19=async throws}}
+  _ = await getInt() // expected-error{{'async' in a function that does not support concurrency}}
+}
+
+func test5<T>(_ f : () async throws -> T)  rethrows->T { // expected-note{{add 'async' to function 'test5' to make it asynchronous}} {{44-52=async rethrows}}
+  return try await f() // expected-error{{'async' in a function that does not support concurrency}}
 }
 
 enum SomeEnum: Int {
@@ -43,7 +51,7 @@ func acceptAutoclosureAsyncThrowsRethrows(_: @autoclosure () async throws -> Int
 
 func acceptAutoclosureNonAsyncBad(_: @autoclosure () async -> Int) -> Int { 0 }
 // expected-error@-1{{'async' autoclosure parameter in a non-'async' function}}
-// expected-note@-2{{add 'async' to function 'acceptAutoclosureNonAsyncBad' to make it asynchronous}} {{none}}
+// expected-note@-2{{add 'async' to function 'acceptAutoclosureNonAsyncBad' to make it asynchronous}} {{67-67= async}}
 
 struct HasAsyncBad {
   init(_: @autoclosure () async -> Int) { }
@@ -182,7 +190,7 @@ func testAsyncLet() async throws {
   _ = await x5
 }
 
-// expected-note@+2 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}} {{none}}
+// expected-note@+2 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}} {{30-30= async}}
 // expected-note@+1 4{{add '@asyncHandler' to function 'testAsyncLetOutOfAsync()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
 func testAsyncLetOutOfAsync() {
   async let x = 1 // expected-error{{'async let' in a function that does not support concurrency}}

@@ -603,17 +603,8 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
 
       // If we have a function ref inst, we need to especially drop its function
       // argument so that it gets a proper ref decrement.
-      auto *fri = dyn_cast<FunctionRefInst>(inst);
-      if (fri && fri->getInitiallyReferencedFunction())
+      if (auto *fri = dyn_cast<FunctionRefBaseInst>(inst))
         fri->dropReferencedFunction();
-
-      auto *dfri = dyn_cast<DynamicFunctionRefInst>(inst);
-      if (dfri && dfri->getInitiallyReferencedFunction())
-        dfri->dropReferencedFunction();
-
-      auto *pfri = dyn_cast<PreviousDynamicFunctionRefInst>(inst);
-      if (pfri && pfri->getInitiallyReferencedFunction())
-        pfri->dropReferencedFunction();
     }
 
     for (auto inst : deadInsts) {

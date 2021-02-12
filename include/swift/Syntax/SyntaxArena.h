@@ -31,14 +31,35 @@ class SyntaxArena : public llvm::ThreadSafeRefCountedBase<SyntaxArena> {
 
   llvm::BumpPtrAllocator Allocator;
 
+  /// The start (inclusive) and end (exclusive) pointers of a memory region that
+  /// is frequently requested using \c containsPointer. Must be inside \c
+  /// Allocator but \c containsPointer will check this region first and will
+  /// thus return more quickly for pointers that lie within this region.
+  const void *HotUseMemoryRegionStart = nullptr;
+  const void *HotUseMemoryRegionEnd = nullptr;
+
 public:
   SyntaxArena() {}
 
   static RC<SyntaxArena> make() { return RC<SyntaxArena>(new SyntaxArena()); }
 
+  void setHotUseMemoryRegion(const void *Start, const void *End) {
+    assert(containsPointer(Start) &&
+           "The hot use memory region should be in the Arena's bump allocator");
+    HotUseMemoryRegionStart = Start;
+    HotUseMemoryRegionEnd = End;
+  }
+
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
   void *Allocate(size_t size, size_t alignment) {
     return Allocator.Allocate(size, alignment);
+  }
+
+  bool containsPointer(const void *Ptr) {
+    if (HotUseMemoryRegionStart <= Ptr && Ptr < HotUseMemoryRegionEnd) {
+      return true;
+    }
+    return getAllocator().identifyObject(Ptr) != llvm::None;
   }
 };
 

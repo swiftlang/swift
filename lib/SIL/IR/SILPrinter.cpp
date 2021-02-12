@@ -957,7 +957,7 @@ public:
   void print(const SILInstruction *I) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(I))
       *this << "  // function_ref "
-            << demangleSymbol(FRI->getInitiallyReferencedFunction()->getName())
+            << demangleSymbol(FRI->getReferencedFunction()->getName())
             << "\n";
     else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(I))
       *this << "  // dynamic_function_ref "
@@ -1270,7 +1270,7 @@ public:
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
-    FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
+    FRI->getReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {

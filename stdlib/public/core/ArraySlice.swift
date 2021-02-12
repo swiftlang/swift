@@ -1516,3 +1516,6 @@ extension ArraySlice {
         shiftedToStartIndex: _startIndex))
   }
 }
+
+extension ArraySlice: ConcurrentValue, UnsafeConcurrentValue
+  where Element: ConcurrentValue { }

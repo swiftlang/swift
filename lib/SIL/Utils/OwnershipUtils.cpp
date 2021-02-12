@@ -1081,26 +1081,26 @@ ValueOwnershipKind ForwardingOperand::getOwnershipKind() const {
   // in each if itself since we have an unreachable at the bottom to ensure if a
   // new subclass of OwnershipForwardingInst is added
   if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
-    return ofsvi->getOwnershipKind();
+    return ofsvi->getForwardingOwnershipKind();
 
   if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
-    return ofsvi->getOwnershipKind();
+    return ofsvi->getForwardingOwnershipKind();
 
   if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
-    return ofci->getOwnershipKind();
+    return ofci->getForwardingOwnershipKind();
 
   if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
-    return ofseib->getOwnershipKind();
+    return ofseib->getForwardingOwnershipKind();
 
   if (auto *ofmvi =
           dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
     assert(ofmvi->getNumOperands() == 1);
-    return ofmvi->getOwnershipKind();
+    return ofmvi->getForwardingOwnershipKind();
   }
 
   if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
     assert(ofti->getNumOperands() == 1);
-    return ofti->getOwnershipKind();
+    return ofti->getForwardingOwnershipKind();
   }
 
   llvm_unreachable("Unhandled forwarding inst?!");
@@ -1112,21 +1112,17 @@ void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
   // in each if itself since we have an unreachable at the bottom to ensure if a
   // new subclass of OwnershipForwardingInst is added
   if (auto *ofsvi = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
-    if (!ofsvi->getType().isTrivial(*ofsvi->getFunction()))
-      return ofsvi->setOwnershipKind(newKind);
+    return ofsvi->setForwardingOwnershipKind(newKind);
   if (auto *ofsvi = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
-    if (!ofsvi->getType().isTrivial(*ofsvi->getFunction()))
-      return ofsvi->setOwnershipKind(newKind);
+    return ofsvi->setForwardingOwnershipKind(newKind);
   if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
-    if (!ofci->getType().isTrivial(*ofci->getFunction()))
-      return ofci->setOwnershipKind(newKind);
+    return ofci->setForwardingOwnershipKind(newKind);
   if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
-    if (!ofseib->getType().isTrivial(*ofseib->getFunction()))
-      return ofseib->setOwnershipKind(newKind);
+    return ofseib->setForwardingOwnershipKind(newKind);
   if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
     assert(ofmvi->getNumOperands() == 1);
     if (!ofmvi->getOperand(0)->getType().isTrivial(*ofmvi->getFunction())) {
-      ofmvi->setOwnershipKind(newKind);
+      ofmvi->setForwardingOwnershipKind(newKind);
       // TODO: Refactor this better.
       if (auto *dsi = dyn_cast<DestructureStructInst>(ofmvi)) {
         for (auto &result : dsi->getAllResultsBuffer()) {
@@ -1149,7 +1145,7 @@ void ForwardingOperand::setOwnershipKind(ValueOwnershipKind newKind) const {
   if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
     assert(ofti->getNumOperands() == 1);
     if (!ofti->getOperand(0)->getType().isTrivial(*ofti->getFunction())) {
-      ofti->setOwnershipKind(newKind);
+      ofti->setForwardingOwnershipKind(newKind);
 
       // Then convert all of its incoming values that are owned to be guaranteed.
       for (auto &succ : ofti->getSuccessors()) {
@@ -1178,24 +1174,24 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
   auto *user = use->getUser();
 
   if (auto *fInst = dyn_cast<AllArgOwnershipForwardingSingleValueInst>(user))
-    if (fInst->getOwnershipKind() == oldKind)
-      return fInst->setOwnershipKind(newKind);
+    if (fInst->getForwardingOwnershipKind() == oldKind)
+      return fInst->setForwardingOwnershipKind(newKind);
 
   if (auto *fInst = dyn_cast<FirstArgOwnershipForwardingSingleValueInst>(user))
-    if (fInst->getOwnershipKind() == oldKind)
-      return fInst->setOwnershipKind(newKind);
+    if (fInst->getForwardingOwnershipKind() == oldKind)
+      return fInst->setForwardingOwnershipKind(newKind);
 
   if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(user))
-    if (ofci->getOwnershipKind() == oldKind)
-      return ofci->setOwnershipKind(newKind);
+    if (ofci->getForwardingOwnershipKind() == oldKind)
+      return ofci->setForwardingOwnershipKind(newKind);
 
   if (auto *ofseib = dyn_cast<OwnershipForwardingSelectEnumInstBase>(user))
-    if (ofseib->getOwnershipKind() == oldKind)
-      return ofseib->setOwnershipKind(newKind);
+    if (ofseib->getForwardingOwnershipKind() == oldKind)
+      return ofseib->setForwardingOwnershipKind(newKind);
 
   if (auto *ofmvi = dyn_cast<OwnershipForwardingMultipleValueInstruction>(user)) {
-    if (ofmvi->getOwnershipKind() == oldKind) {
-      ofmvi->setOwnershipKind(newKind);
+    if (ofmvi->getForwardingOwnershipKind() == oldKind) {
+      ofmvi->setForwardingOwnershipKind(newKind);
     }
     // TODO: Refactor this better.
     if (auto *dsi = dyn_cast<DestructureStructInst>(ofmvi)) {
@@ -1216,8 +1212,8 @@ void ForwardingOperand::replaceOwnershipKind(ValueOwnershipKind oldKind,
   }
 
   if (auto *ofti = dyn_cast<OwnershipForwardingTermInst>(user)) {
-    if (ofti->getOwnershipKind() == oldKind) {
-      ofti->setOwnershipKind(newKind);
+    if (ofti->getForwardingOwnershipKind() == oldKind) {
+      ofti->setForwardingOwnershipKind(newKind);
       // Then convert all of its incoming values that are owned to be guaranteed.
       for (auto &succ : ofti->getSuccessors()) {
         auto *succBlock = succ.getBB();

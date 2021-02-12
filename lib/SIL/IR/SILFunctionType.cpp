@@ -804,7 +804,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     auto fnParamType = dyn_cast<SILFunctionType>(fnParam.getInterfaceType());
     assert(fnParamType);
     auto diffFnType = fnParamType->getWithDifferentiability(
-        DifferentiabilityKind::Normal, parameterIndices, resultIndices);
+        DifferentiabilityKind::Reverse, parameterIndices, resultIndices);
     newParameters.back() = fnParam.getWithInterfaceType(diffFnType);
   }
 
@@ -2486,7 +2486,7 @@ static CanSILFunctionType getNativeSILFunctionType(
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::Closure:
   case SILFunctionType::Representation::WitnessMethod: {
-    switch (constant ? constant->kind : SILDeclRef::Kind::Func) {
+    switch (origConstant ? origConstant->kind : SILDeclRef::Kind::Func) {
     case SILDeclRef::Kind::Initializer:
     case SILDeclRef::Kind::EnumElement:
       return getSILFunctionTypeForConventions(DefaultInitializerConventions());

@@ -127,7 +127,7 @@ class BugReducerTester : public SILFunctionTransform {
         }
 
         auto *FRI = dyn_cast<FunctionRefInst>(FAS.getCallee());
-        if (!FRI || !FRI->getInitiallyReferencedFunction()->getName().equals(
+        if (!FRI || !FRI->getReferencedFunction()->getName().equals(
                         FunctionTarget)) {
           ++II;
           continue;

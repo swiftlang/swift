@@ -221,7 +221,12 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
 def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
-  def enable_resilience : Flag<["-"], "enable-resilience">,
+
+def enable_experimental_concurrent_value_checking :
+  Flag<["-"], "enable-experimental-concurrent-value-checking">,
+  HelpText<"Enable ConcurrentValue checking">;
+
+def enable_resilience : Flag<["-"], "enable-resilience">,
      HelpText<"Deprecated, use -enable-library-evolution instead">;
 }
 
@@ -788,4 +793,7 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
            "disabled. NOTE: Can not be used if enable-ast-verifier is used "
            "as well">;
 
+def new_driver_path
+  : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
+  HelpText<"Path of the new driver to be used">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

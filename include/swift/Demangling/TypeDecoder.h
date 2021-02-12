@@ -237,8 +237,10 @@ enum class ImplFunctionRepresentation {
 
 enum class ImplFunctionDifferentiabilityKind {
   NonDifferentiable,
+  Forward,
+  Reverse,
   Normal,
-  Linear
+  Linear,
 };
 
 class ImplFunctionTypeFlags {
@@ -247,7 +249,7 @@ class ImplFunctionTypeFlags {
   unsigned Escaping : 1;
   unsigned Concurrent : 1;
   unsigned Async : 1;
-  unsigned DifferentiabilityKind : 2;
+  unsigned DifferentiabilityKind : 3;
 
 public:
   ImplFunctionTypeFlags()
@@ -729,7 +731,7 @@ public:
                Node->getKind() ==
                    NodeKind::EscapingDifferentiableFunctionType) {
         flags = flags.withDifferentiabilityKind(
-            FunctionMetadataDifferentiabilityKind::Normal);
+            FunctionMetadataDifferentiabilityKind::Reverse);
       } else if (Node->getKind() == NodeKind::LinearFunctionType ||
                  Node->getKind() == NodeKind::EscapingLinearFunctionType) {
         flags = flags.withDifferentiabilityKind(
@@ -841,12 +843,20 @@ public:
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
           }
-        } else if (child->getKind() == NodeKind::ImplDifferentiable) {
-          flags = flags.withDifferentiabilityKind(
-              ImplFunctionDifferentiabilityKind::Normal);
-        } else if (child->getKind() == NodeKind::ImplLinear) {
-          flags = flags.withDifferentiabilityKind(
-              ImplFunctionDifferentiabilityKind::Linear);
+        } else if (child->getKind() == NodeKind::ImplDifferentiabilityKind) {
+          ImplFunctionDifferentiabilityKind implDiffKind;
+          switch ((MangledDifferentiabilityKind)child->getIndex()) {
+          #define SIMPLE_CASE(CASE) \
+              case MangledDifferentiabilityKind::CASE: \
+                implDiffKind = ImplFunctionDifferentiabilityKind::CASE; break;
+          SIMPLE_CASE(NonDifferentiable)
+          SIMPLE_CASE(Normal)
+          SIMPLE_CASE(Linear)
+          SIMPLE_CASE(Forward)
+          SIMPLE_CASE(Reverse)
+          #undef SIMPLE_CASE
+          }
+          flags = flags.withDifferentiabilityKind(implDiffKind);
         } else if (child->getKind() == NodeKind::ImplEscaping) {
           flags = flags.withEscaping();
         } else if (child->getKind() == NodeKind::ImplParameter) {
@@ -1247,7 +1257,8 @@ private:
     auto diffKind = T::DifferentiabilityType::DifferentiableOrNotApplicable;
     if (node->getNumChildren() == 3) {
       auto diffKindNode = node->getChild(1);
-      if (diffKindNode->getKind() != Node::Kind::ImplDifferentiability)
+      if (diffKindNode->getKind() !=
+          Node::Kind::ImplParameterResultDifferentiability)
         return true;
       auto optDiffKind =
           T::getDifferentiabilityFromString(diffKindNode->getText());

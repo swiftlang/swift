@@ -37,7 +37,7 @@
 // CHECK-SAME: i16 1, i16 12, i32 2, i32 6,
 // CHECK-SAME: @"symbolic BD"
 
-public actor class MyClass {
+public actor MyClass {
   public var x: Int
   public init() { self.x = 0 }
 }
@@ -60,7 +60,7 @@ public actor class MyClass {
 // CHECK: swift_defaultActor_destroy
 // CHECK-LABEL: ret
 
-public actor class Exchanger<T> {
+public actor Exchanger<T> {
   public var value: T
 
   public init(value: T) { self.value = value }

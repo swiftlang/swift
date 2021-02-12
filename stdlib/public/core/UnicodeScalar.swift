@@ -33,7 +33,7 @@ extension Unicode {
   ///     print(airplane)
   ///     // Prints "✈︎"
   @frozen
-  public struct Scalar {
+  public struct Scalar: ConcurrentValue {
     @inlinable
     internal init(_value: UInt32) {
       self._value = _value
@@ -387,7 +387,7 @@ extension Unicode.Scalar: Comparable {
 
 extension Unicode.Scalar {
   @frozen
-  public struct UTF16View {
+  public struct UTF16View: ConcurrentValue {
     @inlinable
     internal init(value: Unicode.Scalar) {
       self.value = value
@@ -437,7 +437,7 @@ extension Unicode.Scalar.UTF16View: RandomAccessCollection {
 extension Unicode.Scalar {
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   @frozen
-  public struct UTF8View {
+  public struct UTF8View: ConcurrentValue {
     @inlinable
     internal init(value: Unicode.Scalar) {
       self.value = value
