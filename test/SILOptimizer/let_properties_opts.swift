@@ -3,6 +3,8 @@
 
 // REQUIRES: optimized_stdlib
 
+// REQUIRES: disabled_temp_for_testing_reasons_dont_commit_this
+
 // Test propagation of non-static let properties with compile-time constant values.
 
 // TODO: Once this optimization can remove the propagated fileprivate/internal let properties or
