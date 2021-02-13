@@ -2339,17 +2339,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
         }
       }
 
-      bool concurrent = false;
-      if (attrs.has(TAK_concurrent)) {
-        if (getASTContext().LangOpts.EnableExperimentalConcurrency) {
-          concurrent = true;
-        } else {
-          diagnoseInvalid(repr, attrs.getLoc(TAK_concurrent),
-                          diag::attr_requires_concurrency,
-                          TypeAttributes::getAttrName(TAK_concurrent),
-                          false);
-        }
-      }
+      bool concurrent = attrs.has(TAK_concurrent);
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
                                   concurrent, parsedClangFunctionType,
