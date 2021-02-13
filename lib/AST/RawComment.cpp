@@ -154,7 +154,14 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
         if (!CachedLocs->DocRanges.empty()) {
           SmallVector<SingleRawComment, 4> SRCs;
           for (const auto &Range : CachedLocs->DocRanges) {
-            SRCs.push_back({ Range, Context.SourceMgr });
+            if (Range.isValid()) {
+              SRCs.push_back({ Range, Context.SourceMgr });
+            } else {
+              // if we've run into an invalid range, don't bother trying to load any of
+              // the other comments
+              SRCs.clear();
+              break;
+            }
           }
           auto RC = RawComment(Context.AllocateCopy(llvm::makeArrayRef(SRCs)));
 
