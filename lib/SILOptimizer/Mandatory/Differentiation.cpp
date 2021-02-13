@@ -782,7 +782,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   // === Create an empty VJP. ===
   Mangle::DifferentiationMangler mangler;
   auto vjpName = mangler.mangleDerivativeFunction(
-      original, AutoDiffDerivativeFunctionKind::VJP, config);
+      original->getName(), AutoDiffDerivativeFunctionKind::VJP, config);
   CanGenericSignature vjpCanGenSig;
   if (auto vjpGenSig = witness->getDerivativeGenericSignature())
     vjpCanGenSig = vjpGenSig->getCanonicalSignature();
@@ -825,7 +825,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
 
   Mangle::DifferentiationMangler mangler;
   auto jvpName = mangler.mangleDerivativeFunction(
-      original, AutoDiffDerivativeFunctionKind::JVP, config);
+      original->getName(), AutoDiffDerivativeFunctionKind::JVP, config);
   CanGenericSignature jvpCanGenSig;
   if (auto jvpGenSig = witness->getDerivativeGenericSignature())
     jvpCanGenSig = jvpGenSig->getCanonicalSignature();

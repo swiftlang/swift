@@ -566,6 +566,8 @@ private:
     case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     case Node::Kind::AsyncFunctionPointer:
     case Node::Kind::AutoDiffFunction:
+    case Node::Kind::AutoDiffSelfReorderingReabstractionThunk:
+    case Node::Kind::AutoDiffSubsetParametersThunk:
     case Node::Kind::AutoDiffFunctionKind:
     case Node::Kind::IndexSubset:
       return false;
@@ -1738,17 +1740,29 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::AutoDiffFunction: {
-    auto childIt = Node->begin();
-    auto original = *childIt++;
-    NodePointer optionalGenSig =
-        (*childIt)->getKind() == Node::Kind::DependentGenericSignature
-            ? *childIt++ : nullptr;
-    auto kind = *childIt++;
-    auto paramIndices = *childIt++;
-    auto resultIndices = *childIt++;
+    unsigned prefixEndIndex = 0;
+    while (prefixEndIndex != Node->getNumChildren() &&
+           Node->getChild(prefixEndIndex)->getKind()
+              != Node::Kind::AutoDiffFunctionKind)
+      ++prefixEndIndex;
+    auto kind = Node->getChild(prefixEndIndex);
+    auto paramIndices = Node->getChild(prefixEndIndex + 1);
+    auto resultIndices = Node->getChild(prefixEndIndex + 2);
     print(kind);
     Printer << " of ";
-    print(original);
+    NodePointer optionalGenSig = nullptr;
+    for (unsigned i = 0; i < prefixEndIndex; ++i) {
+      // The last node may be a generic signature. If so, print it later.
+      if (i == prefixEndIndex - 1 &&
+          Node->getChild(i)->getKind()
+              == Node::Kind::DependentGenericSignature) {
+        optionalGenSig = Node->getChild(i);
+        break;
+      }
+      print(Node->getChild(i));
+    }
+    if (Options.ShortenThunk)
+      return nullptr;
     Printer << " with respect to parameters ";
     print(paramIndices);
     Printer << " and results ";
@@ -1756,6 +1770,61 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     if (optionalGenSig && Options.DisplayWhereClauses) {
       Printer << " with ";
       print(optionalGenSig);
+    }
+    return nullptr;
+  }
+  case Node::Kind::AutoDiffSelfReorderingReabstractionThunk: {
+    Printer << "autodiff self-reordering reabstraction thunk ";
+    auto childIt = Node->begin();
+    auto fromType = *childIt++;
+    auto toType = *childIt++;
+    if (Options.ShortenThunk) {
+      Printer << "for ";
+      print(fromType);
+      return nullptr;
+    }
+    NodePointer optionalGenSig =
+        (*childIt)->getKind() == Node::Kind::DependentGenericSignature
+            ? *childIt++ : nullptr;
+    Printer << "for ";
+    print(*childIt++); // kind
+    if (optionalGenSig) {
+      print(optionalGenSig);
+      Printer << ' ';
+    }
+    Printer << " from ";
+    print(fromType);
+    Printer << " to ";
+    print(toType);
+    return nullptr;
+  }
+  case Node::Kind::AutoDiffSubsetParametersThunk: {
+    Printer << "autodiff subset parameters thunk for ";
+    auto currentIndex = Node->getNumChildren() - 1;
+    auto toParamIndices = Node->getChild(currentIndex--);
+    auto resultIndices = Node->getChild(currentIndex--);
+    auto paramIndices = Node->getChild(currentIndex--);
+    auto kind = Node->getChild(currentIndex--);
+    print(kind);
+    Printer << " from ";
+    // Print the "from" thing.
+    if (currentIndex == 0) {
+      print(Node->getFirstChild()); // the "from" type
+    } else {
+      for (unsigned i = 0; i < currentIndex; ++i) // the "from" global
+        print(Node->getChild(i));
+    }
+    if (Options.ShortenThunk)
+      return nullptr;
+    Printer << " with respect to parameters ";
+    print(paramIndices);
+    Printer << " and results ";
+    print(resultIndices);
+    Printer << " to parameters ";
+    print(toParamIndices);
+    if (currentIndex > 0) {
+      Printer << " of type ";
+      print(Node->getChild(currentIndex)); // "to" type
     }
     return nullptr;
   }
