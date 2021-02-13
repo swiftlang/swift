@@ -26,7 +26,7 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/TerminatorUtils.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
