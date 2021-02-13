@@ -57,10 +57,19 @@
 // CHECK: }
 
 // CHECK: struct HasForwardDeclaredNestedType {
+// CHECK:   struct ForwardDeclaredType {
+// CHECK:     init()
+// CHECK:   }
 // CHECK:   struct NormalSubType {
 // CHECK:     init()
 // CHECK:   }
-// CHECK:   struct ForwardDeclaredType {
+// CHECK:   init()
+// CHECK: }
+
+// CHECK: struct HasForwardDeclaredTemplateChild {
+// CHECK:   struct ForwardDeclaredClassTemplate<T> {
+// CHECK:   }
+// CHECK:   struct DeclaresForwardDeclaredClassTemplateFriend {
 // CHECK:     init()
 // CHECK:   }
 // CHECK:   init()
