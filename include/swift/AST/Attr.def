@@ -602,8 +602,8 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   106)
 
 SIMPLE_DECL_ATTR(concurrent, Concurrent,
-  OnFunc | OnConstructor | OnAccessor | ConcurrencyOnly |
-  ABIStableToAdd | ABIStableToRemove |
+  OnFunc | OnConstructor | OnAccessor |
+  ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   107)
 
