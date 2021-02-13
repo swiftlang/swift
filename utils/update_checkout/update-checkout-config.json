@@ -65,6 +65,7 @@
                 "swift-tools-support-core": "main",
                 "swiftpm": "swiftwasm",
                 "swift-argument-parser": "0.3.0",
+                "swift-crypto": "main",
                 "swift-driver": "main",
                 "swift-syntax": "main",
                 "swift-stress-tester": "main",

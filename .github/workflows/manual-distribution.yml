@@ -8,6 +8,8 @@ on:
       toolchain_name:
         description: 'Toolchain name'
         required: true
+      branch:
+        description: 'Branch name used to fetch built artifacts. If empty, use default branch based on channel'
       display_name:
         description: 'Display name for Darwin toolchain'
       display_name_short:
@@ -16,7 +18,7 @@ jobs:
   manual-distribution:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Setup keychain
         run: |
           security create-keychain -p "$KEYCHAIN_PASSWORD" swiftwasm-ci
@@ -38,15 +40,17 @@ jobs:
           DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_BASE64 }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT_PASSWORD }}
       - run: |
+          BRANCH="${{ github.event.inputs.branch }}"
+
           case "${{ github.event.inputs.channel }}" in
             "DEVELOPMENT")
-              ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm DEVELOPMENT "${{ github.event.inputs.toolchain_name }}"
+              ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm} DEVELOPMENT "${{ github.event.inputs.toolchain_name }}"
             ;;
             "5.3")
-              ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.3 5.3 "${{ github.event.inputs.toolchain_name }}"
+              ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.3} 5.3 "${{ github.event.inputs.toolchain_name }}"
             ;;
             "5.4")
-              ./utils/webassembly/distribute-latest-toolchain.sh swiftwasm-release/5.4 5.4 "${{ github.event.inputs.toolchain_name }}"
+              ./utils/webassembly/distribute-latest-toolchain.sh ${BRANCH:-swiftwasm-release/5.4} 5.4 "${{ github.event.inputs.toolchain_name }}"
             ;;
             *)
               echo "Unrecognised release channel: ${{ github.event.inputs.channel }}"
@@ -55,7 +59,7 @@ jobs:
           esac
 
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SWIFTWASM_BUILDBOT_TOKEN }}
           DARWIN_TOOLCHAIN_APPLICATION_CERT: ${{ secrets.DARWIN_TOOLCHAIN_APPLICATION_CERT }}
           DARWIN_TOOLCHAIN_INSTALLER_CERT: ${{ secrets.DARWIN_TOOLCHAIN_INSTALLER_CERT }}
           DARWIN_TOOLCHAIN_NOTARIZE_EMAIL: ${{ secrets.DARWIN_TOOLCHAIN_NOTARIZE_EMAIL }}
