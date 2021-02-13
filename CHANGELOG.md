@@ -28,6 +28,20 @@ CHANGELOG
 Swift Next
 ----------
 
+* Whenever a reference to `Self` does not impede the usage of a protocol as a value type, or a protocol member on a value of protocol type, the same is now true for references to `[Self]` and `[Key : Self]`:
+
+  ```swift
+  protocol Copyable {
+    func copy() -> Self
+    func copy(count: Int) -> [Self]
+  }
+
+  func test(c: Copyable) {
+    let copy: Copyable = c.copy() // OK
+    let copies: [Copyable] = c.copy(count: 5) // also OK
+  }
+  ```
+
 * [SE-0296][]:
 
   Asynchronous programming is now natively supported using async/await. Asynchronous functions can be defined using `async`:
