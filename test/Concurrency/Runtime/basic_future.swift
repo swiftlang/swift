@@ -27,7 +27,7 @@ func testSimple(
 
   var completed = false
 
-  let taskHandle = Task.runDetached { () async throws -> String in
+  let taskHandle: Task.Handle<String, Error> = Task.runDetached {
     let greeting = await formGreeting(name: name)
 
     // If the intent is to test suspending, wait a bit so the second task

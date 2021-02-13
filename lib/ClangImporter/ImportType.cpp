@@ -2470,7 +2470,9 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   if (asyncInfo) {
     asyncConvention = ForeignAsyncConvention(
         completionHandlerType, asyncInfo->completionHandlerParamIndex(),
-        asyncInfo->completionHandlerErrorParamIndex());
+        asyncInfo->completionHandlerErrorParamIndex(),
+        asyncInfo->completionHandlerFlagParamIndex(),
+        asyncInfo->completionHandlerFlagIsErrorOnZero());
   }
 
   if (errorInfo) {

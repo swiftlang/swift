@@ -57,6 +57,10 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)oldAPIWithCompletionHandler:(void (^ _Nonnull)(NSString *_Nullable, NSError *_Nullable))handler __attribute__((availability(macosx, deprecated=10.14)));
 
 -(void)someAsyncMethodWithBlock:(void (^ _Nonnull)(NSString *_Nullable, NSError *_Nullable))completionHandler;
+
+// Property & async method overloading
+-(void)getOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))handler;
+@property (readonly, nonatomic) NSArray<NSString *> *operations;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

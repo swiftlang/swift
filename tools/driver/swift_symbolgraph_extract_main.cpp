@@ -238,6 +238,14 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
     }
     return EXIT_FAILURE;
   }
+  
+  if (M->failedToLoad()) {
+    llvm::errs() << "Error: Failed to load the module '" << options::ModuleName
+      << "'. Are you missing build dependencies or include/framework directories?\n"
+      << "See the previous error messages for details. Aborting.\n";
+    
+    return EXIT_FAILURE;
+  }
 
   const auto &MainFile = M->getMainFile(FileUnitKind::SerializedAST);
   llvm::errs() << "Emitting symbol graph for module file: " << MainFile.getModuleDefiningPath() << '\n';

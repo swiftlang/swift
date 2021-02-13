@@ -219,6 +219,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 
+  if (const Arg *A = Args.getLastArg(OPT_access_notes_path))
+    Opts.AccessNotesPath = A->getValue();
+
   if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
                                      OPT_no_serialize_debugging_options)) {
     Opts.SerializeOptionsForDebugging =
@@ -236,6 +239,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
   computeImplicitImportModuleNames(OPT_testable_import_module, /*isTestable=*/true);
   computeLLVMArgs();
+
+  Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
+  
+  if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
+    Opts.SymbolGraphOutputDir = A->getValue();
+  }
 
   return false;
 }
@@ -582,6 +591,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   if (!FrontendOptions::canActionEmitModuleSummary(Opts.RequestedAction) &&
       Opts.InputsAndOutputs.hasModuleSummaryOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_summary);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
+      !Opts.SymbolGraphOutputDir.empty()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_symbol_graph);
     return true;
   }
   return false;

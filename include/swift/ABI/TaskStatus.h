@@ -25,7 +25,7 @@
 
 namespace swift {
 
-/// The abstract base class for all sttatus records.
+/// The abstract base class for all status records.
 ///
 /// TaskStatusRecords are typically allocated on the stack (possibly
 /// in the task context), partially initialized, and then atomically

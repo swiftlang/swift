@@ -28,6 +28,10 @@ struct IntAwaitable : Awaitable {
     return 123
   }
 
+  func waitForInt() async -> Int {
+    return 321
+  }
+
   func wait(orThrow: Bool) async throws {
     if (orThrow) {
       throw MyError.bad
@@ -43,6 +47,10 @@ func genericWait<T : Awaitable>(_ t: T) async -> T.Result {
   return await t.wait()
 }
 
+func genericWaitForInt<T : Awaitable>(_ t: T) async -> Int {
+  return await t.waitForInt()
+}
+
 func genericWait<T : Awaitable>(orThrow: Bool, _ t: T) async throws {
   return try await t.wait(orThrow: orThrow)
 }
@@ -56,6 +64,7 @@ AsyncProtocolRequirementSuite.test("AsyncProtocolRequirement") {
     await genericWaitForNothing(x)
 
     expectEqual(123, await genericWait(x))
+    expectEqual(321, await genericWaitForInt(x))
 
     expectNil(try? await genericWait(orThrow: true, x))
     try! await genericWait(orThrow: false, x)

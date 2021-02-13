@@ -487,13 +487,14 @@ public:
                                calleeTypeInfo.substResultType, throws);
 
     // Wrap the Builtin.RawUnsafeContinuation in an
-    // Unsafe[Throwing]Continuation<T>.
-    auto continuationDecl = throws
-      ? SGF.getASTContext().getUnsafeThrowingContinuationDecl()
-      : SGF.getASTContext().getUnsafeContinuationDecl();
-    
+    // UnsafeContinuation<T, E>.
+    auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
+
+    auto errorTy = throws
+      ? SGF.getASTContext().getExceptionType()
+      : SGF.getASTContext().getNeverType();
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
-                                                calleeTypeInfo.substResultType)
+                                                { calleeTypeInfo.substResultType, errorTy })
       ->getCanonicalType();
     auto wrappedContinuation =
         SGF.B.createStruct(loc,

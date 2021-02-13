@@ -141,6 +141,7 @@ endforeach()
 if(is_image_inspection_required)
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
   add_dependencies(stdlib static_binary_magic)
+  add_dependencies(stdlib ${static_binary_lnk_file_list})
 endif()
 
 add_swift_target_library(swiftRuntime OBJECT_LIBRARY

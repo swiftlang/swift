@@ -387,6 +387,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_enable_experimental_concurrency);
   Opts.EnableExperimentalConcurrentValueChecking |=
     Args.hasArg(OPT_enable_experimental_concurrent_value_checking);
+  Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
+    Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
@@ -681,6 +683,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // If we are doing index-while-building, configure lexing and parsing to
   // remember comments.
   if (!FrontendOpts.IndexStorePath.empty()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we are emitting a symbol graph file, configure lexing and parsing to
+  // remember comments.
+  if (FrontendOpts.EmitSymbolGraph) {
     Opts.AttachCommentsToDecls = true;
   }
 

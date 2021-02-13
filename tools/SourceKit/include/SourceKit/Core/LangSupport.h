@@ -376,6 +376,12 @@ struct RefactoringInfo {
   StringRef UnavailableReason;
 };
 
+struct ParentInfo {
+  StringRef Title;
+  StringRef KindName;
+  StringRef USR;
+};
+
 struct CursorInfoData {
   // If nonempty, a proper Info could not be resolved (and the rest of the Info
   // will be empty). Clients can potentially use this to show a diagnostic
@@ -419,6 +425,10 @@ struct CursorInfoData {
   ArrayRef<StringRef> ModuleGroupArray;
   /// All available actions on the code under cursor.
   ArrayRef<RefactoringInfo> AvailableActions;
+  /// Stores the Symbol Graph title, kind, and USR of the parent contexts of the
+  /// symbol under the cursor.
+  ArrayRef<ParentInfo> ParentContexts;
+
   bool IsSystem = false;
   llvm::Optional<unsigned> ParentNameOffset;
 };

@@ -3233,19 +3233,9 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    llvm::Value *context = IGF.getAsyncContext();
-    auto layout = getAsyncContextLayout(IGF);
 
-    Address dataAddr = layout.emitCastTo(IGF, context);
-    for (unsigned index = 0, count = layout.getDirectReturnCount();
-         index < count; ++index) {
-      auto fieldLayout = layout.getDirectReturnLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-      cast<LoadableTypeInfo>(fieldLayout.getType())
-          .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
-    }
-    emitAsyncReturn(IGF, layout, fnType);
+    auto asyncLayout = getAsyncContextLayout(IGF);
+    emitAsyncReturn(IGF, asyncLayout, fnType, result);
     IGF.emitCoroutineOrAsyncExit();
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();

@@ -2312,6 +2312,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Looks up and applies the access note for a given declaration.
+class ApplyAccessNoteRequest
+    : public SimpleRequest<ApplyAccessNoteRequest,
+                           evaluator::SideEffect(ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+
 class TypeCheckSourceFileRequest
     : public SimpleRequest<
           TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),

@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,7 +71,6 @@ static void errnoAndExit(const char *message) {
 }
 
 #if 0
-#include <inttypes.h>
 #define DEBUG_LOG(fmt, ...) fprintf(stderr, "%s: " fmt "\n",\
                                     __func__, __VA_ARGS__)
 #else
@@ -281,7 +281,7 @@ PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
   size_t NumReflectionInfos;
   PipeMemoryReader_collectBytesFromPipe(Reader, &NumReflectionInfos,
                                         sizeof(NumReflectionInfos));
-  DEBUG_LOG("Receiving %z images from child", NumReflectionInfos);
+  DEBUG_LOG("Receiving %zu images from child", NumReflectionInfos);
 
   if (NumReflectionInfos == 0)
     return;
@@ -628,6 +628,29 @@ int reflectEnumValue(SwiftReflectionContextRef RC,
 
 }
 
+static void
+asyncTaskIterationCallback(swift_reflection_ptr_t AllocationPtr, unsigned Count,
+                           swift_async_task_allocation_chunk_t Chunks[],
+                           void *ContextPtr) {
+  printf("  Allocation block %#" PRIx64 "\n", (uint64_t)AllocationPtr);
+  for (unsigned i = 0; i < Count; i++)
+    printf("    Chunk at %#" PRIx64 " length %u kind %u\n",
+           (uint64_t)Chunks[i].Start, Chunks[i].Length, Chunks[i].Kind);
+}
+
+int reflectAsyncTask(SwiftReflectionContextRef RC,
+                     const PipeMemoryReader Pipe) {
+  uintptr_t AsyncTaskInstance = PipeMemoryReader_receiveInstanceAddress(&Pipe);
+  printf("Async task %#" PRIx64 "\n", (uint64_t)AsyncTaskInstance);
+  swift_reflection_iterateAsyncTaskAllocations(
+      RC, AsyncTaskInstance, asyncTaskIterationCallback, NULL);
+
+  printf("\n\n");
+  PipeMemoryReader_sendDoneMessage(&Pipe);
+  fflush(stdout);
+  return 1;
+}
+
 
 int doDumpHeapInstance(const char *BinaryFilename) {
   PipeMemoryReader Pipe = createPipeMemoryReader();
@@ -716,6 +739,12 @@ int doDumpHeapInstance(const char *BinaryFilename) {
         case EnumValue: {
           printf("Reflecting an enum value.\n");
           if (!reflectEnumValue(RC, Pipe))
+            return EXIT_SUCCESS;
+          break;
+        }
+        case AsyncTask: {
+          printf("Reflecting an async task.\n");
+          if (!reflectAsyncTask(RC, Pipe))
             return EXIT_SUCCESS;
           break;
         }
