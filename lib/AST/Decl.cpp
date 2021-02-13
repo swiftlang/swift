@@ -4833,12 +4833,26 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     return findProtocolSelfReferences(proto, selfType->getSelfType(), position);
   }
 
-  // Bound generic types are invariant.
-  if (auto boundGenericType = type->getAs<BoundGenericType>()) {
+  // Most bound generic types are invariant.
+  if (auto *const bgt = type->getAs<BoundGenericType>()) {
     auto info = SelfReferenceInfo();
-    for (auto paramType : boundGenericType->getGenericArgs()) {
-      info |= findProtocolSelfReferences(proto, paramType,
+
+    const auto &ctx = bgt->getDecl()->getASTContext();
+    if (ctx.getArrayDecl() == bgt->getDecl()) {
+      // Swift.Array preserves variance in its Value type.
+      info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
+                                         position);
+    } else if (bgt->getDecl() == ctx.getDictionaryDecl()) {
+      // Swift.Dictionary preserves variance in its Element type.
+      info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().front(),
                                          SelfReferencePosition::Invariant);
+      info |= findProtocolSelfReferences(proto, bgt->getGenericArgs().back(),
+                                         position);
+    } else {
+      for (auto paramType : bgt->getGenericArgs()) {
+        info |= findProtocolSelfReferences(proto, paramType,
+                                           SelfReferencePosition::Invariant);
+      }
     }
 
     return info;
