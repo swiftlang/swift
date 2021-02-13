@@ -72,6 +72,11 @@ extension OldSchool: UnsafeConcurrentValue { }
 // CHECK-NEXT: #endif
 public func runSomethingSomewhere(body: () async -> Void) { }
 
+// CHECK: #if compiler(>=5.3) && $ConcurrentFunctions
+// CHECK-NEXT: func runSomethingConcurrently(body: @concurrent () -> 
+// CHECK-NEXT: #endif
+public func runSomethingConcurrently(body: @concurrent () -> Void) { }
+
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: func stage
 // CHECK-NEXT: #endif

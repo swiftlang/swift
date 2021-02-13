@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -enable-experimental-flow-sensitive-concurrent-captures
+// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-flow-sensitive-concurrent-captures
 // REQUIRES: concurrency
 
 // Concurrent attribute on a function type.
