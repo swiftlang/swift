@@ -398,7 +398,7 @@ public:
   }
 
   /// Check if this binding is viable for inclusion in the set.
-  bool isViable(PotentialBinding &binding) const;
+  bool isViable(PotentialBinding &binding);
 
   explicit operator bool() const {
     return hasViableBindings() || isDirectHole();

@@ -891,22 +891,47 @@ void PotentialBindings::addLiteral(Constraint *constraint) {
   Literals.insert(constraint);
 }
 
-bool BindingSet::isViable(PotentialBinding &binding) const {
+bool BindingSet::isViable(PotentialBinding &binding) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
   // case. In the worst case, we'll produce lots of duplicate solutions
   // for this constraint system, which is problematic for overload
   // resolution.
   auto type = binding.BindingType;
-  if (type->hasTypeVariable()) {
-    auto *NTD = type->getAnyNominal();
-    if (!NTD)
-      return true;
 
-    for (auto &existing : Bindings) {
-      auto *existingNTD = existing.BindingType->getAnyNominal();
-      if (existingNTD && NTD == existingNTD)
-        return false;
+  auto *NTD = type->getAnyNominal();
+  if (!NTD)
+    return true;
+
+  for (auto existing = Bindings.begin(); existing != Bindings.end();
+       ++existing) {
+    auto existingType = existing->BindingType;
+
+    auto *existingNTD = existingType->getAnyNominal();
+    if (!existingNTD || NTD != existingNTD)
+      continue;
+
+    // If new type has a type variable it shouldn't
+    // be considered  viable.
+    if (type->hasTypeVariable())
+      return false;
+
+    // If new type doesn't have any type variables,
+    // but existing binding does, let's replace existing
+    // binding with new one.
+    if (existingType->hasTypeVariable()) {
+      // First, let's remove all of the adjacent type
+      // variables associated with this binding.
+      {
+        SmallPtrSet<TypeVariableType *, 4> referencedVars;
+        existingType->getTypeVariables(referencedVars);
+        for (auto *var : referencedVars)
+          AdjacentVars.erase(var);
+      }
+
+      // And now let's remove the binding itself.
+      Bindings.erase(existing);
+      break;
     }
   }
 
