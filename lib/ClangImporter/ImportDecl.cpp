@@ -7814,20 +7814,6 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
 }
 
-/// Determine whether any of the parameters to the given function is of an
-/// unsafe pointer type.
-static bool hasAnyUnsafePointerParameters(FuncDecl *func) {
-  for (auto param : *func->getParameters()) {
-    Type paramType =
-        param->toFunctionParam().getPlainType()->lookThroughAllOptionalTypes();
-    if (paramType->getAnyPointerElementType()) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 Type ClangImporter::Implementation::getMainActorType() {
   if (MainActorType)
     return *MainActorType;
