@@ -38,7 +38,7 @@ struct SILBasicBlock {
 
 #define SWIFT_SIL_SILFUNCTION_H
 
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 
 using namespace swift;
 

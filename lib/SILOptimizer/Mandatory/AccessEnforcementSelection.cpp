@@ -37,7 +37,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"

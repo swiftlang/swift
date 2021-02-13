@@ -19,7 +19,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"

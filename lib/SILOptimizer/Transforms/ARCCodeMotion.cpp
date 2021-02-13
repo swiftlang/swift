@@ -72,7 +72,7 @@
 #define DEBUG_TYPE "sil-rr-code-motion"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -554,24 +554,16 @@ void RetainCodeMotionContext::convergeCodeMotionDataFlow() {
   // Process each basic block with the genset and killset. Every time the
   // BBSetOut of a basic block changes, the optimization is rerun on its
   // successors. 
-  llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  BasicBlockSet HandledBBs(BlockStates.getFunction());
+  BasicBlockWorklist<16> WorkList(BlockStates.getFunction());
   // Push into reverse post order so that we can pop from the back and get
   // post order.
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
-    WorkList.push_back(B);
-    HandledBBs.insert(B);
+    WorkList.push(B);
   }
-  while (!WorkList.empty()) {
-    SILBasicBlock *BB = WorkList.pop_back_val();
-    HandledBBs.erase(BB);
+  while (SILBasicBlock *BB = WorkList.popAndForget()) {
     if (processBBWithGenKillSet(BB)) {
       for (SILBasicBlock *succ : BB->getSuccessors()) {
-        // We do not push basic block into the worklist if its already 
-        // in the worklist.
-        if (HandledBBs.contains(succ))
-          continue;
-        WorkList.push_back(succ);
+        WorkList.pushIfNotVisited(succ);
       }
     }
   }
@@ -974,24 +966,16 @@ void ReleaseCodeMotionContext::convergeCodeMotionDataFlow() {
   // Process each basic block with the gen and kill set. Every time the
   // BBSetIn of a basic block changes, the optimization is rerun on its
   // predecessors.
-  llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  BasicBlockSet HandledBBs(BlockStates.getFunction());
+  BasicBlockWorklist<16> WorkList(BlockStates.getFunction());
   // Push into reverse post order so that we can pop from the back and get
   // post order.
   for (SILBasicBlock *B : PO->getPostOrder()) {
-    WorkList.push_back(B);
-    HandledBBs.insert(B);
+    WorkList.push(B);
   }
-  while (!WorkList.empty()) {
-    SILBasicBlock *BB = WorkList.pop_back_val();
-    HandledBBs.erase(BB);
+  while (SILBasicBlock *BB = WorkList.popAndForget()) {
     if (processBBWithGenKillSet(BB)) {
       for (auto X : BB->getPredecessorBlocks()) {
-        // We do not push basic block into the worklist if its already 
-        // in the worklist.
-        if (HandledBBs.contains(X))
-          continue;
-        WorkList.push_back(X);
+        WorkList.pushIfNotVisited(X);
       }
     }
   }
