@@ -252,8 +252,6 @@ struct PotentialBindings {
            !Defaults.empty() || isDirectHole();
   }
 
-  /// Determines whether this type variable could be `nil`,
-  /// which means that all of its bindings should be optional.
   bool canBeNil() const;
 
   /// Determine whether attempting this type variable should be
