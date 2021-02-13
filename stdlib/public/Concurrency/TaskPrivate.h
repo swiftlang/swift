@@ -34,10 +34,6 @@ void _swift_task_alloc_destroy(AsyncTask *task);
 
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
-#elif !__APPLE__
-// FIXME: this is a terrible workaround for our temporary
-// inability to link libdispatch.
-#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
 #else
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0
 #endif

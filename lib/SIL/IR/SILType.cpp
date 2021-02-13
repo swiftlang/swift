@@ -637,8 +637,8 @@ bool SILType::isDifferentiable(SILModule &M) const {
 
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
-  return Type(const_cast<TypeBase*>(this)).transform([&](Type t) -> Type {
-    if (auto f = t->getAs<SILFunctionType>()) {
+  return Type(const_cast<TypeBase *>(this)).transform([&](Type t) -> Type {
+    if (auto *f = t->getAs<SILFunctionType>()) {
       auto sft = f->getUnsubstitutedType(M);
       
       // Also eliminate substituted function types in the arguments, yields,
@@ -698,4 +698,12 @@ bool SILType::isEffectivelyExhaustiveEnumType(SILFunction *f) {
   assert(decl && "Called for a non enum type");
   return decl->isEffectivelyExhaustive(f->getModule().getSwiftModule(),
                                        f->getResilienceExpansion());
+}
+
+SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) {
+  auto *boxTy = getASTType()->getAs<SILBoxType>();
+  if (!boxTy)
+    return SILType();
+  return ::getSILBoxFieldType(f->getTypeExpansionContext(), boxTy,
+                              f->getModule().Types, field);
 }

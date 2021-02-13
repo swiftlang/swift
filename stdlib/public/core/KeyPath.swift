@@ -1932,6 +1932,11 @@ func _modifyAtWritableKeyPath_impl<Root, Value>(
   root: inout Root,
   keyPath: WritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
+  if type(of: keyPath).kind == .reference {
+    return _modifyAtReferenceWritableKeyPath_impl(root: root,
+      keyPath: _unsafeUncheckedDowncast(keyPath,
+        to: ReferenceWritableKeyPath<Root, Value>.self))
+  }
   return keyPath._projectMutableAddress(from: &root)
 }
 
@@ -3687,3 +3692,4 @@ internal func _instantiateKeyPathBuffer(
       as: RawKeyPathComponent.Header.self)
   }
 }
+

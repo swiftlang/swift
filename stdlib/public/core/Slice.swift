@@ -507,3 +507,6 @@ extension Slice
     }
   }
 }
+
+extension Slice: ConcurrentValue
+where Base: ConcurrentValue, Base.Index: ConcurrentValue { }

@@ -75,16 +75,14 @@ void SwitchEnumBuilder::emit() && {
     // TODO: We could store the data in CaseBB form and not have to do this.
     llvm::SmallVector<DeclBlockPair, 8> caseBlocks;
     llvm::SmallVector<ProfileCounter, 8> caseBlockCounts;
-    std::transform(caseDataArray.begin(), caseDataArray.end(),
-                   std::back_inserter(caseBlocks),
-                   [](NormalCaseData &caseData) -> DeclBlockPair {
-                     return {caseData.decl, caseData.block};
-                   });
-    std::transform(caseDataArray.begin(), caseDataArray.end(),
-                   std::back_inserter(caseBlockCounts),
-                   [](NormalCaseData &caseData) -> ProfileCounter {
-                     return caseData.count;
-                   });
+    llvm::transform(caseDataArray, std::back_inserter(caseBlocks),
+                    [](NormalCaseData &caseData) -> DeclBlockPair {
+                      return {caseData.decl, caseData.block};
+                    });
+    llvm::transform(caseDataArray, std::back_inserter(caseBlockCounts),
+                    [](NormalCaseData &caseData) -> ProfileCounter {
+                      return caseData.count;
+                    });
     SILBasicBlock *defaultBlock =
         defaultBlockData ? defaultBlockData->block : nullptr;
     ProfileCounter defaultBlockCount =

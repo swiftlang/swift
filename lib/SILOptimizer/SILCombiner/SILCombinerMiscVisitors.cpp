@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
+
 #include "SILCombiner.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DebugUtils.h"
@@ -18,16 +19,17 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -957,8 +959,9 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // globals, which can occur with cross-module optimization.
   if (SingleValueInstruction *initVal = getValueFromStaticLet(LI->getOperand())) {
     StaticInitCloner cloner(LI);
-    cloner.add(initVal);
-    return cloner.clone(initVal);
+    if (cloner.add(initVal)) {
+      return cloner.clone(initVal);
+    }
   }
 
   // If we have a load [copy] whose only non-debug users are destroy_value, just
@@ -1000,6 +1003,7 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
 /// Walks over all fields of an aggregate and checks if a reference count
 /// operation for \p value is required. This differs from a simple `isTrivial`
 /// check, because it treats a value_to_bridge_object instruction as "trivial".
+/// It can also handle non-trivial enums with trivial cases.
 static bool isTrivial(SILValue value, SILFunction *function) {
   SmallVector<ValueBase *, 32> workList;
   SmallPtrSet<ValueBase *, 16> visited;
@@ -1015,6 +1019,11 @@ static bool isTrivial(SILValue value, SILFunction *function) {
         if (visited.insert(op).second)
           workList.push_back(op);
       }
+      continue;
+    }
+    if (auto *en = dyn_cast<EnumInst>(v)) {
+      if (en->hasOperand() && visited.insert(en->getOperand()).second)
+        workList.push_back(en->getOperand());
       continue;
     }
     return false;
@@ -1743,7 +1752,9 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   SILType payloadType = tedai->getType().getObjectType();
 
   // Go back through a second time now that we know all of our users are
-  // loads. Perform the transformation on each load.
+  // loads. Perform the transformation on each load at the load's use site. The
+  // reason that we have to do this is that otherwise we would be hoisting the
+  // loads causing us to need to consider additional ARC issues.
   while (!tedai->use_empty()) {
     auto *use = *tedai->use_begin();
     auto *user = use->getUser();
@@ -1755,15 +1766,33 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
     }
 
     // Insert a new Load of the enum and extract the data from that.
+    //
+    // NOTE: This is potentially hoisting the load, so we need to insert
+    // compensating destroys.
     auto *svi = cast<SingleValueInstruction>(user);
     SILValue newValue;
     if (auto *oldLoad = dyn_cast<LoadInst>(svi)) {
-      auto newLoad = Builder.emitLoadValueOperation(
-          loc, enumAddr, oldLoad->getOwnershipQualifier());
-      newValue =
-          Builder.createUncheckedEnumData(loc, newLoad, enumElt, payloadType);
+      SILBuilderWithScope localBuilder(oldLoad, Builder);
+      // If the old load is trivial and our enum addr is non-trivial, we need to
+      // use a load_borrow here. We know that the unchecked_enum_data will
+      // produce a trivial value meaning that we can just do a
+      // load_borrow/immediately end the lifetime here.
+      if (oldLoad->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial &&
+          !enumAddr->getType().isTrivial(Builder.getFunction())) {
+        localBuilder.emitScopedBorrowOperation(
+            loc, enumAddr, [&](SILValue newLoad) {
+              newValue = localBuilder.createUncheckedEnumData(
+                  loc, newLoad, enumElt, payloadType);
+            });
+      } else {
+        auto newLoad = localBuilder.emitLoadValueOperation(
+            loc, enumAddr, oldLoad->getOwnershipQualifier());
+        newValue = localBuilder.createUncheckedEnumData(loc, newLoad, enumElt,
+                                                        payloadType);
+      }
     } else if (auto *lbi = cast<LoadBorrowInst>(svi)) {
-      auto newLoad = Builder.emitLoadBorrowOperation(loc, enumAddr);
+      SILBuilderWithScope localBuilder(lbi, Builder);
+      auto newLoad = localBuilder.emitLoadBorrowOperation(loc, enumAddr);
       for (auto ui = lbi->consuming_use_begin(), ue = lbi->consuming_use_end();
            ui != ue; ui = lbi->consuming_use_begin()) {
         // We already checked that all of our uses here are end_borrow above.
@@ -1771,12 +1800,18 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
                "Expected only end_borrow consuming uses");
         ui->set(newLoad);
       }
-      newValue =
-          Builder.createUncheckedEnumData(loc, newLoad, enumElt, payloadType);
+      // Any lifetime ending uses of our original load_borrow have been
+      // rewritten by the previous loop to be on the new load_borrow. The reason
+      // that we must do this is end_borrows only are placed on borrow
+      // introducing guaranteed values and our unchecked_enum_data (unlike the
+      // old load_borrow of the same type) is not one.
+      newValue = localBuilder.createUncheckedEnumData(loc, newLoad, enumElt,
+                                                      payloadType);
     }
     assert(newValue);
 
-    // Replace all uses of the old load with the data and erase the old load.
+    // Replace all uses of the old load with the newValue and erase the old
+    // load.
     replaceInstUsesWith(*svi, newValue);
     eraseInstFromFunction(*svi);
   }

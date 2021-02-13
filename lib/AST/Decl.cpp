@@ -3298,7 +3298,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     return AccessScope(resultDC->getParentModule());
   case AccessLevel::Public:
   case AccessLevel::Open:
-    return AccessScope::getPublic(VD->isSPI());
+    return AccessScope::getPublic();
   }
 
   llvm_unreachable("unknown access level");
@@ -3415,6 +3415,23 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
     return true;
   }
   llvm_unreachable("bad access level");
+}
+
+bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
+  auto scope = getFormalAccessScope();
+
+  // 'other' may have come from a @testable import, so we need to upgrade it's
+  // visibility to public here. That is not the same as whether 'other' is
+  // being built with -enable-testing though -- we don't want to treat it
+  // differently in that case.
+  auto otherScope = other->getFormalAccessScope(getDeclContext());
+
+  if (scope.isPublic())
+    return !otherScope.isPublic();
+  else if (scope.isInternal())
+    return !otherScope.isPublic() && !otherScope.isInternal();
+  else
+    return false;
 }
 
 bool ValueDecl::isAccessibleFrom(const DeclContext *useDC,
@@ -4093,7 +4110,8 @@ VarDecl *NominalTypeDecl::getGlobalActorInstance() const {
 
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      ArrayRef<TypeLoc> Inherited,
-                     GenericParamList *GenericParams, DeclContext *Parent)
+                     GenericParamList *GenericParams, DeclContext *Parent,
+                     bool isActor)
   : NominalTypeDecl(DeclKind::Class, Parent, Name, NameLoc, Inherited,
                     GenericParams),
     ClassLoc(ClassLoc) {
@@ -4105,6 +4123,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.HasMissingVTableEntries = 0;
   Bits.ClassDecl.ComputedHasMissingVTableEntries = 0;
   Bits.ClassDecl.IsIncompatibleWithWeakReferences = 0;
+  Bits.ClassDecl.IsActor = isActor;
 }
 
 bool ClassDecl::hasResilientMetadata() const {
@@ -4932,26 +4951,6 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
 bool ProtocolDecl::existentialTypeSupported() const {
   return evaluateOrDefault(getASTContext().evaluator,
     ExistentialTypeSupportedRequest{const_cast<ProtocolDecl *>(this)}, true);
-}
-
-void swift::simple_display(llvm::raw_ostream &out, const ProtocolRethrowsRequirementList list) {
-  for (auto entry : list) {
-    simple_display(out, entry.first);
-    simple_display(out, entry.second);
-  }
-}
-
-
-ProtocolRethrowsRequirementList 
-ProtocolDecl::getRethrowingRequirements() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-    ProtocolRethrowsRequirementsRequest{const_cast<ProtocolDecl *>(this)}, 
-    ProtocolRethrowsRequirementList());
-}
-
-bool 
-ProtocolDecl::isRethrowingProtocol() const {
-  return getRethrowingRequirements().size() > 0;
 }
 
 StringRef ProtocolDecl::getObjCRuntimeName(
@@ -5936,16 +5935,18 @@ void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) con
   if (getDeclContext()->isTypeContext())
     return;
 
-  // Avoid request evaluator overhead in the common case where there's
-  // no wrapper.
-  if (!getAttrs().hasAttribute<CustomAttr>())
-    return;
+  if (getAttrs().hasAttribute<LazyAttr>()) {
+    if (auto *backingVar = getLazyStorageProperty())
+      visit(backingVar);
+  }
 
-  if (auto *backingVar = getPropertyWrapperBackingProperty())
-    visit(backingVar);
+  if (getAttrs().hasAttribute<CustomAttr>()) {
+    if (auto *backingVar = getPropertyWrapperBackingProperty())
+      visit(backingVar);
 
-  if (auto *projectionVar = getPropertyWrapperProjectionVar())
-    visit(projectionVar);
+    if (auto *projectionVar = getPropertyWrapperProjectionVar())
+      visit(projectionVar);
+  }
 }
 
 VarDecl *VarDecl::getLazyStorageProperty() const {
@@ -6106,6 +6107,9 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
 
   Clone->setSpecifier(PD->getSpecifier());
   Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  if (PD->isImplicit()) {
+    Clone->setImplicit();
+  }
   return Clone;
 }
 
@@ -6798,12 +6802,6 @@ bool AbstractFunctionDecl::canBeAsyncHandler() const {
                            false);
 }
 
-FunctionRethrowingKind AbstractFunctionDecl::getRethrowingKind() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-    FunctionRethrowingKindRequest{const_cast<AbstractFunctionDecl *>(this)}, 
-    FunctionRethrowingKind::Invalid);
-}
-
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   if ((getBodyKind() == BodyKind::Synthesize ||
        getBodyKind() == BodyKind::Unparsed) &&
@@ -7010,7 +7008,7 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
     }
 
     // For the first selector piece, attach either the first parameter,
-    // "withCompletionHandker", or "AndReturnError" to the base name,
+    // "withCompletionHandler", or "AndReturnError" to the base name,
     // if appropriate.
     auto firstPiece = baseName;
     llvm::SmallString<32> scratch;
@@ -8023,7 +8021,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     return getActorIsolation(vd);
 
   if (auto *init = dyn_cast<PatternBindingInitializer>(dc)) {
-    if (auto *var = init->getBinding()->getSingleVar())
+    if (auto *var = init->getBinding()->getAnchoringVarDecl(
+            init->getBindingIndex()))
       return getActorIsolation(var);
   }
 

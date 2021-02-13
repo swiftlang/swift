@@ -19,11 +19,13 @@
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/Effects.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeResolutionStage.h"
@@ -330,9 +332,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class ProtocolConformanceRefClassifyAsThrowsRequest : 
-    public SimpleRequest<ProtocolConformanceRefClassifyAsThrowsRequest,
-                         bool(ProtocolConformanceRef),
+class ProtocolConformanceClassifyAsThrowsRequest : 
+    public SimpleRequest<ProtocolConformanceClassifyAsThrowsRequest,
+                         bool(ProtocolConformance *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -342,7 +344,7 @@ private:
 
   // Evaluation.
   bool 
-  evaluate(Evaluator &evaluator, ProtocolConformanceRef conformanceRef) const;
+  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
 
 public:
   // Caching.
@@ -789,8 +791,6 @@ public:
   // Caching.
   bool isCached() const { return true; }
 };
-
-void simple_display(llvm::raw_ostream &out, FunctionRethrowingKind value);
 
 /// Request the custom attribute which attaches a result builder to the
 /// given declaration.
@@ -2311,6 +2311,25 @@ public:
   // Caching.
   bool isCached() const { return true; }
 };
+
+/// Looks up and applies the access note for a given declaration.
+class ApplyAccessNoteRequest
+    : public SimpleRequest<ApplyAccessNoteRequest,
+                           evaluator::SideEffect(ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 
 class TypeCheckSourceFileRequest
     : public SimpleRequest<

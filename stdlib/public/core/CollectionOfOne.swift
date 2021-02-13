@@ -170,3 +170,6 @@ extension CollectionOfOne: CustomReflectable {
     return Mirror(self, children: ["element": _element])
   }
 }
+
+extension CollectionOfOne: ConcurrentValue where Element: ConcurrentValue { }
+extension CollectionOfOne.Iterator: ConcurrentValue where Element: ConcurrentValue { }

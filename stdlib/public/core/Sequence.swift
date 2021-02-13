@@ -1159,6 +1159,8 @@ extension IteratorSequence: IteratorProtocol, Sequence {
   }
 }
 
+extension IteratorSequence: ConcurrentValue where Base: ConcurrentValue { }
+
 /* FIXME: ideally for compatibility we would declare
 extension Sequence {
   @available(swift, deprecated: 5, message: "")

@@ -23,10 +23,10 @@ class MyClass {
   // expected-error@-1{{asynchronous method returning 'Self' cannot be '@objc'}}
 }
 
-// Actor class exporting Objective-C entry points.
+// actor exporting Objective-C entry points.
 
-// CHECK: class MyActor
-actor class MyActor {
+// CHECK: actor MyActor
+actor MyActor {
   // CHECK: @objc func doBigJob() async -> Int
   // CHECK-DUMP: func_decl{{.*}}doBigJob{{.*}}foreign_async=@convention(block) (Int) -> (),completion_handler_param=0
   @objc func doBigJob() async -> Int { return 0 }
@@ -37,7 +37,7 @@ actor class MyActor {
 
   // Actor-isolated entities cannot be exposed to Objective-C.
   @objc func synchronousBad() { } // expected-error{{actor-isolated instance method 'synchronousBad()' cannot be @objc}}
-  // expected-note@-1{{add 'async' to function 'synchronousBad()' to make it asynchronous}} {{none}}
+  // expected-note@-1{{add 'async' to function 'synchronousBad()' to make it asynchronous}} {{30-30= async}}
   // expected-note@-2{{add '@asyncHandler' to function 'synchronousBad()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
 
   @objc var badProp: AnyObject { self } // expected-error{{actor-isolated property 'badProp' cannot be @objc}}
@@ -47,5 +47,13 @@ actor class MyActor {
   @objc @actorIndependent func synchronousGood() { }
 }
 
-// CHECK: @objc actor class MyObjCActor
-@objc actor class MyObjCActor: NSObject { }
+// CHECK: actor class MyActor2
+actor class MyActor2 { }
+// expected-warning@-1{{'actor class' has been renamed to 'actor'}}{{7-13=}}
+
+// CHECK: @objc actor MyObjCActor
+@objc actor MyObjCActor: NSObject { }
+
+// CHECK: @objc actor class MyObjCActor2
+@objc actor class MyObjCActor2: NSObject {}
+// expected-warning@-1{{'actor class' has been renamed to 'actor'}}{{13-19=}}

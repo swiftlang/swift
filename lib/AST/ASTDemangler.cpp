@@ -385,15 +385,15 @@ Type ASTBuilder::createFunctionType(
 
   DifferentiabilityKind diffKind;
   switch (flags.getDifferentiabilityKind()) {
-  case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
-    diffKind = DifferentiabilityKind::NonDifferentiable;
-    break;
-  case FunctionMetadataDifferentiabilityKind::Normal:
-    diffKind = DifferentiabilityKind::Normal;
-    break;
-  case FunctionMetadataDifferentiabilityKind::Linear:
-    diffKind = DifferentiabilityKind::Linear;
-    break;
+  #define SIMPLE_CASE(CASE) \
+      case FunctionMetadataDifferentiabilityKind::CASE: \
+        diffKind = DifferentiabilityKind::CASE; break;
+  SIMPLE_CASE(NonDifferentiable)
+  SIMPLE_CASE(Forward)
+  SIMPLE_CASE(Reverse)
+  SIMPLE_CASE(Normal)
+  SIMPLE_CASE(Linear)
+  #undef SIMPLE_CASE
   }
 
   auto noescape =
@@ -516,17 +516,17 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
-  DifferentiabilityKind diffKind;
+  swift::DifferentiabilityKind diffKind;
   switch (flags.getDifferentiabilityKind()) {
-  case ImplFunctionDifferentiabilityKind::NonDifferentiable:
-    diffKind = DifferentiabilityKind::NonDifferentiable;
-    break;
-  case ImplFunctionDifferentiabilityKind::Normal:
-    diffKind = DifferentiabilityKind::Normal;
-    break;
-  case ImplFunctionDifferentiabilityKind::Linear:
-    diffKind = DifferentiabilityKind::Linear;
-    break;
+  #define SIMPLE_CASE(CASE) \
+      case ImplFunctionDifferentiabilityKind::CASE: \
+        diffKind = swift::DifferentiabilityKind::CASE; break;
+  SIMPLE_CASE(NonDifferentiable)
+  SIMPLE_CASE(Forward)
+  SIMPLE_CASE(Reverse)
+  SIMPLE_CASE(Normal)
+  SIMPLE_CASE(Linear)
+  #undef SIMPLE_CASE
   }
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;

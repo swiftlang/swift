@@ -1,13 +1,22 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+
+// REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 func asyncFunc() async -> Int { 42 }
 func asyncThrowsFunc() async throws -> Int { 42 }
 func asyncThrowsOnCancel() async throws -> Int {
   // terrible suspend-spin-loop -- do not do this
   // only for purposes of demonstration
-  while await !Task.isCancelled() {
-    await Task.sleep(until: Task.Deadline.in(.seconds(1)))
+  while Task.isCancelled {
+    sleep(1)
   }
 
   throw Task.CancellationError()
@@ -87,8 +96,8 @@ func first_allMustSucceed() async throws {
 }
 
 func first_ignoreFailures() async throws {
-  func work() async -> Int { 42 }
-  func boom() async throws -> Int { throw Boom() }
+  @concurrent func work() async -> Int { 42 }
+  @concurrent func boom() async throws -> Int { throw Boom() }
 
   let first: Int = try await Task.withGroup(resultType: Int.self) { group in
     await group.add { await work() }
@@ -212,7 +221,7 @@ extension Collection {
       while let (index, taskResult) = try await group.next() {
         result[index] = taskResult
 
-        try await Task.checkCancellation()
+        try Task.checkCancellation()
         try await submitNext()
       }
 

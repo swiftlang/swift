@@ -46,9 +46,7 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t NodeStart,
     auto NextRawNode = NextLeafNode->getRaw();
     assert(NextRawNode->isPresent());
     NextLeafNodeLength += NextRawNode->getTokenText().size();
-    for (auto TriviaPiece : NextRawNode->getLeadingTrivia()) {
-      NextLeafNodeLength += TriviaPiece.getTextLength();
-    }
+    NextLeafNodeLength += NextRawNode->getLeadingTriviaLength();
   }
 
   auto NodeEnd = NodeStart + Node.getTextLength();

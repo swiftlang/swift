@@ -472,6 +472,8 @@ private:
                       bool isInitializer,
                       Optional<unsigned> explicitCompletionHandlerParamIndex,
                       CustomAsyncName customName,
+                      Optional<unsigned> completionHandlerFlagParamIndex,
+                      bool completionHandlerFlagIsZeroOnError,
                       Optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,

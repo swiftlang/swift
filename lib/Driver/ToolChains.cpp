@@ -279,6 +279,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       options::OPT_disable_fuzzy_forward_scan_trailing_closure_matching);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
+  inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -558,6 +559,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       Arguments,
       options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
+
+  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
+    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
+  }
 
   return II;
 }
@@ -1041,6 +1047,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
                    file_types::TY_ObjCHeader, "-emit-objc-header-path");
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
+
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 

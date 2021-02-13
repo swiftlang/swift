@@ -1481,6 +1481,7 @@ namespace {
         selfParamDecl->setSpecifier(
           ParamDecl::getParameterSpecifierForValueOwnership(
             selfParam.getValueOwnership()));
+        selfParamDecl->setImplicit();
 
         auto *outerParams =
             ParameterList::create(context, SourceLoc(), selfParamDecl,
@@ -3558,8 +3559,6 @@ namespace {
           
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion:
-        // Check is trivially true.
-        ctx.Diags.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ValueCast:
@@ -3979,7 +3978,6 @@ namespace {
     // Rewrite ForcedCheckedCastExpr based on what the solver computed.
     Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
       // The subexpression is always an rvalue.
-      auto &ctx = cs.getASTContext();
       auto sub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(sub);
 
@@ -4007,19 +4005,6 @@ namespace {
         return nullptr;
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
-        if (cs.getType(sub)->isEqual(toType)) {
-          ctx.Diags.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
-              .fixItRemove(SourceRange(expr->getLoc(),
-                                       castTypeRepr->getSourceRange().End));
-
-        } else {
-          ctx.Diags
-              .diagnose(expr->getLoc(), diag::forced_downcast_coercion,
-                        cs.getType(sub), toType)
-              .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),
-                            "as");
-        }
-
         expr->setCastKind(castKind);
         cs.setType(expr, toType);
         return expr;
@@ -4111,8 +4096,6 @@ namespace {
 
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
-        ctx.Diags.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
-                           fromType, toType);
         expr->setCastKind(castKind);
         cs.setType(expr, OptionalType::get(toType));
         return expr;
@@ -4803,6 +4786,7 @@ namespace {
           /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
       param->setSpecifier(ParamSpecifier::Default);
+      param->setImplicit();
 
       // The outer closure.
       //
@@ -4819,6 +4803,7 @@ namespace {
                               ctx.getIdentifier("$kp$"), outerClosure);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
       outerParam->setSpecifier(ParamSpecifier::Default);
+      outerParam->setImplicit();
 
       // let paramRef = "$0"
       auto *paramRef = new (ctx)
@@ -5894,16 +5879,13 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
   ASTContext &ctx = cs.getASTContext();
   Type fromType = cs.getType(expr);
   auto fromFnType = fromType->getAs<AnyFunctionType>();
-  auto isToTypeLinear =
-      toType->getDifferentiabilityKind() == DifferentiabilityKind::Linear;
-  // Conversion from a `@differentiable` function to a `@differentiable(linear)`
-  // function is not allowed, because the from-expression will never be a
-  // closure expression or a declaration/member reference.
-  if (fromFnType->getDifferentiabilityKind() == DifferentiabilityKind::Normal &&
-      toType->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+  // Conversion between two different differentiable function types is not
+  // yet supported.
+  if (fromFnType->isDifferentiable() && toType->isDifferentiable() &&
+      fromFnType->getDifferentiabilityKind() !=
+          toType->getDifferentiabilityKind()) {
     ctx.Diags.diagnose(expr->getLoc(),
-                       diag::invalid_differentiable_function_conversion_expr,
-                       isToTypeLinear);
+                       diag::invalid_differentiable_function_conversion_expr);
     return;
   }
   // Conversion from a non-`@differentiable` function to a `@differentiable` is
@@ -5922,15 +5904,12 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
           ctx.Diags.diagnose(
               expr->getLoc(),
-              diag::invalid_differentiable_function_conversion_expr,
-              isToTypeLinear);
+              diag::invalid_differentiable_function_conversion_expr);
           if (paramDecl->getType()->is<AnyFunctionType>()) {
             auto *typeRepr = paramDecl->getTypeRepr();
             while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
               typeRepr = attributed->getTypeRepr();
             std::string attributeString = "@differentiable";
-            if (isToTypeLinear)
-              attributeString += "(linear)";
             auto *funcTypeRepr = cast<FunctionTypeRepr>(typeRepr);
             auto paramListLoc = funcTypeRepr->getArgsTypeRepr()->getStartLoc();
             ctx.Diags.diagnose(paramDecl->getLoc(),
@@ -5957,8 +5936,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
         }
       }
       ctx.Diags.diagnose(expr->getLoc(),
-                         diag::invalid_differentiable_function_conversion_expr,
-                         isToTypeLinear);
+                         diag::invalid_differentiable_function_conversion_expr);
     };
     maybeDiagnoseFunctionRef(getSemanticExprForDeclOrMemberRef(expr));
   }
@@ -6619,7 +6597,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         fromFunc = fromFunc->getWithoutDifferentiability()
             ->castTo<FunctionType>();
         switch (fromEI.getDifferentiabilityKind()) {
+        // TODO: Ban `Normal` and `Forward` cases.
         case DifferentiabilityKind::Normal:
+        case DifferentiabilityKind::Forward:
+        case DifferentiabilityKind::Reverse:
           expr = cs.cacheType(new (ctx)
               DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
           break;
@@ -6630,16 +6611,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         case DifferentiabilityKind::NonDifferentiable:
           llvm_unreachable("Cannot be NonDifferentiable");
         }
-      }
-      // Handle implicit conversion from @differentiable(linear) to
-      // @differentiable.
-      else if (fromEI.getDifferentiabilityKind() ==
-                   DifferentiabilityKind::Linear &&
-               toEI.getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
-        // TODO(TF-908): Create a `LinearToDifferentiableFunctionExpr` and SILGen
-        // it as thunk application. Remove the diagnostic.
-        ctx.Diags.diagnose(expr->getLoc(),
-                           diag::unsupported_linear_to_differentiable_conversion);
       }
       // Handle implicit conversion from non-@differentiable to @differentiable.
       maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
@@ -6652,13 +6623,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             ->withExtInfo(newEI)
             ->castTo<FunctionType>();
         switch (toEI.getDifferentiabilityKind()) {
+        // TODO: Ban `Normal` and `Forward` cases.
         case DifferentiabilityKind::Normal:
+        case DifferentiabilityKind::Forward:
+        case DifferentiabilityKind::Reverse:
           expr = cs.cacheType(new (ctx)
                               DifferentiableFunctionExpr(expr, fromFunc));
           break;
         case DifferentiabilityKind::Linear:
-          expr = cs.cacheType(new (ctx)
-                              LinearFunctionExpr(expr, fromFunc));
+          expr = cs.cacheType(new (ctx) LinearFunctionExpr(expr, fromFunc));
           break;
         case DifferentiabilityKind::NonDifferentiable:
           llvm_unreachable("Cannot be NonDifferentiable");

@@ -122,16 +122,17 @@ class Lexer {
 
   /// The current leading trivia for the next token.
   ///
-  /// This is only preserved if this Lexer was constructed with
-  /// `TriviaRetentionMode::WithTrivia`.
-  ParsedTrivia LeadingTrivia;
+  /// The StringRef points into the source buffer that is currently being lexed.
+  StringRef LeadingTrivia;
 
   /// The current trailing trivia for the next token.
-  ///
-  /// This is only preserved if this Lexer was constructed with
-  /// `TriviaRetentionMode::WithTrivia`.
-  ParsedTrivia TrailingTrivia;
-  
+  /// The StringRef points into the source buffer that is currently being lexed.
+  StringRef TrailingTrivia;
+
+  /// The location at which the comment of the next token starts. \c nullptr if
+  /// the next token doesn't have a comment.
+  const char *CommentStart;
+
   Lexer(const Lexer&) = delete;
   void operator=(const Lexer&) = delete;
 
@@ -196,19 +197,19 @@ public:
 
   /// Lex a token. If \c TriviaRetentionMode is \c WithTrivia, passed pointers
   /// to trivias are populated.
-  void lex(Token &Result, ParsedTrivia &LeadingTriviaResult,
-           ParsedTrivia &TrailingTriviaResult) {
+  void lex(Token &Result, StringRef &LeadingTriviaResult,
+           StringRef &TrailingTriviaResult) {
     Result = NextToken;
     if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-      LeadingTriviaResult = {LeadingTrivia};
-      TrailingTriviaResult = {TrailingTrivia};
+      LeadingTriviaResult = LeadingTrivia;
+      TrailingTriviaResult = TrailingTrivia;
     }
     if (Result.isNot(tok::eof))
       lexImpl();
   }
 
   void lex(Token &Result) {
-    ParsedTrivia LeadingTrivia, TrailingTrivia;
+    StringRef LeadingTrivia, TrailingTrivia;
     lex(Result, LeadingTrivia, TrailingTrivia);
   }
 
@@ -240,7 +241,7 @@ public:
   /// After restoring the state, lexer will return this token and continue from
   /// there.
   State getStateForBeginningOfToken(const Token &Tok,
-                                    const ParsedTrivia &LeadingTrivia = {}) const {
+                                    const StringRef &LeadingTrivia = {}) const {
 
     // If the token has a comment attached to it, rewind to before the comment,
     // not just the start of the token.  This ensures that we will re-lex and
@@ -249,8 +250,11 @@ public:
     if (TokStart.isInvalid())
       TokStart = Tok.getLoc();
     auto S = getStateForBeginningOfTokenLoc(TokStart);
-    if (TriviaRetention == TriviaRetentionMode::WithTrivia)
+    if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
       S.LeadingTrivia = LeadingTrivia;
+    } else {
+      S.LeadingTrivia = StringRef();
+    }
     return S;
   }
 
@@ -275,8 +279,7 @@ public:
 
     // Restore Trivia.
     if (TriviaRetention == TriviaRetentionMode::WithTrivia)
-      if (auto &LTrivia = S.LeadingTrivia)
-        LeadingTrivia = std::move(*LTrivia);
+      LeadingTrivia = S.LeadingTrivia;
   }
 
   /// Restore the lexer state to a given state that is located before
@@ -550,7 +553,13 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  void lexTrivia(ParsedTrivia &T, bool IsForTrailingTrivia);
+
+  /// Skip over trivia and return characters that were skipped over in a \c
+  /// StringRef. \p AllTriviaStart determines the start of the trivia. In nearly
+  /// all cases, this should be \c CurPtr. If other trivia has already been
+  /// skipped over (like a BOM), this can be used to point to the start of the
+  /// BOM. The returned \c StringRef will always start at \p AllTriviaStart.
+  StringRef lexTrivia(bool IsForTrailingTrivia, const char *AllTriviaStart);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,
@@ -572,7 +581,14 @@ private:
 
   NulCharacterKind getNulCharacterKind(const char *Ptr) const;
 };
-  
+
+/// A lexer that can lex trivia into its pieces
+class TriviaLexer {
+public:
+  /// Decompose the triva in \p TriviaStr into their pieces.
+  static ParsedTrivia lexTrivia(StringRef TriviaStr);
+};
+
 /// Given an ordered token \param Array , get the iterator pointing to the first
 /// token that is not before \param Loc .
 template<typename ArrayTy, typename Iterator = typename ArrayTy::iterator>

@@ -363,8 +363,9 @@ static bool printModuleInterfaceDecl(Decl *D,
               Opened |= ET.Ext->print(Printer, Options);
               if (ET.IsSynthesized)
                 Options.clearSynthesizedExtension();
-              if (Options.BracketOptions.shouldCloseExtension(ET.Ext))
+              if (Options.BracketOptions.shouldCloseExtension(ET.Ext)) {
                 Printer << "\n";
+              }
             }
           });
         Options.BracketOptions = BracketOptions();
@@ -424,7 +425,7 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
         return false;
 
       // Ignore an imports of modules also imported by the underlying module.
-      if (PrevImported.find(Imported) != PrevImported.end())
+      if (PrevImported.contains(Imported))
         return false;
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {

@@ -160,6 +160,7 @@ UID_KEYS = [
     KEY('RetrieveRefactorActions', 'key.retrieve_refactor_actions'),
     KEY('SymbolGraph', 'key.symbol_graph'),
     KEY('RetrieveSymbolGraph', 'key.retrieve_symbol_graph'),
+    KEY('ParentContexts', 'key.parent_contexts'),
     KEY('ActionUID', 'key.actionuid'),
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),
@@ -244,7 +245,8 @@ UID_REQUESTS = [
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
     REQUEST('CollectExpressionType', 'source.request.expression.type'),
-    REQUEST('GlobalConfiguration', 'source.request.configuration.global')
+    REQUEST('GlobalConfiguration', 'source.request.configuration.global'),
+    REQUEST('DependencyUpdated', 'source.request.dependency_updated'),
 ]
 
 

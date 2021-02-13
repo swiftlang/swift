@@ -38,6 +38,7 @@ config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 # --- Android Configuration ---
 config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
+config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows MSVC Configuration ---
 config.swift_stdlib_msvc_runtime = None

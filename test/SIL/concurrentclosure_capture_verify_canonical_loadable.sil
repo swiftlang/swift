@@ -1,0 +1,61 @@
+// RUN: not --crash %target-sil-opt -enable-experimental-concurrency %s
+
+// REQUIRES: concurrency
+
+// This test ensures that the SILVerifier does enforce that concurrent functions
+// must have non-box parameters in canonical SIL for loadable types.
+
+sil_stage canonical
+
+import Builtin
+
+func f(_: @escaping @concurrent () -> ())
+
+@_hasMissingDesignatedInitializers
+class F {
+  func useConcurrent(_: @escaping @concurrent () -> ())
+  init()
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+class Klass {}
+
+////////////////////
+// Loadable Type  //
+////////////////////
+
+sil @$s37concurrentfunction_capturediagnostics1fyyyyJcF : $@convention(thin) (@guaranteed @concurrent @callee_guaranteed () -> ()) -> ()
+sil @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %5
+sil @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyFyyJcfU_ : $@convention(thin) @concurrent (@guaranteed { var Int }) -> () // user: %10
+
+// testCaseTrivialValue()
+sil hidden [ossa] @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Int }, var, name "i"      // users: %34, %8, %1
+  %1 = project_box %0 : ${ var Int }, 0           // users: %30, %26, %18, %9, %6
+  %2 = integer_literal $Builtin.IntLiteral, 17    // user: %5
+  %3 = metatype $@thin Int.Type                   // user: %5
+  // function_ref Int.init(_builtinIntegerLiteral:)
+  %4 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %5
+  %5 = apply %4(%2, %3) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %6
+  store %5 to [trivial] %1 : $*Int                // id: %6
+  // function_ref closure #1 in testCaseTrivialValue()
+  %7 = function_ref @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyFyyJcfU_ : $@convention(thin) @concurrent (@guaranteed { var Int }) -> () // user: %10
+  %8 = copy_value %0 : ${ var Int }               // user: %10
+  %10 = partial_apply [callee_guaranteed] %7(%8) : $@convention(thin) @concurrent (@guaranteed { var Int }) -> () // users: %13, %12
+  // function_ref f(_:)
+  %11 = function_ref @$s37concurrentfunction_capturediagnostics1fyyyyJcF : $@convention(thin) (@guaranteed @concurrent @callee_guaranteed () -> ()) -> () // user: %12
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed @concurrent @callee_guaranteed () -> ()) -> ()
+  destroy_value %10 : $@concurrent @callee_guaranteed () -> () // id: %13
+  destroy_value %0 : ${ var Int }
+  %35 = tuple ()                                  // user: %36
+  return %35 : $()                                // id: %36
+} // end sil function '$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyF'

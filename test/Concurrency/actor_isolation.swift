@@ -17,7 +17,7 @@ func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
 // ----------------------------------------------------------------------
 // Actor state isolation restrictions
 // ----------------------------------------------------------------------
-actor class MySuperActor {
+actor MySuperActor {
   var superState: Int = 25 // expected-note {{mutable state is only available within the actor instance}}
 
   func superMethod() { } // expected-note 3 {{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
@@ -28,7 +28,7 @@ actor class MySuperActor {
   }
 }
 
-actor class MyActor: MySuperActor {
+actor MyActor: MySuperActor {
   let immutable: Int = 17
   var text: [String] = [] // expected-note 10{{mutable state is only available within the actor instance}}
 
@@ -45,7 +45,7 @@ extension MyActor {
     set { }
   }
 
-  // expected-note@+1 {{add 'async' to function 'actorIndependentFunc(otherActor:)' to make it asynchronous}} {{none}}
+  // expected-note@+1 {{add 'async' to function 'actorIndependentFunc(otherActor:)' to make it asynchronous}} {{67-67= async}}
   @actorIndependent func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
     _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from an '@actorIndependent' context}}
@@ -142,7 +142,7 @@ extension MyActor {
     acceptConcurrentClosure {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent closure}}
       _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
-      _ = localVar // okay
+      _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
       localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
     }
@@ -159,7 +159,7 @@ extension MyActor {
     @concurrent func localFn1() {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
       _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
-      _ = localVar // okay
+      _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
       localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
     }
@@ -168,7 +168,7 @@ extension MyActor {
       acceptClosure {
         _ = text[0]  // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
         _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
-        _ = localVar // okay
+        _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
         localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
         _ = localConstant
       }
@@ -199,7 +199,7 @@ extension MyActor {
 // ----------------------------------------------------------------------
 // Global actor isolation restrictions
 // ----------------------------------------------------------------------
-actor class SomeActor { }
+actor SomeActor { }
 
 @globalActor
 struct SomeGlobalActor {
@@ -279,7 +279,7 @@ struct GenericStruct<T> {
   }
 
   // expected-note@+2 {{add '@asyncHandler' to function 'h()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
-  // expected-note@+1 {{add 'async' to function 'h()' to make it asynchronous}} {{none}}
+  // expected-note@+1 {{add 'async' to function 'h()' to make it asynchronous}} {{39-39= async}}
   @GenericGlobalActor<String> func h() {
     f() // expected-error{{'async' in a function that does not support concurrency}}
     _ = f // expected-error{{instance method 'f()' isolated to global actor 'GenericGlobalActor<T>' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
@@ -324,14 +324,18 @@ func testGlobalRestrictions(actor: MyActor) async {
   // Global mutable state cannot be accessed.
   _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
 
-  // Local mutable variables cannot be modified from concurrently-executing
+  // Local mutable variables cannot be accessed from concurrently-executing
   // code.
   var i = 17
   acceptConcurrentClosure {
-    _ = i
+    _ = i // expected-error{{reference to captured var 'i' in concurrently-executing code}}
     i = 42 // expected-error{{mutation of captured var 'i' in concurrently-executing code}}
   }
   print(i)
+
+  acceptConcurrentClosure { [i] in
+    _ = i
+  }
 }
 
 func f() {
@@ -356,7 +360,7 @@ func checkLocalFunctions() async {
   }
 
   func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@concurrent'}}{{3-3=@concurrent }}
-    j = 42 // expected-error{{mutation of captured var 'j' in concurrently-executing code}}
+    j = 42
   }
 
   // Okay to call locally.
@@ -371,7 +375,7 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptConcurrentClosure {
-    local2() // expected-note{{access in concurrently-executed code here}}
+    local2()
   }
 
   print(i)
@@ -380,7 +384,7 @@ func checkLocalFunctions() async {
   var k = 17
   func local4() {
     acceptConcurrentClosure {
-      local3() // expected-note{{access in concurrently-executed code here}}
+      local3()
     }
   }
 
@@ -395,7 +399,7 @@ func checkLocalFunctions() async {
 // Lazy properties with initializers referencing 'self'
 // ----------------------------------------------------------------------
 
-actor class LazyActor {
+actor LazyActor {
     var v: Int = 0
     // expected-note@-1 6 {{mutable state is only available within the actor instance}}
 
@@ -445,4 +449,36 @@ extension SomeClassInActor.ID {
     // expected-note@-2{{add '@asyncHandler' to function 'f' to create an implicit asynchronous context}}
     object.inActor() // expected-error{{'async' in a function that does not support concurrency}}
   }
+}
+
+// ----------------------------------------------------------------------
+// Initializers
+// ----------------------------------------------------------------------
+actor SomeActorWithInits {
+  var mutableState: Int = 17
+  var otherMutableState: Int
+
+  init() {
+    self.mutableState = 42
+    self.otherMutableState = 17
+
+    self.isolated()
+  }
+
+  func isolated() { }
+}
+
+@MainActor
+class SomeClassWithInits {
+  var mutableState: Int = 17
+  var otherMutableState: Int
+
+  init() {
+    self.mutableState = 42
+    self.otherMutableState = 17
+
+    self.isolated()
+  }
+
+  func isolated() { }
 }

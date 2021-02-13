@@ -241,7 +241,9 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
 #define FORWARDING_OWNERSHIP_INST(INST)                                        \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    return I->getOwnershipKind();                                              \
+    return I->getType().isTrivial(*I->getFunction())                           \
+               ? ValueOwnershipKind(OwnershipKind::None)                       \
+               : I->getForwardingOwnershipKind();                              \
   }
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
@@ -258,6 +260,7 @@ FORWARDING_OWNERSHIP_INST(UncheckedValueCast)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
 FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(Enum)
+FORWARDING_OWNERSHIP_INST(MarkDependence)
 // NOTE: init_existential_ref from a reference counting perspective is not
 // considered to be "owned" since it doesn't affect reference counts. That being
 // said in the past, we wanted to conceptually treat it as an owned value that
@@ -310,12 +313,6 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginCOWMutationResult(
 ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
     SILFunctionArgument *Arg) {
   return Arg->getOwnershipKind();
-}
-
-// This is a forwarding instruction through only one of its arguments.
-ValueOwnershipKind
-ValueOwnershipKindClassifier::visitMarkDependenceInst(MarkDependenceInst *MDI) {
-  return MDI->getOwnershipKind();
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {

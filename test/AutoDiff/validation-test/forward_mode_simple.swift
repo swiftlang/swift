@@ -351,7 +351,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
   }
   expectEqual((3, 1), valueWithDerivative(at: 3, in: tupleVar))
 
-  @differentiable
+  @differentiable(reverse)
   func nested(_ x: Tracked<Float>) -> Tracked<Float> {
     // Convoluted function computing `x * x`.
     var tuple: (Int, (Int, Tracked<Float>), Tracked<Float>) = (1, (1, 0), 0)
@@ -365,7 +365,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
   // expectEqual((16, 8), valueWithDerivative(at: 4, in: nested))
 
   struct Wrapper<T> {
-    @differentiable(where T : Differentiable)
+    @differentiable(reverse where T : Differentiable)
     func baz(_ x: T) -> T {
       var tuple = (1, 1, x, 1)
       tuple.0 = 1
@@ -474,12 +474,12 @@ ForwardModeTests.test("GenericTensorWithVars") {
 
 // Test case where associated derivative function's requirements are met.
 extension Tensor where Scalar : Numeric {
-  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
+  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint)
   func mean() -> Tensor {
     return self
   }
 
-  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
+  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint)
   func variance() -> Tensor {
     return mean() // ok
   }
@@ -555,7 +555,7 @@ struct TF_523_Struct : Differentiable & AdditiveArithmetic {
   typealias AllDifferentiableVariables = TF_523_Struct
 }
 
-@differentiable
+@differentiable(reverse)
 func TF_523_f(_ x: TF_523_Struct) -> Float {
   return x.a * 2
 }
@@ -565,7 +565,7 @@ protocol TF_534_Layer : Differentiable {
   associatedtype Input : Differentiable
   associatedtype Output : Differentiable
 
-  @differentiable
+  @differentiable(reverse)
   func callAsFunction(_ input: Input) -> Output
 }
 struct TF_534_Tensor<Scalar> : Differentiable {}
@@ -585,7 +585,7 @@ func TF_534<Model: TF_534_Layer>(
 // struct TF_652<Scalar> {}
 // extension TF_652 : Differentiable where Scalar : FloatingPoint {}
 
-// @differentiable(wrt: x where Scalar: FloatingPoint)
+// @differentiable(reverse, wrt: x where Scalar: FloatingPoint)
 // func test<Scalar: Numeric>(x: TF_652<Scalar>) -> TF_652<Scalar> {
 //   for _ in 0..<10 {
 //     let _ = x
@@ -659,7 +659,7 @@ ForwardModeTests.test("GenericTrackedBinaryVars") {
 
 ForwardModeTests.testWithLeakChecking("TrackedDifferentiableFuncType") {
   func valAndDeriv(
-    f: @escaping @differentiable (Tracked<Float>) -> Tracked<Float>
+    f: @escaping @differentiable(reverse) (Tracked<Float>) -> Tracked<Float>
   ) -> (Tracked<Float>, Tracked<Float>) {
     let (y, diff) = valueWithDifferential(at: 5, in: f)
     return (y, diff(1))
@@ -695,7 +695,7 @@ ForwardModeTests.test("Final") {
 
 ForwardModeTests.test("Simple") {
   class Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func f(_ x: Float) -> Float {
       return 2 * x
     }
@@ -710,14 +710,14 @@ ForwardModeTests.test("Simple") {
   }
 
   class SubOverride : Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Float) -> Float {
       return 3 * x
     }
   }
 
   class SubOverrideCustomDerivatives : Super {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Float) -> Float {
       return 3 * x
     }
@@ -747,12 +747,12 @@ ForwardModeTests.test("SimpleWrtSelf") {
     var _nontrivial: [Float] = []
 
     // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
-    // @differentiable
+    // @differentiable(reverse)
     required init(base: Float) {
       self.base = base
     }
 
-    @differentiable(wrt: (self, x))
+    @differentiable(reverse, wrt: (self, x))
     func f(_ x: Float) -> Float {
       return base * x
     }
@@ -770,15 +770,15 @@ ForwardModeTests.test("SimpleWrtSelf") {
   }
 
   class SubOverride : Super {
-    @differentiable(wrt: (self, x))
+    @differentiable(reverse, wrt: (self, x))
     override func f(_ x: Float) -> Float {
       return 3 * x
     }
   }
 
   class SubOverrideCustomDerivatives : Super {
-    @differentiable(wrt: (self, x))
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: (self, x))
+    @differentiable(reverse, wrt: x)
     override func f(_ x: Float) -> Float {
       return 3 * x
     }
@@ -825,7 +825,7 @@ ForwardModeTests.test("SimpleWrtSelf") {
 //===----------------------------------------------------------------------===//
 
 protocol Prot : Differentiable {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func foo(x: Float) -> Float
 }
 ForwardModeTests.test("Simple Protocol") {
@@ -835,7 +835,7 @@ ForwardModeTests.test("Simple Protocol") {
     let m: Float
     let b: Float
 
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func foo(x: Float) -> Float {
       return m * x + b
     }
@@ -851,7 +851,7 @@ ForwardModeTests.test("Simple Protocol") {
 }
 
 protocol DiffReq : Differentiable {
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func f(_ x: Float) -> Float
 }
 
@@ -865,13 +865,13 @@ extension DiffReq where TangentVector : AdditiveArithmetic {
 struct Quadratic : DiffReq, AdditiveArithmetic {
   typealias TangentVector = Quadratic
 
-  @differentiable
+  @differentiable(reverse)
   let a: Float
 
-  @differentiable
+  @differentiable(reverse)
   let b: Float
 
-  @differentiable
+  @differentiable(reverse)
   let c: Float
 
   init(_ a: Float, _ b: Float, _ c: Float) {
@@ -880,7 +880,7 @@ struct Quadratic : DiffReq, AdditiveArithmetic {
     self.c = c
   }
 
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func f(_ x: Float) -> Float {
     return a * x * x + b * x + c
   }
@@ -895,24 +895,24 @@ ForwardModeTests.test("ProtocolFunc") {
 // MARK: Constructor, accessor, and subscript requirements.
 
 protocol FunctionsOfX: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   init(x: Float)
 
-  @differentiable
+  @differentiable(reverse)
   var x: Float { get }
 
-  @differentiable
+  @differentiable(reverse)
   var y: Float { get }
 
-  @differentiable
+  @differentiable(reverse)
   var z: Float { get }
 
-  @differentiable
+  @differentiable(reverse)
   subscript() -> Float { get }
 }
 
 struct TestFunctionsOfX: FunctionsOfX {
-  @differentiable
+  @differentiable(reverse)
   init(x: Float) {
     self.x = x
     self.y = x * x
@@ -929,7 +929,7 @@ struct TestFunctionsOfX: FunctionsOfX {
     return y + x
   }
 
-  @differentiable
+  @differentiable(reverse)
   subscript() -> Float {
     return z
   }
@@ -955,11 +955,11 @@ ForwardModeTests.test("constructor, accessor, subscript") {
 // MARK: - Test witness method SIL type computation.
 
 protocol P : Differentiable {
-  @differentiable(wrt: (x, y))
+  @differentiable(reverse, wrt: (x, y))
   func foo(_ x: Float, _ y: Double) -> Float
 }
 struct S : P {
-  @differentiable(wrt: (x, y))
+  @differentiable(reverse, wrt: (x, y))
   func foo(_ x: Float, _ y: Double) -> Float {
     return x
   }
@@ -973,18 +973,18 @@ public protocol Distribution {
 }
 
 public protocol DifferentiableDistribution: Differentiable, Distribution {
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func logProbability(of value: Value) -> Float
 }
 
 struct Foo: DifferentiableDistribution {
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   func logProbability(of value: Float) -> Float {
     .zero
   }
 }
 
-@differentiable
+@differentiable(reverse)
 func blah<T: DifferentiableDistribution>(_ x: T) -> Float where T.Value: AdditiveArithmetic {
   x.logProbability(of: .zero)
 }
@@ -992,12 +992,12 @@ func blah<T: DifferentiableDistribution>(_ x: T) -> Float where T.Value: Additiv
 // Adding a more general `@differentiable` attribute.
 public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  @differentiable(wrt: self)
-  @differentiable(wrt: (self, value))
+  @differentiable(reverse, wrt: self)
+  @differentiable(reverse, wrt: (self, value))
   func logProbability(of value: Value) -> Float
 }
 
-@differentiable
+@differentiable(reverse)
 func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Float
   where T.Value: AdditiveArithmetic {
   x.logProbability(of: value)
@@ -1005,17 +1005,17 @@ func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Flo
 
 protocol DifferentiableFoo {
   associatedtype T: Differentiable
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func foo(_ x: T) -> Float
 }
 
 protocol MoreDifferentiableFoo: Differentiable, DifferentiableFoo {
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func foo(_ x: T) -> Float
 }
 
 struct MoreDifferentiableFooStruct: MoreDifferentiableFoo {
-  @differentiable(wrt: (self, x))
+  @differentiable(reverse, wrt: (self, x))
   func foo(_ x: Float) -> Float {
     x
   }
@@ -1198,7 +1198,7 @@ ForwardModeTests.test("StructMemberwiseInitializer") {
     var x: Float
 
     // Custom initializer with `@differentiable`.
-    @differentiable
+    @differentiable(reverse)
     init(x: Float) {
       self.x = x
     }
@@ -1217,12 +1217,12 @@ ForwardModeTests.test("StructConstantStoredProperty") {
     var x: Float
     @noDerivative let constant = Float(2)
 
-    @differentiable
+    @differentiable(reverse)
     init(x: Float) {
       self.x = x
     }
 
-    @differentiable(wrt: (self, input))
+    @differentiable(reverse, wrt: (self, input))
     func applied(to input: Float) -> Float {
       return x * constant * input
     }
@@ -1299,12 +1299,12 @@ ForwardModeTests.test("StructGeneric") {
 }
 
 ForwardModeTests.test("SubsetIndices") {
-  func deriv(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
+  func deriv(_ lossFunction: @differentiable(reverse) (Float, Float) -> Float) -> Float {
     return derivative(at: 1) { x in lossFunction(x * x, 10.0) }
   }
   expectEqual(2, deriv { x, y in x + y })
 
-  func derivWRTNonDiff(_ lossFunction: @differentiable (Float, @noDerivative Int) -> Float) -> Float {
+  func derivWRTNonDiff(_ lossFunction: @differentiable(reverse) (Float, @noDerivative Int) -> Float) -> Float {
     return derivative(at: 2) { x in lossFunction(x * x, 10) }
   }
   expectEqual(4, derivWRTNonDiff { x, y in x + Float(y) })
@@ -1320,56 +1320,56 @@ ForwardModeTests.test("ForceUnwrapping") {
 }
 
 ForwardModeTests.test("NonVariedResult") {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func nonWrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
     y = x
   }
 
-  @differentiable
+  @differentiable(reverse)
   func wrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
     y = x
   }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func nonWrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func wrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
 
-  @differentiable
+  @differentiable(reverse)
   func variedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
     var result: Tracked<Float> = 0
     nonWrtInoutParam(x, &result)
     return result
   }
 
-  @differentiable
+  @differentiable(reverse)
   func variedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
     var result: Tracked<Float> = 0
     wrtInoutParam(x, &result)
     return result
   }
 
-  @differentiable
+  @differentiable(reverse)
   func nonVariedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
     var result: Tracked<Float> = 0
     nonWrtInoutParamNonVaried(x, &result)
     return result
   }
 
-  @differentiable
+  @differentiable(reverse)
   func nonVariedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
     // expected-warning @+1 {{variable 'result' was never mutated}}
     var result: Tracked<Float> = 0
     return result
   }
 
-  @differentiable
+  @differentiable(reverse)
   func nonVariedResultTracked3(_ x: Tracked<Float>) -> Tracked<Float> {
     return 0
   }
 
-  @differentiable
+  @differentiable(reverse)
   func nonVariedResultTracked4(_ x: Tracked<Float>) -> Tracked<Float> {
     var result: Tracked<Float> = 0
     wrtInoutParamNonVaried(x, &result)
@@ -1380,7 +1380,7 @@ ForwardModeTests.test("NonVariedResult") {
 ForwardModeTests.test("ApplyNonActiveIndirectResult") {
   func identity<T: Differentiable>(_ x: T) -> T { x }
 
-  @differentiable
+  @differentiable(reverse)
   func applyNonactiveArgumentActiveIndirectResult(_ x: Tracked<Float>) -> Tracked<Float> {
     var y = identity(0 as Tracked<Float>)
     y = x
@@ -1392,7 +1392,7 @@ ForwardModeTests.test("ApplyNonActiveIndirectResult") {
 ForwardModeTests.test("SR-13530") {
   // SR-13530: Test "leaked owned value" ownership verification failure related
   // to differential generation for `copy_value` instruction.
-  @differentiable
+  @differentiable(reverse)
   func SR_13530(_ x: NonresilientTracked<Float>) -> NonresilientTracked<Float> {
     precondition(x >= 0)
     return x

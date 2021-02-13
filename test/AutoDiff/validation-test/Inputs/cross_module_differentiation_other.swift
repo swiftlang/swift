@@ -1,14 +1,14 @@
 import _Differentiation
 
-@differentiable
+@differentiable(reverse)
 public func defaultArgument(_ x: Float) -> Float {
   return x
 }
 
-@differentiable
+@differentiable(reverse)
 public func applyArgument(
   _ x: Float,
-  _ f: @differentiable (Float) -> Float = defaultArgument
+  _ f: @differentiable(reverse) (Float) -> Float = defaultArgument
 ) -> Float {
   return f(x)
 }

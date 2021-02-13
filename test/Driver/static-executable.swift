@@ -1,4 +1,9 @@
 // Create a self contained binary
+
+// REQUIRES: rdar74148842
+// libc.a and libm.a have duplicate definitions of '__isnanl', so this test
+// fails to build.
+
 // REQUIRES: OS=linux-gnu
 // REQUIRES: static_stdlib
 print("hello world!")

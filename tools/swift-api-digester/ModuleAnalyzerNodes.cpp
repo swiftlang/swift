@@ -2291,8 +2291,7 @@ int swift::ide::api::findDeclUsr(StringRef dumpPath, CheckerOptions Opts) {
     FinderByLocation(StringRef Location): Location(Location) {}
     void visit(SDKNode* Node) override {
       if (auto *D = dyn_cast<SDKNodeDecl>(Node)) {
-        if (D->getLocation().find(Location) != StringRef::npos &&
-            !D->getUsr().empty()) {
+        if (D->getLocation().contains(Location) && !D->getUsr().empty()) {
           llvm::outs() << D->getFullyQualifiedName() << ": " << D->getUsr() << "\n";
         }
       }

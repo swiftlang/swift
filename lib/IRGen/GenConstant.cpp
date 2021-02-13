@@ -22,6 +22,7 @@
 #include "GenTuple.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
+#include "Callee.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILModule.h"
 
@@ -109,11 +110,67 @@ llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
   llvm_unreachable("bad string encoding");
 }
 
-static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
+namespace {
+
+/// Fill in the missing values for padding.
+void insertPadding(SmallVectorImpl<llvm::Constant *> &Elements,
+                   llvm::StructType *sTy) {
+  // fill in any gaps, which are the explicit padding that swiftc inserts.
+  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
+    auto &elt = Elements[i];
+    if (elt == nullptr) {
+      auto *eltTy = sTy->getElementType(i);
+      assert(eltTy->isArrayTy() &&
+             eltTy->getArrayElementType()->isIntegerTy(8) &&
+             "Unexpected non-byte-array type for constant struct padding");
+      elt = llvm::UndefValue::get(eltTy);
+    }
+  }
+}
+
+template <typename InstTy, typename NextIndexFunc>
+llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
+                                          NextIndexFunc nextIndex) {
+  auto type = inst->getType();
+  auto *sTy = cast<llvm::StructType>(IGM.getTypeInfo(type).getStorageType());
+
+  SmallVector<llvm::Constant *, 32> elts(sTy->getNumElements(), nullptr);
+
+  // run over the Swift initializers, putting them into the struct as
+  // appropriate.
+  for (unsigned i = 0, e = inst->getElements().size(); i != e; ++i) {
+    auto operand = inst->getOperand(i);
+    Optional<unsigned> index = nextIndex(IGM, type, i);
+    if (index.hasValue()) {
+      assert(elts[index.getValue()] == nullptr &&
+             "Unexpected constant struct field overlap");
+
+      elts[index.getValue()] = emitConstantValue(IGM, operand);
+    }
+  }
+  insertPadding(elts, sTy);
+  return llvm::ConstantStruct::get(sTy, elts);
+}
+} // end anonymous namespace
+
+llvm::Constant *irgen::emitConstantValue(IRGenModule &IGM, SILValue operand) {
   if (auto *SI = dyn_cast<StructInst>(operand)) {
-    return emitConstantStruct(IGM, SI);
+    // The only way to get a struct's stored properties (which we need to map to
+    // their physical/LLVM index) is to iterate over the properties
+    // progressively. Fortunately the iteration order matches the order of
+    // operands in a StructInst.
+    auto StoredProperties = SI->getStructDecl()->getStoredProperties();
+    auto Iter = StoredProperties.begin();
+
+    return emitConstantStructOrTuple(
+        IGM, SI, [&Iter](IRGenModule &IGM, SILType Type, unsigned _i) mutable {
+          (void)_i;
+          auto *FD = *Iter++;
+          return irgen::getPhysicalStructFieldIndex(IGM, Type, FD);
+        });
   } else if (auto *TI = dyn_cast<TupleInst>(operand)) {
-    return emitConstantTuple(IGM, TI);
+    return emitConstantStructOrTuple(IGM, TI,
+                                     irgen::getPhysicalTupleElementStructIndex);
   } else if (auto *ILI = dyn_cast<IntegerLiteralInst>(operand)) {
     return emitConstantInt(IGM, ILI);
   } else if (auto *FLI = dyn_cast<FloatLiteralInst>(operand)) {
@@ -159,73 +216,43 @@ static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
     auto *val = emitConstantValue(IGM, VTBI->getOperand());
     auto *sTy = IGM.getTypeInfo(VTBI->getType()).getStorageType();
     return llvm::ConstantExpr::getIntToPtr(val, sTy);
+
+  } else if (auto *CFI = dyn_cast<ConvertFunctionInst>(operand)) {
+    return emitConstantValue(IGM, CFI->getOperand());
+
+  } else if (auto *T2TFI = dyn_cast<ThinToThickFunctionInst>(operand)) {
+    SILType type = operand->getType();
+    auto *sTy = cast<llvm::StructType>(IGM.getTypeInfo(type).getStorageType());
+
+    auto *function = llvm::ConstantExpr::getBitCast(
+        emitConstantValue(IGM, T2TFI->getCallee()),
+        sTy->getTypeAtIndex((unsigned)0));
+
+    auto *context = llvm::ConstantExpr::getBitCast(
+        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy),
+        sTy->getTypeAtIndex((unsigned)1));
+    
+    return llvm::ConstantStruct::get(sTy, {function, context});
+
+  } else if (auto *FRI = dyn_cast<FunctionRefInst>(operand)) {
+    SILFunction *fn = FRI->getReferencedFunction();
+
+    llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(fn, NotForDefinition);
+    assert(!fn->isAsync() && "TODO: support async functions");
+
+    CanSILFunctionType fnType = FRI->getType().getAs<SILFunctionType>();
+    auto authInfo = PointerAuthInfo::forFunctionPointer(IGM, fnType);
+    if (authInfo.isSigned()) {
+      auto constantDiscriminator =
+          cast<llvm::Constant>(authInfo.getDiscriminator());
+      assert(!constantDiscriminator->getType()->isPointerTy());
+      fnPtr = IGM.getConstantSignedPointer(fnPtr, authInfo.getKey(), nullptr,
+        constantDiscriminator);
+    }
+    return fnPtr;
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
   }
-}
-
-namespace {
-
-/// Fill in the missing values for padding.
-void insertPadding(SmallVectorImpl<llvm::Constant *> &Elements,
-                   llvm::StructType *sTy) {
-  // fill in any gaps, which are the explicit padding that swiftc inserts.
-  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
-    auto &elt = Elements[i];
-    if (elt == nullptr) {
-      auto *eltTy = sTy->getElementType(i);
-      assert(eltTy->isArrayTy() &&
-             eltTy->getArrayElementType()->isIntegerTy(8) &&
-             "Unexpected non-byte-array type for constant struct padding");
-      elt = llvm::UndefValue::get(eltTy);
-    }
-  }
-}
-
-template <typename InstTy, typename NextIndexFunc>
-llvm::Constant *emitConstantStructOrTuple(IRGenModule &IGM, InstTy inst,
-                                          NextIndexFunc nextIndex) {
-  auto type = inst->getType();
-  auto *sTy = cast<llvm::StructType>(IGM.getTypeInfo(type).getStorageType());
-
-  SmallVector<llvm::Constant *, 32> elts(sTy->getNumElements(), nullptr);
-
-  // run over the Swift initializers, putting them into the struct as
-  // appropriate.
-  for (unsigned i = 0, e = inst->getElements().size(); i != e; ++i) {
-    auto operand = inst->getOperand(i);
-    Optional<unsigned> index = nextIndex(IGM, type, i);
-    if (index.hasValue()) {
-      assert(elts[index.getValue()] == nullptr &&
-             "Unexpected constant struct field overlap");
-
-      elts[index.getValue()] = emitConstantValue(IGM, operand);
-    }
-  }
-  insertPadding(elts, sTy);
-  return llvm::ConstantStruct::get(sTy, elts);
-}
-} // end anonymous namespace
-
-llvm::Constant *irgen::emitConstantStruct(IRGenModule &IGM, StructInst *SI) {
-  // The only way to get a struct's stored properties (which we need to map to
-  // their physical/LLVM index) is to iterate over the properties
-  // progressively. Fortunately the iteration order matches the order of
-  // operands in a StructInst.
-  auto StoredProperties = SI->getStructDecl()->getStoredProperties();
-  auto Iter = StoredProperties.begin();
-
-  return emitConstantStructOrTuple(
-      IGM, SI, [&Iter](IRGenModule &IGM, SILType Type, unsigned _i) mutable {
-        (void)_i;
-        auto *FD = *Iter++;
-        return irgen::getPhysicalStructFieldIndex(IGM, Type, FD);
-      });
-}
-
-llvm::Constant *irgen::emitConstantTuple(IRGenModule &IGM, TupleInst *TI) {
-  return emitConstantStructOrTuple(IGM, TI,
-                                   irgen::getPhysicalTupleElementStructIndex);
 }
 
 llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,

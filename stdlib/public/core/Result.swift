@@ -190,3 +190,5 @@ extension Result where Failure == Swift.Error {
 extension Result: Equatable where Success: Equatable, Failure: Equatable { }
 
 extension Result: Hashable where Success: Hashable, Failure: Hashable { }
+
+extension Result: ConcurrentValue where Success: ConcurrentValue, Failure: ConcurrentValue { }

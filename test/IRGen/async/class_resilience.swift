@@ -8,8 +8,16 @@ import resilient_class
 open class MyBaseClass<T> {
   var value: T
 
+  open func wait() async -> Int {
+    return 0
+  }
+
   open func wait() async -> T {
     return value
+  }
+
+  open func waitThrows() async throws -> Int {
+    return 0
   }
 
   open func waitThrows() async throws -> T {

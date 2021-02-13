@@ -1043,6 +1043,16 @@ keyPath.test("ReferenceWritableKeyPath statically typed as WritableKeyPath") {
   expectEqual(outer[keyPath: upcastKeyPath], 43)
   outer[keyPath: upcastKeyPath] = 44
   expectEqual(outer[keyPath: upcastKeyPath], 44)
+
+  func setWithInout<T>(_ lhs: inout T, _ rhs: T) { lhs = rhs }
+
+  expectEqual(outer[keyPath: keyPath], 44)
+  setWithInout(&outer[keyPath: keyPath], 45);
+  expectEqual(outer[keyPath: keyPath], 45)
+
+  expectEqual(outer[keyPath: upcastKeyPath], 45)
+  setWithInout(&outer[keyPath: upcastKeyPath], 46)
+  expectEqual(outer[keyPath: upcastKeyPath], 46)
 }
 
 runAllTests()

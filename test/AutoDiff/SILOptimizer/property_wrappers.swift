@@ -51,20 +51,20 @@ struct Struct: Differentiable {
   @DifferentiableWrapper var differentiableWrapped: Float = 40
 
   static func testGetters() {
-    let _: @differentiable (Self) -> Float = { $0.trivial }
-    let _: @differentiable (Self) -> Tracked<Float> = { $0.tracked }
-    let _: @differentiable (Self) -> NontrivialLoadable<Float> = { $0.nontrivial }
-    let _: @differentiable (Self) -> Float = { $0.differentiableWrapped }
+    let _: @differentiable(reverse) (Self) -> Float = { $0.trivial }
+    let _: @differentiable(reverse) (Self) -> Tracked<Float> = { $0.tracked }
+    let _: @differentiable(reverse) (Self) -> NontrivialLoadable<Float> = { $0.nontrivial }
+    let _: @differentiable(reverse) (Self) -> Float = { $0.differentiableWrapped }
   }
 
   static func testSetters() {
-    let _: @differentiable (inout Self, Float) -> Void =
+    let _: @differentiable(reverse) (inout Self, Float) -> Void =
       { $0.trivial = $1 }
-    let _: @differentiable (inout Self, Tracked<Float>) -> Void =
+    let _: @differentiable(reverse) (inout Self, Tracked<Float>) -> Void =
       { $0.tracked = $1 }
-    let _: @differentiable (inout Self, NontrivialLoadable<Float>) -> Void =
+    let _: @differentiable(reverse) (inout Self, NontrivialLoadable<Float>) -> Void =
       { $0.nontrivial = $1 }
-    let _: @differentiable (inout Self, Float) -> Void =
+    let _: @differentiable(reverse) (inout Self, Float) -> Void =
       { $0.differentiableWrapped = $1 }
   }
 }
@@ -77,21 +77,21 @@ struct GenericStruct<T: Differentiable>: Differentiable {
 
   // SR-12778: Test getter pullback for non-trivial loadable property.
   static func testGetters() {
-    let _: @differentiable (Self) -> Float = { $0.trivial }
-    let _: @differentiable (Self) -> Tracked<Float> = { $0.tracked }
-    let _: @differentiable (Self) -> NontrivialLoadable<Float> = { $0.nontrivial }
-    let _: @differentiable (Self) -> T = { $0.addressOnly }
+    let _: @differentiable(reverse) (Self) -> Float = { $0.trivial }
+    let _: @differentiable(reverse) (Self) -> Tracked<Float> = { $0.tracked }
+    let _: @differentiable(reverse) (Self) -> NontrivialLoadable<Float> = { $0.nontrivial }
+    let _: @differentiable(reverse) (Self) -> T = { $0.addressOnly }
   }
 
   // SR-12779: Test setter pullback for non-trivial loadable property.
   static func testSetters() {
-    let _: @differentiable (inout Self, Float) -> Void =
+    let _: @differentiable(reverse) (inout Self, Float) -> Void =
       { $0.trivial = $1 }
-    let _: @differentiable (inout Self, Tracked<Float>) -> Void =
+    let _: @differentiable(reverse) (inout Self, Tracked<Float>) -> Void =
       { $0.tracked = $1 }
-    let _: @differentiable (inout Self, NontrivialLoadable<Float>) -> Void =
+    let _: @differentiable(reverse) (inout Self, NontrivialLoadable<Float>) -> Void =
       { $0.nontrivial = $1 }
-    let _: @differentiable (inout Self, T) -> Void =
+    let _: @differentiable(reverse) (inout Self, T) -> Void =
       { $0.addressOnly = $1 }
   }
 }

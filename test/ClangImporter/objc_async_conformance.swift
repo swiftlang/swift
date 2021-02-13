@@ -35,6 +35,12 @@ extension C4 {
   func hello(_ completion : @escaping (Bool) -> Void) -> Void { completion(true) }
 }
 
+protocol Club : ObjCClub {}
+
+class ConformsToSync : NSObject, Club {
+  func activate( completion: @escaping ( Error? ) -> Void ) { }
+}
+
 ///////
 // selector conflicts
 
@@ -64,6 +70,12 @@ class SelectorOK2 : NSObject, RequiredObserverOnlyCompletion {
 class Rock : NSObject, Rollable {
   func roll(completionHandler: @escaping () -> Void) { completionHandler() }
   func roll() { roll(completionHandler: {}) }
+}
+
+// additional coverage for a situation where only an argument label differs, excluding the completion handler.
+final class Moon : LabellyProtocol {
+  func myMethod(_ value: Int, foo: Int) {}
+  func myMethod(_ value: Int, newFoo foo: Int, completion: @escaping (Error?) -> Void) {}
 }
 
 // Crash involving actor isolation checking.

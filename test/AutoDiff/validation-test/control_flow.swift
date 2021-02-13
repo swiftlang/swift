@@ -383,7 +383,7 @@ ControlFlowTests.test("NestedConditionals") {
     struct TF_781: Differentiable {
       var w: Float = 3
 
-      @differentiable(wrt: self) // wrt only self is important
+      @differentiable(reverse, wrt: self) // wrt only self is important
       func callAsFunction(_ input: Float) -> Float {
         var x = input
         if true {
@@ -402,7 +402,7 @@ ControlFlowTests.test("NestedConditionals") {
 
   // Non-method version of TF-781.
   do {
-    @differentiable(wrt: x)
+    @differentiable(reverse, wrt: x)
     func TF_781(_ x: Float, _ y: Float) -> Float {
       var result = y
       if true {
@@ -535,7 +535,7 @@ ControlFlowTests.test("Enums") {
     var w1: Float
     @noDerivative var w2: Float?
 
-    @differentiable
+    @differentiable(reverse)
     func callAsFunction(_ input: Float) -> Float {
       if let w2 = w2 {
         return input * w1 * w2
@@ -756,14 +756,14 @@ ControlFlowTests.test("ThrowingCalls") {
    // TF-433: Test non-active `try_apply` differentiation.
   func throwing() throws -> Void {}
 
-  @differentiable
+  @differentiable(reverse)
   func testThrowing(_ x: Float) -> Float {
     try! throwing()
     return x
   }
   expectEqual(10, pullback(at: 3, in: testThrowing)(10))
 
-  @differentiable
+  @differentiable(reverse)
   func testThrowingGeneric<T: Differentiable>(_ x: T) -> T {
     try! throwing()
     return x
@@ -772,21 +772,21 @@ ControlFlowTests.test("ThrowingCalls") {
 
   func rethrowing(_ body: () throws -> Void) rethrows -> Void {}
 
-  @differentiable
+  @differentiable(reverse)
   func testRethrowingIdentity(_ x: Float) -> Float {
     rethrowing({}) // non-active `try_apply`
     return x
   }
   expectEqual(10, pullback(at: 3, in: testRethrowingIdentity)(10))
 
-  @differentiable
+  @differentiable(reverse)
   func testRethrowingIdentityGeneric<T: Differentiable>(_ x: T) -> T {
     rethrowing({}) // non-active `try_apply`
     return x
   }
   expectEqual(10, pullback(at: 3, in: testRethrowingIdentityGeneric)(10))
 
-  @differentiable
+  @differentiable(reverse)
   func testComplexControlFlow(_ x: Float) -> Float {
     rethrowing({})
     for _ in 0..<Int(x) {
@@ -800,7 +800,7 @@ ControlFlowTests.test("ThrowingCalls") {
   }
   expectEqual(10, pullback(at: 3, in: testComplexControlFlow)(10))
 
-  @differentiable
+  @differentiable(reverse)
   func testComplexControlFlowGeneric<T: Differentiable>(_ x: T) -> T {
     rethrowing({})
     for _ in 0..<10 {

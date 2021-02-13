@@ -7,7 +7,7 @@ func acceptEscapingClosure<T>(_: @escaping () -> T) { }
 func acceptAsyncClosure<T>(_: () async -> T) { }
 func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
 
-actor class MyActor {
+actor MyActor {
   func method() async -> String { "" }
 }
 
@@ -36,7 +36,7 @@ extension MyActor {
   }
 }
 
-actor class SomeActor { }
+actor SomeActor { }
 
 @globalActor
 struct SomeGlobalActor {

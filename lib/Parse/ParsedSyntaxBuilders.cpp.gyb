@@ -38,7 +38,7 @@ using namespace swift::syntax;
 %         child_elt_name = child.name + 'Member'
 %       end
 Parsed${node.name}Builder &
-Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} ${child.name}) {
+Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} &&${child.name}) {
 %       if child_elt:
   assert(${child_elt_name}s.empty() && "use either 'use' function or 'add', not both");
 %       end

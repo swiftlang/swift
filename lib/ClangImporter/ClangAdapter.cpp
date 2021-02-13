@@ -731,7 +731,8 @@ bool importer::isUnavailableInSwift(
     llvm::VersionTuple version = attr->getDeprecated();
     if (version.empty())
       continue;
-    if (platformAvailability.treatDeprecatedAsUnavailable(decl, version)) {
+    if (platformAvailability.treatDeprecatedAsUnavailable(
+            decl, version, /*isAsync=*/false)) {
       return true;
     }
   }

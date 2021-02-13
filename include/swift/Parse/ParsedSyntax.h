@@ -22,11 +22,11 @@ class ParsedSyntax {
   ParsedRawSyntaxNode RawNode;
 
 public:
-  explicit ParsedSyntax(ParsedRawSyntaxNode rawNode)
+  explicit ParsedSyntax(ParsedRawSyntaxNode &&rawNode)
     : RawNode(std::move(rawNode)) {}
 
   const ParsedRawSyntaxNode &getRaw() const { return RawNode; }
-  ParsedRawSyntaxNode takeRaw() { return std::move(RawNode); }
+  ParsedRawSyntaxNode &&takeRaw() { return std::move(RawNode); }
   syntax::SyntaxKind getKind() const { return RawNode.getKind(); }
 
   /// Returns true if the syntax node is of the given type.
@@ -38,19 +38,9 @@ public:
   /// Cast this Syntax node to a more specific type, asserting it's of the
   /// right kind.
   template <typename T>
-  T castTo() const {
+  T castTo() && {
     assert(is<T>() && "castTo<T>() node of incompatible type!");
-    return T { RawNode.copyDeferred() };
-  }
-
-  /// If this Syntax node is of the right kind, cast and return it,
-  /// otherwise return None.
-  template <typename T>
-  llvm::Optional<T> getAs() const {
-    if (is<T>()) {
-      return castTo<T>();
-    }
-    return llvm::None;
+    return T(std::move(RawNode));
   }
 
   ParsedSyntax copyDeferred() const {
@@ -69,7 +59,7 @@ public:
 
 class ParsedTokenSyntax final : public ParsedSyntax {
 public:
-  explicit ParsedTokenSyntax(ParsedRawSyntaxNode rawNode)
+  explicit ParsedTokenSyntax(ParsedRawSyntaxNode &&rawNode)
     : ParsedSyntax(std::move(rawNode)) {}
 
   tok getTokenKind() const {

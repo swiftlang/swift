@@ -30,20 +30,20 @@ class Super: Differentiable {
     self.base = base
   }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   func method(_ x: Float, _ y: Float) -> Float {
     return x
   }
 
-  @differentiable(wrt: x where T: Differentiable)
+  @differentiable(reverse, wrt: x where T: Differentiable)
   func genericMethod<T>(_ x: T, _ y: T) -> T {
     return x
   }
 
-  @differentiable
+  @differentiable(reverse)
   var property: Float { base }
 
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   subscript(_ x: Float, _ y: Float) -> Float {
     return x
   }
@@ -71,15 +71,15 @@ class Sub: Super {
   // FIXME(TF-1203): This `@differentiable` attribute should not be necessary to
   // override derivatives. Fix `derivativeFunctionRequiresNewVTableEntry` to
   // account for derived declaration `@derivative` attributes.
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   // Add new derivatives for `method` wrt `(x, y)`.
-  @differentiable(wrt: (x, y))
+  @differentiable(reverse, wrt: (x, y))
   override func method(_ x: Float, _ y: Float) -> Float {
     return x
   }
 
   // Override derivatives for `property` wrt `self`.
-  @differentiable
+  @differentiable(reverse)
   override var property: Float { base }
   @derivative(of: property)
   final func vjpProperty() -> (value: Float, pullback: (Float) -> TangentVector) {
@@ -87,7 +87,7 @@ class Sub: Super {
   }
 
   // Override derivatives for `subscript` wrt `x`.
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   override subscript(_ x: Float, _ y: Float) -> Float {
     return x
   }
@@ -101,7 +101,7 @@ class SubSub: Sub {}
 // CHECK: bb0(%0 : $Float, %1 : $Float, %2 : @guaranteed $Super):
 // CHECK:   %3 = function_ref @$s6vtable5SuperC6methodyS2f_SftF : $@convention(method) (Float, Float, @guaranteed Super) -> Float
 // CHECK:   %4 = differentiable_function [parameters 0] [results 0] %3 : $@convention(method) (Float, Float, @guaranteed Super) -> Float
-// CHECK:   %5 = differentiable_function_extract [jvp] %4 : $@differentiable @convention(method) (Float, @noDerivative Float, @noDerivative @guaranteed Super) -> Float
+// CHECK:   %5 = differentiable_function_extract [jvp] %4 : $@differentiable(reverse) @convention(method) (Float, @noDerivative Float, @noDerivative @guaranteed Super) -> Float
 // CHECK:   %6 = apply %5(%0, %1, %2) : $@convention(method) (Float, Float, @guaranteed Super) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK:   return %6 : $(Float, @callee_guaranteed (Float) -> Float)
 // CHECK: }

@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
@@ -374,4 +375,12 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // in the common case.
 
   return { false, false };
+}
+
+llvm::StringRef swift::getFeatureName(Feature feature) {
+  switch (feature) {
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
+  case Feature::FeatureName: return #FeatureName;
+#include "swift/Basic/Features.def"
+  }
 }

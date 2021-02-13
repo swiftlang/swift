@@ -100,13 +100,13 @@ PropertyWrapperTests.test("GenericStruct") {
 
 // TF-1149: Test class with loadable type but address-only `TangentVector` type.
 class Class: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   @Wrapper @Wrapper var x: Tracked<Float> = 10
 
-  @differentiable
+  @differentiable(reverse)
   @Wrapper var y: Tracked<Float> = 20
 
-  @differentiable
+  @differentiable(reverse)
   var z: Tracked<Float> = 30
 }
 
@@ -210,7 +210,7 @@ struct RealPropertyWrappers: Differentiable {
 }
 
 PropertyWrapperTests.test("RealPropertyWrappers") {
-  @differentiable
+  @differentiable(reverse)
   func multiply(_ s: RealPropertyWrappers) -> Float {
     return s.x * s.y
   }

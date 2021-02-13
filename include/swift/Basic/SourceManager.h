@@ -78,7 +78,7 @@ public:
     FileSystem = FS;
   }
 
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const {
     return FileSystem;
   }
 

@@ -911,7 +911,7 @@ static void annotateSnippetWithInfo(SourceManager &SM,
     for (auto fixIt : Info.FixIts) {
       // Don't print multi-line fix-its inline, only include them at the end of
       // the message.
-      if (fixIt.getText().find("\n") == std::string::npos)
+      if (!fixIt.getText().contains("\n"))
         Snippet.addFixIt(fixIt.getRange(), fixIt.getText());
     }
   }

@@ -17,9 +17,9 @@ import DifferentiationUnittest
 var SeparateTangentTypeTests = TestSuite("SeparateTangentType")
 
 struct DifferentiableSubset : Differentiable {
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   var w: Tracked<Float>
-  @differentiable(wrt: self)
+  @differentiable(reverse, wrt: self)
   var b: Tracked<Float>
   @noDerivative var flag: Bool
 

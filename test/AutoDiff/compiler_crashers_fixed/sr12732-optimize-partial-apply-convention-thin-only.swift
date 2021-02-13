@@ -12,7 +12,7 @@ import DifferentiationUnittest
 
 func callback(_ x: inout Tracked<Float>.TangentVector) {}
 
-@differentiable
+@differentiable(reverse)
 func caller(_ x: Tracked<Float>) -> Tracked<Float> {
   return x.withDerivative(callback)
 }

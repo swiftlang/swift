@@ -201,6 +201,8 @@ public:
   bool isInsertingIntoGlobal() const { return F == nullptr; }
 
   TypeExpansionContext getTypeExpansionContext() const {
+    if (!F)
+      return TypeExpansionContext::minimal();
     return TypeExpansionContext(getFunction());
   }
 
@@ -1027,7 +1029,7 @@ public:
                                              SILType Ty,
                                              bool WithoutActuallyEscaping) {
     return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
-                                              getFunction(), C.OpenedArchetypes,
+                                              getModule(), F, C.OpenedArchetypes,
                                               WithoutActuallyEscaping));
   }
 
@@ -1157,7 +1159,7 @@ public:
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
     return insert(ThinToThickFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getModule(), F, C.OpenedArchetypes));
   }
 
   ThickToObjCMetatypeInst *createThickToObjCMetatype(SILLocation Loc,

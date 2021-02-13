@@ -360,10 +360,12 @@ $s17property_wrappers10WithTuplesV9fractionsSd_S2dtvpfP ---> property wrapper ba
 $sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTOTA ---> {T:$sSo17OS_dispatch_queueC4sync7executeyyyXE_tFTO} partial apply forwarder for @nonobjc __C.OS_dispatch_queue.sync(execute: () -> ()) -> ()
 $s4main1gyySiXCvp ---> main.g : @convention(c) (Swift.Int) -> ()
 $s4main1gyySiXBvp ---> main.g : @convention(block) (Swift.Int) -> ()
+$sxq_Ifgnr_D ---> @differentiable(_forward) @callee_guaranteed (@in_guaranteed A) -> (@out B)
+$sxq_Irgnr_D ---> @differentiable(reverse) @callee_guaranteed (@in_guaranteed A) -> (@out B)
 $sxq_Idgnr_D ---> @differentiable @callee_guaranteed (@in_guaranteed A) -> (@out B)
-$sxq_Ilgnr_D ---> @differentiable(linear) @callee_guaranteed (@in_guaranteed A) -> (@out B)
+$sxq_Ilgnr_D ---> @differentiable(_linear) @callee_guaranteed (@in_guaranteed A) -> (@out B)
 $sS3fIedgyywd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative Swift.Float) -> (@unowned Swift.Float)
-$sS5fIedtyyywddw_D ---> @escaping @differentiable @convention(thin) (@unowned Swift.Float, @unowned Swift.Float, @unowned @noDerivative Swift.Float) -> (@unowned Swift.Float, @unowned @noDerivative Swift.Float)
+$sS5fIertyyywddw_D ---> @escaping @differentiable(reverse) @convention(thin) (@unowned Swift.Float, @unowned Swift.Float, @unowned @noDerivative Swift.Float) -> (@unowned Swift.Float, @unowned @noDerivative Swift.Float)
 $syQo ---> $syQo
 $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee -> $s0059xxxxxxxxxxxxxxx_ttttttttBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBee
 $sx1td_t ---> (t: A...)

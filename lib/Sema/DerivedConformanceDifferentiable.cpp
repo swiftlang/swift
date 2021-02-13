@@ -305,6 +305,7 @@ static ValueDecl *deriveDifferentiable_method(
                                   SourceLoc(), parameterName, parentDC);
   param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
+  param->setImplicit();
   ParameterList *params = ParameterList::create(C, {param});
 
   DeclName declName(C, methodName, params);
@@ -499,7 +500,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
           derivativeGenericSignature = extGenSig;
       auto *diffableAttr = DifferentiableAttr::create(
           getter, /*implicit*/ true, SourceLoc(), SourceLoc(),
-          /*linear*/ false, /*parameterIndices*/ IndexSubset::get(C, 1, {0}),
+          DifferentiabilityKind::Reverse,
+          /*parameterIndices*/ IndexSubset::get(C, 1, {0}),
           derivativeGenericSignature);
       member->getAttrs().add(diffableAttr);
     }

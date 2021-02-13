@@ -1025,6 +1025,11 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::Statistics:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestStatistics);
     break;
+
+  case SourceKitRequest::DependencyUpdated:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestDependencyUpdated);
+    break;
   }
 
   if (!SourceFile.empty()) {
@@ -1223,6 +1228,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteSetPopularAPI:
     case SourceKitRequest::TypeContextInfo:
     case SourceKitRequest::ConformingMethodList:
+    case SourceKitRequest::DependencyUpdated:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 
@@ -1608,6 +1614,25 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OverrideUSRs.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyUSR));
   }
 
+  struct ParentInfo {
+    const char *Title;
+    const char *Kind;
+    const char *USR;
+  };
+  std::vector<ParentInfo> Parents;
+  sourcekitd_variant_t ParentsObj =
+      sourcekitd_variant_dictionary_get_value(Info, KeyParentContexts);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ParentsObj);
+       i != e; ++i) {
+    sourcekitd_variant_t Entry =
+        sourcekitd_variant_array_get_value(ParentsObj, i);
+    Parents.push_back({
+      sourcekitd_variant_dictionary_get_string(Entry, KeyName),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyKind),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyUSR)
+    });
+  }
+
   std::vector<const char *> GroupNames;
   sourcekitd_variant_t GroupObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyModuleGroups);
@@ -1698,6 +1723,12 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
       OS << SymbolGraph;
     }
     OS << "\nSYMBOL GRAPH END\n";
+  }
+  if (!Parents.empty()) {
+    OS << "PARENT CONTEXTS BEGIN\n";
+    for (auto parent: Parents)
+      OS << parent.Title << " " << parent.Kind << " " << parent.USR << '\n';
+    OS << "PARENT CONTEXTS END\n";
   }
   OS << "OVERRIDES BEGIN\n";
   for (auto OverUSR : OverrideUSRs)

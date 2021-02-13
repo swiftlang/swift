@@ -9,7 +9,7 @@ struct HasNoDerivativeProperty: Differentiable {
   var x: Float
   @noDerivative var y: Float
 }
-@differentiable
+@differentiable(reverse)
 func testNoDerivativeStructProjection(_ s: HasNoDerivativeProperty) -> Float {
   var tmp = s
   tmp.y = tmp.x
@@ -30,7 +30,7 @@ func testNoDerivativeStructProjection(_ s: HasNoDerivativeProperty) -> Float {
 
 // Check that non-differentiable `tuple_element_addr` projections are non-varied.
 
-@differentiable(where T : Differentiable)
+@differentiable(reverse where T : Differentiable)
 func testNondifferentiableTupleElementAddr<T>(_ x: T) -> T {
   var tuple = (1, 1, (x, 1), 1)
   tuple.0 = 1
@@ -62,7 +62,7 @@ func testNondifferentiableTupleElementAddr<T>(_ x: T) -> T {
 
 // TF-781: check active local address + nested conditionals.
 
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func TF_781(_ x: Float, _ y: Float) -> Float {
   var result = y
   if true {
@@ -86,7 +86,7 @@ func TF_781(_ x: Float, _ y: Float) -> Float {
 
 // TF-954: check nested conditionals and addresses.
 
-@differentiable
+@differentiable(reverse)
 func TF_954(_ x: Float) -> Float {
   var outer = x
   outerIf: if true {
@@ -126,7 +126,7 @@ func TF_954(_ x: Float) -> Float {
 // Branching cast instructions
 //===----------------------------------------------------------------------===//
 
-@differentiable
+@differentiable(reverse)
 func checked_cast_branch(_ x: Float) -> Float {
   // expected-warning @+1 {{'is' test is always true}}
   if Int.self is Any.Type {
@@ -165,7 +165,7 @@ func checked_cast_branch(_ x: Float) -> Float {
 // CHECK:   checked_cast_br %3 : $@thick Int.Type to Any.Type, bb1, bb2
 // CHECK: }
 
-@differentiable
+@differentiable(reverse)
 func checked_cast_addr_nonactive_result<T: Differentiable>(_ x: T) -> T {
   if let _ = x as? Float {
     // Do nothing with `y: Float?` value.
@@ -197,7 +197,7 @@ func checked_cast_addr_nonactive_result<T: Differentiable>(_ x: T) -> T {
 // CHECK: }
 
 // expected-error @+1 {{function is not differentiable}}
-@differentiable
+@differentiable(reverse)
 // expected-note @+1 {{when differentiating this function definition}}
 func checked_cast_addr_active_result<T: Differentiable>(x: T) -> T {
   // expected-note @+1 {{expression is not differentiable}}
@@ -238,7 +238,7 @@ func checked_cast_addr_active_result<T: Differentiable>(x: T) -> T {
 
 // Check `array.uninitialized_intrinsic` applications.
 
-@differentiable
+@differentiable(reverse)
 func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
   return [x, y]
 }
@@ -257,7 +257,7 @@ func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
 // CHECK: [ACTIVE]   %15 = apply %14<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
-@differentiable(where T: Differentiable)
+@differentiable(reverse where T: Differentiable)
 func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
   return [x, y]
 }
@@ -277,7 +277,7 @@ func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
 // CHECK: [ACTIVE]   %15 = apply %14<T>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-952: Test array literal initialized from an address (e.g. `var`).
-@differentiable
+@differentiable(reverse)
 func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
   var result = x
   result = result * y
@@ -306,7 +306,7 @@ func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [ACTIVE]   %30 = apply %29<Float>(%18) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-952: Test array literal initialized with `apply` direct results.
-@differentiable
+@differentiable(reverse)
 func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [Float] {
   return [x * y, x * y]
 }
@@ -330,7 +330,7 @@ func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [F
 // CHECK: [ACTIVE]   %21 = apply %20<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
 // TF-975: Test nested array literals.
-@differentiable
+@differentiable(reverse)
 func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
   let array = [x, y]
   return [array[0], array[1]]
@@ -375,7 +375,7 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 struct Wrapper<T: Differentiable>: Differentiable {
   var value: T
 }
-@differentiable
+@differentiable(reverse)
 func testArrayUninitializedIntrinsicApplyIndirectResult<T>(_ x: T, _ y: T) -> [Wrapper<T>] {
   return [Wrapper(value: x), Wrapper(value: y)]
 }
@@ -407,7 +407,7 @@ func testArrayUninitializedIntrinsicApplyIndirectResult<T>(_ x: T, _ y: T) -> [W
 
 struct Mut: Differentiable {}
 extension Mut {
-  @differentiable(wrt: x)
+  @differentiable(reverse, wrt: x)
   mutating func mutatingMethod(_ x: Mut) {}
 }
 
@@ -417,7 +417,7 @@ extension Mut {
 
 // TODO(TF-985): Find workaround to avoid marking non-wrt `inout` argument as
 // active.
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) {
   nonactive.mutatingMethod(x)
   nonactive = x
@@ -431,7 +431,7 @@ func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) {
 // CHECK: [NONE]   %6 = apply %5(%1, %4) : $@convention(method) (Mut, @inout Mut) -> ()
 // CHECK: [ACTIVE]   %8 = begin_access [modify] [static] %0 : $*Mut
 
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
   var result = x
   result.mutatingMethod(result)
@@ -449,7 +449,7 @@ func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
 // CHECK: [ACTIVE]   %11 = begin_access [read] [static] %2 : $*Mut
 // CHECK: [ACTIVE]   %12 = load [trivial] %11 : $*Mut
 
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
   var result = nonactive
   result.mutatingMethod(x)
@@ -470,7 +470,7 @@ func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) {
 // CHECK: [ACTIVE]   %15 = begin_access [modify] [static] %0 : $*Mut
 // CHECK: [NONE]   %19 = tuple ()
 
-@differentiable(wrt: x)
+@differentiable(reverse, wrt: x)
 func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
   var result = (nonactive, x)
   result.0.mutatingMethod(result.0)
@@ -498,7 +498,7 @@ func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) {
 
 // Check `inout` arguments.
 
-@differentiable
+@differentiable(reverse)
 func activeInoutArg(_ x: Float) -> Float {
   var result = x
   result += x
@@ -514,7 +514,7 @@ func activeInoutArg(_ x: Float) -> Float {
 // CHECK: [ACTIVE]   %9 = begin_access [read] [static] %2 : $*Float
 // CHECK: [ACTIVE]   %10 = load [trivial] %9 : $*Float
 
-@differentiable
+@differentiable(reverse)
 func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
   var result: Float = 1
   result += x
@@ -541,7 +541,7 @@ func activeInoutArgNonactiveInitialResult(_ x: Float) -> Float {
 
 func rethrowing(_ x: () throws -> Void) rethrows -> Void {}
 
-@differentiable
+@differentiable(reverse)
 func testTryApply(_ x: Float) -> Float {
   rethrowing({})
   return x
@@ -575,7 +575,7 @@ struct HasCoroutineAccessors: Differentiable {
   }
 }
 // expected-error @+1 {{function is not differentiable}}
-@differentiable
+@differentiable(reverse)
 // expected-note @+1 {{when differentiating this function definition}}
 func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors {
   var x = x
@@ -606,7 +606,7 @@ func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors
 // `Array.subscript.modify` is the applied coroutine.
 
 // expected-error @+1 {{function is not differentiable}}
-@differentiable
+@differentiable(reverse)
 // expected-note @+1 {{when differentiating this function definition}}
 func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
   var array = array
@@ -643,7 +643,7 @@ func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
 // TF-1115: Test `begin_apply` active `inout` argument with non-active initial result.
 
 // expected-error @+1 {{function is not differentiable}}
-@differentiable
+@differentiable(reverse)
 // expected-note @+1 {{when differentiating this function definition}}
 func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
   // `var array` is initially non-active.
@@ -693,14 +693,14 @@ func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
 //===----------------------------------------------------------------------===//
 
 class C: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   var float: Float
 
   init(_ float: Float) {
     self.float = float
   }
 
-  @differentiable
+  @differentiable(reverse)
   func method(_ x: Float) -> Float {
     x * float
   }
@@ -718,7 +718,7 @@ class C: Differentiable {
 }
 
 // TF-1176: Test class property `modify` accessor.
-@differentiable
+@differentiable(reverse)
 func testClassModifyAccessor(_ c: inout C) {
   c.float *= c.float
 }
@@ -744,7 +744,7 @@ func testClassModifyAccessor(_ c: inout C) {
 //===----------------------------------------------------------------------===//
 
 // expected-error @+1 {{function is not differentiable}}
-@differentiable
+@differentiable(reverse)
 // expected-note @+1 {{when differentiating this function definition}}
 func testActiveOptional(_ x: Float) -> Float {
   var maybe: Float? = 10
@@ -785,7 +785,7 @@ enum DirectEnum: Differentiable & AdditiveArithmetic {
 }
 
 // expected-error @+1 {{function is not differentiable}}
-@differentiable(wrt: e)
+@differentiable(reverse, wrt: e)
 // expected-note @+2 {{when differentiating this function definition}}
 // expected-note @+1 {{differentiating enum values is not yet supported}}
 func testActiveEnumValue(_ e: DirectEnum, _ x: Float) -> Float {
@@ -827,7 +827,7 @@ enum IndirectEnum<T: Differentiable>: Differentiable & AdditiveArithmetic {
 }
 
 // expected-error @+1 {{function is not differentiable}}
-@differentiable(wrt: e)
+@differentiable(reverse, wrt: e)
 // expected-note @+2 {{when differentiating this function definition}}
 // expected-note @+1 {{differentiating enum values is not yet supported}}
 func testActiveEnumAddr<T>(_ e: IndirectEnum<T>) -> T {

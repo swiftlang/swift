@@ -7,7 +7,7 @@
 
 import _Differentiation
 
-@differentiable
+@differentiable(reverse)
 func opaqueResult(_ x: Float) -> some Differentiable { x }
 
 // swift: swift/lib/SILOptimizer/Differentiation/PullbackEmitter.cpp:244: void swift::autodiff::PullbackEmitter::addAdjointValue(swift::SILBasicBlock *, swift::SILValue, swift::autodiff::AdjointValue, swift::SILLocation): Assertion `newAdjointValue.getType() == getRemappedTangentType(originalValue->getType())' failed.

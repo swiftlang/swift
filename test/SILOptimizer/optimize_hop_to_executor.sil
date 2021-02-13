@@ -7,7 +7,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-actor class MyActor {
+actor MyActor {
   @_hasStorage private var p: Int { get set }
 }
 

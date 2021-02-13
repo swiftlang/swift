@@ -764,6 +764,10 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
+extension UnsafeBufferPointer: ConcurrentValue { }
+extension UnsafeBufferPointer.Iterator: ConcurrentValue { }
+extension UnsafeMutableBufferPointer: ConcurrentValue { }
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

@@ -1,0 +1,2 @@
+Colourless green ideas sleep furiously.
+# expected-warning@-1 {{ignored access notes file because it cannot be parsed: not a mapping}}

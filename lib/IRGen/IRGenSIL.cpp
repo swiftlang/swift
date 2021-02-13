@@ -1631,10 +1631,13 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
     auto &paramTI = IGF.IGM.getTypeInfo(inContextResultType);
 
     // The parameter's type might be different due to looking through opaque
-    // archetypes.
+    // archetypes or for non-fixed types (llvm likes to do type based analysis
+    // for sret arguments and so we use opaque storage types for them).
     llvm::Value *ptr = emission.getIndirectResult(idx);
-    if (paramTI.getStorageType() != retTI.getStorageType()) {
-      assert(inContextResultType.getASTType()->hasOpaqueArchetype());
+    bool isFixedSize = isa<FixedTypeInfo>(paramTI);
+    if (paramTI.getStorageType() != retTI.getStorageType() || !isFixedSize) {
+      assert(!isFixedSize ||
+             inContextResultType.getASTType()->hasOpaqueArchetype());
       ptr = IGF.Builder.CreateBitCast(ptr,
                                       retTI.getStorageType()->getPointerTo());
     }
@@ -3230,19 +3233,9 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    llvm::Value *context = IGF.getAsyncContext();
-    auto layout = getAsyncContextLayout(IGF);
 
-    Address dataAddr = layout.emitCastTo(IGF, context);
-    for (unsigned index = 0, count = layout.getDirectReturnCount();
-         index < count; ++index) {
-      auto fieldLayout = layout.getDirectReturnLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-      cast<LoadableTypeInfo>(fieldLayout.getType())
-          .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
-    }
-    emitAsyncReturn(IGF, layout, fnType);
+    auto asyncLayout = getAsyncContextLayout(IGF);
+    emitAsyncReturn(IGF, asyncLayout, fnType, result);
     IGF.emitCoroutineOrAsyncExit();
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
@@ -6415,17 +6408,8 @@ void IRGenModule::emitSILStaticInitializers() {
       continue;
     }
 
-    // Set the IR global's initializer to the constant for this SIL
-    // struct.
-    if (auto *SI = dyn_cast<StructInst>(InitValue)) {
-      IRGlobal->setInitializer(emitConstantStruct(*this, SI));
-      continue;
-    }
-
-    // Set the IR global's initializer to the constant for this SIL
-    // tuple.
-    auto *TI = cast<TupleInst>(InitValue);
-    IRGlobal->setInitializer(emitConstantTuple(*this, TI));
+    IRGlobal->setInitializer(
+      emitConstantValue(*this, cast<SingleValueInstruction>(InitValue)));
   }
 }
 

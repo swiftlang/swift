@@ -23,7 +23,7 @@
 
 import empty
 
-// Ensure the dependent libraries embeded by clang are merged.
+// Ensure the dependent libraries embedded by clang are merged.
 
 
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.15 -emit-module -parse-stdlib -o %t -module-name empty -module-link-name empty %S/../Inputs/empty.swift

@@ -437,7 +437,8 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
         // of the implicit `@differentiable` attribute.
         auto *newAttr = DifferentiableAttr::create(
             witnessAFD, /*implicit*/ true, witness->getLoc(), witness->getLoc(),
-            reqDiffAttr->isLinear(), reqDiffAttr->getParameterIndices(),
+            reqDiffAttr->getDifferentiabilityKind(),
+            reqDiffAttr->getParameterIndices(),
             derivativeGenSig);
         // If the implicit attribute is inherited from a protocol requirement's
         // attribute, store the protocol requirement attribute's location for
@@ -619,6 +620,8 @@ swift::matchWitness(
     if (isa<VarDecl>(req) &&
         cast<VarDecl>(req)->getParsedAccessor(AccessorKind::Set))
       return RequirementMatch(witness, MatchKind::SettableConflict);
+
+    decomposeFunctionType = enumCase->hasAssociatedValues();
   }
 
   // If the requirement is @objc, the witness must not be marked with @nonobjc.
@@ -1543,6 +1546,17 @@ class swift::MultiConformanceChecker {
 public:
   MultiConformanceChecker(ASTContext &ctx) : Context(ctx) {}
 
+  ~MultiConformanceChecker() {
+    // force-flush diagnostics in checkers that have not already complained
+    for (auto &checker : AllUsedCheckers) {
+      if (checker.AlreadyComplained)
+        continue;
+
+      checker.SuppressDiagnostics = false; // no need to restore to prev value
+      checker.emitDelayedDiags();
+    }
+  }
+
   ASTContext &getASTContext() const { return Context; }
 
   /// Add a conformance into the batched checker.
@@ -1577,17 +1591,11 @@ isUnsatisfiedReq(ConformanceChecker &checker,
   if (!witness) {
     // If another @objc requirement refers to the same Objective-C
     // method, this requirement isn't unsatisfied.
-    if (conformance->getProtocol()->isObjC() &&
-        isa<AbstractFunctionDecl>(req)) {
-      auto funcReq = cast<AbstractFunctionDecl>(req);
-      auto key = checker.getObjCMethodKey(funcReq);
-      for (auto otherReq : checker.getObjCRequirements(key)) {
-        if (otherReq == req)
-          continue;
-
-        if (conformance->getWitness(otherReq))
-          return false;
-      }
+    if (checker.getObjCRequirementSibling(
+            req, [conformance](AbstractFunctionDecl *cand) {
+              return static_cast<bool>(conformance->getWitness(cand));
+            })) {
+      return false;
     }
 
     // An optional requirement might not have a witness.
@@ -2546,6 +2554,13 @@ ConformanceChecker::ConformanceChecker(
       LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
       SuppressDiagnostics(suppressDiagnostics) {}
 
+ConformanceChecker::~ConformanceChecker() {
+  // its not OK to forget about error diagnostics, unless if we have already
+  // complained or are suppose to suppress diagnostics.
+  assert(AlreadyComplained || SuppressDiagnostics ||
+            !getASTContext().hasDelayedConformanceErrors(Conformance));
+}
+
 ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
   // Check whether we've already cached this information.
@@ -2669,6 +2684,7 @@ bool ConformanceChecker::checkActorIsolation(
     ValueDecl *requirement, ValueDecl *witness) {
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
+  bool isCrossActor = false;
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
@@ -2701,6 +2717,14 @@ bool ConformanceChecker::checkActorIsolation(
 
     return true;
   }
+
+  case ActorIsolationRestriction::CrossActorSelf:
+    return diagnoseNonConcurrentTypesInReference(
+        witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
+
+  case ActorIsolationRestriction::CrossGlobalActor:
+    isCrossActor = true;
+    LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
     // Hang on to the global actor that's used for the witness. It will need
@@ -2744,6 +2768,22 @@ bool ConformanceChecker::checkActorIsolation(
   if (!witnessGlobalActor && !requirementGlobalActor)
     return false;
 
+  // If both have global actors and they are the same, we are done.
+  if (witnessGlobalActor && requirementGlobalActor &&
+      witnessGlobalActor->isEqual(requirementGlobalActor))
+    return false;
+
+  // For cross-actor references, check for non-concurrent types.
+  if (isCrossActor) {
+    // If the requirement was imported from Objective-C, it may not have been
+    // annotated appropriately. Allow the mismatch.
+    if (requirement->hasClangNode())
+      return false;
+
+    return diagnoseNonConcurrentTypesInReference(
+      witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
+  }
+
   // If the witness has a global actor but the requirement does not, we have
   // an isolation error.
   //
@@ -2767,6 +2807,11 @@ bool ConformanceChecker::checkActorIsolation(
   //
   // FIXME: Within a module, this will be an inference rule.
   if (requirementGlobalActor && !witnessGlobalActor) {
+    if (isCrossActor) {
+      return diagnoseNonConcurrentTypesInReference(
+        witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
+    }
+
     witness->diagnose(
         diag::global_actor_isolated_requirement, witness->getDescriptiveKind(),
         witness->getName(), requirementGlobalActor, Proto->getName())
@@ -2777,18 +2822,14 @@ bool ConformanceChecker::checkActorIsolation(
     return true;
   }
 
-  // If both have global actors but they differ, this is an isolation error.
-  if (!witnessGlobalActor->isEqual(requirementGlobalActor)) {
-    witness->diagnose(
-        diag::global_actor_isolated_requirement_witness_conflict,
-        witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
-        Proto->getName(), requirementGlobalActor);
-    requirement->diagnose(diag::decl_declared_here, requirement->getName());
-    return true;
-  }
-
-  // Everything is okay.
-  return false;
+  // Both have global actors but they differ, so this is an isolation error.
+  assert(!witnessGlobalActor->isEqual(requirementGlobalActor));
+  witness->diagnose(
+      diag::global_actor_isolated_requirement_witness_conflict,
+      witness->getDescriptiveKind(), witness->getName(), witnessGlobalActor,
+      Proto->getName(), requirementGlobalActor);
+  requirement->diagnose(diag::decl_declared_here, requirement->getName());
+  return true;
 }
 
 bool ConformanceChecker::checkObjCTypeErasedGenerics(
@@ -3284,46 +3325,36 @@ static ArrayRef<MissingWitness> pruneMissingWitnesses(
         scratch.push_back(missingWitness);
     };
 
-    // We only care about functions
-    auto funcRequirement = dyn_cast<AbstractFunctionDecl>(
-        missingWitness.requirement);
-    if (!funcRequirement) {
+    // We only care about functions.
+    if (!isa<AbstractFunctionDecl>(missingWitness.requirement)) {
       addWitness();
       continue;
     }
 
-    // ... whose selector is one that maps to multiple requirement declarations.
-    auto key = checker.getObjCMethodKey(funcRequirement);
-    auto matchingRequirements = checker.getObjCRequirements(key);
-    if (matchingRequirements.size() < 2) {
-      addWitness();
-      continue;
-    }
+    auto fnRequirement = cast<AbstractFunctionDecl>(missingWitness.requirement);
+    auto key = checker.getObjCMethodKey(fnRequirement);
 
     // If we have already reported a function with this selector as missing,
     // don't do it again.
-    if (!alreadyReportedAsMissing.insert(key).second) {
+    if (alreadyReportedAsMissing.count(key)) {
       skipWitness();
       continue;
     }
 
-    // If there is a witness for any of the *other* requirements with this
-    // same selector, don't report it.
-    bool foundOtherWitness = false;
-    for (auto otherReq : matchingRequirements) {
-      if (otherReq == funcRequirement)
-        continue;
+    auto sibling = checker.getObjCRequirementSibling(
+        fnRequirement, [conformance](AbstractFunctionDecl *candidate) {
+          return static_cast<bool>(conformance->getWitness(candidate));
+        });
 
-      if (conformance->getWitness(otherReq)) {
-        foundOtherWitness = true;
-        break;
-      }
+    if (!sibling) {
+      alreadyReportedAsMissing.insert(key);
+      addWitness();
+      continue;
     }
 
-    if (foundOtherWitness)
-      skipWitness();
-    else
-      addWitness();
+    // Otherwise, there is a witness for any of the *other* requirements with
+    // this same selector, so prune it out.
+    skipWitness();
   }
 
   if (removedAny)
@@ -4576,6 +4607,22 @@ void ConformanceChecker::resolveValueWitnesses() {
     if (isa<AccessorDecl>(requirement))
       continue;
 
+    // If this requirement is part of a pair of imported async requirements,
+    // where one has already been witnessed, we can skip it.
+    //
+    // This situation primarily arises when the ClangImporter translates an
+    // async-looking ObjC protocol method requirement into two Swift protocol
+    // requirements: an async version and a sync version. Exactly one of the two
+    // must be witnessed by the conformer.
+    if (!requirement->isImplicit() && getObjCRequirementSibling(
+            requirement, [this](AbstractFunctionDecl *cand) {
+              return !cand->getAttrs().hasAttribute<OptionalAttr>() &&
+                     !cand->isImplicit() &&
+                     this->Conformance->hasWitness(cand);
+            })) {
+      continue;
+    }
+
     // Try to resolve the witness.
     switch (resolveWitnessTryingAllStrategies(requirement)) {
     case ResolveWitnessResult::Success:
@@ -4591,6 +4638,33 @@ void ConformanceChecker::resolveValueWitnesses() {
       break;
     }
   }
+}
+
+ValueDecl *ConformanceChecker::getObjCRequirementSibling(ValueDecl *requirement,
+               llvm::function_ref<bool(AbstractFunctionDecl*)> predicate) {
+  if (!Proto->isObjC())
+    return nullptr;
+
+  assert(requirement->isProtocolRequirement());
+  assert(Proto == requirement->getDeclContext()->getAsDecl());
+
+  // We only care about functions
+  if (auto fnRequirement = dyn_cast<AbstractFunctionDecl>(requirement)) {
+    auto fnSelector = getObjCMethodKey(fnRequirement);
+    auto similarRequirements = getObjCRequirements(fnSelector);
+    // ... whose selector is one that maps to multiple requirement declarations.
+    for (auto candidate : similarRequirements) {
+      if (candidate == fnRequirement)
+        continue; // skip the requirement we're trying to resolve.
+
+      if (!predicate(candidate))
+        continue; // skip if doesn't match requirements
+
+      return candidate;
+    }
+  }
+
+  return nullptr;
 }
 
 void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
@@ -5564,6 +5638,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto &Context = dc->getASTContext();
   MultiConformanceChecker groupChecker(Context);
 
+  ProtocolConformance *concurrentValueConformance = nullptr;
+  ProtocolConformance *unsafeConcurrentValueConformance = nullptr;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -5584,13 +5660,23 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       }
     }
 
-    if (conformance->getProtocol()->
-          isSpecificProtocol(KnownProtocolKind::StringInterpolationProtocol)) {
+    auto proto = conformance->getProtocol();
+    if (proto->isSpecificProtocol(
+            KnownProtocolKind::StringInterpolationProtocol)) {
       if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
         diagnoseMissingAppendInterpolationMethod(typeDecl);
       }
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
+      concurrentValueConformance = conformance;
+    } else if (proto->isSpecificProtocol(
+                   KnownProtocolKind::UnsafeConcurrentValue)) {
+      unsafeConcurrentValueConformance = conformance;
     }
   }
+
+  // Check constraints of ConcurrentValue.
+  if (concurrentValueConformance && !unsafeConcurrentValueConformance)
+    checkConcurrentValueConformance(concurrentValueConformance);
 
   // Check all conformances.
   groupChecker.checkAllConformances();

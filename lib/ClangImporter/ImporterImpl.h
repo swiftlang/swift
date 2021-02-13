@@ -257,11 +257,16 @@ public:
   /// should be inlucded in the cutoff of imported deprecated APIs marked
   /// unavailable.
   bool treatDeprecatedAsUnavailable(const clang::Decl *clangDecl,
-                                    const llvm::VersionTuple &version) const;
+                                    const llvm::VersionTuple &version,
+                                    bool isAsync) const;
 
   /// The message to embed for implicitly unavailability if a deprecated
   /// API is now unavailable.
   std::string deprecatedAsUnavailableMessage;
+
+  /// The message to embed for implicit async unavailability based on
+  /// deprecation.
+  std::string asyncDeprecatedAsUnavailableMessage;
 
   PlatformAvailability(const LangOptions &opts);
 

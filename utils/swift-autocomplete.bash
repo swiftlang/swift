@@ -58,8 +58,8 @@ _swift_complete()
       -sil-print-pass-name \
       -sil-print-pass-time \
       -sil-opt-pass-count \
-      -sil-print-only-function \
-      -sil-print-only-functions \
+      -sil-print-function \
+      -sil-print-functions \
       -sil-print-before \
       -sil-print-after \
       -sil-print-around \

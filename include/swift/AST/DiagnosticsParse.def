@@ -1042,8 +1042,6 @@ ERROR(expected_else_after_guard,PointsToFirstBadToken,
       "expected 'else' after 'guard' condition", ())
 ERROR(expected_lbrace_after_guard,PointsToFirstBadToken,
       "expected '{' after 'guard' else", ())
-ERROR(bound_var_guard_body,none,
-      "variable declared in 'guard' condition is not usable in its body", ())
 
 // While Statement
 ERROR(expected_condition_while,PointsToFirstBadToken,
@@ -1229,9 +1227,6 @@ NOTE(super_in_closure_with_capture_here,none,
      "'self' explicitly captured here", ())
 
 WARNING(await_before_try,none, "'try' must precede 'await'", ())
-WARNING(warn_await_keyword,none, 
-      "future versions of Swift reserve the word 'await'; "
-      "if this name is unavoidable, use backticks to escape it", ())
 
 // Tuples and parenthesized expressions
 ERROR(expected_expr_in_expr_list,none,
@@ -1610,14 +1605,19 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 // differentiable
+WARNING(attr_differentiable_expected_reverse,PointsToFirstBadToken,
+        "'@differentiable' has been renamed to '@differentiable(reverse)' and "
+        "will be removed in the next release", ())
+ERROR(attr_differentiable_kind_not_supported,PointsToFirstBadToken,
+      "unsupported differentiability kind '%0'; only 'reverse' is supported", (StringRef))
+ERROR(attr_differentiable_unknown_kind,PointsToFirstBadToken,
+      "unknown differentiability kind '%0'; only 'reverse' is supported", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_expected_label,none,
       "expected 'wrt:' or 'where' in '@differentiable' attribute", ())
-ERROR(attr_differentiable_unexpected_argument,none,
-      "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,

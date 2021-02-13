@@ -475,8 +475,7 @@ namespace {
 
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
-      return X->getInitiallyReferencedFunction() ==
-             RHS->getInitiallyReferencedFunction();
+      return X->getReferencedFunction() == RHS->getReferencedFunction();
     }
     bool visitDynamicFunctionRefInst(const DynamicFunctionRefInst *RHS) {
       auto *X = cast<DynamicFunctionRefInst>(LHS);
@@ -543,8 +542,6 @@ namespace {
     bool visitRefElementAddrInst(RefElementAddrInst *RHS) {
       auto *X = cast<RefElementAddrInst>(LHS);
       if (X->getField() != RHS->getField())
-        return false;
-      if (X->getOperand() != RHS->getOperand())
         return false;
       return true;
     }

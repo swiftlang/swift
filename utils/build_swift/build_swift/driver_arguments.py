@@ -667,9 +667,6 @@ def create_argument_parser():
     option('--libdispatch', toggle_true('build_libdispatch'),
            help='build libdispatch')
 
-    option('--clibdispatch', toggle_true('build_clibdispatch'),
-           help='build clibdispatch')
-
     option('--libicu', toggle_true('build_libicu'),
            help='build libicu')
 
@@ -1019,6 +1016,7 @@ def create_argument_parser():
            help='skip testing iOS simulator targets')
     option('--skip-test-ios-32bit-simulator',
            toggle_false('test_ios_32bit_simulator'),
+           default=False,
            help='skip testing iOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),

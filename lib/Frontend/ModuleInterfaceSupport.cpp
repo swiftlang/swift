@@ -248,6 +248,23 @@ class InheritedProtocolCollector {
     return cache.getValue();
   }
 
+  static bool canPrintProtocolTypeNormally(Type type, const Decl *D) {
+    if (!isPublicOrUsableFromInline(type))
+      return false;
+
+    // Extensions and protocols can print marker protocols.
+    if (isa<ExtensionDecl>(D) || isa<ProtocolDecl>(D))
+      return true;
+
+    ExistentialLayout layout = type->getExistentialLayout();
+    for (ProtocolType *protoTy : layout.getProtocols()) {
+      if (protoTy->getDecl()->isMarkerProtocol())
+        return false;
+    }
+
+    return true;
+  }
+  
   /// For each type in \p directlyInherited, classify the protocols it refers to
   /// as included for printing or not, and record them in the appropriate
   /// vectors.
@@ -259,7 +276,7 @@ class InheritedProtocolCollector {
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
 
-      bool canPrintNormally = isPublicOrUsableFromInline(inheritedTy);
+      bool canPrintNormally = canPrintProtocolTypeNormally(inheritedTy, D);
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
       for (ProtocolType *protoTy : layout.getProtocols()) {
         if (canPrintNormally)
@@ -450,7 +467,7 @@ public:
         // not extensions of that 'actor class'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::Continue; 
+          return TypeWalker::Action::SkipChildren;
 
         if (inherited->isSPI() && !printOptions.PrintSPIs)
           return TypeWalker::Action::Continue;
@@ -471,6 +488,9 @@ public:
       StreamPrinter printer(out);
       ProtocolDecl *proto = protoAndAvailability.first;
 
+      bool haveFeatureChecks = printOptions.PrintCompatibilityFeatureChecks &&
+        printCompatibilityFeatureChecksPre(printer, proto);
+
       // FIXME: Shouldn't this be an implicit conversion?
       TinyPtrVector<const DeclAttribute *> attrs;
       attrs.insert(attrs.end(), protoAndAvailability.second.begin(),
@@ -485,7 +505,12 @@ public:
 
       proto->getDeclaredInterfaceType()->print(printer, printOptions);
 
-      printer << " {}\n";
+      printer << " {}";
+
+      if (haveFeatureChecks)
+        printCompatibilityFeatureChecksPost(printer);
+      else
+        printer << "\n";
     }
   }
 

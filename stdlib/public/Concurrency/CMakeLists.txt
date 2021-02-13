@@ -19,17 +19,16 @@ set(LLVM_OPTIONAL_SOURCES
 set(swift_concurrency_link_libraries
   swiftCore)
 
-set(swift_concurrency_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
-
 if(SWIFT_CONCURRENCY_USES_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     include_directories(AFTER
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
-    link_directories(AFTER
-                        ${SWIFT_PATH_TO_LIBDISPATCH_BUILD})
 
-    list(APPEND swift_concurrency_link_flags
-      "-ldispatch")
+    # FIXME: we can't rely on libdispatch having been built for the
+    # target at this point in the process.  Currently, we're relying
+    # on soft-linking.
+    list(APPEND swift_concurrency_link_libraries
+      dispatch)
   endif()
 endif()
 
@@ -39,13 +38,27 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   Actor.swift
   CheckedContinuation.swift
   GlobalExecutor.cpp
+  Executor.swift
+  AsyncCompactMapSequence.swift
+  AsyncDropFirstSequence.swift
+  AsyncDropWhileSequence.swift
+  AsyncFilterSequence.swift
+  AsyncFlatMapSequence.swift
   AsyncIteratorProtocol.swift
+  AsyncMapSequence.swift
+  AsyncPrefixSequence.swift
+  AsyncPrefixWhileSequence.swift
   AsyncSequence.swift
+  AsyncThrowingCompactMapSequence.swift
+  AsyncThrowingDropWhileSequence.swift
+  AsyncThrowingFilterSequence.swift
+  AsyncThrowingFlatMapSequence.swift
+  AsyncThrowingMapSequence.swift
+  AsyncThrowingPrefixWhileSequence.swift
   PartialAsyncTask.swift
   Task.cpp
   Task.swift
   TaskCancellation.swift
-  _TimeTypes.swift
   TaskAlloc.cpp
   TaskStatus.cpp
   TaskGroup.cpp
@@ -68,6 +81,6 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     -Xfrontend -enable-experimental-concurrency
-  LINK_FLAGS "${swift_concurrency_link_flags}"
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
 )

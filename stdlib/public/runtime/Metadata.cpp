@@ -392,6 +392,10 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   if (!oldClassMetadata->isTypeMetadata())
    return;
 
+  // Copy the value witness table pointer for pointer authentication.
+  auto newClassMetadata = reinterpret_cast<ClassMetadata *>(newClass);
+  newClassMetadata->setValueWitnesses(oldClassMetadata->getValueWitnesses());
+
  // Otherwise, re-sign v-table entries using the extra discriminators stored
  // in the v-table descriptor.
 
@@ -5006,7 +5010,7 @@ swift_getAssociatedTypeWitnessSlowImpl(
     Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
 
   // Demangle the associated type.
-  TypeLookupErrorOr<TypeInfo> result = TypeInfo();
+  TypeLookupErrorOr<TypeInfo> result;
   if (inProtocolContext) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.

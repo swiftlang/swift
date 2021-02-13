@@ -5,6 +5,6 @@
 import _Differentiation
 
 struct Dense: Differentiable {
-  @differentiable
+  @differentiable(reverse)
   var bias: Float?
 }

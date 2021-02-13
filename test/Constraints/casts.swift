@@ -470,3 +470,62 @@ func protocol_composition(_ c: ProtocolP & ProtocolQ, _ c1: ProtocolP & Composit
   _ = c1 as? StructNotComforms // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'StructNotComforms' always fails}}
   _ = c1 as? NotConformsFinal // expected-warning {{cast from 'ProtocolP & Composition' (aka 'ProtocolP & ProtocolP1 & ProtocolQ1') to unrelated type 'NotConformsFinal' always fails}}
 }
+
+// SR-13899
+class SR13899_Base {}
+class SR13899_Derived: SR13899_Base {}
+
+protocol SR13899_P {}
+class SR13899_A: SR13899_P {}
+
+typealias DA = SR13899_Derived
+typealias BA = SR13899_Base
+typealias ClosureType = (SR13899_Derived) -> Void
+
+let blockp = { (_: SR13899_A) in }
+let block = { (_: SR13899_Base) in }
+let derived = { (_: SR13899_Derived) in }
+
+let blockalias =  { (_: BA) in  }
+let derivedalias =  { (_: DA) in  }
+
+let _ = block is ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
+let _ = blockalias is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-22=as}}
+let _ = block is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
+let _ = block is (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; 'is' test always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-17=as}}
+
+let _ = block as! ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = blockalias as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-23=as}}
+let _ = block as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = block as! (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+
+let _ = block as? ClosureType // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to 'ClosureType' (aka '(SR13899_Derived) -> ()') is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = blockalias as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(BA) -> ()' (aka '(SR13899_Base) -> ()') to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{20-23=as}}
+let _ = block as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+let _ = block as? (SR13899_Derived) -> Void // expected-warning{{runtime conversion from '(SR13899_Base) -> ()' to '(SR13899_Derived) -> Void' is not supported; cast always fails}}
+// expected-note@-1 {{consider using 'as' coercion instead}} {{15-18=as}}
+
+
+let _ = derived is (SR13899_Base) -> Void // expected-warning{{always fails}}
+let _ = blockp is (SR13899_P) -> Void // expected-warning{{always fails}}
+
+// Types are trivially equal.
+let _ = block is (SR13899_Base) -> Void // expected-warning{{'is' test is always true}}
+let _ = block is (SR13899_Base) throws -> Void // expected-warning{{'is' test is always true}}
+let _ = derivedalias is (SR13899_Derived) -> Void // expected-warning{{'is' test is always true}}
+let _ = derivedalias is (SR13899_Derived) throws -> Void // expected-warning{{'is' test is always true}}
+let _ = derived is (SR13899_Derived) -> Void // expected-warning{{'is' test is always true}}
+let _ = derived is (SR13899_Derived) throws -> Void // expected-warning{{'is' test is always true}}
+let _ = blockp is (SR13899_A) -> Void //expected-warning{{'is' test is always true}}
+let _ = blockp is (SR13899_A) throws -> Void //expected-warning{{'is' test is always true}}

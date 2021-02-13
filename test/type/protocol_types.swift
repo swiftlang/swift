@@ -138,3 +138,8 @@ struct BadSubscript {
     set {}
   }
 }
+
+struct OuterGeneric<T> {
+  func contextuallyGenericMethod() where T == HasAssoc {}
+  // expected-error@-1 {{protocol 'HasAssoc' can only be used as a generic constraint because it has Self or associated type requirements}}
+}

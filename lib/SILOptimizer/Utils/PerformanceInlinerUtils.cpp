@@ -790,8 +790,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  if (!SILInlineNeverFuns.empty()
-      && Callee->getName().find(SILInlineNeverFuns, 0) != StringRef::npos)
+  if (!SILInlineNeverFuns.empty() &&
+      Callee->getName().contains(SILInlineNeverFuns))
     return nullptr;
 
   if (!SILInlineNeverFun.empty() &&

@@ -50,7 +50,7 @@ class LoopRegionViewText : public SILModuleTransform {
       if (!SILViewCFGOnlyFun.empty() && fn.getName() != SILViewCFGOnlyFun)
         continue;
       if (!SILViewCFGOnlyFuns.empty() &&
-          fn.getName().find(SILViewCFGOnlyFuns, 0) == StringRef::npos)
+          !fn.getName().contains(SILViewCFGOnlyFuns))
         continue;
 
       // Ok, we are going to analyze this function. Invalidate all state
@@ -74,7 +74,7 @@ class LoopRegionViewCFG : public SILModuleTransform {
       if (!SILViewCFGOnlyFun.empty() && fn.getName() != SILViewCFGOnlyFun)
         continue;
       if (!SILViewCFGOnlyFuns.empty() &&
-          fn.getName().find(SILViewCFGOnlyFuns, 0) == StringRef::npos)
+          !fn.getName().contains(SILViewCFGOnlyFuns))
         continue;
 
       // Ok, we are going to analyze this function. Invalidate all state

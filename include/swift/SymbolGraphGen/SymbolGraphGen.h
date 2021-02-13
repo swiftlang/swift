@@ -16,6 +16,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "SymbolGraphOptions.h"
+#include "PathComponent.h"
 
 namespace swift {
 class ValueDecl;
@@ -25,14 +26,17 @@ namespace symbolgraphgen {
 /// Emit a Symbol Graph JSON file for a module.
 int emitSymbolGraphForModule(ModuleDecl *M, const SymbolGraphOptions &Options);
 
-/// Print a Symbol Graph containing a single node for the given decl.
+/// Print a Symbol Graph containing a single node for the given decl to \p OS.
+/// The \p ParentContexts out parameter will also be populated with information
+/// about each parent context of the given decl, from outermost to innermost.
 ///
-/// \returns \c EXIT_SUCCESS if the kind of the provided node is supported and
-/// its Symbo lGraph was printed, or \c EXIT_FAILURE otherwise.
+/// \returns \c EXIT_SUCCESS if the kind of the provided node is supported or
+/// \c EXIT_FAILURE otherwise.
 int printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
-                             bool InSynthesizedExtensions,
-                             const SymbolGraphOptions &Options,
-                             llvm::raw_ostream &OS);
+                            bool InSynthesizedExtension,
+                            const SymbolGraphOptions &Options,
+                            llvm::raw_ostream &OS,
+                            SmallVectorImpl<PathComponent> &ParentContexts);
 
 } // end namespace symbolgraphgen
 } // end namespace swift

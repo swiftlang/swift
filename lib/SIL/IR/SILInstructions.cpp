@@ -616,7 +616,7 @@ SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
     IndexSubset *ResultIndices) {
   assert(!ResultIndices->isEmpty());
   auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
-  auto diffTy = fnTy->getWithDifferentiability(DifferentiabilityKind::Normal,
+  auto diffTy = fnTy->getWithDifferentiability(DifferentiabilityKind::Reverse,
                                                ParameterIndices, ResultIndices);
   return SILType::getPrimitiveObjectType(diffTy);
 }
@@ -707,7 +707,11 @@ SILType DifferentiableFunctionExtractInst::getExtracteeType(
     SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
     SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
-  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
+  // TODO: Ban 'Normal' and 'Forward'.
+  assert(
+      fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Reverse ||
+      fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal ||
+      fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Forward);
   auto originalFnTy = fnTy->getWithoutDifferentiability();
   auto kindOpt = extractee.getAsDerivativeFunctionKind();
   if (!kindOpt) {
@@ -2313,12 +2317,14 @@ UpcastInst *UpcastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 
 ThinToThickFunctionInst *
 ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                                SILType Ty, SILFunction &F,
+                                SILType Ty, SILModule &Mod, SILFunction *F,
                                 SILOpenedArchetypesState &OpenedArchetypes) {
-  SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getASTType());
+  if (F) {
+    assert(&F->getModule() == &Mod);
+    collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
+                                 Ty.getASTType());
+  }
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ThinToThickFunctionInst));
@@ -2342,12 +2348,15 @@ PointerToThinFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 }
 
 ConvertFunctionInst *ConvertFunctionInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
+    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
+    SILFunction *F,
     SILOpenedArchetypesState &OpenedArchetypes, bool WithoutActuallyEscaping) {
-  SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               Ty.getASTType());
+  if (F) {
+    assert(&F->getModule() == &Mod);
+    collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, *F,
+                                 Ty.getASTType());
+  }
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
@@ -2358,14 +2367,14 @@ ConvertFunctionInst *ConvertFunctionInst::create(
   //
   // *NOTE* We purposely do not use an early return here to ensure that in
   // builds without assertions this whole if statement is optimized out.
-  if (F.getModule().getStage() != SILStage::Lowered) {
+  if (Mod.getStage() != SILStage::Lowered) {
     // Make sure we are not performing ABI-incompatible conversions.
     CanSILFunctionType opTI =
         CFI->getOperand()->getType().castTo<SILFunctionType>();
     (void)opTI;
     CanSILFunctionType resTI = CFI->getType().castTo<SILFunctionType>();
     (void)resTI;
-    assert(opTI->isABICompatibleWith(resTI, F).isCompatible() &&
+    assert((!F || opTI->isABICompatibleWith(resTI, *F).isCompatible()) &&
            "Can not convert in between ABI incompatible function types");
   }
   return CFI;

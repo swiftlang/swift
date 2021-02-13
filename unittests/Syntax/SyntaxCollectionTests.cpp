@@ -9,11 +9,11 @@ using namespace swift;
 using namespace swift::syntax;
 
 TupleExprElementSyntax getCannedArgument() {
-  auto X = SyntaxFactory::makeIdentifier("x", {}, {});
-  auto Foo = SyntaxFactory::makeIdentifier("foo", {}, {});
-  auto Colon = SyntaxFactory::makeColonToken({}, Trivia::spaces(1));
+  auto X = SyntaxFactory::makeIdentifier("x", "", "");
+  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "");
+  auto Colon = SyntaxFactory::makeColonToken("", " ");
   auto SymbolicRef = SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None);
-  auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
+  auto Comma = SyntaxFactory::makeCommaToken("", " ");
   auto NoComma = RawSyntax::missing(tok::comma, ",");
 
   return SyntaxFactory::makeTupleExprElement(X, Colon, SymbolicRef, Comma);
@@ -105,10 +105,10 @@ TEST(SyntaxCollectionTests, prepending) {
   auto Arg = getCannedArgument();
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
   auto List = SyntaxFactory::makeBlankTupleExprElementList()
-    .prepending(Arg.withTrailingComma(NoComma))
-    .prepending(Arg
-                  .withLabel(SyntaxFactory::makeIdentifier("schwifty", {}, {})))
-    .prepending(Arg);
+                  .prepending(Arg.withTrailingComma(NoComma))
+                  .prepending(Arg.withLabel(
+                      SyntaxFactory::makeIdentifier("schwifty", "", "")))
+                  .prepending(Arg);
 
   ASSERT_EQ(List.size(), size_t(3));
 
@@ -138,11 +138,11 @@ TEST(SyntaxCollectionTests, removingFirst) {
   auto Arg = getCannedArgument();
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",");
   auto List = SyntaxFactory::makeBlankTupleExprElementList()
-    .appending(Arg
-                 .withLabel(SyntaxFactory::makeIdentifier("schwifty", {}, {})))
-    .appending(Arg)
-    .appending(Arg.withTrailingComma(NoComma))
-    .removingFirst();
+                  .appending(Arg.withLabel(
+                      SyntaxFactory::makeIdentifier("schwifty", "", "")))
+                  .appending(Arg)
+                  .appending(Arg.withTrailingComma(NoComma))
+                  .removingFirst();
   SmallString<48> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   List.print(OS);
@@ -200,12 +200,11 @@ TEST(SyntaxCollectionTests, inserting) {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     SyntaxFactory::makeBlankTupleExprElementList()
-      .appending(Arg)
-      .appending(Arg)
-      .inserting(1,
-                 Arg.withLabel(SyntaxFactory::makeIdentifier("schwifty",
-                                                             {}, {})))
-      .print(OS);
+        .appending(Arg)
+        .appending(Arg)
+        .inserting(
+            1, Arg.withLabel(SyntaxFactory::makeIdentifier("schwifty", "", "")))
+        .print(OS);
     ASSERT_EQ(OS.str().str(), "x: foo, schwifty: foo, x: foo, ");
   }
 }
@@ -261,10 +260,11 @@ TEST(SyntaxCollectionTests, Iteration) {
 TEST(SyntaxCollectionTests, Removing) {
   auto Arg = getCannedArgument();
   auto List = SyntaxFactory::makeBlankTupleExprElementList()
-    .appending(Arg)
-    .appending(Arg.withLabel(SyntaxFactory::makeIdentifier("first", {}, {})))
-    .appending(Arg)
-    .removing(1);
+                  .appending(Arg)
+                  .appending(Arg.withLabel(
+                      SyntaxFactory::makeIdentifier("first", "", "")))
+                  .appending(Arg)
+                  .removing(1);
 
   ASSERT_EQ(List.size(), static_cast<size_t>(2));
 

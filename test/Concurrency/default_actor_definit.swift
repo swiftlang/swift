@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil %s -enable-experimental-concurrency | %FileCheck %s
 // REQUIRES: concurrency
 
-actor class A {
+actor A {
   var x: String = "Hello"
   var y: String = "World"
 }
@@ -9,7 +9,7 @@ actor class A {
 // CHECK:         builtin "initializeDefaultActor"(%0 : $A) : $()
 // CHECK-LABEL: end sil function '$s21default_actor_definit1ACACycfc'
 
-actor class B {
+actor B {
   var x: String
   var y: String
 
@@ -22,7 +22,7 @@ actor class B {
 // CHECK:         builtin "initializeDefaultActor"(%0 : $B) : $()
 // CHECK-LABEL: end sil function '$s21default_actor_definit1BCACycfc'
 
-actor class C {
+actor C {
   var x: String
   var y: Int
 

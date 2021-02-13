@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 extension Unicode {
   @frozen
-  public enum UTF32 {
+  public enum UTF32: ConcurrentValue {
   case _swift3Codec
   }
 }
@@ -57,7 +57,7 @@ extension Unicode.UTF32: Unicode.Encoding {
   }
   
   @frozen
-  public struct Parser {
+  public struct Parser: ConcurrentValue {
     @inlinable
     public init() { }
   }

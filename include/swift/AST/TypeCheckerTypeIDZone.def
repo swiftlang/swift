@@ -20,6 +20,8 @@ SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
                                 SmallVector<GenericTypeParamType *, 2>,
                                 SmallVector<Requirement, 2>),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ApplyAccessNoteRequest,
+              evaluator::SideEffect(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedResultBuilderRequest,
               CustomAttr *(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedPropertyWrapperTypeRequest,
@@ -270,7 +272,7 @@ SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
 SWIFT_REQUEST(TypeChecker, ProtocolRethrowsRequirementsRequest,
               ProtocolRethrowsRequirementList(ProtocolDecl *), 
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, ProtocolConformanceRefClassifyAsThrowsRequest,
+SWIFT_REQUEST(TypeChecker, ProtocolConformanceClassifyAsThrowsRequest,
               bool(ProtocolConformanceRef), 
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,

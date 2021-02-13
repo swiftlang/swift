@@ -6,12 +6,12 @@ import Swift
 import _Differentiation
 
 protocol Protocol {
-  @differentiable(wrt: (x, y))
+  @differentiable(reverse, wrt: (x, y))
   func f(_ x: Float, _ y: Float) -> Float
 }
 
 class Class<T> {
-  @differentiable(wrt: (x, y) where T: Differentiable)
+  @differentiable(reverse, wrt: (x, y) where T: Differentiable)
   func f(_ x: T, _ y: Float) -> T
 }
 

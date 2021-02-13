@@ -8,18 +8,18 @@
 
 import _Differentiation
 func id(_ x: Float, _ y: Float) -> Float { x }
-let transformed: @differentiable (Float, @noDerivative Float) -> Float = id
+let transformed: @differentiable(reverse) (Float, @noDerivative Float) -> Float = id
 
 // Incorrect reconstructed type for $sS3fIedgyyd_D
 // Original type:
-// (sil_function_type type=@differentiable @callee_guaranteed (Float, @noDerivative Float) -> Float
+// (sil_function_type type=@differentiable(reverse) @callee_guaranteed (Float, @noDerivative Float) -> Float
 //   (input=struct_type decl=Swift.(file).Float)
 //   (input=struct_type decl=Swift.(file).Float)
 //   (result=struct_type decl=Swift.(file).Float)
 //   (substitution_map generic_signature=<nullptr>)
 //   (substitution_map generic_signature=<nullptr>))
 // Reconstructed type:
-// (sil_function_type type=@differentiable @callee_guaranteed (Float, Float) -> Float
+// (sil_function_type type=@differentiable(reverse) @callee_guaranteed (Float, Float) -> Float
 //   (input=struct_type decl=Swift.(file).Float)
 //   (input=struct_type decl=Swift.(file).Float)
 //   (result=struct_type decl=Swift.(file).Float)

@@ -13,6 +13,7 @@ set_swift_llvm_is_available()
 
 add_swift_host_library(swiftAST STATIC
   AbstractSourceFileDepGraphFactory.cpp
+  AccessNotes.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -44,6 +45,7 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
+  Effects.cpp
   Evaluator.cpp
   Expr.cpp
   ExtInfo.cpp

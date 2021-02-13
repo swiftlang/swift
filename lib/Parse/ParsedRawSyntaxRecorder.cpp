@@ -27,26 +27,23 @@ using namespace swift;
 using namespace swift::syntax;
 
 ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::recordToken(const Token &tok,
-                                     const ParsedTrivia &leadingTrivia,
-                                     const ParsedTrivia &trailingTrivia) {
-  return recordToken(tok.getKind(), tok.getRange(),
-                     leadingTrivia.Pieces, trailingTrivia.Pieces);
+ParsedRawSyntaxRecorder::recordToken(const Token &tok, StringRef leadingTrivia,
+                                     StringRef trailingTrivia) {
+  return recordToken(tok.getKind(), tok.getRange(), leadingTrivia,
+                     trailingTrivia);
 }
 
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordToken(tok tokKind, CharSourceRange tokRange,
-                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
-                                ArrayRef<ParsedTriviaPiece> trailingTrivia) {
-  size_t leadingTriviaLen = ParsedTriviaPiece::getTotalLength(leadingTrivia);
-  size_t trailingTriviaLen = ParsedTriviaPiece::getTotalLength(trailingTrivia);
-  SourceLoc offset = tokRange.getStart().getAdvancedLoc(-leadingTriviaLen);
-  unsigned length = leadingTriviaLen + tokRange.getByteLength() +
-      trailingTriviaLen;
-  CharSourceRange range{offset, length};
-  OpaqueSyntaxNode n = SPActions->recordToken(tokKind, leadingTrivia,
-                                              trailingTrivia, range);
-  return ParsedRawSyntaxNode{SyntaxKind::Token, tokKind, range, n};
+                                     StringRef leadingTrivia,
+                                     StringRef trailingTrivia) {
+  SourceLoc offset = tokRange.getStart().getAdvancedLoc(-leadingTrivia.size());
+  unsigned length =
+      leadingTrivia.size() + tokRange.getByteLength() + trailingTrivia.size();
+  CharSourceRange range(offset, length);
+  OpaqueSyntaxNode n =
+      SPActions->recordToken(tokKind, leadingTrivia, trailingTrivia, range);
+  return ParsedRawSyntaxNode(SyntaxKind::Token, tokKind, range, n);
 }
 
 ParsedRawSyntaxNode
@@ -67,9 +64,8 @@ getRecordedNode(ParsedRawSyntaxNode node, ParsedRawSyntaxRecorder &rec) {
   tok tokKind = node.getTokenKind();
   if (node.isMissing())
     return rec.recordMissingToken(tokKind, tokRange.getStart());
-  return rec.recordToken(tokKind,tokRange,
-                         node.getDeferredLeadingTriviaPieces(),
-                         node.getDeferredTrailingTriviaPieces());
+  return rec.recordToken(tokKind, tokRange, node.getDeferredLeadingTrivia(),
+                         node.getDeferredTrailingTrivia());
 }
 
 ParsedRawSyntaxNode

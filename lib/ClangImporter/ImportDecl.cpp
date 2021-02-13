@@ -2177,6 +2177,11 @@ namespace {
           if (!fd->getName().getArgumentNames().empty())
             continue;
 
+          // async methods don't conflict with properties because of sync/async
+          // overloading.
+          if (fd->hasAsync())
+            continue;
+
           foundMethod = true;
         } else if (auto *var = dyn_cast<VarDecl>(result)) {
           if (var->isInstanceMember() != decl->isInstanceProperty())
@@ -5146,7 +5151,8 @@ namespace {
                                                         AccessLevel::Public,
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
-                                                        nullptr, dc);
+                                                        nullptr, dc,
+                                                        /*isActor*/false);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
@@ -5236,7 +5242,8 @@ namespace {
       // Create the class declaration and record it.
       auto result = Impl.createDeclWithClangNode<ClassDecl>(
           decl, access, Impl.importSourceLoc(decl->getBeginLoc()), name,
-          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
+          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc,
+          /*isActor*/false);
 
       // Import generic arguments, if any.
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
@@ -5695,7 +5702,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
 
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
-      nullptr, dc);
+      nullptr, dc, /*isActor*/false);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setHasMissingVTableEntries(false);
@@ -7807,46 +7814,6 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
 }
 
-/// Determine whether any of the parameters to the given function is of an
-/// unsafe pointer type.
-static bool hasAnyUnsafePointerParameters(FuncDecl *func) {
-  for (auto param : *func->getParameters()) {
-    Type paramType =
-        param->toFunctionParam().getPlainType()->lookThroughAllOptionalTypes();
-    if (paramType->getAnyPointerElementType()) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/// Determine whether the given Objective-C method is likely to be an
-/// asynchronous handler based on its name.
-static bool isObjCMethodLikelyAsyncHandler(
-    const clang::ObjCMethodDecl *method) {
-  auto selector = method->getSelector();
-
-  for (unsigned argIdx : range(std::max(selector.getNumArgs(), 1u))) {
-    auto selectorPiece = selector.getNameForSlot(argIdx);
-    // For the first selector piece, look for the word "did" anywhere.
-    if (argIdx == 0) {
-      for (auto word : camel_case::getWords(selectorPiece)) {
-        if (word == "did" || word == "Did")
-          return true;
-      }
-
-      continue;
-    }
-
-    // Otherwise, check whether any subsequent selector piece starts with "did".
-    if (camel_case::getFirstWord(selectorPiece) == "did")
-      return true;
-  }
-
-  return false;
-}
-
 Type ClangImporter::Implementation::getMainActorType() {
   if (MainActorType)
     return *MainActorType;
@@ -7918,6 +7885,11 @@ void ClangImporter::Implementation::importAttributes(
   if (auto maybeDefinition = getDefinitionForClangTypeDecl(ClangDecl))
     if (maybeDefinition.getValue())
       ClangDecl = cast<clang::NamedDecl>(maybeDefinition.getValue());
+
+  // Determine whether this is an async import.
+  bool isAsync = false;
+  if (auto func = dyn_cast<AbstractFunctionDecl>(MappedDecl))
+    isAsync = func->hasAsync();
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
@@ -8023,12 +7995,18 @@ void ClangImporter::Implementation::importAttributes(
       llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
-        if (platformAvailability.treatDeprecatedAsUnavailable(ClangDecl,
-                                                              deprecated)) {
+        if (platformAvailability.treatDeprecatedAsUnavailable(
+                ClangDecl, deprecated, isAsync)) {
           AnyUnavailable = true;
           PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
-          if (message.empty())
-            message = platformAvailability.deprecatedAsUnavailableMessage;
+          if (message.empty()) {
+            if (isAsync) {
+              message =
+                  platformAvailability.asyncDeprecatedAsUnavailableMessage;
+            } else {
+              message = platformAvailability.deprecatedAsUnavailableMessage;
+            }
+          }
         }
       }
 
@@ -8189,24 +8167,6 @@ void ClangImporter::Implementation::importAttributes(
   // Map __attribute__((pure)).
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
-  }
-
-  // Infer @asyncHandler on imported protocol methods that meet the semantic
-  // requirements.
-  if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    if (auto func = dyn_cast<FuncDecl>(MappedDecl)) {
-      if (auto proto = dyn_cast<ProtocolDecl>(func->getDeclContext())) {
-        if (proto->isObjC() && isa<clang::ObjCMethodDecl>(ClangDecl) &&
-            func->isInstanceMember() && !isa<AccessorDecl>(func) &&
-            isObjCMethodLikelyAsyncHandler(
-                cast<clang::ObjCMethodDecl>(ClangDecl)) &&
-            func->canBeAsyncHandler() &&
-            !hasAnyUnsafePointerParameters(func)) {
-          MappedDecl->getAttrs().add(
-              new (C) AsyncHandlerAttr(/*IsImplicit=*/false));
-        }
-      }
-    }
   }
 }
 

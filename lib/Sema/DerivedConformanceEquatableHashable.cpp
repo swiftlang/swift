@@ -387,6 +387,7 @@ deriveEquatable_eq(
                                     C.getIdentifier(s), parentDC);
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
+    param->setImplicit();
     return param;
   };
 
@@ -537,6 +538,7 @@ deriveHashable_hashInto(
                                             C.Id_hasher, parentDC);
   hasherParamDecl->setSpecifier(ParamSpecifier::InOut);
   hasherParamDecl->setInterfaceType(hasherType);
+  hasherParamDecl->setImplicit();
 
   ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
 
