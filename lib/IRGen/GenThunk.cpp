@@ -37,6 +37,7 @@
 #include "ProtocolInfo.h"
 #include "Signature.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/IR/Function.h"
@@ -282,6 +283,9 @@ Callee IRGenThunk::lookupMethod() {
 }
 
 void IRGenThunk::emit() {
+  PrettyStackTraceDecl stackTraceRAII("emitting dispatch thunk for",
+                                      declRef.getDecl());
+
   GenericContextScope scope(IGF.IGM, origTy->getInvocationGenericSignature());
 
   if (isAsync) {
@@ -345,7 +349,7 @@ void IRGenThunk::emit() {
   }
 
   if (isAsync) {
-    emitAsyncReturn(IGF, *asyncLayout, origTy);
+    emitAsyncReturn(IGF, *asyncLayout, origTy, result);
     IGF.emitCoroutineOrAsyncExit();
     return;
   }
