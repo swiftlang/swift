@@ -192,6 +192,15 @@ public:
                                       AutoDiffLinearMapKind kind,
                                       AutoDiffConfig config);
 
+  /// Mangle the linear map self parameter reordering thunk the given:
+  /// - Mangled original function declaration.
+  /// - Linear map kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffSelfReorderingReabstractionThunk(
+      CanType fromType, CanType toType, GenericSignature signature,
+      AutoDiffLinearMapKind linearMapKind);
+
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
   /// - Mangled original function name.

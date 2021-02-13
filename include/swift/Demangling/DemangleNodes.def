@@ -310,6 +310,8 @@ NODE(CanonicalPrespecializedGenericTypeCachingOnceToken)
 NODE(AsyncFunctionPointer)
 CONTEXT_NODE(AutoDiffFunction)
 NODE(AutoDiffFunctionKind)
+NODE(AutoDiffSelfReorderingReabstractionThunk)
+NODE(AutoDiffSubsetParametersThunk)
 NODE(IndexSubset)
 
 #undef CONTEXT_NODE

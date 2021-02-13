@@ -27,17 +27,29 @@ class DifferentiationMangler : public ASTMangler {
 public:
   DifferentiationMangler() {}
   /// Returns the mangled name for a differentiation function of the given kind.
-  std::string mangle(SILFunction *originalFunction,
-                     Demangle::AutoDiffFunctionKind kind,
-                     AutoDiffConfig config);
+  std::string mangleAutoDiffFunction(StringRef originalName,
+                                     Demangle::AutoDiffFunctionKind kind,
+                                     AutoDiffConfig config);
   /// Returns the mangled name for a derivative function of the given kind.
-  std::string mangleDerivativeFunction(SILFunction *originalFunction,
+  std::string mangleDerivativeFunction(StringRef originalName,
                                        AutoDiffDerivativeFunctionKind kind,
                                        AutoDiffConfig config);
   /// Returns the mangled name for a linear map of the given kind.
-  std::string mangleLinearMap(SILFunction *originalFunction,
+  std::string mangleLinearMap(StringRef originalName,
                               AutoDiffLinearMapKind kind,
                               AutoDiffConfig config);
+  /// Returns the mangled name for a derivative function subset parameters
+  /// thunk.
+  std::string mangleDerivativeFunctionSubsetParametersThunk(
+      StringRef originalName, CanType toType,
+      AutoDiffDerivativeFunctionKind linearMapKind,
+      IndexSubset *fromParamIndices, IndexSubset *fromResultIndices,
+      IndexSubset *toParamIndices);
+  /// Returns the mangled name for a linear map subset parameters thunk.
+  std::string mangleLinearMapSubsetParametersThunk(
+      CanType fromType, AutoDiffLinearMapKind linearMapKind,
+      IndexSubset *fromParamIndices, IndexSubset *fromResultIndices,
+      IndexSubset *toParamIndices);
 };
 
 } // end namespace Mangle
