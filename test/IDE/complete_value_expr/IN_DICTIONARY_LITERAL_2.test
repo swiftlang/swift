@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/complete_value_expr.swift -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %S/Inputs/complete_value_expr.swift -check-prefix=SIMPLE_OBJECT_DOT

@@ -1,0 +1,1 @@
+// RUN: %swift-ide-test -code-completion -source-filename %S/Inputs/complete_ambiguous.swift -code-completion-token=REGULAR_MULTICLOSURE_APPLIED | %FileCheck %S/Inputs/complete_ambiguous.swift --check-prefix=POINT_MEMBER

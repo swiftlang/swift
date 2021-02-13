@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/complete_unresolved_members.swift -code-completion-token=SUGAR_TYPE | %FileCheck %S/Inputs/complete_unresolved_members.swift -check-prefix=SUGAR_TYPE

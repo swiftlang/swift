@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/complete_unresolved_members.swift -code-completion-token=UNRESOLVED_16 | %FileCheck %S/Inputs/complete_unresolved_members.swift -check-prefix=UNRESOLVED_4

@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/complete_value_expr.swift -code-completion-token=IMPLICITLY_CURRIED_FUNC_2 | %FileCheck %S/Inputs/complete_value_expr.swift -check-prefix=IMPLICITLY_CURRIED_FUNC_2

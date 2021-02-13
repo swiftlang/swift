@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/complete_value_expr.swift -code-completion-token=NODUP_RESTATED_REQ_TYPE2 | %FileCheck %S/Inputs/complete_value_expr.swift -check-prefix=CHECK_NODUP_RESTATED_REQ_TYPE2

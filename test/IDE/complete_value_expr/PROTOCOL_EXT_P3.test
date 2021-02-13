@@ -1,0 +1,1 @@
+// RUN: %target-swift-ide-test -code-completion -source-filename %S/Inputs/complete_value_expr.swift -code-completion-token=PROTOCOL_EXT_P3 | %FileCheck %S/Inputs/complete_value_expr.swift -check-prefix=PROTOCOL_EXT_P3
