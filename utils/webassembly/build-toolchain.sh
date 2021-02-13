@@ -18,6 +18,8 @@ case $(uname -s) in
       OS_SUFFIX=ubuntu18.04_$(uname -m)
     elif [ "$(grep RELEASE /etc/lsb-release)" == "DISTRIB_RELEASE=20.04" ]; then
       OS_SUFFIX=ubuntu20.04_$(uname -m)
+    elif [[ "$(grep PRETTY_NAME /etc/os-release)" == 'PRETTY_NAME="Amazon Linux 2"' ]]; then
+      OS_SUFFIX=amazonlinux2_$(uname -m)
     else
       echo "Unknown Ubuntu version"
       exit 1

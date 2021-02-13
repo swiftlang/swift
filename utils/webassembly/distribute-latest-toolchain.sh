@@ -2,10 +2,16 @@
 
 set -xe
 repository='swiftwasm/swift'
-workflow_name='main.yml'
+workflow_name='build-toolchain.yml'
 branch=$1
 channel=$2
 swift_source_dir="$(cd "$(dirname $0)/../.." && pwd)"
+
+targets=(
+  "ubuntu18.04_x86_64"
+  "ubuntu20.04_x86_64"
+  "macos_x86_64"
+)
 
 DARWIN_TOOLCHAIN_APPLICATION_CERT=${DARWIN_TOOLCHAIN_APPLICATION_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
 DARWIN_TOOLCHAIN_INSTALLER_CERT=${DARWIN_TOOLCHAIN_INSTALLER_CERT:?"Please set DARWIN_TOOLCHAIN_APPLICATION_CERT"}
@@ -27,6 +33,25 @@ fi
 
 artifacts_url=$(echo $latest_run | jq .artifacts_url --raw-output)
 head_sha=$(echo $latest_run | jq .head_sha --raw-output)
+
+dispatch_release_event() {
+  local release_id=$1
+  local body=$(cat <<EOS
+    {
+      "event_type": "release_created",
+      "client_payload": {
+        "toolchain_channel": "$channel",
+        "ref": "$head_sha",
+        "release_id": "$release_id"
+      }
+    }
+EOS
+)
+
+  github --request POST --fail \
+    --url "${gh_api}/repos/swiftwasm/swiftwasm-buildbot/dispatches" \
+    --data "$body"
+}
 
 get_artifact_url() {
   local name=$1
@@ -168,12 +193,11 @@ package_darwin_toolchain() {
 
 tmp_dir=$(mktemp -d)
 pushd $tmp_dir
-download_artifact ubuntu18.04-installable
-download_artifact ubuntu20.04-installable
-download_artifact macos-installable
-unzip ubuntu18.04-installable.zip
-unzip ubuntu20.04-installable.zip
-unzip macos-installable.zip
+
+for target in ${targets[@]}; do
+  download_artifact $target-installable
+  unzip $target-installable.zip
+done
 
 original_toolchain_name=$(basename $(tar tfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz | head -n1))
 toolchain_name=${3:-$original_toolchain_name}
@@ -184,38 +208,42 @@ if is_released $toolchain_name; then
 fi
 
 if [[ "$toolchain_name" != "$original_toolchain_name" ]]; then
-  tar xfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz
-  mv "$original_toolchain_name" "$toolchain_name"
-  tar cfz swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz "$toolchain_name"
-  rm -rf "$toolchain_name"
-
-  tar xfz swift-wasm-$channel-SNAPSHOT-ubuntu20.04_x86_64.tar.gz
-  mv "$original_toolchain_name" "$toolchain_name"
-  tar cfz swift-wasm-$channel-SNAPSHOT-ubuntu20.04_x86_64.tar.gz "$toolchain_name"
-  rm -rf "$toolchain_name"
-
-  tar xfz swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz
-  mv "$original_toolchain_name" "$toolchain_name"
-  darwin_toolchain_info_plist="$toolchain_name/Info.plist"
-  if [[ -n "${DARWIN_TOOLCHAIN_DISPLAY_NAME}" ]]; then
-    /usr/libexec/PlistBuddy -c "Set DisplayName '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${darwin_toolchain_info_plist}"
-  fi
-  if [[ -n "${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}" ]]; then
-    /usr/libexec/PlistBuddy -c "Set ShortDisplayName '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${darwin_toolchain_info_plist}"
-  fi
-  tar cfz swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz "$toolchain_name"
-  rm -rf "$toolchain_name"
+  for target in ${targets[@]}; do
+    tar xfz swift-wasm-$channel-SNAPSHOT-$target.tar.gz
+    mv "$original_toolchain_name" "$toolchain_name"
+    if [[ "$target" == "macos_x86_64" ]]; then
+      darwin_toolchain_info_plist="$toolchain_name/Info.plist"
+      if [[ -n "${DARWIN_TOOLCHAIN_DISPLAY_NAME}" ]]; then
+        /usr/libexec/PlistBuddy -c "Set DisplayName '${DARWIN_TOOLCHAIN_DISPLAY_NAME}'" "${darwin_toolchain_info_plist}"
+      fi
+      if [[ -n "${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}" ]]; then
+        /usr/libexec/PlistBuddy -c "Set ShortDisplayName '${DARWIN_TOOLCHAIN_DISPLAY_NAME_SHORT}'" "${darwin_toolchain_info_plist}"
+      fi
+    fi
+    tar cfz swift-wasm-$channel-SNAPSHOT-$target.tar.gz "$toolchain_name"
+    rm -rf "$toolchain_name"
+  done
 fi
 
-mv swift-wasm-$channel-SNAPSHOT-ubuntu18.04_x86_64.tar.gz "$toolchain_name-ubuntu18.04_x86_64.tar.gz"
-mv swift-wasm-$channel-SNAPSHOT-ubuntu20.04_x86_64.tar.gz "$toolchain_name-ubuntu20.04_x86_64.tar.gz"
-package_darwin_toolchain "swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz" "$toolchain_name-macos_x86_64.pkg"
+release_packages=()
+
+for target in ${targets[@]}; do
+  if [[ "$target" == "macos_x86_64" ]]; then
+    package_darwin_toolchain "swift-wasm-$channel-SNAPSHOT-macos_x86_64.tar.gz" "$toolchain_name-macos_x86_64.pkg"
+    release_packages=("$toolchain_name-macos_x86_64.pkg" "${release_packages[@]}")
+  else
+    mv swift-wasm-$channel-SNAPSHOT-$target.tar.gz "$toolchain_name-$target.tar.gz"
+    release_packages=("$toolchain_name-$target.tar.gz" "${release_packages[@]}")
+  fi
+done
 
 create_tag $toolchain_name $head_sha
 release_id=$(create_release $toolchain_name $toolchain_name $head_sha)
 
-upload_tarball $release_id "$toolchain_name-ubuntu18.04_x86_64.tar.gz"
-upload_tarball $release_id "$toolchain_name-ubuntu20.04_x86_64.tar.gz"
-upload_tarball $release_id "$toolchain_name-macos_x86_64.pkg"
+for package in ${release_packages[@]}; do
+  upload_tarball $release_id "$package"
+done
+
+dispatch_release_event "$release_id"
 
 popd
