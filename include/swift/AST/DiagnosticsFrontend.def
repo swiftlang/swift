@@ -351,12 +351,10 @@ ERROR(error_opening_explicit_module_file,none,
 ERROR(error_extracting_flags_from_module_interface,none,
       "error extracting flags from module interface", ())
 WARNING(warning_module_shadowing_may_break_module_interface,none,
-        "public %0 %1 shadows module %2, which is permitted by Swift but may "
-        "stop other compiler versions from importing module %3 or its clients; "
-        "please work around this language bug (SR-898) by renaming either the "
-        "%0 %1 or the module %2, or by passing the '-Xfrontend "
-        "-module-interface-preserve-types-as-written' flags to the Swift "
-        "compiler",
+        "public %0 %1 shadows module %2, which may cause failures when "
+        "importing %3 or its clients in some configurations; please rename "
+        "either the %0 %1 or the module %2, or see "
+        "https://bugs.swift.org/browse/SR-14195 for workarounds",
         (DescriptiveDeclKind, FullyQualified<Type>,
         /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
