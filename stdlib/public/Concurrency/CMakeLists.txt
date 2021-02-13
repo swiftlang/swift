@@ -42,6 +42,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   AsyncIteratorProtocol.swift
   AsyncSequence.swift
   PartialAsyncTask.swift
+  SequenceExtensions.swift
   Task.cpp
   Task.swift
   TaskCancellation.swift
