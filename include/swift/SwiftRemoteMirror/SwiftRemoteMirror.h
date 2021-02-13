@@ -372,6 +372,34 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
     SwiftReflectionContextRef ContextRef,
     swift_metadataAllocationBacktraceIterator Call, void *ContextPtr);
 
+/// Allocation iterator passed to swift_reflection_iterateAsyncTaskAllocations
+typedef void (*swift_asyncTaskAllocationIterator)(
+    swift_reflection_ptr_t AllocationPtr, unsigned Count,
+    swift_async_task_allocation_chunk_t Chunks[], void *ContextPtr);
+
+/// Iterate over the allocations associated with the given async task object.
+/// This object must have an isa value equal to
+/// _swift_concurrency_debug_asyncTaskMetadata.
+///
+/// Calls the passed in Call function for each allocation associated with the
+/// async task object. The function is passed the allocation pointer and an
+/// array of chunks. Each chunk consists of a start, length, and kind for that
+/// chunk of the allocated memory. Any regions of the allocation that are not
+/// covered by a chunk are unallocated or garbage. The chunk array is valid only
+/// for the duration of the call.
+///
+/// An async task may have more than one allocation associated with it, so the
+/// function may be called more than once. It may also have no allocations, in
+/// which case the function is not called.
+///
+/// Returns NULL on success. On error, returns a pointer to a C string
+/// describing the error. This pointer remains valid until the next
+/// swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_iterateAsyncTaskAllocations(
+    SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t AsyncTaskPtr,
+    swift_asyncTaskAllocationIterator Call, void *ContextPtr);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

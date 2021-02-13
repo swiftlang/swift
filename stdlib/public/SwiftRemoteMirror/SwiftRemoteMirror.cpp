@@ -463,6 +463,30 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   };
 }
 
+static swift_layout_kind_t convertAllocationChunkKind(
+    NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind Kind) {
+  switch (Kind) {
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::Unknown:
+    return SWIFT_UNKNOWN;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::NonPointer:
+    return SWIFT_BUILTIN;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::RawPointer:
+    return SWIFT_RAW_POINTER;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      StrongReference:
+    return SWIFT_STRONG_REFERENCE;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      UnownedReference:
+    return SWIFT_UNOWNED_REFERENCE;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      WeakReference:
+    return SWIFT_WEAK_REFERENCE;
+  case NativeReflectionContext::AsyncTaskAllocationChunk::ChunkKind::
+      UnmanagedReference:
+    return SWIFT_UNMANAGED_REFERENCE;
+  }
+}
+
 static const char *returnableCString(SwiftReflectionContextRef ContextRef,
                                       llvm::Optional<std::string> String) {
   if (String) {
@@ -715,6 +739,26 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
         std::vector<swift_reflection_ptr_t> ConvertedPtrs{&Ptrs[0],
                                                           &Ptrs[Count]};
         Call(AllocationPtr, Count, ConvertedPtrs.data(), ContextPtr);
+      });
+  return returnableCString(ContextRef, Error);
+}
+
+const char *swift_reflection_iterateAsyncTaskAllocations(
+    SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t AsyncTaskPtr,
+    swift_asyncTaskAllocationIterator Call, void *ContextPtr) {
+  auto Context = ContextRef->nativeContext;
+  auto Error = Context->iterateAsyncTaskAllocations(
+      AsyncTaskPtr, [&](auto AllocationPtr, auto Count, auto Chunks) {
+        std::vector<swift_async_task_allocation_chunk_t> ConvertedChunks;
+        ConvertedChunks.reserve(Count);
+        for (unsigned i = 0; i < Count; i++) {
+          swift_async_task_allocation_chunk_t Chunk;
+          Chunk.Start = Chunks[i].Start;
+          Chunk.Length = Chunks[i].Length;
+          Chunk.Kind = convertAllocationChunkKind(Chunks[i].Kind);
+          ConvertedChunks.push_back(Chunk);
+        }
+        Call(AllocationPtr, Count, ConvertedChunks.data(), ContextPtr);
       });
   return returnableCString(ContextRef, Error);
 }

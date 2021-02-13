@@ -570,6 +570,7 @@ func _enqueueJobGlobal(_ task: Builtin.Job)
 @_silgen_name("swift_task_isCancelled")
 func isTaskCancelled(_ task: Builtin.NativeObject) -> Bool
 
+@available(*, deprecated)
 @_silgen_name("swift_task_runAndBlockThread")
 public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 

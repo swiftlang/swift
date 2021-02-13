@@ -186,9 +186,9 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                          CanSILFunctionType blockType,
                                          CanType continuationTy,
                                          ForeignAsyncConvention convention) {
-  // Extract the result type from the continuation type.
+  // Extract the result and error types from the continuation type.
   auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
-  
+
   // Build up the implementation function type, which matches the
   // block signature with an added block storage argument that points at the
   // block buffer. The block storage holds the continuation we feed the
@@ -249,13 +249,14 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       
       // Check for an error if the convention includes one.
       auto errorIndex = convention.completionHandlerErrorParamIndex();
-    
-      FuncDecl *resumeIntrinsic, *errorIntrinsic;
+
+      FuncDecl *resumeIntrinsic;
+      Type replacementTypes[] = {resumeType};
 
       SILBasicBlock *returnBB = nullptr;
       if (errorIndex) {
         resumeIntrinsic = getResumeUnsafeThrowingContinuation();
-        errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
+        auto errorIntrinsic = getResumeUnsafeThrowingContinuationWithError();
         
         auto errorArgument = params[*errorIndex + 1];
         auto someErrorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
@@ -281,7 +282,6 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         // Resume the continuation as throwing the given error, bridged to a
         // native Swift error.
         auto nativeError = SGF.emitBridgedToNativeError(loc, matchedError);
-        Type replacementTypes[] = {resumeType};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          ArrayRef<ProtocolConformanceRef>{});
@@ -343,7 +343,6 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         
         // Resume the continuation with the composed bridged result.
         ManagedValue resumeArg = SGF.emitManagedBufferWithCleanup(resumeArgBuf);
-        Type replacementTypes[] = {resumeType};
         auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          ArrayRef<ProtocolConformanceRef>{});

@@ -7,7 +7,12 @@ import resilient_protocol
 
 public protocol MyAwaitable {
   associatedtype Result
+
+  func wait() async -> Int
+
   func wait() async -> Result
+
+  func waitThrows() async throws -> Int
 
   func waitThrows() async throws -> Result
 

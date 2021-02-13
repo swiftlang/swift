@@ -26,6 +26,10 @@ class MyDerived : BaseClass<Int> {
     return await super.wait() * 2
   }
 
+  override func waitForInt() async -> Int {
+    return await super.waitForInt() * 2
+  }
+
   override func wait(orThrow: Bool) async throws {
     return try await super.wait(orThrow: orThrow)
   }
@@ -37,6 +41,10 @@ func virtualWaitForNothing<T>(_ c: BaseClass<T>) async {
 
 func virtualWait<T>(_ c: BaseClass<T>) async -> T {
   return await c.wait()
+}
+
+func virtualWaitForInt<T>(_ c: BaseClass<T>) async -> Int {
+  return await c.waitForInt()
 }
 
 func virtualWait<T>(orThrow: Bool, _ c: BaseClass<T>) async throws {
@@ -52,6 +60,7 @@ AsyncVTableMethodSuite.test("AsyncVTableMethod") {
     await virtualWaitForNothing(x)
 
     expectEqual(642, await virtualWait(x))
+    expectEqual(246, await virtualWaitForInt(x))
 
     expectNil(try? await virtualWait(orThrow: true, x))
     try! await virtualWait(orThrow: false, x)
