@@ -178,7 +178,7 @@ bb0(%0 : $Int32):
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32):
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %8, bb3(%4 : $Builtin.Int32), bb2
+  cond_br %8, bb3, bb2
 
 bb2:
   %10 = integer_literal $Builtin.Int32, 1
@@ -193,8 +193,8 @@ bb2:
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
   br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32)
 
-bb3 (%23 : $Builtin.Int32) :
-  %24 = struct $Int32 (%23 : $Builtin.Int32)
+bb3:
+  %24 = struct $Int32 (%4 : $Builtin.Int32)
   return %24 : $Int32
 }
 
