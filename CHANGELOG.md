@@ -61,6 +61,19 @@ Swift Next
   }
   ```
 
+* [SE-0298][]:
+
+  The "for" loop can be used to traverse asynchronous sequences in asynchronous code:
+
+	```swift
+  for try await line in myFile.lines() {
+    // Do something with each line
+  }
+	```
+
+  Asynchronous for loops use asynchronous sequences, defined by the protocol
+  `AsyncSequence` and its corresponding `AsyncIterator`.
+
 **Add new entries to the top of this section, not here!**
 
 Swift 5.4
@@ -8309,6 +8322,7 @@ Swift 1.0
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
+[SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
