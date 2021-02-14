@@ -20,7 +20,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace swift {

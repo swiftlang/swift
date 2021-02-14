@@ -24,6 +24,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
 namespace swift {
 namespace autodiff {
@@ -574,26 +575,14 @@ getOrCreateSubsetParametersThunkForLinearMap(
                                   /*withoutActuallyEscaping*/ true,
                                   DifferentiationThunkKind::Reabstraction);
 
-  // TODO(TF-685): Use more principled mangling for thunks.
-  std::string thunkName;
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    thunkName = "differential";
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    thunkName = "pullback";
-  }
-  Mangle::ASTMangler mangler;
+  Mangle::DifferentiationMangler mangler;
   auto fromInterfaceType =
       linearMapType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = targetType->mapTypeOutOfContext()->getCanonicalType();
-  CanType dynamicSelfType;
-  thunkName = "AD__" +
-              mangler.mangleReabstractionThunkHelper(
-                  thunkType, fromInterfaceType, toInterfaceType,
-                  dynamicSelfType, parentThunk->getModule().getSwiftModule()) +
-              "_" + desiredConfig.mangle() + "_" + thunkName;
-  thunkName += "_index_subset_thunk";
+
+  auto thunkName = mangler.mangleLinearMapSubsetParametersThunk(
+      fromInterfaceType, kind.getLinearMapKind(),
+      actualConfig.parameterIndices, actualConfig.resultIndices,
+      desiredConfig.parameterIndices);
 
   auto loc = parentThunk->getLocation();
   auto *thunk = fb.getOrCreateSharedFunction(
@@ -861,26 +850,11 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                    ->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  // TODO(TF-685): Use more principled mangling for thunks.
-  std::string thunkName;
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    thunkName = "jvp";
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    thunkName = "vjp";
-  }
-  Mangle::ASTMangler mangler;
-  auto fromInterfaceType =
-      derivativeFnType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = targetType->mapTypeOutOfContext()->getCanonicalType();
-  CanType dynamicSelfType;
-  thunkName = "AD__orig_" + origName.str() + "_" +
-              mangler.mangleReabstractionThunkHelper(
-                  thunkType, fromInterfaceType, toInterfaceType,
-                  dynamicSelfType, module.getSwiftModule()) +
-              "_" + desiredConfig.mangle() + "_" + thunkName;
-  thunkName += "_subset_parameters_thunk";
+  Mangle::DifferentiationMangler mangler;
+  auto thunkName = mangler.mangleDerivativeFunctionSubsetParametersThunk(
+      origName, targetType->mapTypeOutOfContext()->getCanonicalType(),
+      kind, actualConfig.parameterIndices, actualConfig.resultIndices,
+      desiredConfig.parameterIndices);
 
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(

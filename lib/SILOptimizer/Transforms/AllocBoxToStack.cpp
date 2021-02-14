@@ -18,7 +18,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"

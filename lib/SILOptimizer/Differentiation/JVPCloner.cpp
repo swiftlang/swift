@@ -1686,8 +1686,8 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
 
   Mangle::DifferentiationMangler mangler;
   auto diffName = mangler.mangleLinearMap(
-      witness->getOriginalFunction(), AutoDiffLinearMapKind::Differential,
-      witness->getConfig());
+      witness->getOriginalFunction()->getName(),
+      AutoDiffLinearMapKind::Differential, witness->getConfig());
   // Set differential generic signature equal to JVP generic signature.
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.

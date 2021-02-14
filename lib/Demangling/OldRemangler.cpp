@@ -748,6 +748,14 @@ void Remangler::mangleAutoDiffFunction(Node *node, EntityContext &ctx) {
   Buffer << "<autodiff-function>";
 }
 
+void Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node) {
+  Buffer << "<autodiff-self-reordering-reabstraction-thunk>";
+}
+
+void Remangler::mangleAutoDiffSubsetParametersThunk(Node *node) {
+  Buffer << "<autodiff-subset-parameters-thunk>";
+}
+
 void Remangler::mangleAutoDiffFunctionKind(Node *node) {
   Buffer << "<autodiff-function-kind>";
 }

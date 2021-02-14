@@ -979,7 +979,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
 
   Mangle::DifferentiationMangler mangler;
   auto pbName = mangler.mangleLinearMap(
-      original, AutoDiffLinearMapKind::Pullback, config);
+      original->getName(), AutoDiffLinearMapKind::Pullback, config);
   // Set pullback generic signature equal to VJP generic signature.
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.

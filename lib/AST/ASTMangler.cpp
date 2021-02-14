@@ -448,6 +448,19 @@ void ASTMangler::appendAutoDiffFunctionParts(char functionKindCode,
   appendOperator("r");
 }
 
+std::string ASTMangler::mangleAutoDiffSelfReorderingReabstractionThunk(
+    CanType fromType, CanType toType, GenericSignature signature,
+    AutoDiffLinearMapKind linearMapKind) {
+  beginMangling();
+  appendType(fromType);
+  appendType(toType);
+  if (signature)
+    appendGenericSignature(signature);
+  auto kindCode = (char)getAutoDiffFunctionKind(linearMapKind);
+  appendOperator("TJO", StringRef(&kindCode, 1));
+  return finalize();
+}
+
 /// Mangle the index subset.
 void ASTMangler::appendIndexSubset(IndexSubset *indices) {
   Buffer << indices->getString();

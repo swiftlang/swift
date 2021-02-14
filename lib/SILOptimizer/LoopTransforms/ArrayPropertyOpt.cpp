@@ -62,7 +62,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/LoopInfo.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/CommandLine.h"
