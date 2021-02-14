@@ -324,7 +324,7 @@ extension Task {
       }
     }
 
-    /// Whether this is a channel.
+    /// Whether this is a task group.
     var isTaskGroup: Bool {
       get {
         (bits & (1 << 26)) != 0
@@ -335,6 +335,21 @@ extension Task {
           bits = bits | 1 << 26
         } else {
           bits = (bits & ~(1 << 26))
+        }
+      }
+    }
+
+    /// Whether this (or its parents) have task local values.
+    var hasLocalValues: Bool {
+      get {
+        (bits & (1 << 27)) != 0
+      }
+
+      set {
+        if newValue {
+          bits = bits | 1 << 27
+        } else {
+          bits = (bits & ~(1 << 27))
         }
       }
     }
@@ -381,6 +396,7 @@ extension Task {
     priority: Priority = .default,
     startingOn executor: ExecutorRef? = nil,
     operation: @concurrent @escaping () async -> T
+    // TODO: Allow inheriting task-locals?
   ) -> Handle<T, Never> {
     assert(executor == nil, "Custom executor support is not implemented yet.") // FIXME
 
@@ -639,9 +655,17 @@ public func _runChildTask<T>(
 
   return task
 }
+class StringLike: CustomStringConvertible {
+  let value: String
+  init(_ value: String) {
+    self.value = value
+  }
+  var description: String { value }
+}
 
 public func _runGroupChildTask<T>(
   overridingPriority priorityOverride: Task.Priority? = nil,
+  withLocalValues hasLocalValues: Bool = false,
   operation: @concurrent @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
   let currentTask = Builtin.getCurrentAsyncTask()
