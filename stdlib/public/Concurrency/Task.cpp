@@ -32,6 +32,8 @@
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using GroupFragment = AsyncTask::GroupFragment;
+using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
+using TaskLocalInheritance = AsyncTask::TaskLocalValuesFragment::TaskLocalInheritance;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -145,6 +147,9 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
     task->futureFragment()->destroy();
   }
 
+  // release any objects potentially held as task local values.
+  task->localValuesFragment()->destroy();
+
   // The task execution itself should always hold a reference to it, so
   // if we get here, we know the task has finished running, which means
   // swift_task_complete should have been run, which will have torn down
@@ -233,6 +238,8 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
 
+  headerSize += sizeof(AsyncTask::TaskLocalValuesFragment);
+
   if (flags.task_isTaskGroup()) {
     headerSize += sizeof(AsyncTask::GroupFragment);
   }
@@ -268,12 +275,16 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     new (childFragment) AsyncTask::ChildFragment(parent);
   }
 
-  // Initialize the channel fragment if applicable.
-  if (flags.task_isTaskGroup()) {
+  auto taskLocalsFragment = task->localValuesFragment();
+  new (taskLocalsFragment) AsyncTask::TaskLocalValuesFragment();
+  taskLocalsFragment->initializeLinkParent(task, parent);
+
+  // Initialize the task group fragment if applicable.
+    if (flags.task_isTaskGroup()) {
     auto groupFragment = task->groupFragment();
     new (groupFragment) GroupFragment();
   }
-
+  
   // Initialize the future fragment if applicable.
   if (futureResultType) {
     assert(task->isFuture());
@@ -300,8 +311,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 
   // Initialize the task-local allocator.
-  // TODO: consider providing an initial pre-allocated first slab to the
-  //       allocator.
+  // TODO: consider providing an initial pre-allocated first slab to the allocator.
   _swift_task_alloc_initialize(task);
 
   return {task, initialContext};
@@ -464,8 +474,8 @@ void swift::swift_task_runAndBlockThread(const void *function,
   RunAndBlockSemaphore semaphore;
 
   // Set up a task that runs the runAndBlock async function above.
-  auto pair = swift_task_create_f(JobFlags(JobKind::Task,
-                                           JobPriority::Default),
+  auto flags = JobFlags(JobKind::Task, JobPriority::Default);
+  auto pair = swift_task_create_f(flags,
                                   /*parent*/ nullptr,
                                   &runAndBlock_start,
                                   sizeof(RunAndBlockContext));
@@ -483,6 +493,23 @@ void swift::swift_task_runAndBlockThread(const void *function,
 
 size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
+}
+
+void swift::swift_task_localValuePush(AsyncTask *task,
+                                        const Metadata *keyType,
+                                        /* +1 */ OpaqueValue *value,
+                                        const Metadata *valueType) {
+  task->localValuesFragment()->pushValue(task, keyType, value, valueType);
+}
+
+void swift::swift_task_localValuePop(AsyncTask *task) {
+  task->localValuesFragment()->popValue(task);
+}
+
+OpaqueValue* swift::swift_task_localValueGet(AsyncTask *task,
+                                             const Metadata *keyType,
+                                             TaskLocalInheritance inheritance) {
+  return task->localValueGet(keyType, inheritance);
 }
 
 namespace {
