@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift
 // REQUIRES: concurrency
+import _Concurrency
 
 struct AsyncRange<Bound: Comparable & Strideable>: AsyncSequence, AsyncIteratorProtocol where Bound.Stride : SignedInteger {
   var range: Range<Bound>.Iterator
