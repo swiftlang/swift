@@ -250,6 +250,7 @@ class BuildScriptInvocation(object):
             (args.build_cmark, "cmark"),
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
+            (args.build_uswift, "uswift"),
             (args.build_foundation, "foundation"),
             (args.build_xctest, "xctest"),
             (args.build_lldb, "lldb"),
@@ -562,6 +563,8 @@ class BuildScriptInvocation(object):
                                  is_enabled=self.args.build_libicu)
         builder.add_impl_product(products.Swift,
                                  is_enabled=self.args.build_swift)
+        builder.add_impl_product(products.USwift,
+                                 is_enabled=self.args.build_uswift)
         builder.add_impl_product(products.LLDB,
                                  is_enabled=self.args.build_lldb)
 

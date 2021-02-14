@@ -346,7 +346,7 @@ def create_argument_parser():
            help='enable code coverage analysis in Swift (false, not-merged, '
                 'merged).')
 
-    option('--swift-disable-dead-stripping', toggle_true, 
+    option('--swift-disable-dead-stripping', toggle_true,
            help="Turn off Darwin-specific dead stripping for Swift host tools")
 
     option('--build-subdir', store,
@@ -1252,6 +1252,8 @@ def create_argument_parser():
            help='skip building llvm')
     option('--skip-build-swift', toggle_false('build_swift'),
            help='skip building swift')
+    option('--skip-build-uswift', toggle_false('build_uswift'),
+           help='skip building uswift')
 
     # We need to list --skip-test-swift explicitly because otherwise argparse
     # will auto-expand arguments like --skip-test-swift to the only known

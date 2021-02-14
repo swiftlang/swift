@@ -58,6 +58,7 @@ EXPECTED_DEFAULTS = {
     'build_foundation': False,
     'build_cmark': True,
     'build_swift': True,
+    'build_uswift': True,
     'build_llvm': True,
     'build_freebsd': True,
     'build_ios': True,
@@ -597,6 +598,7 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-build-cmark', dest='build_cmark'),
     DisableOption('--skip-build-llvm', dest='build_llvm'),
     DisableOption('--skip-build-swift', dest='build_swift'),
+    DisableOption('--skip-build-uswift', dest='build_uswift'),
 
     DisableOption('--skip-build-android', dest='build_android'),
     DisableOption('--skip-build-benchmarks', dest='build_benchmarks'),

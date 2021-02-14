@@ -14,6 +14,7 @@ from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
 from .earlyswiftdriver import EarlySwiftDriver
+from .uswift import USwift
 from .foundation import Foundation
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
@@ -40,6 +41,7 @@ from .xctest import XCTest
 
 __all__ = [
     'BackDeployConcurrency',
+    'USwift',
     'CMark',
     'Ninja',
     'Foundation',
