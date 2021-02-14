@@ -225,6 +225,55 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
+using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
+
+/// Get a task local value from the passed in task. Its Swift signature is
+///
+/// \code
+/// func _taskLocalValueGet<Key>(
+///   _ task: Builtin.NativeObject,
+///   keyType: Any.Type /*Key.Type*/,
+///   inheritance: UInt8/*TaskLocalInheritance*/
+/// ) -> UnsafeMutableRawPointer? where Key: TaskLocalKey
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+OpaqueValue* swift_task_localValueGet(AsyncTask* task,
+                                      const Metadata *keyType,
+                     TaskLocalValuesFragment::TaskLocalInheritance inheritance);
+
+/// Add a task local value to the passed in task.
+///
+/// This must be only invoked by the task itself to avoid concurrent writes.
+///
+/// Its Swift signature is
+///
+/// \code
+///  public func _taskLocalValuePush<Value>(
+///    _ task: Builtin.NativeObject,
+///    keyType: Any.Type/*Key.Type*/,
+///    value: __owned Value
+///  )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_localValuePush(AsyncTask* task,
+                         const Metadata *keyType,
+                         /* +1 */ OpaqueValue *value,
+                         const Metadata *valueType);
+
+/// Remove task a local binding from the task local values stack.
+///
+/// This must be only invoked by the task itself to avoid concurrent writes.
+///
+/// Its Swift signature is
+///
+/// \code
+///  public func _taskLocalValuePop(
+///    _ task: Builtin.NativeObject
+///  )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_localValuePop(AsyncTask* task);
+
 /// This should have the same representation as an enum like this:
 ///    enum NearestTaskDeadline {
 ///      case none
