@@ -9,6 +9,9 @@ set(CMAKE_AR "${LLVM_BIN}/llvm-ar" CACHE STRING "LLVM Archiver for wasm32")
 set(CMAKE_RANLIB "${LLVM_BIN}/llvm-ranlib" CACHE STRING "LLVM Ranlib for wasm32")
 set(CMAKE_C_COMPILER_TARGET ${triple} CACHE STRING "")
 set(CMAKE_CXX_COMPILER_TARGET ${triple} CACHE STRING "")
+set(CMAKE_Swift_COMPILER_TARGET ${triple} CACHE STRING "")
+set(CMAKE_ASM_COMPILER_TARGET ${triple} CACHE STRING "")
+
 set(CMAKE_EXE_LINKER_FLAGS "-Wl,--no-threads" CACHE STRING "Single thread options")
 
 # Don't look in the sysroot for executables to run during the build

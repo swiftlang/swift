@@ -26,6 +26,7 @@ RUN_TEST_BIN=$SWIFT_PATH/utils/run-test
 TARGET_STDLIB_BUILD_DIR=$SOURCE_PATH/target-build/swift-stdlib-wasi-wasm32
 
 $DEPENDENCIES_SCRIPT
+$UTILS_PATH/install-build-sdk.sh
 
 export PATH="$HOME/.wasmer/bin:$PATH"
 

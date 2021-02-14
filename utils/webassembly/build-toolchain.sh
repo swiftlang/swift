@@ -4,7 +4,8 @@ set -ex
 SOURCE_PATH="$(cd "$(dirname "$0")/../../.." && pwd)"
 UTILS_PATH="$(cd "$(dirname "$0")" && pwd)"
 
-WASI_SDK_PATH="$SOURCE_PATH/wasi-sdk"
+BUILD_SDK_PATH="$SOURCE_PATH/build-sdk"
+WASI_SDK_PATH="$BUILD_SDK_PATH/wasi-sdk"
 WASI_SYSROOT_PATH="$WASI_SDK_PATH/share/wasi-sysroot"
 
 case $(uname -s) in
@@ -33,6 +34,21 @@ case $(uname -s) in
   ;;
 esac
 
+BUILD_HOST_TOOLCHAIN=1
+
+while [ $# -ne 0 ]; do
+  case "$1" in
+    --skip-build-host-toolchain)
+    BUILD_HOST_TOOLCHAIN=0
+  ;;
+  *)
+    echo "Unrecognised argument \"$1\""
+    exit 1
+  ;;
+  esac
+  shift
+done
+
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
@@ -56,15 +72,12 @@ build_host_toolchain() {
     --preset-file="$UTILS_PATH/build-presets.ini" \
     --preset=$HOST_PRESET \
     --build-dir="$HOST_BUILD_DIR" \
-    HOST_ARCHITECTURE=$(uname -m) \
+    HOST_ARCHITECTURE="$(uname -m)" \
     INSTALL_DESTDIR="$HOST_TOOLCHAIN_DESTDIR" \
-    TOOLCHAIN_NAME="$TOOLCHAIN_NAME" \
-    C_CXX_LAUNCHER="$(which sccache)"
+    TOOLCHAIN_NAME="$TOOLCHAIN_NAME"
 }
 
 build_target_toolchain() {
-  rm -rf "$DIST_TOOLCHAIN_DESTDIR"
-  rsync -a "$HOST_TOOLCHAIN_DESTDIR/" "$DIST_TOOLCHAIN_DESTDIR"
 
   COMPILER_RT_BUILD_DIR="$TARGET_BUILD_ROOT/compiler-rt-wasi-wasm32"
   cmake -B "$COMPILER_RT_BUILD_DIR" \
@@ -97,6 +110,11 @@ build_target_toolchain() {
     -D LLVM_DIR="$HOST_BUILD_DIR/llvm-$HOST_SUFFIX/lib/cmake/llvm/" \
     -D SWIFT_NATIVE_SWIFT_TOOLS_PATH="$HOST_BUILD_DIR/swift-$HOST_SUFFIX/bin" \
     -D SWIFT_WASI_SYSROOT_PATH="$WASI_SYSROOT_PATH" \
+    -D SWIFT_WASI_wasm32_ICU_UC_INCLUDE="$BUILD_SDK_PATH/icu/include" \
+    -D SWIFT_WASI_wasm32_ICU_UC="$BUILD_SDK_PATH/icu/lib/libicuuc.a" \
+    -D SWIFT_WASI_wasm32_ICU_I18N_INCLUDE="$BUILD_SDK_PATH/icu/include" \
+    -D SWIFT_WASI_wasm32_ICU_I18N="$BUILD_SDK_PATH/icu/lib/libicui18n.a" \
+    -D SWIFT_WASI_wasm32_ICU_DATA="$BUILD_SDK_PATH/icu/lib/libicudata.a" \
     -G Ninja \
     -S "$SOURCE_PATH/swift"
 
@@ -169,7 +187,12 @@ create_darwin_info_plist() {
   chmod a+r "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 }
 
-build_host_toolchain
+if [ ${BUILD_HOST_TOOLCHAIN} -eq 1 ]; then
+  build_host_toolchain
+  rm -rf "$DIST_TOOLCHAIN_DESTDIR"
+  rsync -a "$HOST_TOOLCHAIN_DESTDIR/" "$DIST_TOOLCHAIN_DESTDIR"
+fi
+
 build_target_toolchain
 
 embed_wasi_sysroot

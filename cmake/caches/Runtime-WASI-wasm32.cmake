@@ -27,8 +27,4 @@ set(SWIFT_STDLIB_ENABLE_THINCMO YES CACHE BOOL "")
 # build with the host compiler
 set(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER YES CACHE BOOL "")
 
-set(WASI_ICU_URL "https://github.com/swiftwasm/icu4c-wasi/releases/download/0.5.0/icu4c-wasi.tar.xz" CACHE STRING "")
-set(WASI_ICU_MD5 "25943864ebbfff15cf5aee8d9d5cc4d7" CACHE STRING "")
-
-
 set(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME YES CACHE BOOL "")

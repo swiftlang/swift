@@ -40,6 +40,6 @@ WORKDIR /home/ec2-user/swift
 RUN git fetch origin $SWIFT_GIT_SHA
 RUN git checkout $SWIFT_GIT_SHA
 RUN ./utils/update-checkout --clone --scheme $SWIFT_CHECKOUT_SCHEME --skip-repository swift
-RUN ./utils/webassembly/install-wasi-sdk.sh linux ubuntu-18.04
+RUN ./utils/webassembly/install-build-sdk.sh
 
 RUN ./utils/webassembly/build-toolchain.sh
