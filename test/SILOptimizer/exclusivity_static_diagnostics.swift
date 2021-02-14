@@ -12,7 +12,7 @@ func simpleInoutDiagnostic() {
   // turned on by default.
   // expected-error@+4{{inout arguments are not allowed to alias each other}}
   // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-error@+2{{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}} {{educational-notes=exclusivity}}
   // expected-note@+1{{conflicting access is here}}
   takesTwoInouts(&i, &i)
 }

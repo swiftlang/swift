@@ -92,4 +92,9 @@ EDUCATIONAL_NOTES(result_builder_missing_build_either,
 EDUCATIONAL_NOTES(result_builder_missing_build_array,
                   "result-builder-methods.md")
 
+EDUCATIONAL_NOTES(exclusivity_access_required,
+                  "exclusivity.md")
+EDUCATIONAL_NOTES(exclusivity_access_required_unknown_decl,
+                  "exclusivity.md")
+
 #undef EDUCATIONAL_NOTES
