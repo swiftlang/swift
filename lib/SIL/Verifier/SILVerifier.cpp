@@ -980,14 +980,17 @@ public:
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
     // - Non-phi arguments have a single predecessor.
-    if (arg->isPhiArgument()) {
-      for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
-        auto *TI = predBB->getTerminator();
-        // FIXME: when critical edges are removed, only allow BranchInst.
-        require(isa <BranchInst>(TI) || isa<CondBranchInst>(TI),
+    assert(arg->isPhiArgument() && "precondition");
+    for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
+      auto *TI = predBB->getTerminator();
+      if (F.hasOwnership()) {
+        require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
+      } else {
+        // FIXME: when critical edges are removed and cond_br arguments are
+        // disallowed, only allow BranchInst.
+        require(isa<BranchInst>(TI) || isa<CondBranchInst>(TI),
                 "All phi argument inputs must be from branches.");
       }
-    } else {
     }
     if (arg->isPhiArgument() && prohibitAddressPhis()) {
       // As a property of well-formed SIL, we disallow address-type

@@ -110,15 +110,15 @@ bb4:
   %44 = struct_extract %43 : $Bool, #Bool._value
 // CHECK-NOT: cond_br
 // CHECK: br bb5
-  cond_br %44, bb5, bb6(%28 : $Int32)
+  cond_br %44, bb5, bb6
 
 bb5:
   %46 = integer_literal $Builtin.Int32, 0
   %47 = struct $Int32 (%46 : $Builtin.Int32)
   br bb7(%47 : $Int32)
 
-bb6(%28a : $Int32):
- br bb7(%28a : $Int32)
+bb6:
+ br bb7(%28 : $Int32)
 
 bb7(%49 : $Int32):
   %50 = integer_literal $Builtin.Int32, 10
@@ -126,15 +126,15 @@ bb7(%49 : $Int32):
   %53 = builtin "cmp_eq_Int32"(%50 : $Builtin.Int32, %52 : $Builtin.Int32) : $Builtin.Int1
   %54 = struct $Bool (%53 : $Builtin.Int1)
   %55 = struct_extract %54 : $Bool, #Bool._value
-  cond_br %55, bb8, bb9(%29 : $Int32)
+  cond_br %55, bb8, bb9
 
 bb8:
   %57 = integer_literal $Builtin.Int32, 0
   %58 = struct $Int32 (%57 : $Builtin.Int32)
   br bb10(%58 : $Int32)
 
-bb9(%29a : $Int32):
-  br bb10(%29a : $Int32)
+bb9:
+  br bb10(%29 : $Int32)
 
 // CHECK: bb5([[BBARG:%.*]]):
 bb10(%60 : $Int32):
