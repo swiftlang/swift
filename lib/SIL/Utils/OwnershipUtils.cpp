@@ -648,16 +648,15 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
     if (isa<DebugValueInst>(user) || isa<SuperMethodInst>(user) ||
         isa<ClassMethodInst>(user) || isa<CopyValueInst>(user) ||
         isa<EndBorrowInst>(user) || isa<ApplyInst>(user) ||
-        isa<StoreBorrowInst>(user) || isa<StoreInst>(user) ||
-        isa<PartialApplyInst>(user) || isa<UnmanagedRetainValueInst>(user) ||
+        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<UnmanagedRetainValueInst>(user) ||
         isa<UnmanagedReleaseValueInst>(user) ||
         isa<UnmanagedAutoreleaseValueInst>(user)) {
       continue;
     }
 
     // These are interior pointers that have not had support yet added for them.
-    if (isa<OpenExistentialBoxInst>(user) ||
-        isa<ProjectExistentialBoxInst>(user)) {
+    if (isa<ProjectExistentialBoxInst>(user)) {
       continue;
     }
 
