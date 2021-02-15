@@ -40,6 +40,7 @@ import _Concurrency
 // CHECK-NEXT: @actorIndependent func independentMethod()
 // CHECK-NEXT: @asyncHandler func asyncHandlerMethod()
 // CHECK-NEXT: @MainActor func mainActorMethod()
+// CHECK-NEXT: @MainActor func uiActorMethod()
 // CHECK-NEXT: {{^}}  optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
 
