@@ -88,7 +88,7 @@ bb0:
 // CHECK:   unreachable
 
 // CHECK: await.async.maybe.resume:
-// CHECK:   call { i8*, i8*, i8* } (i8*, i8*, ...) @llvm.coro.suspend.async({{.*}} @__swift_async_resume_project_context
+// CHECK:   call { i8*, i8*, i8* } (i8*, i8*, ...) @llvm.coro.suspend.async{{.*}}({{.*}} @__swift_async_resume_project_context
 //  Abort if we are the first to arrive at the continuation point we must wait
 //  on the await to arrive.
 // CHECK:   [[first_at_sync_pt:%.*]] = cmpxchg {{(i64|i32)}}* [[synchronization_addr_before_await]], {{(i64|i32)}} 0, {{(i64|i32)}} 1 release acquire
