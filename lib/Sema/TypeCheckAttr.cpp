@@ -2062,14 +2062,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   attr->setInvalid();
 }
 
-void AttributeChecker::visitAtRethrowsAttr(AtRethrowsAttr *attr) {
-  if (isa<ProtocolDecl>(D)) {
-    return;
-  }
-
-  diagnose(attr->getLocation(), diag::rethrows_attr_on_non_protocol);
-  attr->setInvalid();
-}
+void AttributeChecker::visitAtRethrowsAttr(AtRethrowsAttr *attr) {}
 
 /// Collect all used generic parameter types from a given type.
 static void collectUsedGenericParameters(
