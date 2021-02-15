@@ -569,7 +569,7 @@ protected:
 
   NodePointer demangleTypeMangling();
   NodePointer demangleSymbolicReference(unsigned char rawKind);
-  NodePointer demangleAutoDiffFunction();
+  NodePointer demangleAutoDiffFunctionOrSimpleThunk(Node::Kind nodeKind);
   NodePointer demangleAutoDiffFunctionKind();
   NodePointer demangleAutoDiffSubsetParametersThunk();
   NodePointer demangleAutoDiffSelfReorderingReabstractionThunk();
