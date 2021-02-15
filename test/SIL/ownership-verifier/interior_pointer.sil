@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 sil_stage canonical
@@ -9,6 +9,10 @@ class Klass {}
 
 class KlassUser {
   var field: Klass
+}
+
+protocol Error {
+  var _code: Int { get }
 }
 
 sil @use_builtinnativeobject_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
@@ -135,4 +139,22 @@ bb0(%0 : @owned $KlassUser, %0a : @guaranteed $Klass):
   destroy_value %0 : $KlassUser
   %3 = load [copy] %result : $*Klass
   return %3 : $Klass
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'open_existential_box_interior_pointer_error'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Error                   // users: %3, %2
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Error                          // id: %3
+// CHECK-NEXT: Non Consuming User:   %6 = apply %5<@opened("01234567-89AB-CDEF-0123-000000000000") Error>(%2) : $@convention(witness_method: Error) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> Int // type-defs: %2; user: %7
+// CHECK-NEXT: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'open_existential_box_interior_pointer_error'
+sil [ossa] @open_existential_box_interior_pointer_error : $@convention(thin) (@owned Error) -> Int {
+bb0(%0 : @owned $Error):
+  %1 = begin_borrow %0 : $Error
+  %2 = open_existential_box %1 : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000000") Error
+  end_borrow %1 : $Error
+  destroy_value %0 : $Error
+  %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000") Error, #Error._code!getter, %2 : $*@opened("01234567-89AB-CDEF-0123-000000000000") Error : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
+  %result = apply %m<@opened("01234567-89AB-CDEF-0123-000000000000") Error>(%2) : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
+  return %result : $Int
 }
