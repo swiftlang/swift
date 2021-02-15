@@ -836,6 +836,20 @@ bb0(%0 : $C1):
   return %0 : $C1
 }
 
+// strong_retain/strong_release don't accept an Optional<reference>.
+//
+// CHECK-LABEL: sil @dontOptimizeRefCastOfOptional
+// CHECK:   %1 = unchecked_ref_cast %0
+// CHECK:   strong_retain %1
+// CHECK: } // end sil function 'dontOptimizeRefCastOfOptional'
+sil @dontOptimizeRefCastOfOptional : $@convention(thin) (@guaranteed Optional<C1>) -> () {
+bb0(%0 : $Optional<C1>):
+  %1 = unchecked_ref_cast %0 : $Optional<C1> to $C1
+  strong_retain %1 : $C1
+  %3 = tuple ()
+  return %3 : $()
+}
+
 // CHECK-LABEL: sil @dead_end_cow_mutation
 // CHECK: bb0
 // CHECK-NEXT: strong_retain %0
