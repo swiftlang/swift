@@ -255,7 +255,10 @@ bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
                               StoreOwnershipQualifier::Unqualified);
   });
 
-  // Then remove the qualified store.
+  // Then remove the qualified store after RAUWing si with its dest. This
+  // ensures that any uses of the interior pointer result of the store_borrow
+  // are rewritten to be on the dest point.
+  si->replaceAllUsesWith(si->getDest());
   eraseInstruction(si);
   return true;
 }
