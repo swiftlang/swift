@@ -1,15 +1,17 @@
 // RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
-import Swift
-
 sil_stage canonical
+
+import Builtin
 
 class Klass {}
 
 class KlassUser {
   var field: Klass
 }
+
+sil @use_builtinnativeobject_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
 
 // CHECK-LABEL: Function: 'simple_error_ref_element_addr'
 // CHECK-NEXT: Found outside of lifetime use?!
@@ -43,8 +45,13 @@ bb0(%0 : @owned $KlassUser):
   return %3 : $Klass
 }
 
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
 class OptionalBox<T> {
-  var t: T?
+  var t: FakeOptional<T>
 }
 
 // CHECK-NOT: Function: 'inject_enum_addr_test'
@@ -52,7 +59,7 @@ sil [ossa] @inject_enum_addr_test : $@convention(thin) <T> (@owned OptionalBox<T
 bb0(%0 : @owned $OptionalBox<T>):
   %1 = begin_borrow %0 : $OptionalBox<T>
   %2 = ref_element_addr %1 : $OptionalBox<T>, #OptionalBox.t
-  inject_enum_addr %2 : $*Optional<T>, #Optional.none!enumelt
+  inject_enum_addr %2 : $*FakeOptional<T>, #FakeOptional.none!enumelt
   end_borrow %1 : $OptionalBox<T>
   destroy_value %0 : $OptionalBox<T>
   %3 = tuple ()
@@ -64,7 +71,7 @@ sil [ossa] @init_enum_data_addr_test : $@convention(thin) <T> (@owned OptionalBo
 bb0(%0 : @owned $OptionalBox<T>, %1 : $*T):
   %2 = begin_borrow %0 : $OptionalBox<T>
   %3 = ref_element_addr %2 : $OptionalBox<T>, #OptionalBox.t
-  %4 = init_enum_data_addr %3 : $*Optional<T>, #Optional.some!enumelt
+  %4 = init_enum_data_addr %3 : $*FakeOptional<T>, #FakeOptional.some!enumelt
   copy_addr %1 to [initialization] %4 : $*T
   end_borrow %2 : $OptionalBox<T>
   destroy_value %0 : $OptionalBox<T>
@@ -74,6 +81,10 @@ bb0(%0 : @owned $OptionalBox<T>, %1 : $*T):
 
 class Box<T> {
   var t: T
+}
+
+struct Int {
+  var _value: Builtin.Int64
 }
 
 // CHECK-NOT: Function: 'unconditional_cast_test'
@@ -86,4 +97,24 @@ bb0(%0 : @owned $Box<T>, %1 : $*Int):
   destroy_value %0 : $Box<T>
   %4 = tuple ()
   return %4 : $()
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'store_borrow_result_used_outside_of_borrow_lifetime'
+// CHECK-NEXT: Found outside of lifetime use?!
+// CHECK-NEXT: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %4, %3
+// CHECK-NEXT: Consuming User:   end_borrow %1 : $Builtin.NativeObject           // id: %4
+// CHECK-NEXT: Non Consuming User:   %7 = apply %6(%3) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+// CHECK-NEXT: Block: bb0
+sil [ossa] @store_borrow_result_used_outside_of_borrow_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %0a = begin_borrow %0 : $Builtin.NativeObject
+  %1 = alloc_stack $Builtin.NativeObject
+  %result = store_borrow %0a to %1 : $*Builtin.NativeObject
+  end_borrow %0a : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %func = function_ref @use_builtinnativeobject_inguaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %func(%result) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
 }
