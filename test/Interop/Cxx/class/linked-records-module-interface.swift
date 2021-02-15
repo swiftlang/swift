@@ -1,6 +1,6 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=LinkedRecords -I %S/Inputs/ -source-filename=x -enable-cxx-interop | %FileCheck %s
 
-// CHECK: enum Space {
+// CHECK: extension Space {
 // CHECK:   struct C {
 // CHECK:     struct D {
 // CHECK:       var B: Space.A.B
