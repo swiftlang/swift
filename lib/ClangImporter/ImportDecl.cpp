@@ -8969,8 +8969,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   // If we're in concurrency mode, mark the constant as @actorIndependent
   if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    auto actorIndependentAttr = new (C) ActorIndependentAttr(SourceLoc(),
-        SourceRange(), ActorIndependentKind::Safe);
+    auto actorIndependentAttr = new (C) ActorIndependentAttr(
+        ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
     var->getAttrs().add(actorIndependentAttr);
   }
   // Set the function up as the getter.
