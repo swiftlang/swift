@@ -3473,6 +3473,11 @@ namespace {
           }
         }
 
+        // If we've already imported this decl, skip it so we don't add the same
+        // member twice.
+        if (Impl.ImportedDecls.count({nd->getCanonicalDecl(), getVersion()}))
+          continue;
+
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
@@ -3485,11 +3490,6 @@ namespace {
         }
 
         if (auto nestedType = dyn_cast<TypeDecl>(member)) {
-          // Only import definitions. Otherwise, we might add the same member
-          // twice.
-          if (auto tagDecl = dyn_cast<clang::TagDecl>(nd))
-            if (tagDecl->getDefinition() != tagDecl)
-              continue;
           nestedTypes.push_back(nestedType);
           continue;
         }
