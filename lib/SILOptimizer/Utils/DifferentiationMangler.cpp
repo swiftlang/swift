@@ -87,7 +87,7 @@ std::string DifferentiationMangler::mangleAutoDiffFunction(
   // mangle the other parts.
   beginManglingWithoutPrefix();
   appendOperator(originalName);
-  appendAutoDiffFunctionParts((char)kind, config);
+  appendAutoDiffFunctionParts("TJ", kind, config);
   return finalize();
 }
 

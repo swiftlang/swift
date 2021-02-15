@@ -748,6 +748,10 @@ void Remangler::mangleAutoDiffFunction(Node *node, EntityContext &ctx) {
   Buffer << "<autodiff-function>";
 }
 
+void Remangler::mangleAutoDiffDerivativeVTableThunk(Node *node) {
+  Buffer << "<autodiff-derivative-vtable-thunk>";
+}
+
 void Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node) {
   Buffer << "<autodiff-self-reordering-reabstraction-thunk>";
 }

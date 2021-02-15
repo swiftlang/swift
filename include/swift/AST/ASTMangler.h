@@ -173,7 +173,8 @@ public:
                                                    CanType ResultType,
                                                    bool predefined);
   
-  /// Mangle the derivative function (JVP/VJP) for the given:
+  /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
+  /// thunk, for the given:
   /// - Mangled original function declaration.
   /// - Derivative function kind.
   /// - Derivative function configuration: parameter/result indices and
@@ -181,7 +182,8 @@ public:
   std::string
   mangleAutoDiffDerivativeFunction(const AbstractFunctionDecl *originalAFD,
                                    AutoDiffDerivativeFunctionKind kind,
-                                   AutoDiffConfig config);
+                                   AutoDiffConfig config,
+                                   bool isVTableThunk = false);
 
   /// Mangle the linear map (differential/pullback) for the given:
   /// - Mangled original function declaration.
@@ -447,7 +449,8 @@ protected:
 
   void beginManglingWithAutoDiffOriginalFunction(
       const AbstractFunctionDecl *afd);
-  void appendAutoDiffFunctionParts(char functionKindCode,
+  void appendAutoDiffFunctionParts(StringRef op, 
+                                   Demangle::AutoDiffFunctionKind kind,
                                    AutoDiffConfig config);
   void appendIndexSubset(IndexSubset *indexSubset);
 };
