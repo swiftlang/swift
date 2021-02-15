@@ -1342,6 +1342,7 @@ public:
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &asyncLoc,
+                                      bool &reasync,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
@@ -1353,11 +1354,14 @@ public:
   /// one. Parsing 'async' or 'throws' after the `->` is an error we
   /// correct for.
   ///
+  /// \param reasync If non-NULL, will also parse the 'reasync' keyword in
+  /// lieu of 'async'.
+  ///
   /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
   /// lieu of 'throws'.
   ParserStatus parseEffectsSpecifiers(SourceLoc existingArrowLoc,
-                                      SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-                                      bool *rethrows);
+                                      SourceLoc &asyncLoc, bool *reasync,
+                                      SourceLoc &throwsLoc, bool *rethrows);
 
   /// Returns 'true' if \p T is considered effects specifier.
   bool isEffectsSpecifier(const Token &T);

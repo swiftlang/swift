@@ -613,6 +613,17 @@ SIMPLE_DECL_ATTR(_marker, Marker,
   APIBreakingToAdd | APIBreakingToRemove,
   108)
 
+SIMPLE_DECL_ATTR(reasync, Reasync,
+  OnFunc | OnConstructor |
+  RejectByParser |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  109)
+
+SIMPLE_DECL_ATTR(reasync, AtReasync,
+  OnProtocol |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  110)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

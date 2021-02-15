@@ -277,6 +277,9 @@ public:
   void visitGlobalActorAttr(GlobalActorAttr *attr);
   void visitAsyncAttr(AsyncAttr *attr);
   void visitMarkerAttr(MarkerAttr *attr);
+
+  void visitReasyncAttr(ReasyncAttr *attr);
+  void visitAtReasyncAttr(AtReasyncAttr *attr);
 };
 } // end anonymous namespace
 
@@ -5467,3 +5470,9 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
     }
   }
 }
+
+void AttributeChecker::visitReasyncAttr(ReasyncAttr *attr) {
+  // FIXME
+}
+
+void AttributeChecker::visitAtReasyncAttr(AtReasyncAttr *attr) {}

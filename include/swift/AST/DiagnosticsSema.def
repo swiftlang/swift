@@ -2995,6 +2995,10 @@ ERROR(override_rethrows_with_non_rethrows,none,
 ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
 
+ERROR(override_reasync_with_non_reasync,none,
+      "override of 'reasync' %select{method|initializer}0 should also "
+      "be 'reasync'", (bool))
+
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
       ())
