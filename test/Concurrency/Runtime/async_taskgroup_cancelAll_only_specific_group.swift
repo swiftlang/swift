@@ -1,24 +1,15 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
 
-import Dispatch
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
+import func Foundation.sleep
 
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
 func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-  fputs("[\(file):\(line)] \(m)\n", stderr)
+//  fputs("[\(file):\(line)] \(m)\n", stderr)
   print(m)
 }
 
@@ -30,7 +21,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
     for i in 1...5 {
       await group.add {
         sleep(1)
-        let c = await Task.isCancelled()
+        let c = await Task.__unsafeCurrentAsync().isCancelled
         pprint("add: \(i) (cancelled: \(c))")
         return i
       }
@@ -42,7 +33,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
       sum += got
     }
 
-    let c = await Task.isCancelled()
+    let c = await Task.__unsafeCurrentAsync().isCancelled
     pprint("g1 task cancelled: \(c)")
     let cc = group.isCancelled
     pprint("g1 group cancelled: \(cc)")
@@ -55,7 +46,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
     for i in 1...3 {
       await group.add {
         sleep(1)
-        let c = await Task.isCancelled()
+        let c = await Task.__unsafeCurrentAsync().isCancelled
         pprint("g1 task \(i) (cancelled: \(c))")
         return i
       }
@@ -64,7 +55,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
     pprint("cancelAll")
     group.cancelAll()
 
-    let c = await Task.isCancelled()
+    let c = await Task.__unsafeCurrentAsync().isCancelled
     pprint("g2 task cancelled: \(c)")
     let cc = group.isCancelled
     pprint("g2 group cancelled: \(cc)")

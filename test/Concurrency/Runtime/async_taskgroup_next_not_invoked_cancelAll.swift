@@ -1,11 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
 
-import Dispatch
+import func Foundation.sleep
 
 func test_skipCallingNext_butInvokeCancelAll() async {
   let numbers = [1, 1]
@@ -14,10 +11,10 @@ func test_skipCallingNext_butInvokeCancelAll() async {
     for n in numbers {
       print("group.add { \(n) }")
       await group.add { () async -> Int in
-        sleep(1)
+        sleep(2)
         print("  inside group.add { \(n) }")
-        let cancelled = await Task.__unsafeCurrentAsync().isCancelled
-        print("  inside group.add { \(n) } (canceled: \(cancelled))")
+        let c = await Task.__unsafeCurrentAsync().isCancelled
+        print("  inside group.add { \(n) } (cancelled: \(c))")
         return n
       }
     }
@@ -26,19 +23,17 @@ func test_skipCallingNext_butInvokeCancelAll() async {
 
     // return immediately; the group should wait on the tasks anyway
     let c = await Task.__unsafeCurrentAsync().isCancelled
-    print("return immediately 0 (canceled: \(c))")
+    print("return immediately 0 (task cancelled: \(c))")
+    print("return immediately 0 (group cancelled: \(group.isCancelled))")
     return 0
   }
 
   // CHECK: group.add { 1 }
   // CHECK: group.add { 1 }
-  // CHECK: return immediately 0 (canceled: true)
-
-  // CHECK: inside group.add { 1 }
-  // CON: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
-
-  // CHECK: inside group.add { 1 }
-  // CON: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
+  // CHECK: return immediately 0 (task cancelled: false)
+  // CHECK: return immediately 0 (group cancelled: true)
+  // CHECK: inside group.add { 1 } (cancelled: true)
+  // CHECK: inside group.add { 1 } (cancelled: true)
 
   // CHECK: result: 0
   print("result: \(result)")

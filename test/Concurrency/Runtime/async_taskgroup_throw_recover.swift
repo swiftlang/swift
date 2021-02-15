@@ -5,6 +5,7 @@
 // REQUIRES: CPU=x86_64
 
 import Dispatch
+import Darwin
 
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
@@ -16,7 +17,7 @@ func boom() async throws -> Int {
 }
 
 func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-  fputs("[\(file):\(line)] \(m)\n", stderr)
+//  fputs("[\(file):\(line)] \(m)\n", stderr)
   print(m)
 }
 

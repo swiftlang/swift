@@ -246,11 +246,12 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
 
+  /// Every task is able to store task local values.
+  headerSize += sizeof(AsyncTask::TaskLocalValuesFragment);
+
   if (parent) {
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
-
-  headerSize += sizeof(AsyncTask::TaskLocalValuesFragment);
 
   if (flags.task_isGroupChildTask()) {
     headerSize += sizeof(AsyncTask::GroupChildFragment);
@@ -280,16 +281,16 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     new(allocation) AsyncTask(&taskHeapMetadata, flags,
                               function, initialContext);
 
+  // Initialize task locals fragment.
+  auto taskLocalsFragment = task->localValuesFragment();
+  new (taskLocalsFragment) AsyncTask::TaskLocalValuesFragment();
+  taskLocalsFragment->initializeLinkParent(task, parent);
+
   // Initialize the child fragment if applicable.
   if (parent) {
     auto childFragment = task->childFragment();
     new (childFragment) AsyncTask::ChildFragment(parent);
   }
-
-  // Initialize task locals fragment if applicable.
-  auto taskLocalsFragment = task->localValuesFragment();
-  new (taskLocalsFragment) AsyncTask::TaskLocalValuesFragment();
-  taskLocalsFragment->initializeLinkParent(task, parent);
 
   // Initialize the group child fragment if applicable.
   if (flags.task_isGroupChildTask()) {
@@ -322,8 +323,7 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     } else {
       // just a normal child task
       fprintf(stderr, "[%s:%d] (%s): create child task record in parent [%d] to %d %d\n", __FILE__, __LINE__, __FUNCTION__, parent, task);
-      swift_task_addStatusRecord(parent,
-                                 new ChildTaskStatusRecord(task));
+      swift_task_addStatusRecord(parent, new ChildTaskStatusRecord(task));
     }
 
     // if the parent was already cancelled, we carry this flag forward to the child.

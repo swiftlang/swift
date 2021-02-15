@@ -139,8 +139,8 @@ public:
 /// An AsyncTask may have the following fragments:
 ///
 ///    +--------------------------+
+///    | taskLocalValuesFragment  |
 ///    | childFragment?           |
-////   | taskLocalValuesFragment? |
 ///    | groupChildFragment?      |
 ///    | futureFragment?          |*
 ///    +--------------------------+
@@ -185,42 +185,9 @@ public:
     return Status.load(std::memory_order_relaxed).isCancelled();
   }
 
-  // ==== Child Fragment -------------------------------------------------------
-
-  /// A fragment of an async task structure that happens to be a child task.
-  class ChildFragment {
-    /// The parent task of this task.
-    AsyncTask *Parent;
-
-    /// The next task in the singly-linked list of child tasks.
-    /// The list must start in a `ChildTaskStatusRecord` registered
-    /// with the parent task.
-    /// Note that the parent task may have multiple such records.
-    AsyncTask *NextChild = nullptr;
-
-  public:
-    ChildFragment(AsyncTask *parent) : Parent(parent) {}
-
-    AsyncTask *getParent() const {
-      return Parent;
-    }
-
-    AsyncTask *getNextChild() const {
-      return NextChild;
-    }
-  };
-
-  bool hasChildFragment() const {
-    return Flags.task_isChildTask();
-  }
-
-  ChildFragment *childFragment() {
-    assert(hasChildFragment());
-    return reinterpret_cast<ChildFragment*>(this + 1);
-  }
-
   // ==== Task Locals Values ---------------------------------------------------
 
+  /// Storage fragment for task local values.
   class TaskLocalValuesFragment {
   public:
     /// Type of the pointed at `next` task local item.
@@ -270,9 +237,9 @@ public:
 
     private:
       explicit TaskLocalItem(const Metadata *keyType, const Metadata *valueType)
-          : keyType(keyType),
-            valueType(valueType),
-            next(0) { }
+        : keyType(keyType),
+          valueType(valueType),
+          next(0) { }
 
     public:
       /// TaskLocalItem which does not by itself store any value, but only points
@@ -320,7 +287,7 @@ public:
           }
         } else {
           item->next = reinterpret_cast<uintptr_t>(parentHead) |
-                            static_cast<uintptr_t>(NextLinkType::IsTerminal);
+                       static_cast<uintptr_t>(NextLinkType::IsTerminal);
         }
 
         return item;
@@ -339,7 +306,7 @@ public:
         auto next = task->localValuesFragment()->head;
         auto nextLinkType = next ? NextLinkType::IsNext : NextLinkType::IsTerminal;
         item->next = reinterpret_cast<uintptr_t>(next) |
-            static_cast<uintptr_t>(nextLinkType);
+                     static_cast<uintptr_t>(nextLinkType);
 
         return item;
       }
@@ -433,7 +400,7 @@ public:
     void initializeLinkParent(AsyncTask* task, AsyncTask* parent);
 
     void pushValue(AsyncTask *task, const Metadata *keyType,
-                   /* +1 */ OpaqueValue *value, const Metadata *valueType);
+        /* +1 */ OpaqueValue *value, const Metadata *valueType);
 
     void popValue(AsyncTask *task);
 
@@ -443,19 +410,52 @@ public:
   TaskLocalValuesFragment *localValuesFragment() {
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
-
-    if (hasChildFragment()) {
-      offset += sizeof(ChildFragment);
-    }
-
     return reinterpret_cast<TaskLocalValuesFragment*>(offset);
   }
 
   OpaqueValue* localValueGet(const Metadata *keyType,
-                    TaskLocalValuesFragment::TaskLocalInheritance inheritance) {
+                             TaskLocalValuesFragment::TaskLocalInheritance inheritance) {
     return localValuesFragment()->get(keyType, inheritance);
   }
 
+  // ==== Child Fragment -------------------------------------------------------
+
+  /// A fragment of an async task structure that happens to be a child task.
+  class ChildFragment {
+    /// The parent task of this task.
+    AsyncTask *Parent;
+
+    /// The next task in the singly-linked list of child tasks.
+    /// The list must start in a `ChildTaskStatusRecord` registered
+    /// with the parent task.
+    /// Note that the parent task may have multiple such records.
+    AsyncTask *NextChild = nullptr;
+
+  public:
+    ChildFragment(AsyncTask *parent) : Parent(parent) {}
+
+    AsyncTask *getParent() const {
+      return Parent;
+    }
+
+    AsyncTask *getNextChild() const {
+      return NextChild;
+    }
+  };
+
+  bool hasChildFragment() const {
+    return Flags.task_isChildTask();
+  }
+
+  ChildFragment *childFragment() {
+    assert(hasChildFragment());
+
+    auto offset = reinterpret_cast<char*>(this);
+    offset += sizeof(AsyncTask);
+    offset += sizeof(TaskLocalValuesFragment);
+
+    return reinterpret_cast<ChildFragment*>(offset);
+  }
 
   // ==== TaskGroup Child ------------------------------------------------------
 
@@ -490,12 +490,13 @@ public:
   GroupChildFragment *groupChildFragment() {
     assert(hasGroupChildFragment());
 
-    if (hasChildFragment()) {
-      return reinterpret_cast<GroupChildFragment *>(
-          reinterpret_cast<ChildFragment*>(this + 1) + 1); // FIXME !!!!!! MATH
-    }
+    auto offset = reinterpret_cast<char*>(this);
+    offset += sizeof(AsyncTask);
+    offset += sizeof(TaskLocalValuesFragment);
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
 
-    return reinterpret_cast<GroupChildFragment *>(this + 1);
+    return reinterpret_cast<GroupChildFragment *>(offset);
   }
 
   // ==== Future ---------------------------------------------------------------
@@ -594,19 +595,13 @@ public:
 
   FutureFragment *futureFragment() {
     assert(isFuture());
-
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
-
-    if (hasChildFragment()) {
-      offset += sizeof(ChildFragment);
-    }
-
     offset += sizeof(TaskLocalValuesFragment);
-
-    if (hasGroupChildFragment()) {
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
+    if (hasGroupChildFragment())
       offset += sizeof(GroupChildFragment);
-    }
 
     return reinterpret_cast<FutureFragment *>(offset);
   }

@@ -18,7 +18,7 @@ func asyncEcho(_ value: Int) async -> Int {
 }
 
 func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-  fputs("[\(file):\(line)] \(m)\n", stderr)
+//  fputs("[\(file):\(line)] \(m)\n", stderr)
   print(m)
 }
 
@@ -28,16 +28,16 @@ func test_taskGroup_cancel_parent_affects_group() async {
     try! await Task.withGroup(resultType: Int.self) { group -> Void in
       await group.add {
         sleep(3)
-        let c = await Task.isCancelled()
+        let c = await Task.__unsafeCurrentAsync().isCancelled
         print("group task isCancelled: \(c)")
         return 0
       }
 
-      _ = await try! group.next()
-      let c = await Task.isCancelled()
+      _ = try! await group.next()
+      let c = await Task.__unsafeCurrentAsync().isCancelled
       print("group isCancelled: \(c)")
     }
-    let c = await Task.isCancelled()
+    let c = await Task.__unsafeCurrentAsync().isCancelled
     print("detached task isCancelled: \(c)")
   }
 

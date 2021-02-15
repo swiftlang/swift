@@ -499,7 +499,8 @@ void swift::swift_task_cancel(AsyncTask *task) {
   // Carry out the cancellation operations associated with all
   // the active records.
   for (auto cur: oldStatus.records()) {
-    fprintf(stderr, "[%s:%d] (%s): record:%d type: %d\n", __FILE__, __LINE__, __FUNCTION__, cur, cur->getKind());
+    fprintf(stderr, "[%s:%d] (%s): task:%d record:%d type: %d\n", __FILE__, __LINE__, __FUNCTION__,
+            task, cur, cur->getKind());
     performCancellationAction(cur);
   }
 

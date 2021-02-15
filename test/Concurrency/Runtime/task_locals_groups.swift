@@ -67,6 +67,10 @@ func groups() async {
       try! await printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
       await group.add {
         try! await printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+
+        async let childInsideGroupChild = printTaskLocal(\.number)
+        try! await childInsideGroupChild // CHECK: NumberKey: 2 {{.*}}
+
         return await Task.local(\.number)
       }
       try! await printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}

@@ -1,24 +1,15 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
 
-import Dispatch
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
+import func Foundation.sleep
 
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
 func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-  fputs("[\(file):\(line)] \(m)\n", stderr)
+//  fputs("[\(file):\(line)] \(m)\n", stderr)
   print(m)
 }
 
@@ -28,7 +19,7 @@ func test_taskGroup_cancel_then_completions() async {
 
 //  async let outer: Bool = {
 //    sleep(6)
-//    return await Task.isCancelled()
+//    return await Task.__unsafeCurrentAsync().isCancelled
 //  }()
 
   let result: Int = try! await Task.withGroup(resultType: (Int, Bool).self) { group in
@@ -37,7 +28,7 @@ func test_taskGroup_cancel_then_completions() async {
       pprint("start first")
       sleep(1)
       pprint("done first")
-      return (1, await Task.isCancelled())
+      return (1, await Task.__unsafeCurrentAsync().isCancelled)
     }
     pprint("added first: \(addedFirst)") // CHECK: added first: true
     assert(addedFirst)
@@ -46,7 +37,7 @@ func test_taskGroup_cancel_then_completions() async {
       pprint("start second")
       sleep(3)
       pprint("done second")
-      return (2, await Task.isCancelled())
+      return (2, await Task.__unsafeCurrentAsync().isCancelled)
     }
     pprint("added second: \(addedSecond)") // CHECK: added second: true
     assert(addedSecond)

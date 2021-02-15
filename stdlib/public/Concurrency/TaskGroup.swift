@@ -13,10 +13,10 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-import Darwin // FIXME: remove this
+//import Darwin // FIXME: remove this
 
 func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-  fputs("[\(file):\(line)] \(m)\n", stderr)
+//  fputs("[\(file):\(line)] \(m)\n", stderr)
 }
 
 // ==== Task Group -------------------------------------------------------------
