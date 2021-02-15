@@ -2501,18 +2501,27 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'J':
       switch (peekChar()) {
       case 'S':
+        nextChar();
         return demangleAutoDiffSubsetParametersThunk();
       case 'O':
+        nextChar();
         return demangleAutoDiffSelfReorderingReabstractionThunk();
+      case 'V':
+        nextChar();
+        return demangleAutoDiffFunctionOrSimpleThunk(
+            Node::Kind::AutoDiffDerivativeVTableThunk);
+      default:
+        return demangleAutoDiffFunctionOrSimpleThunk(
+            Node::Kind::AutoDiffFunction);
       }
-      return demangleAutoDiffFunction();
     default:
       return nullptr;
   }
 }
 
-NodePointer Demangler::demangleAutoDiffFunction() {
-  auto result = createNode(Node::Kind::AutoDiffFunction);
+NodePointer
+Demangler::demangleAutoDiffFunctionOrSimpleThunk(Node::Kind nodeKind) {
+  auto result = createNode(nodeKind);
   while (auto *originalNode = popNode())
     result = addChild(result, originalNode);
   result->reverseChildren();
@@ -2535,7 +2544,6 @@ NodePointer Demangler::demangleAutoDiffFunctionKind() {
 }
 
 NodePointer Demangler::demangleAutoDiffSubsetParametersThunk() {
-  nextChar();
   auto result = createNode(Node::Kind::AutoDiffSubsetParametersThunk);
   while (auto *node = popNode())
     result = addChild(result, node);
@@ -2555,7 +2563,6 @@ NodePointer Demangler::demangleAutoDiffSubsetParametersThunk() {
 }
 
 NodePointer Demangler::demangleAutoDiffSelfReorderingReabstractionThunk() {
-  nextChar();
   auto result = createNode(
       Node::Kind::AutoDiffSelfReorderingReabstractionThunk);
   addChild(result, popNode(Node::Kind::DependentGenericSignature));

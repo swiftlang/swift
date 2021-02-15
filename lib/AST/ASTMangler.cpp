@@ -409,9 +409,11 @@ std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
 std::string ASTMangler::mangleAutoDiffDerivativeFunction(
     const AbstractFunctionDecl *originalAFD,
     AutoDiffDerivativeFunctionKind kind,
-    AutoDiffConfig config) {
+    AutoDiffConfig config,
+    bool isVTableThunk) {
   beginManglingWithAutoDiffOriginalFunction(originalAFD);
-  appendAutoDiffFunctionParts((char)getAutoDiffFunctionKind(kind), config);
+  appendAutoDiffFunctionParts(
+      isVTableThunk ? "TJV" : "TJ", getAutoDiffFunctionKind(kind), config);
   return finalize();
 }
 
@@ -419,7 +421,7 @@ std::string ASTMangler::mangleAutoDiffLinearMap(
     const AbstractFunctionDecl *originalAFD, AutoDiffLinearMapKind kind,
     AutoDiffConfig config) {
   beginManglingWithAutoDiffOriginalFunction(originalAFD);
-  appendAutoDiffFunctionParts((char)getAutoDiffFunctionKind(kind), config);
+  appendAutoDiffFunctionParts("TJ", getAutoDiffFunctionKind(kind), config);
   return finalize();
 }
 
@@ -437,11 +439,13 @@ void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
     appendEntity(afd);
 }
 
-void ASTMangler::appendAutoDiffFunctionParts(char functionKindCode,
+void ASTMangler::appendAutoDiffFunctionParts(StringRef op,
+                                             AutoDiffFunctionKind kind,
                                              AutoDiffConfig config) {
   if (auto sig = config.derivativeGenericSignature)
     appendGenericSignature(sig);
-  appendOperator("TJ", StringRef(&functionKindCode, 1));
+  auto kindCode = (char)kind;
+  appendOperator(op, StringRef(&kindCode, 1));
   appendIndexSubset(config.parameterIndices);
   appendOperator("p");
   appendIndexSubset(config.resultIndices);

@@ -97,7 +97,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     auto derivedFnType =
         Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
             .SILFnType;
-    implFn = getOrCreateAutoDiffClassMethodThunk(derived, derivedFnType);
+    implFn = getOrCreateDerivativeVTableThunk(derived, derivedFnType);
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }

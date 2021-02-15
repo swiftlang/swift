@@ -401,7 +401,7 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
 }
 
-SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
+SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
     SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
   auto *derivativeId = derivativeFnDeclRef.getDerivativeFunctionIdentifier();
   assert(derivativeId);
@@ -409,9 +409,14 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
 
   SILGenFunctionBuilder builder(*this);
   auto originalFnDeclRef = derivativeFnDeclRef.asAutoDiffOriginalFunction();
-  // TODO(TF-685): Use principled thunk mangling.
-  // Do not simply reuse reabstraction thunk mangling.
-  auto name = "AD__" + derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
+  Mangle::ASTMangler mangler;
+  auto name = mangler.mangleAutoDiffDerivativeFunction(
+      originalFnDeclRef.getAbstractFunctionDecl(),
+      derivativeId->getKind(),
+      AutoDiffConfig(derivativeId->getParameterIndices(),
+                     IndexSubset::get(getASTContext(), 1, {0}),
+                     derivativeId->getDerivativeGenericSignature()),
+      /*isVTableThunk*/ true);
   auto *thunk = builder.getOrCreateFunction(
       derivativeFnDecl, name, originalFnDeclRef.getLinkage(ForDefinition),
       constantTy, IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(),

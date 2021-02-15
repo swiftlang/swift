@@ -566,6 +566,7 @@ private:
     case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     case Node::Kind::AsyncFunctionPointer:
     case Node::Kind::AutoDiffFunction:
+    case Node::Kind::AutoDiffDerivativeVTableThunk:
     case Node::Kind::AutoDiffSelfReorderingReabstractionThunk:
     case Node::Kind::AutoDiffSubsetParametersThunk:
     case Node::Kind::AutoDiffFunctionKind:
@@ -1739,16 +1740,19 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(Node->getChild(idx));
     return nullptr;
   }
-  case Node::Kind::AutoDiffFunction: {
+  case Node::Kind::AutoDiffFunction:
+  case Node::Kind::AutoDiffDerivativeVTableThunk: {
     unsigned prefixEndIndex = 0;
     while (prefixEndIndex != Node->getNumChildren() &&
            Node->getChild(prefixEndIndex)->getKind()
               != Node::Kind::AutoDiffFunctionKind)
       ++prefixEndIndex;
-    auto kind = Node->getChild(prefixEndIndex);
+    auto funcKind = Node->getChild(prefixEndIndex);
     auto paramIndices = Node->getChild(prefixEndIndex + 1);
     auto resultIndices = Node->getChild(prefixEndIndex + 2);
-    print(kind);
+    if (kind == Node::Kind::AutoDiffDerivativeVTableThunk)
+      Printer << "vtable thunk for ";
+    print(funcKind);
     Printer << " of ";
     NodePointer optionalGenSig = nullptr;
     for (unsigned i = 0; i < prefixEndIndex; ++i) {

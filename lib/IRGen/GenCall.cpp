@@ -362,9 +362,11 @@ llvm::Value *IRGenFunction::getAsyncContext() {
 }
 
 llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(ArrayRef<llvm::Value *> args) {
-  auto *id =
-    Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async, args);
+  auto resultTy = llvm::StructType::get(
+      IGM.getLLVMContext(), {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy});
 
+  auto *id = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async,
+                                         {resultTy}, args);
   // Update the current values of task, executor and context.
 
   auto *rawTask = Builder.CreateExtractValue(id,
@@ -372,6 +374,7 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(ArrayRef<llvm::Value *> args
   auto *task = Builder.CreateBitCast(rawTask, IGM.SwiftTaskPtrTy);
   Builder.CreateStore(task, asyncTaskLocation);
 
+  // Update the current values of task, executor and context.
   auto *rawExecutor = Builder.CreateExtractValue(id,
       (unsigned)AsyncFunctionArgumentIndex::Executor);
   auto *executor = Builder.CreateBitCast(rawExecutor, IGM.SwiftExecutorPtrTy);
