@@ -23,6 +23,7 @@ CHANGELOG
 | [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
 | [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
 
+
 </details>
 
 Swift Next
