@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PrunedLiveness.h"
+#include "swift/SIL/OwnershipUtils.h"
 
 using namespace swift;
 
@@ -92,4 +93,26 @@ void PrunedLiveness::updateForUse(SILInstruction *user, bool lifetimeEnding) {
   auto iterAndSuccess = users.try_emplace(user, lifetimeEnding);
   if (!iterAndSuccess.second)
     iterAndSuccess.first->second &= lifetimeEnding;
+}
+
+bool PrunedLiveness::updateForBorrowingOperand(Operand *op) {
+  assert(op->getOperandOwnership() == OperandOwnership::Borrow);
+
+  // A nested borrow scope is considered a use-point at each scope ending
+  // instruction.
+  //
+  // TODO: Handle reborrowed copies by considering the extended borrow
+  // scope. Temporarily bail-out on reborrows because we can't handle uses
+  // that aren't dominated by currentDef.
+  if (!BorrowingOperand(op).visitScopeEndingUses(
+        [this](Operand *end) {
+          if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
+            return false;
+          }
+          updateForUse(end->getUser(), /*lifetimeEnding*/ false);
+          return true;
+        })) {
+    return false;
+  }
+  return true;
 }

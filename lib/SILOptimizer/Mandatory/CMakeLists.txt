@@ -10,6 +10,7 @@ target_sources(swiftSILOptimizer PRIVATE
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
   DiagnoseInvalidEscapingCaptures.cpp
+  DiagnoseLifetimeIssues.cpp
   DiagnoseStaticExclusivity.cpp
   DiagnoseUnreachable.cpp
   Differentiation.cpp
