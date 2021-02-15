@@ -2450,19 +2450,116 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      auto dc =
+      auto extensionDC =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
-      if (!dc)
+      if (!extensionDC)
         return nullptr;
 
       SourceLoc loc = Impl.importSourceLoc(decl->getBeginLoc());
-
-      // FIXME: If Swift gets namespaces, import as a namespace.
-      auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
+      DeclContext *dc = nullptr;
+      // If this is a top-level namespace, don't put it in the module we're
+      // importing, put it in the "__ObjC" module that is implicitly imported.
+      // This way, if we have multiple modules that all open the same namespace,
+      // we won't import multiple enums with the same name in swift.
+      if (extensionDC->getContextKind() == DeclContextKind::FileUnit)
+        dc = Impl.ImportedHeaderUnit;
+      else {
+        // This is a nested namespace, we need to find its extension decl
+        // context and then use that to find the parent enum. It's important
+        // that we add this to the parent enum (in the "__ObjC" module) and not
+        // to the extension.
+        auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
+        auto parent = Impl.importDecl(parentNS, getVersion());
+        // Sometimes when the parent namespace is imported, this namespace
+        // also gets imported. If that's the case, then the parent namespace
+        // will be an enum (because it was able to be fully imported) in which
+        // case we need to bail here.
+        auto cachedResult =
+            Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+        if (cachedResult != Impl.ImportedDecls.end())
+          return cachedResult->second;
+        dc = cast<ExtensionDecl>(parent)
+                 ->getExtendedType()
+                 ->getEnumOrBoundGenericEnum();
+      }
+      auto *enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
           decl, AccessLevel::Public, loc,
           importedName.getDeclName().getBaseIdentifier(),
           Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
-      enumDecl->setMemberLoader(&Impl, 0);
+      if (isa<clang::NamespaceDecl>(decl->getParent()))
+        cast<EnumDecl>(dc)->addMember(enumDecl);
+
+      // We are creating an extension, so put it at the top level. This is done
+      // after creating the enum, though, because we may need the correctly
+      // nested decl context above when creating the enum.
+      while (extensionDC->getParent() &&
+             extensionDC->getContextKind() != DeclContextKind::FileUnit)
+        extensionDC = extensionDC->getParent();
+
+      auto *extension = ExtensionDecl::create(Impl.SwiftContext, loc, nullptr,
+                                              {}, extensionDC, nullptr, decl);
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{extension},
+                                              enumDecl->getDeclaredType());
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{extension},
+                                              std::move(enumDecl));
+      // Keep track of what members we've already added so we don't add the same
+      // member twice. Note: we can't use "ImportedDecls" for this because we
+      // might import a decl that we don't add (for example, if it was a
+      // parameter to another decl).
+      SmallPtrSet<Decl *, 16> addedMembers;
+      for (auto redecl : decl->redecls()) {
+        // This will be reset as the EnumDecl after we return from
+        // VisitNamespaceDecl.
+        Impl.ImportedDecls[{redecl->getCanonicalDecl(), getVersion()}] =
+            extension;
+
+        // Insert these backwards into "namespaceDecls" so we can pop them off
+        // the end without loosing order.
+        SmallVector<clang::Decl *, 16> namespaceDecls;
+        auto addDeclsReversed = [&](auto decls) {
+          auto begin = decls.begin();
+          auto end = decls.end();
+          int currentSize = namespaceDecls.size();
+          int declCount = currentSize + std::distance(begin, end);
+          namespaceDecls.resize(declCount);
+          for (int index = declCount - 1; index >= currentSize; --index)
+            namespaceDecls[index] = *(begin++);
+        };
+        addDeclsReversed(redecl->decls());
+        while (!namespaceDecls.empty()) {
+          auto nd = dyn_cast<clang::NamedDecl>(namespaceDecls.pop_back_val());
+          // Make sure we only import the defenition of a record.
+          if (auto tagDecl = dyn_cast_or_null<clang::TagDecl>(nd))
+            // Some decls, for example ClassTemplateSpecializationDecls, won't
+            // have a definition here. That's OK.
+            nd = tagDecl->getDefinition() ? tagDecl->getDefinition() : tagDecl;
+          if (!nd)
+            continue;
+
+          // Special case class templates: import all their specilizations here.
+          if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(nd)) {
+            addDeclsReversed(classTemplate->specializations());
+            continue;
+          }
+
+          auto member = Impl.importDecl(nd, getVersion());
+          if (!member || addedMembers.count(member) ||
+              isa<clang::NamespaceDecl>(nd))
+            continue;
+          // This happens (for example) when a struct is declared inside another
+          // struct inside a namespace but defined out of line.
+          assert(member->getDeclContext()->getAsDecl());
+          if (dyn_cast<ExtensionDecl>(member->getDeclContext()->getAsDecl()) !=
+              extension)
+            continue;
+          extension->addMember(member);
+          addedMembers.insert(member);
+        }
+      }
+
+      if (!extension->getMembers().empty())
+        enumDecl->addExtension(extension);
+
       return enumDecl;
     }
 
@@ -8543,6 +8640,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   auto decl = dyn_cast<clang::NamedDecl>(dc);
   if (!decl)
     return nullptr;
+
   // Category decls with same name can be merged and using canonical decl always
   // leads to the first category of the given name. We'd like to keep these
   // categories separated.
