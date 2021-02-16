@@ -965,6 +965,103 @@ namespace {
       return false;
     }
 
+    AutoClosureExpr *buildPropertyWrapperFnThunk(
+        Expr *fnRef, FunctionType *fnType, AnyFunctionRef fnDecl,
+        ArrayRef<Expr *> appliedPropertyWrappers) {
+      auto &context = cs.getASTContext();
+      auto paramInfo = fnType->getParams();
+
+      SmallVector<Expr *, 4> args;
+      SmallVector<Identifier, 4> argLabels;
+
+      auto *innerParams = fnDecl.getParameters();
+      SmallVector<AnyFunctionType::Param, 4> innerParamTypes;
+
+      OptionSet<ParameterList::CloneFlags> options
+        = (ParameterList::Implicit |
+           ParameterList::NamedArguments);
+      auto *outerParams = innerParams->clone(context, options);
+      SmallVector<AnyFunctionType::Param, 4> outerParamTypes;
+
+      unsigned appliedWrapperIndex = 0;
+      for (auto i : indices(*innerParams)) {
+        auto *innerParam = innerParams->get(i);
+        auto *outerParam = outerParams->get(i);
+        auto outerParamType = paramInfo[i].getPlainType();
+
+        Expr *paramRef = new (context) DeclRefExpr(outerParam, DeclNameLoc(),
+                                                   /*implicit=*/true);
+        paramRef->setType(outerParam->isInOut()
+                          ? LValueType::get(outerParamType) : outerParamType);
+        cs.cacheType(paramRef);
+
+        if (auto wrapperInfo = innerParam->getPropertyWrapperBackingPropertyInfo()) {
+          // Rewrite the parameter ref to the backing wrapper initialization
+          // expression.
+          Expr *init = appliedPropertyWrappers[appliedWrapperIndex++];
+          auto *placeholder = findWrappedValuePlaceholder(init);
+          placeholder->setOriginalWrappedValue(paramRef);
+
+          auto target = SolutionApplicationTarget(init, cs.DC, CTP_Unused, Type(),
+                                                  /*isDiscarded=*/false);
+          auto result = cs.applySolution(solution, target);
+          if (!result)
+            return nullptr;
+
+          paramRef = result->getAsExpr();
+          cs.cacheExprTypes(paramRef);
+
+          // SILGen knows how to emit property-wrapped parameters, but the
+          // function type needs the backing wrapper type in its param list.
+          innerParamTypes.push_back(AnyFunctionType::Param(paramRef->getType(),
+                                                           innerParam->getArgumentName()));
+        } else {
+          // Rewrite the parameter ref if necessary.
+          if (outerParam->isInOut()) {
+            paramRef = new (context) InOutExpr(SourceLoc(), paramRef,
+                                               outerParamType, /*implicit=*/true);
+          } else if (innerParam->isVariadic()) {
+            paramRef = new (context) VarargExpansionExpr(paramRef,
+                                                         /*implicit=*/ true,
+                                                         outerParamType);
+          }
+          cs.cacheType(paramRef);
+
+          innerParamTypes.push_back(innerParam->toFunctionParam());
+        }
+
+        // The outer parameters are for an autoclosure, which shouldn't have
+        // argument labels.
+        outerParamTypes.push_back(AnyFunctionType::Param(outerParamType,
+                                                         Identifier(),
+                                                         paramInfo[i].getParameterFlags()));
+        outerParam->setInterfaceType(outerParamType);
+
+        if (fnDecl.getAbstractFunctionDecl())
+          argLabels.push_back(innerParam->getArgumentName());
+
+        args.push_back(paramRef);
+      }
+
+      fnRef->setType(FunctionType::get(innerParamTypes, fnType->getResult()));
+      cs.cacheType(fnRef);
+
+      auto *fnCall = CallExpr::createImplicit(context, fnRef, args, argLabels);
+      fnCall->setType(fnType->getResult());
+      cs.cacheType(fnCall);
+      cs.cacheType(fnCall->getArg());
+
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+      auto *autoClosureType = FunctionType::get(outerParamTypes, fnType->getResult());
+      auto *autoClosure = new (context) AutoClosureExpr(fnCall, autoClosureType,
+                                                        discriminator, cs.DC);
+      autoClosure->setParameterList(outerParams);
+      autoClosure->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
+      cs.cacheType(autoClosure);
+
+      return autoClosure;
+    }
+
     AutoClosureExpr *buildCurryThunk(ValueDecl *member,
                                      FunctionType *selfFnTy,
                                      Expr *selfParamRef,
