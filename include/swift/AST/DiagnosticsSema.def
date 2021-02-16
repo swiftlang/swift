@@ -2556,8 +2556,8 @@ ERROR(override_ownership_mismatch,none,
       "cannot override %0 property with %1 property",
       (ReferenceOwnership, ReferenceOwnership))
 ERROR(override_dynamic_self_mismatch,none,
-      "cannot override a Self return type with a non-Self return type",
-      ())
+      "cannot override a Self return type with a non-Self return type in "
+      "non-final class", ())
 ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())

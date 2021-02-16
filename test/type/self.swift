@@ -32,7 +32,7 @@ class Mario {
   func getEnemy() -> Mario { return self }
 }
 class SuperMario : Mario {
-  override func getFriend() -> SuperMario { // expected-error{{cannot override a Self return type with a non-Self return type}}
+  override func getFriend() -> SuperMario { // expected-error{{cannot override a Self return type with a non-Self return type in non-final class}}
     return SuperMario()
   }
   override func getEnemy() -> Self { return self }
