@@ -89,7 +89,10 @@ public:
 
   friend class Scope;
 
-//--- Function prologue and epilogue -------------------------------------------
+  Address createErrorResultSlot(SILType errorType, bool isAsync);
+
+  //--- Function prologue and epilogue
+  //-------------------------------------------
 public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
@@ -106,6 +109,7 @@ public:
   /// For async functions, this is different from the caller result slot because
   /// that is a gep into the %swift.context.
   Address getCalleeErrorResultSlot(SILType errorType);
+  Address getAsyncCalleeErrorResultSlot(SILType errorType);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
@@ -165,6 +169,7 @@ private:
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   llvm::Value *CalleeErrorResultSlot = nullptr;
+  llvm::Value *AsyncCalleeErrorResultSlot = nullptr;
   llvm::Value *CallerErrorResultSlot = nullptr;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;

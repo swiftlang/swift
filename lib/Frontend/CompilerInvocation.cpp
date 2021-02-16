@@ -492,9 +492,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_objc_attr_requires_foundation_module);
   }
 
-  Opts.EnableExperimentalPrespecialization |=
-      Args.hasArg(OPT_enable_experimental_prespecialization);
-
   if (auto A = Args.getLastArg(OPT_enable_testable_attr_requires_testable_module,
                                OPT_disable_testable_attr_requires_testable_module)) {
     Opts.EnableTestableAttrRequiresTestableModule

@@ -70,7 +70,7 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) returnToCaller;
   //   SwiftActor * __ptrauth(...) callerActor;
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
-  //   SwiftError *errorResult;
+  //   SwiftError **errorResult;
   //   IndirectResultTypes *indirectResults...;
   //   union {
   //     struct {

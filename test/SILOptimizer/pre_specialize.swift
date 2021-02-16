@@ -1,20 +1,20 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -I %t -Onone -emit-sil %s | %FileCheck %s --check-prefix=NONE
+// RUN: %target-swift-frontend -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -I %t -Onone -emit-sil %s | %FileCheck %s --check-prefix=NONE
 
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -O -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -O -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -O -enable-library-evolution -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -O -enable-library-evolution -emit-module-path %t/pre_specialized_module.swiftmodule %S/Inputs/pre_specialized_module.swift
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift
+// RUN: %target-swift-frontend -I %t -O -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 import pre_specialized_module
 
