@@ -37,6 +37,7 @@ namespace options {
     ArgumentIsPath = (1 << 12),
     ModuleInterfaceOption = (1 << 13),
     SupplementaryOutput = (1 << 14),
+    SwiftAPIExtractOption = (1 << 15),
   };
 
   enum ID {

@@ -132,6 +132,7 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
+ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
       "%select{|; use -module-name flag to specify an alternate name}1",
