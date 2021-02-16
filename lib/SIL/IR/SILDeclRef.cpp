@@ -701,7 +701,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     AutoDiffConfig silConfig(
         silParameterIndices, resultIndices,
         derivativeFunctionIdentifier->getDerivativeGenericSignature());
-  return mangler.mangleAutoDiffDerivativeFunction(
+    return mangler.mangleAutoDiffDerivativeFunction(
         asAutoDiffOriginalFunction().getAbstractFunctionDecl(),
         derivativeFunctionIdentifier->getKind(),
         silConfig);
