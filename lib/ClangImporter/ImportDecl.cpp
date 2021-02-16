@@ -3475,7 +3475,8 @@ namespace {
 
         // If we've already imported this decl, skip it so we don't add the same
         // member twice.
-        if (Impl.ImportedDecls.count({nd->getCanonicalDecl(), getVersion()}))
+        if (Impl.ImportedDecls.find({nd->getCanonicalDecl(), getVersion()}) !=
+            Impl.ImportedDecls.end())
           continue;
 
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
