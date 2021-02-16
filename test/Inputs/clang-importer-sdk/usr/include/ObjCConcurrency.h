@@ -117,6 +117,11 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
   - (void) myMethod:(NSInteger)value1 foo:(NSInteger)value2;
 @end
 
+@interface GenericObject<T> : NSObject
+- (void)doSomethingWithCompletionHandler:(void (^)(T _Nullable_result, NSError * _Nullable))completionHandler;
+- (void)doAnotherThingWithCompletionHandler:(void (^)(GenericObject<T> *_Nullable))completionHandler;
+@end
+
 #define MAGIC_NUMBER 42
 
 #pragma clang assume_nonnull end

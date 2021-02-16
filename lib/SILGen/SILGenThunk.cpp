@@ -185,6 +185,7 @@ SILFunction *
 SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                          CanSILFunctionType blockType,
                                          CanType continuationTy,
+                                         CanGenericSignature sig,
                                          ForeignAsyncConvention convention) {
   // Extract the result and error types from the continuation type.
   auto resumeType = cast<BoundGenericType>(continuationTy).getGenericArgs()[0];
@@ -207,10 +208,11 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       blockType->getClangTypeInfo().getType(),
       getASTContext().getClangTypeForIRGen(blockStorageTy));
   
-  auto implTy = SILFunctionType::get(GenericSignature(),
+  auto implTy = SILFunctionType::get(sig,
          blockType->getExtInfo().intoBuilder()
            .withRepresentation(SILFunctionTypeRepresentation::CFunctionPointer)
            .withClangFunctionType(newClangTy)
+           .withIsPseudogeneric((bool)sig)
            .build(),
          SILCoroutineKind::None,
          ParameterConvention::Direct_Unowned,
@@ -223,6 +225,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   Mangle::ASTMangler Mangler;
   auto name = Mangler.mangleObjCAsyncCompletionHandlerImpl(blockType,
                                                            resumeType,
+                                                           sig,
                                                            /*predefined*/ false);
   
   SILGenFunctionBuilder builder(*this);
@@ -234,6 +237,9 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
   
   if (F->empty()) {
     // Emit the implementation.
+    if (sig)
+      F->setGenericEnvironment(sig->getGenericEnvironment());
+
     SILGenFunction SGF(*this, *F, SwiftModule);
     {
       Scope scope(SGF, loc);
@@ -282,6 +288,8 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         // Resume the continuation as throwing the given error, bridged to a
         // native Swift error.
         auto nativeError = SGF.emitBridgedToNativeError(loc, matchedError);
+        Type replacementTypes[]
+          = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(errorIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          ArrayRef<ProtocolConformanceRef>{});
@@ -296,7 +304,7 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       }
             
       auto loweredResumeTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
-                                                resumeType);
+                                            F->mapTypeIntoContext(resumeType));
       
       // Prepare the argument for the resume intrinsic, using the non-error
       // arguments to the callback.
@@ -343,6 +351,8 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         
         // Resume the continuation with the composed bridged result.
         ManagedValue resumeArg = SGF.emitManagedBufferWithCleanup(resumeArgBuf);
+        Type replacementTypes[]
+          = {F->mapTypeIntoContext(resumeType)->getCanonicalType()};
         auto subs = SubstitutionMap::get(resumeIntrinsic->getGenericSignature(),
                                          replacementTypes,
                                          ArrayRef<ProtocolConformanceRef>{});

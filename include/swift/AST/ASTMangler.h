@@ -171,6 +171,7 @@ public:
   /// predefined in the Swift runtime for the given type signature.
   std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
                                                    CanType ResultType,
+                                                   CanGenericSignature Sig,
                                                    bool predefined);
   
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
