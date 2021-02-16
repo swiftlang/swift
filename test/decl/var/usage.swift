@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -emit-sil %s -verify
 
 // <rdar://problem/20872721> QoI: warn about unused variables
 // <rdar://problem/15975935> warning that you can use 'let' not 'var'
@@ -12,12 +12,12 @@ func basicTests() -> Int {
   return y
 }
 
-func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-warning {{'var' in this position is interpreted as an argument label}} {{43-46=`var`}}
-  i += 1 // expected-error {{left side of mutating operator isn't mutable: 'i' is a 'let' constant}}
-  var j = j
-  swap(&i, &j) // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
-  return i+g
-}
+//func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // FIXME: move exxpected-warning {{'var' in this position is interpreted as an argument label}} {{43-46=`var`}}
+//  i += 1 // FIXME: move exxpected-error {{left side of mutating operator isn't mutable: 'i' is a 'let' constant}}
+//  var j = j
+//  swap(&i, &j) // FIXME: move exxpected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
+//  return i+g
+//}
 
 struct X {
   func f() {}
@@ -59,7 +59,7 @@ func testEnum() -> Int {
                                    // expected-warning@-1 {{variable 'j' was never mutated; consider changing to 'let' constant}} {{21-24=let}}
                                    // expected-warning@-2 {{variable 'k' was never mutated; consider changing to 'let' constant}} {{28-31=let}}
     return i + j + k
-  default:
+  default: // expected-warning {{default will never be executed}}
     return 0
   }
 }
@@ -193,10 +193,10 @@ func testTuple(_ x : Int) -> Int {
   
 
 
- struct TestComputedPropertyStruct {
+struct TestComputedPropertyStruct {
   
   var x : Int {
-    get {}
+    get {} // expected-error {{missing return in a function expected to return 'Int'}}
     nonmutating set {}
   }
 }
@@ -221,7 +221,8 @@ func testTuple() {
   tup.x = 1
 
   // <rdar://problem/20927707> QoI: 'variable was never mutated' noisy when only part of a destructured tuple is mutated
-  var (tupA, tupB) = (1,2)  // don't warn about tupB being changeable to a 'let'.
+  // don't warn about tupB being changeable to a 'let'.
+  var (tupA, tupB) = (1,2)  // expected-warning {{variable 'tupA' was written to, but never read}}
   tupA += tupB
 
 }
@@ -233,23 +234,24 @@ func testForceValueExpr() {
   a!.g()
 }
 
-// <rdar://problem/20894455> "variable was never mutated" diagnostic does not take #if into account
-func testBuildConfigs() {
-  let abc = 42    // no warning.
-  var mut = 18    // no warning.
-#if false
-  mut = abc    // These uses prevent abc/mut from being unused/unmutated.
-#endif
-}
-
-// same as above, but with a guard statement
-func testGuardWithPoundIf(x: Int?) {
-  guard let x = x else { return }
-
-#if false
-  _ = x
-#endif
-}
+// FIXME: delete?
+//// <rdar://problem/20894455> "variable was never mutated" diagnostic does not take #if into account
+//func testBuildConfigs() {
+//  let abc = 42    // no warning.
+//  var mut = 18    // no warning.
+//#if false
+//  mut = abc    // These uses prevent abc/mut from being unused/unmutated.
+//#endif
+//}
+//
+//// same as above, but with a guard statement
+//func testGuardWithPoundIf(x: Int?) {
+//  guard let x = x else { return }
+//
+//#if false
+//  _ = x
+//#endif
+//}
 
 // <rdar://problem/21091625> Bogus 'never mutated' warning when protocol variable is mutated only by mutating method
 protocol Fooable {
@@ -315,9 +317,16 @@ func testFixitsInStatementsWithPatterns(_ a : Int?) {
 func test(_ a : Int?, b : Any) {
   if true == true, let x = a {   // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{20-25=_}}
   }
+  
+  var z: Int // expected-warning {{variable 'z' was written to, but never read}}
   if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
-    _ = y
+    z = y
   }
+  
+  // FIXME: Impossible to notice `_ = y` in SILGen, do we ignore it?
+//  if let x = a, let y = a {  // exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
+//    _ = y
+//  }
 
   // Simple case, insert a comparison with nil.
   if let x = a {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{15-15= != nil}}
@@ -398,7 +407,7 @@ if let string = optionalAny as? String {} // expected-warning {{value 'string' w
 let unusedVariable = ""
 var unNeededVar = false
 if unNeededVar {}
-guard let foo = optionalAny else {}
+//guard let foo = optionalAny else { } // FIXME: what do I do?
 
 for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; consider replacing with '_' or removing it}} {{5-6=_}}
    print("")
@@ -406,7 +415,8 @@ for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; cons
 
 // Tests fix to SR-2421
 func sr2421() {
-  let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
+  // FIXME: "consider removing it"?
+  let x: Int // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
   x = 42
 }
 
@@ -466,20 +476,38 @@ extension MemberGetterExtension {
   }
 }
 
-func testLocalFunc() {
+// FIXME: Mark the unused capture
+func testLocalFuncNotCalled() {
   var unusedVar = 0
   // expected-warning@-1 {{initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it}}
 
   var notMutatedVar = 0
-  // expected-warning@-1 {{variable 'notMutatedVar' was never mutated; consider changing to 'let' constant}}
+  // expected-warning@-1 {{initialization of variable 'notMutatedVar' was never used; consider replacing with assignment to '_' or removing it}}
 
   var mutatedVar = 0
-  // expected-warning@-1 {{variable 'mutatedVar' was written to, but never read}}
+  // expected-warning@-1 {{initialization of variable 'mutatedVar' was never used; consider replacing with assignment to '_' or removing it}}
 
   func localFunc() {
     _ = notMutatedVar
     mutatedVar = 1
   }
+}
+
+func testLocalFunc() {
+  var unusedVar = 0
+  // expected-warning@-1 {{initialization of variable 'unusedVar' was never used; consider replacing with assignment to '_' or removing it}}
+  
+  var notMutatedVar = 0
+  // expected-warning@-1 {{variable 'notMutatedVar' was never mutated; consider changing to 'let' constant}}
+  
+  var mutatedVar = 0
+  // expected-warning@-1 {{variable 'mutatedVar' was written to, but never read}}
+  
+  func localFunc() {
+    _ = notMutatedVar
+    mutatedVar = 1
+  }
+  localFunc()
 }
 
 // False positive "'var' was never mutated" warning - rdar://60563962
@@ -494,52 +522,52 @@ func testForwardReferenceCapture() {
 }
 
 // rdar://47240768 Expand the definition of "simple" pattern to variables bound in patterns
-func testVariablesBoundInPatterns() {
-  enum StringB {
-    case simple(b: Bool)
-    case tuple(b: (Bool, Bool))
-    case optional(b: Bool?)
-  }
-
-  // Because Swift enables all kinds of creative binding forms, make sure that
-  // variable patterns occuring directly under a `let` or `var` have that
-  // introducer stripped by the fixit. All other cases are currently too
-  // complicated for the VarDeclUsageChecker.
-  switch StringB.simple(b: true) {
-  case .simple(b: let b) where false: // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
-    break
-  case .simple(b: var b) where false: // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
-    break
-  case var .simple(b: b): // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{23-24=_}}
-    break
-  case .tuple(b: let (b1, b2)) where false:
-    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
-    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
-    break
-  case .tuple(b: (let b1, let b2)) where false:
-    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
-    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
-    break
-  case .tuple(b: (var b1, var b2)) where false:
-    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
-    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
-    break
-  case var .tuple(b: (b1, b2)) where false:
-    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
-    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
-    break
-  case .tuple(b: let b): // expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{18-23=_}}
-    break
-  case .optional(b: let x?) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
-    break
-  case .optional(b: let .some(x)) where false: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{31-32=_}}
-    break
-  case let .optional(b: x?): // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
-    break
-  case let .optional(b: .none): // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
-    break
-  }
-}
+//func testVariablesBoundInPatterns() {
+//  enum StringB {
+//    case simple(b: Bool)
+//    case tuple(b: (Bool, Bool))
+//    case optional(b: Bool?)
+//  }
+//
+//  // Because Swift enables all kinds of creative binding forms, make sure that
+//  // variable patterns occuring directly under a `let` or `var` have that
+//  // introducer stripped by the fixit. All other cases are currently too
+//  // complicated for the VarDeclUsageChecker.
+//  switch StringB.simple(b: true) {
+//  case .simple(b: let b) where false: // FIXME: move exxpected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+//    break
+//  case .simple(b: var b) where false: // FIXME: move exxpected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+//    break
+//  case var .simple(b: b): // FIXME: move exxpected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{23-24=_}}
+//    break
+//  case .tuple(b: let (b1, b2)) where false:
+//    // FIXME: move exxpected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+//    // FIXME: move exxpected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+//    break
+//  case .tuple(b: (let b1, let b2)) where false:
+//    // FIXME: move exxpected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+//    // FIXME: move exxpected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+//    break
+//  case .tuple(b: (var b1, var b2)) where false:
+//    // FIXME: move exxpected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+//    // FIXME: move exxpected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+//    break
+//  case var .tuple(b: (b1, b2)) where false:
+//    // FIXME: move exxpected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+//    // FIXME: move exxpected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+//    break
+//  case .tuple(b: let b): // FIXME: move exxpected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{18-23=_}}
+//    break
+//  case .optional(b: let x?) where false: // FIXME: move exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+//    break
+//  case .optional(b: let .some(x)) where false: // FIXME: move exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{31-32=_}}
+//    break
+//  case let .optional(b: x?): // FIXME: move exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+//    break
+//  case let .optional(b: .none): // FIXME: move exxpected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
+//    break
+//  }
+//}
 
 //===----------------------------------------------------------------------===//
 // Top Level Closures
@@ -635,3 +663,328 @@ func testUselessCastWithInvalidParam(foo: Any?) -> Int {
   class Foo { }
   if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}
   else { return 54 }
+}
+  
+//===----------------------------------------------------------------------===//
+// FIXME: rename Other SIL Failure Cases
+//===----------------------------------------------------------------------===//
+
+struct Y {
+  var v: Int
+}
+
+class Z {
+  let a: Int
+  init(y: Y) {
+    a = y.v
+  }
+}
+
+func testPassingLetStructClassReturn() -> Z {
+  let y = Y(v: 3)
+  let z = Z(y: y)
+  return z
+}
+
+func testPassingLetStructNoClassReturn() {
+  let y = Y(v: 3)
+  let z = Z(y: y) // expected-warning {{initialization of immutable value 'z' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+func testPassingVarStructClassReturn() -> Z {
+  var y = Y(v: 3) // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}}
+  let z = Z(y: y)
+  return z
+}
+
+func testPassingVarStructNoClassReturn() {
+  var y = Y(v: 3) // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}}
+  let z = Z(y: y) // expected-warning {{initialization of immutable value 'z' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+struct IfTester {
+  var v: Int
+  func doSomething() { }
+  func doSomethingElse() { }
+}
+
+func testIfDecl(x: IfTester?) {
+  let unwrappedX = x!
+  if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
+    unwrappedX.doSomething()
+  } else {
+    unwrappedX.doSomethingElse()
+  }
+}
+
+struct LetPropertyInGetter {
+  var values: [Any?] = [1]
+  public var property: Int? {
+    get {
+      let value = values[0]
+      return value as? Int
+    }
+    set {
+      values[0] = newValue as Any
+    }
+  }
+}
+
+struct VarPropertyInGetter {
+  var values: [Any?] = [1]
+  public var property: Int? {
+    get {
+      var value = values[0] // expected-warning {{variable 'value' was never mutated; consider changing to 'let' constant}}
+      return value as? Int
+    }
+    set {
+      values[0] = newValue as Any
+    }
+  }
+}
+
+struct IfLetInGetter {
+  struct Nested {
+    var string: String
+  }
+  
+  var x: Nested?
+  
+  public var letRead: String {
+    if let u = x {
+      return u.string
+    } else {
+      return ""
+    }
+  }
+  
+  public var varRead: String {
+    if var u = x { // expected-warning {{variable 'u' was written to, but never read}}
+      u.string += "."
+      return ""
+    } else {
+      return ""
+    }
+  }
+  
+  public var varReadModified: String {
+    if var u = x { // expected-warning {{variable 'u' was never mutated; consider changing to 'let' constant}}
+      return u.string
+    } else {
+      return ""
+    }
+  }
+}
+
+struct ThrowInFunc {
+  
+  var structError: Error?
+  
+  public func useThrow() throws -> Bool {
+    let error = structError
+    if let e = error {
+      throw e
+    } else {
+      return true
+    }
+  }
+}
+
+func substringReturn() -> Substring {
+  let s = "hello"
+  return s[...]
+}
+
+
+func elementReturn() -> Int {
+  let i = [1]
+  return i[0]
+}
+
+struct AssignInIf {
+  
+  var a: Bool
+  var b: Bool
+  
+  func test() -> String {
+    let result: String
+    if (a) {
+      result = "a"
+    } else if (b) {
+      result = "b"
+    } else {
+      result = "c"
+    }
+    return result
+  }
+}
+
+struct MutableThrow {
+  mutating func mutate() throws { }
+}
+
+func testTryMutate() throws {
+  var x = MutableThrow()
+  try x.mutate()
+}
+
+class GuardPropertyAssign {
+  var value: Int
+  init?(_ input: Any) {
+    guard let integer = input as? Int else {
+      return nil
+    }
+    self.value = integer
+  }
+}
+
+class Object {
+  func foo() { }
+}
+
+class GuardClassTest {
+  
+  var object: Object?
+  
+  func invalidate() {
+    guard let x = self.object else { return }
+    x.foo()
+  }
+}
+
+class ACast { }
+
+struct IfLetEqualityTester {
+  
+  var x: Any
+  
+  func unbox(_ value: Any) -> Bool? {
+    
+    if let number = value as? ACast {
+      if number === x as! ACast {
+        return true
+      }
+    }
+    return false
+  }
+}
+
+func testClosureUnread() {
+  let body = { () -> Void in // expected-warning {{initialization of immutable value 'body' was never used; consider replacing with assignment to '_' or removing it}}
+    print("")
+  }
+}
+
+func testClosureRead() {
+  let body = { () -> Void in
+    print("")
+  }
+  
+  body()
+}
+
+func testClosureUnreadUnmodified() {
+  var body = { () -> Void in // expected-warning {{initialization of variable 'body' was never used; consider replacing with assignment to '_' or removing it}}
+    print("")
+  }
+}
+
+func testClosureUnmodified() {
+  var body = { () -> Void in // expected-warning {{variable 'body' was never mutated; consider changing to 'let'}}
+    print("")
+  }
+  body()
+}
+
+func testReturnInTuple() -> (Bool, Int) {
+  let i = 20
+  return (true, i)
+}
+
+func testTupleAssignUsed() -> Int {
+  let (a, b) = (1, true)
+  if b {
+    return a
+  }
+}
+
+func testTupleAssignUsedModified() -> Int {
+  var (a, b) = (1, true)
+  if b {
+    a += 1
+    return a
+  }
+}
+
+func testDeclareInIf() {
+  var a = [1,2] // expected-warning {{variable 'a' was written to, but never read}}
+  #if arch(arm64)
+  let i = 0
+  #else
+  let i = 1
+  #endif
+  a[i] = 0
+}
+
+enum Switchable {
+  case a, b
+}
+
+func testSwitch(y: ((Switchable) -> ()) -> ()) -> Int {
+  
+  do {
+    var x = 0
+    y { (v) -> () in
+      switch v {
+      case .a:
+        break
+      case .b:
+        x += 1
+      }
+    }
+    return x
+  }
+}
+
+struct TestPointerStruct {
+  
+  typealias Counters = (UInt32, UInt32)
+  
+  var counters: Counters = (UInt32(0), UInt32(0))
+  
+  func testPointer(_ index: Int) -> UInt32 {
+    var tmpCounters = counters
+    
+    let counter: UInt32 = withUnsafePointer(to: &tmpCounters) { ptr in
+      return ptr.withMemoryRebound(to: UInt32.self, capacity: 64) { buf in
+        return buf[index]
+      }
+    }
+    return counter
+  }
+}
+
+public func testSwitchGeneric<T>(first: (T?, Bool), next: @escaping (T) -> T?) -> T? {
+  switch first {
+  case (let value, true):
+    return value
+  case (let value?, _):
+    let nextValue = next(value)
+    return nextValue
+  case (nil, _):
+    return nil
+  }
+}
+
+
+func trailClosure(c: (Int) -> (Bool, Int)) -> (Bool, Int) {
+  return c(5)
+}
+
+func TestTupleMutate() -> (Bool, Int) {
+  var (a, b): (Bool, Int) = trailClosure { i in
+    return (true, i)
+  }
+  a = false
+  return (a, b)
+}
