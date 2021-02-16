@@ -253,9 +253,6 @@ namespace swift {
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
 
-    /// Enable experimental support for `@_specialize(exported: true,...)` .
-    bool EnableExperimentalPrespecialization = false;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;

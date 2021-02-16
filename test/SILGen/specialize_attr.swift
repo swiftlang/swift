@@ -1,23 +1,23 @@
 // Test .swiftmodule with library-evolution
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -module-name A -emit-module-path %t/A.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module.swift
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -I %t -module-name B -emit-module-path %t/B.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module2.swift
-// RUN: %target-swift-emit-silgen -enable-experimental-prespecialization -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-sil -enable-experimental-prespecialization -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-EVO %s
+// RUN: %target-swift-frontend -module-name A -emit-module-path %t/A.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module.swift
+// RUN: %target-swift-frontend -I %t -module-name B -emit-module-path %t/B.swiftmodule -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module2.swift
+// RUN: %target-swift-emit-silgen -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-EVO %s
 
 // Test .swiftinterface
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module -o /dev/null -module-name A -emit-module-interface-path %t/A.swiftinterface -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module.swift
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module -o /dev/null -I %t -module-name B -emit-module-interface-path %t/B.swiftinterface -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module2.swift
-// RUN: %target-swift-emit-silgen -enable-experimental-prespecialization -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-sil -enable-experimental-prespecialization -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-EVO %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -module-name A -emit-module-interface-path %t/A.swiftinterface -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module.swift
+// RUN: %target-swift-frontend -emit-module -o /dev/null -I %t -module-name B -emit-module-interface-path %t/B.swiftinterface -enable-library-evolution -swift-version 5 %S/Inputs/specialize_attr_module2.swift
+// RUN: %target-swift-emit-silgen -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-EVO %s
 
 // Test .swiftmodule without library-evolution
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -module-name A -emit-module-path %t/A.swiftmodule -swift-version 5 %S/Inputs/specialize_attr_module.swift
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -I %t -module-name B -emit-module-path %t/B.swiftmodule -swift-version 5 %S/Inputs/specialize_attr_module2.swift
-// RUN: %target-swift-emit-silgen -enable-experimental-prespecialization -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-sil -enable-experimental-prespecialization -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-NOEVO %s
+// RUN: %target-swift-frontend -module-name A -emit-module-path %t/A.swiftmodule -swift-version 5 %S/Inputs/specialize_attr_module.swift
+// RUN: %target-swift-frontend -I %t -module-name B -emit-module-path %t/B.swiftmodule -swift-version 5 %S/Inputs/specialize_attr_module2.swift
+// RUN: %target-swift-emit-silgen -I %t -module-name specialize_attr -emit-verbose-sil %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-sil -I %t -sil-verify-all -O -module-name specialize_attr -emit-verbose-sil %s | %FileCheck -check-prefix=CHECK-OPT -check-prefix=CHECK-OPT-NOEVO %s
 
 import A
 import B

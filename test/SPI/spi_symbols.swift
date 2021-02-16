@@ -1,7 +1,7 @@
 // REQUIRES: VENDOR=apple
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -enable-experimental-prespecialization %S/Inputs/spi_helper.swift -emit-ir -o %t/spi_helper.ll -emit-tbd-path %t/spi_helper.tbd -module-name spi_helper
+// RUN: %target-swift-frontend %S/Inputs/spi_helper.swift -emit-ir -o %t/spi_helper.ll -emit-tbd-path %t/spi_helper.tbd -module-name spi_helper
 
 // RUN: cat %t/spi_helper.ll | %FileCheck -check-prefix=CHECK-IR %s
 // RUN: cat %t/spi_helper.tbd | %FileCheck -check-prefix=CHECK-TBD %s
