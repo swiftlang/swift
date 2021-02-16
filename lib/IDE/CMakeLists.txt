@@ -11,6 +11,7 @@ add_swift_host_library(swiftIDE STATIC
   FuzzyStringMatcher.cpp
   Refactoring.cpp
   ModuleInterfacePrinting.cpp
+  ModuleSourceFileInfo.cpp
   REPLCodeCompletion.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp

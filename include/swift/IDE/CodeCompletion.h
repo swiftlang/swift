@@ -633,6 +633,7 @@ public:
 private:
   CodeCompletionString *CompletionString;
   StringRef ModuleName;
+  StringRef SourceFilePath;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
   ArrayRef<std::pair<StringRef, StringRef>> DocWords;
@@ -740,7 +741,7 @@ public:
                        CodeCompletionFlair Flair, unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        CodeCompletionDeclKind DeclKind, bool IsSystem,
-                       StringRef ModuleName,
+                       StringRef ModuleName, StringRef SourceFilePath,
                        CodeCompletionResult::NotRecommendedReason NotRecReason,
                        StringRef BriefDocComment,
                        ArrayRef<StringRef> AssociatedUSRs,
@@ -749,10 +750,11 @@ public:
                        CodeCompletionOperatorKind KnownOperatorKind)
       : Kind(ResultKind::Declaration),
         KnownOperatorKind(unsigned(KnownOperatorKind)),
-        SemanticContext(unsigned(SemanticContext)), Flair(unsigned(Flair.toRaw())),
-        NotRecommended(unsigned(NotRecReason)), IsSystem(IsSystem),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString),
-        ModuleName(ModuleName), BriefDocComment(BriefDocComment),
+        SemanticContext(unsigned(SemanticContext)),
+        Flair(unsigned(Flair.toRaw())), NotRecommended(unsigned(NotRecReason)),
+        IsSystem(IsSystem), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        SourceFilePath(SourceFilePath), BriefDocComment(BriefDocComment),
         AssociatedUSRs(AssociatedUSRs), DocWords(DocWords),
         TypeDistance(TypeDistance) {
     AssociatedKind = static_cast<unsigned>(DeclKind);
@@ -853,6 +855,16 @@ public:
     return DocWords;
   }
 
+  void setSourceFilePath(StringRef value) {
+    SourceFilePath = value;
+  }
+
+  /// Returns the source file path where the associated decl was declared.
+  /// Returns an empty string if the information is not available.
+  StringRef getSourceFilePath() const {
+    return SourceFilePath;
+  }
+
   /// Print a debug representation of the code completion result to \p OS.
   void printPrefix(raw_ostream &OS) const;
   SWIFT_DEBUG_DUMP;
@@ -863,6 +875,15 @@ public:
   static CodeCompletionOperatorKind
   getCodeCompletionOperatorKind(CodeCompletionString *str);
   static bool getDeclIsSystem(const Decl *D);
+};
+
+/// A pair of a file path and its up-to-date-ness.
+struct SourceFileAndUpToDate {
+  StringRef FilePath;
+  bool IsUpToDate;
+
+  SourceFileAndUpToDate(StringRef FilePath, bool IsUpToDate)
+      : FilePath(FilePath), IsUpToDate(IsUpToDate) {}
 };
 
 struct CodeCompletionResultSink {
@@ -877,11 +898,13 @@ struct CodeCompletionResultSink {
 
   /// Whether to annotate the results with XML.
   bool annotateResult = false;
+  bool requiresSourceFileInfo = false;
 
   /// Whether to emit object literals if desired.
   bool includeObjectLiterals = true;
 
   std::vector<CodeCompletionResult *> Results;
+  std::vector<SourceFileAndUpToDate> SourceFiles;
 
   /// A single-element cache for module names stored in Allocator, keyed by a
   /// clang::Module * or swift::ModuleDecl *.
@@ -950,7 +973,10 @@ public:
       : Cache(Cache) {}
 
   void setAnnotateResult(bool flag) { CurrentResults.annotateResult = flag; }
-  bool getAnnotateResult() { return CurrentResults.annotateResult; }
+  bool getAnnotateResult() const { return CurrentResults.annotateResult; }
+
+  void setRequiresSourceFileInfo(bool flag) { CurrentResults.requiresSourceFileInfo = flag; }
+  bool requiresSourceFileInfo() const { return CurrentResults.requiresSourceFileInfo; }
 
   void setIncludeObjectLiterals(bool flag) {
     CurrentResults.includeObjectLiterals = flag;
@@ -1006,6 +1032,7 @@ class PrintingCodeCompletionConsumer
   bool IncludeKeywords;
   bool IncludeComments;
   bool PrintAnnotatedDescription;
+  bool RequiresSourceFileInfo = false;
 
 public:
  PrintingCodeCompletionConsumer(llvm::raw_ostream &OS,
@@ -1017,8 +1044,8 @@ public:
        IncludeComments(IncludeComments),
        PrintAnnotatedDescription(PrintAnnotatedDescription) {}
 
- void handleResults(CodeCompletionContext &context) override;
- void handleResults(MutableArrayRef<CodeCompletionResult *> Results);
+  void handleResults(CodeCompletionContext &context) override;
+  void handleResults(MutableArrayRef<CodeCompletionResult *> Results);
 };
 
 /// Create a factory for code completion callbacks.

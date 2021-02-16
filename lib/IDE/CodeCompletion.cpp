@@ -33,6 +33,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
+#include "swift/IDE/ModuleSourceFileInfo.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -1320,11 +1321,14 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       }
     }
 
-    return new (*Sink.Allocator) CodeCompletionResult(
+    CodeCompletionResult *result = new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, Flair, NumBytesToErase, CCS, AssociatedDecl,
         ModuleName, NotRecReason, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         copyArray(*Sink.Allocator, CommentWords), ExpectedTypeRelation);
+    if (!result->isSystem())
+      result->setSourceFilePath(getSourceFilePathForDecl(AssociatedDecl));
+    return result;
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
@@ -6558,6 +6562,37 @@ static void postProcessResults(MutableArrayRef<CodeCompletionResult *> results,
   }
 }
 
+static void copyAllKnownSourceFileInfo(
+    ASTContext &Ctx, CodeCompletionResultSink &Sink) {
+  assert(Sink.SourceFiles.empty());
+
+  SmallVector<ModuleDecl *, 8> loadedModules;
+  loadedModules.reserve(Ctx.getNumLoadedModules());
+  for (auto &entry : Ctx.getLoadedModules())
+    loadedModules.push_back(entry.second);
+
+  auto &result = Sink.SourceFiles;
+  for (auto *M : loadedModules) {
+    // We don't need to check system modules.
+    if (M->isSystemModule())
+      continue;
+
+    M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
+      if (info.getFilePath().empty())
+        return;
+      
+      bool isUpToDate = false;
+      if (info.isFromSourceFile()) {
+        // 'SourceFile' is always "up-to-date" because we've just loaded.
+        isUpToDate = true;
+      } else {
+        isUpToDate = isSourceFileUpToDate(info, Ctx);
+      }
+      result.emplace_back(copyString(*Sink.Allocator, info.getFilePath()), isUpToDate);
+    });
+  }
+}
+
 static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
                                      CompletionLookup &Lookup,
                                      DeclContext *DC,
@@ -6676,6 +6711,10 @@ static void deliverCompletionResults(CodeCompletionContext &CompletionContext,
   postProcessResults(CompletionContext.getResultSink().Results,
                      CompletionContext.CodeCompletionKind, DC,
                      /*Sink=*/nullptr);
+
+  if (CompletionContext.requiresSourceFileInfo())
+    copyAllKnownSourceFileInfo(SF.getASTContext(),
+                               CompletionContext.getResultSink());
 
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules, DC);
 }
@@ -7378,6 +7417,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
 void PrintingCodeCompletionConsumer::handleResults(
     CodeCompletionContext &context) {
+  if (context.requiresSourceFileInfo() &&
+      !context.getResultSink().SourceFiles.empty()) {
+    OS << "Known module source files\n";
+    for (auto &entry : context.getResultSink().SourceFiles) {
+      OS << (entry.IsUpToDate ? " + "  : " - ");
+      OS << entry.FilePath;
+      OS << "\n";
+    }
+    this->RequiresSourceFileInfo = true;
+  }
   auto results = context.takeResults();
   handleResults(results);
 }
@@ -7412,6 +7461,13 @@ void PrintingCodeCompletionConsumer::handleResults(
     StringRef comment = Result->getBriefDocComment();
     if (IncludeComments && !comment.empty()) {
       OS << "; comment=" << comment;
+    }
+
+    if (RequiresSourceFileInfo) {
+      StringRef sourceFilePath = Result->getSourceFilePath();
+      if (!sourceFilePath.empty()) {
+        OS << "; source=" << sourceFilePath;
+      }
     }
 
     OS << "\n";
