@@ -242,8 +242,7 @@ public:
 
   /// Get or create a derivative function vtable entry thunk for the given
   /// SILDeclRef and derivative function type.
-  SILFunction *
-  getOrCreateDerivativeVTableThunk(
+  SILFunction *getOrCreateDerivativeVTableThunk(
       SILDeclRef derivativeFnRef, CanSILFunctionType derivativeFnTy);
 
   /// Determine whether we need to emit an ivar destroyer for the given class.
