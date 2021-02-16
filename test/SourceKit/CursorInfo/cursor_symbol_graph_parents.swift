@@ -1,5 +1,3 @@
-// REQUIRES: rdar74150023
-
 /// Something about variable global
 let global = 1
 
