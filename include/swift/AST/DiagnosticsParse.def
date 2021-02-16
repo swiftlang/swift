@@ -1672,6 +1672,15 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
 
+// hasAsyncAlternative
+ERROR(requires_has_async_alternative, none,
+      "'%0' support is required to be explicitly enabled using "
+      "-experimental-has-async-alternative-attribute", (StringRef))
+
+ERROR(has_async_alternative_invalid_name, none,
+      "argument of '%0' attribute must be an identifier or full function name",
+      (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
