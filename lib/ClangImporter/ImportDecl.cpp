@@ -8133,9 +8133,10 @@ void ClangImporter::Implementation::importAttributes(
     // __attribute__((swift_attr("attribute")))
     //
     if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
-      // FIXME: Hard-core @MainActor, because we don't have a point at which to
-      // do name lookup for imported entities.
-      if (swiftAttr->getAttribute() == "@MainActor") {
+      // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
+      // point at which to do name lookup for imported entities.
+      if (swiftAttr->getAttribute() == "@MainActor" ||
+          swiftAttr->getAttribute() == "@UIActor") {
         if (Type mainActorType = getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
@@ -9067,8 +9068,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   // If we're in concurrency mode, mark the constant as @actorIndependent
   if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    auto actorIndependentAttr = new (C) ActorIndependentAttr(SourceLoc(),
-        SourceRange(), ActorIndependentKind::Safe);
+    auto actorIndependentAttr = new (C) ActorIndependentAttr(
+        ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
     var->getAttrs().add(actorIndependentAttr);
   }
   // Set the function up as the getter.

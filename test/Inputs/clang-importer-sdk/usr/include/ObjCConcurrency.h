@@ -82,6 +82,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)independentMethod __attribute__((__swift_attr__("@actorIndependent")));
 -(void)asyncHandlerMethod __attribute__((__swift_attr__("@asyncHandler")));
 -(void)mainActorMethod __attribute__((__swift_attr__("@MainActor")));
+-(void)uiActorMethod __attribute__((__swift_attr__("@UIActor")));
 
 @optional
 -(void)missingAtAttributeMethod __attribute__((__swift_attr__("asyncHandler")));
