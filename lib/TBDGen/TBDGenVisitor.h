@@ -61,6 +61,32 @@ struct InstallNameStore {
   void remark(ASTContext &Ctx, StringRef ModuleName) const;
 };
 
+/// A set of callbacks for recording APIs.
+class APIRecorder {
+public:
+  virtual ~APIRecorder() {}
+
+  virtual void addSymbol(StringRef name, llvm::MachO::SymbolKind kind,
+                         SymbolSource source) {}
+  virtual void addObjCInterface(const ClassDecl *decl) {}
+  virtual void addObjCMethod(const ClassDecl *cls, SILDeclRef method) {}
+};
+
+class SimpleAPIRecorder final : public APIRecorder {
+public:
+  using SymbolCallbackFn = llvm::function_ref<void(
+      StringRef, llvm::MachO::SymbolKind, SymbolSource)>;
+
+  SimpleAPIRecorder(SymbolCallbackFn func) : func(func) {}
+
+  void addSymbol(StringRef symbol, llvm::MachO::SymbolKind kind,
+                 SymbolSource source) override {
+    func(symbol, kind, source);
+  }
+private:
+  SymbolCallbackFn func;
+};
+
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 #ifndef NDEBUG
   /// Tracks the symbols emitted to ensure we don't emit any duplicates.
@@ -71,12 +97,9 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   UniversalLinkageInfo UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
+  APIRecorder &recorder;
 
   using SymbolKind = llvm::MachO::SymbolKind;
-  using SymbolCallbackFn =
-      llvm::function_ref<void(StringRef, SymbolKind, SymbolSource)>;
-
-  SymbolCallbackFn SymbolCallback;
 
   /// A set of original function and derivative configuration pairs for which
   /// derivative symbols have been emitted.
@@ -144,15 +167,15 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   TBDGenVisitor(const llvm::Triple &target, const llvm::DataLayout &dataLayout,
                 ModuleDecl *swiftModule, const TBDGenOptions &opts,
-                SymbolCallbackFn symbolCallback)
+                APIRecorder &recorder)
       : DataLayout(dataLayout),
         UniversalLinkInfo(target, opts.HasMultipleIGMs, /*forcePublic*/ false),
-        SwiftModule(swiftModule), Opts(opts), SymbolCallback(symbolCallback),
+        SwiftModule(swiftModule), Opts(opts), recorder(recorder),
         previousInstallNameMap(parsePreviousModuleInstallNameMap()) {}
 
   /// Create a new visitor using the target and layout information from a
   /// TBDGenDescriptor.
-  TBDGenVisitor(const TBDGenDescriptor &desc, SymbolCallbackFn symbolCallback);
+  TBDGenVisitor(const TBDGenDescriptor &desc, APIRecorder &recorder);
 
   ~TBDGenVisitor() { assert(DeclStack.empty()); }
   void addMainIfNecessary(FileUnit *file) {

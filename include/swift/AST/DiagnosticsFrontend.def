@@ -138,6 +138,7 @@ WARNING(emit_swift_ranges_without_primary_file,none,
 WARNING(emit_compiled_source_without_primary_file,none,
 "ignoring -emit-compiled-source (requires -primary-file)", ())
 
+ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
       "%select{|; use -module-name flag to specify an alternate name}1",
