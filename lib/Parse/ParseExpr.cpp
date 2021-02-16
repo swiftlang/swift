@@ -128,8 +128,9 @@ ParserResult<Expr> Parser::parseExprArrow() {
   SourceLoc asyncLoc, throwsLoc, arrowLoc;
   ParserStatus status;
 
-  status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
-                                   /*rethrows=*/nullptr);
+  status |= parseEffectsSpecifiers(SourceLoc(),
+                                   asyncLoc, /*reasync=*/nullptr,
+                                   throwsLoc, /*rethrows=*/nullptr);
   if (status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
     return status;
@@ -145,7 +146,9 @@ ParserResult<Expr> Parser::parseExprArrow() {
 
   arrowLoc = consumeToken(tok::arrow);
 
-  parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+  parseEffectsSpecifiers(arrowLoc,
+                         asyncLoc, /*reasync=*/nullptr,
+                         throwsLoc, /*rethrows=*/nullptr);
 
   auto arrow = new (Context) ArrowExpr(asyncLoc, throwsLoc, arrowLoc);
   return makeParserResult(arrow);
@@ -2600,8 +2603,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
       params = ParameterList::create(Context, elements);
     }
 
-    status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
-                                     /*rethrows*/nullptr);
+    status |= parseEffectsSpecifiers(SourceLoc(),
+                                     asyncLoc, /*reasync*/nullptr,
+                                     throwsLoc, /*rethrows*/nullptr);
 
     // Parse the optional explicit return type.
     if (Tok.is(tok::arrow)) {
@@ -2620,8 +2624,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         explicitResultType = new (Context) TypeExpr(explicitResultTypeRepr);
 
         // Check for 'throws' and 'rethrows' after the type and correct it.
-        parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc,
-                               /*rethrows*/nullptr);
+        parseEffectsSpecifiers(arrowLoc,
+                               asyncLoc, /*reasync*/nullptr,
+                               throwsLoc, /*rethrows*/nullptr);
       }
     }
   }

@@ -353,25 +353,25 @@ SIMPLE_DECL_ATTR(testable, Testable,
 DECL_ATTR(_alignment, Alignment,
   OnStruct | OnEnum |
   UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   56)
 SIMPLE_DECL_ATTR(rethrows, Rethrows,
-  OnFunc | OnAccessor | OnConstructor |
+  OnFunc | OnConstructor |
   RejectByParser |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   57)
 SIMPLE_DECL_ATTR(rethrows, AtRethrows,
   OnProtocol |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   58)
 DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
   OnClass |
   UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   59)
 CONTEXTUAL_SIMPLE_DECL_ATTR(indirect, Indirect, DeclModifier |
   OnEnum | OnEnumElement |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   60)
 SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
   OnFunc | OnAccessor /*| OnVar*/ |
@@ -469,7 +469,7 @@ DECL_ATTR(_dynamicReplacement, DynamicReplacement,
 SIMPLE_DECL_ATTR(_borrowed, Borrowed,
   OnVar | OnSubscript | UserInaccessible |
   NotSerialized |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   81)
 DECL_ATTR(_private, PrivateImport,
   OnImport |
@@ -479,7 +479,7 @@ DECL_ATTR(_private, PrivateImport,
   82)
 SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   OnVar | OnSubscript | OnAbstractFunction | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   83)
 
 SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
@@ -612,6 +612,17 @@ SIMPLE_DECL_ATTR(_marker, Marker,
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   108)
+
+SIMPLE_DECL_ATTR(reasync, Reasync,
+  OnFunc | OnConstructor |
+  RejectByParser |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  109)
+
+SIMPLE_DECL_ATTR(reasync, AtReasync,
+  OnProtocol |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  110)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -371,8 +371,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   if (isAtFunctionTypeArrow()) {
-    status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
-                                     /*rethrows=*/nullptr);
+    status |= parseEffectsSpecifiers(SourceLoc(),
+                                     asyncLoc, /*reasync=*/nullptr,
+                                     throwsLoc, /*rethrows=*/nullptr);
   }
 
   // Handle type-function if we have an arrow.
@@ -380,7 +381,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     SourceLoc arrowLoc = consumeToken();
 
     // Handle async/throws in the wrong place.
-    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+    parseEffectsSpecifiers(arrowLoc,
+                           asyncLoc, /*reasync=*/nullptr,
+                           throwsLoc, /*rethrows=*/nullptr);
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);

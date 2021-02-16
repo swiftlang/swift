@@ -1537,6 +1537,9 @@ namespace  {
 
     UNINTERESTING_ATTR(AtRethrows)
     UNINTERESTING_ATTR(Marker)
+
+    UNINTERESTING_ATTR(AtReasync)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1551,6 +1554,16 @@ namespace  {
       if (!Override->getAttrs().hasAttribute<RethrowsAttr>() &&
           cast<AbstractFunctionDecl>(Override)->hasThrows()) {
         Diags.diagnose(Override, diag::override_rethrows_with_non_rethrows,
+                       isa<ConstructorDecl>(Override));
+        Diags.diagnose(Base, diag::overridden_here);
+      }
+    }
+
+    void visitReasyncAttr(ReasyncAttr *attr) {
+      // 'reasync' functions are a subtype of ordinary 'async' functions.
+      // Require 'reasync' on the override if it was there on the base.
+      if (!Override->getAttrs().hasAttribute<ReasyncAttr>()) {
+        Diags.diagnose(Override, diag::override_reasync_with_non_reasync,
                        isa<ConstructorDecl>(Override));
         Diags.diagnose(Base, diag::overridden_here);
       }
