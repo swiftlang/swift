@@ -472,6 +472,27 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
   )
 }
 
+
+  /// Suspends the current task for _at least_ the given duration
+  /// in nanoseconds.
+  ///
+  /// This function does _not_ block the underlying thread.
+  public static func sleep(_ duration: UInt64) async {
+
+    // Set up the job flags for a new task.
+    var flags = JobFlags()
+    flags.kind = .task
+    flags.priority = .default
+    flags.isFuture = true
+
+    // Create the asynchronous task future.
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, {})
+
+    // Enqueue the resulting job.
+    _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
+
+    let _ = await Handle<Void, Never>(task).get()
+  }
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
 extension Task {
@@ -570,6 +591,10 @@ func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
+
+@_silgen_name("swift_task_enqueueGlobalWithDelay")
+@usableFromInline
+func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
 @available(*, deprecated)
 @_silgen_name("swift_task_runAndBlockThread")
