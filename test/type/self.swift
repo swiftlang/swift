@@ -52,6 +52,8 @@ do {
     }
 
     func inAndOut(arg: GenericClass) -> Self { arg }
+
+    func nonCovariantSelf(_: GenericClass<Self>, _: Self) {}
   }
 }
 
