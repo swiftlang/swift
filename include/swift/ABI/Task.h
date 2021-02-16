@@ -845,8 +845,10 @@ public:
     /// The type of the result that will be produced by the future.
     const Metadata *resultType;
 
-    // Trailing storage for the result itself. The storage will be uninitialized,
-    // contain an instance of \c resultType, or contain an an \c Error.
+    SwiftError *error = nullptr;
+
+    // Trailing storage for the result itself. The storage will be
+    // uninitialized, contain an instance of \c resultType.
 
     friend class AsyncTask;
 
@@ -865,25 +867,20 @@ public:
     }
 
     /// Retrieve the error.
-    SwiftError *&getError() {
-      return *reinterpret_cast<SwiftError **>(
-           reinterpret_cast<char *>(this) + storageOffset(resultType));
-    }
+    SwiftError *&getError() { return *&error; }
 
     /// Compute the offset of the storage from the base of the future
     /// fragment.
     static size_t storageOffset(const Metadata *resultType)  {
       size_t offset = sizeof(FutureFragment);
-      size_t alignment =
-          std::max(resultType->vw_alignment(), alignof(SwiftError *));
+      size_t alignment = resultType->vw_alignment();
       return (offset + alignment - 1) & ~(alignment - 1);
     }
 
     /// Determine the size of the future fragment given a particular future
     /// result type.
     static size_t fragmentSize(const Metadata *resultType) {
-      return storageOffset(resultType) +
-          std::max(resultType->vw_size(), sizeof(SwiftError *));
+      return storageOffset(resultType) + resultType->vw_size();
     }
   };
 
@@ -1038,7 +1035,7 @@ public:
 /// futures.
 class FutureAsyncContext : public AsyncContext {
 public:
-  SwiftError *errorResult = nullptr;
+  SwiftError **errorResult = nullptr;
   OpaqueValue *indirectResult;
 
   using AsyncContext::AsyncContext;

@@ -60,7 +60,7 @@ namespace {
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   // Error result is always present.
-  SwiftError *errorResult = nullptr;
+  SwiftError **errorResult = nullptr;
 
   // No indirect results.
 

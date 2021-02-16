@@ -96,7 +96,7 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   // If an error was thrown, save it in the future fragment.
   auto futureContext = static_cast<FutureAsyncContext *>(context);
   bool hadErrorResult = false;
-  if (auto errorObject = futureContext->errorResult) {
+  if (auto errorObject = *futureContext->errorResult) {
     fragment->getError() = errorObject;
     hadErrorResult = true;
   }
@@ -294,7 +294,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
     // Set up the context for the future so there is no error, and a successful
     // result will be written into the future fragment's storage.
     auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
-    futureContext->errorResult = nullptr;
+    futureContext->errorResult = &futureFragment->getError();
     futureContext->indirectResult = futureFragment->getStoragePtr();
   }
 
