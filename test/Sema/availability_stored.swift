@@ -9,26 +9,52 @@
 struct NewStruct {}
 
 @available(macOS 50, *)
-struct GoodReference {
+struct GoodReferenceStruct {
   var x: NewStruct
 }
 
 @available(macOS 50, *)
-struct GoodNestedReference {
+struct GoodNestedReferenceStruct {
   struct Inner {
     var x: NewStruct
   }
 }
 
-struct BadReference1 {
+struct BadReferenceStruct1 {
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   var x: NewStruct
 }
 
 @available(macOS 40, *)
-struct BadReference2 {
+struct BadReferenceStruct2 {
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   var x: NewStruct
+}
+
+// The same behavior should hold for enum elements with payloads.
+@available(macOS 50, *)
+enum GoodReferenceEnum {
+  case x(NewStruct)
+}
+
+@available(macOS 50, *)
+enum GoodNestedReferenceEnum {
+  enum Inner {
+    case x(NewStruct)
+  }
+}
+
+enum BadReferenceEnum1 {
+  // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  case x(NewStruct)
+}
+
+@available(macOS 40, *)
+enum BadReferenceEnum2 {
+  // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 50, *)
+  case x(NewStruct)
 }
