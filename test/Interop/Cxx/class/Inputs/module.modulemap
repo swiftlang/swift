@@ -65,4 +65,5 @@ module NestedRecords {
 
 module LinkedRecords {
   header "linked-records.h"
+  requires cplusplus
 }
