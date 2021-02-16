@@ -1208,3 +1208,18 @@ bb0:
   return %22 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @cse_mark_dependence2 :
+// CHECK: mark_dependence
+// CHECK-NOT: mark_dependence
+// CHECK-LABEL: } // end sil function 'cse_mark_dependence2'
+sil [ossa] @cse_mark_dependence2 : $@convention(thin) (@inout Builtin.Int64, @guaranteed Builtin.NativeObject) -> (Builtin.Int64, Builtin.Int64) {
+bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = mark_dependence %0 : $*Builtin.Int64 on %1 : $Builtin.NativeObject
+  %copy = copy_value %1 : $Builtin.NativeObject
+  %3 = mark_dependence %0 : $*Builtin.Int64 on %copy : $Builtin.NativeObject
+  %4 = load [trivial] %2 : $*Builtin.Int64
+  %5 = load [trivial] %3 : $*Builtin.Int64
+  %6 = tuple(%4 : $Builtin.Int64, %5 : $Builtin.Int64)
+  destroy_value %copy : $Builtin.NativeObject
+  return %6 : $(Builtin.Int64, Builtin.Int64)
+}
