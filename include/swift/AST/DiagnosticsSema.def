@@ -5487,6 +5487,9 @@ NOTE(property_wrapper_declared_here,none,
 ERROR(property_wrapper_param_arg, none,
       "property wrapper attributes applied to parameters cannot have arguments",
       ())
+ERROR(property_wrapper_param_no_projection,none,
+      "cannot use property wrapper projection parameter; "
+      "wrapper %0 does not have a 'projectedValue'", (Type))
 
 ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "

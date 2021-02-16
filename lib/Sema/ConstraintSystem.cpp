@@ -1156,6 +1156,62 @@ static unsigned getNumRemovedArgumentLabels(ValueDecl *decl,
   llvm_unreachable("Unhandled FunctionRefKind in switch.");
 }
 
+/// Replaces property wrapper types in the parameter list of the given function type
+/// with the wrapped-value or projected-value types (depending on argument label).
+static FunctionType *
+unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *funcDecl,
+                                    FunctionRefKind functionRefKind, FunctionType *functionType,
+                                    ConstraintLocatorBuilder locator) {
+  // Only apply property wrappers to unapplied references to functions
+  // with wrapped parameters.
+  if (!AnyFunctionRef(funcDecl).hasPropertyWrapperParameters() ||
+      !(functionRefKind == FunctionRefKind::Compound ||
+        functionRefKind == FunctionRefKind::Unapplied)) {
+    return functionType;
+  }
+
+  auto *paramList = funcDecl->getParameters();
+  auto paramTypes = functionType->getParams();
+  SmallVector<AnyFunctionType::Param, 4> adjustedParamTypes;
+
+  DeclNameLoc nameLoc;
+  auto *ref = getAsExpr(locator.getAnchor());
+  if (auto *declRef = dyn_cast<DeclRefExpr>(ref)) {
+    nameLoc = declRef->getNameLoc();
+  } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(ref)) {
+    nameLoc = dotExpr->getNameLoc();
+  } else if (auto *overloadedRef = dyn_cast<OverloadedDeclRefExpr>(ref)) {
+    nameLoc = overloadedRef->getNameLoc();
+  } else if (auto *memberExpr = dyn_cast<UnresolvedMemberExpr>(ref)) {
+    nameLoc = memberExpr->getNameLoc();
+  }
+
+  for (unsigned i : indices(*paramList)) {
+    auto *paramDecl = paramList->get(i);
+    if (!paramDecl->hasAttachedPropertyWrapper()) {
+      adjustedParamTypes.push_back(paramTypes[i]);
+      continue;
+    }
+
+    Identifier argLabel;
+    if (functionRefKind == FunctionRefKind::Compound) {
+      auto &context = cs.getASTContext();
+      auto argLabelLoc = nameLoc.getArgumentLabelLoc(i);
+      auto argLabelToken = Lexer::getTokenAtLocation(context.SourceMgr, argLabelLoc);
+      argLabel = context.getIdentifier(argLabelToken.getText());
+    }
+
+    auto *wrappedType = cs.createTypeVariable(cs.getConstraintLocator(locator), 0);
+    auto paramType = paramTypes[i].getParameterType();
+    auto paramLabel = paramTypes[i].getLabel();
+    adjustedParamTypes.push_back(AnyFunctionType::Param(wrappedType, paramLabel));
+    cs.applyPropertyWrapperParameter(paramType, wrappedType, paramDecl, argLabel,
+                                     ConstraintKind::Equal, locator);
+  }
+
+  return FunctionType::get(adjustedParamTypes, functionType->getResult());
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
@@ -1200,6 +1256,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto openedType = openFunctionType(funcType, locator, replacements,
                                        funcDecl->getDeclContext())
                           ->removeArgumentLabels(numLabelsToRemove);
+
+    openedType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
+                                                     openedType->getAs<FunctionType>(),
+                                                     locator);
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
@@ -1629,6 +1689,16 @@ ConstraintSystem::getTypeOfMemberReference(
         outerDC, genericFn->getGenericSignature(),
         /*skipProtocolSelfConstraint=*/true, locator,
         [&](Type type) { return openType(type, replacements); });
+  }
+
+  if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
+    auto *fullFunctionType = openedType->getAs<AnyFunctionType>();
+
+    // Strip off the 'self' parameter
+    auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
+    functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
+                                                       functionType, locator);
+    openedType = FunctionType::get(fullFunctionType->getParams(), functionType);
   }
 
   // Compute the type of the reference.

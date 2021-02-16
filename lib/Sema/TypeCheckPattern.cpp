@@ -1665,7 +1665,7 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
-void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
+void TypeChecker::coerceParameterListToType(ParameterList *P,
                                             AnyFunctionType *FN) {
 
   // Local function to check if the given type is valid e.g. doesn't have
@@ -1691,21 +1691,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      // Apply property wrapper types to synthesized vars
-      if (auto wrapperInfo = param->getPropertyWrapperBackingPropertyInfo()) {
-        wrapperInfo.backingVar->setInterfaceType(ty->mapTypeOutOfContext());
-
-        if (auto *projection = wrapperInfo.projectionVar) {
-          auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
-          auto projectionType = ty->getTypeOfMember(param->getModuleContext(),
-                                                    typeInfo.projectedValueVar);
-          projection->setInterfaceType(projectionType->mapTypeOutOfContext());
-        }
-
-        ty = computeWrappedValueType(param, ty);
-        param->getPropertyWrapperWrappedValueVar()->setInterfaceType(ty);
-      }
-
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
   };
@@ -1722,6 +1707,4 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                     params[i].isInOut());
     assert(!param->isDefaultArgument() && "Closures cannot have default args");
   }
-
-  TypeChecker::checkParameterList(P, CE);
 }

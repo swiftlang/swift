@@ -1421,9 +1421,10 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       }
 
       if (auto *param = paramInfo.getPropertyWrapperParam(argIdx)) {
-        return cs.matchPropertyWrapperArgument(
-            /*wrapperType=*/paramTy, /*argumentType=*/argTy, param,
-            argInfo->Labels[argIdx], subKind, loc);
+        auto argLabel = argInfo->Labels[argIdx];
+        cs.applyPropertyWrapperParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
+                                         argLabel, subKind, locator);
+        continue;
       }
 
       // If argument comes for declaration it should loose
@@ -1445,45 +1446,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   }
 
   return cs.getTypeMatchSuccess();
-}
-
-ConstraintSystem::TypeMatchResult
-ConstraintSystem::matchPropertyWrapperArgument(
-    Type wrapperType, Type argumentType, const ParamDecl *param,
-    Identifier argLabel, ConstraintKind matchKind,
-    ConstraintLocatorBuilder locator) {
-  auto anchor = simplifyLocatorToAnchor(getConstraintLocator(locator));
-  if (!anchor)
-    return getTypeMatchFailure(locator);
-
-  // Use a wrapped value placeholder to avoid generating constriants for the
-  // argument expression again.
-  auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
-      getASTContext(), param->getSourceRange(), Type(), /*wrappedValue=*/nullptr);
-  setType(placeholder, argumentType);
-
-  PropertyWrapperInitKind initKind;
-  if (!argLabel.empty() && argLabel.str().startswith("$")) {
-    initKind = PropertyWrapperInitKind::ProjectedValue;
-  } else {
-    initKind = PropertyWrapperInitKind::WrappedValue;
-  }
-
-  auto initializer = buildPropertyWrapperInitCall(
-      param, wrapperType, placeholder, initKind);
-  auto *arg = getAsExpr(anchor);
-  appliedPropertyWrappers[arg] = initializer;
-
-  generateConstraints(initializer, DC);
-  addConstraint(matchKind, getType(initializer), wrapperType,
-                getConstraintLocator(initializer));
-
-  // Set the original wrapped value _after_ generating constraints
-  // so the argument expression isn't visited in CSGen.
-  placeholder->setOriginalWrappedValue(arg);
-
-  // FIXME: Can there be failures from the above?
-  return getTypeMatchSuccess();
 }
 
 ConstraintSystem::TypeMatchResult
@@ -6736,8 +6698,27 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  DeclNameRef lookupName = memberName;
+  if (memberName.isCompoundName()) {
+    auto &context = getASTContext();
+
+    // Remove any $ prefixes for lookup
+    SmallVector<Identifier, 4> lookupLabels;
+    for (auto label : memberName.getArgumentNames()) {
+      if (label.hasDollarPrefix()) {
+        auto unprefixed = label.str().drop_front();
+        lookupLabels.push_back(context.getIdentifier(unprefixed));
+      } else {
+        lookupLabels.push_back(label);
+      }
+    }
+
+    DeclName unprefixedName(context, memberName.getBaseName(), lookupLabels);
+    lookupName = DeclNameRef(unprefixedName);
+  }
+
   // Look for members within the base.
-  LookupResult &lookup = lookupMember(instanceTy, memberName);
+  LookupResult &lookup = lookupMember(instanceTy, lookupName);
 
   // If this is true, we're using type construction syntax (Foo()) rather
   // than an explicit call to `init` (Foo.init()).
@@ -8247,29 +8228,6 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
           param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
-
-      if (auto wrapperInfo = paramDecl->getPropertyWrapperBackingPropertyInfo()) {
-        auto bindPropertyType = [&](VarDecl *var, Type type) {
-          auto *typeVar = createTypeVariable(paramLoc, 0);
-          auto constraintKind = (oneWayConstraints ?
-                                 ConstraintKind::OneWayEqual : ConstraintKind::Equal);
-          addConstraint(constraintKind, typeVar, type, paramLoc);
-          setType(var, typeVar);
-        };
-
-        bindPropertyType(wrapperInfo.backingVar, externalType);
-
-        if (auto *projection = wrapperInfo.projectionVar) {
-          auto typeInfo = paramDecl->getAttachedPropertyWrapperTypeInfo(0);
-          auto projectionType = externalType->getTypeOfMember(paramDecl->getModuleContext(),
-                                                              typeInfo.projectedValueVar);
-          bindPropertyType(projection, projectionType);
-        }
-
-        // Bind the internal parameter type to the wrapped value type
-        externalType = swift::computeWrappedValueType(paramDecl, externalType);
-      }
-
       if (oneWayConstraints) {
         addConstraint(
             ConstraintKind::OneWayBindParam, typeVar, externalType, paramLoc);

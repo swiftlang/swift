@@ -2053,16 +2053,16 @@ namespace {
                 TVO_CanBindToInOut | TVO_CanBindToNoEscape | TVO_CanBindToHole);
           }
 
-          if (param->hasAttachedPropertyWrapper()) {
+          if (auto wrapperInfo = param->getPropertyWrapperBackingPropertyInfo()) {
             auto *wrapperAttr = param->getAttachedPropertyWrappers().front();
             auto wrapperType = param->getAttachedPropertyWrapperType(0);
             auto backingType = CS.openUnboundGenericTypes(
                 wrapperType, CS.getConstraintLocator(wrapperAttr->getTypeRepr()));
-            if (generateWrappedPropertyTypeConstraints(CS, backingType, param, externalType))
-              return nullptr;
+            CS.setType(wrapperInfo.backingVar, backingType);
 
-            // The external parameter type is the backing property wrapper type
-            externalType = backingType;
+            CS.applyPropertyWrapperParameter(backingType, externalType, param,
+                                             param->getName(), ConstraintKind::Equal,
+                                             CS.getConstraintLocator(closure));
           }
 
           closureParams.push_back(param->toFunctionParam(externalType));
@@ -2666,8 +2666,10 @@ namespace {
 
     Type visitPropertyWrapperValuePlaceholderExpr(
         PropertyWrapperValuePlaceholderExpr *expr) {
-      if (auto ty = expr->getType())
+      if (auto ty = expr->getType()) {
+        CS.cacheType(expr);
         return ty;
+      }
 
       assert(CS.getType(expr));
       return CS.getType(expr);
@@ -4055,6 +4057,38 @@ bool ConstraintSystem::generateConstraints(
   }
 
   return false;
+}
+
+void ConstraintSystem::applyPropertyWrapperParameter(
+    Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
+    ConstraintKind matchKind, ConstraintLocatorBuilder locator) {
+  Expr *anchor = getAsExpr(locator.getAnchor());
+  if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
+    anchor = apply->getFn();
+  }
+
+  PropertyWrapperInitKind initKind;
+  if (argLabel.hasDollarPrefix()) {
+    auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+    auto projectionType = wrapperType->getTypeOfMember(param->getModuleContext(),
+                                                       typeInfo.projectedValueVar);
+    addConstraint(matchKind, paramType, projectionType, locator);
+    initKind = PropertyWrapperInitKind::ProjectedValue;
+  } else {
+    generateWrappedPropertyTypeConstraints(*this, wrapperType, param, paramType);
+    initKind = PropertyWrapperInitKind::WrappedValue;
+  }
+
+  // Build the wrapper initializer expression and generate constraints.
+  auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
+    getASTContext(), anchor->getSourceRange(), Type(), /*wrappedValue*/nullptr);
+  setType(placeholder, paramType);
+
+  auto *init = buildPropertyWrapperInitCall(param, wrapperType, placeholder, initKind);
+  setType(init, wrapperType);
+  generateConstraints(init, DC);
+
+  appliedPropertyWrappers[anchor].push_back({ init });
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {

@@ -1187,7 +1187,7 @@ public:
       resultBuilderTransformed;
 
   /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::MapVector<Expr *, Expr *> appliedPropertyWrappers;
+  llvm::MapVector<ASTNode, SmallVector<Expr *, 2>> appliedPropertyWrappers;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -2233,13 +2233,13 @@ private:
   std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
       resultBuilderTransformed;
 
-  /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::SmallMapVector<Expr *, Expr *, 4> appliedPropertyWrappers;
-
   /// Cache of the effects any closures visited.
   llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
 
 public:
+  /// A map from argument expressions to their applied property wrapper expressions.
+  llvm::SmallMapVector<ASTNode,SmallVector<Expr *, 2>, 4> appliedPropertyWrappers;
+
   /// The locators of \c Defaultable constraints whose defaults were used.
   std::vector<ConstraintLocator *> DefaultedConstraints;
 
@@ -4642,13 +4642,11 @@ public:
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
 
-  /// Matches a wrapped value argument type to its backing wrapper type by applying
-  /// the property wrapper and generating constraints for the backing initializer
-  /// expression.
-  TypeMatchResult matchPropertyWrapperArgument(
-      Type wrapperType, Type wrappedValueArgumentType, const ParamDecl *param,
-      Identifier argLabel, ConstraintKind matchKind,
-      ConstraintLocatorBuilder locator);
+  /// Matches a wrapped or projected value parameter type to its backing
+  /// property wrapper type by applying the property wrapper.
+  void applyPropertyWrapperParameter(
+      Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
+      ConstraintKind matchKind, ConstraintLocatorBuilder locator);
 
   Optional<BindingSet> determineBestBindings();
 

@@ -671,7 +671,19 @@ namespace {
           new (ctx) DeclRefExpr(ref, loc, implicit, semantics, fullType);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
-      return forceUnwrapIfExpected(declRefExpr, choice, locator);
+      Expr *result = forceUnwrapIfExpected(declRefExpr, choice, locator);
+
+      if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (AnyFunctionRef(fnDecl).hasPropertyWrapperParameters() &&
+            (declRefExpr->getFunctionRefKind() == FunctionRefKind::Compound ||
+             declRefExpr->getFunctionRefKind() == FunctionRefKind::Unapplied)) {
+          auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
+          result = buildPropertyWrapperFnThunk(result, fullType->getAs<FunctionType>(), fnDecl,
+                                               appliedWrappers);
+        }
+      }
+
+      return result;
     }
 
     /// Describes an opened existential that has not yet been closed.
@@ -1096,8 +1108,9 @@ namespace {
       cs.cacheType(closure);
 
       auto refTy = cs.getType(ref)->castTo<FunctionType>();
-      auto calleeParams = refTy->getResult()->castTo<FunctionType>()->getParams();
-      auto calleeResultTy = refTy->getResult()->castTo<FunctionType>()->getResult();
+      auto calleeFnType = refTy->getResult()->castTo<FunctionType>();
+      auto calleeParams = calleeFnType->getParams();
+      auto calleeResultTy = calleeFnType->getResult();
 
       auto selfParam = refTy->getParams()[0];
       auto selfParamTy = selfParam.getPlainType();
@@ -1143,6 +1156,19 @@ namespace {
 
       if (selfParamRef->isSuperExpr())
         selfCall->setIsSuper(true);
+
+      auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
+      if (!appliedWrappers.empty()) {
+        auto fnDecl = AnyFunctionRef(dyn_cast<AbstractFunctionDecl>(member));
+        auto *closure = buildPropertyWrapperFnThunk(selfCall, calleeFnType,
+                                                    fnDecl, appliedWrappers);
+
+        ref->setType(FunctionType::get(refTy->getParams(), selfCall->getType()));
+        cs.cacheType(ref);
+
+        // FIXME: There's more work to do.
+        return closure;
+      }
 
       // Pass all the closure parameters to the call.
       SmallVector<Identifier, 4> labels;
@@ -1809,7 +1835,8 @@ namespace {
     coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
                         ConcreteDeclRef callee, ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
-                        ConstraintLocatorBuilder locator);
+                        ConstraintLocatorBuilder locator,
+                        ArrayRef<Expr *> appliedPropertyWrappers);
 
     /// Coerce the given 'self' argument (e.g., for the base of a
     /// member expression) to the given type.
@@ -2015,10 +2042,12 @@ namespace {
                                   ->castTo<FunctionType>();
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
+      auto &appliedWrappers = solution.appliedPropertyWrappers[memberLoc.getAnchor()];
       index = coerceCallArguments(index, fullSubscriptTy, subscriptRef, nullptr,
                                   argLabels,
                                   locator.withPathElement(
-                                    ConstraintLocator::ApplyArgument));
+                                    ConstraintLocator::ApplyArgument),
+                                  appliedWrappers);
       if (!index)
         return nullptr;
 
@@ -2840,7 +2869,8 @@ namespace {
       auto newArg = coerceCallArguments(
           expr->getArg(), fnType, witness,
           /*applyExpr=*/nullptr, expr->getArgumentLabels(),
-          cs.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
+          cs.getConstraintLocator(expr, ConstraintLocator::ApplyArgument),
+          /*appliedPropertyWrappers=*/{});
 
       expr->setInitializer(witness);
       expr->setArg(newArg);
@@ -5028,7 +5058,7 @@ namespace {
       auto *newIndexExpr =
           coerceCallArguments(indexExpr, subscriptType, ref,
                               /*applyExpr*/ nullptr, labels,
-                              locator);
+                              locator, /*appliedPropertyWrappers*/ {});
 
       // We need to be able to hash the captured index values in order for
       // KeyPath itself to be hashable, so check that all of the subscript
@@ -5564,9 +5594,11 @@ Expr *ExprRewriter::coerceCallArguments(
     ConcreteDeclRef callee,
     ApplyExpr *apply,
     ArrayRef<Identifier> argLabels,
-    ConstraintLocatorBuilder locator) {
+    ConstraintLocatorBuilder locator,
+    ArrayRef<Expr *> appliedPropertyWrappers) {
   auto &ctx = getConstraintSystem().getASTContext();
   auto params = funcType->getParams();
+  unsigned appliedWrapperIndex = 0;
 
   // Local function to produce a locator to refer to the given parameter.
   auto getArgLocator =
@@ -5795,6 +5827,22 @@ Expr *ExprRewriter::coerceCallArguments(
 
       return true;
     };
+
+    if (paramInfo.getPropertyWrapperParam(paramIdx)) {
+      Expr *init = appliedPropertyWrappers[appliedWrapperIndex++];
+      auto *placeholder = findWrappedValuePlaceholder(init);
+      placeholder->setOriginalWrappedValue(arg);
+
+      // Apply the solution to the property wrapper initializer.
+      auto target = SolutionApplicationTarget(init, cs.DC, CTP_Unused, Type(),
+                                              /*isDiscarded=*/false);
+      auto result = cs.applySolution(solution, target);
+      if (!result)
+        return nullptr;
+
+      arg = result->getAsExpr();
+      cs.cacheExprTypes(arg);
+    }
 
     if (argRequiresAutoClosureExpr(param, argType)) {
       assert(!param.isInOut());
@@ -7233,12 +7281,14 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
         SmallVector<Identifier, 2> argLabelsScratch;
 
+        auto &appliedWrappers = solution.appliedPropertyWrappers[calleeLocator.getAnchor()];
         auto fnType = cs.getType(fn)->getAs<FunctionType>();
         arg = coerceCallArguments(arg, fnType, declRef,
                                   apply,
                                   apply->getArgumentLabels(argLabelsScratch),
                                   locator.withPathElement(
-                                    ConstraintLocator::ApplyArgument));
+                                    ConstraintLocator::ApplyArgument),
+                                  appliedWrappers);
         if (!arg) {
           return nullptr;
         }
@@ -7438,10 +7488,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // the function.
   SmallVector<Identifier, 2> argLabelsScratch;
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
+    auto &appliedWrappers = solution.appliedPropertyWrappers[calleeLocator.getAnchor()];
     arg = coerceCallArguments(arg, fnType, callee, apply,
                               apply->getArgumentLabels(argLabelsScratch),
                               locator.withPathElement(
-                                  ConstraintLocator::ApplyArgument));
+                                  ConstraintLocator::ApplyArgument),
+                              appliedWrappers);
     if (!arg) {
       return nullptr;
     }
@@ -7710,6 +7762,12 @@ namespace {
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
 
+    bool shouldWalkIntoPropertyWrapperPlaceholderValue() override {
+      // Property wrapper placeholder underlying values are filled in
+      // with already-type-checked expressions. Don't walk into them.
+      return false;
+    }
+
     const SmallVectorImpl<ClosureExpr *> &getClosuresToTypeCheck() const {
       return ClosuresToTypeCheck;
     }
@@ -7719,17 +7777,14 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // If this expression has an applied property wrapper, get the backing
-      // initializer expression.
-      if (Rewriter.solution.appliedPropertyWrappers.count(expr)) {
-        auto *init = Rewriter.solution.appliedPropertyWrappers[expr];
-        Rewriter.solution.appliedPropertyWrappers.erase(expr);
-        expr = init;
-      }
-
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         rewriteFunction(closure);
+
+        if (AnyFunctionRef(closure).hasPropertyWrapperParameters()) {
+          return { false, rewriteClosure(closure) };
+        }
+
         return { false, closure };
       }
 
@@ -7765,6 +7820,38 @@ namespace {
     /// Rewrite the target, producing a new target.
     Optional<SolutionApplicationTarget>
     rewriteTarget(SolutionApplicationTarget target);
+
+    AutoClosureExpr *rewriteClosure(ClosureExpr *closure) {
+      auto &solution = Rewriter.solution;
+      auto closureType = solution.simplifyType(solution.getType(closure));
+      FunctionType *closureFnType = closureType->castTo<FunctionType>();
+
+      // Apply types to synthesized property wrapper vars.
+      for (auto *param : *closure->getParameters()) {
+        if (!param->hasAttachedPropertyWrapper())
+          continue;
+
+        auto wrapperInfo = param->getPropertyWrapperBackingPropertyInfo();
+        auto *backingVar = wrapperInfo.backingVar;
+        auto wrapperType = solution.simplifyType(solution.getType(backingVar));
+        backingVar->setInterfaceType(wrapperType->mapTypeOutOfContext());
+
+        if (auto *projection = wrapperInfo.projectionVar) {
+          auto typeInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+          auto projectionType = wrapperType->getTypeOfMember(param->getModuleContext(),
+                                                             typeInfo.projectedValueVar);
+          projection->setInterfaceType(projectionType);
+        }
+
+        auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
+        auto wrappedValueType = computeWrappedValueType(param, wrapperType);
+        wrappedValueVar->setInterfaceType(wrappedValueType);
+      }
+
+      auto &appliedWrappers = Rewriter.solution.appliedPropertyWrappers[closure];
+      return Rewriter.buildPropertyWrapperFnThunk(closure, closureFnType, closure,
+                                                  appliedWrappers);
+    }
 
     /// Rewrite the function for the given solution.
     ///
