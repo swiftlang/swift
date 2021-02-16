@@ -318,7 +318,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
-    let maybeOffset = try _withUnsafeMutableBufferPointerIfSupported {
+    let maybeOffset = try withContiguousMutableStorageIfAvailable {
       (bufferPointer) -> Int in
       let unsafeBufferPivot = try bufferPointer._partitionImpl(
         by: belongsInSecondPartition)
