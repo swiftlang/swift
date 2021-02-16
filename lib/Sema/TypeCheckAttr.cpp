@@ -1825,7 +1825,6 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
 
   auto *callExpr = CallExpr::createImplicit(context, memberRefExpr, {}, {});
   callExpr->setImplicit(true);
-  callExpr->setThrows(mainFunction->hasThrows());
   callExpr->setType(context.TheEmptyTupleType);
 
   Expr *returnedExpr;
