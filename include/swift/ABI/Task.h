@@ -300,7 +300,7 @@ public:
                 // therefore skip also skip pointing to that parent and point
                 // to whichever parent it was pointing to as well, it may be its
                 // immediate parent, or some super-parent.
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext());
+                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) |
                                   static_cast<uintptr_t>(NextLinkType::IsParent);
                 break;
               case NextLinkType::IsNext:
@@ -308,7 +308,7 @@ public:
                                 "this should not happen, as it implies the parent must have stored some value.");
                 break;
               case NextLinkType::IsTerminal:
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext());
+                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) | 
                                   static_cast<uintptr_t>(NextLinkType::IsTerminal);
                 break;
             }
