@@ -502,11 +502,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    if (E->getOriginalWrappedValue()) {
-      if (auto *newValue = doIt(E->getOriginalWrappedValue()))
-        E->setOriginalWrappedValue(newValue);
-      else
-        return nullptr;
+    if (Walker.shouldWalkIntoPropertyWrapperPlaceholderValue()) {
+      if (E->getOriginalWrappedValue()) {
+        if (auto *newValue = doIt(E->getOriginalWrappedValue()))
+          E->setOriginalWrappedValue(newValue);
+        else
+          return nullptr;
+      }
     }
 
     return E;
