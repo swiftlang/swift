@@ -682,6 +682,9 @@ public:
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
+    ZeroInitBuilder.SetInsertPoint(
+        getEarliestInsertionPoint()->getParent(),
+        getEarliestInsertionPoint()->getIterator());
 
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
@@ -1513,8 +1516,6 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     IGM.createReplaceableProlog(*this, f);
   }
 
-  if (f->getLoweredFunctionType()->isAsync())
-    setupAsync();
 }
 
 IRGenSILFunction::~IRGenSILFunction() {
@@ -1714,10 +1715,6 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                    witnessMetadata);
   }
 
-  // Bind the error result by popping it off the parameter list.
-  if (funcTy->hasErrorResult()) {
-    IGF.setCallerErrorResultSlot(emission->getCallerErrorResultArgument());
-  }
   // The coroutine context should be the first parameter.
   switch (funcTy->getCoroutineKind()) {
   case SILCoroutineKind::None:
@@ -1734,6 +1731,11 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     emitAsyncFunctionEntry(IGF,
                            getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
                            LinkEntity::forSILFunction(IGF.CurSILFn));
+  }
+
+  // Bind the error result by popping it off the parameter list.
+  if (funcTy->hasErrorResult()) {
+    IGF.setCallerErrorResultSlot(emission->getCallerErrorResultArgument());
   }
 
   SILFunctionConventions conv(funcTy, IGF.getSILModule());
