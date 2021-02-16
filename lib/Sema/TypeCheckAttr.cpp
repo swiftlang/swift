@@ -3390,6 +3390,12 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // for potential unavailability.
     if (!VD->isStatic() && !VD->getDeclContext()->isModuleScopeContext())
       return diag::availability_stored_property_no_potential;
+
+  } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+    // An enum element with an associated value cannot be potentially
+    // unavailable.
+    if (EED->hasAssociatedValues())
+      return diag::availability_enum_element_no_potential;
   }
 
   return None;

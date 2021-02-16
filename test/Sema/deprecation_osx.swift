@@ -127,7 +127,7 @@ var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn10_51?
 enum EnumWithDeprecatedCasePayload {
   case WithDeprecatedPayload(p: ClassDeprecatedIn10_51) // expected-warning {{ClassDeprecatedIn10_51' was deprecated in macOS 10.51}}
 
-  @available(OSX, introduced: 10.8, deprecated: 10.51)
+  @available(OSX, deprecated: 10.51)
   case AnnotatedWithDeprecatedPayload(p: ClassDeprecatedIn10_51)
 }
 
