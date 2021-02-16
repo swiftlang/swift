@@ -1023,9 +1023,8 @@ private:
     }
 
     // The body result cannot be 'none' unless it's an autoclosure.
-    if (!allowNone) {
+    if (!allowNone && result == ThrowingKind::None)
       result = ThrowingKind::RethrowingOnly;
-    }
 
     // Remember the result.
     Cache[key] = result;
