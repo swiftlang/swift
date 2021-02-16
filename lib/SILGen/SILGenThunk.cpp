@@ -418,9 +418,9 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
                      derivativeId->getDerivativeGenericSignature()),
       /*isVTableThunk*/ true);
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, originalFnDeclRef.getLinkage(ForDefinition),
-      constantTy, IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(),
-      IsNotDynamic, ProfileCounter(), IsThunk);
+      derivativeFnDecl, name, SILLinkage::Private, constantTy, IsBare,
+      IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
+      ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
 
