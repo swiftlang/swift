@@ -130,6 +130,9 @@ public:
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
   IGNORED_ATTR(Concurrent)
+  IGNORED_ATTR(AtRethrows)
+  IGNORED_ATTR(AtReasync)
+  IGNORED_ATTR(RethrowsUnchecked)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -224,7 +227,6 @@ public:
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
-  void visitAtRethrowsAttr(AtRethrowsAttr *attr);
 
   void checkApplicationMainAttribute(DeclAttribute *attr,
                                      Identifier Id_ApplicationDelegate,
@@ -279,7 +281,6 @@ public:
   void visitMarkerAttr(MarkerAttr *attr);
 
   void visitReasyncAttr(ReasyncAttr *attr);
-  void visitAtReasyncAttr(AtReasyncAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2063,8 +2064,6 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
   attr->setInvalid();
 }
-
-void AttributeChecker::visitAtRethrowsAttr(AtRethrowsAttr *attr) {}
 
 /// Collect all used generic parameter types from a given type.
 static void collectUsedGenericParameters(
@@ -5473,5 +5472,3 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
 void AttributeChecker::visitReasyncAttr(ReasyncAttr *attr) {
   // FIXME
 }
-
-void AttributeChecker::visitAtReasyncAttr(AtReasyncAttr *attr) {}
