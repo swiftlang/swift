@@ -975,7 +975,7 @@ self.test("\(testNamePrefix).partition/DispatchesThroughDirectStorageAccessors")
   let actualWCMSIA =  lc.log.withContiguousMutableStorageIfAvailable[type(of: lc)]
 
   let actualWUMBPIFNonNil = lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)]
-  let actualWUMBPIFNonNil =  lc.log.withContiguousMutableStorageIfAvailableNonNilReturns[type(of: lc)]
+  let actualWCMSIAIFNonNil =  lc.log.withContiguousMutableStorageIfAvailableNonNilReturns[type(of: lc)]
 
   expectEqual(1, actualWUMBPIF + actualWCMSIA)
   expectEqual(
@@ -1297,4 +1297,3 @@ self.test("\(testNamePrefix).sort/ThrowingPredicateWithLargeNumberElements") {
 
   } // addMutableRandomAccessCollectionTests
 }
-
