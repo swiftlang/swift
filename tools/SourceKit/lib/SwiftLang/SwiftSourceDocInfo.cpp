@@ -836,9 +836,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
 
 
   SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
-  SmallVector<ParentInfo, 4> Parents;
   unsigned SymbolGraphBegin = SS.size();
-  unsigned SymbolGraphEnd = SymbolGraphBegin;
   if (SymbolGraph) {
     symbolgraphgen::SymbolGraphOptions Options {
       "",
@@ -851,16 +849,16 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     symbolgraphgen::printSymbolGraphForDecl(VD, BaseType,
                                             InSynthesizedExtension, Options, OS,
                                             PathComponents);
-    SymbolGraphEnd = SS.size();
-
-    for (auto &Component: PathComponents) {
-      unsigned USRStart = SS.size();
-      if (SwiftLangSupport::printUSR(Component.VD, OS))
-        continue;
-      StringRef USR{SS.begin()+USRStart, SS.size() - USRStart};
-      Parents.push_back({Component.Title, Component.Kind, USR});
-    }
   }
+  unsigned SymbolGraphEnd = SS.size();
+
+  DelayedStringRetriever ParentUSRsOS(SS);
+  for (auto &Component: PathComponents) {
+    ParentUSRsOS.startPiece();
+    if (SwiftLangSupport::printUSR(Component.VD, OS))
+      ParentUSRsOS.startPiece(); // ignore any output if invalid
+    ParentUSRsOS.endPiece();
+  };
 
   unsigned FullDeclBegin = SS.size();
   {
@@ -994,6 +992,15 @@ static bool passCursorInfoForDecl(SourceFile* SF,
                                         LocalizationEnd - LocalizationBegin);
   StringRef SymbolGraphJSON = StringRef(SS.begin()+SymbolGraphBegin,
                                         SymbolGraphEnd-SymbolGraphBegin);
+
+  SmallVector<ParentInfo, 4> Parents;
+  auto ParentIt = PathComponents.begin();
+  ParentUSRsOS.retrieve([&](StringRef ParentUSR) {
+    assert(ParentIt != PathComponents.end());
+    if (!ParentUSR.empty())
+      Parents.push_back({ParentIt->Title, ParentIt->Kind, ParentUSR});
+    ++ParentIt;
+  });
 
   // If VD is the syntehsized property wrapper backing storage (_foo) or
   // projected value ($foo) of a property (foo), base the location on that
