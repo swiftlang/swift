@@ -72,6 +72,12 @@ public:
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
 private:
+  /// Determines whether the type variable associated with this node
+  /// is a representative of an equivalence class.
+  ///
+  /// Note: The smallest equivalence class is of just one variable - itself.
+  bool forRepresentativeVar() const;
+
   /// Retrieve all of the type variables in the same equivalence class
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
