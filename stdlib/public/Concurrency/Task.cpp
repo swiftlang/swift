@@ -145,7 +145,7 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
     task->futureFragment()->destroy();
   }
 
-  // release any objects potentially held as task local values.
+  // Release any objects potentially held as task local values.
   task->localValuesFragment()->destroy();
 
   // The task execution itself should always hold a reference to it, so
@@ -313,18 +313,10 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
 
   // Perform additional linking between parent and child task.
   if (parent) {
-    // FIXME: can we allocate this in the task local allocator?
-    // TODO: Do we need to delete it manually or is the record infra handling this?
-    if (flags.task_isGroupChildTask()) {
-      // this task is a child of a task group
-      fprintf(stderr, "[%s:%d] (%s): create group child task record in parent [%d] to %d [group:%d]\n", __FILE__, __LINE__, __FUNCTION__, parent, task, group);
-      swift_task_addStatusRecord(parent,
-                                 new GroupChildTaskStatusRecord(group, task));
-    } else {
+    if (!flags.task_isGroupChildTask()) {
       // just a normal child task
-      fprintf(stderr, "[%s:%d] (%s): create child task record in parent [%d] to %d %d\n", __FILE__, __LINE__, __FUNCTION__, parent, task);
-      swift_task_addStatusRecord(parent, new ChildTaskStatusRecord(task));
-    }
+      swift_task_attachChild(parent, task); // TODO: this has to be done outside of here (!!!!!!!!!!!!!!!!!!!)
+    } // else, group children are recorded outside
 
     // if the parent was already cancelled, we carry this flag forward to the child.
     //

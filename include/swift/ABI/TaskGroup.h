@@ -260,15 +260,18 @@ namespace swift {
     /// Used for queue management, counting number of waiting and ready tasks
     std::atomic<uint64_t> status;
 
+    /// TaskStatusRecord that is attached to the task running the group.
+    ///
+    /// Because we must remove it from the task as we exit/destroy the group,
+    /// we have to keep this pointer here so we know which record to remove then.
+    TaskGroupTaskStatusRecord* Record;
+
     /// Queue containing completed tasks offered into this channel.
     ///
     /// The low bits contain the status, the rest of the pointer is the
     /// AsyncTask.
     NaiveQueue<ReadyQueueItem> readyQueue;
 //     mpsc_queue_t<ReadyQueueItem> readyQueue; // TODO: can we get away with an MPSC queue here once actor executors land?
-
-//    /// Queue containing all pending tasks.
-//    NaiveQueue<PendingQueueItem> pendingQueue;
 
     /// Single waiting `AsyncTask` currently waiting on `group.next()`,
     /// or `nullptr` if no task is currently waiting.
@@ -277,8 +280,9 @@ namespace swift {
     friend class AsyncTask;
 
   public:
-    explicit TaskGroup()
+    explicit TaskGroup(TaskGroupTaskStatusRecord* record)
         : status(GroupStatus::initial().status),
+          Record(record),
           readyQueue(),
 //          readyQueue(ReadyQueueItem::get(ReadyStatus::Empty, nullptr)),
           waitQueue(nullptr) {}
@@ -294,6 +298,10 @@ namespace swift {
     bool isCancelled() {
       auto oldStatus = GroupStatus { status.load(std::memory_order_relaxed) };
       return oldStatus.isCancelled();
+    }
+
+    TaskGroupTaskStatusRecord* getTaskRecord() const {
+      return Record;
     }
 
     /// Cancel the task group and all tasks within it.
@@ -314,7 +322,6 @@ namespace swift {
       auto old = status.fetch_and(~GroupStatus::waiting, std::memory_order_release);
       return GroupStatus{old};
     }
-
 
     /// Returns *assumed* new status, including the just performed +1.
     GroupStatus statusAddReadyAssumeAcquire() {

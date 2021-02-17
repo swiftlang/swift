@@ -189,6 +189,52 @@ swift_task_group_wait_next;
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 swift::TaskGroup* swift_task_group_create(AsyncTask *task);
 
+///// Attach the task group to the passed in (current) task that runs it.
+/////
+///// Returns the allocated and attached record that must be removed from the task,
+///// when the group exits.
+/////
+///// Its Swift signature is
+/////
+///// \code
+///// func swift_task_group_attach(
+/////     group: Builtin.NativeObject
+/////     to task: Builtin.NativeObject
+///// ) -> UnsafeRawPointer
+///// \endcode
+//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+//TaskGroupTaskStatusRecord*
+//swift_task_group_attach(TaskGroup *group, AsyncTask *task);
+
+/// Attach a child task to the parent task's task group record.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_task_group_attachChild(
+///     group: Builtin.NativeObject,
+///     parent: Builtin.NativeObject,
+///     child: Builtin.NativeObject
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_group_attachChild(TaskGroup *group,
+                                  AsyncTask *parent, AsyncTask *child);
+
+///// Detach the group from its parent and remove the passed in record.
+/////
+///// Its Swift signature is
+/////
+///// \code
+///// func swift_task_group_detach(
+/////     group: UnsafeRawPointer,
+/////     from task: Builtin.NativeObject
+///// ) -> UnsafeRawPointer
+///// \endcode
+//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+//void
+//swift_task_group_detach(TaskGroupTaskStatusRecord *record, AsyncTask *task);
+
 /// Its Swift signature is
 ///
 /// \code
@@ -289,8 +335,33 @@ bool swift_task_tryAddStatusRecord(AsyncTask *task,
 ///s
 /// Returns false if the task has been cancelled.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_removeStatusRecord(AsyncTask *task,
-                                   TaskStatusRecord *record);
+bool swift_task_removeStatusRecord(AsyncTask *task, TaskStatusRecord *record);
+
+/// Attach a child task to its parent task and return the newly created
+/// `ChildTaskStatusRecord`.
+///
+/// The record must be removed with by the parent invoking
+/// `swift_task_detachChild` when the child has completed.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ChildTaskStatusRecord*
+swift_task_attachChild(AsyncTask *parent, AsyncTask *child);
+
+/// Remove a child task from the parent tracking it.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_detachChild(AsyncTask *parent, ChildTaskStatusRecord *record);
+
+///// Ensure the `parent` task has a `TaskGroupTaskStatusRecord` fragment,
+///// and return it.
+/////
+///// Unlike one-off child tasks, child tasks within a task group are tracked
+///// within a single record in their parent task (which is running the group).
+/////
+///// This fragment will be removed once the group completes, automatically
+///// removing all child tasks it contained from the parent task in one remove
+///// record operation.
+//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+//TaskGroupTaskStatusRecord*
+//swift_task_ensureTaskGroupStatusRecord(AsyncTask *task, TaskGroup *group);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
@@ -321,9 +392,10 @@ using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
 /// ) -> UnsafeMutableRawPointer? where Key: TaskLocalKey
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-OpaqueValue* swift_task_localValueGet(AsyncTask* task,
-                                      const Metadata *keyType,
-                     TaskLocalValuesFragment::TaskLocalInheritance inheritance);
+OpaqueValue*
+swift_task_localValueGet(AsyncTask* task,
+                         const Metadata *keyType,
+                         TaskLocalValuesFragment::TaskLocalInheritance inheritance);
 
 /// Add a task local value to the passed in task.
 ///

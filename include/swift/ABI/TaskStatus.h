@@ -35,7 +35,7 @@ namespace swift {
 /// access by a cancelling thread.  In particular, the chain of
 /// status records must not be disturbed.  When the task leaves
 /// the scope that requires the status record, the record can
-/// be unregistered from the task with `swift_task_removeTaskStatusRecord`,
+/// be unregistered from the task with `swift_task_removeStatusRecord`,
 /// at which point the memory can be returned to the system.
 class TaskStatusRecord {
 public:
@@ -135,7 +135,7 @@ public:
     : TaskStatusRecord(kind),
       FirstChild(child) {
     assert(kind == TaskStatusRecordKind::ChildTask ||
-           kind == TaskStatusRecordKind::GroupChildTask);
+           kind == TaskStatusRecordKind::TaskGroup);
   }
 
   /// Return the first child linked by this record.  This may be null;
@@ -159,34 +159,63 @@ public:
   }
 };
 
-/// A status record which states that a task has a task group, and potentially
-/// task group children inside it.
-class GroupChildTaskStatusRecord : public ChildTaskStatusRecord {
+/// A status record which states that a task has a task group.
+///
+/// All children of given task group are stored within this record,
+/// so that they may be cancelled when this task becomes cancelled.
+class TaskGroupTaskStatusRecord : public TaskStatusRecord {
   TaskGroup *Group;
+  AsyncTask *FirstChild;
 public:
-  GroupChildTaskStatusRecord(TaskGroup *group, AsyncTask *child)
-    : ChildTaskStatusRecord(child, TaskStatusRecordKind::GroupChildTask),
-      Group(group) {}
+  TaskGroupTaskStatusRecord(TaskGroup *group)
+    : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+      Group(group),
+      FirstChild(nullptr) {}
 
-  TaskGroup* getGroup() {
+  TaskGroupTaskStatusRecord(TaskGroup *group, AsyncTask *child)
+    : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+      Group(group),
+      FirstChild(child) {}
+
+  TaskGroup* getGroup() const {
     return Group;
   }
 
-  bool is(TaskGroup *group) const {
-    return Group == group;
+  /// Return the first child linked by this record.  This may be null;
+  /// if not, it (and all of its successors) are guaranteed to satisfy
+  /// `isChildTask()`.
+  AsyncTask *getFirstChild() const {
+    return FirstChild;
   }
 
-  // AsyncTask *getFirstChild() const
+  void attachChild(AsyncTask *child) {
+    assert(child->groupChildFragment());
+    assert(child->hasGroupChildFragment());
+    assert(child->groupChildFragment()->getGroup() == Group);
+
+    auto c = FirstChild;
+    if (!c) {
+      fprintf(stderr, "[%s:%d] (%s): stored (first) CHILD, group:%d, record:%d child:%d\n", __FILE__, __LINE__, __FUNCTION__,
+              Group, this, child);
+      // This is the first child we ever attach, so store it as FirstChild.
+      FirstChild = c;
+      return;
+    }
+
+    assert(false && "attach second child not implemented yet");
+  }
 
   static AsyncTask *getNextChildTask(AsyncTask *task) {
     return task->childFragment()->getNextChild();
   }
 
-//  using child_iterator = LinkedListIterator<AsyncTask, getNextChildTask>;
-//  llvm::iterator_range<child_iterator> children() const
+  using child_iterator = LinkedListIterator<AsyncTask, getNextChildTask>;
+  llvm::iterator_range<child_iterator> children() const {
+    return child_iterator::rangeBeginning(getFirstChild());
+  }
 
   static bool classof(const TaskStatusRecord *record) {
-    return record->getKind() == TaskStatusRecordKind::GroupChildTask;
+    return record->getKind() == TaskStatusRecordKind::TaskGroup;
   }
 };
 
@@ -195,7 +224,7 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeTaskStatusRecord` and freely
+/// code may call `swift_task_removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
@@ -225,7 +254,7 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeTaskStatusRecord` and freely
+/// code may call `swift_task_removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {

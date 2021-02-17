@@ -43,11 +43,39 @@ using PollResult = TaskGroup::PollResult;
 // ==== create -----------------------------------------------------------------
 
 TaskGroup* swift::swift_task_group_create(AsyncTask *task) {
-  fprintf(stderr, "[%s:%d] (%s): task %d\n", __FILE__, __LINE__, __FUNCTION__, task);
   void *allocation = swift_task_alloc(task, sizeof(TaskGroup));
-  TaskGroup *group = new (allocation) TaskGroup();
-  fprintf(stderr, "[%s:%d] (%s): group %d\n", __FILE__, __LINE__, __FUNCTION__, group);
+
+  // nasty trick, but we want to keep the record inside the group as we'll need
+  // to remove it from the task as the group is destroyed, as well as interact
+  // with it every time we add child tasks; so it is useful to pre-create it here
+  // and store it in the group.
+  //
+  // The record won't be used by anyone until we're done constructing and setting
+  // up the group anyway.
+  void *recordAllocation = swift_task_alloc(task, sizeof(TaskGroupTaskStatusRecord));
+  auto record = new (recordAllocation)
+      TaskGroupTaskStatusRecord(reinterpret_cast<TaskGroup*>(allocation));
+
+  TaskGroup *group = new (allocation) TaskGroup(record);
+  fprintf(stderr, "[%s:%d] (%s): create group; task: %d, group:%d\n", __FILE__, __LINE__, __FUNCTION__, task, group);
+
+  // ok, now that the group actually is initialized: attach it to the task
+  swift_task_addStatusRecord(task, record);
+  fprintf(stderr, "[%s:%d] (%s): attach GROUP, task record in parent [%d]; record:%d\n", __FILE__, __LINE__, __FUNCTION__, task, record);
+
   return group;
+}
+
+// =============================================================================
+// ==== add / attachChild -----------------------------------------------------------------
+
+void swift::swift_task_group_attachChild(TaskGroup *group,
+                                         AsyncTask *parent, AsyncTask *child) {
+  auto groupRecord = group->getTaskRecord();
+  assert(groupRecord->getGroup() == group);
+  fprintf(stderr, "[%s:%d] (%s): attach GROUP CHILD, task:%d, group record:%d, child:%d\n", __FILE__, __LINE__, __FUNCTION__,
+          parent, groupRecord, child);
+  return groupRecord->attachChild(child);
 }
 
 // =============================================================================
@@ -58,6 +86,11 @@ void swift::swift_task_group_destroy(AsyncTask *task, TaskGroup *group) {
 }
 
 void TaskGroup::destroy(AsyncTask *task) {
+  // First, remove the group from the task and deallocate the record
+  fprintf(stderr, "[%s:%d] (%s): detach GROUP, task:%d, group record:%d, group:%d\n", __FILE__, __LINE__, __FUNCTION__, task, Record, this);
+  swift_task_removeStatusRecord(task, Record);
+  swift_task_dealloc(task, Record);
+
   // TODO: need to release all waiters as well
 //  auto waitHead = waitQueue.load(std::memory_order_acquire);
 //  switch (waitHead.getStatus()) {

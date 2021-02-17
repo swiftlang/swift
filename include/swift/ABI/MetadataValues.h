@@ -1977,10 +1977,11 @@ enum class TaskStatusRecordKind : uint8_t {
 
   /// A ChildTaskStatusRecord, which represents the potential for
   /// active child tasks.
-  ChildTask      = 1,
-  /// A GroupChildTaskStatusRecord, which represents a task group
-  /// and child tasks spawned within it (stored in similar fashion as ChildTask).
-  GroupChildTask = 2,
+  ChildTask = 1,
+
+  /// A TaskGroupTaskStatusRecord, which represents a task group
+  /// and child tasks spawned within it.
+  TaskGroup = 2,
 
   /// A CancellationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task is cancelled.

@@ -349,12 +349,19 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
                                  /*locked*/ false);
       if (task->Status.compare_exchange_weak(oldStatus, newStatus,
              /*success*/ std::memory_order_release,
-             /*failure*/ std::memory_order_relaxed))
+             /*failure*/ std::memory_order_relaxed)) {
+        fprintf(stderr, "[%s:%d] (%s): removed record:%d  in [%d]\n", __FILE__, __LINE__, __FUNCTION__, record, task);
         return !oldStatus.isCancelled();
+      }
 
       // Otherwise, restart.
       continue;
     }
+
+    fprintf(stderr, "[%s:%d] (%s): removing; no record match (found: %d kind:%d, want:%d kind:%d) in [%d]\n", __FILE__, __LINE__, __FUNCTION__,
+            oldStatus.getInnermostRecord(), oldStatus.getInnermostRecord()->getKind(),
+            record, record->getKind(),
+            task);
 
     // If the record is not the innermost record, we need to acquire the
     // record lock; there's no way to splice the record list safely with
@@ -379,6 +386,7 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
   while (true) {
     auto next = cur->getParent();
     if (next == record) {
+      fprintf(stderr, "[%s:%d] (%s): splicing out record:%d  in [%d]\n", __FILE__, __LINE__, __FUNCTION__, record, task);
       cur->spliceParent(record->getParent());
       break;
     }
@@ -391,6 +399,105 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 
   return !oldStatus.isCancelled();
 }
+
+/**************************************************************************/
+/************************** CHILD TASK MANAGEMENT *************************/
+/**************************************************************************/
+
+// ==== Child tasks ------------------------------------------------------------
+// TODO: it may be so in the future that all child tasks are group child tasks
+//       just that some are children of an implicitly created group
+//       (e.g. all async lets in a scope belong to the same implicit group)
+
+ChildTaskStatusRecord*
+swift::swift_task_attachChild(AsyncTask *parent, AsyncTask *child) {
+  void *allocation = malloc(sizeof(swift::ChildTaskStatusRecord));
+  auto record = new (allocation) swift::ChildTaskStatusRecord(child);
+  fprintf(stderr, "[%s:%d] (%s): attach CHILD, task record in parent [%d]; child:%d %d\n", __FILE__, __LINE__, __FUNCTION__, parent, child, record);
+  swift_task_addStatusRecord(parent, record);
+  return record;
+}
+
+void swift::swift_task_detachChild(AsyncTask *parent, ChildTaskStatusRecord *record) {
+  fprintf(stderr, "[%s:%d] (%s): detach CHILD, task record in parent [%d]; child record:%d\n", __FILE__, __LINE__, __FUNCTION__,
+          parent, record);
+  swift_task_removeStatusRecord(parent, record);
+}
+
+// ==== Group child tasks ------------------------------------------------------
+
+//TaskGroupTaskStatusRecord*
+//swift::swift_task_ensureTaskGroupStatusRecord(AsyncTask *task,
+//                                               TaskGroup *group) {
+//  // Load the current state.
+//  auto oldStatus = task->Status.load(std::memory_order_relaxed);
+//  fprintf(stderr, "[%s:%d] (%s)[task:%d] old status [%d]; %d\n", __FILE__, __LINE__, __FUNCTION__, task, oldStatus);
+//
+//  TaskGroupTaskStatusRecord *result;
+//  TaskStatusRecord *record;
+//
+//  // Wait for any active lock to be released.
+//  if (oldStatus.isLocked())
+//    waitForStatusRecordUnlock(task, oldStatus);
+//
+//  // 1. If the group record is the innermost record, try to just return it.
+//  if (oldStatus.getInnermostRecord()->getKind() == TaskStatusRecordKind::TaskGroup) {
+//    return cast<TaskGroupTaskStatusRecord>(oldStatus.getInnermostRecord());
+//  }
+//
+//  // 2. The group record is not the innermost record, so we must search for it.
+//
+//  // Acquire the status record lock.
+//  Optional<StatusRecordLockRecord> recordLockRecord;
+//  oldStatus = acquireStatusRecordLock(task, recordLockRecord,
+//                                      /*forCancellation*/ false);
+//  assert(!oldStatus.isLocked());
+//
+//  // Safety check, as we're running synchronously inside the task,
+//  // no-one should have mutated the innermost task here.
+//  auto cur = oldStatus.getInnermostRecord();
+//  assert(cur->getKind() != TaskStatusRecordKind::TaskGroup);
+//
+//  // Attempt to find the record
+//  auto next = cur;
+//  do {
+//    if (next->getKind() == TaskStatusRecordKind::TaskGroup) {
+//      fprintf(stderr, "[%s:%d] (%s): ensured (found) task group record, in [%d]; %d\n", __FILE__, __LINE__, __FUNCTION__, task, next);
+//      return cast<TaskGroupTaskStatusRecord>(next);
+//    }
+//  } while (next = next->getParent());
+//
+//  /// 3. We didn't find the group record, so it seems we must create a new one.
+//  fprintf(stderr, "[%s:%d] (%s): ensure, did not find existing task group record, in [%d]\n", __FILE__, __LINE__, __FUNCTION__, task);
+//
+//  // Create the new group record.
+//  void* allocation = malloc(sizeof(TaskGroupTaskStatusRecord));
+//  auto newRecord = new (allocation) TaskGroupTaskStatusRecord(group);
+//
+//  // Add the new record, no need to take locks since we're already holding it.
+//  while (true) {
+//    // Reset the parent of the new record.
+//    newRecord->resetParent(oldStatus.getInnermostRecord());
+//
+//    // Set the record as the new innermost record.
+//    // We have to use a release on success to make the initialization of
+//    // the new record visible to the cancelling thread.
+//    ActiveTaskStatus newStatus(newRecord,
+//                               oldStatus.isCancelled(),
+//                               /*locked*/ false);
+//    if (task->Status.compare_exchange_weak(oldStatus, newStatus,
+//        /*success*/ std::memory_order_release,
+//        /*failure*/ std::memory_order_relaxed)) {
+//
+//      // Release the lock.  Since the record can't be the root, we don't
+//      // have to worry about replacing the root, and oldStatus is always
+//      // exactly what we want to restore.
+//      releaseStatusRecordLock(task, oldStatus, recordLockRecord);
+//
+//      return newRecord;
+//    }
+//  }
+//}
 
 /**************************************************************************/
 /****************************** CANCELLATION ******************************/
@@ -412,9 +519,9 @@ static void performCancellationAction(TaskStatusRecord *record) {
     return;
   }
 
-  case TaskStatusRecordKind::GroupChildTask: {
+  case TaskStatusRecordKind::TaskGroup: {
     fprintf(stderr, "[%s:%d] (%s) group child task\n", __FILE__, __LINE__, __FUNCTION__);
-    auto childRecord = cast<GroupChildTaskStatusRecord>(record);
+    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_cancel(child);
     return;
@@ -451,8 +558,8 @@ static void performGroupCancellationAction(TaskStatusRecord *record,
   case TaskStatusRecordKind::ChildTask:
     return;
 
-  case TaskStatusRecordKind::GroupChildTask: {
-    auto groupChildRecord = cast<GroupChildTaskStatusRecord>(record);
+  case TaskStatusRecordKind::TaskGroup: {
+    auto groupChildRecord = cast<TaskGroupTaskStatusRecord>(record);
     // since a task can only be running a single task group at the same time,
     // we do not need to `group == groupChildRecord->getGroup()` filter here,
     // however we assert this for good measure.
@@ -460,8 +567,10 @@ static void performGroupCancellationAction(TaskStatusRecord *record,
     // A group enforces that tasks can not "escape" it, and as such once the group
     // returns, all its task have been completed.
     assert(group == groupChildRecord->getGroup());
-    for (AsyncTask *child: groupChildRecord->children())
+    for (AsyncTask *child: groupChildRecord->children()) {
+      fprintf(stderr, "[%s:%d] (%s): fire cancel group:%d, record:%d\n", __FILE__, __LINE__, __FUNCTION__, group, record);
       swift_task_cancel(child);
+    }
     return;
   }
 
@@ -470,6 +579,7 @@ static void performGroupCancellationAction(TaskStatusRecord *record,
   case TaskStatusRecordKind::CancellationNotification:
   case TaskStatusRecordKind::EscalationNotification:
   case TaskStatusRecordKind::Private_RecordLock:
+    fprintf(stderr, "[%s:%d] (%s): fire perform performCancellationAction group:%d, record:%d\n", __FILE__, __LINE__, __FUNCTION__, group, record);
     performCancellationAction(record);
     return;
 }
@@ -551,7 +661,7 @@ static void performEscalationAction(TaskStatusRecord *record,
 
   // Child tasks need to be recursively escalated.
   case TaskStatusRecordKind::ChildTask:
-  case TaskStatusRecordKind::GroupChildTask: {
+  case TaskStatusRecordKind::TaskGroup: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_escalate(child, newPriority);

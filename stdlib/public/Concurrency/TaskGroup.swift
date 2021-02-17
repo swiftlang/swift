@@ -153,10 +153,11 @@ extension Task {
       let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
         flags.bits, _task, _group, operation)
 
+      // Attach it to the group's task record in the current task.
+      _taskGroupAttachChild(group: _group, parent: _task, child: childTask)
+
       // Enqueue the resulting job.
       _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
-
-      // TODO: need to store task in the group too
 
       return true
     }
@@ -354,6 +355,31 @@ func _swiftRelease(
 func _taskGroupCreate(
   task: Builtin.NativeObject
 ) -> Builtin.NativeObject
+
+///// Attach the group to the task.
+//@_silgen_name("swift_task_group_attach")
+//func _taskGroupAttach(
+//  group: Builtin.NativeObject,
+//  to task: Builtin.NativeObject
+//) -> UnsafeRawPointer /*TaskGroupTaskStatusRecord*/
+
+/// Attach task group child to the group group to the task.
+@_silgen_name("swift_task_group_attachChild")
+func _taskGroupAttachChild(
+  group: Builtin.NativeObject,
+  parent: Builtin.NativeObject,
+  child: Builtin.NativeObject
+) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
+
+///// Detach the group to the task.
+/////
+///// - Parameters:
+/////   - record: the TaskGroupTaskStatusRecord returned by _taskGroupAttach
+//@_silgen_name("swift_task_group_detach")
+//func _taskGroupDetach(
+//  record: UnsafeRawPointer,
+//  from task: Builtin.NativeObject
+//)
 
 @_silgen_name("swift_task_group_destroy")
 func _taskGroupDestroy(

@@ -22,6 +22,7 @@
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
 #include "bitset"
@@ -237,9 +238,9 @@ public:
 
     private:
       explicit TaskLocalItem(const Metadata *keyType, const Metadata *valueType)
-        : keyType(keyType),
-          valueType(valueType),
-          next(0) { }
+        : next(0),
+          keyType(keyType),
+          valueType(valueType) { }
 
     public:
       /// TaskLocalItem which does not by itself store any value, but only points
