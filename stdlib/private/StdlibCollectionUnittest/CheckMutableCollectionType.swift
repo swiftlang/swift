@@ -651,7 +651,7 @@ self.test("\(testNamePrefix).sorted/DispatchesThroughDirectStorageAccessors/Pred
   let actualWCMSIA =  lc.log.withContiguousMutableStorageIfAvailable[type(of: lc)]
 
   let actualWUMBPIFNonNil = lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)]
-  let actualWUMBPIFNonNil =  lc.log.withContiguousMutableStorageIfAvailableNonNilReturns[type(of: lc)]
+  let actualWCMSIAIFNonNil =  lc.log.withContiguousMutableStorageIfAvailableNonNilReturns[type(of: lc)]
 
   // This sort operation is not in-place.
   // The collection is copied into an array before sorting.
