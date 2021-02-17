@@ -1326,8 +1326,8 @@ void IRGenerator::addLazyFunction(SILFunction *f) {
     // f is a specialization. Try to emit all specializations of the same
     // original function into the same IGM. This increases the chances that
     // specializations are merged by LLVM's function merging.
-    auto iter =
-      IGMForSpecializations.insert(std::make_pair(orig, CurrentIGM)).first;
+    IRGenModule *IGM = CurrentIGM ? CurrentIGM : getPrimaryIGM();
+    auto iter = IGMForSpecializations.insert(std::make_pair(orig, IGM)).first;
     DefaultIGMForFunction.insert(std::make_pair(f, iter->second));
     return;
   }
