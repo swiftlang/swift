@@ -1117,3 +1117,14 @@ struct SR12033_S {
     Self.unwrap(o, { _ in .zero }) // expected-error {{contextual closure type '() -> U' expects 0 arguments, but 1 was used in closure body}}
   }
 }
+
+// rdar://problem/74435602 - failure to infer a type for @autoclosure parameter.
+func rdar_74435602(error: Error?) {
+  func accepts_autoclosure<T>(_ expression: @autoclosure () throws -> T) {}
+
+  accepts_autoclosure({
+    if let failure = error {
+      throw failure
+    }
+  })
+}
