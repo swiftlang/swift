@@ -962,7 +962,8 @@ using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
 class GlobalActorAttributeRequest :
     public SimpleRequest<
         GlobalActorAttributeRequest,
-        Optional<CustomAttrNominalPair>(Decl *),
+        Optional<CustomAttrNominalPair>(
+            llvm::PointerUnion<Decl *, ClosureExpr *>),
         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -972,7 +973,8 @@ private:
 
   // Evaluation.
   Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-  evaluate(Evaluator &evaluator, Decl *decl) const;
+  evaluate(
+      Evaluator &evaluator, llvm::PointerUnion<Decl *, ClosureExpr *>) const;
 
 public:
   // Caching

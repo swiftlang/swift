@@ -4387,6 +4387,9 @@ ERROR(global_actor_on_struct_property,none,
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))
+ERROR(global_actor_isolated_synchronous_closure,none,
+      "closure isolated to global actor %0 must be 'async'",
+      (Type))
 
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %1 %2 has different actor isolation from %3 overridden declaration",
