@@ -2956,7 +2956,12 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   // handled by a simplification pass in SIL.)
   if (i->getNumArguments() != 1)
     return false;
-  
+  // The closure application is going to expect to pass the context in swiftself
+  // only methods where the call to `hasSelfContextParameter` returns true will
+  // use swiftself for the self parameter.
+  if (!hasSelfContextParameter(calleeTy))
+    return false;
+
   auto appliedParam = calleeTy->getParameters().back();
   if (resultTy->isNoEscape()) {
     // A trivial closure accepts an unowned or guaranteed argument, possibly
