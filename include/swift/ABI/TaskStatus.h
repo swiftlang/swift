@@ -134,8 +134,11 @@ public:
   ChildTaskStatusRecord(AsyncTask *child, TaskStatusRecordKind kind)
     : TaskStatusRecord(kind),
       FirstChild(child) {
-    assert(kind == TaskStatusRecordKind::ChildTask ||
-           kind == TaskStatusRecordKind::TaskGroup);
+    assert(kind == TaskStatusRecordKind::ChildTask);
+    assert(!child->hasGroupChildFragment() &&
+      "Group child tasks must be tracked in their respective "
+      "TaskGroupTaskStatusRecord, and not as independent ChildTaskStatusRecord "
+      "records.");
   }
 
   /// Return the first child linked by this record.  This may be null;
@@ -161,8 +164,18 @@ public:
 
 /// A status record which states that a task has a task group.
 ///
-/// All children of given task group are stored within this record,
+/// The child tasks are stored as an invasive single-linked list, starting
+/// from `FirstChild` and continuing through the `NextChild` pointers of all
+/// the linked children.
+///
+/// All children of the specific `Group` are stored "by" this record,
 /// so that they may be cancelled when this task becomes cancelled.
+///
+/// When the group exits, it may simply remove this single record from the task
+/// running it. As it has guaranteed that the tasks have already completed.
+///
+/// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
+/// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
   TaskGroup *Group;
   AsyncTask *FirstChild;
@@ -188,21 +201,47 @@ public:
     return FirstChild;
   }
 
+  /// Attach the passed in `child` task to this group.
   void attachChild(AsyncTask *child) {
+    fprintf(stderr, "[%s:%d] (%s): attaching GROUP CHILD, group:%d, record:%d child:%d\n", __FILE__, __LINE__, __FUNCTION__,
+            Group, this, child);
+
     assert(child->groupChildFragment());
     assert(child->hasGroupChildFragment());
     assert(child->groupChildFragment()->getGroup() == Group);
 
-    auto c = FirstChild;
-    if (!c) {
+    if (!FirstChild) {
       fprintf(stderr, "[%s:%d] (%s): stored (first) CHILD, group:%d, record:%d child:%d\n", __FILE__, __LINE__, __FUNCTION__,
               Group, this, child);
       // This is the first child we ever attach, so store it as FirstChild.
-      FirstChild = c;
+      FirstChild = child;
       return;
     }
 
-    assert(false && "attach second child not implemented yet");
+    // We need to traverse the siblings to find the last one and add the child there.
+
+    auto cur = FirstChild;
+    auto i = 0;
+    while (cur) {
+      i++;
+
+      // no need to check hasChildFragment, all tasks we store here have them.
+      auto fragment = cur->childFragment();
+      if (auto next = fragment->getNextChild()) {
+        fprintf(stderr, "[%s:%d] (%s): storing GROUP CHILD, search, is %d [i:%d] the last one?\n", __FILE__, __LINE__, __FUNCTION__,
+                cur, i);
+        cur = next;
+      } else {
+        // we're done searching and `cur` is the last
+        fprintf(stderr, "[%s:%d] (%s): storing GROUP CHILD, done searching, is %d [i:%d] the last one?\n", __FILE__, __LINE__, __FUNCTION__,
+                cur, i);
+        break;
+      }
+    }
+
+    fprintf(stderr, "[%s:%d] (%s): stored %d-th GROUP CHILD, group:%d, record:%d child:%d (was %d <--- %d)\n", __FILE__, __LINE__, __FUNCTION__,
+            i, Group, this, child, FirstChild, child);
+    cur->childFragment()->setNextChild(child);
   }
 
   static AsyncTask *getNextChildTask(AsyncTask *task) {

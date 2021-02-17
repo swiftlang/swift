@@ -405,9 +405,6 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 /**************************************************************************/
 
 // ==== Child tasks ------------------------------------------------------------
-// TODO: it may be so in the future that all child tasks are group child tasks
-//       just that some are children of an implicitly created group
-//       (e.g. all async lets in a scope belong to the same implicit group)
 
 ChildTaskStatusRecord*
 swift::swift_task_attachChild(AsyncTask *parent, AsyncTask *child) {
@@ -418,88 +415,13 @@ swift::swift_task_attachChild(AsyncTask *parent, AsyncTask *child) {
   return record;
 }
 
-void swift::swift_task_detachChild(AsyncTask *parent, ChildTaskStatusRecord *record) {
+void
+swift::swift_task_detachChild(AsyncTask *parent, ChildTaskStatusRecord *record) {
   fprintf(stderr, "[%s:%d] (%s): detach CHILD, task record in parent [%d]; child record:%d\n", __FILE__, __LINE__, __FUNCTION__,
           parent, record);
   swift_task_removeStatusRecord(parent, record);
 }
 
-// ==== Group child tasks ------------------------------------------------------
-
-//TaskGroupTaskStatusRecord*
-//swift::swift_task_ensureTaskGroupStatusRecord(AsyncTask *task,
-//                                               TaskGroup *group) {
-//  // Load the current state.
-//  auto oldStatus = task->Status.load(std::memory_order_relaxed);
-//  fprintf(stderr, "[%s:%d] (%s)[task:%d] old status [%d]; %d\n", __FILE__, __LINE__, __FUNCTION__, task, oldStatus);
-//
-//  TaskGroupTaskStatusRecord *result;
-//  TaskStatusRecord *record;
-//
-//  // Wait for any active lock to be released.
-//  if (oldStatus.isLocked())
-//    waitForStatusRecordUnlock(task, oldStatus);
-//
-//  // 1. If the group record is the innermost record, try to just return it.
-//  if (oldStatus.getInnermostRecord()->getKind() == TaskStatusRecordKind::TaskGroup) {
-//    return cast<TaskGroupTaskStatusRecord>(oldStatus.getInnermostRecord());
-//  }
-//
-//  // 2. The group record is not the innermost record, so we must search for it.
-//
-//  // Acquire the status record lock.
-//  Optional<StatusRecordLockRecord> recordLockRecord;
-//  oldStatus = acquireStatusRecordLock(task, recordLockRecord,
-//                                      /*forCancellation*/ false);
-//  assert(!oldStatus.isLocked());
-//
-//  // Safety check, as we're running synchronously inside the task,
-//  // no-one should have mutated the innermost task here.
-//  auto cur = oldStatus.getInnermostRecord();
-//  assert(cur->getKind() != TaskStatusRecordKind::TaskGroup);
-//
-//  // Attempt to find the record
-//  auto next = cur;
-//  do {
-//    if (next->getKind() == TaskStatusRecordKind::TaskGroup) {
-//      fprintf(stderr, "[%s:%d] (%s): ensured (found) task group record, in [%d]; %d\n", __FILE__, __LINE__, __FUNCTION__, task, next);
-//      return cast<TaskGroupTaskStatusRecord>(next);
-//    }
-//  } while (next = next->getParent());
-//
-//  /// 3. We didn't find the group record, so it seems we must create a new one.
-//  fprintf(stderr, "[%s:%d] (%s): ensure, did not find existing task group record, in [%d]\n", __FILE__, __LINE__, __FUNCTION__, task);
-//
-//  // Create the new group record.
-//  void* allocation = malloc(sizeof(TaskGroupTaskStatusRecord));
-//  auto newRecord = new (allocation) TaskGroupTaskStatusRecord(group);
-//
-//  // Add the new record, no need to take locks since we're already holding it.
-//  while (true) {
-//    // Reset the parent of the new record.
-//    newRecord->resetParent(oldStatus.getInnermostRecord());
-//
-//    // Set the record as the new innermost record.
-//    // We have to use a release on success to make the initialization of
-//    // the new record visible to the cancelling thread.
-//    ActiveTaskStatus newStatus(newRecord,
-//                               oldStatus.isCancelled(),
-//                               /*locked*/ false);
-//    if (task->Status.compare_exchange_weak(oldStatus, newStatus,
-//        /*success*/ std::memory_order_release,
-//        /*failure*/ std::memory_order_relaxed)) {
-//
-//      // Release the lock.  Since the record can't be the root, we don't
-//      // have to worry about replacing the root, and oldStatus is always
-//      // exactly what we want to restore.
-//      releaseStatusRecordLock(task, oldStatus, recordLockRecord);
-//
-//      return newRecord;
-//    }
-//  }
-//}
-
-/**************************************************************************/
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 

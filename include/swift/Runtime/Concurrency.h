@@ -350,19 +350,6 @@ swift_task_attachChild(AsyncTask *parent, AsyncTask *child);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_detachChild(AsyncTask *parent, ChildTaskStatusRecord *record);
 
-///// Ensure the `parent` task has a `TaskGroupTaskStatusRecord` fragment,
-///// and return it.
-/////
-///// Unlike one-off child tasks, child tasks within a task group are tracked
-///// within a single record in their parent task (which is running the group).
-/////
-///// This fragment will be removed once the group completes, automatically
-///// removing all child tasks it contained from the parent task in one remove
-///// record operation.
-//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-//TaskGroupTaskStatusRecord*
-//swift_task_ensureTaskGroupStatusRecord(AsyncTask *task, TaskGroup *group);
-
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
 

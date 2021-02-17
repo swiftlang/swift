@@ -426,10 +426,15 @@ public:
     /// The parent task of this task.
     AsyncTask *Parent;
 
+    // TODO: Document more how this is used from the `TaskGroupTaskStatusRecord`
+
     /// The next task in the singly-linked list of child tasks.
     /// The list must start in a `ChildTaskStatusRecord` registered
     /// with the parent task.
+    ///
     /// Note that the parent task may have multiple such records.
+    ///
+    /// WARNING: Access can only be performed by the `Parent` of this task.
     AsyncTask *NextChild = nullptr;
 
   public:
@@ -441,6 +446,14 @@ public:
 
     AsyncTask *getNextChild() const {
       return NextChild;
+    }
+
+    /// Set the `NextChild` to to the passed task.
+    ///
+    /// WARNING: This must ONLY be invoked from the parent of both
+    /// (this and the passed-in) tasks for thread-safety reasons.
+    void setNextChild(AsyncTask *task) {
+      NextChild = task;
     }
   };
 

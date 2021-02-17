@@ -14,7 +14,7 @@ func test_skipCallingNext_butInvokeCancelAll() async {
         sleep(2)
         print("  inside group.add { \(n) }")
         let c = await Task.__unsafeCurrentAsync().isCancelled
-        print("  inside group.add { \(n) } (cancelled: \(c))")
+        print("  inside group.add { \(n) } (task cancelled: \(c))")
         return n
       }
     }
@@ -32,8 +32,8 @@ func test_skipCallingNext_butInvokeCancelAll() async {
   // CHECK: group.add { 1 }
   // CHECK: return immediately 0 (task cancelled: false)
   // CHECK: return immediately 0 (group cancelled: true)
-  // CHECK: inside group.add { 1 } (cancelled: true)
-  // CHECK: inside group.add { 1 } (cancelled: true)
+  // CHECK: inside group.add { 1 } (task cancelled: true)
+  // CHECK: inside group.add { 1 } (task cancelled: true)
 
   // CHECK: result: 0
   print("result: \(result)")
