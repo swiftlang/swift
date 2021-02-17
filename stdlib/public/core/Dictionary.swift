@@ -831,9 +831,8 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
 }
 
 extension Dictionary {
-  /// Accesses the value with the given key. If the dictionary doesn't contain
-  /// the given key, accesses the provided default value as if the key and
-  /// default value existed in the dictionary.
+  /// Accesses the value with the given key, falling back to the given default
+  /// value if the key isn't found.
   ///
   /// Use this subscript when you want either the value for a particular key
   /// or, when that key is not present in the dictionary, a default value. This
