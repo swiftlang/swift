@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-ir -module-name test %s | %FileCheck %s
 // RUN: %target-run-simple-swift %s | %FileCheck %s --check-prefix=CHECK-EXEC
 
+// REQUIRES: executable_test
+
 @propertyWrapper
 struct State<T> {
   private class Reference {
