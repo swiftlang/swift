@@ -2117,6 +2117,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     return {fn, size};
   }
   }
+  llvm_unreachable("unhandled case");
 }
 
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
@@ -4688,6 +4689,7 @@ StringRef FunctionPointer::getName(IRGenModule &IGM) const {
             cast<llvm::Constant>(getDirectPointer()->getOperand(0)))
         ->getName();
   }
+  llvm_unreachable("unhandled case");
 }
 
 llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
@@ -4716,6 +4718,7 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
     }
   }
   }
+  llvm_unreachable("unhandled case");
 }
 
 FunctionPointer FunctionPointer::forExplosionValue(IRGenFunction &IGF,
