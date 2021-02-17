@@ -754,8 +754,13 @@ protected:
     // statements by excluding invalid cases.
     if (auto *BS = dyn_cast<BraceStmt>(body)) {
       if (BS->getNumElements() == 0) {
-        hadError = true;
-        return nullptr;
+        // HACK: still allow empty bodies if typechecking for code
+        // completion. Code completion ignores diagnostics
+        // and won't get any types if we fail.
+        if (!ctx.SourceMgr.hasCodeCompletionBuffer()) {
+          hadError = true;
+          return nullptr;
+        }
       }
     }
 
