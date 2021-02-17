@@ -181,6 +181,7 @@ public:
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                            CanSILFunctionType blockType,
                                            CanType continuationTy,
+                                           CanGenericSignature sig,
                                            ForeignAsyncConvention convention);
 
   /// Determine whether the given class has any instance variables that

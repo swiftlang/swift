@@ -398,10 +398,13 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
                                                    CanSILFunctionType BlockType,
                                                    CanType ResultType,
+                                                   CanGenericSignature Sig,
                                                    bool predefined) {
   beginMangling();
   appendType(BlockType);
   appendType(ResultType);
+  if (Sig)
+    appendGenericSignature(Sig);
   appendOperator(predefined ? "TZ" : "Tz");
   return finalize();
 }

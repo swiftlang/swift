@@ -2301,12 +2301,16 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case 'z':
     case 'Z': {
+      NodePointer sig = popNode(Node::Kind::DependentGenericSignature);
       NodePointer resultType = popNode(Node::Kind::Type);
       NodePointer implType = popNode(Node::Kind::Type);
-      return createWithChildren(c == 'z'
+      auto node = createWithChildren(c == 'z'
                                   ? Node::Kind::ObjCAsyncCompletionHandlerImpl
                                   : Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl,
                                 implType, resultType);
+      if (sig)
+        addChild(node, sig);
+      return node;
     }
     case 'V': {
       NodePointer Base = popNode(isEntity);
