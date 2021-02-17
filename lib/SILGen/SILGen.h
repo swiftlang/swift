@@ -420,6 +420,7 @@ public:
   /// functions (null if undefined).
   void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
                                     SILFunction *originalFunction,
+                                    DifferentiabilityKind diffKind,
                                     const AutoDiffConfig &config,
                                     SILFunction *jvp, SILFunction *vjp,
                                     const DeclAttribute *diffAttr);

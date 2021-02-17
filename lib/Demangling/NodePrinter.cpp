@@ -570,6 +570,7 @@ private:
     case Node::Kind::AutoDiffSelfReorderingReabstractionThunk:
     case Node::Kind::AutoDiffSubsetParametersThunk:
     case Node::Kind::AutoDiffFunctionKind:
+    case Node::Kind::DifferentiabilityWitness:
     case Node::Kind::IndexSubset:
       return false;
     }
@@ -1847,6 +1848,47 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     case AutoDiffFunctionKind::Pullback:
       Printer << "pullback";
       break;
+    }
+    return nullptr;
+  }
+  case Node::Kind::DifferentiabilityWitness: {
+    auto kindNodeIndex = Node->getNumChildren() - (
+        Node->getLastChild()->getKind() == Node::Kind::DependentGenericSignature
+            ? 4 : 3);
+    auto kind =
+        (MangledDifferentiabilityKind)Node->getChild(kindNodeIndex)->getIndex();
+    switch (kind) {
+    case MangledDifferentiabilityKind::Forward:
+      Printer << "forward-mode";
+      break;
+    case MangledDifferentiabilityKind::Reverse:
+      Printer << "reverse-mode";
+      break;
+    case MangledDifferentiabilityKind::Normal:
+      Printer << "normal";
+      break;
+    case MangledDifferentiabilityKind::Linear:
+      Printer << "linear";
+      break;
+    case MangledDifferentiabilityKind::NonDifferentiable:
+      assert(false && "Impossible case");
+    }
+    Printer << " differentiability witness for ";
+    unsigned idx = 0;
+    for (auto numChildren = Node->getNumChildren();
+         idx < numChildren &&
+             Node->getChild(idx)->getKind() != Node::Kind::Index; ++idx)
+      print(Node->getChild(idx));
+    ++idx; // kind (handled earlier)
+    Printer << " with respect to parameters ";
+    print(Node->getChild(idx++)); // parameter indices
+    Printer << " and results ";
+    print(Node->getChild(idx++));
+    if (idx < Node->getNumChildren()) {
+      auto *genSig = Node->getChild(idx);
+      assert(genSig->getKind() == Node::Kind::DependentGenericSignature);
+      Printer << " with ";
+      print(genSig);
     }
     return nullptr;
   }

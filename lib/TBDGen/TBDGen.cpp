@@ -602,8 +602,9 @@ void TBDGenVisitor::addAutoDiffDerivativeFunction(
 }
 
 void TBDGenVisitor::addDifferentiabilityWitness(
-    AbstractFunctionDecl *original, IndexSubset *astParameterIndices,
-    IndexSubset *resultIndices, GenericSignature derivativeGenericSignature) {
+    AbstractFunctionDecl *original, DifferentiabilityKind kind,
+    IndexSubset *astParameterIndices, IndexSubset *resultIndices,
+    GenericSignature derivativeGenericSignature) {
   bool foreign = requiresForeignEntryPoint(original);
   auto declRef = SILDeclRef(original).asForeign(foreign);
 
@@ -625,14 +626,15 @@ void TBDGenVisitor::addDifferentiabilityWitness(
       silParamIndices, resultIndices,
       autodiff::getDifferentiabilityWitnessGenericSignature(
           original->getGenericSignature(), derivativeGenericSignature)};
-  SILDifferentiabilityWitnessKey key(originalMangledName, config);
 
   Mangle::ASTMangler mangler;
-  auto mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  auto mangledName = mangler.mangleSILDifferentiabilityWitness(
+      originalMangledName, kind, config);
   addSymbol(mangledName, SymbolSource::forSILDeclRef(declRef));
 }
 
-void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
+void TBDGenVisitor::addDerivativeConfiguration(DifferentiabilityKind diffKind,
+                                               AbstractFunctionDecl *original,
                                                AutoDiffConfig config) {
   auto inserted = AddedDerivatives.insert({original, config});
   if (!inserted.second)
@@ -648,7 +650,7 @@ void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
   addAutoDiffDerivativeFunction(original, config.parameterIndices,
                                 config.derivativeGenericSignature,
                                 AutoDiffDerivativeFunctionKind::VJP);
-  addDifferentiabilityWitness(original, config.parameterIndices,
+  addDifferentiabilityWitness(original, diffKind, config.parameterIndices,
                               config.resultIndices,
                               config.derivativeGenericSignature);
 }
@@ -733,6 +735,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   for (const auto *differentiableAttr :
        AFD->getAttrs().getAttributes<DifferentiableAttr>())
     addDerivativeConfiguration(
+        differentiableAttr->getDifferentiabilityKind(),
         AFD,
         AutoDiffConfig(differentiableAttr->getParameterIndices(),
                        IndexSubset::get(AFD->getASTContext(), 1, {0}),
@@ -740,6 +743,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   for (const auto *derivativeAttr :
        AFD->getAttrs().getAttributes<DerivativeAttr>())
     addDerivativeConfiguration(
+        DifferentiabilityKind::Reverse,
         derivativeAttr->getOriginalFunction(AFD->getASTContext()),
         AutoDiffConfig(derivativeAttr->getParameterIndices(),
                        IndexSubset::get(AFD->getASTContext(), 1, {0}),
@@ -806,6 +810,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   for (const auto *differentiableAttr :
        ASD->getAttrs().getAttributes<DifferentiableAttr>())
     addDerivativeConfiguration(
+        differentiableAttr->getDifferentiabilityKind(),
         ASD->getOpaqueAccessor(AccessorKind::Get),
         AutoDiffConfig(differentiableAttr->getParameterIndices(),
                        IndexSubset::get(ASD->getASTContext(), 1, {0}),

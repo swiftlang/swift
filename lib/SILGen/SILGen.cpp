@@ -1124,7 +1124,8 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
               diffAttr->getDerivativeGenericSignature());
       AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
                             witnessGenSig);
-      emitDifferentiabilityWitness(AFD, F, config, /*jvp*/ nullptr,
+      emitDifferentiabilityWitness(AFD, F, DifferentiabilityKind::Reverse,
+                                   config, /*jvp*/ nullptr,
                                    /*vjp*/ nullptr, diffAttr);
     }
     for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
@@ -1148,8 +1149,9 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
       auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
       AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
                             witnessGenSig);
-      emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,
-                                   derivAttr);
+      emitDifferentiabilityWitness(origAFD, origFn,
+                                   DifferentiabilityKind::Reverse, config, jvp,
+                                   vjp, derivAttr);
     }
   };
   if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
@@ -1160,8 +1162,8 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
 
 void SILGenModule::emitDifferentiabilityWitness(
     AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
-    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp,
-    const DeclAttribute *attr) {
+    DifferentiabilityKind diffKind, const AutoDiffConfig &config,
+    SILFunction *jvp, SILFunction *vjp, const DeclAttribute *attr) {
   assert(isa<DifferentiableAttr>(attr) || isa<DerivativeAttr>(attr));
   auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
   auto origSilFnType = originalFunction->getLoweredFunctionType();
@@ -1183,14 +1185,15 @@ void SILGenModule::emitDifferentiabilityWitness(
   // Witness JVP and VJP are set below.
   AutoDiffConfig silConfig(silParamIndices, config.resultIndices,
                            config.derivativeGenericSignature);
-  SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
+  SILDifferentiabilityWitnessKey key = {
+      originalFunction->getName(), diffKind, silConfig};
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
     // Differentiability witnesses have the same linkage as the original
     // function, stripping external.
     auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(
-        M, linkage, originalFunction, silConfig.parameterIndices,
+        M, linkage, originalFunction, diffKind, silConfig.parameterIndices,
         silConfig.resultIndices, config.derivativeGenericSignature,
         /*jvp*/ nullptr, /*vjp*/ nullptr,
         /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),

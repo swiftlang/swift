@@ -534,8 +534,8 @@ emitDerivativeFunctionReference(
     // configuration.
     if (!minimalWitness)
       minimalWitness = getOrCreateMinimalASTDifferentiabilityWitness(
-          context.getModule(), originalFn, desiredParameterIndices,
-          desiredResultIndices);
+          context.getModule(), originalFn, DifferentiabilityKind::Reverse,
+          desiredParameterIndices, desiredResultIndices);
     // If no minimal witness exists, check non-differentiable cases before
     // creating a new private differentiability witness.
     if (!minimalWitness) {
@@ -600,8 +600,8 @@ emitDerivativeFunctionReference(
               LookUpConformanceInModule(context.getModule().getSwiftModule()));
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
           context.getModule(), SILLinkage::Private, originalFn,
-          desiredParameterIndices, desiredResultIndices,
-          derivativeConstrainedGenSig, /*jvp*/ nullptr,
+          DifferentiabilityKind::Reverse, desiredParameterIndices,
+          desiredResultIndices, derivativeConstrainedGenSig, /*jvp*/ nullptr,
           /*vjp*/ nullptr, /*isSerialized*/ false);
       if (transformer.canonicalizeDifferentiabilityWitness(
               minimalWitness, invoker, IsNotSerialized))

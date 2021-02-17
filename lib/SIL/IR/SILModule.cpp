@@ -669,7 +669,8 @@ SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
   Mangle::ASTMangler mangler;
   return lookUpDifferentiabilityWitness(
-      mangler.mangleSILDifferentiabilityWitnessKey(key));
+      mangler.mangleSILDifferentiabilityWitness(
+          key.originalFunctionName, key.kind, key.config));
 }
 
 /// Look up the differentiability witness corresponding to the given indices.

@@ -2002,26 +2002,49 @@ static bool parseIndexList(Parser &P, StringRef label,
   return false;
 };
 
+/// Parse a differentiability kind, an autodiff config, and a function name for
+/// a differentiability witness. Returns true on error.
+///
 /// sil-differentiability-witness-config-and-function ::=
+///   '[' differentiability-kind ']'
 ///   '[' 'parameters' index-subset ']'
 ///   '[' 'results' index-subset ']'
 ///   ('<' 'where' derivative-generic-signature-requirements '>')?
 ///   sil-function-ref
 ///
-/// e.g. parameters 0 1] [results 0] <T where T: Differentiable>
+/// e.g. [reverse] [parameters 0 1] [results 0] <T where T: Differentiable>
 ///      @foo : <T> $(T) -> T
-static Optional<std::pair<AutoDiffConfig, SILFunction *>>
-parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
-                                                  SILLocation L) {
+static bool parseSILDifferentiabilityWitnessConfigAndFunction(
+    Parser &P, SILParser &SP, SILLocation L,
+    DifferentiabilityKind &resultDiffKind, AutoDiffConfig &resultConfig,
+    SILFunction *&resultOrigFn) {
+  // Parse differentiability kind.
+  if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
+                   "differentiability kind"))
+    return true;
+  resultDiffKind = llvm::StringSwitch<DifferentiabilityKind>(P.Tok.getText())
+      .Case("forward", DifferentiabilityKind::Forward)
+      .Case("reverse", DifferentiabilityKind::Reverse)
+      .Case("normal", DifferentiabilityKind::Normal)
+      .Case("linear", DifferentiabilityKind::Linear)
+      .Default(DifferentiabilityKind::NonDifferentiable);
+  if (resultDiffKind == DifferentiabilityKind::NonDifferentiable) {
+    P.diagnose(P.Tok, diag::sil_diff_witness_unknown_kind, P.Tok.getText());
+    return true;
+  }
+  P.consumeToken(tok::identifier);
+  if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                   "differentiability kind"))
+    return true;
   // Parse parameter and result indices.
   SmallVector<unsigned, 8> rawParameterIndices;
   SmallVector<unsigned, 8> rawResultIndices;
   if (parseIndexList(P, "parameters", rawParameterIndices,
                      diag::sil_autodiff_expected_parameter_index))
-    return {};
+    return true;
   if (parseIndexList(P, "results", rawResultIndices,
                      diag::sil_autodiff_expected_result_index))
-    return {};
+    return true;
   // Parse witness generic parameter clause.
   GenericSignature witnessGenSig = GenericSignature();
   SourceLoc witnessGenSigStartLoc = P.getEndOfPreviousLoc();
@@ -2033,13 +2056,12 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     }
   }
   // Parse original function name and type.
-  SILFunction *originalFunction = nullptr;
-  if (SP.parseSILFunctionRef(L, originalFunction))
-    return {};
+  if (SP.parseSILFunctionRef(L, resultOrigFn))
+    return true;
   // Resolve parsed witness generic signature.
   if (witnessGenSig) {
     auto origGenSig =
-        originalFunction->getLoweredFunctionType()->getSubstGenericSignature();
+        resultOrigFn->getLoweredFunctionType()->getSubstGenericSignature();
     // Check whether original function generic signature and parsed witness
     // generic have the same generic parameters.
     auto areGenericParametersConsistent = [&]() {
@@ -2055,7 +2077,7 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
       P.diagnose(witnessGenSigStartLoc,
                  diag::sil_diff_witness_invalid_generic_signature,
                  witnessGenSig->getAsString(), origGenSig->getAsString());
-      return {};
+      return true;
     }
     // Combine parsed witness requirements with original function generic
     // signature requirements to form full witness generic signature.
@@ -2069,13 +2091,13 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
                                         std::move(witnessRequirements)},
         nullptr);
   }
-  auto origFnType = originalFunction->getLoweredFunctionType();
+  auto origFnType = resultOrigFn->getLoweredFunctionType();
   auto *parameterIndices = IndexSubset::get(
       P.Context, origFnType->getNumParameters(), rawParameterIndices);
   auto *resultIndices = IndexSubset::get(P.Context, origFnType->getNumResults(),
                                          rawResultIndices);
-  AutoDiffConfig config(parameterIndices, resultIndices, witnessGenSig);
-  return std::make_pair(config, originalFunction);
+  resultConfig = AutoDiffConfig(parameterIndices, resultIndices, witnessGenSig);
+  return false;
 }
 
 bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
@@ -5226,14 +5248,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                        "differentiability witness function kind"))
         return true;
       SourceLoc keyStartLoc = P.Tok.getLoc();
-      auto configAndFn =
-          parseSILDifferentiabilityWitnessConfigAndFunction(P, *this, InstLoc);
-      if (!configAndFn)
+      DifferentiabilityKind diffKind;
+      AutoDiffConfig config;
+      SILFunction *originalFn = nullptr;
+      if (parseSILDifferentiabilityWitnessConfigAndFunction(
+              P, *this, InstLoc, diffKind, config, originalFn))
         return true;
-      auto config = configAndFn->first;
-      auto originalFn = configAndFn->second;
       auto *witness = SILMod.lookUpDifferentiabilityWitness(
-          {originalFn->getName(), config});
+          {originalFn->getName(), diffKind, config});
       if (!witness) {
         P.diagnose(keyStartLoc, diag::sil_diff_witness_undefined);
         return true;
@@ -6798,13 +6820,12 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
   // We need to turn on InSILBody to parse the function references.
   Lexer::SILBodyRAII tmp(*P.L);
 
-  auto configAndFn =
-      parseSILDifferentiabilityWitnessConfigAndFunction(P, State, silLoc);
-  if (!configAndFn) {
+  DifferentiabilityKind kind;
+  AutoDiffConfig config;
+  SILFunction *originalFn;
+  if (parseSILDifferentiabilityWitnessConfigAndFunction(
+          P, State, silLoc, kind, config, originalFn))
     return true;
-  }
-  auto config = configAndFn->first;
-  auto originalFn = configAndFn->second;
 
   // If this is just a declaration, create the declaration now and return.
   if (!P.Tok.is(tok::l_brace)) {
@@ -6816,7 +6837,7 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
 
     SILDifferentiabilityWitness::createDeclaration(
         M, linkage ? *linkage : SILLinkage::DefaultForDeclaration, originalFn,
-        config.parameterIndices, config.resultIndices,
+        kind, config.parameterIndices, config.resultIndices,
         config.derivativeGenericSignature);
     return false;
   }
@@ -6853,7 +6874,7 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
 
   SILDifferentiabilityWitness::createDefinition(
       M, linkage ? *linkage : SILLinkage::DefaultForDefinition, originalFn,
-      config.parameterIndices, config.resultIndices,
+      kind, config.parameterIndices, config.resultIndices,
       config.derivativeGenericSignature, jvp, vjp, isSerialized);
   return false;
 }
