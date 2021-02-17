@@ -249,6 +249,8 @@ llvm::Constant *irgen::emitConstantValue(IRGenModule &IGM, SILValue operand) {
       fnPtr = IGM.getConstantSignedPointer(fnPtr, authInfo.getKey(), nullptr,
         constantDiscriminator);
     }
+    llvm::Type *ty = IGM.getTypeInfo(FRI->getType()).getStorageType();
+    fnPtr = llvm::ConstantExpr::getBitCast(fnPtr, ty);
     return fnPtr;
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
