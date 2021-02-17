@@ -169,6 +169,7 @@
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
+      "SIMDConcreteOperations.swift",
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}
   ],

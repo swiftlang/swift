@@ -225,6 +225,7 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  SIMDConcreteOperations.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
