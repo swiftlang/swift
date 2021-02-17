@@ -656,7 +656,7 @@ self.test("\(testNamePrefix).sorted/DispatchesThroughDirectStorageAccessors/Pred
   // This sort operation is not in-place.
   // The collection is copied into an array before sorting.
   expectEqual(0, actualWUMBPIF + actualWCMSIA)
-  expectEqual(0, actualWUMBPIFNonNil + actualWUMBPIFNonNil)
+  expectEqual(0, actualWUMBPIFNonNil + actualWCMSIAIFNonNil)
 
   expectEqualSequence([ 1, 2, 3, 4, 5 ], extractedResult.map { $0.value })
 }
@@ -980,7 +980,7 @@ self.test("\(testNamePrefix).partition/DispatchesThroughDirectStorageAccessors")
   expectEqual(1, actualWUMBPIF + actualWCMSIA)
   expectEqual(
     withUnsafeMutableBufferPointerIsSupported ? 1 : 0,
-    actualWUMBPIFNonNil + actualWUMBPIFNonNil)
+    actualWUMBPIFNonNil + actualWCMSIAIFNonNil)
 
   if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
     // `partition(by:)` is expected to dispatch to the public API in releases
