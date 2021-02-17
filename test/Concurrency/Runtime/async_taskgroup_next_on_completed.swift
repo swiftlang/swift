@@ -28,7 +28,7 @@ func test_sum_nextOnCompleted() async {
 
     // We specifically want to await on completed child tasks in this test,
     // so give them some time to complete before we hit group.next()
-    sleep(2)
+      await Task.sleep(2_000_000_000)
 
     var sum = 0
     do {

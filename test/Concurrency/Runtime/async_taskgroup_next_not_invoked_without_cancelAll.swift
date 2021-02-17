@@ -11,7 +11,6 @@ import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #endif
-
 func test_skipCallingNext() async {
   let numbers = [1, 1]
 
@@ -19,7 +18,7 @@ func test_skipCallingNext() async {
     for n in numbers {
       print("group.add { \(n) }")
       await group.add { () async -> Int in
-        sleep(1)
+        await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("  inside group.add { \(n) } (canceled: \(c))")
         return n
