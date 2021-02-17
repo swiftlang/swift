@@ -5026,12 +5026,14 @@ public:
 
 class HandlePlaceholderType {
   ConstraintSystem &cs;
-  const ConstraintLocatorBuilder &locator;
+  ConstraintLocator *locator;
 
 public:
   explicit HandlePlaceholderType(ConstraintSystem &cs,
                                  const ConstraintLocatorBuilder &locator)
-      : cs(cs), locator(locator) {}
+      : cs(cs) {
+    this->locator = cs.getConstraintLocator(locator);
+  }
 
   Type operator()(PlaceholderTypeRepr *placeholderRepr) const {
     return cs.createTypeVariable(
