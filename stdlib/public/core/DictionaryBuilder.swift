@@ -55,9 +55,9 @@ extension Dictionary {
   /// initialized and the elements in the range `c..<capacity` are
   /// uninitialized.
   ///
-  /// The resulting dictionary has a `count` less than or equal to `c`. The
-  /// actual count is less iff some of the initialized keys were duplicates.
-  /// (This cannot happen if `allowingDuplicates` is false.)
+  /// The resulting dictionary has a `count` less than or equal to `c`.
+  /// If some of the initialized keys were duplicates, the actual count is less.
+  /// This cannot happen for any other reasons or if `allowingDuplicates` is false.
   ///
   /// The buffers passed to the closure are only valid for the duration of the
   /// call.  After the closure returns, this initializer moves all initialized
