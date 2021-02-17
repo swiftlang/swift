@@ -594,9 +594,9 @@ bool LiteralRequirement::isCoveredBy(Type type, DeclContext *useDC) const {
 }
 
 std::pair<bool, Type>
-PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
-                                      const PotentialBinding &binding,
-                                      bool canBeNil) const {
+LiteralRequirement::isCoveredBy(const PotentialBinding &binding,
+                                bool canBeNil,
+                                DeclContext *useDC) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
   case AllowedBindingKind::Exact:
@@ -616,7 +616,7 @@ PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
     if (type->isTypeVariableOrMember() || type->isHole())
       return std::make_pair(false, Type());
 
-    if (literal.isCoveredBy(type, CS.DC)) {
+    if (isCoveredBy(type, useDC)) {
       return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
     }
 
@@ -628,7 +628,7 @@ PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
     // If this literal protocol is not a direct requirement it
     // would not be possible to change optionality while inferring
     // bindings for a supertype, so this hack doesn't apply.
-    if (!literal.isDirectRequirement())
+    if (!isDirectRequirement())
       return std::make_pair(false, Type());
 
     // If we're allowed to bind to subtypes, look through optionals.
@@ -726,7 +726,7 @@ void PotentialBindings::addPotentialBinding(PotentialBinding binding,
       Type adjustedTy;
 
       std::tie(isCovered, adjustedTy) =
-          isLiteralCoveredBy(info, binding, allowsNil);
+          info.isCoveredBy(binding, allowsNil, CS.DC);
 
       if (!isCovered)
         continue;
@@ -800,7 +800,7 @@ void PotentialBindings::addLiteral(Constraint *constraint) {
       Type adjustedTy;
 
       std::tie(isCovered, adjustedTy) =
-        isLiteralCoveredBy(literal, *binding, allowsNil);
+          literal.isCoveredBy(*binding, allowsNil, CS.DC);
 
       // No luck here, let's try next literal requirement.
       if (!isCovered)
