@@ -2057,7 +2057,8 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   // 'rethrows' only applies to functions that take throwing functions
   // as parameters.
   auto fn = dyn_cast<AbstractFunctionDecl>(D);
-  if (fn && fn->getRethrowingKind() != FunctionRethrowingKind::Invalid) {
+  if (fn->getPolymorphicEffectKind(EffectKind::Throws)
+        != PolymorphicEffectKind::Invalid) {
     return;
   }
 

@@ -598,7 +598,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     auto module = dc->getParentModule();
     auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
     
-    if (conformanceRef.classifyAsThrows() && 
+    if (conformanceRef.hasEffect(EffectKind::Throws) &&
         stmt->getTryLoc().isInvalid()) {
       auto &diags = dc->getASTContext().Diags;
       diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled)
