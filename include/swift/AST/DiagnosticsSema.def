@@ -283,6 +283,10 @@ ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
 
+ERROR(unsupported_closure_attr,none,
+      "%select{attribute |}0 '%1' is not supported on a closure",
+      (bool, StringRef))
+
 NOTE(suggest_expected_match,none,
      "%select{expected an argument list|produces result}0 of type '%1'",
      (bool, StringRef))
