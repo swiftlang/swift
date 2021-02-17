@@ -28,6 +28,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILProperty.h"
 #include "swift/SIL/SILUndef.h"
 
 #include "llvm/ADT/Statistic.h"
@@ -2937,11 +2938,11 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   assert(VId <= GlobalVars.size() && "invalid GlobalVar ID");
   auto &globalVarOrOffset = GlobalVars[VId-1];
-  if (globalVarOrOffset.isComplete())
-    return globalVarOrOffset;
+  if (globalVarOrOffset.isFullyDeserialized())
+    return globalVarOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  if (llvm::Error Err = SILCursor.JumpToBit(globalVarOrOffset))
+  if (llvm::Error Err = SILCursor.JumpToBit(globalVarOrOffset.getOffset()))
     MF->fatal(std::move(Err));
   llvm::Expected<llvm::BitstreamEntry> maybeEntry =
       SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -2988,7 +2989,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
       None,
       dID ? cast<VarDecl>(MF->getDecl(dID)): nullptr);
   v->setLet(IsLet);
-  globalVarOrOffset = v;
+  globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);
 
   if (Callback)
@@ -3087,11 +3088,11 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   assert(VId <= VTables.size() && "invalid VTable ID");
   auto &vTableOrOffset = VTables[VId-1];
 
-  if (vTableOrOffset.isComplete())
-    return vTableOrOffset;
+  if (vTableOrOffset.isFullyDeserialized())
+    return vTableOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  if (llvm::Error Err = SILCursor.JumpToBit(vTableOrOffset))
+  if (llvm::Error Err = SILCursor.JumpToBit(vTableOrOffset.getOffset()))
     MF->fatal(std::move(Err));
   llvm::Expected<llvm::BitstreamEntry> maybeEntry =
       SILCursor.advance(AF_DontPopBlockAtEnd);
@@ -3188,7 +3189,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
       SILMod, theClass,
       Serialized ? IsSerialized : IsNotSerialized,
       vtableEntries);
-  vTableOrOffset = vT;
+  vTableOrOffset.set(vT, true /*isFullyDeserialized*/);
 
   if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), vT);
   return vT;
@@ -3814,6 +3815,130 @@ bool SILDeserializer::invalidateFunction(SILFunction *F) {
     if (fnEntry.isDeserialized() && fnEntry.get() == F) {
       fnEntry.get()->decrementRefCount();
       fnEntry.reset();
+      return true;
+    }
+  }
+  return false;
+}
+
+// Invalidate all cached SILGlobalVariable.
+void SILDeserializer::invalidateGlobalVariableCache() {
+  for (auto &entry : GlobalVars) {
+    if (entry.isDeserialized()) {
+      entry.reset();
+    }
+  }
+}
+
+// Invalidate a specific cached GlobalVariable.
+bool SILDeserializer::invalidateGlobalVariable(SILGlobalVariable *gv) {
+  for (auto &entry : GlobalVars) {
+    if (entry.isDeserialized() && entry.get() == gv) {
+      entry.reset();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Invalidate all cached SILVTable.
+void SILDeserializer::invalidateVTableCache() {
+  for (auto &entry : VTables) {
+    if (entry.isDeserialized()) {
+      entry.reset();
+    }
+  }
+}
+
+// Invalidate a specific cached SILVTable.
+bool SILDeserializer::invalidateVTable(SILVTable *v) {
+  for (auto &entry : VTables) {
+    if (entry.isDeserialized() && entry.get() == v) {
+      entry.reset();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Invalidate all cached SILWitnessTable.
+void SILDeserializer::invalidateWitnessTableCache() {
+  for (auto &entry : WitnessTables) {
+    if (entry.isDeserialized()) {
+      entry.reset();
+    }
+  }
+}
+
+// Invalidate a specific cached SILWitnessTable.
+bool SILDeserializer::invalidateWitnessTable(SILWitnessTable *wt) {
+  for (auto &entry : WitnessTables) {
+    if (entry.isDeserialized() && entry.get() == wt) {
+      entry.reset();
+      return true;
+    }
+  }
+  return false;
+}
+
+// Invalidate all cached SILDefaultWitnessTable.
+void SILDeserializer::invalidateDefaultWitnessTableCache() {
+  for (auto &entry : DefaultWitnessTables) {
+    if (entry.isDeserialized()) {
+      entry.reset();
+    }
+  }
+}
+
+// Invalidate a specific cached SILDefaultWitnessTable.
+bool SILDeserializer::invalidateDefaultWitnessTable(
+    SILDefaultWitnessTable *wt) {
+  for (auto &entry : DefaultWitnessTables) {
+    if (entry.isDeserialized() && entry.get() == wt) {
+      entry.reset();
+      return true;
+    }
+  }
+  return false;
+}
+
+// Invalidate all cached SILProperty.
+void SILDeserializer::invalidatePropertyCache() {
+  for (auto &entry : Properties) {
+    if (entry.isDeserialized()) {
+      entry.reset();
+    }
+  }
+}
+
+// Invalidate a specific cached SILProperty.
+bool SILDeserializer::invalidateProperty(SILProperty *p) {
+  for (auto &entry : Properties) {
+    if (entry.isDeserialized() && entry.get() == p) {
+      entry.reset();
+      return true;
+    }
+  }
+  return false;
+}
+
+// Invalidate all cached SILDifferentiabilityWitness.
+void SILDeserializer::invalidateDifferentiabilityWitnessCache() {
+  for (auto &entry : DifferentiabilityWitnesses) {
+    if (entry.isDeserialized()) {
+      entry.reset();
+    }
+  }
+}
+
+// Invalidate a specific cached SILDifferentiabilityWitness.
+bool SILDeserializer::invalidateDifferentiabilityWitness(
+    SILDifferentiabilityWitness *w) {
+  for (auto &entry : DifferentiabilityWitnesses) {
+    if (entry.isDeserialized() && entry.get() == w) {
+      entry.reset();
       return true;
     }
   }
