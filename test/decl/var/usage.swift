@@ -32,8 +32,26 @@ func testStruct() {
   var b = X()
   b.g()
   
-  var c = X()  // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
+  var c = X() // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   c.f()
+  
+  var d = X() // expected-warning {{initialization of variable 'd' was never used; consider replacing with assignment to '_' or removing it}}
+  
+  let e = X() // expected-warning {{initialization of immutable value 'e' was never used; consider replacing with assignment to '_' or removing it}}
+  
+  var f = X() // expected-warning {{variable 'f' was written to, but never read}}
+  f = X()
+  
+  let g = X()
+  var h = X() // expected-warning {{variable 'h' was written to, but never read}}
+  h = g
+  
+  let i = X()
+  let j = i // expected-warning {{initialization of immutable value 'j' was never used; consider replacing with assignment to '_' or removing it}}
+  var k = i // expected-warning {{initialization of variable 'k' was never used; consider replacing with assignment to '_' or removing it}}
+  markUsed(i)
+  
+  _ = X() // ok
 }
 
 func takeClosure(_ fn : () -> ()) {}
@@ -234,24 +252,45 @@ func testForceValueExpr() {
   a!.g()
 }
 
-// FIXME: delete?
 //// <rdar://problem/20894455> "variable was never mutated" diagnostic does not take #if into account
-//func testBuildConfigs() {
-//  let abc = 42    // no warning.
-//  var mut = 18    // no warning.
-//#if false
-//  mut = abc    // These uses prevent abc/mut from being unused/unmutated.
-//#endif
-//}
-//
-//// same as above, but with a guard statement
-//func testGuardWithPoundIf(x: Int?) {
-//  guard let x = x else { return }
-//
-//#if false
-//  _ = x
-//#endif
-//}
+func testBuildConfigsTrue() {
+  let abc = 42
+  var mut = 18 // expected-warning {{variable 'mut' was written to, but never read}}
+  var read = 24
+  #if true
+    mut = abc
+    read = 1
+    markUsed(read)
+  #endif
+}
+
+func testBuildConfigsFalse() {
+  let abc = 42 // expected-warning {{initialization of immutable value 'abc' was never used; consider replacing with assignment to '_' or removing it}}
+  var mut = 18 // expected-warning {{initialization of variable 'mut' was never used; consider replacing with assignment to '_' or removing it}}
+  var read = 24 // expected-warning {{initialization of variable 'read' was never used; consider replacing with assignment to '_' or removing it}}
+  #if false // false IfConfigs don't appear in SIL, so we can't track this
+    mut = abc
+    read = 1
+    markUsed(read)
+  #endif
+}
+
+func markUsed<T>(_ t: T) {}
+func testGuardWithPoundIfTrue(x: Int?) {
+  guard let x = x else { return }
+  
+  #if true
+    markUsed(x)
+  #endif
+}
+
+func testGuardWithPoundIfFalse(x: Int?) {
+  guard let x = x else { return } // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}}
+  
+  #if false
+    markUsed(x)
+  #endif
+}
 
 // <rdar://problem/21091625> Bogus 'never mutated' warning when protocol variable is mutated only by mutating method
 protocol Fooable {
@@ -323,10 +362,9 @@ func test(_ a : Int?, b : Any) {
     z = y
   }
   
-  // FIXME: Impossible to notice `_ = y` in SILGen, do we ignore it?
-//  if let x = a, let y = a {  // exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
-//    _ = y
-//  }
+  if let x = a, let y = a {  // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{6-11=_}}
+    markUsed(y)
+  }
 
   // Simple case, insert a comparison with nil.
   if let x = a {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{15-15= != nil}}
@@ -407,7 +445,6 @@ if let string = optionalAny as? String {} // expected-warning {{value 'string' w
 let unusedVariable = ""
 var unNeededVar = false
 if unNeededVar {}
-//guard let foo = optionalAny else { } // FIXME: what do I do?
 
 for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; consider replacing with '_' or removing it}} {{5-6=_}}
    print("")
@@ -522,52 +559,76 @@ func testForwardReferenceCapture() {
 }
 
 // rdar://47240768 Expand the definition of "simple" pattern to variables bound in patterns
-//func testVariablesBoundInPatterns() {
-//  enum StringB {
-//    case simple(b: Bool)
-//    case tuple(b: (Bool, Bool))
-//    case optional(b: Bool?)
-//  }
-//
-//  // Because Swift enables all kinds of creative binding forms, make sure that
-//  // variable patterns occuring directly under a `let` or `var` have that
-//  // introducer stripped by the fixit. All other cases are currently too
-//  // complicated for the VarDeclUsageChecker.
-//  switch StringB.simple(b: true) {
-//  case .simple(b: let b) where false: // FIXME: move exxpected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
-//    break
-//  case .simple(b: var b) where false: // FIXME: move exxpected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
-//    break
-//  case var .simple(b: b): // FIXME: move exxpected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}} {{23-24=_}}
-//    break
-//  case .tuple(b: let (b1, b2)) where false:
-//    // FIXME: move exxpected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
-//    // FIXME: move exxpected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
-//    break
-//  case .tuple(b: (let b1, let b2)) where false:
-//    // FIXME: move exxpected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
-//    // FIXME: move exxpected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
-//    break
-//  case .tuple(b: (var b1, var b2)) where false:
-//    // FIXME: move exxpected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
-//    // FIXME: move exxpected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
-//    break
-//  case var .tuple(b: (b1, b2)) where false:
-//    // FIXME: move exxpected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
-//    // FIXME: move exxpected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
-//    break
-//  case .tuple(b: let b): // FIXME: move exxpected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{18-23=_}}
-//    break
-//  case .optional(b: let x?) where false: // FIXME: move exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
-//    break
-//  case .optional(b: let .some(x)) where false: // FIXME: move exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{31-32=_}}
-//    break
-//  case let .optional(b: x?): // FIXME: move exxpected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
-//    break
-//  case let .optional(b: .none): // FIXME: move exxpected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
-//    break
-//  }
-//}
+enum StringB {
+  case simple(b: Bool)
+  case tuple(b: (Bool, Bool))
+  case optional(b: Bool?)
+}
+func testVariablesBoundInPatterns(stringB: StringB) {
+
+  // Because Swift enables all kinds of creative binding forms, make sure that
+  // variable patterns occuring directly under a `let` or `var` have that
+  // introducer stripped by the fixit. All other cases are currently too
+  // complicated for the VarDeclUsageChecker.
+  switch stringB {
+  case .simple(b: let b) where false:
+    // expected-warning@-1 {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+    // expected-note@-2 {{condition always evaluates to false}}
+    // expected-warning@-3 {{will never be executed}}
+    break
+  case .simple(b: var b) where false:
+    // expected-warning@-1 {{variable 'b' was never used; consider replacing with '_' or removing it}} {{19-24=_}}
+    // expected-note@-2 {{condition always evaluates to false}}
+    // expected-warning@-3 {{will never be executed}}
+    break
+  case var .simple(b: b):
+    // expected-warning@-1 {{variable 'b' was never used; consider replacing with '_' or removing it}} {{23-24=_}}
+    break
+  case .tuple(b: let (b1, b2)) where false:
+    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    // expected-note@-3 {{condition always evaluates to false}}
+    // expected-warning@-4 {{will never be executed}}
+    break
+  case .tuple(b: (let b1, let b2)) where false:
+    // expected-warning@-1 {{immutable value 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-2 {{immutable value 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    // expected-note@-3 {{condition always evaluates to false}}
+    // expected-warning@-4 {{will never be executed}}
+    break
+  case .tuple(b: (var b1, var b2)) where false:
+    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{19-25=_}}
+    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-33=_}}
+    // expected-note@-3 {{condition always evaluates to false}}
+    // expected-warning@-4 {{will never be executed}}
+    break
+  case var .tuple(b: (b1, b2)) where false:
+    // expected-warning@-1 {{variable 'b1' was never used; consider replacing with '_' or removing it}} {{23-25=_}}
+    // expected-warning@-2 {{variable 'b2' was never used; consider replacing with '_' or removing it}} {{27-29=_}}
+    // expected-note@-3 {{condition always evaluates to false}}
+    // expected-warning@-4 {{will never be executed}}
+    break
+  case .tuple(b: let b):
+    // expected-warning@-1 {{immutable value 'b' was never used; consider replacing with '_' or removing it}} {{18-23=_}}
+    break
+  case .optional(b: let x?) where false:
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+    // expected-note@-2 {{condition always evaluates to false}}
+    // expected-warning@-3 {{will never be executed}}
+    break
+  case .optional(b: let .some(x)) where false:
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{31-32=_}}
+    // expected-note@-2 {{condition always evaluates to false}}
+    // expected-warning@-3 {{will never be executed}}
+    break
+  case let .optional(b: x?):
+    // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{25-26=_}}
+    break
+  case let .optional(b: .none):
+    // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
+    break
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Top Level Closures
@@ -987,4 +1048,292 @@ func TestTupleMutate() -> (Bool, Int) {
   }
   a = false
   return (a, b)
+}
+
+// ASTScope assertion
+func patternBindingWithTwoEntries() {
+  let x2 = 1, (_, _) = (1, 2)
+  // expected-warning@-1 {{immutable value 'x2' was never used; consider replacing with '_' or removing it}}
+}
+
+//===----------------------------------------------------------------------===//
+// FIXME: Moved from properties
+//===----------------------------------------------------------------------===//
+
+
+var implicitGet2: Int {
+  var zzz = 0
+  // expected-warning@-1 {{initialization of variable 'zzz' was never used; consider replacing with assignment to '_' or removing it}}
+  // For the purpose of this test, any other function attribute work as well.
+  @inline(__always)
+  func foo() {}
+  return 0
+}
+
+class SelfRefProperties {
+  var setter: Int {
+    get {
+      return 42
+    }
+    set {
+      markUsed(setter)  // expected-warning {{setter argument 'newValue' was never used, but the property was accessed}} expected-note {{did you mean to use 'newValue' instead of accessing the property's current value?}}
+      var unused = setter + setter // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}} {{7-17=_}}
+    }
+  }
+}
+
+func takeTrailingClosure(_ fn: () -> ()) -> Int { return 0 }
+func disambiguateGetSet4Attr() {
+  func set(_ x: Int, fn: () -> ()) {}
+  var newValue: Int = 0
+  // expected-warning@-1 {{variable 'newValue' was never mutated; consider changing to 'let' constant}}
+  var a: Int = takeTrailingClosure {
+    @inline(__always)
+    func foo() {}
+    set(newValue) {}
+  }
+  // Check that the property is read-write.
+  a = a + 42
+}
+
+
+// FIXME: Moved from associated_types
+
+protocol TestAssocType {
+  associatedtype AssocType
+}
+
+struct TestAssocTypeStruct : TestAssocType {
+  typealias AssocType = Int
+  func blah() {
+    var a : AssocType // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} {{9-10=_}}
+  }
+}
+
+@dynamicCallable
+struct Callable {
+  func dynamicallyCall(withArguments arguments: [Int]) -> Int {
+    return arguments.count
+  }
+}
+
+@dynamicCallable
+struct Throwing {
+  func dynamicallyCall(withArguments arguments: [String]) throws -> Int {
+    return arguments.count
+  }
+}
+
+func testCallable(a: Callable, b: Throwing) {
+  _ = a()
+  let a1 = a(1, 2, 3, 4) // expected-warning {{initialization of immutable value 'a1' was never used}}
+  
+  _ = try? b()
+  let b1 = try! b("hello", "world") // expected-warning {{initialization of immutable value 'b1' was never used}}
+}
+
+// SR-4082
+func foo2() {
+  let x = 5
+  if x < 0, let x = Optional(1) { } // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} expected-note {{condition always evaluates to false}} expected-warning {{will never be executed}}
+}
+
+class ForwardReference {
+  var x: Int = 0
+  
+  func test() {
+    x = 0
+    var x: Float = 0.0 // expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
+  }
+}
+
+func localtest() {
+  func shadowbug() { 
+    var Foo = 10
+    // expected-warning@-1 {{initialization of variable 'Foo' was never used; consider replacing with assignment to '_' or removing it}}
+    func g() {
+      struct S {
+        // FIXME: Swap these two lines to crash our broken lookup.
+        typealias Foo = Int
+        var x : Foo
+      }
+    }
+  }
+}
+
+enum EnumA {
+  case A(Int)
+  case B(Bool)
+  case C
+  case D
+}
+
+enum EnumB {
+  case A
+  case B
+}
+
+func s(a: EnumA, b: EnumB) {
+  switch (a, b) {
+  case (.A(_), .A):
+    break
+  case (.A(_), .B):
+    break
+    
+  case (.B(_), let b):
+    // expected-warning@-1 {{immutable value 'b' was never used; consider replacing with '_' or removing it}}
+    break
+    
+  case (.C, _), (.D, _):
+    break
+  }
+}
+
+func fullNameTest() {
+  let x = 123 // expected-warning {{never used}}
+  func x() {}
+}
+
+// SR-6726
+var sr6726var: Int?
+
+func sr6726() {
+  guard let bar = sr6726var else {
+    return
+  }
+  let sr6726var = String(bar) // expected-warning {{initialization of immutable value 'sr6726var' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+
+func nested_scope_2() {
+  do {
+    let x = 11// expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    do {
+      let _ = x
+      let x = 111 // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    }
+  }
+  let x = 1  // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+func nested_scope_3() {
+  let x = 1 // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  do {
+    do {
+      let x = 111 // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+    }
+    let x = 11 // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+}
+
+class Ty {
+  var v : Int?
+  
+  func fn() {
+    let _ = v
+    let v = 1 // expected-warning {{initialization of immutable value 'v' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+}
+
+let g = 0
+func file_scope_1() {
+  let _ = g
+  let g = 1 // expected-warning {{initialization of immutable value 'g' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+func module_scope_1() {
+  let _ = print // Legal use of func print declared in Swift Standard Library
+  let print = "something" // expected-warning {{initialization of immutable value 'print' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+// SR-7660
+class TestC {
+  var variable: Int?
+  func f() {
+    guard let _ = variable else { return }
+    let variable = 1 // expected-warning {{initialization of immutable value 'variable' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+}
+
+func test_lambda() {
+  // A simple closure.
+  var a = { (value: Int) -> () in markUsed(value+1) }
+  // expected-warning@-1 {{initialization of variable 'a' was never used; consider replacing with assignment to '_' or removing it}}
+  
+  // A recursive lambda.
+  var fib = { (n: Int) -> Int in
+    // expected-warning@-1 {{variable 'fib' was never mutated; consider changing to 'let' constant}}
+    if (n < 2) {
+      return n
+    }
+    
+    return fib(n-1)+fib(n-2)
+  }
+}
+
+var nestedSelfRef = {
+  var recursive = { nestedSelfRef() }
+  // expected-warning@-1 {{variable 'recursive' was never mutated; consider changing to 'let' constant}}
+  recursive()
+}
+
+class Writer {}
+
+class MyCls {
+  func something() {}
+  
+  func test() {
+    // expected-warning @+1 {{initialization of immutable value 'self' was never used}}
+    let `self` = Writer() // Even if `self` is shadowed,
+    something() // this should still refer `MyCls.something`.
+  }
+}
+
+func barFunc() {
+  var x : () = { () -> () in
+    // expected-warning@-1 {{variable 'x' was never used; consider replacing with '_' or removing it}}
+    return
+  } ()
+  
+  var y : () = { () -> () in
+    // expected-warning@-1 {{variable 'y' was never used; consider replacing with '_' or removing it}}
+    return
+  } ()
+}
+
+@discardableResult
+func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
+  return arg(x)
+}
+func capture_list_no_captures(x: Int) {
+  calls({ [x] in $0 }, 0) // expected-warning {{capture 'x' was never used}}
+}
+
+func testUnusedInFor() {
+  for _ in 0..<10 {
+    var y = 300 // expected-warning {{variable 'y' was written to, but never read}}
+    y += 1
+  }
+}
+
+// <rdar://problem/19382878> Introduce new x? pattern
+switch Optional(42) {
+case let x?: break // expected-warning{{immutable value 'x' was never used; consider replacing with '_' or removing it}} {{10-11=_}}
+case nil: break
+}
+
+for (var x) in 0...100 {} // expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
+for var x in 0...100 {}  // rdar://20167543 expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
+
+// rdar://problem/32390726 - Bad Diagnostic: Don't suggest `var` to `let` when binding inside for-statement
+for var i in 0..<10 { // expected-warning {{variable 'i' was never mutated; consider removing 'var' to make it constant}} {{5-9=}}
+  _ = i + 1
+}
+
+func takes_closure(_ fn: () -> ()) {}
+func testVarReadInClosure() {
+  var b1 = 0 // expected-warning {{variable 'b1' was never mutated; consider changing to 'let' constant}}
+  takes_closure {
+    markUsed(b1)
+  }
 }

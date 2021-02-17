@@ -8,14 +8,8 @@
 func foo() -> Int {
 	let x = 1
 	var y = 2
+// DEFAULT:    warning: variable 'y' was never mutated; consider changing to 'let' constant
+// WERR:       error: variable 'y' was never mutated; consider changing to 'let' constant
+// NOWARN-NOT: variable 'y' was never mutated
 	return x + y
-}
-
-func bar() {
-	foo()
-// To help anchor the checks, have an error. Put it inside a later function, to help make sure it comes after
-	xyz
-// DEFAULT: error: cannot find 'xyz' in scope
-// WERR:    error: cannot find 'xyz' in scope
-// NOWARN:  error: cannot find 'xyz' in scope
 }

@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-sil %s -verify | %FileCheck %s
 
 func testUnreachableAfterReturn() -> Int {
-  var x: Int = 3
+  var x: Int = 3 //expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
   return x
   x += 1 //expected-warning {{code after 'return' will never be executed}}
 }
@@ -17,7 +17,7 @@ func testUnreachableAfterIfReturn(a: Bool) -> Int {
 
 func testUnreachableForAfterContinue(b: Bool) {
   for _ in 0..<10 {
-    var y: Int = 300
+    var y: Int = 300 // expected-warning {{variable 'y' was written to, but never read}}
     y += 1
     if b {
       break
@@ -29,9 +29,9 @@ func testUnreachableForAfterContinue(b: Bool) {
 }
 
 func testUnreachableWhileAfterContinue(b: Bool) {
-  var i:Int = 0
+  var i:Int = 0 // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}}
   while (i<10) { 
-    var y: Int = 300
+    var y: Int = 300 // expected-warning {{variable 'y' was written to, but never read}}
     y += 1
     if b {
       break
@@ -131,7 +131,7 @@ class TestThrowInInit {
 }
 
 func sr6141() {
-  var bar: String? = ""
+  var bar: String? = "" // expected-warning{{variable 'bar' was never used; consider replacing with '_' or removing it}}
   return;
   bar?.append("x")  // expected-warning{{code after 'return' will never be executed}}
 }

@@ -70,6 +70,10 @@ static bool isSetterParam(SILInstruction *I) {
 static bool verifyVarDecl(SILInstruction *I) {
   if (auto *VD = getVarDecl(I)) {
     
+    if (VD->isCaptureList()) {
+      return true;
+    }
+    
     if (isSetterParam(I)) {
       return true;
     }
@@ -146,11 +150,19 @@ static SILValue getDebugVarAddrOp(SILInstruction *I) {
 static SILInstruction *getDebugVar(SILInstruction *I) {
   if (auto *DVI = dyn_cast<DebugValueInst>(I)) {
     
-    // If is a param, if AccessorDecl
+    // Var Declaration is setter parameter 'newValue'
     if (isSetterParam(I)) {
       return I;
     }
     
+    // Var Declaration is a parameter in capture list
+    if (auto VD = getVarDecl(I)) {
+      if (VD->isCaptureList()) {
+        return I;
+      }
+    }
+    
+    // Var Declaration is a parameter that we do not track
     if (DVI->getVarInfo().hasValue()) {
       if (DVI->getVarInfo().getValue().ArgNo) {
         
@@ -158,6 +170,8 @@ static SILInstruction *getDebugVar(SILInstruction *I) {
         return nullptr;
       }
     }
+    
+    // Otherwise, this is just a local Var Declaration
     return verifyVarDecl(DVI) ? DVI : nullptr; // FIXME: may be redundant
   }
   return nullptr;
@@ -305,7 +319,7 @@ private:
       Fn = BAI->getReferencedFunctionOrNull();
     }
     
-    if (AS && Fn) {
+    if (AS && Fn && Fn->isExternalDeclaration()) {
       if ((Op->getUser() == Apply) && AS.isArgumentOperand(*Op)) {
         return argIsInout(AS.getArgumentConvention(*Op));
       }
@@ -412,16 +426,30 @@ public:
   
 };
 
+bool inBlock(SILInstruction *I, SILBasicBlock *BB) {
+  auto i = BB->begin(), e = BB->end();
+  while (i != e) {
+    if (&*i == I) {
+      return true;
+    }
+    ++i;
+  }
+  return false;
+}
+
 class VariableReadTraverser {
   
   VarDecl *VD;
   SmallVector<SILValue, 32> Worklist;
   llvm::SetVector<SILValue> Seen;
   SILInstruction *EntryInst;
+  SILBasicBlock *CurBlock;
   
 public:
-  VariableReadTraverser(SILInstruction *EntryInst, VarDecl *VD) : VD(VD),
-  EntryInst(EntryInst) {
+  VariableReadTraverser(SILInstruction *EntryInst,
+                        VarDecl *VD,
+                        SILBasicBlock *CurBlock)
+  : VD(VD), EntryInst(EntryInst), CurBlock(CurBlock) {
     appendValues(EntryInst);
   }
   
@@ -529,6 +557,15 @@ private:
     return false;
   }
   
+  bool notIgnored(SILInstruction *I) {
+    if (auto ParentStmt = VD->getRecursiveParentPatternStmt()) {
+      if (isa<CaseStmt>(ParentStmt)) {
+        return inBlock(I, CurBlock);
+      }
+    }
+    return true;
+  }
+  
   bool isDirectRead(SILInstruction *I, Operand *Op, SILValue Value) {
     if (isSelfParam(I)) {
       return true;
@@ -540,7 +577,6 @@ private:
       case SILInstructionKind::CondBranchInst:
       case SILInstructionKind::ThrowInst:
       case SILInstructionKind::TupleInst:
-      case SILInstructionKind::SwitchEnumInst:
       case SILInstructionKind::SwitchEnumAddrInst:
       case SILInstructionKind::UncheckedEnumDataInst: // FIXME: Should we search?
       case SILInstructionKind::StoreBorrowInst: // FIXME: Should we search?
@@ -548,19 +584,72 @@ private:
       case SILInstructionKind::OpenExistentialAddrInst: // FIXME: Should we search?
       case SILInstructionKind::PointerToAddressInst:
       case SILInstructionKind::MarkDependenceInst:
-        return true;
+        return notIgnored(I);
         
+      case SILInstructionKind::SwitchEnumInst: {
+        
+        // If the switch cases contain the current basic block,
+        // the entry instruction is a debug var defined in a switch case
+        // and is not considered a read.
+        //
+        //    switch (a, b) : {
+        //        case(0, let v) // entry instruction
+        //        ...
+        //
+        if (auto ParentInst = I->getOperand(0).getDefiningInstruction()) {
+          // Search through sibling switch enum instructions if this is
+          // switching a tuple.
+          for (SILValue Result : ParentInst->getResults()) {
+            for (Operand *Use : Result->getUses()) {
+              if (auto SEI = dyn_cast<SwitchEnumInst>(Use->getUser())) {
+                for (unsigned i = 0; i < SEI->getNumCases(); ++i) {
+                  auto *Case = SEI->getCase(i).second;
+                  if (Case == CurBlock) {
+                    return false;
+                  }                
+                }
+              }
+            }
+          }
+        }
+        
+        // Otherwise, this switch is reading this variable
+        //
+        //    let v = 1 // entry instruction
+        //    switch (v) {
+        //      ...
+        //
+        return true;
+      }
+      
       case SILInstructionKind::StoreInst:
-        return dyn_cast<StoreInst>(I)->getSrc() == Value;
+        return dyn_cast<StoreInst>(I)->getSrc() == Value && notIgnored(I);
       case SILInstructionKind::AssignInst:
-        return dyn_cast<AssignInst>(I)->getSrc() == Value;
+        return dyn_cast<AssignInst>(I)->getSrc() == Value && notIgnored(I);
       case SILInstructionKind::CopyAddrInst:
-        return dyn_cast<CopyAddrInst>(I)->getSrc() == Value;
+        return dyn_cast<CopyAddrInst>(I)->getSrc() == Value && notIgnored(I);
         
       case SILInstructionKind::DebugValueInst:
+        // FIXME: check if decl pattern/parent is switch case
         if (auto *DebugVD = getVarDecl(I)) {
-          // This is an assignment to another variable
-          if (DebugVD != VD) {
+          
+          // Switch cases may assign a value to multiple 
+          // variable declarations; do not count this as a 
+          // read.
+          bool isSwitchCase = false;
+          if (auto ParentStmt = VD->getRecursiveParentPatternStmt()) {
+            isSwitchCase = isa<CaseStmt>(ParentStmt);
+          }
+          
+          // If this variable is a capture list, there is at 
+          // least one source variable declaration; do not 
+          // count this as a read.
+          if (!VD->isCaptureList() &&
+              !isSwitchCase &&
+              DebugVD != VD) {
+            
+            // TODO: Return true only if VD precedes DebugVD
+            // This is an assignment to another variable
             return true;
           }
         }
@@ -575,7 +664,7 @@ private:
       case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::TryApplyInst:
-        return applyIsDirectRead(I, Op, Value);
+        return notIgnored(I) && applyIsDirectRead(I, Op, Value);
       default:
         return false;
     }
@@ -726,15 +815,17 @@ static bool didModify(VarDecl *VD, SILInstruction *I) {
   return VMT.didModify();
 }
 
-static bool didRead(VarDecl *VD, SILInstruction *I) {
+static bool didRead(VarDecl *VD, SILInstruction *I, SILBasicBlock *BB) {
   
-  auto VRT = VariableReadTraverser(I, VD);
+  auto VRT = VariableReadTraverser(I, VD, BB);
   return VRT.didRead();
 }
 
-static void searchSetterParam(VarDecl *VD, SILInstruction *I) {
+static void searchSetterParam(VarDecl *VD,
+                              SILInstruction *I,
+                              SILBasicBlock *BB) {
   
-  auto VRT = VariableReadTraverser(I, VD);
+  auto VRT = VariableReadTraverser(I, VD, BB);
   if (!VRT.didRead()) {
     auto SRGT = SetterReadsGetterTraverser(I->getFunction());
     if (SRGT.findGetterAccess()) {
@@ -755,28 +846,9 @@ public:
   DiagnoseVarUsageCollector(ASTContext &Context) : Context(Context) {}
   
   void diagnoseReadModified(VarDecl *var) {
-    // If this is a member in a capture list, just say it is unused.  We could
-    // produce a fixit hint with a parent map, but this is a lot of effort for
-    // a narrow case.
-    //    if (var->isCaptureList()) {
-    //      Context.Diags.diagnose(var->getLoc(), diag::capture_never_used,
-    //                             var->getName());
-    //    }
   }
   
-  void diagnoseUnreadUnmodified(VarDecl *var, bool Modified = false) {
-    
-//    if (auto param = dyn_cast<ParamDecl>(var)) {
-//      auto FD = dyn_cast<AccessorDecl>(param->getDeclContext());
-//      if (FD && FD->getAccessorKind() == AccessorKind::Set) {
-//        Context.Diags.diagnose(var->getLoc(), diag::unused_setter_parameter,
-//                               var->getName());
-//        Context.Diags.diagnose(var->getLoc(), diag::fixit_for_unused_setter_parameter,
-//                               var->getName())
-//        .fixItReplace(var->getSourceRange(), var->getName().str());
-//      }
-//      return;
-//    }
+  void diagnoseUnreadUnmodified(VarDecl *var) {
     
     // If the source of the VarDecl is a trivial PatternBinding with only a
     // single binding, rewrite the whole thing into an assignment.
@@ -877,19 +949,31 @@ public:
       }
     }
     
+    
+    // If this is a member in a capture list, just say it is unused.  We could
+    // produce a fixit hint with a parent map, but this is a lot of effort for
+    // a narrow case.
+    if (var->isCaptureList()) {
+      Context.Diags.diagnose(var->getLoc(),
+                             diag::capture_never_used,
+                             var->getName());
+      return;
+    }
+    
+    // FIXME: Never run?
     // Otherwise, this is something more complex, perhaps
     //    let (a,b) = foo()
-    if (var->isLet() && Modified) {
-      Context.Diags.diagnose(var->getLoc(),
-                             diag::immutable_value_never_used_but_assigned,
-                             var->getName());
-    } else {
-      unsigned varKind = var->isLet();
-      // Just rewrite the one variable with a _.
-      Context.Diags.diagnose(var->getLoc(), diag::variable_never_used,
-                             var->getName(), varKind)
-      .fixItReplace(var->getLoc(), "_");
-    }
+//    if (var->isLet() && false) {
+//      Context.Diags.diagnose(var->getLoc(),
+//                             diag::immutable_value_never_used_but_assigned,
+//                             var->getName());
+//    }
+    
+    unsigned varKind = var->isLet();
+    // Just rewrite the one variable with a _.
+    Context.Diags.diagnose(var->getLoc(), diag::variable_never_used,
+                           var->getName(), varKind)
+    .fixItReplace(var->getLoc(), "_");
   }
   
   void diagnoseUnreadModified(VarDecl *var) {
@@ -939,13 +1023,16 @@ public:
         suggestLet = !isa<ForEachStmt>(stmt);
       }
       
-      auto diag = Context.Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
+      auto diag = Context.Diags.diagnose(var->getLoc(),
+                                         diag::variable_never_mutated,
                                          var->getName(), suggestLet);
       
-      if (suggestLet)
+      if (suggestLet) {
+        // FIXME: Not emitting?
         diag.fixItReplace(FixItLoc, "let");
-      else
+      } else {
         diag.fixItRemove(FixItLoc);
+      }
     }
   }
   
@@ -986,7 +1073,7 @@ static void checkVarUsage(SILFunction &Fn) {
       VarDecl *VD = getVarDecl(Inst);
       
       if (isSetterParam(Inst)) {
-        searchSetterParam(VD, Inst);
+        searchSetterParam(VD, Inst, &bb);
         ++i;
         continue;
       }
@@ -1017,7 +1104,7 @@ static void checkVarUsage(SILFunction &Fn) {
       // Pop unread and modified declarations to consider promotion to read
       // and modified.
       if (VarUnreadModified.count(VD)) {
-        if (didRead(VD, Inst)) {
+        if (didRead(VD, Inst, &bb)) {
           VarUnreadModified.remove(VD);
           VarReadModified.insert(VD);
         }
@@ -1031,7 +1118,7 @@ static void checkVarUsage(SILFunction &Fn) {
       }
       
       // Promote new declarations and unread and unmodified declarations
-      bool DidRead = didRead(VD, Inst);
+      bool DidRead = didRead(VD, Inst, &bb);
       bool DidModify = didModify(VD, Inst);
       if (!DidRead && !DidModify) {
         VarUnreadUnmodified.insert(VD);
@@ -1090,7 +1177,7 @@ static void checkVarUsage(SILFunction &Fn) {
   
   for (VarDecl *VD : VarAll) {
     if (VarUnreadUnmodified.count(VD)) {
-      DVUC.diagnoseUnreadUnmodified(VD, false);
+      DVUC.diagnoseUnreadUnmodified(VD);
     } else if (VarReadUnmodified.count(VD)) {
       DVUC.diagnoseReadUnmodified(VD);
     } else if (VarUnreadModified.count(VD)) {

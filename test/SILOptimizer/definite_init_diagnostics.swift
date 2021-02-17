@@ -38,12 +38,13 @@ func test2() {
   // inout.
 
   var a1 : Int        // expected-note {{variable defined here}}
+                      // expected-warning@-1 {{variable 'a1' was written to, but never read}}
   takes_inout(&a1)    // expected-error {{variable 'a1' passed by reference before being initialized}}
 
-  var a2 = 4
+  var a2 = 4          // expected-warning {{variable 'a2' was written to, but never read}}
   takes_inout(&a2)    // ok.
 
-  var a3 : Int
+  var a3 : Int        // expected-warning {{variable 'a3' was written to, but never read}}
   a3 = 4
   takes_inout(&a3)    // ok.
   

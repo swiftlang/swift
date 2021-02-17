@@ -5,7 +5,7 @@ func singleBlock() -> Int {
 } // expected-error {{missing return in global function expected to return 'Int'}}
 
 func singleBlock2() -> Int {
-  var y = 0 
+  var y = 0 // expected-warning {{variable 'y' was written to, but never read}}
   y += 1
 } // expected-error {{missing return in global function expected to return 'Int'}}
 
@@ -54,7 +54,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
     y -= 1
     break
   }
-  var x = 0
+  var x = 0 // expected-warning {{variable 'x' was written to, but never read}}
   x += 1
 } // expected-error {{missing return in global function expected to return 'Int'}}
 

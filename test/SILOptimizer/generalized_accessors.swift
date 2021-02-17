@@ -417,6 +417,7 @@ struct TestYieldsInLetPatterns {
 
     _modify {
       if var stored = storedOpt { // expected-note {{missing yield in the non-nil case}}
+        // expected-warning@-1 {{variable 'stored' was written to, but never read}}
         stored += 1
         return
       }
