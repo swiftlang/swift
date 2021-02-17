@@ -147,6 +147,15 @@ static void runTaskWithPollResult(
       assert(false && "Must not attempt to run with a Waiting result.");
   }
 
+  // FIXME: removing children on next() resumption is not implemented yet; we keep accumulating them until the group exits
+  // We need to remove the completed child from the task group's task record
+  // we it competes and returns from next(). We cannot do it here though as
+  // we're executing on _some_ executor here, but we must only modify records
+  // from the owning task itself, i.e. after we have resumed.
+  //
+  // Only resume the context, completing the `_taskGroupWaitNext()` async call,
+  // there, on the correct task, we can remove the task from the record.
+
   // TODO: schedule this task on the executor rather than running it directly.
   // FIXME: or   waitingTask->run(executor); ?
   waitingTask->run(waitingTaskContext->ResumeParentExecutor);

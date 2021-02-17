@@ -222,6 +222,10 @@ extension Task {
 
       let rawResult = await _taskGroupWaitNext(waitingTask: _task, group: _group)
 
+      // FIXME: we are now in the parent task again, and can safely modify the
+      //        records again; we should remove this specific child from the
+      //        group->record
+
       if rawResult.hadErrorResult {
         // Throw the result on error.
         let error = unsafeBitCast(rawResult.storage, to: Error.self)
@@ -237,6 +241,7 @@ extension Task {
       let storagePtr =
         storage.bindMemory(to: TaskResult.self, capacity: 1)
       let value = UnsafeMutablePointer<TaskResult>(mutating: storagePtr).pointee
+
       return value
     }
 
