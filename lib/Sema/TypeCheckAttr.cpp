@@ -5482,10 +5482,9 @@ namespace {
 class ClosureAttributeChecker
     : public AttributeVisitor<ClosureAttributeChecker> {
   ASTContext &ctx;
-  ClosureExpr *closure;
 public:
   ClosureAttributeChecker(ClosureExpr *closure)
-    : ctx(closure->getASTContext()), closure(closure) { }
+    : ctx(closure->getASTContext()) { }
 
   void visitDeclAttribute(DeclAttribute *attr) {
     ctx.Diags.diagnose(
@@ -5493,6 +5492,10 @@ public:
         attr->isDeclModifier(), attr->getAttrName())
       .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
+  }
+
+  void visitConcurrentAttr(ConcurrentAttr *attr) {
+    // Nothing else to check.
   }
 };
 
