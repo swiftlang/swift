@@ -1072,7 +1072,7 @@ namespace {
 
     bool shouldWalkCaptureInitializerExpressions() override { return true; }
 
-    bool shouldWalkIntoTapExpression() override { return false; }
+    bool shouldWalkIntoTapExpression() override { return true; }
 
     bool walkToDeclPre(Decl *decl) override {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
