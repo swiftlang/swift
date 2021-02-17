@@ -124,6 +124,7 @@ private:
   void retractFromInference(Constraint *constraint, bool notifyFixedBindings);
   void reintroduceToInference(Constraint *constraint, bool notifyFixedBindings);
   void resetBindingSet();
+  void updateAdjacentVars() const;
   /// }
 
   /// The constraint graph this node belongs to.

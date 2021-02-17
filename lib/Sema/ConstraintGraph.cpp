@@ -138,43 +138,61 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
-static void
-gatherAffectedVars(ConstraintGraph &CG, TypeVariableType *modifiedVar,
-                   llvm::SmallPtrSetImpl<TypeVariableType *> &affectedVars) {
+void ConstraintGraphNode::updateAdjacentVars() const {
   SmallVector<TypeVariableType *, 4> stack;
 
-  stack.push_back(modifiedVar);
+  stack.push_back(TypeVar);
+
+  auto updateAdjacencies = [&](TypeVariableType *typeVar) {
+    for (auto *constraint : CG[typeVar].getConstraints()) {
+      if (constraint->getClassification() !=
+          ConstraintClassification::Relational)
+        continue;
+
+      auto lhsTy = constraint->getFirstType();
+      auto rhsTy = constraint->getSecondType();
+
+      Type affectedTy =
+          ConstraintSystem::typeVarOccursInType(typeVar, lhsTy) ? rhsTy : lhsTy;
+
+      if (auto *affectedVar = affectedTy->getAs<TypeVariableType>()) {
+        auto *repr =
+            affectedVar->getImpl().getRepresentative(/*record=*/nullptr);
+
+        if (!repr->getImpl().getFixedType(/*record=*/nullptr))
+          CG[repr].reintroduceToInference(constraint,
+                                          /*notifyFixedBindings=*/false);
+      }
+    }
+  };
 
   while (!stack.empty()) {
     auto *typeVar = stack.pop_back_val();
 
-    for (auto *referrer : CG[typeVar].getReferencedBy()) {
-      stack.push_back(referrer);
+    // All of the relational constraints associated with this
+    // variable need to get re-introduced to other mentioned
+    // type variable to update their bindings.
+    //
+    // If variable is a representative of an equivalence class
+    // it means that all members have been modified together
+    // with their representative and their adjacencies have to
+    // get updated as well.
+    if (CG[typeVar].forRepresentativeVar()) {
+      for (auto *eqVar : CG[typeVar].getEquivalenceClass()) {
+        updateAdjacencies(eqVar);
 
-      // All of the not-yet bound representative type variables that can
-      // get their bindings from "referrer" or its equivalence class
-      // have to re-compute the binding set.
-      //
-      // TODO: This is an overkill, I think they only need to re-introduce
-      // constraints that mention "referrer", but that could be addressed
-      // separately, for now let's be conservative.
-      for (auto *eqVar : CG[referrer].getEquivalenceClass()) {
-        for (auto *constraint : CG[eqVar].getConstraints()) {
-          if (constraint->getClassification() !=
-              ConstraintClassification::Relational)
-            continue;
-
-          for (auto *referencedVar : constraint->getTypeVariables()) {
-            if (referencedVar == referrer || referencedVar == eqVar)
-              continue;
-
-            auto *repr =
-              referencedVar->getImpl().getRepresentative(/*record=*/nullptr);
-            if (!repr->getImpl().getFixedType(/*record=*/nullptr))
-              affectedVars.insert(repr);
-          }
-        }
+        for (auto *referrer : CG[eqVar].getReferencedBy())
+          stack.push_back(referrer);
       }
+    } else {
+      updateAdjacencies(typeVar);
+
+      // If current type variable is referenced by some other
+      // type variable as part of its fixed type it means that
+      // all of the adjacencies of that variable have to be
+      // notified as well otherwise they'll miss change in type.
+      for (auto *referrer : CG[typeVar].getReferencedBy())
+        stack.push_back(referrer);
     }
   }
 }
@@ -188,71 +206,14 @@ void ConstraintGraphNode::addToEquivalenceClass(
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
 
   {
-    resetBindingSet();
-
-    // Collect type variables adjacent to new members, to re-compute
-    // their bindings.
-    llvm::SmallPtrSet<TypeVariableType *, 4> adjacentVars;
-
     for (auto *newMember : typeVars) {
       auto &node = CG[newMember];
-      // Drop any existing bindings, they are going to be re-inferred
-      // once member becomes representative again.
-      node.Bindings.reset();
 
       for (auto *constraint : node.getConstraints()) {
-        if (constraint->getClassification() !=
-            ConstraintClassification::Relational)
-          continue;
-
-        // All of the representative type variables associated
-        // with new member's constraints need to get notified
-        // about type changes.
-        {
-          llvm::SmallPtrSet<TypeVariableType *, 4> adjacentVars;
-          // New representative has been already notified.
-          adjacentVars.insert(getTypeVariable());
-
-          for (auto *referencedVar : constraint->getTypeVariables()) {
-            auto *repr =
-                referencedVar->getImpl().getRepresentative(/*record=*/nullptr);
-
-            if (adjacentVars.insert(repr).second)
-              CG[repr].reintroduceToInference(constraint,
-                                              /*notifyFixedBindings=*/false);
-          }
-        }
+        introduceToInference(constraint, /*notifyFixedBindings=*/true);
       }
 
-      // Let's allow all of the referenced variables to re-evaluate all of the
-      // constraints that reference this type variable, since it would now be
-      // replaced with another type variable.
-      for (auto *fixedBinding : node.getReferencedVars()) {
-        for (auto *constraint : CG[fixedBinding].getConstraints()) {
-          if (constraint->getClassification() !=
-              ConstraintClassification::Relational)
-            continue;
-
-          for (auto *referencedVar : constraint->getTypeVariables()) {
-            if (referencedVar != fixedBinding)
-              CG[referencedVar].reintroduceToInference(
-                  constraint,
-                  /*notifyFixedBindings=*/false);
-          }
-        }
-      }
-
-      // If this type variable is used in some other type, it has to trigger
-      // binding set re-computation of all type variables referring to it,
-      // otherwise they would miss an update.
-      {
-        llvm::SmallPtrSet<TypeVariableType *, 4> affectedVars;
-
-        gatherAffectedVars(CG, newMember, affectedVars);
-
-        for (auto *var : affectedVars)
-          CG[var].resetBindingSet();
-      }
+      node.updateAdjacentVars();
     }
   }
 }
@@ -275,66 +236,8 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
     resetBindingSet();
 
     // Re-infer bindings all all of the newly made representatives.
-    for (auto *typeVar : disconnectedVars) {
-      auto &node = CG[typeVar];
-
-      // If this is a newly formed representative let's
-      // re-infer a binding set for it.
-      if (node.forRepresentativeVar())
-        node.resetBindingSet();
-
-      // All of the representative type variables associated
-      // with disconnected member's constraints need to get notified
-      // about type changes.
-      for (auto *constraint : node.getConstraints()) {
-        if (constraint->getClassification() !=
-            ConstraintClassification::Relational)
-          continue;
-
-        llvm::SmallPtrSet<TypeVariableType *, 4> adjacentVars;
-        // New representative has been already notified.
-        adjacentVars.insert(getTypeVariable());
-
-        for (auto *referencedVar : constraint->getTypeVariables()) {
-          auto *repr =
-              referencedVar->getImpl().getRepresentative(/*record=*/nullptr);
-
-          if (adjacentVars.insert(repr).second)
-            CG[repr].reintroduceToInference(constraint,
-                                            /*notifyFixedBindings=*/false);
-        }
-      }
-
-      // Let's allow all of the referenced variables to re-evaluate all of the
-      // constraints that reference this type variable, since it would now be
-      // replaced with another type variable.
-      for (auto *fixedBinding : node.getReferencedVars()) {
-        for (auto *constraint : CG[fixedBinding].getConstraints()) {
-          if (constraint->getClassification() !=
-              ConstraintClassification::Relational)
-            continue;
-
-          for (auto *referencedVar : constraint->getTypeVariables()) {
-            if (referencedVar != fixedBinding)
-              CG[referencedVar].reintroduceToInference(
-                  constraint,
-                  /*notifyFixedBindings=*/false);
-          }
-        }
-      }
-
-      // If this type variable is used in some other type, it has to trigger
-      // binding set re-computation of all type variables referring to it,
-      // otherwise they would miss an update.
-      {
-        llvm::SmallPtrSet<TypeVariableType *, 4> affectedVars;
-
-        gatherAffectedVars(CG, typeVar, affectedVars);
-
-        for (auto *var : affectedVars)
-          CG[var].resetBindingSet();
-      }
-    }
+    for (auto *typeVar : disconnectedVars)
+      CG[typeVar].updateAdjacentVars();
   }
 }
 
@@ -370,6 +273,20 @@ inference::PotentialBindings &ConstraintGraphNode::getCurrentBindings() {
   return *Bindings;
 }
 
+static bool isUsefulForReferencedVars(Constraint *constraint) {
+  switch (constraint->getKind()) {
+  // Don't attempt to propagate information about `Bind`s to referenced
+  // variables since they are adjacent through that binding already, and
+  // there is no useful information in trying to process that kind of
+  // constraint.
+  case ConstraintKind::Bind:
+    return false;
+
+  default:
+    return true;
+  }
+}
+
 void ConstraintGraphNode::introduceToInference(Constraint *constraint,
                                                bool notifyFixedBindings) {
   if (forRepresentativeVar()) {
@@ -382,7 +299,7 @@ void ConstraintGraphNode::introduceToInference(Constraint *constraint,
     CG[repr].introduceToInference(constraint, /*notifyFixedBindings=*/false);
   }
 
-  if (!notifyFixedBindings)
+  if (!notifyFixedBindings || !isUsefulForReferencedVars(constraint))
     return;
 
   for (auto *fixedBinding : getReferencedVars()) {
@@ -403,7 +320,7 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint,
     CG[repr].retractFromInference(constraint, /*notifyFixedBindings=*/false);
   }
 
-  if (!notifyFixedBindings)
+  if (!notifyFixedBindings || !isUsefulForReferencedVars(constraint))
     return;
 
   for (auto *fixedBinding : getReferencedVars()) {
@@ -623,8 +540,9 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     Changes.push_back(Change::boundTypeVariable(typeVar, fixed));
 
   // If there are no type variables in the fixed type, there's nothing to do.
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+
   if (fixed->hasTypeVariable()) {
-    llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
     fixed->getTypeVariables(typeVars);
 
     auto &node = (*this)[typeVar];
@@ -650,56 +568,7 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   // whole equivalence class of the current type variable and all of its
   // fixed bindings.
   {
-    auto &node = (*this)[typeVar];
-
-    // Since this type variable is bound, binding set is no longer useful
-    // and can be re-computed once the variable is freed again.
-    node.Bindings.reset();
-
-    llvm::SmallPtrSet<TypeVariableType *, 4> adjacentVars;
-
-    auto recordAsAdjacent = [&](TypeVariableType *typeVar) {
-      auto *repr = typeVar->getImpl().getRepresentative(/*record=*/nullptr);
-      adjacentVars.insert(repr);
-    };
-
-    for (auto *eqVar : node.getEquivalenceClass()) {
-      for (auto *constraint : (*this)[eqVar].getConstraints()) {
-        if (constraint->getClassification() !=
-            ConstraintClassification::Relational)
-          continue;
-
-        for (auto *referencedVar : constraint->getTypeVariables()) {
-          if (referencedVar != eqVar)
-            recordAsAdjacent(referencedVar);
-        }
-      }
-
-      // If something mentions a member of current equivalence class
-      // it needs to re-compute bindings.
-
-      // Consider following situation:
-      //
-      // $T1 := ???
-      // $T2 <-> $T1 ($T2 is equivalent to $T1 and $T1 is representative)
-      // $T3 := Array<$T2>
-      // $T3 convertible to $T4
-      // ---
-      // $T1 gets bound to (Int, Int)
-      // ---
-      // This means that $T3 is going to become Array<(Int, Int)> and
-      // $T4 needs to get any constraints that mention it re-introduced
-      // to update its own binding set, otherwise $T3 ends up having
-      // stale bindings which still mention $T1.
-      gatherAffectedVars(*this, eqVar, adjacentVars);
-    }
-
-    for (auto *adjacentVar : adjacentVars) {
-      if (adjacentVar == typeVar)
-        continue;
-
-      (*this)[adjacentVar].resetBindingSet();
-    }
+    (*this)[typeVar].updateAdjacentVars();
   }
 }
 
@@ -711,51 +580,11 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) 
   {
     auto &node = (*this)[typeVar];
 
-    llvm::SmallPtrSet<TypeVariableType *, 4> adjacentVars;
+    node.updateAdjacentVars();
 
-    auto recordAsAdjacent = [&](TypeVariableType *typeVar) {
-      auto *repr = typeVar->getImpl().getRepresentative(/*record=*/nullptr);
-      adjacentVars.insert(repr);
-    };
+    llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
 
-    // Step #1: Collect all of the adjacent variables which would
-    //          be affected by this change in current type variable.
-    for (auto *eqVar : node.getEquivalenceClass()) {
-      for (auto *constraint : (*this)[eqVar].getConstraints()) {
-        if (constraint->getClassification() !=
-            ConstraintClassification::Relational)
-          continue;
-
-        for (auto *referencedVar : constraint->getTypeVariables()) {
-          if (referencedVar != eqVar)
-            recordAsAdjacent(referencedVar);
-        }
-      }
-
-      // If something mentions a member of current equivalence class
-      // it needs to re-compute bindings.
-
-      // Consider following situation:
-      //
-      // $T1 := ???
-      // $T2 <-> $T1 ($T2 is equivalent to $T1 and $T1 is representative)
-      // $T3 := Array<$T2>
-      // $T3 convertible to $T4
-      // ---
-      // $T1 gets bound to (Int, Int)
-      // ---
-      // This means that $T3 is going to become Array<(Int, Int)> and
-      // $T4 needs to get any constraints that mention it re-introduced
-      // to update its own binding set, otherwise $T3 ends up having
-      // stale bindings which still mention $T1.
-      gatherAffectedVars(*this, eqVar, adjacentVars);
-    }
-
-    // Step #2: Remove obsolete type variables from "fixed bindings"
-    //          so inference reset can't reach current variable.
-    // If there are no type variables in the fixed type, there's nothing to do.
     if (fixed->hasTypeVariable()) {
-      llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
       fixed->getTypeVariables(typeVars);
 
       for (auto otherTypeVar : typeVars) {
@@ -765,20 +594,8 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) 
         node.removeReference(otherTypeVar);
 
         if (otherNode.forRepresentativeVar())
-          adjacentVars.insert(otherTypeVar);
+          otherNode.resetBindingSet();
       }
-    }
-
-    // Re-compute the bindings associated with current node after
-    // references to disconnected variables have been removed.
-    node.resetBindingSet();
-
-    // Step #3: Reset all of the adjacencies.
-    for (auto *adjacentVar : adjacentVars) {
-      if (adjacentVar == typeVar)
-        continue;
-
-      (*this)[adjacentVar].resetBindingSet();
     }
   }
 }
