@@ -127,6 +127,14 @@ func nested_3_onlyTopContributes() async {
   try! await printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
 }
 
+func withLocal_body_mustNotEscape() async {
+  var something = "Nice"
+  await Task.withLocal(\.string, boundTo: "xxx") {
+    something = "very nice"
+  }
+
+}
+
 @main struct Main {
   static func main() async {
     await simple()
