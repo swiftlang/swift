@@ -65,14 +65,23 @@ extension Task {
   ///
   /// Does not check for cancellation, and always executes the passed `operation`.
   ///
-  /// ### Suspension
   /// This function returns instantly and will never suspend.
-  /* @instantaneous */
   public static func withCancellationHandler<T>(
     handler: @concurrent () -> (),
     operation: () async throws -> T
-  ) async throws -> T {
-      fatalError("\(#function) not implemented yet.")
+  ) async rethrows -> T {
+    let task = Builtin.getCurrentAsyncTask()
+
+    guard !_taskIsCancelled(task) else {
+      // If the current task is already cancelled, run the handler immediately.
+      handler()
+      return try await operation()
+    }
+
+    let record = _taskAddCancellationHandler(task: task, handler: handler)
+    defer { _taskRemoveCancellationHandler(task: task, record: record) }
+
+    return try await operation()
   }
 
   /// The default cancellation thrown when a task is cancelled.
@@ -85,3 +94,15 @@ extension Task {
   }
 
 }
+
+@_silgen_name("swift_task_addCancellationHandler")
+func _taskAddCancellationHandler(
+  task: Builtin.NativeObject,
+  handler: @concurrent () -> ()
+) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+
+@_silgen_name("swift_task_removeCancellationHandler")
+func _taskRemoveCancellationHandler(
+  task: Builtin.NativeObject,
+  record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+)
