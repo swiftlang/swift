@@ -84,6 +84,23 @@ fromStableVTableEntryKind(unsigned value) {
   }
 }
 
+static Optional<swift::DifferentiabilityKind>
+fromStableDifferentiabilityKind(uint8_t diffKind) {
+  switch (diffKind) {
+#define CASE(THE_DK) \
+  case (uint8_t)serialization::DifferentiabilityKind::THE_DK: \
+    return swift::DifferentiabilityKind::THE_DK;
+  CASE(NonDifferentiable)
+  CASE(Forward)
+  CASE(Reverse)
+  CASE(Normal)
+  CASE(Linear)
+#undef CASE
+  default:
+    return None;
+  }
+}
+
 /// Used to deserialize entries in the on-disk func hash table.
 class SILDeserializer::FuncTableInfo {
   ModuleFile &MF;
@@ -3694,15 +3711,15 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   (void)kind;
 
   DeclID originalNameId, jvpNameId, vjpNameId;
-  unsigned rawLinkage, isDeclaration, isSerialized, numParameterIndices,
-      numResultIndices;
+  unsigned rawLinkage, isDeclaration, isSerialized, rawDiffKind,
+      numParameterIndices, numResultIndices;
   GenericSignatureID derivativeGenSigID;
   ArrayRef<uint64_t> rawParameterAndResultIndices;
 
   DifferentiabilityWitnessLayout::readRecord(
       scratch, originalNameId, rawLinkage, isDeclaration, isSerialized,
-      derivativeGenSigID, jvpNameId, vjpNameId, numParameterIndices,
-      numResultIndices, rawParameterAndResultIndices);
+      rawDiffKind, derivativeGenSigID, jvpNameId, vjpNameId,
+      numParameterIndices, numResultIndices, rawParameterAndResultIndices);
 
   if (isDeclaration) {
     assert(!isSerialized && "declaration must not be serialized");
@@ -3711,6 +3728,9 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   auto linkageOpt = fromStableSILLinkage(rawLinkage);
   assert(linkageOpt &&
          "Expected value linkage for sil_differentiability_witness");
+  auto diffKind = fromStableDifferentiabilityKind(rawDiffKind);
+  assert(diffKind &&
+         "Expected differentiability kind for sil_differentiability_witness");
   auto originalName = MF->getIdentifierText(originalNameId);
   auto jvpName = MF->getIdentifierText(jvpNameId);
   auto vjpName = MF->getIdentifierText(vjpNameId);
@@ -3746,8 +3766,8 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
                            .take_back(numResultIndices));
 
   AutoDiffConfig config(parameterIndices, resultIndices, derivativeGenSig);
-  auto *diffWitness =
-      SILMod.lookUpDifferentiabilityWitness({originalName, config});
+  auto *diffWitness = SILMod.lookUpDifferentiabilityWitness(
+      {originalName, *diffKind, config});
 
   // Witnesses that we deserialize are always available externally; we never
   // want to emit them ourselves.
@@ -3756,7 +3776,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   // If there is no existing differentiability witness, create one.
   if (!diffWitness)
     diffWitness = SILDifferentiabilityWitness::createDeclaration(
-        SILMod, linkage, original, parameterIndices, resultIndices,
+        SILMod, linkage, original, *diffKind, parameterIndices, resultIndices,
         derivativeGenSig);
 
   // If the current differentiability witness is merely a declaration, and the

@@ -439,9 +439,10 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleReflectionAssociatedTypeDescriptor(
                                                     getProtocolConformance());
   case Kind::DifferentiabilityWitness:
-    return mangler.mangleSILDifferentiabilityWitnessKey(
-        {getSILDifferentiabilityWitness()->getOriginalFunction()->getName(),
-         getSILDifferentiabilityWitness()->getConfig()});
+    return mangler.mangleSILDifferentiabilityWitness(
+        getSILDifferentiabilityWitness()->getOriginalFunction()->getName(),
+        getSILDifferentiabilityWitness()->getKind(),
+        getSILDifferentiabilityWitness()->getConfig());
 
   case Kind::AsyncFunctionPointer:
   case Kind::DispatchThunkAsyncFunctionPointer:

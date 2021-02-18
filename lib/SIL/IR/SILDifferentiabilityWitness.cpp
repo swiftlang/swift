@@ -20,16 +20,18 @@ using namespace swift;
 
 SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-    IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature derivativeGenSig, const DeclAttribute *attribute) {
+    DifferentiabilityKind kind, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices, GenericSignature derivativeGenSig,
+    const DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
-      module, linkage, originalFunction, parameterIndices, resultIndices,
+      module, linkage, originalFunction, kind, parameterIndices, resultIndices,
       derivativeGenSig, /*jvp*/ nullptr, /*vjp*/ nullptr,
       /*isDeclaration*/ true, /*isSerialized*/ false, attribute);
   // Register the differentiability witness in the module.
   Mangle::ASTMangler mangler;
-  auto mangledKey =
-      mangler.mangleSILDifferentiabilityWitnessKey(diffWitness->getKey());
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+      diffWitness->getOriginalFunction()->getName(),
+      diffWitness->getKind(), diffWitness->getConfig());
   assert(!module.DifferentiabilityWitnessMap.count(mangledKey) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[mangledKey] = diffWitness;
@@ -41,17 +43,19 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
 
 SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-    IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-    bool isSerialized, const DeclAttribute *attribute) {
+    DifferentiabilityKind kind, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices, GenericSignature derivativeGenSig,
+    SILFunction *jvp, SILFunction *vjp, bool isSerialized,
+    const DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
-      module, linkage, originalFunction, parameterIndices, resultIndices,
+      module, linkage, originalFunction, kind, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
       attribute);
   // Register the differentiability witness in the module.
   Mangle::ASTMangler mangler;
-  auto mangledKey =
-      mangler.mangleSILDifferentiabilityWitnessKey(diffWitness->getKey());
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+      diffWitness->getOriginalFunction()->getName(),
+      diffWitness->getKind(), diffWitness->getConfig());
   assert(!module.DifferentiabilityWitnessMap.count(mangledKey) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[mangledKey] = diffWitness;
@@ -72,5 +76,5 @@ void SILDifferentiabilityWitness::convertToDefinition(SILFunction *jvp,
 }
 
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
-  return std::make_pair(getOriginalFunction()->getName(), getConfig());
+  return {getOriginalFunction()->getName(), getKind(), getConfig()};
 }

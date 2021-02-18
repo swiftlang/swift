@@ -494,8 +494,8 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
 }
 
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
-    SILModule &module, SILFunction *original, IndexSubset *parameterIndices,
-    IndexSubset *resultIndices) {
+    SILModule &module, SILFunction *original, DifferentiabilityKind kind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices) {
   // AST differentiability witnesses always have a single result.
   if (resultIndices->getCapacity() != 1 || !resultIndices->contains(0))
     return nullptr;
@@ -520,8 +520,8 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
     original = module.lookUpFunction(SILDeclRef(originalAFD).asForeign());
   }
 
-  auto *existingWitness =
-      module.lookUpDifferentiabilityWitness({originalName, *minimalConfig});
+  auto *existingWitness = module.lookUpDifferentiabilityWitness(
+      {originalName, kind, *minimalConfig});
   if (existingWitness)
     return existingWitness;
 
@@ -530,7 +530,7 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "definitions with explicit differentiable attributes");
 
   return SILDifferentiabilityWitness::createDeclaration(
-      module, SILLinkage::PublicExternal, original,
+      module, SILLinkage::PublicExternal, original, kind,
       minimalConfig->parameterIndices, minimalConfig->resultIndices,
       minimalConfig->derivativeGenericSignature);
 }

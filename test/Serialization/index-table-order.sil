@@ -47,5 +47,5 @@ struct A {
 sil_property #A.a ()
 
 // For SIL_DIFFERENTIABILITY_WITNESS_NAMES
-sil_differentiability_witness [parameters 0] [results 0] @id : $@convention(thin) (Float) -> Float {}
+sil_differentiability_witness [reverse] [parameters 0] [results 0] @id : $@convention(thin) (Float) -> Float {}
 

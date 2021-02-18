@@ -156,13 +156,15 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   /// given original function, AST parameter indices, result indices, and
   /// derivative generic signature.
   void addDifferentiabilityWitness(AbstractFunctionDecl *original,
+                                   DifferentiabilityKind kind,
                                    IndexSubset *astParameterIndices,
                                    IndexSubset *resultIndices,
                                    GenericSignature derivativeGenericSignature);
 
   /// Adds symbols associated with the given original function and
   /// derivative function configuration.
-  void addDerivativeConfiguration(AbstractFunctionDecl *original,
+  void addDerivativeConfiguration(DifferentiabilityKind diffKind,
+                                  AbstractFunctionDecl *original,
                                   AutoDiffConfig config);
 
 public:
