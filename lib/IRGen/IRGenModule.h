@@ -753,6 +753,7 @@ public:
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
+  llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
 
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
 

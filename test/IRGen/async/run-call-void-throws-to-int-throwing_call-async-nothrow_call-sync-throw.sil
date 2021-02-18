@@ -99,7 +99,7 @@ bb5:
 }
 
 // CHECK-LL: @voidThrowsToIntTu =
-// CHECK-LL: define hidden swiftcc void @voidThrowsToInt(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @voidThrowsToInt(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
 sil hidden @voidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error) {
 entry:
   %asyncVoidThrowsToInt = function_ref @asyncVoidThrowsToInt : $@async @convention(thin) () -> (Int64, @error Error)

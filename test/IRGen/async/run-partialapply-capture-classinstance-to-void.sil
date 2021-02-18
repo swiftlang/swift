@@ -58,7 +58,7 @@ sil_vtable S {
 }
 
 // CHECK-LL: @classinstanceSToVoidTu =
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @classinstanceSToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @classinstanceSToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
 sil @classinstanceSToVoid : $@async @convention(method) (@owned S) -> () {
 entry(%c : $S):
   %class_addr = alloc_stack $S
