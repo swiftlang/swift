@@ -53,6 +53,34 @@ static VarDecl *getVarDecl(SILInstruction *I) {
   return nullptr;
 }
 
+static DeclRefExpr *getDeclRefExpr(SILInstruction *I) {
+  if (auto Loc = I->getLoc()) {
+    if (auto *VD = Loc.getAsASTNode<DeclRefExpr>()) {
+      return VD;
+    }
+  }
+  return nullptr;
+}
+
+static bool referencesVarDecl(DeclRefExpr *E, VarDecl *VD) {
+  if (auto Value = E->getDecl()) {
+    return Value->getBaseIdentifier() == VD->getName();
+  }
+  return false;
+}
+
+static bool isAssignedToVarDecl(VarDecl *VD, VarDecl *Assignee) {
+  if (Assignee->isDebuggerVar()) {
+    return false;
+  }
+  if (auto Init = Assignee->getParentInitializer()) {
+    if (auto DRE = dyn_cast<DeclRefExpr>(Init)) {
+      return referencesVarDecl(DRE, VD);
+    }
+  }
+  return false;
+}
+
 static bool isSetterParam(SILInstruction *I) {
   if (auto *VD = getVarDecl(I)) {
     if (auto PD = dyn_cast<ParamDecl>(VD)) {
@@ -210,8 +238,8 @@ static bool argIsInout(SILArgumentConvention ArgConv) {
   }
 }
 
-static SILValue getFunctionArgInst(SILInstruction *Apply,
-                                   Operand *Op) {
+static SILArgument *getFunctionArgInst(SILInstruction *Apply,
+                                       Operand *Op) {
   ApplySite AS;
   SILFunction *Fn;
   
@@ -382,7 +410,7 @@ private:
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::TryApplyInst:
         appendValues(I);
-        if (auto Arg = getFunctionArgInst(I, Op)) {
+        if (SILValue Arg = getFunctionArgInst(I, Op)) {
           appendValue(Arg);
         }
         break;
@@ -440,6 +468,7 @@ bool inBlock(SILInstruction *I, SILBasicBlock *BB) {
 class VariableReadTraverser {
   
   VarDecl *VD;
+  llvm::SetVector<SILInstruction *> DirectCheckWorklist;
   SmallVector<SILValue, 32> Worklist;
   llvm::SetVector<SILValue> Seen;
   SILInstruction *EntryInst;
@@ -519,6 +548,16 @@ private:
 
   
   bool applyIsDirectRead(SILInstruction *I, Operand *Op, SILValue Value) {
+    
+    // FIXME: Make sure this is a use of this VD and not a similar VD
+    //
+    // AST:
+    //    (call_expr
+    //      (declref_expr
+    //      (paren_expr
+    //        (declref_expr    <--- references the VD
+    
+    
     if (auto *OpInst =
         I->getAllOperands()[0].get().getDefiningInstruction()) {
       if (isa<WitnessMethodInst>(OpInst)) {
@@ -558,31 +597,68 @@ private:
   }
   
   bool notIgnored(SILInstruction *I) {
-    if (auto ParentStmt = VD->getRecursiveParentPatternStmt()) {
-      if (isa<CaseStmt>(ParentStmt)) {
-        return inBlock(I, CurBlock);
-      }
+    if (VD->isCaseBodyVariable()) {
+      return inBlock(I, CurBlock);
     }
     return true;
   }
   
   bool isDirectRead(SILInstruction *I, Operand *Op, SILValue Value) {
+    
     if (isSelfParam(I)) {
       return true;
     }
     
     switch (I->getKind()) {
+      
+      // Returning this value is a direct read
+      // FIXME: check for unique VD?
       case SILInstructionKind::ReturnInst:
-      case SILInstructionKind::BuiltinInst:  // FIXME: Is this true?
+      
+      // FIXME: Is this true?
+      // Builtin Instructions found in the standard library
+      // are responsible for logging and other utilities.
+      // count this as a read.
+      case SILInstructionKind::BuiltinInst:  
+        
+      // This value is read in an if-statement
       case SILInstructionKind::CondBranchInst:
+        
+      // This value is thrown, and therefore read
       case SILInstructionKind::ThrowInst:
+        
+      // FIXME: why?
       case SILInstructionKind::TupleInst:
+      
+      // FIXME: Should this be handled like SwitchEnumInst?
       case SILInstructionKind::SwitchEnumAddrInst:
-      case SILInstructionKind::UncheckedEnumDataInst: // FIXME: Should we search?
-      case SILInstructionKind::StoreBorrowInst: // FIXME: Should we search?
-      case SILInstructionKind::StoreWeakInst: // FIXME: Should we search?
-      case SILInstructionKind::OpenExistentialAddrInst: // FIXME: Should we search?
+      
+      // FIXME: why?
+      // FIXME: Should we search?
+      case SILInstructionKind::UncheckedEnumDataInst:
+      
+      // FIXME: why?
+      // FIXME: Should we search?
+      case SILInstructionKind::StoreBorrowInst:
+      
+      // FIXME: Is this the only use case?
+      // FIXME: Should we search?
+      // This value is passed into a capture with a
+      // weak reference. We don't care if it is used
+      // within the capture because we diagnose unused
+      // capture parameters seperately.
+      case SILInstructionKind::StoreWeakInst:
+        
+      // FIXME: why?
+      // FIXME: Should we search?
+      case SILInstructionKind::OpenExistentialAddrInst:
+        
+      // FIXME: are we sure?
+      // We can guarantee that if a Pointer is transformed into
+      // an Address, the value will be read
       case SILInstructionKind::PointerToAddressInst:
+      
+      // FIXME: are we sure?
       case SILInstructionKind::MarkDependenceInst:
         return notIgnored(I);
         
@@ -622,36 +698,43 @@ private:
         return true;
       }
       
-      case SILInstructionKind::StoreInst:
-        return dyn_cast<StoreInst>(I)->getSrc() == Value && notIgnored(I);
+      case SILInstructionKind::StoreInst: {
+        auto SI = dyn_cast<StoreInst>(I);
+        if (SI->getSrc() != Value) {
+          return false;
+        }
+        
+        auto DI = SI->getDest().getDefiningInstruction();
+        
+        //FIXME: Assuming this is a store into inout
+        if (!DI) {
+          return true;
+        }
+        
+        // The destination of this store is a Var Declaration.
+        // Because we are tracking the use of a value, which may be referenced
+        // by multiple Var Declarations, check in the AST if the assignment
+        // specifically uses the current Var Declaration.
+        if (auto *DestVD = getVarDecl(DI)) {
+          return isAssignedToVarDecl(VD, DestVD);
+        }
+        
+        return false;
+//        return SI->getSrc() == Value && notIgnored(I);
+      }
       case SILInstructionKind::AssignInst:
         return dyn_cast<AssignInst>(I)->getSrc() == Value && notIgnored(I);
       case SILInstructionKind::CopyAddrInst:
         return dyn_cast<CopyAddrInst>(I)->getSrc() == Value && notIgnored(I);
         
       case SILInstructionKind::DebugValueInst:
-        // FIXME: check if decl pattern/parent is switch case
+        
+        // The value described by a Var Declaration may be assigned to multiple
+        // Var Declarations, but this does not always mean the Var Declaration
+        // is read by others, so we must explicitly checl the DeclRefExpr in
+        // the AST.
         if (auto *DebugVD = getVarDecl(I)) {
-          
-          // Switch cases may assign a value to multiple 
-          // variable declarations; do not count this as a 
-          // read.
-          bool isSwitchCase = false;
-          if (auto ParentStmt = VD->getRecursiveParentPatternStmt()) {
-            isSwitchCase = isa<CaseStmt>(ParentStmt);
-          }
-          
-          // If this variable is a capture list, there is at 
-          // least one source variable declaration; do not 
-          // count this as a read.
-          if (!VD->isCaptureList() &&
-              !isSwitchCase &&
-              DebugVD != VD) {
-            
-            // TODO: Return true only if VD precedes DebugVD
-            // This is an assignment to another variable
-            return true;
-          }
+          return isAssignedToVarDecl(VD, DebugVD);
         }
         return false;
         
@@ -664,6 +747,9 @@ private:
       case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::TryApplyInst:
+        if (!Op) {
+          return false;
+        }
         return notIgnored(I) && applyIsDirectRead(I, Op, Value);
       default:
         return false;
@@ -672,6 +758,30 @@ private:
   
   void search(SILInstruction *I, Operand *Op, SILValue Value) {
     switch (I->getKind()) {
+        
+      // FIXME: should we only look for direct uses here? Instead of traversing
+      case SILInstructionKind::InitExistentialAddrInst: {
+        if (auto DI = I->getAllOperands()[0].get().getDefiningInstruction()) {
+          DirectCheckWorklist.insert(DI);
+        }
+        break;
+      }
+        
+      // This case occurs if the store was not determined as a direct read.
+      // We will trace the store destination for use of the value, such as
+      // an Apply Instruction.
+      case SILInstructionKind::StoreInst: {
+        auto SI = dyn_cast<StoreInst>(I);
+        if (SI->getSrc() != Value) {
+          break;
+        }
+        if (auto DI = SI->getDest().getDefiningInstruction()) {
+          DirectCheckWorklist.insert(DI);
+          appendValues(DI);
+        }
+        break;
+      }
+        
       case SILInstructionKind::BranchInst:
         if (auto *Arg = getBasicBlockArgInst(dyn_cast<BranchInst>(I), Value)) {
           appendValue(Arg);
@@ -681,17 +791,49 @@ private:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::PartialApplyInst:
-      case SILInstructionKind::TryApplyInst:
+      case SILInstructionKind::TryApplyInst: {
         
-        // FIXME: crashes if we are coming from an argument
-        appendValues(I);
+        // The value referenced by the Var Declaration is used as a function
+        // parameter. Check that the parameter explicitly refers to this
+        // Var Declaration.
+        //
+        //    let x = 42
+        //    let y = x
+        //    foo(x)        <---- track this call for x, not y
+        //
+        bool foundVD = false;
+        auto FnRef = I->getAllOperands()[0].get().getDefiningInstruction();
+        if (auto Loc = FnRef->getLoc()) {
+          if (auto CE = Loc.getAsASTNode<CallExpr>()) {
+            for (unsigned i = 0; i < CE->getArgumentLabels().size(); ++i) {
+              Identifier Id = CE->getArgumentLabels()[i];
+              if (Id.str().equals(VD->getName().str())) {
+                foundVD = true;
+              }
+            }
+//            for (auto Id : CE->getArgumentLabels()) {
+              // if none are VD, we still want to evaluate
+//            }
+          }
+        }
         
         // This function is defined locally, and we can step in to
         // track variable usage
-        if (auto Arg = getFunctionArgInst(I, Op)) {
-          appendValue(Arg);
+        if (SILArgument *Arg = getFunctionArgInst(I, Op)) {
+          if (auto FAI = dyn_cast<SILFunctionArgument>(Arg)) {
+            foundVD |= FAI->isSelf();
+          }
+          if (foundVD) {
+            appendValue(Arg);
+          }
         }
+        
+        if (foundVD) {
+          appendValues(I);
+        }
+        
         break;
+      }
         
       default:
         appendValues(I);
@@ -733,6 +875,15 @@ public:
       for (Operand *Use : Value->getUses()) {
         if (SILInstruction *User = Use->getUser()) {
           search(User, Use, Value);
+          
+          // Check instructions staged for direct checks
+          for (SILInstruction *Inst : DirectCheckWorklist) {
+            DirectCheckWorklist.remove(Inst);
+            if (isDirectRead(Inst, Use, Value)) {
+              return true;
+            }
+            search(Inst, Use, Value);
+          }
         }
       }
     }
@@ -761,18 +912,22 @@ public:
         
         if (auto FRI = dyn_cast<FunctionRefInst>(I)) {
           if (auto Fn = FRI->getReferencedFunctionOrNull()) {
-            if (auto AD = dyn_cast<AccessorDecl>(Fn->getDeclContext())) {
-              if (AD->getAccessorKind() == AccessorKind::Get) {
-                GetterInst = FRI;
-                return true;
+            if (auto DC = Fn->getDeclContext()) {
+              if (auto AD = dyn_cast_or_null<AccessorDecl>(DC)) {
+                if (AD->getAccessorKind() == AccessorKind::Get) {
+                  GetterInst = FRI;
+                  return true;
+                }
               }
             }
           }
         } else if (auto CMI = dyn_cast<ClassMethodInst>(I)) {
-          if (auto AD = dyn_cast<AccessorDecl>(CMI->getMember().getDecl())) {
-            if (AD->getAccessorKind() == AccessorKind::Get) {
-              GetterInst = CMI;
-              return true;
+          if (auto Member = CMI->getMember()) {
+            if (auto AD = dyn_cast<AccessorDecl>(Member.getDecl())) {
+              if (AD->getAccessorKind() == AccessorKind::Get) {
+                GetterInst = CMI;
+                return true;
+              }
             }
           }
         }
@@ -827,9 +982,11 @@ static void searchSetterParam(VarDecl *VD,
   
   auto VRT = VariableReadTraverser(I, VD, BB);
   if (!VRT.didRead()) {
-    auto SRGT = SetterReadsGetterTraverser(I->getFunction());
-    if (SRGT.findGetterAccess()) {
-      SRGT.diagnoseGetterUse(VD);
+    if (auto Fn = I->getFunction()) {
+      auto SRGT = SetterReadsGetterTraverser(Fn);
+      if (SRGT.findGetterAccess()) {
+        SRGT.diagnoseGetterUse(VD);
+      }
     }
   }
 }

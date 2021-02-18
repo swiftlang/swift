@@ -46,10 +46,16 @@ func testStruct() {
   var h = X() // expected-warning {{variable 'h' was written to, but never read}}
   h = g
   
+  // Variables reference the same value but should only track their own uses
   let i = X()
   let j = i // expected-warning {{initialization of immutable value 'j' was never used; consider replacing with assignment to '_' or removing it}}
   var k = i // expected-warning {{initialization of variable 'k' was never used; consider replacing with assignment to '_' or removing it}}
   markUsed(i)
+  
+  let l = X()
+  let m = l
+  var n = m // expected-warning {{initialization of variable 'n' was never used; consider replacing with assignment to '_' or removing it}}
+  markUsed(m)
   
   _ = X() // ok
 }
@@ -253,6 +259,7 @@ func testForceValueExpr() {
 }
 
 //// <rdar://problem/20894455> "variable was never mutated" diagnostic does not take #if into account
+func markUsed<T>(_ t: T) {}
 func testBuildConfigsTrue() {
   let abc = 42
   var mut = 18 // expected-warning {{variable 'mut' was written to, but never read}}
@@ -275,7 +282,6 @@ func testBuildConfigsFalse() {
   #endif
 }
 
-func markUsed<T>(_ t: T) {}
 func testGuardWithPoundIfTrue(x: Int?) {
   guard let x = x else { return }
   
