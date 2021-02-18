@@ -368,7 +368,10 @@ precedencegroup MultiplicationPrecedence {
 precedencegroup BitwiseShiftPrecedence {
   higherThan: MultiplicationPrecedence
 }
-
+precedencegroup ExponentiationPrecedence {
+  associativity: right
+  higherThan: MultiplicationPrecedence
+}
 
 //===----------------------------------------------------------------------===//
 // Standard operators
@@ -398,6 +401,7 @@ prefix operator ..<: Comparable
 
 // "Exponentiative"
 
+infix operator  **: ExponentiationPrecedence
 infix operator  <<: BitwiseShiftPrecedence, BinaryInteger
 infix operator &<<: BitwiseShiftPrecedence, FixedWidthInteger
 infix operator  >>: BitwiseShiftPrecedence, BinaryInteger
@@ -463,6 +467,7 @@ infix operator ||: LogicalDisjunctionPrecedence, Bool
 
 // Compound
 
+infix operator  **=: AssignmentPrecedence
 infix operator   *=: AssignmentPrecedence, Numeric
 infix operator  &*=: AssignmentPrecedence, FixedWidthInteger
 infix operator   /=: AssignmentPrecedence, BinaryInteger
@@ -486,3 +491,48 @@ infix operator   |=: AssignmentPrecedence, BinaryInteger
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~>
+
+//===----------------------------------------------------------------------===//
+// Placeholder operator functions for diagnostic purposes
+//===----------------------------------------------------------------------===//
+
+extension Float {
+  @available(*, unavailable, message: "use 'Foundation.pow' instead")
+  @_alwaysEmitIntoClient
+  public static func ** (lhs: Self, rhs: Self) -> Self {
+    fatalError("Not implemented")
+  }
+  @available(*, unavailable, message: "use 'Foundation.pow' instead")
+  @_alwaysEmitIntoClient
+  public static func **= (lhs: inout Self, rhs: Self) {
+    fatalError("Not implemented")
+  }
+}
+
+extension Double {
+  @available(*, unavailable, message: "use 'Foundation.pow' instead")
+  @_alwaysEmitIntoClient
+  public static func ** (lhs: Self, rhs: Self) -> Self {
+    fatalError("Not implemented")
+  }
+  @available(*, unavailable, message: "use 'Foundation.pow' instead")
+  @_alwaysEmitIntoClient
+  public static func **= (lhs: inout Self, rhs: Self) {
+    fatalError("Not implemented")
+  }
+}
+
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+extension Float80 {
+  @available(*, unavailable, message: "use 'Foundation.pow' instead")
+  @_alwaysEmitIntoClient
+  public static func ** (lhs: Self, rhs: Self) -> Self {
+    fatalError("Not implemented")
+  }
+  @available(*, unavailable, message: "use 'Foundation.pow' instead")
+  @_alwaysEmitIntoClient
+  public static func **= (lhs: inout Self, rhs: Self) {
+    fatalError("Not implemented")
+  }
+}
+#endif
