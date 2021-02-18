@@ -7640,8 +7640,12 @@ namespace {
           });
 
       switch (result) {
-      case SolutionApplicationToFunctionResult::Success:
+      case SolutionApplicationToFunctionResult::Success: {
+        if (auto closure = dyn_cast_or_null<ClosureExpr>(
+                fn.getAbstractClosureExpr()))
+          TypeChecker::checkClosureAttributes(closure);
         return false;
+      }
 
       case SolutionApplicationToFunctionResult::Failure:
         return true;
