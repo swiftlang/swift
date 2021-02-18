@@ -478,6 +478,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
   static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
                                             Type protocolType,
                                             ConstraintLocator *locator);
@@ -489,6 +491,12 @@ public:
   Type getNonConformingType() { return NonConformingType; }
 
   Type getProtocolType() { return ProtocolType; }
+
+  bool isEqual(const ConstraintFix *other) const;
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AddConformance;
+  }
 };
 
 /// Skip same-type generic requirement constraint,
