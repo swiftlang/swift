@@ -313,9 +313,9 @@ public:
   void cacheResult(bool value) const;
 };
 
-class ProtocolRethrowsRequirementsRequest :
-    public SimpleRequest<ProtocolRethrowsRequirementsRequest,
-                         ProtocolRethrowsRequirementList(ProtocolDecl *),
+class PolymorphicEffectRequirementsRequest :
+    public SimpleRequest<PolymorphicEffectRequirementsRequest,
+                         PolymorphicEffectRequirementList(EffectKind, ProtocolDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -324,17 +324,17 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ProtocolRethrowsRequirementList 
-  evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+  PolymorphicEffectRequirementList
+  evaluate(Evaluator &evaluator, EffectKind kind, ProtocolDecl *decl) const;
 
 public:
   // Caching.
   bool isCached() const { return true; }
 };
 
-class ProtocolConformanceClassifyAsThrowsRequest : 
-    public SimpleRequest<ProtocolConformanceClassifyAsThrowsRequest,
-                         bool(ProtocolConformance *),
+class ConformanceHasEffectRequest :
+    public SimpleRequest<ConformanceHasEffectRequest,
+                         bool(EffectKind, ProtocolConformance *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -344,7 +344,8 @@ private:
 
   // Evaluation.
   bool 
-  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+  evaluate(Evaluator &evaluator, EffectKind kind,
+           ProtocolConformance *conformance) const;
 
 public:
   // Caching.
@@ -774,9 +775,9 @@ void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
 
 void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
-class FunctionRethrowingKindRequest :
-    public SimpleRequest<FunctionRethrowingKindRequest,
-                         FunctionRethrowingKind(AbstractFunctionDecl*),
+class PolymorphicEffectKindRequest :
+    public SimpleRequest<PolymorphicEffectKindRequest,
+                         PolymorphicEffectKind(EffectKind, AbstractFunctionDecl*),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -785,7 +786,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  FunctionRethrowingKind evaluate(Evaluator &evaluator, AbstractFunctionDecl *decl) const;
+  PolymorphicEffectKind evaluate(Evaluator &evaluator,
+                                 EffectKind kind,
+                                 AbstractFunctionDecl *decl) const;
 
 public:
   // Caching.
