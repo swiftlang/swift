@@ -206,6 +206,11 @@ struct LiteralRequirement {
                                     bool canBeNil,
                                     DeclContext *useDC) const;
 
+  void resetCoverage() {
+    assert(isCovered() && "literal requirement is uncovered");
+    CoveredBy = nullptr;
+  }
+
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
@@ -464,6 +469,13 @@ private:
 
 public:
   void infer(Constraint *constraint);
+
+  /// Retract all bindings and other information related to a given
+  /// constraint from this binding set.
+  ///
+  /// This would happen when constraint is simplified or solver backtracks
+  /// (either from overload choice or (some) type variable binding).
+  void retract(Constraint *constraint);
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
