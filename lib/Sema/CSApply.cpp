@@ -6515,6 +6515,10 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return cs.cacheType(new (ctx)
                               ForeignObjectConversionExpr(result, toType));
     }
+
+    case ConversionRestrictionKind::FinalClassToDynamicSelf:
+      return cs.cacheType(new (ctx)
+                              CovariantReturnConversionExpr(expr, toType));
     }
   }
 

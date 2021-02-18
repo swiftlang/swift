@@ -2662,17 +2662,20 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     isStatic = FD->isStatic();
     selfAccess = FD->getSelfAccessKind();
 
-    // `self`s type for subscripts and properties
-    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
-      if (wantDynamicSelf && AD->getStorage()
-          ->getValueInterfaceType()->hasDynamicSelfType())
-        isDynamicSelf = true;
+    if (wantDynamicSelf) {
+      // 'self' may be dynamic only in a non-final class.
+      auto *const classDecl = selfTy->getClassOrBoundGenericClass();
+      if (classDecl && !classDecl->isFinal()) {
+        if (auto *const AD = dyn_cast<AccessorDecl>(AFD)) {
+          // Getters returning 'Self' have a dynamic 'self'.
+          isDynamicSelf =
+              AD->getStorage()->getValueInterfaceType()->hasDynamicSelfType();
+        } else {
+          // Methods returning 'Self' have a dynamic 'self'.
+          isDynamicSelf = FD->hasDynamicSelfResult();
+        }
+      }
     }
-    // Methods returning 'Self' have a dynamic 'self'.
-    //
-    // FIXME: All methods of non-final classes should have this.
-    else if (wantDynamicSelf && FD->hasDynamicSelfResult())
-      isDynamicSelf = true;
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
@@ -2684,7 +2687,8 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
       isStatic = true;
     }
 
-    // Convenience initializers have a dynamic 'self' in '-swift-version 5'.
+    // Convenience initializers in non-final classes have a dynamic 'self'
+    // in '-swift-version 5'.
     if (Ctx.isSwiftVersionAtLeast(5)) {
       if (wantDynamicSelf && CD->isConvenienceInit())
         if (auto *classDecl = selfTy->getClassOrBoundGenericClass())

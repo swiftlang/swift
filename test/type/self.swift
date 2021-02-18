@@ -43,6 +43,18 @@ final class FinalMario : Mario {
     }
 }
 
+do {
+  final class GenericClass<T> {
+    func me() -> Self { self }
+
+    func invalidMe() -> Self {
+      GenericClass<Never>() // expected-error{{cannot convert return expression of type 'GenericClass<Never>' to return type 'Self'}}
+    }
+
+    func inAndOut(arg: GenericClass) -> Self { arg }
+  }
+}
+
 // These references to Self are now possible (SE-0068)
 
 class A<T> {
