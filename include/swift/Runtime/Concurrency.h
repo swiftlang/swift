@@ -225,6 +225,17 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
+/// Create and add an cancellation record to the task.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+CancellationNotificationStatusRecord*
+swift_task_addCancellationHandler(
+    AsyncTask *task, CancellationNotificationStatusRecord::FunctionType handler);
+
+/// Remove the passed cancellation record from the task.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_removeCancellationHandler(
+    AsyncTask *task, CancellationNotificationStatusRecord *record);
+
 using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
 
 /// Get a task local value from the passed in task. Its Swift signature is
