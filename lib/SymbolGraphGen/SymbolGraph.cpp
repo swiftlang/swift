@@ -533,11 +533,9 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
           case FileUnitKind::Synthesized:
             llvm_unreachable("Unexpected module kind: Synthesized");
             break;
-          case FileUnitKind::Source: {
-            auto Target = MainFile->getASTContext().LangOpts.Target;
-            symbolgraphgen::serialize(Target, OS);
+          case FileUnitKind::Source:
+            symbolgraphgen::serialize(M.getASTContext().LangOpts.Target, OS);
             break;
-          }
           case FileUnitKind::SerializedAST: {
             auto SerializedAST = cast<SerializedASTFile>(MainFile);
             auto Target = llvm::Triple(SerializedAST->getTargetTriple());

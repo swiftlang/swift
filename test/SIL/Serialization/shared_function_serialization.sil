@@ -7,6 +7,9 @@
 // CHECK: sil public_external [serialized] @$ss17the_thing_it_does1xys1XV_tF{{.*}}
 // CHECK: sil shared_external [serializable] [noinline] @$ss9the_thing1tyx_tlFs1XV_Tgq5{{.*}}
 
+// See shared_function_serialization_darwin.sil
+// UNSUPPORTED: OS=macosx || OS=tvos || OS=watchos || OS=ios
+
 sil_stage canonical
 
 import Builtin

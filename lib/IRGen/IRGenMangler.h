@@ -56,13 +56,12 @@ public:
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
     beginManglingWithAutoDiffOriginalFunction(func);
-    auto kindCode =
-        (char)Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
         IndexSubset::get(func->getASTContext(), 1, {0}),
         derivativeId->getDerivativeGenericSignature());
-    appendAutoDiffFunctionParts(kindCode, config);
+    appendAutoDiffFunctionParts("TJ", kind, config);
     appendOperator("Tj");
     return finalize();
   }
@@ -86,13 +85,12 @@ public:
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
     beginManglingWithAutoDiffOriginalFunction(func);
-    auto kindCode =
-        (char)Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
+    auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     AutoDiffConfig config(
         derivativeId->getParameterIndices(),
         IndexSubset::get(func->getASTContext(), 1, {0}),
         derivativeId->getDerivativeGenericSignature());
-    appendAutoDiffFunctionParts(kindCode, config);
+    appendAutoDiffFunctionParts("TJ", kind, config);
     appendOperator("Tq");
     return finalize();
   }

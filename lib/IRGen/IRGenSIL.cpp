@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/IR/Constant.h"
 #define DEBUG_TYPE "irgensil"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
@@ -32,7 +32,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
@@ -47,6 +47,8 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
@@ -700,6 +702,10 @@ public:
   ///
   /// - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
   bool needsShadowCopy(llvm::Value *Storage) {
+    // If we have a constant data vector, we always need a shadow copy due to
+    // bugs in LLVM.
+    if (isa<llvm::ConstantDataVector>(Storage))
+      return true;
     return !isa<llvm::Constant>(Storage);
   }
 
@@ -1295,7 +1301,10 @@ public:
 
   llvm::Value *getCallerErrorResultArgument() override {
     auto errorLayout = layout.getErrorLayout();
-    Address addr = errorLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    Address pointerToAddress =
+        errorLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    auto load = IGF.Builder.CreateLoad(pointerToAddress);
+    auto addr = Address(load, IGF.IGM.getPointerAlignment());
     return addr.getAddress();
   }
   llvm::Value *getContext() override {
@@ -2017,16 +2026,10 @@ void IRGenSILFunction::emitSILFunction() {
 
   // Invariant: for every block in the work queue, we have visited all
   // of its dominators.
-  BasicBlockSet visitedBlocks(CurSILFn);
-  SmallVector<SILBasicBlock*, 8> workQueue; // really a stack
+  // Start with the entry block, for which the invariant trivially holds.
+  BasicBlockWorklist<32> workQueue(&*CurSILFn->getEntryBlock());
 
-  // Queue up the entry block, for which the invariant trivially holds.
-  visitedBlocks.insert(&*CurSILFn->begin());
-  workQueue.push_back(&*CurSILFn->begin());
-
-  while (!workQueue.empty()) {
-    auto bb = workQueue.pop_back_val();
-
+  while (SILBasicBlock *bb = workQueue.pop()) {
     // Emit the block.
     visitSILBasicBlock(bb);
 
@@ -2052,15 +2055,14 @@ void IRGenSILFunction::emitSILFunction() {
     // Therefore the invariant holds of all the successors, and we can
     // queue them up if we haven't already visited them.
     for (auto *succBB : bb->getSuccessorBlocks()) {
-      if (visitedBlocks.insert(succBB))
-        workQueue.push_back(succBB);
+      workQueue.pushIfNotVisited(succBB);
     }
   }
 
   // If there are dead blocks in the SIL function, we might have left
   // invalid blocks in the IR.  Do another pass and kill them off.
   for (SILBasicBlock &bb : *CurSILFn)
-    if (!visitedBlocks.contains(&bb))
+    if (!workQueue.isVisited(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
 
 }
@@ -2840,7 +2842,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     SILFunctionConventions substConv(substCalleeType, getSILModule());
     SILType errorType =
         substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
-    Address calleeErrorSlot = emission->getCalleeErrorSlot(errorType);
+    Address calleeErrorSlot = emission->getCalleeErrorSlot(
+        errorType, /*isCalleeAsync=*/site.getOrigCalleeType()->isAsync());
     auto errorValue = Builder.CreateLoad(calleeErrorSlot);
     emission->end();
 
@@ -2971,7 +2974,12 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   // handled by a simplification pass in SIL.)
   if (i->getNumArguments() != 1)
     return false;
-  
+  // The closure application is going to expect to pass the context in swiftself
+  // only methods where the call to `hasSelfContextParameter` returns true will
+  // use swiftself for the self parameter.
+  if (!hasSelfContextParameter(calleeTy))
+    return false;
+
   auto appliedParam = calleeTy->getParameters().back();
   if (resultTy->isNoEscape()) {
     // A trivial closure accepts an unowned or guaranteed argument, possibly
@@ -3233,19 +3241,9 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     assert(!IGF.IndirectReturn.isValid() &&
            "Formally direct results should stay direct results for async "
            "functions");
-    llvm::Value *context = IGF.getAsyncContext();
-    auto layout = getAsyncContextLayout(IGF);
 
-    Address dataAddr = layout.emitCastTo(IGF, context);
-    for (unsigned index = 0, count = layout.getDirectReturnCount();
-         index < count; ++index) {
-      auto fieldLayout = layout.getDirectReturnLayout(index);
-      Address fieldAddr =
-          fieldLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-      cast<LoadableTypeInfo>(fieldLayout.getType())
-          .initialize(IGF, result, fieldAddr, /*isOutlined*/ false);
-    }
-    emitAsyncReturn(IGF, layout, fnType);
+    auto asyncLayout = getAsyncContextLayout(IGF);
+    emitAsyncReturn(IGF, asyncLayout, fnType, result);
     IGF.emitCoroutineOrAsyncExit();
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();

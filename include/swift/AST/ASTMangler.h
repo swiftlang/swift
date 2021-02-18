@@ -171,9 +171,11 @@ public:
   /// predefined in the Swift runtime for the given type signature.
   std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
                                                    CanType ResultType,
+                                                   CanGenericSignature Sig,
                                                    bool predefined);
   
-  /// Mangle the derivative function (JVP/VJP) for the given:
+  /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
+  /// thunk, for the given:
   /// - Mangled original function declaration.
   /// - Derivative function kind.
   /// - Derivative function configuration: parameter/result indices and
@@ -181,7 +183,8 @@ public:
   std::string
   mangleAutoDiffDerivativeFunction(const AbstractFunctionDecl *originalAFD,
                                    AutoDiffDerivativeFunctionKind kind,
-                                   AutoDiffConfig config);
+                                   AutoDiffConfig config,
+                                   bool isVTableThunk = false);
 
   /// Mangle the linear map (differential/pullback) for the given:
   /// - Mangled original function declaration.
@@ -191,6 +194,15 @@ public:
   std::string mangleAutoDiffLinearMap(const AbstractFunctionDecl *originalAFD,
                                       AutoDiffLinearMapKind kind,
                                       AutoDiffConfig config);
+
+  /// Mangle the linear map self parameter reordering thunk the given:
+  /// - Mangled original function declaration.
+  /// - Linear map kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffSelfReorderingReabstractionThunk(
+      CanType fromType, CanType toType, GenericSignature signature,
+      AutoDiffLinearMapKind linearMapKind);
 
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
@@ -438,7 +450,8 @@ protected:
 
   void beginManglingWithAutoDiffOriginalFunction(
       const AbstractFunctionDecl *afd);
-  void appendAutoDiffFunctionParts(char functionKindCode,
+  void appendAutoDiffFunctionParts(StringRef op, 
+                                   Demangle::AutoDiffFunctionKind kind,
                                    AutoDiffConfig config);
   void appendIndexSubset(IndexSubset *indexSubset);
 };

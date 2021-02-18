@@ -2938,8 +2938,8 @@ ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
 
 ERROR(dynamic_self_invalid,none,
-      "covariant 'Self' can only appear as the type of a property, subscript or method result; "
-      "did you mean '%0'?", (StringRef))
+      "covariant 'Self' can only appear as the possibly optional type of a "
+      "property, subscript or method result; did you mean '%0'?", (StringRef))
 ERROR(dynamic_self_in_mutable_property,none,
       "mutable property cannot have covariant 'Self' type", ())
 ERROR(dynamic_self_in_stored_property,none,
@@ -2994,8 +2994,10 @@ ERROR(override_rethrows_with_non_rethrows,none,
       "be 'rethrows'", (bool))
 ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
-ERROR(rethrows_attr_on_non_protocol,none,
-      "@rethrows may only be used on 'protocol' declarations", ())
+
+ERROR(override_reasync_with_non_reasync,none,
+      "override of 'reasync' %select{method|initializer}0 should also "
+      "be 'reasync'", (bool))
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",

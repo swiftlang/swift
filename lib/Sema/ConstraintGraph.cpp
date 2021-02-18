@@ -84,8 +84,13 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   return { *nodePtr, index };
 }
 
+bool ConstraintGraphNode::forRepresentativeVar() const {
+  auto *typeVar = getTypeVariable();
+  return typeVar == typeVar->getImpl().getRepresentative(nullptr);
+}
+
 ArrayRef<TypeVariableType *> ConstraintGraphNode::getEquivalenceClass() const{
-  assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
+  assert(forRepresentativeVar() &&
          "Can't request equivalence class from non-representative type var");
   return getEquivalenceClassUnsafe();
 }
@@ -131,10 +136,10 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
 
 void ConstraintGraphNode::addToEquivalenceClass(
        ArrayRef<TypeVariableType *> typeVars) {
-  assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
+  assert(forRepresentativeVar() &&
          "Can't extend equivalence class of non-representative type var");
   if (EquivalenceClass.empty())
-    EquivalenceClass.push_back(TypeVar);
+    EquivalenceClass.push_back(getTypeVariable());
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
 }
 
@@ -1189,6 +1194,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
     SmallVector<Constraint *, 4> sortedConstraints(Constraints.begin(),
                                                    Constraints.end());
     std::sort(sortedConstraints.begin(), sortedConstraints.end());
+
     for (auto constraint : sortedConstraints) {
       out.indent(indent + 4);
       constraint->print(out, &TypeVar->getASTContext().SourceMgr);
@@ -1218,8 +1224,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
   }
 
   // Print equivalence class.
-  if (TypeVar->getImpl().getRepresentative(nullptr) == TypeVar &&
-      EquivalenceClass.size() > 1) {
+  if (forRepresentativeVar() && EquivalenceClass.size() > 1) {
     out.indent(indent + 2);
     out << "Equivalence class:";
     for (unsigned i = 1, n = EquivalenceClass.size(); i != n; ++i) {

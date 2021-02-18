@@ -6,6 +6,8 @@
 // - it happens before the performance inlining and thus preserves @_semantics functions
 // - it happens after generic specialization
 
+// UNSUPPORTED: OS=macosx || OS=tvos || OS=watchos || OS=ios
+
 @frozen
 public struct Int {
   @inlinable

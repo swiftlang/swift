@@ -70,7 +70,7 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) returnToCaller;
   //   SwiftActor * __ptrauth(...) callerActor;
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
-  //   SwiftError *errorResult;
+  //   SwiftError **errorResult;
   //   IndirectResultTypes *indirectResults...;
   //   union {
   //     struct {
@@ -435,6 +435,9 @@ namespace irgen {
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        CanSILFunctionType fnType);
+
+  void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
+                       CanSILFunctionType fnType, Explosion &result);
 
   Address emitAutoDiffCreateLinearMapContext(
       IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);

@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %target-sil-func-extractor -module-name="Swift" -func='$ss1XV4testyyF' | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -O -parse-as-library -parse-stdlib -emit-sib -o - | %target-sil-func-extractor -module-name="Swift" -func='$ss1XV4testyyF' | %FileCheck %s -check-prefix=SIB-CHECK
 
+// UNSUPPORTED: OS=macosx || OS=tvos || OS=watchos || OS=ios
+
 // CHECK: import Builtin
 // CHECK: import Swift
 

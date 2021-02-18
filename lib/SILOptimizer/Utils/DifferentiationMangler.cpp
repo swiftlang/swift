@@ -41,21 +41,19 @@ static NodePointer mangleGenericSignatureAsNode(GenericSignature sig,
   return result;
 }
 
-static NodePointer mangleAsNode(
-    SILFunction *originalFunction, Demangle::AutoDiffFunctionKind kind,
+static NodePointer mangleAutoDiffFunctionAsNode(
+    StringRef originalName, Demangle::AutoDiffFunctionKind kind,
     AutoDiffConfig config, Demangler &demangler) {
-  assert(isMangledName(originalFunction->getName()));
-  auto demangledOrig = demangler.demangleSymbol(originalFunction->getName());
+  assert(isMangledName(originalName));
+  auto demangledOrig = demangler.demangleSymbol(originalName);
+  assert(demangledOrig && "Should only be called when the original "
+         "function has a mangled name");
   assert(demangledOrig->getKind() == Node::Kind::Global);
-  assert(demangledOrig->getNumChildren() == 1);
-  auto originalEntityNode = demangledOrig->getFirstChild();
   auto derivativeGenericSignatureNode = mangleGenericSignatureAsNode(
       config.derivativeGenericSignature, demangler);
-
   auto *adFunc = demangler.createNode(Node::Kind::AutoDiffFunction);
-  assert(originalEntityNode && "Should only be called when the original "
-         "function has a mangled name");
-  adFunc->addChild(originalEntityNode, demangler);
+  for (auto *child : *demangledOrig)
+    adFunc->addChild(child, demangler);
   if (derivativeGenericSignatureNode)
     adFunc->addChild(derivativeGenericSignatureNode, demangler);
   adFunc->addChild(
@@ -75,33 +73,126 @@ static NodePointer mangleAsNode(
   return root;
 }
 
-std::string DifferentiationMangler::mangle(
-    SILFunction *originalFunction, Demangle::AutoDiffFunctionKind kind,
+std::string DifferentiationMangler::mangleAutoDiffFunction(
+    StringRef originalName, Demangle::AutoDiffFunctionKind kind,
     AutoDiffConfig config) {
   // If the original function is mangled, mangle the tree.
-  if (isMangledName(originalFunction->getName())) {
+  if (isMangledName(originalName)) {
     Demangler demangler;
-    auto node = mangleAsNode(originalFunction, kind, config, demangler);
+    auto node = mangleAutoDiffFunctionAsNode(
+        originalName, kind, config, demangler);
     return Demangle::mangleNode(node);
   }
   // Otherwise, treat the original function symbol as a black box and just
   // mangle the other parts.
   beginManglingWithoutPrefix();
-  appendOperator(originalFunction->getName());
-  appendAutoDiffFunctionParts((char)kind, config);
+  appendOperator(originalName);
+  appendAutoDiffFunctionParts("TJ", kind, config);
   return finalize();
 }
 
 // Returns the mangled name for a derivative function of the given kind.
 std::string DifferentiationMangler::mangleDerivativeFunction(
-    SILFunction *originalFunction, AutoDiffDerivativeFunctionKind kind,
+    StringRef originalName, AutoDiffDerivativeFunctionKind kind,
     AutoDiffConfig config) {
-  return mangle(originalFunction, getAutoDiffFunctionKind(kind), config);
+  return mangleAutoDiffFunction(
+      originalName, getAutoDiffFunctionKind(kind), config);
 }
 
 // Returns the mangled name for a derivative function of the given kind.
 std::string DifferentiationMangler::mangleLinearMap(
-    SILFunction *originalFunction, AutoDiffLinearMapKind kind,
+    StringRef originalName, AutoDiffLinearMapKind kind,
     AutoDiffConfig config) {
-  return mangle(originalFunction, getAutoDiffFunctionKind(kind), config);
+  return mangleAutoDiffFunction(
+      originalName, getAutoDiffFunctionKind(kind), config);
+}
+
+static NodePointer mangleDerivativeFunctionSubsetParametersThunkAsNode(
+    StringRef originalName, Type toType, Demangle::AutoDiffFunctionKind kind,
+    IndexSubset *fromParamIndices, IndexSubset *fromResultIndices,
+    IndexSubset *toParamIndices, Demangler &demangler) {
+  assert(isMangledName(originalName));
+  auto demangledOrig = demangler.demangleSymbol(originalName);
+  assert(demangledOrig && "Should only be called when the original "
+         "function has a mangled name");
+  assert(demangledOrig->getKind() == Node::Kind::Global);
+  auto *thunk = demangler.createNode(Node::Kind::AutoDiffSubsetParametersThunk);
+  for (auto *child : *demangledOrig)
+    thunk->addChild(child, demangler);
+  NodePointer toTypeNode = nullptr;
+  {
+    ASTMangler typeMangler;
+    toTypeNode = demangler.demangleType(
+        typeMangler.mangleTypeWithoutPrefix(toType));
+    assert(toTypeNode && "Cannot demangle the to-type as node");
+  }
+  thunk->addChild(toTypeNode, demangler);
+  thunk->addChild(
+      demangler.createNode(
+          Node::Kind::AutoDiffFunctionKind, (Node::IndexType)kind),
+      demangler);
+  thunk->addChild(
+      demangler.createNode(
+          Node::Kind::IndexSubset, fromParamIndices->getString()),
+      demangler);
+  thunk->addChild(
+      demangler.createNode(
+          Node::Kind::IndexSubset, fromResultIndices->getString()),
+      demangler);
+  thunk->addChild(
+      demangler.createNode(
+          Node::Kind::IndexSubset, toParamIndices->getString()),
+      demangler);
+  auto root = demangler.createNode(Node::Kind::Global);
+  root->addChild(thunk, demangler);
+  return root;
+}
+
+std::string
+DifferentiationMangler::mangleDerivativeFunctionSubsetParametersThunk(
+    StringRef originalName, CanType toType,
+    AutoDiffDerivativeFunctionKind linearMapKind,
+    IndexSubset *fromParamIndices, IndexSubset *fromResultIndices,
+    IndexSubset *toParamIndices) {
+  beginMangling();
+  auto kind = getAutoDiffFunctionKind(linearMapKind);
+  // If the original function is mangled, mangle the tree.
+  if (isMangledName(originalName)) {
+    Demangler demangler;
+    auto node = mangleDerivativeFunctionSubsetParametersThunkAsNode(
+        originalName, toType, kind, fromParamIndices, fromResultIndices,
+        toParamIndices, demangler);
+    return Demangle::mangleNode(node);
+  }
+  // Otherwise, treat the original function symbol as a black box and just
+  // mangle the other parts.
+  beginManglingWithoutPrefix();
+  appendOperator(originalName);
+  appendType(toType);
+  auto kindCode = (char)kind;
+  appendOperator("TJS", StringRef(&kindCode, 1));
+  appendIndexSubset(fromParamIndices);
+  appendOperator("p");
+  appendIndexSubset(fromResultIndices);
+  appendOperator("r");
+  appendIndexSubset(toParamIndices);
+  appendOperator("P");
+  return finalize();
+}
+
+std::string DifferentiationMangler::mangleLinearMapSubsetParametersThunk(
+    CanType fromType, AutoDiffLinearMapKind linearMapKind,
+    IndexSubset *fromParamIndices, IndexSubset *fromResultIndices,
+    IndexSubset *toParamIndices) {
+  beginMangling();
+  appendType(fromType);
+  auto functionKindCode = (char)getAutoDiffFunctionKind(linearMapKind);
+  appendOperator("TJS", StringRef(&functionKindCode, 1));
+  appendIndexSubset(fromParamIndices);
+  appendOperator("p");
+  appendIndexSubset(fromResultIndices);
+  appendOperator("r");
+  appendIndexSubset(toParamIndices);
+  appendOperator("P");
+  return finalize();
 }

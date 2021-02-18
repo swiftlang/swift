@@ -27,5 +27,6 @@ typedef enum InstanceKind {
   ErrorExistential,
   Closure,
   Enum,
-  EnumValue
+  EnumValue,
+  AsyncTask
 } InstanceKind;

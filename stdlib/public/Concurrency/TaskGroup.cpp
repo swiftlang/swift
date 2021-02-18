@@ -1,4 +1,4 @@
-//===--- TaskGroup.cpp - Task Group internal message channel ------------===//
+//===--- TaskGroup.cpp - Task Groups --------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Object management for async child tasks that are children of a task group.
+// Object management for child tasks that are children of a task group.
 //
 //===----------------------------------------------------------------------===//
 
@@ -74,7 +74,7 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
   // If an error was thrown, save it in the future fragment.
   auto futureContext = static_cast<FutureAsyncContext *>(context);
   bool hadErrorResult = false;
-  if (auto errorObject = futureContext->errorResult) {
+  if (auto errorObject = *futureContext->errorResult) {
     // instead we need to enqueue this result:
     hadErrorResult = true;
   }

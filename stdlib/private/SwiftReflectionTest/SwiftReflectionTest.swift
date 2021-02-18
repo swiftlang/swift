@@ -179,6 +179,7 @@ public enum InstanceKind: UInt8 {
   case Closure
   case Enum
   case EnumValue
+  case AsyncTask
 }
 
 /// Represents a section in a loaded image in this process.
@@ -577,6 +578,12 @@ public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
   reflect(instanceAddress: contextPointer, kind: .Object)
 
   fn.deallocate()
+}
+
+
+/// Reflect an AsyncTask.
+public func reflect(asyncTask: UInt) {
+  reflect(instanceAddress: asyncTask, kind: .AsyncTask)
 }
 
 /// Call this function to indicate to the parent that there are

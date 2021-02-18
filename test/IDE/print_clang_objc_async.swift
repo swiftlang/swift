@@ -29,8 +29,8 @@ import _Concurrency
 // CHECK: {{^[}]$}}
 
 // CHECK-LABEL: protocol RefrigeratorDelegate
-// CHECK-NEXT: @asyncHandler func someoneDidOpenRefrigerator(_ fridge: Any)
-// CHECK-NEXT: @asyncHandler func refrigerator(_ fridge: Any, didGetFilledWithItems items: [Any])
+// CHECK-NEXT: func someoneDidOpenRefrigerator(_ fridge: Any)
+// CHECK-NEXT: func refrigerator(_ fridge: Any, didGetFilledWithItems items: [Any])
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, didGetFilledWithIntegers items: UnsafeMutablePointer<Int>, count: Int)
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, willAddItem item: Any)
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, didRemoveItem item: Any) -> Bool
@@ -40,7 +40,8 @@ import _Concurrency
 // CHECK-NEXT: @actorIndependent func independentMethod()
 // CHECK-NEXT: @asyncHandler func asyncHandlerMethod()
 // CHECK-NEXT: @MainActor func mainActorMethod()
+// CHECK-NEXT: @MainActor func uiActorMethod()
 // CHECK-NEXT: {{^}}  optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
 
-// CHECK: @actorIndependent var MAGIC_NUMBER: Int32 { get }
+// CHECK: {{^}}var MAGIC_NUMBER: Int32 { get }

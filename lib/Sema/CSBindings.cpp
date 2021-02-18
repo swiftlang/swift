@@ -119,8 +119,8 @@ bool PotentialBindings::involvesTypeVariables() const {
   // on each step of the solver, but once bindings are computed
   // incrementally it becomes more important to double-check that
   // any adjacent type variables found previously are still unresolved.
-  return llvm::any_of(AdjacentVars, [](TypeVariableType *typeVar) {
-    return !typeVar->getImpl().getFixedType(/*record=*/nullptr);
+  return llvm::any_of(AdjacentVars, [](const auto &adjacent) {
+    return !adjacent.first->getImpl().getFixedType(/*record=*/nullptr);
   });
 }
 
@@ -369,12 +369,8 @@ void PotentialBindings::inferTransitiveBindings(
       addLiteral(literal.second.getSource());
 
     // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults) {
-      if (def.getSecond()->getKind() == ConstraintKind::DefaultClosureType)
-        continue;
-
+    for (const auto &def : bindings.Defaults)
       addDefault(def.second);
-    }
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
@@ -403,45 +399,11 @@ void PotentialBindings::inferTransitiveBindings(
   }
 }
 
-// If potential binding type variable is a closure that has a subtype relation
-// associated with argument conversion constraint located directly on an
-// autoclosure parameter.
-static bool
-isClosureInAutoClosureArgumentConversion(PotentialBindings &bindings) {
-
-  if (!bindings.TypeVar->getImpl().isClosureType())
-    return false;
-
-  return llvm::any_of(
-      bindings.SubtypeOf,
-      [](std::pair<TypeVariableType *, Constraint *> subType) {
-        if (subType.second->getKind() != ConstraintKind::ArgumentConversion)
-          return false;
-        return subType.second->getLocator()
-            ->isLastElement<LocatorPathElt::AutoclosureResult>();
-      });
-}
-
 void PotentialBindings::finalize(
     llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
         &inferredBindings) {
   inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
-
-  // For autoclosure parameters if we have a closure argument which could
-  // default to `() -> $T`, we avoid infering defaultable binding because
-  // an autoclosure cannot accept a closure paramenter unless the result `$T`
-  // is bound to a function type via another contextual binding. Also consider
-  // adjacent vars because they can also default transitively.
-  if (isClosureInAutoClosureArgumentConversion(*this)) {
-    auto closureDefault = llvm::find_if(
-        Defaults, [](const std::pair<CanType, Constraint *> &entry) {
-          return entry.second->getKind() == ConstraintKind::DefaultClosureType;
-        });
-    if (closureDefault != Defaults.end()) {
-      Defaults.erase(closureDefault);
-    }
-  }
 }
 
 PotentialBindings::BindingScore
@@ -594,9 +556,9 @@ bool LiteralRequirement::isCoveredBy(Type type, DeclContext *useDC) const {
 }
 
 std::pair<bool, Type>
-PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
-                                      const PotentialBinding &binding,
-                                      bool canBeNil) const {
+LiteralRequirement::isCoveredBy(const PotentialBinding &binding,
+                                bool canBeNil,
+                                DeclContext *useDC) const {
   auto type = binding.BindingType;
   switch (binding.Kind) {
   case AllowedBindingKind::Exact:
@@ -616,7 +578,7 @@ PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
     if (type->isTypeVariableOrMember() || type->isHole())
       return std::make_pair(false, Type());
 
-    if (literal.isCoveredBy(type, CS.DC)) {
+    if (isCoveredBy(type, useDC)) {
       return std::make_pair(true, requiresUnwrap ? type : binding.BindingType);
     }
 
@@ -628,7 +590,7 @@ PotentialBindings::isLiteralCoveredBy(const LiteralRequirement &literal,
     // If this literal protocol is not a direct requirement it
     // would not be possible to change optionality while inferring
     // bindings for a supertype, so this hack doesn't apply.
-    if (!literal.isDirectRequirement())
+    if (!isDirectRequirement())
       return std::make_pair(false, Type());
 
     // If we're allowed to bind to subtypes, look through optionals.
@@ -726,7 +688,7 @@ void PotentialBindings::addPotentialBinding(PotentialBinding binding,
       Type adjustedTy;
 
       std::tie(isCovered, adjustedTy) =
-          isLiteralCoveredBy(info, binding, allowsNil);
+          info.isCoveredBy(binding, allowsNil, CS.DC);
 
       if (!isCovered)
         continue;
@@ -800,7 +762,7 @@ void PotentialBindings::addLiteral(Constraint *constraint) {
       Type adjustedTy;
 
       std::tie(isCovered, adjustedTy) =
-        isLiteralCoveredBy(literal, *binding, allowsNil);
+          literal.isCoveredBy(*binding, allowsNil, CS.DC);
 
       // No luck here, let's try next literal requirement.
       if (!isCovered)
@@ -983,7 +945,8 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     findInferableTypeVars(second, typeVars);
 
     if (typeVars.erase(TypeVar)) {
-      AdjacentVars.insert(typeVars.begin(), typeVars.end());
+      for (auto *typeVar : typeVars)
+        AdjacentVars.insert({typeVar, constraint});
     }
 
     return None;
@@ -1016,9 +979,21 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   if (type->getWithoutSpecifierType()
           ->lookThroughAllOptionalTypes()
           ->is<DependentMemberType>()) {
-    type->getTypeVariables(AdjacentVars);
+    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    type->getTypeVariables(referencedVars);
 
-    bool containsSelf = AdjacentVars.erase(TypeVar);
+    bool containsSelf = false;
+    for (auto *var : referencedVars) {
+      // Add all type variables encountered in the type except
+      // to the current type variable.
+      if (var != TypeVar) {
+        AdjacentVars.insert({var, constraint});
+        continue;
+      }
+
+      containsSelf = true;
+    }
+
     // If inferred type doesn't contain the current type variable,
     // let's mark bindings as delayed until dependent member type
     // is resolved.
@@ -1043,15 +1018,20 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   // Check whether we can perform this binding.
   if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
     type = *boundType;
-    if (type->hasTypeVariable())
-      type->getTypeVariables(AdjacentVars);
+    if (type->hasTypeVariable()) {
+      llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+      type->getTypeVariables(referencedVars);
+      for (auto *var : referencedVars) {
+        AdjacentVars.insert({var, constraint});
+      }
+    }
   } else {
     auto *bindingTypeVar = type->getRValueType()->getAs<TypeVariableType>();
 
     if (!bindingTypeVar)
       return None;
 
-    AdjacentVars.insert(bindingTypeVar);
+    AdjacentVars.insert({bindingTypeVar, constraint});
 
     // If current type variable is associated with a code completion token
     // it's possible that it doesn't have enough contextual information

@@ -26,7 +26,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
@@ -1234,18 +1234,12 @@ public:
 /// functions.
 bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
                 SmallVectorImpl<SILFunction *> &FunctionsAdded) {
-  BasicBlockSet Visited(Fun);
-  SmallVector<SILBasicBlock *, 128> Worklist;
+  BasicBlockWorklist<128> Worklist(Fun->getEntryBlock());
   OutlinePatterns patterns(FuncBuilder);
   bool changed = false;
 
   // Traverse the function.
-  Worklist.push_back(&*Fun->begin());
-  while (!Worklist.empty()) {
-
-    SILBasicBlock *CurBlock = Worklist.pop_back_val();
-    if (!Visited.insert(CurBlock)) continue;
-
+  while (SILBasicBlock *CurBlock = Worklist.pop()) {
     SILBasicBlock::iterator CurInst = CurBlock->begin();
 
     // Go over the instructions trying to match and replace patterns.
@@ -1260,8 +1254,9 @@ bool tryOutline(SILOptFunctionBuilder &FuncBuilder, SILFunction *Fun,
          assert(LastInst->getParent() == CurBlock);
          changed = true;
        } else if (isa<TermInst>(CurInst)) {
-         std::copy(CurBlock->succ_begin(), CurBlock->succ_end(),
-                   std::back_inserter(Worklist));
+         for (SILBasicBlock *succ : CurBlock->getSuccessors()) {
+           Worklist.pushIfNotVisited(succ);
+         }
          ++CurInst;
        } else {
          ++CurInst;

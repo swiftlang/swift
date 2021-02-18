@@ -2177,6 +2177,11 @@ namespace {
           if (!fd->getName().getArgumentNames().empty())
             continue;
 
+          // async methods don't conflict with properties because of sync/async
+          // overloading.
+          if (fd->hasAsync())
+            continue;
+
           foundMethod = true;
         } else if (auto *var = dyn_cast<VarDecl>(result)) {
           if (var->isInstanceMember() != decl->isInstanceProperty())
@@ -2445,19 +2450,116 @@ namespace {
       auto importedName = importFullName(decl, correctSwiftName);
       if (!importedName) return nullptr;
 
-      auto dc =
+      auto extensionDC =
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
-      if (!dc)
+      if (!extensionDC)
         return nullptr;
 
       SourceLoc loc = Impl.importSourceLoc(decl->getBeginLoc());
-
-      // FIXME: If Swift gets namespaces, import as a namespace.
-      auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
+      DeclContext *dc = nullptr;
+      // If this is a top-level namespace, don't put it in the module we're
+      // importing, put it in the "__ObjC" module that is implicitly imported.
+      // This way, if we have multiple modules that all open the same namespace,
+      // we won't import multiple enums with the same name in swift.
+      if (extensionDC->getContextKind() == DeclContextKind::FileUnit)
+        dc = Impl.ImportedHeaderUnit;
+      else {
+        // This is a nested namespace, we need to find its extension decl
+        // context and then use that to find the parent enum. It's important
+        // that we add this to the parent enum (in the "__ObjC" module) and not
+        // to the extension.
+        auto parentNS = cast<clang::NamespaceDecl>(decl->getParent());
+        auto parent = Impl.importDecl(parentNS, getVersion());
+        // Sometimes when the parent namespace is imported, this namespace
+        // also gets imported. If that's the case, then the parent namespace
+        // will be an enum (because it was able to be fully imported) in which
+        // case we need to bail here.
+        auto cachedResult =
+            Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+        if (cachedResult != Impl.ImportedDecls.end())
+          return cachedResult->second;
+        dc = cast<ExtensionDecl>(parent)
+                 ->getExtendedType()
+                 ->getEnumOrBoundGenericEnum();
+      }
+      auto *enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
           decl, AccessLevel::Public, loc,
           importedName.getDeclName().getBaseIdentifier(),
           Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
-      enumDecl->setMemberLoader(&Impl, 0);
+      if (isa<clang::NamespaceDecl>(decl->getParent()))
+        cast<EnumDecl>(dc)->addMember(enumDecl);
+
+      // We are creating an extension, so put it at the top level. This is done
+      // after creating the enum, though, because we may need the correctly
+      // nested decl context above when creating the enum.
+      while (extensionDC->getParent() &&
+             extensionDC->getContextKind() != DeclContextKind::FileUnit)
+        extensionDC = extensionDC->getParent();
+
+      auto *extension = ExtensionDecl::create(Impl.SwiftContext, loc, nullptr,
+                                              {}, extensionDC, nullptr, decl);
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{extension},
+                                              enumDecl->getDeclaredType());
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{extension},
+                                              std::move(enumDecl));
+      // Keep track of what members we've already added so we don't add the same
+      // member twice. Note: we can't use "ImportedDecls" for this because we
+      // might import a decl that we don't add (for example, if it was a
+      // parameter to another decl).
+      SmallPtrSet<Decl *, 16> addedMembers;
+      for (auto redecl : decl->redecls()) {
+        // This will be reset as the EnumDecl after we return from
+        // VisitNamespaceDecl.
+        Impl.ImportedDecls[{redecl->getCanonicalDecl(), getVersion()}] =
+            extension;
+
+        // Insert these backwards into "namespaceDecls" so we can pop them off
+        // the end without loosing order.
+        SmallVector<clang::Decl *, 16> namespaceDecls;
+        auto addDeclsReversed = [&](auto decls) {
+          auto begin = decls.begin();
+          auto end = decls.end();
+          int currentSize = namespaceDecls.size();
+          int declCount = currentSize + std::distance(begin, end);
+          namespaceDecls.resize(declCount);
+          for (int index = declCount - 1; index >= currentSize; --index)
+            namespaceDecls[index] = *(begin++);
+        };
+        addDeclsReversed(redecl->decls());
+        while (!namespaceDecls.empty()) {
+          auto nd = dyn_cast<clang::NamedDecl>(namespaceDecls.pop_back_val());
+          // Make sure we only import the defenition of a record.
+          if (auto tagDecl = dyn_cast_or_null<clang::TagDecl>(nd))
+            // Some decls, for example ClassTemplateSpecializationDecls, won't
+            // have a definition here. That's OK.
+            nd = tagDecl->getDefinition() ? tagDecl->getDefinition() : tagDecl;
+          if (!nd)
+            continue;
+
+          // Special case class templates: import all their specilizations here.
+          if (auto classTemplate = dyn_cast<clang::ClassTemplateDecl>(nd)) {
+            addDeclsReversed(classTemplate->specializations());
+            continue;
+          }
+
+          auto member = Impl.importDecl(nd, getVersion());
+          if (!member || addedMembers.count(member) ||
+              isa<clang::NamespaceDecl>(nd))
+            continue;
+          // This happens (for example) when a struct is declared inside another
+          // struct inside a namespace but defined out of line.
+          assert(member->getDeclContext()->getAsDecl());
+          if (dyn_cast<ExtensionDecl>(member->getDeclContext()->getAsDecl()) !=
+              extension)
+            continue;
+          extension->addMember(member);
+          addedMembers.insert(member);
+        }
+      }
+
+      if (!extension->getMembers().empty())
+        enumDecl->addExtension(extension);
+
       return enumDecl;
     }
 
@@ -3371,6 +3473,12 @@ namespace {
           }
         }
 
+        // If we've already imported this decl, skip it so we don't add the same
+        // member twice.
+        if (Impl.ImportedDecls.find({nd->getCanonicalDecl(), getVersion()}) !=
+            Impl.ImportedDecls.end())
+          continue;
+
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
         if (!member) {
           if (!isa<clang::TypeDecl>(nd) && !isa<clang::FunctionDecl>(nd)) {
@@ -3383,11 +3491,6 @@ namespace {
         }
 
         if (auto nestedType = dyn_cast<TypeDecl>(member)) {
-          // Only import definitions. Otherwise, we might add the same member
-          // twice.
-          if (auto tagDecl = dyn_cast<clang::TagDecl>(nd))
-            if (tagDecl->getDefinition() != tagDecl)
-              continue;
           nestedTypes.push_back(nestedType);
           continue;
         }
@@ -3595,6 +3698,22 @@ namespace {
       return VisitRecordDecl(decl);
     }
 
+    bool isSpecializationDepthGreaterThan(
+        const clang::ClassTemplateSpecializationDecl *decl, unsigned maxDepth) {
+      for (auto arg : decl->getTemplateArgs().asArray()) {
+        if (arg.getKind() == clang::TemplateArgument::Type) {
+          if (auto classSpec =
+                  dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                      arg.getAsType()->getAsCXXRecordDecl())) {
+            if (maxDepth == 0 ||
+                isSpecializationDepthGreaterThan(classSpec, maxDepth - 1))
+              return true;
+          }
+        }
+      }
+      return false;
+    }
+
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
       // `Sema::isCompleteType` will try to instantiate the class template as a
@@ -3611,6 +3730,13 @@ namespace {
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
       assert(def && "Class template instantiation didn't have definition");
+
+      // Currently this is a relatively low number, in the future we might
+      // consider increasing it, but this should keep compile time down,
+      // especially for types that become exponentially large when
+      // instantiating.
+      if (isSpecializationDepthGreaterThan(def, 8))
+        return nullptr;
 
       // FIXME: This will instantiate all members of the specialization (and detect
       // instantiation failures in them), which can be more than is necessary
@@ -7809,46 +7935,6 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
 }
 
-/// Determine whether any of the parameters to the given function is of an
-/// unsafe pointer type.
-static bool hasAnyUnsafePointerParameters(FuncDecl *func) {
-  for (auto param : *func->getParameters()) {
-    Type paramType =
-        param->toFunctionParam().getPlainType()->lookThroughAllOptionalTypes();
-    if (paramType->getAnyPointerElementType()) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/// Determine whether the given Objective-C method is likely to be an
-/// asynchronous handler based on its name.
-static bool isObjCMethodLikelyAsyncHandler(
-    const clang::ObjCMethodDecl *method) {
-  auto selector = method->getSelector();
-
-  for (unsigned argIdx : range(std::max(selector.getNumArgs(), 1u))) {
-    auto selectorPiece = selector.getNameForSlot(argIdx);
-    // For the first selector piece, look for the word "did" anywhere.
-    if (argIdx == 0) {
-      for (auto word : camel_case::getWords(selectorPiece)) {
-        if (word == "did" || word == "Did")
-          return true;
-      }
-
-      continue;
-    }
-
-    // Otherwise, check whether any subsequent selector piece starts with "did".
-    if (camel_case::getFirstWord(selectorPiece) == "did")
-      return true;
-  }
-
-  return false;
-}
-
 Type ClangImporter::Implementation::getMainActorType() {
   if (MainActorType)
     return *MainActorType;
@@ -8071,9 +8157,10 @@ void ClangImporter::Implementation::importAttributes(
     // __attribute__((swift_attr("attribute")))
     //
     if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
-      // FIXME: Hard-core @MainActor, because we don't have a point at which to
-      // do name lookup for imported entities.
-      if (swiftAttr->getAttribute() == "@MainActor") {
+      // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
+      // point at which to do name lookup for imported entities.
+      if (swiftAttr->getAttribute() == "@MainActor" ||
+          swiftAttr->getAttribute() == "@UIActor") {
         if (Type mainActorType = getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
@@ -8202,24 +8289,6 @@ void ClangImporter::Implementation::importAttributes(
   // Map __attribute__((pure)).
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
-  }
-
-  // Infer @asyncHandler on imported protocol methods that meet the semantic
-  // requirements.
-  if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    if (auto func = dyn_cast<FuncDecl>(MappedDecl)) {
-      if (auto proto = dyn_cast<ProtocolDecl>(func->getDeclContext())) {
-        if (proto->isObjC() && isa<clang::ObjCMethodDecl>(ClangDecl) &&
-            func->isInstanceMember() && !isa<AccessorDecl>(func) &&
-            isObjCMethodLikelyAsyncHandler(
-                cast<clang::ObjCMethodDecl>(ClangDecl)) &&
-            func->canBeAsyncHandler() &&
-            !hasAnyUnsafePointerParameters(func)) {
-          MappedDecl->getAttrs().add(
-              new (C) AsyncHandlerAttr(/*IsImplicit=*/false));
-        }
-      }
-    }
   }
 }
 
@@ -8596,6 +8665,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   auto decl = dyn_cast<clang::NamedDecl>(dc);
   if (!decl)
     return nullptr;
+
   // Category decls with same name can be merged and using canonical decl always
   // leads to the first category of the given name. We'd like to keep these
   // categories separated.
@@ -9022,8 +9092,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   // If we're in concurrency mode, mark the constant as @actorIndependent
   if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    auto actorIndependentAttr = new (C) ActorIndependentAttr(SourceLoc(),
-        SourceRange(), ActorIndependentKind::Safe);
+    auto actorIndependentAttr = new (C) ActorIndependentAttr(
+        ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
     var->getAttrs().add(actorIndependentAttr);
   }
   // Set the function up as the getter.

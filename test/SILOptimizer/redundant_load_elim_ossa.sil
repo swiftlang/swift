@@ -1129,13 +1129,13 @@ bb2(%20 : $Builtin.Int32):
   %39 = load [trivial] %12 : $*Builtin.Int32
   %40 = load [trivial] %13 : $*Builtin.Int32
   %41 = builtin "cmp_eq_Int32"(%39 : $Builtin.Int32, %40 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %41, bb2a, bb2b(%39 : $Builtin.Int32)
+  cond_br %41, bb2a, bb2b
 
 bb2a:
   br bb3
 
-bb2b(%39a : $Builtin.Int32):
-  br bb2(%39a : $Builtin.Int32)
+bb2b:
+  br bb2(%39 : $Builtin.Int32)
 
 // bb1 is after bb2 to make sure the first predecessor of bb2 is not bb2 to
 // expose the bug.

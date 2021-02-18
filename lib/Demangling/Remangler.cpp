@@ -311,6 +311,8 @@ class Remangler : public RemanglerBase {
 
   void mangleKeyPathThunkHelper(Node *node, StringRef op);
 
+  void mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op);
+
 #define NODE(ID)                                                        \
   void mangle##ID(Node *node);
 #define CONTEXT_NODE(ID)                                                \
@@ -2114,17 +2116,50 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   Buffer << "Ty";
 }
 
-void Remangler::mangleAutoDiffFunction(Node *node) {
+void Remangler::mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op) {
   auto childIt = node->begin();
-  mangle(*childIt++); // original
-  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
-    mangleDependentGenericSignature(*childIt++);
-  Buffer << "TJ";
+  while (childIt != node->end() &&
+         (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
+    mangle(*childIt++);
+  Buffer << op;
   mangle(*childIt++); // kind
   mangle(*childIt++); // parameter indices
   Buffer << 'p';
   mangle(*childIt++); // result indices
   Buffer << 'r';
+}
+
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  mangleAutoDiffFunctionOrSimpleThunk(node, "TJ");
+}
+
+void Remangler::mangleAutoDiffDerivativeVTableThunk(Node *node) {
+  mangleAutoDiffFunctionOrSimpleThunk(node, "TJV");
+}
+
+void Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node) {
+  auto childIt = node->begin();
+  mangle(*childIt++); // from type
+  mangle(*childIt++); // to type
+  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
+    mangleDependentGenericSignature(*childIt++);
+  Buffer << "TJO";
+  mangle(*childIt++); // kind
+}
+
+void Remangler::mangleAutoDiffSubsetParametersThunk(Node *node) {
+  auto childIt = node->begin();
+  while (childIt != node->end() &&
+         (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
+    mangle(*childIt++);
+  Buffer << "TJS";
+  mangle(*childIt++); // kind
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
+  mangle(*childIt++); // to parameter indices
+  Buffer << 'P';
 }
 
 void Remangler::mangleAutoDiffFunctionKind(Node *node) {

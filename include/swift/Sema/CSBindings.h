@@ -185,11 +185,33 @@ struct LiteralRequirement {
     CoveredBy = coveredBy;
   }
 
-  bool isCoveredBy(Type type, DeclContext *useDC) const;
+  /// Determines whether this literal requirement is "covered"
+  /// by the given binding - type of the binding could either be
+  /// equal (in canonical sense) to the protocol's default type,
+  /// or conform to a protocol.
+  ///
+  /// \param binding The binding to check for coverage.
+  ///
+  /// \param canBeNil The flag that determines whether given type
+  /// variable requires all of its bindings to be optional.
+  ///
+  /// \param useDC The declaration context in which this literal
+  /// requirement is used.
+  ///
+  /// \returns a pair of bool and a type:
+  ///    - bool, true if binding covers given literal protocol;
+  ///    - type, non-null if binding type has to be adjusted
+  ///      to cover given literal protocol;
+  std::pair<bool, Type> isCoveredBy(const PotentialBinding &binding,
+                                    bool canBeNil,
+                                    DeclContext *useDC) const;
 
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
+
+private:
+  bool isCoveredBy(Type type, DeclContext *useDC) const;
 };
 
 struct PotentialBindings {
@@ -231,7 +253,8 @@ struct PotentialBindings {
   /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
   /// reachable through subtype/conversion  relationship e.g.
   /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
-  llvm::SmallPtrSet<TypeVariableType *, 2> AdjacentVars;
+  llvm::SmallDenseSet<std::pair<TypeVariableType *, Constraint *>, 2>
+      AdjacentVars;
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
@@ -390,26 +413,6 @@ struct PotentialBindings {
   void addDefault(Constraint *constraint);
 
   void addLiteral(Constraint *constraint);
-
-  /// Determines whether the given literal protocol is "covered"
-  /// by the given binding - type of the binding could either be
-  /// equal (in canonical sense) to the protocol's default type,
-  /// or conform to a protocol.
-  ///
-  /// \param literal The literal protocol requirement to check.
-  ///
-  /// \param binding The binding to check for coverage.
-  ///
-  /// \param canBeNil The flag that determines whether given type
-  /// variable requires all of its bindings to be optional.
-  ///
-  /// \returns a pair of bool and a type:
-  ///    - bool, true if binding covers given literal protocol;
-  ///    - type, non-null if binding type has to be adjusted
-  ///      to cover given literal protocol;
-  std::pair<bool, Type> isLiteralCoveredBy(const LiteralRequirement &literal,
-                                           const PotentialBinding &binding,
-                                           bool canBeNil) const;
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.

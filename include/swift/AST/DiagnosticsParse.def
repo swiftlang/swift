@@ -731,6 +731,9 @@ ERROR(generic_non_function,PointsToFirstBadToken,
 ERROR(rethrowing_function_type,none,
       "only function declarations may be marked 'rethrows'; "
       "did you mean 'throws'?", ())
+ERROR(reasync_function_type,none,
+      "only function declarations may be marked 'reasync'; "
+      "did you mean 'async'?", ())
 ERROR(async_or_throws_in_wrong_position,none,
       "'%0' may only occur before '->'", (StringRef))
 ERROR(throw_in_function_type,none,
@@ -745,7 +748,8 @@ ERROR(function_type_argument_label,none,
 ERROR(expected_dynamic_func_attr,none,
       "expected a dynamically_replaceable function", ())
 ERROR(async_after_throws,none,
-      "'async' must precede %select{'throws'|'rethrows'}0", (bool))
+      "%select{'async'|'reasync'}0 must precede %select{'throws'|'rethrows'}1",
+      (bool, bool))
 ERROR(async_init,none, "initializer cannot be marked 'async'", ())
 ERROR(duplicate_effects_specifier,none,
       "'%0' has already been specified", (StringRef))
@@ -1580,9 +1584,6 @@ ERROR(attr_specialize_missing_comma,none,
 
 ERROR(attr_specialize_unknown_parameter_name,none,
       "unknown parameter %0 in '_specialize attribute'", (StringRef))
-
-ERROR(attr_specialize_unsupported_exported_true ,none,
-      "'exported: true' has no effect in '_specialize' attribute", (StringRef))
 
 ERROR(attr_specialize_expected_bool_value,none,
       "expected a boolean true or false value in '_specialize' attribute", ())

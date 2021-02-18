@@ -103,10 +103,6 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                    llvm::cl::desc("Enable experimental concurrency model."));
 
-static llvm::cl::opt<bool> EnableExperimentalPrespecialization(
-    "enable-experimental-prespecialization",
-    llvm::cl::desc("Enable experimental prespecialziation."));
-
 static llvm::cl::opt<bool>
 VerifyExclusivity("enable-verify-exclusivity",
                   llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
@@ -393,9 +389,6 @@ int main(int argc, char **argv) {
   }
   Invocation.getLangOptions().EnableExperimentalConcurrency =
     EnableExperimentalConcurrency;
-
-  Invocation.getLangOptions().EnableExperimentalPrespecialization =
-      EnableExperimentalPrespecialization;
 
   Invocation.getLangOptions().EnableObjCInterop =
     EnableObjCInterop ? true :

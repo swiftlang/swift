@@ -878,7 +878,7 @@ SourceFile::getBasicLocsForDecl(const Decl *D) const {
   BasicDeclLocs Result;
   Result.SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
 
-  for (const auto &SRC : D->getRawComment().Comments) {
+  for (const auto &SRC : D->getRawComment(/*SerializedOK*/false).Comments) {
     Result.DocRanges.push_back(std::make_pair(
       LineColumn { SRC.StartLine, SRC.StartColumn },
       SRC.Range.getByteLength())
@@ -2051,6 +2051,8 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+  if (module == this) return false;
+
   auto &imports = getASTContext().getImportCache();
 
   // Look through non-implementation-only imports to see if module is imported

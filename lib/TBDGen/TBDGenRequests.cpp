@@ -21,6 +21,8 @@
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 
+#include "APIGen.h"
+
 using namespace swift;
 
 namespace swift {

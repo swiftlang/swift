@@ -95,7 +95,7 @@ public:
   /// Set the arguments to the function from an explosion.
   virtual void setArgs(Explosion &arg, bool isOutlined,
                        WitnessMetadata *witnessMetadata);
-  virtual Address getCalleeErrorSlot(SILType errorType) = 0;
+  virtual Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) = 0;
 
   void addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr);
 

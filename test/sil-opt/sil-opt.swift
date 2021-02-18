@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %target-sil-opt -enable-sil-verify-all -module-name="Swift" -emit-sorted-sil | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -O -parse-as-library -parse-stdlib -emit-sib -o - | %target-sil-opt -enable-sil-verify-all -module-name="Swift" -emit-sorted-sil | %FileCheck %s -check-prefix=SIB-CHECK
 
+// UNSUPPORTED: OS=macosx || OS=tvos || OS=watchos || OS=ios
+
 // CHECK: import Builtin
 // CHECK: import Swift
 

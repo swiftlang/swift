@@ -23,6 +23,7 @@
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/Config.h"
 #include "clang/Basic/PointerAuthOptions.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
@@ -336,6 +337,10 @@ public:
 
   /// Pointer authentication.
   PointerAuthOptions PointerAuth;
+
+  /// Use async-specific lowering for async functions if it is supported for
+  /// the target.
+  bool UseAsyncLowering = USE_SWIFT_ASYNC_LOWERING;
 
   /// The different modes for dumping IRGen type info.
   enum class TypeInfoDumpFilter {

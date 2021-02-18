@@ -1,4 +1,4 @@
-//===--- SILBitField.h - Defines the bitfield utilities ---------*- C++ -*-===//
+//===--- BasicBlockBits.h - SILBasicBlock bit utilities ---------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the BasicBlockBitfield and BasicBlockFlag utilities.
+// This file defines utilities for BasicBlock bit fields and sets.
 //
 //===----------------------------------------------------------------------===//
 
@@ -209,6 +209,63 @@ public:
     }
     return false;
   }
+};
+
+/// A utility for processing basic blocks in a worklist.
+///
+/// It is basically a combination of a block vector and a block set. It can be
+/// used for typical worklist-processing algorithms.
+template <unsigned N> class BasicBlockWorklist {
+  llvm::SmallVector<SILBasicBlock *, N> worklist;
+  BasicBlockSet visited;
+  
+public:
+  /// Construct an empty worklist.
+  BasicBlockWorklist(SILFunction *function) : visited(function) {}
+
+  /// Initialize the worklist with \p initialBlock.
+  BasicBlockWorklist(SILBasicBlock *initialBlock)
+      : visited(initialBlock->getParent()) {
+    push(initialBlock);
+  }
+
+  /// Pops the last added element from the worklist or returns null, if the
+  /// worklist is empty.
+  SILBasicBlock *pop() {
+    if (worklist.empty())
+      return nullptr;
+    return worklist.pop_back_val();
+  }
+
+  /// Pushes \p block onto the worklist if \p block has never been push before.
+  bool pushIfNotVisited(SILBasicBlock *block) {
+    if (visited.insert(block)) {
+      worklist.push_back(block);
+      return true;
+    }
+    return false;
+  }
+
+  /// Like `pushIfNotVisited`, but requires that \p block has never been on the
+  /// worklist before.
+  void push(SILBasicBlock *block) {
+    assert(!visited.contains(block));
+    visited.insert(block);
+    worklist.push_back(block);
+  }
+
+  /// Like `pop`, but marks the returned block as "unvisited". This means, that
+  /// the block can be pushed onto the worklist again.
+  SILBasicBlock *popAndForget() {
+    if (worklist.empty())
+      return nullptr;
+    SILBasicBlock *block = worklist.pop_back_val();
+    visited.erase(block);
+    return block;
+  }
+
+  /// Returns true if \p block was visited, i.e. has been added to the worklist.
+  bool isVisited(SILBasicBlock *block) const { return visited.contains(block); }
 };
 
 } // namespace swift

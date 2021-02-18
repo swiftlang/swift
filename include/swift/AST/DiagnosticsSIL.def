@@ -279,6 +279,9 @@ WARNING(switch_on_a_constant,none,
 NOTE(unreachable_code_note,none, "will never be executed", ())
 WARNING(warn_infinite_recursive_call,none,
         "function call causes an infinite recursion", ())
+WARNING(warn_dead_weak_store,none,
+        "weak reference will always be nil because the referenced object is "
+        "deallocated here", ())
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,

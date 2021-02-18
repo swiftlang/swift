@@ -38,5 +38,6 @@ LANGUAGE_FEATURE(StaticAssert, 0, "#assert", langOpts.EnableExperimentalStaticAs
 LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
 LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
 LANGUAGE_FEATURE(Actors, 0, "actors", langOpts.EnableExperimentalConcurrency)
+LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions", true)
 
 #undef LANGUAGE_FEATURE

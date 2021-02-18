@@ -37,6 +37,7 @@
 #include "ProtocolInfo.h"
 #include "Signature.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/IR/Function.h"
@@ -153,8 +154,11 @@ void IRGenThunk::prepareArguments() {
     }
 
     if (origTy->hasErrorResult()) {
-      Address addr = asyncLayout->getErrorLayout().project(
-          IGF, context, llvm::None);
+      auto errorLayout = asyncLayout->getErrorLayout();
+      Address pointerToAddress =
+          errorLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto load = IGF.Builder.CreateLoad(pointerToAddress);
+      auto addr = Address(load, IGF.IGM.getPointerAlignment());
       IGF.setCallerErrorResultSlot(addr.getAddress());
     }
 
@@ -282,6 +286,9 @@ Callee IRGenThunk::lookupMethod() {
 }
 
 void IRGenThunk::emit() {
+  PrettyStackTraceDecl stackTraceRAII("emitting dispatch thunk for",
+                                      declRef.getDecl());
+
   GenericContextScope scope(IGF.IGM, origTy->getInvocationGenericSignature());
 
   if (isAsync) {
@@ -334,7 +341,8 @@ void IRGenThunk::emit() {
 
   if (isAsync && origTy->hasErrorResult()) {
     SILType errorType = conv.getSILErrorType(expansionContext);
-    Address calleeErrorSlot = emission->getCalleeErrorSlot(errorType);
+    Address calleeErrorSlot = emission->getCalleeErrorSlot(
+        errorType, /*isCalleeAsync=*/origTy->isAsync());
     errorValue = IGF.Builder.CreateLoad(calleeErrorSlot);
   }
 
@@ -345,7 +353,7 @@ void IRGenThunk::emit() {
   }
 
   if (isAsync) {
-    emitAsyncReturn(IGF, *asyncLayout, origTy);
+    emitAsyncReturn(IGF, *asyncLayout, origTy, result);
     IGF.emitCoroutineOrAsyncExit();
     return;
   }

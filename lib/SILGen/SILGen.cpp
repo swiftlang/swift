@@ -2123,20 +2123,6 @@ static void transferSpecializeAttributeTargets(SILGenModule &SGM, SILModule &M,
 }
 
 void SILGenModule::visitImportDecl(ImportDecl *import) {
-  // Importing `@_specializet(targetFunction: otherFunc)` only supported in
-  // experimental pre-specialization mode.
-  if (!getASTContext().LangOpts.EnableExperimentalPrespecialization)
-    return;
-
-  // TODO: this horrible full AST deserializing walk should be replaced by a
-  // 'single place' to lookup those declarations in the module
-  // E.g
-  // prespecializations {
-  //    extension Array {
-  //       @_specialize(exported: true, targetFunction: other(_:), T == Int)
-  //       func prespecialzie_other() {}
-  //    }
-  // }
   auto *module = import->getModule();
   if (module->isNonSwiftModule())
     return;
