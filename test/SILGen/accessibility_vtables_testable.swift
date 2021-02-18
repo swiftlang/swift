@@ -20,7 +20,7 @@
 import accessibility_vtables_testable_helper
 
 public class Derived : Middle {
-	open override func method() {}
+  open override func method() {}
 }
 
 // LIBRARY-LABEL: sil_vtable {{(\[serialized\] )?}}Base {
