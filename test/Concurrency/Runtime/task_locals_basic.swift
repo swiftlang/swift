@@ -79,6 +79,20 @@ func simple_deinit() async {
   try! await printTaskLocal(\.clazz) // CHECK: ClazzKey: nil {{.*}}
 }
 
+struct Boom: Error {
+  let value: String
+}
+func simple_throw() async {
+  do {
+    try await Task.withLocal(\.clazz, boundTo: ClassTaskLocal()) {
+      throw Boom(value: "oh no!")
+    }
+  } catch {
+    //CHECK: error: Boom(value: "oh no!")
+    print("error: \(error)")
+  }
+}
+
 func nested() async {
   try! await printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "hello") {
@@ -132,13 +146,13 @@ func withLocal_body_mustNotEscape() async {
   await Task.withLocal(\.string, boundTo: "xxx") {
     something = "very nice"
   }
-
 }
 
 @main struct Main {
   static func main() async {
     await simple()
     await simple_deinit()
+    await simple_throw()
     await nested()
     await nested_allContribute()
     await nested_3_onlyTopContributes()

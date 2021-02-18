@@ -102,7 +102,7 @@ extension Task {
     _taskLocalValuePush(task, keyType: Key.self, value: value)
     defer { _taskLocalValuePop(task) }
 
-    return try await body()
+    return try await operation()
   }
 
 }
