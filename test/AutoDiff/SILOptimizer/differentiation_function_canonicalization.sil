@@ -24,9 +24,9 @@ bb0:
 // CHECK-LABEL: sil @test_function_ref
 // CHECK:   [[ORIG_FN_REF:%.*]] = function_ref @basic : $@convention(thin) (Float) -> Float
 // CHECK:   [[ORIG_FN:%.*]] = thin_to_thick_function [[ORIG_FN_REF]]
-// CHECK:   [[JVP_FN_REF:%.*]] = differentiability_witness_function [jvp] [parameters 0] [results 0] @basic
+// CHECK:   [[JVP_FN_REF:%.*]] = differentiability_witness_function [jvp] [reverse] [parameters 0] [results 0] @basic
 // CHECK:   [[JVP_FN:%.*]] = thin_to_thick_function [[JVP_FN_REF]]
-// CHECK:   [[VJP_FN_REF:%.*]] = differentiability_witness_function [vjp] [parameters 0] [results 0] @basic
+// CHECK:   [[VJP_FN_REF:%.*]] = differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] @basic
 // CHECK:   [[VJP_FN:%.*]] = thin_to_thick_function [[VJP_FN_REF]]
 // CHECK:   differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : $@callee_guaranteed (Float) -> Float with_derivative {[[JVP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), [[VJP_FN]] : $@callee_guaranteed (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
 // CHECK: }

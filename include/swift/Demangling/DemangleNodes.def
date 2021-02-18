@@ -312,6 +312,8 @@ CONTEXT_NODE(AutoDiffFunction)
 NODE(AutoDiffFunctionKind)
 NODE(AutoDiffSelfReorderingReabstractionThunk)
 NODE(AutoDiffSubsetParametersThunk)
+NODE(AutoDiffDerivativeVTableThunk)
+NODE(DifferentiabilityWitness)
 NODE(IndexSubset)
 
 #undef CONTEXT_NODE

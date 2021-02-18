@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclContext.h"
@@ -3122,24 +3123,9 @@ public:
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
 };
 
-/// This is a conversion from an expression of UnresolvedType to an arbitrary
-/// other type, and from an arbitrary type to UnresolvedType.  This node does
-/// not appear in valid code, only in code involving diagnostics.
-class UnresolvedTypeConversionExpr : public ImplicitConversionExpr {
-public:
-  UnresolvedTypeConversionExpr(Expr *subExpr, Type type)
-  : ImplicitConversionExpr(ExprKind::UnresolvedTypeConversion, subExpr, type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnresolvedTypeConversion;
-  }
-};
-
 /// FunctionConversionExpr - Convert a function to another function type,
 /// which might involve renaming the parameters or handling substitutions
 /// of subtypes (in the return) or supertypes (in the input).
-///
-/// FIXME: This should be a CapturingExpr.
 class FunctionConversionExpr : public ImplicitConversionExpr {
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
@@ -3786,6 +3772,9 @@ public:
   };
 
 private:
+  /// The attributes attached to the closure.
+  DeclAttributes Attributes;
+
   /// The range of the brackets of the capture list, if present.
   SourceRange BracketRange;
     
@@ -3818,13 +3807,14 @@ private:
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
 public:
-  ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
+  ClosureExpr(const DeclAttributes &attributes,
+              SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
               SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      BracketRange(bracketRange),
+      Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
       InLoc(inLoc),
@@ -3844,6 +3834,9 @@ public:
     Body.setPointer(S);
     Body.setInt(isSingleExpression);
   }
+
+  DeclAttributes &getAttrs() { return Attributes; }
+  const DeclAttributes &getAttrs() const { return Attributes; }
 
   /// Determine whether the parameters of this closure are actually
   /// anonymous closure variables.

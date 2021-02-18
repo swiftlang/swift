@@ -14,8 +14,8 @@ final actor MyActor {
 // CHECK-LABEL: define{{.*}} void @test_simple(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
 // CHECK: [[TASK_LOC:%[0-9]+]] = alloca %swift.task*
 // CHECK: [[CTX:%[0-9]+]] = bitcast %swift.context* %2
-// CHECK-32: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, %swift.error*, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 5
-// CHECK-64: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, [4 x i8], %swift.error*, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 6
+// CHECK-32: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, %swift.error**, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 5
+// CHECK-64: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.task*, %swift.executor*, %swift.context*)*, %swift.executor*, i32, [4 x i8], %swift.error**, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 6
 // CHECK: [[ACTOR:%[0-9]+]] = load %T4test7MyActorC*, %T4test7MyActorC** [[ACTOR_ADDR]]
 // CHECK: [[RESUME:%[0-9]+]] = call i8* @llvm.coro.async.resume()
 // CHECK: [[TASK:%[0-9]+]] = load %swift.task*, %swift.task** [[TASK_LOC]]
@@ -26,8 +26,8 @@ final actor MyActor {
 // CHECK-arm64e: [[SIGNED_INT:%[0-9]+]]      = call i64 @llvm.ptrauth.sign.i64(i64 [[RESUME_INT]], i32 0, i64 [[PTRAUTH_BLEND]])
 // CHECK-arm64e: [[SIGNED_RESUME:%[0-9]+]]   = inttoptr i64 [[SIGNED_INT]] to i8*
 // CHECK: [[CAST_ACTOR:%[0-9]+]] = bitcast %T4test7MyActorC* [[ACTOR]] to %swift.executor*
-// CHECK-x86_64: call {{.*}} @llvm.coro.suspend.async(i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.task*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.task* [[TASK]], %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}})
-// CHECK-arm64e: call {{.*}} @llvm.coro.suspend.async(i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.task*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[SIGNED_RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.task* [[TASK]], %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}})
+// CHECK-x86_64: call {{.*}} @llvm.coro.suspend.async{{.*}}(i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.task*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.task* [[TASK]], %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}})
+// CHECK-arm64e: call {{.*}} @llvm.coro.suspend.async{{.*}}(i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.task*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[SIGNED_RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.task* [[TASK]], %swift.executor* {{%[0-9]+}}, %swift.context* {{%[0-9]+}})
 sil @test_simple : $@convention(method) @async (@guaranteed MyActor) -> () {
 bb0(%0 : $MyActor):
   hop_to_executor %0 : $MyActor

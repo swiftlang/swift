@@ -3,14 +3,14 @@
 // RUN: %empty-directory(%t)
 
 /// Compile the SPI lib
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface -enable-library-evolution -swift-version 5 -parse-as-library
+// RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface -enable-library-evolution -swift-version 5 -parse-as-library
 
 /// Reading from swiftmodule
-// RUN: %target-typecheck-verify-swift -enable-experimental-prespecialization -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
 
 /// Reading from .private.swiftinterface
 // RUN: rm %t/SPIHelper.swiftmodule
-// RUN: %target-typecheck-verify-swift -enable-experimental-prespecialization -I %t -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
 
 /// Reading from .swiftinterface should still produce the same failures
 // RUN: rm %t/SPIHelper.private.swiftinterface

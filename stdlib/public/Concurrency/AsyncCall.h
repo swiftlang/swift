@@ -63,12 +63,12 @@ struct AsyncFrameLayout;
 
 template <class... ArgTys, bool HasErrorResult>
 struct AsyncFrameLayout<AsyncSignature<void(ArgTys...), HasErrorResult>> {
-  using BasicLayout = BasicLayout<0, SwiftError*, ArgTys...>;
+  using BasicLayout = BasicLayout<0, SwiftError **, ArgTys...>;
   static constexpr size_t firstArgIndex = 1;
 };
 template <class ResultTy, class... ArgTys, bool HasErrorResult>
 struct AsyncFrameLayout<AsyncSignature<ResultTy(ArgTys...), HasErrorResult>> {
-  using BasicLayout = BasicLayout<0, SwiftError*, ResultTy, ArgTys...>;
+  using BasicLayout = BasicLayout<0, SwiftError **, ResultTy, ArgTys...>;
   static constexpr size_t firstArgIndex = 2;
 };
 

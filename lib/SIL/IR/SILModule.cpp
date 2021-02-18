@@ -320,6 +320,7 @@ SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
 void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
   auto Conf = Wt->getConformance();
   assert(lookUpWitnessTable(Conf, false) == Wt);
+  getSILLoader()->invalidateWitnessTable(Wt);
   WitnessTableMap.erase(Conf);
   witnessTables.erase(Wt);
 }
@@ -474,7 +475,7 @@ bool SILModule::hasFunction(StringRef Name) {
 }
 
 void SILModule::invalidateSILLoaderCaches() {
-  getSILLoader()->invalidateCaches();
+  getSILLoader()->invalidateAllCaches();
 }
 
 SILFunction *SILModule::removeFromZombieList(StringRef Name) {
@@ -526,9 +527,10 @@ void SILModule::invalidateFunctionInSILCache(SILFunction *F) {
 }
 
 /// Erase a global SIL variable from the module.
-void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
-  GlobalVariableMap.erase(G->getName());
-  getSILGlobalList().erase(G);
+void SILModule::eraseGlobalVariable(SILGlobalVariable *gv) {
+  getSILLoader()->invalidateGlobalVariable(gv);
+  GlobalVariableMap.erase(gv->getName());
+  getSILGlobalList().erase(gv);
 }
 
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
@@ -669,7 +671,8 @@ SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
   Mangle::ASTMangler mangler;
   return lookUpDifferentiabilityWitness(
-      mangler.mangleSILDifferentiabilityWitnessKey(key));
+      mangler.mangleSILDifferentiabilityWitness(
+          key.originalFunctionName, key.kind, key.config));
 }
 
 /// Look up the differentiability witness corresponding to the given indices.

@@ -94,6 +94,22 @@ static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
   llvm_unreachable("bad cast consumption kind");
 }
 
+static unsigned
+toStableDifferentiabilityKind(swift::DifferentiabilityKind kind) {
+  switch (kind) {
+  case swift::DifferentiabilityKind::NonDifferentiable:
+    return (unsigned)serialization::DifferentiabilityKind::NonDifferentiable;
+  case swift::DifferentiabilityKind::Forward:
+    return (unsigned)serialization::DifferentiabilityKind::Forward;
+  case swift::DifferentiabilityKind::Reverse:
+    return (unsigned)serialization::DifferentiabilityKind::Reverse;
+  case swift::DifferentiabilityKind::Normal:
+    return (unsigned)serialization::DifferentiabilityKind::Normal;
+  case swift::DifferentiabilityKind::Linear:
+    return (unsigned)serialization::DifferentiabilityKind::Linear;
+  }
+}
+
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
@@ -2320,8 +2336,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *witness = dwfi->getWitness();
     DifferentiabilityWitnessesToEmit.insert(witness);
     Mangle::ASTMangler mangler;
-    auto mangledKey =
-        mangler.mangleSILDifferentiabilityWitnessKey(witness->getKey());
+    auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+        witness->getOriginalFunction()->getName(), witness->getKind(),
+        witness->getConfig());
     auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
     // We only store the type when the instruction has an explicit type.
     bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
@@ -2632,7 +2649,8 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
 void SILSerializer::writeSILDifferentiabilityWitness(
     const SILDifferentiabilityWitness &dw) {
   Mangle::ASTMangler mangler;
-  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(dw.getKey());
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+      dw.getOriginalFunction()->getName(), dw.getKind(), dw.getConfig());
   size_t nameLength = mangledKey.size();
   char *stringStorage =
       static_cast<char *>(StringTable.Allocate(nameLength, 1));
@@ -2670,6 +2688,7 @@ void SILSerializer::writeSILDifferentiabilityWitness(
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
       addSILFunctionRef(original), toStableSILLinkage(dw.getLinkage()),
       dw.isDeclaration(), dw.isSerialized(),
+      toStableDifferentiabilityKind(dw.getKind()),
       S.addGenericSignatureRef(dw.getDerivativeGenericSignature()), jvpID,
       vjpID, dw.getParameterIndices()->getNumIndices(),
       dw.getResultIndices()->getNumIndices(), parameterAndResultIndices);

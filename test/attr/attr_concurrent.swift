@@ -118,3 +118,10 @@ func testCaseNonTrivialValue() {
 
   j = 17
 }
+
+func testExplicitConcurrentClosure() {
+  let fn = { @concurrent in
+    17
+  }
+  let _: String = fn // expected-error{{cannot convert value of type '@concurrent () -> Int' to specified type 'String'}}
+}

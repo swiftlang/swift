@@ -688,6 +688,9 @@ public:
   /// Skip over SIL decls until we encounter the start of a Swift decl or eof.
   void skipSILUntilSwiftDecl();
 
+  /// Skip over any attribute.
+  void skipAnyAttribute();
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -1342,6 +1345,7 @@ public:
                                       ParameterList *&bodyParams,
                                       DefaultArgumentInfo &defaultArgs,
                                       SourceLoc &asyncLoc,
+                                      bool &reasync,
                                       SourceLoc &throws,
                                       bool &rethrows,
                                       TypeRepr *&retType);
@@ -1353,11 +1357,14 @@ public:
   /// one. Parsing 'async' or 'throws' after the `->` is an error we
   /// correct for.
   ///
+  /// \param reasync If non-NULL, will also parse the 'reasync' keyword in
+  /// lieu of 'async'.
+  ///
   /// \param rethrows If non-NULL, will also parse the 'rethrows' keyword in
   /// lieu of 'throws'.
   ParserStatus parseEffectsSpecifiers(SourceLoc existingArrowLoc,
-                                      SourceLoc &asyncLoc, SourceLoc &throwsLoc,
-                                      bool *rethrows);
+                                      SourceLoc &asyncLoc, bool *reasync,
+                                      SourceLoc &throwsLoc, bool *rethrows);
 
   /// Returns 'true' if \p T is considered effects specifier.
   bool isEffectsSpecifier(const Token &T);
@@ -1571,6 +1578,7 @@ public:
   /// \returns ParserStatus error if an error occurred. Success if no signature
   /// is present or succssfully parsed.
   ParserStatus parseClosureSignatureIfPresent(
+          DeclAttributes &attributes,
           SourceRange &bracketRange,
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,

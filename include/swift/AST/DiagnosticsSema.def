@@ -225,13 +225,6 @@ ERROR(cannot_apply_lvalue_binop_to_subelement,none,
 ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
-ERROR(cannot_subscript_base,none,
-      "cannot subscript a value of type %0",
-      (Type))
-
-ERROR(cannot_subscript_ambiguous_base,none,
-      "cannot subscript a value of incorrect or ambiguous type", ())
-
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
 ERROR(conditional_cast_from_nil,none,
@@ -282,6 +275,10 @@ FIXIT(insert_closure_return_type_placeholder,
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
+
+ERROR(unsupported_closure_attr,none,
+      "%select{attribute |}0 '%1' is not supported on a closure",
+      (bool, StringRef))
 
 NOTE(suggest_expected_match,none,
      "%select{expected an argument list|produces result}0 of type '%1'",
@@ -778,6 +775,13 @@ NOTE(serialization_compatibility_version_mismatch,none,
      "compiling as Swift %0, with '%1' built as Swift %2 "
      "(this is supported but may expose additional compiler issues)",
      (StringRef, StringRef, StringRef))
+
+ERROR(serialization_allowing_invalid_decl,none,
+      "allowing deserialization of invalid declaration %0 from module '%1'",
+      (DeclName, StringRef))
+ERROR(serialization_invalid_decl,Fatal,
+      "invalid declaration %0 read from module '%1'; "
+      SWIFT_BUG_REPORT_MESSAGE, ())
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -2994,8 +2998,10 @@ ERROR(override_rethrows_with_non_rethrows,none,
       "be 'rethrows'", (bool))
 ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
-ERROR(rethrows_attr_on_non_protocol,none,
-      "@rethrows may only be used on 'protocol' declarations", ())
+
+ERROR(override_reasync_with_non_reasync,none,
+      "override of 'reasync' %select{method|initializer}0 should also "
+      "be 'reasync'", (bool))
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",

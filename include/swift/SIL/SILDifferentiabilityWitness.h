@@ -47,6 +47,8 @@ private:
   SILLinkage Linkage;
   /// The original function.
   SILFunction *OriginalFunction;
+  /// The differentiability kind.
+  DifferentiabilityKind Kind;
   /// The derivative configuration: parameter indices, result indices, and
   /// derivative generic signature (optional). The derivative generic signature
   /// may contain same-type requirements such that all generic parameters are
@@ -69,27 +71,32 @@ private:
 
   SILDifferentiabilityWitness(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-      bool isDeclaration, bool isSerialized, const DeclAttribute *attribute)
+      DifferentiabilityKind kind, IndexSubset *parameterIndices,
+      IndexSubset *resultIndices, GenericSignature derivativeGenSig,
+      SILFunction *jvp, SILFunction *vjp, bool isDeclaration, bool isSerialized,
+      const DeclAttribute *attribute)
       : Module(module), Linkage(linkage), OriginalFunction(originalFunction),
+        Kind(kind),
         Config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
         JVP(jvp), VJP(vjp), IsDeclaration(isDeclaration),
-        IsSerialized(isSerialized), Attribute(attribute) {}
+        IsSerialized(isSerialized), Attribute(attribute) {
+    assert(kind != DifferentiabilityKind::NonDifferentiable);
+  }
 
 public:
   static SILDifferentiabilityWitness *
   createDeclaration(SILModule &module, SILLinkage linkage,
-                    SILFunction *originalFunction,
+                    SILFunction *originalFunction, DifferentiabilityKind kind,
                     IndexSubset *parameterIndices, IndexSubset *resultIndices,
                     GenericSignature derivativeGenSig,
                     const DeclAttribute *attribute = nullptr);
 
   static SILDifferentiabilityWitness *createDefinition(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-      IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-      bool isSerialized, const DeclAttribute *attribute = nullptr);
+      DifferentiabilityKind kind, IndexSubset *parameterIndices,
+      IndexSubset *resultIndices, GenericSignature derivativeGenSig,
+      SILFunction *jvp, SILFunction *vjp, bool isSerialized,
+      const DeclAttribute *attribute = nullptr);
 
   void convertToDefinition(SILFunction *jvp, SILFunction *vjp,
                            bool isSerialized);
@@ -98,6 +105,7 @@ public:
   SILModule &getModule() const { return Module; }
   SILLinkage getLinkage() const { return Linkage; }
   SILFunction *getOriginalFunction() const { return OriginalFunction; }
+  DifferentiabilityKind getKind() const { return Kind; }
   const AutoDiffConfig &getConfig() const { return Config; }
   IndexSubset *getParameterIndices() const { return Config.parameterIndices; }
   IndexSubset *getResultIndices() const { return Config.resultIndices; }

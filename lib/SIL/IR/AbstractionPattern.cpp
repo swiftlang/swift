@@ -608,7 +608,15 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
     auto callbackParamTy = getObjCMethod()->parameters()[paramIndex]
                                           ->getType().getTypePtr();
     
-    return AbstractionPattern(swiftCompletionHandlerType, callbackParamTy);
+    CanGenericSignature patternSig;
+    if (auto origSig = getGenericSignature()) {
+      patternSig = origSig;
+    } else if (auto genFnTy = dyn_cast<GenericFunctionType>(getType())) {
+      patternSig = genFnTy->getGenericSignature()->getCanonicalSignature();
+    }
+    
+    return AbstractionPattern(patternSig,
+                              swiftCompletionHandlerType, callbackParamTy);
   }
   case Kind::Opaque:
   case Kind::OpaqueFunction:

@@ -196,6 +196,13 @@ if(SWIFT_PROFDATA_FILE AND EXISTS ${SWIFT_PROFDATA_FILE})
   add_definitions("-fprofile-instr-use=${SWIFT_PROFDATA_FILE}")
 endif()
 
+option(USE_SWIFT_ASYNC_LOWERING
+       "Indicates if Swiftc should use async-specific lowering for async
+        functions if it is supported for the target. The runtime also checks
+        this setting before using async-specific attributes. This only applies
+        to the async calling convention and not to the async context attribute."
+	FALSE)
+
 #
 # User-configurable Swift Standard Library specific options.
 #

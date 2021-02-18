@@ -392,6 +392,7 @@ extension Task {
   /// - Returns: handle to the task, allowing to `await handle.get()` on the
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
+  @discardableResult
   public static func runDetached<T>(
     priority: Priority = .default,
     startingOn executor: ExecutorRef? = nil,
@@ -447,6 +448,7 @@ extension Task {
   /// - Returns: handle to the task, allowing to `await handle.get()` on the
   ///     tasks result or `cancel` it. If the operation fails the handle will
   ///     throw the error the operation has thrown when awaited on.
+  @discardableResult
   public static func runDetached<T, Failure>(
     priority: Priority = .default,
     startingOn executor: ExecutorRef? = nil,
@@ -474,7 +476,7 @@ extension Task {
 
 public func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @concurrent () async -> ()
-  _ = Task.runDetached(
+  Task.runDetached(
     operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)
   )
 }
@@ -594,7 +596,7 @@ public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 public func _asyncMainDrainQueue() -> Never
 
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
-  let _ = Task.runDetached {
+  Task.runDetached {
     do {
       try await asyncFun()
       exit(0)
@@ -704,7 +706,7 @@ internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) 
   // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other
   // situations.
-  _ = Task.runDetached { await body() }
+  Task.runDetached { await body() }
 }
 
 #endif

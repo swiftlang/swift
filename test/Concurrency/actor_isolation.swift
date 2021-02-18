@@ -295,6 +295,14 @@ extension GenericStruct where T == String {
   }
 }
 
+@SomeGlobalActor
+var number: Int = 42 // expected-note 2 {{mutable state is only available within the actor instance}}
+
+//expected-note@+1{{add '@SomeGlobalActor' to make global function 'badNumberUser()' part of global actor 'SomeGlobalActor'}}
+func badNumberUser() {
+  //expected-error@+1{{var 'number' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  print("The protected number is: \(number)")
+}
 
 // ----------------------------------------------------------------------
 // Non-actor code isolation restrictions
@@ -336,6 +344,9 @@ func testGlobalRestrictions(actor: MyActor) async {
   acceptConcurrentClosure { [i] in
     _ = i
   }
+
+  //expected-error@+1{{var 'number' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  print("\(number)")
 }
 
 func f() {

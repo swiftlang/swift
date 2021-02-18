@@ -181,6 +181,7 @@ public:
   SILFunction *getOrCreateForeignAsyncCompletionHandlerImplFunction(
                                            CanSILFunctionType blockType,
                                            CanType continuationTy,
+                                           CanGenericSignature sig,
                                            ForeignAsyncConvention convention);
 
   /// Determine whether the given class has any instance variables that
@@ -242,9 +243,8 @@ public:
 
   /// Get or create a derivative function vtable entry thunk for the given
   /// SILDeclRef and derivative function type.
-  SILFunction *
-  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
-                                      CanSILFunctionType derivativeFnTy);
+  SILFunction *getOrCreateDerivativeVTableThunk(
+      SILDeclRef derivativeFnRef, CanSILFunctionType derivativeFnTy);
 
   /// Determine whether we need to emit an ivar destroyer for the given class.
   /// An ivar destroyer is needed if a superclass of this class may define a
@@ -421,6 +421,7 @@ public:
   /// functions (null if undefined).
   void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
                                     SILFunction *originalFunction,
+                                    DifferentiabilityKind diffKind,
                                     const AutoDiffConfig &config,
                                     SILFunction *jvp, SILFunction *vjp,
                                     const DeclAttribute *diffAttr);

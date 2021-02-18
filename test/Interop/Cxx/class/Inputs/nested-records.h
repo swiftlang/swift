@@ -51,6 +51,18 @@ struct HasForwardDeclaredNestedType {
   struct ForwardDeclaredType { };
 };
 
+struct HasForwardDeclaredTemplateChild {
+  template <class T> struct ForwardDeclaredClassTemplate;
+  
+  struct DeclaresForwardDeclaredClassTemplateFriend {
+    template <class T>
+    friend struct HasForwardDeclaredTemplateChild::ForwardDeclaredClassTemplate;
+  };
+  
+  template <class T> struct ForwardDeclaredClassTemplate { };
+};
+
+
 // TODO: Nested class templates (SR-13853).
 
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_NESTED_RECORDS_H

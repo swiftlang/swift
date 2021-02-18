@@ -2358,17 +2358,19 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
+  bool concurrent = expr->getAttrs().hasAttribute<ConcurrentAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws)
       .withAsync(async)
+      .withConcurrent(concurrent)
       .build();
   }
 
   // Scan the body to determine the effects.
   auto body = expr->getBody();
   if (!body)
-    return FunctionType::ExtInfo();
+    return ASTExtInfoBuilder().withConcurrent(concurrent).build();
 
   auto throwFinder = FindInnerThrows(*this, expr);
   body->walk(throwFinder);
@@ -2377,6 +2379,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   auto result = ASTExtInfoBuilder()
     .withThrows(throwFinder.foundThrow())
     .withAsync(asyncFinder.foundAsync())
+    .withConcurrent(concurrent)
     .build();
   closureEffectsCache[expr] = result;
   return result;

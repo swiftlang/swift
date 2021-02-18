@@ -397,11 +397,6 @@ DisableObjCAttrRequiresFoundationModule(
     llvm::cl::cat(Category),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> EnableExperimentalPrespecialization(
-    "enable-experimental-prespecialization",
-    llvm::cl::desc("Enable experimental prespecialization"),
-    llvm::cl::cat(Category), llvm::cl::init(false));
-
 static llvm::cl::opt<bool>
 PrintStats("print-stats",
            llvm::cl::desc("Print statistics"),
@@ -3920,8 +3915,6 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-  InitInvok.getLangOptions().EnableExperimentalPrespecialization =
-      options::EnableExperimentalPrespecialization;
   InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
     options::DebugForbidTypecheckPrefix;
   InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
