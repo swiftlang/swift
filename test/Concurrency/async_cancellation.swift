@@ -26,7 +26,7 @@ func test_cancellation_withCancellationHandler(_ anything: Any) async -> Picture
   let handle: Task.Handle<PictureData, Error> = Task.runDetached {
     let file = SomeFile()
 
-    return try await Task.withCancellationHandler(
+    return await Task.withCancellationHandler(
       handler: { file.close() },
       operation: {
       await test_cancellation_guard_isCancelled(file)
