@@ -97,22 +97,22 @@ public protocol P: Differentiable {
   subscript(_ x: Float) -> Float { get set }
 }
 
-/* FIXME(rdar://73791807): Enable the following tests once we've fixed TBDGen
-   for derivative vtable entry thunks.
 public final class Class: Differentiable {
   var stored: Float
 
   // Test initializer.
-  @differentiable(reverse)
+  // FIXME(rdar://74380324)
+  // @differentiable(reverse)
   public init(_ x: Float) {
     stored = x
   }
 
   // Test delegating initializer.
-  @differentiable(reverse)
-  public convenience init(blah x: Float) {
-    self.init(x)
-  }
+  // FIXME(rdar://74380324)
+  // @differentiable(reverse)
+  // public convenience init(blah x: Float) {
+  //   self.init(x)
+  // }
 
   // Test method.
   public func method(_ x: Float, _ y: Float) -> Float { x }
@@ -149,4 +149,3 @@ public final class Class: Differentiable {
   //   fatalError()
   // }
 }
-*/

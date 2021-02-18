@@ -380,7 +380,8 @@ class LinkEntity {
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
 
-    /// A SIL differentiability witness.
+    /// A SIL differentiability witness. The pointer is a
+    /// SILDifferentiabilityWitness*.
     DifferentiabilityWitness,
 
     // Everything following this is a type kind.

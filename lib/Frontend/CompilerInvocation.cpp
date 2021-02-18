@@ -492,9 +492,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_objc_attr_requires_foundation_module);
   }
 
-  Opts.EnableExperimentalPrespecialization |=
-      Args.hasArg(OPT_enable_experimental_prespecialization);
-
   if (auto A = Args.getLastArg(OPT_enable_testable_attr_requires_testable_module,
                                OPT_disable_testable_attr_requires_testable_module)) {
     Opts.EnableTestableAttrRequiresTestableModule
@@ -1204,11 +1201,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_sil_stop_optzns_before_lowering_ownership);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
-  // If our triple is a darwin triple, lower ownership on the stdlib after we
-  // serialize.
-  if (Triple.isOSDarwin()) {
-    Opts.SerializeStdlibWithOwnershipWithOpts = true;
-  }
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   const Arg *ProfileUse = Args.getLastArg(OPT_profile_use);

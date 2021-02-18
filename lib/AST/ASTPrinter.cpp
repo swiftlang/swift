@@ -3152,7 +3152,10 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   if (AFD->hasAsync()) {
     Printer << " ";
-    Printer.printKeyword("async", Options);
+    if (AFD->getAttrs().hasAttribute<ReasyncAttr>())
+      Printer.printKeyword("reasync", Options);
+    else
+      Printer.printKeyword("async", Options);
   }
 
   if (AFD->hasThrows()) {

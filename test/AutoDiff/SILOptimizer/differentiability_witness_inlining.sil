@@ -6,17 +6,17 @@ import _Differentiation
 import Swift
 import Builtin
 
-sil_differentiability_witness [parameters 0] [results 0] @witness_defined_in_module : $@convention(thin) (Float) -> Float {
+sil_differentiability_witness [reverse] [parameters 0] [results 0] @witness_defined_in_module : $@convention(thin) (Float) -> Float {
   jvp: @witness_defined_in_module_jvp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
   vjp: @witness_defined_in_module_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 }
 
-sil_differentiability_witness [parameters 0] [results 0] @witness_definition_not_available : $@convention(thin) (Float) -> Float
+sil_differentiability_witness [reverse] [parameters 0] [results 0] @witness_definition_not_available : $@convention(thin) (Float) -> Float
 
 // This is an example of a witness that is available (via deserialization)
 // even though it is not defined in the current module.
 // witness for static Swift.Float.+ infix(Swift.Float, Swift.Float) -> Swift.Float
-sil_differentiability_witness [parameters 0 1] [results 0] @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+sil_differentiability_witness [reverse] [parameters 0 1] [results 0] @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 
 sil @witness_defined_in_module : $@convention(thin) (Float) -> Float
 
@@ -30,13 +30,13 @@ sil public_external [transparent] [serialized] @$sSf1poiyS2f_SftFZ : $@conventio
 
 sil @test : $@convention(thin) (Float) -> () {
 bb0(%0 : $Float):
-  %1 = differentiability_witness_function [vjp] [parameters 0] [results 0] @witness_defined_in_module : $@convention(thin) (Float) -> Float
+  %1 = differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] @witness_defined_in_module : $@convention(thin) (Float) -> Float
   // CHECK: function_ref @witness_defined_in_module_vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 
-  %2 = differentiability_witness_function [vjp] [parameters 0] [results 0] @witness_definition_not_available : $@convention(thin) (Float) -> Float
-  // CHECK: differentiability_witness_function [vjp] [parameters 0] [results 0] @witness_definition_not_available : $@convention(thin) (Float) -> Float
+  %2 = differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] @witness_definition_not_available : $@convention(thin) (Float) -> Float
+  // CHECK: differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] @witness_definition_not_available : $@convention(thin) (Float) -> Float
 
-  %3 = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
+  %3 = differentiability_witness_function [vjp] [reverse] [parameters 0 1] [results 0] @$sSf1poiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
   // CHECK: function_ref @$sSf1poiyS2f_SftFZTJrSSUpSr : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float))
 
   return undef : $()

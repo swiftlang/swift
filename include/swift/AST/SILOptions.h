@@ -154,9 +154,8 @@ public:
   bool VerifyExclusivity = false;
 
   /// When building the stdlib with opts should we lower ownership after
-  /// serialization? Otherwise we do before. Only set to true on Darwin for now.
-  ///
-  bool SerializeStdlibWithOwnershipWithOpts = false;
+  /// serialization? Otherwise we do before.
+  bool SerializeStdlibWithOwnershipWithOpts = true;
 
   /// Calls to the replaced method inside of the replacement method will call
   /// the previous implementation.

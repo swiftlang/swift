@@ -401,14 +401,14 @@ bb1(%5 : $Builtin.RawPointer):
   %9 = integer_literal $Builtin.Word, 1
   %10 = index_addr %6 : $*AnyObject, %9 : $Builtin.Word
   %11 = address_to_pointer %10 : $*AnyObject to $Builtin.RawPointer
-  cond_br undef, bb2, bb3(%11 : $Builtin.RawPointer)
+  cond_br undef, bb2, bb3
 
 bb2:
   br bb1(%11 : $Builtin.RawPointer)
 
-bb3(%14 : $Builtin.RawPointer):
+bb3:
   destroy_value %3 : $AnyObject
-  %15 = struct $UnsafeMutablePointer<AnyObject> (%14 : $Builtin.RawPointer)
+  %15 = struct $UnsafeMutablePointer<AnyObject> (%11 : $Builtin.RawPointer)
   return %15 : $UnsafeMutablePointer<AnyObject>
 }
 

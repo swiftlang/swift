@@ -64,6 +64,16 @@ func testSlowServer(slowServer: SlowServer) async throws {
   let _: NSObject = try await slowServer.someObject()
 }
 
+func testGeneric<T: AnyObject>(x: GenericObject<T>) async throws {
+  let _: T? = try await x.doSomething()
+  let _: GenericObject<T>? = await x.doAnotherThing()
+}
+
+func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
+  let _: T? = try await x.doSomething()
+  let _: GenericObject<T>? = await x.doAnotherThing()
+}
+
 // CHECK: sil{{.*}}@[[INT_COMPLETION_BLOCK]]
 // CHECK:   [[CONT_ADDR:%.*]] = project_block_storage %0
 // CHECK:   [[CONT:%.*]] = load [trivial] [[CONT_ADDR]]

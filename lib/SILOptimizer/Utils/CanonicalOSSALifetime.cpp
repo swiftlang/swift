@@ -408,22 +408,8 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         recordConsumingUse(use);
         break;
       case OperandOwnership::Borrow:
-        // A nested borrow scope is considered a use-point at each scope ending
-        // instruction.
-        //
-        // TODO: Handle reborrowed copies by considering the extended borrow
-        // scope. Temporarily bail-out on reborrows because we can't handle uses
-        // that aren't dominated by currentDef.
-        if (!BorrowingOperand(use).visitScopeEndingUses(
-              [this](Operand *end) {
-                if (end->getOperandOwnership() == OperandOwnership::Reborrow) {
-                  return false;
-                }
-                liveness.updateForUse(end->getUser(), /*lifetimeEnding*/ false);
-                return true;
-              })) {
+        if (!liveness.updateForBorrowingOperand(use))
           return false;
-        }
         break;
       case OperandOwnership::InteriorPointer:
       case OperandOwnership::ForwardingBorrow:

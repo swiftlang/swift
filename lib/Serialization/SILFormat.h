@@ -259,16 +259,17 @@ namespace sil_block {
 
   using DifferentiabilityWitnessLayout = BCRecordLayout<
     SIL_DIFFERENTIABILITY_WITNESS,
-    DeclIDField,             // Original function name
-    SILLinkageField,         // Linkage
-    BCFixed<1>,              // Is declaration?
-    BCFixed<1>,              // Is serialized?
-    GenericSignatureIDField, // Derivative function generic signature
-    DeclIDField,             // JVP function name
-    DeclIDField,             // VJP function name
-    BCVBR<8>,                // Number of parameter indices
-    BCVBR<8>,                // Number of result indices
-    BCArray<ValueIDField>    // Parameter and result indices
+    DeclIDField,                // Original function name
+    SILLinkageField,            // Linkage
+    BCFixed<1>,                 // Is declaration?
+    BCFixed<1>,                 // Is serialized?
+    DifferentiabilityKindField, // Differentiability kind
+    GenericSignatureIDField,    // Derivative function generic signature
+    DeclIDField,                // JVP function name
+    DeclIDField,                // VJP function name
+    BCVBR<8>,                   // Number of parameter indices
+    BCVBR<8>,                   // Number of result indices
+    BCArray<ValueIDField>       // Parameter and result indices
   >;
 
   using SILFunctionLayout =

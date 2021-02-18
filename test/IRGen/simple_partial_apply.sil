@@ -23,10 +23,11 @@ entry(%body : $@convention(method) (Int, @guaranteed C) -> Int, %context : $C):
   return %closure : $@callee_guaranteed (Int) -> Int
 }
 
+// Can't reuse the method because it does not have swiftself.
+
 // CHECK-LABEL: define {{.*}} @escape_partial_apply_swift_single_refcount_struct
-// CHECK-arm64e:  call i64 @llvm.ptrauth.resign.i64
-// CHECK:      [[FPTR:%.*]] = insertvalue { i8*, %swift.refcounted* } undef, i8* {{.*}}, 0
-// CHECK-NEXT: [[FCTX:%.*]] = insertvalue { i8*, %swift.refcounted* } [[FPTR]], %swift.refcounted* {{.*}}, 1
+// CHECK: [[CTXT:%.*]] = call {{.*}} @swift_allocObject
+// CHECK: [[FCTX:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (i{{(64|32)}} (i{{(64|32)}}, %swift.refcounted*)* @"$sTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CTXT]], 1
 // CHECK-NEXT: ret { i8*, %swift.refcounted* } [[FCTX]]
 sil @escape_partial_apply_swift_single_refcount_struct : $@convention(thin) (@convention(method) (Int, @guaranteed SingleRefcounted) -> Int, @guaranteed SingleRefcounted) -> @callee_guaranteed (Int) -> Int {
 entry(%body : $@convention(method) (Int, @guaranteed SingleRefcounted) -> Int, %context : $SingleRefcounted):
@@ -47,11 +48,9 @@ entry(%body : $@convention(method) (Int, @in_guaranteed C) -> Int, %context : $*
   return undef : $()
 }
 
+// Can't reuse the method because it does not have swiftself.
 // CHECK-LABEL: define {{.*}} @noescape_partial_apply_swift_direct_word
-// CHECK-arm64e:  call i64 @llvm.ptrauth.resign.i64
-// CHECK:         [[CTX:%.*]] = inttoptr i{{.*}} %1 to %swift.opaque*
-// CHECK-NEXT:    [[CONT:%.*]] = bitcast i8* %2
-// CHECK-NEXT:    call {{.*}}void [[CONT]](i8* {{.*}}, %swift.opaque* [[CTX]], %swift.refcounted* {{.*}}%3)
+// CHECK: call swiftcc void %11(i8* bitcast (i{{(64|32)}} (i{{(64|32)}}, %swift.refcounted*)* @"$sTA.1" to i8*), %swift.opaque* {{.*}}, %swift.refcounted* swiftself {{.*}})
 sil @noescape_partial_apply_swift_direct_word : $@convention(thin) (@convention(method) (Int, Int) -> Int, Int, @guaranteed @callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()) -> () {
 entry(%body : $@convention(method) (Int, Int) -> Int, %context : $Int, %cont : $@callee_guaranteed (@noescape @callee_guaranteed (Int) -> Int) -> ()):
   %closure = partial_apply [callee_guaranteed] [on_stack] %body(%context) : $@convention(method) (Int, Int) -> Int

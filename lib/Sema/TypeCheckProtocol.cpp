@@ -563,13 +563,15 @@ swift::matchWitness(
     // else the witness can be by conformance, throwing or non throwing
     if (reqAttrs.hasAttribute<RethrowsAttr>() &&
         !witnessAttrs.hasAttribute<RethrowsAttr>()) {
-      auto reqRethrowingKind = funcReq->getRethrowingKind();
-      auto witnessRethrowingKind = funcWitness->getRethrowingKind();
-      if (reqRethrowingKind == FunctionRethrowingKind::ByConformance) {
+      auto reqRethrowingKind =
+          funcReq->getPolymorphicEffectKind(EffectKind::Throws);
+      auto witnessRethrowingKind =
+          funcWitness->getPolymorphicEffectKind(EffectKind::Throws);
+      if (reqRethrowingKind == PolymorphicEffectKind::ByConformance) {
         switch (witnessRethrowingKind) {
-        case FunctionRethrowingKind::ByConformance:
-        case FunctionRethrowingKind::Throws:
-        case FunctionRethrowingKind::None:
+        case PolymorphicEffectKind::ByConformance:
+        case PolymorphicEffectKind::Always:
+        case PolymorphicEffectKind::None:
           break;
         default:
           return RequirementMatch(witness, MatchKind::RethrowsConflict);

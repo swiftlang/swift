@@ -648,16 +648,15 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
     if (isa<DebugValueInst>(user) || isa<SuperMethodInst>(user) ||
         isa<ClassMethodInst>(user) || isa<CopyValueInst>(user) ||
         isa<EndBorrowInst>(user) || isa<ApplyInst>(user) ||
-        isa<StoreBorrowInst>(user) || isa<StoreInst>(user) ||
-        isa<PartialApplyInst>(user) || isa<UnmanagedRetainValueInst>(user) ||
+        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<UnmanagedRetainValueInst>(user) ||
         isa<UnmanagedReleaseValueInst>(user) ||
         isa<UnmanagedAutoreleaseValueInst>(user)) {
       continue;
     }
 
     // These are interior pointers that have not had support yet added for them.
-    if (isa<OpenExistentialBoxInst>(user) ||
-        isa<ProjectExistentialBoxInst>(user)) {
+    if (isa<ProjectExistentialBoxInst>(user)) {
       continue;
     }
 
@@ -708,13 +707,12 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
     // and do not need to check transitive uses of.
     if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
         isIncidentalUse(user) || isa<StoreInst>(user) ||
-        isa<StoreBorrowInst>(user) || isa<PartialApplyInst>(user) ||
-        isa<DestroyAddrInst>(user) || isa<AssignInst>(user) ||
-        isa<AddressToPointerInst>(user) || isa<YieldInst>(user) ||
-        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
-        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
-        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
-        isa<BeginUnpairedAccessInst>(user) ||
+        isa<PartialApplyInst>(user) || isa<DestroyAddrInst>(user) ||
+        isa<AssignInst>(user) || isa<AddressToPointerInst>(user) ||
+        isa<YieldInst>(user) || isa<LoadUnownedInst>(user) ||
+        isa<StoreUnownedInst>(user) || isa<EndApplyInst>(user) ||
+        isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
+        isa<AssignByWrapperInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)) {
@@ -727,7 +725,7 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
         isa<OpenExistentialAddrInst>(user) ||
         isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
-        isa<IndexAddrInst>(user) ||
+        isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
         isa<UnconditionalCheckedCastAddrInst>(user) ||
         isa<UncheckedAddrCastInst>(user)) {
       for (SILValue r : user->getResults()) {

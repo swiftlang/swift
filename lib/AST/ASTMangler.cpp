@@ -398,10 +398,13 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
                                                    CanSILFunctionType BlockType,
                                                    CanType ResultType,
+                                                   CanGenericSignature Sig,
                                                    bool predefined) {
   beginMangling();
   appendType(BlockType);
   appendType(ResultType);
+  if (Sig)
+    appendGenericSignature(Sig);
   appendOperator(predefined ? "TZ" : "Tz");
   return finalize();
 }
@@ -409,9 +412,11 @@ std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
 std::string ASTMangler::mangleAutoDiffDerivativeFunction(
     const AbstractFunctionDecl *originalAFD,
     AutoDiffDerivativeFunctionKind kind,
-    AutoDiffConfig config) {
+    AutoDiffConfig config,
+    bool isVTableThunk) {
   beginManglingWithAutoDiffOriginalFunction(originalAFD);
-  appendAutoDiffFunctionParts((char)getAutoDiffFunctionKind(kind), config);
+  appendAutoDiffFunctionParts(
+      isVTableThunk ? "TJV" : "TJ", getAutoDiffFunctionKind(kind), config);
   return finalize();
 }
 
@@ -419,7 +424,7 @@ std::string ASTMangler::mangleAutoDiffLinearMap(
     const AbstractFunctionDecl *originalAFD, AutoDiffLinearMapKind kind,
     AutoDiffConfig config) {
   beginManglingWithAutoDiffOriginalFunction(originalAFD);
-  appendAutoDiffFunctionParts((char)getAutoDiffFunctionKind(kind), config);
+  appendAutoDiffFunctionParts("TJ", getAutoDiffFunctionKind(kind), config);
   return finalize();
 }
 
@@ -437,11 +442,13 @@ void ASTMangler::beginManglingWithAutoDiffOriginalFunction(
     appendEntity(afd);
 }
 
-void ASTMangler::appendAutoDiffFunctionParts(char functionKindCode,
+void ASTMangler::appendAutoDiffFunctionParts(StringRef op,
+                                             AutoDiffFunctionKind kind,
                                              AutoDiffConfig config) {
   if (auto sig = config.derivativeGenericSignature)
     appendGenericSignature(sig);
-  appendOperator("TJ", StringRef(&functionKindCode, 1));
+  auto kindCode = (char)kind;
+  appendOperator(op, StringRef(&kindCode, 1));
   appendIndexSubset(config.parameterIndices);
   appendOperator("p");
   appendIndexSubset(config.resultIndices);
@@ -464,6 +471,64 @@ std::string ASTMangler::mangleAutoDiffSelfReorderingReabstractionThunk(
 /// Mangle the index subset.
 void ASTMangler::appendIndexSubset(IndexSubset *indices) {
   Buffer << indices->getString();
+}
+
+static NodePointer mangleSILDifferentiabilityWitnessAsNode(
+    StringRef originalName, DifferentiabilityKind kind, AutoDiffConfig config,
+    Demangler &demangler) {
+  auto *diffWitnessNode = demangler.createNode(
+      Node::Kind::DifferentiabilityWitness);
+  auto origNode = demangler.demangleSymbol(originalName);
+  assert(origNode->getKind() == Node::Kind::Global);
+  for (auto *child : *origNode)
+    diffWitnessNode->addChild(child, demangler);
+  diffWitnessNode->addChild(
+      demangler.createNode(
+          Node::Kind::Index,
+          (Node::IndexType)getMangledDifferentiabilityKind(kind)),
+      demangler);
+  diffWitnessNode->addChild(
+      demangler.createNode(
+          Node::Kind::IndexSubset, config.parameterIndices->getString()),
+      demangler);
+  diffWitnessNode->addChild(
+      demangler.createNode(
+          Node::Kind::IndexSubset, config.resultIndices->getString()),
+      demangler);
+  if (auto genSig = config.derivativeGenericSignature) {
+    ASTMangler genSigMangler;
+    auto genSigSymbol = genSigMangler.mangleGenericSignature(genSig);
+    auto demangledGenSig = demangler.demangleSymbol(genSigSymbol);
+    assert(demangledGenSig);
+    for (auto *child : *demangledGenSig)
+      diffWitnessNode->addChild(child, demangler);
+  }
+  return diffWitnessNode;
+}
+
+std::string ASTMangler::mangleSILDifferentiabilityWitness(
+    StringRef originalName, DifferentiabilityKind kind, AutoDiffConfig config) {
+  // If the original name was a mangled name, differentiability witnesses must
+  // be mangled as node because they contain generic signatures which may repeat
+  // entities in the original function name. Mangling as node will make sure the
+  // substitutions are mangled correctly.
+  if (isMangledName(originalName)) {
+    Demangler demangler;
+    auto *node = mangleSILDifferentiabilityWitnessAsNode(
+        originalName, kind, config, demangler);
+    return mangleNode(node);
+  }
+  beginManglingWithoutPrefix();
+  appendOperator(originalName);
+  if (auto genSig = config.derivativeGenericSignature)
+    appendGenericSignature(genSig);
+  auto diffKindCode = (char)getMangledDifferentiabilityKind(kind);
+  appendOperator("WJ", StringRef(&diffKindCode, 1));
+  appendIndexSubset(config.parameterIndices);
+  appendOperator("p");
+  appendIndexSubset(config.resultIndices);
+  appendOperator("r");
+  return finalize();
 }
 
 std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
@@ -499,27 +564,6 @@ std::string ASTMangler::mangleAutoDiffGeneratedDeclaration(
     Buffer << '_';
     appendGenericSignature(config.derivativeGenericSignature);
   }
-
-  auto result = Storage.str().str();
-  Storage.clear();
-  return result;
-}
-
-std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
-    SILDifferentiabilityWitnessKey key) {
-  // TODO(TF-20): Make the mangling scheme robust. Support demangling.
-  beginManglingWithoutPrefix();
-
-  auto originalName = key.first;
-  auto *parameterIndices = key.second.parameterIndices;
-  auto *resultIndices = key.second.resultIndices;
-  auto derivativeGenericSignature = key.second.derivativeGenericSignature;
-
-  Buffer << "AD__" << originalName << '_';
-  Buffer << "P" << parameterIndices->getString();
-  Buffer << "R" << resultIndices->getString();
-  if (derivativeGenericSignature)
-    appendGenericSignature(derivativeGenericSignature);
 
   auto result = Storage.str().str();
   Storage.clear();
@@ -1666,21 +1710,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back('e');
 
   // Differentiability kind.
-  switch (fn->getExtInfo().getDifferentiabilityKind()) {
-  case DifferentiabilityKind::NonDifferentiable:
-    break;
-  case DifferentiabilityKind::Normal:
-    OpArgs.push_back('d');
-    break;
-  case DifferentiabilityKind::Linear:
-    OpArgs.push_back('l');
-    break;
-  case DifferentiabilityKind::Forward:
-    OpArgs.push_back('f');
-    break;
-  case DifferentiabilityKind::Reverse:
-    OpArgs.push_back('r');
-    break;
+  auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
+  if (diffKind != DifferentiabilityKind::NonDifferentiable) {
+    OpArgs.push_back((char)getMangledDifferentiabilityKind(diffKind));
   }
 
   // <impl-callee-convention>

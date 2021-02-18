@@ -31,6 +31,7 @@ namespace swift {
 
 class ConcreteDeclRef;
 class ProtocolConformance;
+enum class EffectKind : uint8_t;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
 /// may be either concrete or abstract.
@@ -171,7 +172,7 @@ public:
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
 
-  bool classifyAsThrows() const;
+  bool hasEffect(EffectKind kind) const;
 };
 
 void simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef);

@@ -2442,6 +2442,23 @@ public:
       *this << "transpose";
       break;
     }
+    *this << "] [";
+    switch (dwfi->getWitness()->getKind()) {
+    case DifferentiabilityKind::Forward:
+      *this << "forward";
+      break;
+    case DifferentiabilityKind::Reverse:
+      *this << "reverse";
+      break;
+    case DifferentiabilityKind::Normal:
+      *this << "normal";
+      break;
+    case DifferentiabilityKind::Linear:
+      *this << "linear";
+      break;
+    case DifferentiabilityKind::NonDifferentiable:
+      llvm_unreachable("Impossible case");
+    }
     *this << "] [parameters";
     for (auto i : witness->getParameterIndices()->getIndices())
       *this << ' ' << i;
@@ -3342,8 +3359,26 @@ void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
   // ([serialized])?
   if (isSerialized())
     OS << "[serialized] ";
+  // Kind
+  OS << '[';
+  switch (getKind()) {
+  case DifferentiabilityKind::Forward:
+    OS << "forward";
+    break;
+  case DifferentiabilityKind::Reverse:
+    OS << "reverse";
+    break;
+  case DifferentiabilityKind::Normal:
+    OS << "normal";
+    break;
+  case DifferentiabilityKind::Linear:
+    OS << "linear";
+    break;
+  case DifferentiabilityKind::NonDifferentiable:
+    llvm_unreachable("Impossible case");
+  }
   // [parameters ...]
-  OS << "[parameters ";
+  OS << "] [parameters ";
   interleave(
       getParameterIndices()->getIndices(), [&](unsigned index) { OS << index; },
       [&] { OS << ' '; });

@@ -796,3 +796,37 @@ bb3:
   return %res : $()
 }
 
+// CHECK-LABEL: sil [ossa] @cse_select_enum2 :
+// CHECK: select_enum
+// CHECK-NOT: select_enum
+// CHECK: tuple
+// CHECK-LABEL: } // end sil function 'cse_select_enum2'
+sil [ossa] @cse_select_enum2 : $@convention(thin) (@guaranteed FakeOptional) -> (Builtin.Int1, Builtin.Int1) {
+bb0(%0 : @guaranteed $FakeOptional):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %1 = select_enum %0 : $FakeOptional, case #FakeOptional.none!enumelt: %t, case #FakeOptional.some!enumelt: %f : $Builtin.Int1
+  %copy = copy_value %0 : $FakeOptional
+  %2 = select_enum %copy : $FakeOptional, case #FakeOptional.none!enumelt: %t, case #FakeOptional.some!enumelt: %f : $Builtin.Int1
+  destroy_value %copy : $FakeOptional
+  %3 = tuple (%1: $Builtin.Int1, %2: $Builtin.Int1)
+  return %3: $(Builtin.Int1, Builtin.Int1)
+}
+
+// CHECK-LABEL: sil [ossa] @enum_cse2 :
+// CHECK: enum $FakeOptional, #FakeOptional.some!enumelt
+// CHECK-NOT: enum $FakeOptional, #FakeOptional.some!enumelt
+// CHECK-LABEL: } // end sil function 'enum_cse2'
+sil [ossa] @enum_cse2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %func = function_ref @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
+  %copy = copy_value %0 : $Klass
+  %4 = enum $FakeOptional, #FakeOptional.some!enumelt, %0 : $Klass
+  %5 = enum $FakeOptional, #FakeOptional.some!enumelt, %copy : $Klass
+  apply %func(%4) : $@convention(thin) (FakeOptional) -> ()
+  apply %func(%5) : $@convention(thin) (FakeOptional) -> ()
+  destroy_value %5 : $FakeOptional
+  %6 = tuple()
+  return %6 : $()
+}
+

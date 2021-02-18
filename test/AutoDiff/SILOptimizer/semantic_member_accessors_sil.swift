@@ -33,16 +33,16 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 }
 
 // CHECK-LABEL: // differentiability witness for Generic.x.setter
-// CHECK-NEXT: sil_differentiability_witness private [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s4null7GenericV1xxvs : $@convention(method) <T> (@in T, @inout Generic<T>) -> () {
+// CHECK-NEXT: sil_differentiability_witness private [reverse] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s4null7GenericV1xxvs : $@convention(method) <T> (@in T, @inout Generic<T>) -> () {
 
 // CHECK-LABEL: // differentiability witness for Generic.x.getter
-// CHECK-NEXT: sil_differentiability_witness private [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s4null7GenericV1xxvg : $@convention(method) <T> (@in_guaranteed Generic<T>) -> @out T {
+// CHECK-NEXT: sil_differentiability_witness private [reverse] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s4null7GenericV1xxvg : $@convention(method) <T> (@in_guaranteed Generic<T>) -> @out T {
 
 // CHECK-LABEL: // differentiability witness for Struct.x.setter
-// CHECK-NEXT: sil_differentiability_witness private [parameters 0 1] [results 0] @$s4null6StructV1xSfvs : $@convention(method) (Float, @inout Struct) -> () {
+// CHECK-NEXT: sil_differentiability_witness private [reverse] [parameters 0 1] [results 0] @$s4null6StructV1xSfvs : $@convention(method) (Float, @inout Struct) -> () {
 
 // CHECK-LABEL: // differentiability witness for Struct.x.getter
-// CHECK-NEXT: sil_differentiability_witness private [parameters 0] [results 0] @$s4null6StructV1xSfvg : $@convention(method) (Struct) -> Float {
+// CHECK-NEXT: sil_differentiability_witness private [reverse] [parameters 0] [results 0] @$s4null6StructV1xSfvg : $@convention(method) (Struct) -> Float {
 
 // CHECK-LABEL: sil private [ossa] @$s4null7GenericV1xxvs16_Differentiation14DifferentiableRzlTJpSSpSr
 // CHECK: bb0([[ADJ_X_RESULT:%.*]] : $*τ_0_0.TangentVector, [[ADJ_SELF:%.*]] : $*Generic<τ_0_0>.TangentVector, {{.*}} : {{.*}}):

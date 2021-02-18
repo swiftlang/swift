@@ -129,6 +129,7 @@ public:
     case Kind::AsyncFunction:
       return RequirementsVector;
     }
+    llvm_unreachable("unhandled case");
   }
 
   bool forPartialApply() const { return kind == Kind::PartialApply; }

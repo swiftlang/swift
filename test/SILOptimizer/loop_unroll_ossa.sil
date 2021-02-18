@@ -299,12 +299,15 @@ bb4(%58 : $Builtin.Int64, %59 : $Builtin.Int64):
   %64 = builtin "smul_with_overflow_Int64"(%59 : $Builtin.Int64, %28 : $Builtin.Int64, %56 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %65 = tuple_extract %64 : $(Builtin.Int64, Builtin.Int1), 0
   %70 = builtin "cmp_slt_Int64"(%61 : $Builtin.Int64, %28 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %70, bb5, bb6(%61 : $Builtin.Int64)
+  cond_br %70, bb5, bb6
 
 bb5:
   br bb4(%61 : $Builtin.Int64, %65 : $Builtin.Int64)
 
-bb6(%72 : $Builtin.Int64):
+bb6:
+  br bb7(%61 : $Builtin.Int64)
+
+bb7(%72 : $Builtin.Int64):
   %401 = tuple ()
   return %401 : $()
 }
@@ -337,12 +340,15 @@ bb4(%58 : $Builtin.Int64, %59 : $Builtin.Int64):
   %64 = builtin "smul_with_overflow_Int64"(%59 : $Builtin.Int64, %28 : $Builtin.Int64, %56 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %65 = tuple_extract %64 : $(Builtin.Int64, Builtin.Int1), 0
   %70 = builtin "cmp_slt_Int64"(%61 : $Builtin.Int64, %28 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %70, bb5, bb6(%61 : $Builtin.Int64)
+  cond_br %70, bb5, bb6
 
 bb5:
   br bb4(%61 : $Builtin.Int64, %65 : $Builtin.Int64)
 
-bb6(%72 : $Builtin.Int64):
+bb6:
+  br bb7(%61 : $Builtin.Int64)
+
+bb7(%72 : $Builtin.Int64):
   %401 = tuple ()
   return %401 : $()
 }

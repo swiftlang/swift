@@ -82,6 +82,7 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)independentMethod __attribute__((__swift_attr__("@actorIndependent")));
 -(void)asyncHandlerMethod __attribute__((__swift_attr__("@asyncHandler")));
 -(void)mainActorMethod __attribute__((__swift_attr__("@MainActor")));
+-(void)uiActorMethod __attribute__((__swift_attr__("@UIActor")));
 
 @optional
 -(void)missingAtAttributeMethod __attribute__((__swift_attr__("asyncHandler")));
@@ -114,6 +115,11 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
 @protocol LabellyProtocol
   - (void) myMethod:(NSInteger)value1 newFoo:(NSInteger)value2 completion:(ObjCErrorHandler)completion;
   - (void) myMethod:(NSInteger)value1 foo:(NSInteger)value2;
+@end
+
+@interface GenericObject<T> : NSObject
+- (void)doSomethingWithCompletionHandler:(void (^)(T _Nullable_result, NSError * _Nullable))completionHandler;
+- (void)doAnotherThingWithCompletionHandler:(void (^)(GenericObject<T> *_Nullable))completionHandler;
 @end
 
 #define MAGIC_NUMBER 42

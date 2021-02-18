@@ -250,8 +250,8 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
 /// \param parameterIndices must be lowered to SIL.
 /// \param resultIndices must be lowered to SIL.
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
-    SILModule &module, SILFunction *original, IndexSubset *parameterIndices,
-    IndexSubset *resultIndices);
+    SILModule &module, SILFunction *original, DifferentiabilityKind kind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices);
 
 } // end namespace autodiff
 

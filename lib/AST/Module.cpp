@@ -2051,6 +2051,8 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 }
 
 bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
+  if (module == this) return false;
+
   auto &imports = getASTContext().getImportCache();
 
   // Look through non-implementation-only imports to see if module is imported

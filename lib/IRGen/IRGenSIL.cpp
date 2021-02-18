@@ -1301,7 +1301,10 @@ public:
 
   llvm::Value *getCallerErrorResultArgument() override {
     auto errorLayout = layout.getErrorLayout();
-    Address addr = errorLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    Address pointerToAddress =
+        errorLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
+    auto load = IGF.Builder.CreateLoad(pointerToAddress);
+    auto addr = Address(load, IGF.IGM.getPointerAlignment());
     return addr.getAddress();
   }
   llvm::Value *getContext() override {
@@ -2839,7 +2842,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     SILFunctionConventions substConv(substCalleeType, getSILModule());
     SILType errorType =
         substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
-    Address calleeErrorSlot = emission->getCalleeErrorSlot(errorType);
+    Address calleeErrorSlot = emission->getCalleeErrorSlot(
+        errorType, /*isCalleeAsync=*/site.getOrigCalleeType()->isAsync());
     auto errorValue = Builder.CreateLoad(calleeErrorSlot);
     emission->end();
 
@@ -2970,7 +2974,12 @@ static bool isSimplePartialApply(IRGenFunction &IGF, PartialApplyInst *i) {
   // handled by a simplification pass in SIL.)
   if (i->getNumArguments() != 1)
     return false;
-  
+  // The closure application is going to expect to pass the context in swiftself
+  // only methods where the call to `hasSelfContextParameter` returns true will
+  // use swiftself for the self parameter.
+  if (!hasSelfContextParameter(calleeTy))
+    return false;
+
   auto appliedParam = calleeTy->getParameters().back();
   if (resultTy->isNoEscape()) {
     // A trivial closure accepts an unowned or guaranteed argument, possibly

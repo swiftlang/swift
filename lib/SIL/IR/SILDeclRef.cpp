@@ -692,8 +692,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
   ASTMangler mangler;
 
-  auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier();
-  if (derivativeFunctionIdentifier) {
+  if (auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier()) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
         derivativeFunctionIdentifier->getParameterIndices(),
@@ -703,7 +702,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silParameterIndices, resultIndices,
         derivativeFunctionIdentifier->getDerivativeGenericSignature());
     return mangler.mangleAutoDiffDerivativeFunction(
-        cast<AbstractFunctionDecl>(asAutoDiffOriginalFunction().getDecl()),
+        asAutoDiffOriginalFunction().getAbstractFunctionDecl(),
         derivativeFunctionIdentifier->getKind(),
         silConfig);
   }
@@ -845,7 +844,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 }
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-// FIXME(TF-1213): Also consider derived declaration `@derivative` attributes.
+// FIXME(SR-14131): Also consider derived declaration `@derivative` attributes.
 static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
   assert(declRef.getDerivativeFunctionIdentifier() &&
          "Expected a derivative function SILDeclRef");
