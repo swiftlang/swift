@@ -764,6 +764,10 @@ void Remangler::mangleAutoDiffFunctionKind(Node *node) {
   Buffer << "<autodiff-function-kind>";
 }
 
+void Remangler::mangleDifferentiabilityWitness(Node *node) {
+  Buffer << "<differentiability-witness>";
+}
+
 void Remangler::mangleIndexSubset(Node *node) {
   Buffer << "<index-subset>";
 }

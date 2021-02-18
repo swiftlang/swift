@@ -132,7 +132,8 @@ SILDifferentiabilityWitness *
 SerializedSILLoader::lookupDifferentiabilityWitness(
     SILDifferentiabilityWitnessKey key) {
   Mangle::ASTMangler mangler;
-  std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+     key.originalFunctionName, key.kind, key.config);
   // It is possible that one module has a declaration of a
   // SILDifferentiabilityWitness, while another has the full definition.
   SILDifferentiabilityWitness *dw = nullptr;
