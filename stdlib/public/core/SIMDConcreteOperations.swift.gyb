@@ -126,6 +126,24 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_${s}ge_${Builtin}(a._storage._value, b._storage._value)
     )
   }
+    
+  /// The wrapping sum of two vectors.
+  @_alwaysEmitIntoClient
+  public static func &+(a: Self, b: Self) -> Self{
+    Self(Builtin.add_${Builtin}(a._storage._value, b._storage._value))
+  }
+    
+  /// The wrapping difference of two vectors.
+  @_alwaysEmitIntoClient
+  public static func &-(a: Self, b: Self) -> Self{
+    Self(Builtin.sub_${Builtin}(a._storage._value, b._storage._value))
+  }
+    
+  /// The pointwise wrapping product of two vectors.
+  @_alwaysEmitIntoClient
+  public static func &*(a: Self, b: Self) -> Self{
+    Self(Builtin.mul_${Builtin}(a._storage._value, b._storage._value))
+  }
 }
 
 % end
@@ -192,6 +210,30 @@ extension SIMD${n} where Scalar == ${Scalar} {
     SIMDMask<MaskStorage>(
       Builtin.fcmp_oge_${Builtin}(a._storage._value, b._storage._value)
     )
+  }
+    
+  /// The sum of two vectors.
+  @_alwaysEmitIntoClient
+  public static func +(a: Self, b: Self) -> Self{
+    Self(Builtin.fadd_${Builtin}(a._storage._value, b._storage._value))
+  }
+    
+  /// The difference of two vectors.
+  @_alwaysEmitIntoClient
+  public static func -(a: Self, b: Self) -> Self{
+    Self(Builtin.fsub_${Builtin}(a._storage._value, b._storage._value))
+  }
+    
+  /// The pointwise product of two vectors.
+  @_alwaysEmitIntoClient
+  public static func *(a: Self, b: Self) -> Self{
+    Self(Builtin.fmul_${Builtin}(a._storage._value, b._storage._value))
+  }
+    
+  /// The pointwise quotient of two vectors.
+  @_alwaysEmitIntoClient
+  public static func /(a: Self, b: Self) -> Self{
+    Self(Builtin.fdiv_${Builtin}(a._storage._value, b._storage._value))
   }
 }
 %  if bits == 16:
