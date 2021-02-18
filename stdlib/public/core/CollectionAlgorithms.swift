@@ -330,8 +330,8 @@ extension MutableCollection where Self: BidirectionalCollection {
       return try _partitionImpl(by: belongsInSecondPartition)
     }
   }
-  
-  @usableFromInline
+
+  @inlinable
   internal mutating func _partitionImpl(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
