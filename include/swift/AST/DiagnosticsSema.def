@@ -776,6 +776,13 @@ NOTE(serialization_compatibility_version_mismatch,none,
      "(this is supported but may expose additional compiler issues)",
      (StringRef, StringRef, StringRef))
 
+ERROR(serialization_allowing_invalid_decl,none,
+      "allowing deserialization of invalid declaration %0 from module '%1'",
+      (DeclName, StringRef))
+ERROR(serialization_invalid_decl,Fatal,
+      "invalid declaration %0 read from module '%1'; "
+      SWIFT_BUG_REPORT_MESSAGE, ())
+
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
