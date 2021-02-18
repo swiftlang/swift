@@ -38,7 +38,7 @@ struct AsyncTaskAndContext {
 /// be true, and this must be called synchronously with the parent.
 /// The parent is responsible for creating a ChildTaskStatusRecord.
 /// TODO: should we have a single runtime function for creating a task
-/// and doing this child task status record management?
+///       and doing this child task status record management?
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create(JobFlags flags,
                                       AsyncTask *parent,
@@ -66,7 +66,7 @@ using FutureAsyncSignature =
 /// be true, and this must be called synchronously with the parent.
 /// The parent is responsible for creating a ChildTaskStatusRecord.
 /// TODO: should we have a single runtime function for creating a task
-/// and doing this child task status record management?
+///       and doing this child task status record management?
 ///
 /// flags.task_isFuture must be set. \c futureResultType is the type
 ///
