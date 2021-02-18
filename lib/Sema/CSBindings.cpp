@@ -369,12 +369,8 @@ void PotentialBindings::inferTransitiveBindings(
       addLiteral(literal.second.getSource());
 
     // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults) {
-      if (def.getSecond()->getKind() == ConstraintKind::DefaultClosureType)
-        continue;
-
+    for (const auto &def : bindings.Defaults)
       addDefault(def.second);
-    }
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
@@ -403,45 +399,11 @@ void PotentialBindings::inferTransitiveBindings(
   }
 }
 
-// If potential binding type variable is a closure that has a subtype relation
-// associated with argument conversion constraint located directly on an
-// autoclosure parameter.
-static bool
-isClosureInAutoClosureArgumentConversion(PotentialBindings &bindings) {
-
-  if (!bindings.TypeVar->getImpl().isClosureType())
-    return false;
-
-  return llvm::any_of(
-      bindings.SubtypeOf,
-      [](std::pair<TypeVariableType *, Constraint *> subType) {
-        if (subType.second->getKind() != ConstraintKind::ArgumentConversion)
-          return false;
-        return subType.second->getLocator()
-            ->isLastElement<LocatorPathElt::AutoclosureResult>();
-      });
-}
-
 void PotentialBindings::finalize(
     llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
         &inferredBindings) {
   inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
-
-  // For autoclosure parameters if we have a closure argument which could
-  // default to `() -> $T`, we avoid infering defaultable binding because
-  // an autoclosure cannot accept a closure paramenter unless the result `$T`
-  // is bound to a function type via another contextual binding. Also consider
-  // adjacent vars because they can also default transitively.
-  if (isClosureInAutoClosureArgumentConversion(*this)) {
-    auto closureDefault = llvm::find_if(
-        Defaults, [](const std::pair<CanType, Constraint *> &entry) {
-          return entry.second->getKind() == ConstraintKind::DefaultClosureType;
-        });
-    if (closureDefault != Defaults.end()) {
-      Defaults.erase(closureDefault);
-    }
-  }
 }
 
 PotentialBindings::BindingScore
