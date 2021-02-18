@@ -1019,27 +1019,16 @@ static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
   if (!storage->isSetterAccessibleFrom(useDC))
     return false;
 
-  // If there is no base, or if the base isn't being used, it is settable.
-  // This is only possible for vars.
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (!baseType || var->isStatic())
-      return true;
-  }
-
-  // If the base is an lvalue, then a reference produces an lvalue.
-  if (baseType->is<LValueType>())
+  // If there is no base, or the base is an lvalue, then a reference
+  // produces an lvalue.
+  if (!baseType || baseType->is<LValueType>())
     return true;
 
-  // Stored properties of reference types produce lvalues.
-  if (baseType->hasReferenceSemantics() && storage->hasStorage())
-    return true;
-
-  // So the base is an rvalue type. The only way an accessor can
+  // The base is an rvalue type. The only way an accessor can
   // produce an lvalue is if we have a property where both the
   // getter and setter are nonmutating.
-  return !storage->hasStorage() &&
-      !storage->isGetterMutating() &&
-      !storage->isSetterMutating();
+  return (!storage->isGetterMutating() &&
+          !storage->isSetterMutating());
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
