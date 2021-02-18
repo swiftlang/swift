@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -swift-version 4
 
 enum Conditional<T> {
-  case a( x: T, y: T?)
+  case a(x: T, y: T?)
   case b(z: [T])
 
   func foo() {

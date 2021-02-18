@@ -5,6 +5,7 @@
 enum SimpleEnum : Codable {
     case a(x: Int, y: Double)
     case b(z: String)
+    case c(Int, String, b: Bool)
 
     // These lines have to be within the SimpleEnum type because CodingKeys
     // should be private.
@@ -13,6 +14,7 @@ enum SimpleEnum : Codable {
         let _ = SimpleEnum.CodingKeys.self
         let _ = SimpleEnum.ACodingKeys.self
         let _ = SimpleEnum.BCodingKeys.self
+        let _ = SimpleEnum.CCodingKeys.self
 
         // The enum should have a case for each of the cases.
         let _ = SimpleEnum.CodingKeys.a
@@ -23,6 +25,10 @@ enum SimpleEnum : Codable {
         let _ = SimpleEnum.ACodingKeys.y
 
         let _ = SimpleEnum.BCodingKeys.z
+
+        let _ = SimpleEnum.CCodingKeys._0
+        let _ = SimpleEnum.CCodingKeys._1
+        let _ = SimpleEnum.CCodingKeys.b
     }
 }
 
@@ -34,3 +40,5 @@ let _ = SimpleEnum.encode(to:)
 // enum.
 let _ = SimpleEnum.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
 let _ = SimpleEnum.ACodingKeys.self // expected-error {{'ACodingKeys' is inaccessible due to 'private' protection level}}
+let _ = SimpleEnum.BCodingKeys.self // expected-error {{'BCodingKeys' is inaccessible due to 'private' protection level}}
+let _ = SimpleEnum.CCodingKeys.self // expected-error {{'CCodingKeys' is inaccessible due to 'private' protection level}}

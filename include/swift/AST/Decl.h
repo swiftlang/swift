@@ -6525,9 +6525,6 @@ public:
     return getAttrs().hasAttribute<IndirectAttr>();
   }
 
-  /// True if any of the parameter are unnamed.
-  bool hasAnyUnnamedParameters() const;
-
   /// Do not call this!
   /// It exists to let the AST walkers get the raw value without forcing a request.
   LiteralExpr *getRawValueUnchecked() const { return RawValueExpr; }
