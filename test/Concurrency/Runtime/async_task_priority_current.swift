@@ -2,7 +2,11 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-import func Foundation.sleep
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 // FIXME: use `Task.currentPriority` once unsafeCurrent works in all these
 
@@ -26,7 +30,7 @@ func test_multiple_lo_indirectly_escalated() async {
   @concurrent
   func loopUntil(priority: Task.Priority) async {
     while (await Task.__unsafeCurrentAsync().task.priority != priority) {
-      sleep(1)
+      usleep(1000 * 1)
     }
   }
 

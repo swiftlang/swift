@@ -2,7 +2,11 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-import func Foundation.sleep
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 func test_skipCallingNext() async {
   let numbers = [1, 1]
@@ -11,7 +15,7 @@ func test_skipCallingNext() async {
     for n in numbers {
       print("group.add { \(n) }")
       await group.add { () async -> Int in
-        sleep(1)
+        usleep(1000 * 1)
         let c = await Task.__unsafeCurrentAsync().isCancelled
         print("  inside group.add { \(n) } (canceled: \(c))")
         return n

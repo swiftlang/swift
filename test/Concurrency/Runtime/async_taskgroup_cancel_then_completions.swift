@@ -2,7 +2,11 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-import func Foundation.sleep
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 func asyncEcho(_ value: Int) async -> Int {
   value
@@ -18,7 +22,7 @@ func test_taskGroup_cancel_then_completions() async {
   pprint("before \(#function)")
 
 //  async let outer: Bool = {
-//    sleep(6)
+//    uusleep(1000 * 1000 * 6)
 //    return await Task.__unsafeCurrentAsync().isCancelled
 //  }()
 
@@ -26,7 +30,7 @@ func test_taskGroup_cancel_then_completions() async {
     pprint("group cancelled: \(group.isCancelled)") // CHECK: group cancelled: false
     let addedFirst = await group.add {
       pprint("start first")
-      sleep(1)
+      usleep(1000 * 1)
       pprint("done first")
       return (1, await Task.__unsafeCurrentAsync().isCancelled)
     }
@@ -35,7 +39,7 @@ func test_taskGroup_cancel_then_completions() async {
 
     let addedSecond = await group.add {
       pprint("start second")
-      sleep(3)
+      usleep(1000 * 3)
       pprint("done second")
       return (2, await Task.__unsafeCurrentAsync().isCancelled)
     }

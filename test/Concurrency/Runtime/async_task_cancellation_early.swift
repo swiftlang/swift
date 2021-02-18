@@ -4,13 +4,17 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-import func Foundation.sleep
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 func test_runDetached_cancel_child_early() async {
   print(#function) // CHECK: test_runDetached_cancel_child_early
   let h: Task.Handle<Bool, Error> = Task.runDetached {
     async let childCancelled: Bool = { () -> Bool in
-      sleep(2)
+      usleep(1000 * 2)
       return await Task.__unsafeCurrentAsync().isCancelled
     }()
 
