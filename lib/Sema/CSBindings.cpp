@@ -579,7 +579,7 @@ void BindingSet::determineLiteralCoverage() {
       }
 
       std::tie(isCovered, adjustedTy) =
-          literalInfo.isCoveredBy(*binding, CS.DC, allowsNil);
+          literalInfo.isCoveredBy(*binding, allowsNil, CS.DC);
 
       if (isCovered) {
         literalInfo.setCoveredBy(binding->getSource());

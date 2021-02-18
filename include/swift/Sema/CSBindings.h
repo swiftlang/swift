@@ -417,8 +417,6 @@ public:
            !Defaults.empty();
   }
 
-  LiteralBindingKind getLiteralKind() const;
-
   ArrayRef<Constraint *> getConformanceRequirements() const {
     return Info.Protocols;
   }
@@ -459,33 +457,10 @@ public:
 
   LiteralBindingKind getLiteralKind() const;
 
-  void addDefault(Constraint *constraint);
-
-  void addLiteral(Constraint *constraint);
-
-  /// Add a potential binding to the list of bindings,
-  /// coalescing supertype bounds when we are able to compute the meet.
-  void addPotentialBinding(PotentialBinding binding, bool allowJoinMeet = true);
-
-  /// Check if this binding is viable for inclusion in the set.
-  bool isViable(PotentialBinding &binding) const;
-
-  bool isGenericParameter() const;
-
-  bool isSubtypeOf(TypeVariableType *typeVar) const {
-    auto result = SubtypeOf.find(typeVar);
-    if (result == SubtypeOf.end())
-      return false;
-
-    auto *constraint = result->second;
-    return constraint->getKind() == ConstraintKind::Subtype;
-  }
-
   /// Check if this binding is favored over a disjunction e.g.
   /// if it has only concrete types or would resolve a closure.
   bool favoredOverDisjunction(Constraint *disjunction) const;
 
-private:
   /// Detect `subtype` relationship between two type variables and
   /// attempt to infer supertype bindings transitively e.g.
   ///
@@ -509,10 +484,6 @@ private:
   /// inferring bindings from context e.g. transitive bindings.
   void finalize(
       llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
-
-  /// Check if this binding is favored over a disjunction e.g.
-  /// if it has only concrete types or would resolve a closure.
-  bool favoredOverDisjunction(Constraint *disjunction) const;
 
   static BindingScore formBindingScore(const BindingSet &b);
 
