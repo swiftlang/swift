@@ -34,8 +34,12 @@ print("Hello!")
 let s = S()
 print(s)
 
+// We need to call a partial apply thunk instead of directly calling the method
+// because the ABI of closure requires swiftself in the context parameter but
+// the method of this self type (struct S) does not.
+
 // CHECK: define {{.*}}swiftcc %T4test5StateV9Reference33_C903A018FCE7355FD30EF8324850EB90LLCySi_G* @"$s4test1SVACycfC"()
-// CHECK:  call swiftcc void @"$s4test1SV5valueSivsTA"(i{{(32|64)}} 10, %swift.refcounted* swiftself {{.*}})
+// CHECK:  call swiftcc void {{.*}}"$s4test1SV5valueSivsTA
 // CHECK:  ret %T4test5StateV9Reference33_C903A018FCE7355FD30EF8324850EB90LLCySi_G
 
 // This used to crash.
