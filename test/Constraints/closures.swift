@@ -1056,3 +1056,14 @@ func test_inout_with_invalid_member_ref() {
   // expected-error@-1 {{value of tuple type 'Void' has no member 'createS'}}
   // expected-error@-2 {{cannot pass immutable value as inout argument: '$0' is immutable}}
 }
+
+// rdar://problem/74435602 - failure to infer a type for @autoclosure parameter.
+func rdar_74435602(error: Error?) {
+  func accepts_autoclosure<T>(_ expression: @autoclosure () throws -> T) {}
+
+  accepts_autoclosure({
+    if let failure = error {
+      throw failure
+    }
+  })
+}
