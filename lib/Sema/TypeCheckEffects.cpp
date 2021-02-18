@@ -29,17 +29,24 @@
 
 using namespace swift;
 
-static bool hasThrowingFunctionClosureParameter(CanType type) {
-  // Only consider throwing function types.
-  if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
-    return fnType->getExtInfo().isThrowing();
+static bool hasFunctionParameterWithEffect(EffectKind kind, Type type) {
+  // Look through Optional types.
+  type = type->lookThroughAllOptionalTypes();
+
+  // Only consider function types with this effect.
+  if (auto fnType = type->getAs<AnyFunctionType>()) {
+    auto extInfo = fnType->getExtInfo();
+    switch (kind) {
+    case EffectKind::Throws: return extInfo.isThrowing();
+    case EffectKind::Async: return extInfo.isAsync();
+    }
+    llvm_unreachable("Bad effect kind");
   }
 
   // Look through tuples.
-  if (auto tuple = dyn_cast<TupleType>(type)) {
-    for (auto eltType : tuple.getElementTypes()) {
-      auto elt = eltType->lookThroughAllOptionalTypes()->getCanonicalType();
-      if (hasThrowingFunctionClosureParameter(elt))
+  if (auto tuple = type->getAs<TupleType>()) {
+    for (auto eltType : tuple->getElementTypes()) {
+      if (hasFunctionParameterWithEffect(kind, eltType))
         return true;
     }
     return false;
@@ -53,87 +60,88 @@ static bool hasThrowingFunctionClosureParameter(CanType type) {
   return false;
 }
 
-ProtocolRethrowsRequirementList
-ProtocolRethrowsRequirementsRequest::evaluate(Evaluator &evaluator,
-                                              ProtocolDecl *decl) const {
-  ASTContext &ctx = decl->getASTContext();
+PolymorphicEffectRequirementList
+PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
+                                               EffectKind kind,
+                                               ProtocolDecl *proto) const {
+  ASTContext &ctx = proto->getASTContext();
 
   // only allow rethrowing requirements to be determined from marked protocols
-  if (!decl->isRethrowingProtocol()) {
-    return ProtocolRethrowsRequirementList();
+  if (!proto->hasPolymorphicEffect(kind)) {
+    return PolymorphicEffectRequirementList();
   }
 
   SmallVector<AbstractFunctionDecl *, 2> requirements;
   SmallVector<std::pair<Type, ProtocolDecl *>, 2> conformances;
   
   // check if immediate members of protocol are 'throws'
-  for (auto member : decl->getMembers()) {
+  for (auto member : proto->getMembers()) {
     auto fnDecl = dyn_cast<AbstractFunctionDecl>(member);
-    if (!fnDecl || !fnDecl->hasThrows())
+    if (!fnDecl || !fnDecl->hasEffect(kind))
       continue;
 
     requirements.push_back(fnDecl);
   }
 
   // check associated conformances of associated types or inheritance
-  for (auto requirement : decl->getRequirementSignature()) {
+  for (auto requirement : proto->getRequirementSignature()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
 
     auto protoTy = requirement.getSecondType()->castTo<ProtocolType>();
     auto protoDecl = protoTy->getDecl();
-    if (!protoDecl->isRethrowingProtocol())
+    if (!protoDecl->hasPolymorphicEffect(kind))
       continue;
 
     conformances.emplace_back(requirement.getFirstType(), protoDecl);
   }
   
-  return ProtocolRethrowsRequirementList(ctx.AllocateCopy(requirements),
-                                         ctx.AllocateCopy(conformances));
+  return PolymorphicEffectRequirementList(ctx.AllocateCopy(requirements),
+                                          ctx.AllocateCopy(conformances));
 }
 
-FunctionRethrowingKind
-FunctionRethrowingKindRequest::evaluate(Evaluator &evaluator,
-                                        AbstractFunctionDecl *decl) const {
-  if (decl->hasThrows()) {
-    auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext());
-    bool fromRethrow = proto != nullptr ? proto->isRethrowingProtocol() : false;
-    bool markedRethrows = decl->getAttrs().hasAttribute<RethrowsAttr>();
-    if (fromRethrow && !markedRethrows) {
-      return FunctionRethrowingKind::ByConformance;
-    }
-    if (markedRethrows) {
-      if (auto genericSig = decl->getGenericSignature()) {
-        for (auto req : genericSig->getRequirements()) {
-          if (req.getKind() == RequirementKind::Conformance) {
-            if (req.getSecondType()->castTo<ProtocolType>()
-                                   ->getDecl()
-                                   ->isRethrowingProtocol()) {
-              return FunctionRethrowingKind::ByConformance;
-            }
-          }
-        }
-      }
+PolymorphicEffectKind
+PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
+                                       EffectKind kind,
+                                       AbstractFunctionDecl *decl) const {
+  if (!decl->hasEffect(kind))
+    return PolymorphicEffectKind::None;
 
-      for (auto param : *decl->getParameters()) {
-        auto interfaceTy = param->getInterfaceType();
-        if (hasThrowingFunctionClosureParameter(interfaceTy
-              ->lookThroughAllOptionalTypes()
-              ->getCanonicalType())) {
-          return FunctionRethrowingKind::ByClosure;
-        }
-      }
-
-      return FunctionRethrowingKind::Invalid;
+  if (!decl->hasPolymorphicEffect(kind)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (proto->hasPolymorphicEffect(kind))
+        return PolymorphicEffectKind::ByConformance;
     }
-    return FunctionRethrowingKind::Throws;
+
+    return PolymorphicEffectKind::Always;
   }
-  return FunctionRethrowingKind::None;
+
+  if (auto genericSig = decl->getGenericSignature()) {
+    for (auto req : genericSig->getRequirements()) {
+      if (req.getKind() == RequirementKind::Conformance) {
+        if (req.getSecondType()->castTo<ProtocolType>()
+                               ->getDecl()
+                               ->hasPolymorphicEffect(kind)) {
+          return PolymorphicEffectKind::ByConformance;
+        }
+      }
+    }
+  }
+
+  for (auto param : *decl->getParameters()) {
+    auto interfaceTy = param->getInterfaceType();
+    if (hasFunctionParameterWithEffect(kind, interfaceTy)) {
+      return PolymorphicEffectKind::ByClosure;
+    }
+  }
+
+  return PolymorphicEffectKind::Invalid;
 }
 
 static bool classifyWitness(ModuleDecl *module, 
                             ProtocolConformance *conformance, 
-                            AbstractFunctionDecl *req) {
+                            AbstractFunctionDecl *req,
+                            EffectKind kind) {
   auto declRef = conformance->getWitnessDeclRef(req);
   if (!declRef) {
     // Invalid conformance.
@@ -142,46 +150,46 @@ static bool classifyWitness(ModuleDecl *module,
 
   auto witnessDecl = dyn_cast<AbstractFunctionDecl>(declRef.getDecl());
   if (!witnessDecl) {
-    // Enum element constructors never throw.
+    // Enum element constructors do not have effects.
     assert(isa<EnumElementDecl>(declRef.getDecl()));
     return false;
   }
 
-  switch (witnessDecl->getRethrowingKind()) {
-    case FunctionRethrowingKind::None:
-      // Witness doesn't throw at all, so it contributes nothing.
+  switch (witnessDecl->getPolymorphicEffectKind(kind)) {
+    case PolymorphicEffectKind::None:
+      // Witness doesn't have this effect at all, so it contributes nothing.
       return false;
 
-    case FunctionRethrowingKind::ByConformance: {
-      // Witness throws if the concrete type's @rethrows conformances
-      // recursively throw.
+    case PolymorphicEffectKind::ByConformance: {
+      // Witness has the effect if the concrete type's conformances
+      // recursively have the effect.
       auto substitutions = conformance->getSubstitutions(module);
       for (auto conformanceRef : substitutions.getConformances()) {
-        if (conformanceRef.classifyAsThrows()) {
+        if (conformanceRef.hasEffect(kind)) {
           return true;
         }
       }
       return false;
     }
 
-    case FunctionRethrowingKind::ByClosure:
-      // Witness only throws if a closure argument throws, so it
-      // contributes nothng.
+    case PolymorphicEffectKind::ByClosure:
+      // Witness only has the effect if a closure argument has the effect,
+      // so it contributes nothing to the conformance`s effect.
       return false;
 
-    case FunctionRethrowingKind::Throws:
-      // Witness always throws.
+    case PolymorphicEffectKind::Always:
+      // Witness always has the effect.
       return true;
 
-    case FunctionRethrowingKind::Invalid:
-      // If the code is invalid, just assume it throws.
+    case PolymorphicEffectKind::Invalid:
+      // If something was invalid, just assume it has the effect.
       return true;
   }
 }
 
-bool
-ProtocolConformanceClassifyAsThrowsRequest::evaluate(
-  Evaluator &evaluator, ProtocolConformance *conformance) const {
+bool ConformanceHasEffectRequest::evaluate(
+  Evaluator &evaluator, EffectKind kind,
+  ProtocolConformance *conformance) const {
   auto *module = conformance->getDeclContext()->getParentModule();
 
   llvm::SmallDenseSet<ProtocolConformance *, 2> visited;
@@ -198,9 +206,9 @@ ProtocolConformanceClassifyAsThrowsRequest::evaluate(
 
     auto protoDecl = current->getProtocol();
 
-    auto list = protoDecl->getRethrowingRequirements();
+    auto list = protoDecl->getPolymorphicEffectRequirements(kind);
     for (auto req : list.getRequirements()) {
-      if (classifyWitness(module, current, req))
+      if (classifyWitness(module, current, req, kind))
         return true;
     }
 
@@ -236,21 +244,21 @@ private:
   };
   unsigned TheKind : 2;
   unsigned ParamCount : 2;
-  FunctionRethrowingKind RethrowingKind;
+  PolymorphicEffectKind RethrowingKind;
   SubstitutionMap Substitutions;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
     : TheKind(kind),
       ParamCount(1),
-      RethrowingKind(FunctionRethrowingKind::None) {
+      RethrowingKind(PolymorphicEffectKind::None) {
     TheExpr = fn;
   }
 
   explicit AbstractFunction(AbstractFunctionDecl *fn, SubstitutionMap subs)
     : TheKind(Kind::Function),
       ParamCount(fn->getNumCurryLevels()),
-      RethrowingKind(fn->getRethrowingKind()),
+      RethrowingKind(fn->getPolymorphicEffectKind(EffectKind::Throws)),
       Substitutions(subs) {
     TheFunction = fn;
   }
@@ -258,14 +266,14 @@ public:
   explicit AbstractFunction(AbstractClosureExpr *closure)
     : TheKind(Kind::Closure),
       ParamCount(1),
-      RethrowingKind(FunctionRethrowingKind::None) {
+      RethrowingKind(PolymorphicEffectKind::None) {
     TheClosure = closure;
   }
 
   explicit AbstractFunction(ParamDecl *parameter)
     : TheKind(Kind::Parameter),
       ParamCount(1),
-      RethrowingKind(FunctionRethrowingKind::None) {
+      RethrowingKind(PolymorphicEffectKind::None) {
     TheParameter = parameter;
   }
 
@@ -274,18 +282,18 @@ public:
   /// Whether the function is marked 'rethrows'.
   bool isBodyRethrows() const {
     switch (RethrowingKind) {
-    case FunctionRethrowingKind::None:
-    case FunctionRethrowingKind::Throws:
+    case PolymorphicEffectKind::None:
+    case PolymorphicEffectKind::Always:
       return false;
 
-    case FunctionRethrowingKind::ByClosure:
-    case FunctionRethrowingKind::ByConformance:
-    case FunctionRethrowingKind::Invalid:
+    case PolymorphicEffectKind::ByClosure:
+    case PolymorphicEffectKind::ByConformance:
+    case PolymorphicEffectKind::Invalid:
       return true;
     }
   }
 
-  FunctionRethrowingKind getRethrowingKind() const {
+  PolymorphicEffectKind getRethrowingKind() const {
     return RethrowingKind;
   }
 
@@ -749,10 +757,10 @@ public:
                                       isAsync);
     }
 
-    if (fnRef.getRethrowingKind() == FunctionRethrowingKind::ByConformance) {
+    if (fnRef.getRethrowingKind() == PolymorphicEffectKind::ByConformance) {
       auto substitutions = fnRef.getSubstitutions();
       for (auto conformanceRef : substitutions.getConformances()) {
-        if (conformanceRef.classifyAsThrows()) {
+        if (conformanceRef.hasEffect(EffectKind::Throws)) {
           return Classification::forRethrowingOnly(
             PotentialThrowReason::forRethrowsConformance(E), isAsync);
         }
@@ -1229,7 +1237,8 @@ public:
     if (!fn)
       return false;
 
-    return fn->getRethrowingKind() == FunctionRethrowingKind::ByClosure;
+    return fn->getPolymorphicEffectKind(EffectKind::Throws)
+        == PolymorphicEffectKind::ByClosure;
   }
 
   /// Whether this is an autoclosure.

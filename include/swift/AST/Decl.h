@@ -86,11 +86,12 @@ namespace swift {
   struct PropertyWrapperTypeInfo;
   struct PropertyWrapperMutability;
   class ProtocolDecl;
-  class ProtocolRethrowsRequirementList;
+  class PolymorphicEffectRequirementList;
   class ProtocolType;
   struct RawComment;
   enum class ResilienceExpansion : unsigned;
-  enum class FunctionRethrowingKind : uint8_t;
+  enum class EffectKind : uint8_t;
+  enum class PolymorphicEffectKind : uint8_t;
   class TrailingWhereClause;
   class TypeAliasDecl;
   class Stmt;
@@ -4117,8 +4118,11 @@ public:
   /// contain 'Self' in 'parameter' or 'other' position.
   bool existentialTypeSupported() const;
 
-  ProtocolRethrowsRequirementList getRethrowingRequirements() const;
-  bool isRethrowingProtocol() const;
+  /// Returns a list of protocol requirements that must be assessed to
+  /// determine a concrete's conformance effect polymorphism kind.
+  PolymorphicEffectRequirementList getPolymorphicEffectRequirements(
+      EffectKind kind) const;
+  bool hasPolymorphicEffect(EffectKind kind) const;
 
   /// Determine whether this is a "marker" protocol, meaning that is indicates
   /// semantics but has no corresponding witness table.
@@ -5740,7 +5744,13 @@ public:
   /// Returns true if the function body throws.
   bool hasThrows() const { return Bits.AbstractFunctionDecl.Throws; }
 
-  FunctionRethrowingKind getRethrowingKind() const;
+  /// Returns if the function throws or is async.
+  bool hasEffect(EffectKind kind) const;
+
+  /// Returns if the function is 'rethrows' or 'reasync'.
+  bool hasPolymorphicEffect(EffectKind kind) const;
+
+  PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
   // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
