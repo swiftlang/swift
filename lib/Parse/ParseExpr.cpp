@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/EditorPlaceholder.h"
@@ -2335,6 +2336,7 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
 }
 
 ParserStatus Parser::parseClosureSignatureIfPresent(
+    DeclAttributes &attributes,
     SourceRange &bracketRange,
     SmallVectorImpl<CaptureListEntry> &captureList,
     VarDecl *&capturedSelfDecl,
@@ -2344,6 +2346,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
     TypeExpr *&explicitResultType, SourceLoc &inLoc) {
   // Clear out result parameters.
   bracketRange = SourceRange();
+  attributes = DeclAttributes();
   capturedSelfDecl = nullptr;
   params = nullptr;
   throwsLoc = SourceLoc();
@@ -2360,8 +2363,15 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
 
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
-  if (Tok.isAny(tok::l_paren, tok::l_square, tok::identifier, tok::kw__)) {
+  if (Tok.isAny(
+          tok::at_sign, tok::l_paren, tok::l_square, tok::identifier,
+          tok::kw__)) {
     BacktrackingScope backtrack(*this);
+
+    // Consume attributes.
+    while (Tok.is(tok::at_sign)) {
+      skipAnyAttribute();
+    }
 
     // Skip by a closure capture list if present.
     if (consumeIf(tok::l_square)) {
@@ -2425,6 +2435,9 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
   }
   ParserStatus status;
   SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
+
+  (void)parseDeclAttributeList(attributes);
+
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
     
     SyntaxParsingContext CaptureCtx(SyntaxContext,
@@ -2721,6 +2734,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc leftBrace = consumeToken();
 
   // Parse the closure-signature, if present.
+  DeclAttributes attributes;
   SourceRange bracketRange;
   SmallVector<CaptureListEntry, 2> captureList;
   VarDecl *capturedSelfDecl;
@@ -2731,8 +2745,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
   TypeExpr *explicitResultType;
   SourceLoc inLoc;
   Status |= parseClosureSignatureIfPresent(
-      bracketRange, captureList, capturedSelfDecl, params, asyncLoc, throwsLoc,
-      arrowLoc, explicitResultType, inLoc);
+      attributes, bracketRange, captureList, capturedSelfDecl, params, asyncLoc,
+      throwsLoc, arrowLoc, explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2748,8 +2762,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Create the closure expression and enter its context.
   auto *closure = new (Context) ClosureExpr(
-      bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc, arrowLoc,
-      inLoc, explicitResultType, discriminator, CurDeclContext);
+      attributes, bracketRange, capturedSelfDecl, params, asyncLoc, throwsLoc,
+      arrowLoc, inLoc, explicitResultType, discriminator, CurDeclContext);
   ParseFunctionBody cc(*this, closure);
 
   // Handle parameters.

@@ -2077,6 +2077,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
+  TypeChecker::checkClosureAttributes(closure);
   TypeChecker::checkParameterList(closure->getParameters(), closure);
 
   BraceStmt *body = closure->getBody();

@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclContext.h"
@@ -3771,6 +3772,9 @@ public:
   };
 
 private:
+  /// The attributes attached to the closure.
+  DeclAttributes Attributes;
+
   /// The range of the brackets of the capture list, if present.
   SourceRange BracketRange;
     
@@ -3803,13 +3807,14 @@ private:
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
 public:
-  ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
+  ClosureExpr(const DeclAttributes &attributes,
+              SourceRange bracketRange, VarDecl *capturedSelfDecl,
               ParameterList *params, SourceLoc asyncLoc, SourceLoc throwsLoc,
               SourceLoc arrowLoc, SourceLoc inLoc, TypeExpr *explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      BracketRange(bracketRange),
+      Attributes(attributes), BracketRange(bracketRange),
       CapturedSelfDecl(capturedSelfDecl),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
       InLoc(inLoc),
@@ -3829,6 +3834,9 @@ public:
     Body.setPointer(S);
     Body.setInt(isSingleExpression);
   }
+
+  DeclAttributes &getAttrs() { return Attributes; }
+  const DeclAttributes &getAttrs() const { return Attributes; }
 
   /// Determine whether the parameters of this closure are actually
   /// anonymous closure variables.

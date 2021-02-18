@@ -688,6 +688,9 @@ public:
   /// Skip over SIL decls until we encounter the start of a Swift decl or eof.
   void skipSILUntilSwiftDecl();
 
+  /// Skip over any attribute.
+  void skipAnyAttribute();
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -1575,6 +1578,7 @@ public:
   /// \returns ParserStatus error if an error occurred. Success if no signature
   /// is present or succssfully parsed.
   ParserStatus parseClosureSignatureIfPresent(
+          DeclAttributes &attributes,
           SourceRange &bracketRange,
           SmallVectorImpl<CaptureListEntry> &captureList,
           VarDecl *&capturedSelfParamDecl,

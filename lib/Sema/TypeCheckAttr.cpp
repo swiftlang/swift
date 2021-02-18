@@ -5476,3 +5476,34 @@ void AttributeChecker::visitReasyncAttr(ReasyncAttr *attr) {
 }
 
 void AttributeChecker::visitAtReasyncAttr(AtReasyncAttr *attr) {}
+
+namespace {
+
+class ClosureAttributeChecker
+    : public AttributeVisitor<ClosureAttributeChecker> {
+  ASTContext &ctx;
+public:
+  ClosureAttributeChecker(ClosureExpr *closure)
+    : ctx(closure->getASTContext()) { }
+
+  void visitDeclAttribute(DeclAttribute *attr) {
+    ctx.Diags.diagnose(
+        attr->getLocation(), diag::unsupported_closure_attr,
+        attr->isDeclModifier(), attr->getAttrName())
+      .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+  }
+
+  void visitConcurrentAttr(ConcurrentAttr *attr) {
+    // Nothing else to check.
+  }
+};
+
+}
+
+void TypeChecker::checkClosureAttributes(ClosureExpr *closure) {
+  ClosureAttributeChecker checker(closure);
+  for (auto attr : closure->getAttrs()) {
+    checker.visit(attr);
+  }
+}
