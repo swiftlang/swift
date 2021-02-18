@@ -151,7 +151,7 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
     auto waitingTask = waitQueue.load(std::memory_order_acquire);
     fprintf(stderr, "[%s:%d] (%s): has waiter! waiter:%d %s\n", __FILE__, __LINE__, __FUNCTION__, waitingTask, assumed.to_string().c_str());
     while (true) {
-      fprintf(stderr, "[%s:%d] (%s): run waiting task directly!!!!!\n", __FILE__, __LINE__, __FUNCTION__);
+      fprintf(stderr, "[%s:%d] (%s): run waiting task directly!\n", __FILE__, __LINE__, __FUNCTION__);
       // ==== a) run waiting task directly -------------------------------------
       assert(assumed.hasWaitingTask());
       assert(assumed.pendingTasks() && "offered to group with no pending tasks!");

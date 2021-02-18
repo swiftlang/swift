@@ -313,10 +313,11 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
 
   // Perform additional linking between parent and child task.
   if (parent) {
-    if (!flags.task_isGroupChildTask()) {
-      // just a normal child task
-      swift_task_attachChild(parent, task); // TODO: this has to be done outside of here (!!!!!!!!!!!!!!!!!!!)
-    } // else, group children are recorded outside
+    // FIXME: we must attach children (`async let` created child tasks to the parent)
+//    if (!flags.task_isGroupChildTask()) {
+//      // just a normal child task
+//      swift_task_attachChild(parent, task); // TODO: this has to be done outside of here (!!!!!!!!!!!!!!!!!!!)
+//    } // else, group children are recorded outside
 
     // if the parent was already cancelled, we carry this flag forward to the child.
     //
