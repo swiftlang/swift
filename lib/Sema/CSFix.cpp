@@ -953,6 +953,29 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
   llvm_unreachable("covered switch");
 }
 
+bool AllowInvalidRefInKeyPath::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto *primaryFix =
+      commonFixes.front().second->getAs<AllowInvalidRefInKeyPath>();
+  assert(primaryFix);
+
+  if (llvm::all_of(
+          commonFixes,
+          [&primaryFix](
+              const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            return primaryFix->isEqual(entry.second);
+          })) {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  return false;
+}
+
+bool AllowInvalidRefInKeyPath::isEqual(const ConstraintFix *other) const {
+  auto *refFix = other->getAs<AllowInvalidRefInKeyPath>();
+  return refFix ? Kind == refFix->Kind && Member == refFix->Member : false;
+}
+
 AllowInvalidRefInKeyPath *
 AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
                                  ConstraintLocator *locator) {

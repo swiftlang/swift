@@ -1520,9 +1520,17 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
   /// Determine whether give reference requires a fix and produce one.
   static AllowInvalidRefInKeyPath *
   forRef(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+
+  bool isEqual(const ConstraintFix *other) const;
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidRefInKeyPath;
+  }
 
 private:
   static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
