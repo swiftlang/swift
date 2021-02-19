@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DerivedConformances.h"
+#include "llvm/ADT/STLExtras.h"
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -126,7 +127,7 @@ static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
-/// match with the stored vars of the given type.
+/// match with the the given VarDecls.
 static bool validateCodingKeysEnum(DerivedConformance &derived) {
   auto &C = derived.Context;
   auto codingKeysDecls =
@@ -177,35 +178,22 @@ static bool validateCodingKeysEnum(DerivedConformance &derived) {
     return false;
   }
 
-  // Look through all var decls in the given type.
-  // * Filter out lazy/computed vars.
-  // * Filter out ones which are present in the given decl (by name).
+  // Look through all var decls.
   //
   // If any of the entries in the CodingKeys decl are not present in the type
   // by name, then this decl doesn't match.
   // If there are any vars left in the type which don't have a default value
   // (for Decodable), then this decl doesn't match.
-
-  // Here we'll hold on to properties by name -- when we've validated a property
-  // against its CodingKey entry, it will get removed.
-  llvm::SmallMapVector<Identifier, VarDecl *, 8> properties;
-  for (auto *varDecl : derived.Nominal->getStoredProperties()) {
-    if (!varDecl->isUserAccessible())
-      continue;
-
-    properties[getVarNameForCoding(varDecl)] = varDecl;
-  }
-
-  bool propertiesAreValid = true;
+  bool varDeclsAreValid = true;
   for (auto elt : codingKeysDecl->getAllElements()) {
-    auto it = properties.find(elt->getBaseIdentifier());
-    if (it == properties.end()) {
+    auto it = varDecls.find(elt->getBaseIdentifier());
+    if (it == varDecls.end()) {
 
       elt->diagnose(diag::codable_extraneous_codingkey_case_here,
                     elt->getBaseIdentifier());
       // TODO: Investigate typo-correction here; perhaps the case name was
       //       misspelled and we can provide a fix-it.
-      propertiesAreValid = false;
+      varDeclsAreValid = false;
       continue;
     }
 
@@ -221,21 +209,21 @@ static bool validateCodingKeysEnum(DerivedConformance &derived) {
       };
       it->second->diagnose(diag::codable_non_conforming_property_here,
                            derived.getProtocolType(), typeLoc);
-      propertiesAreValid = false;
+      varDeclsAreValid = false;
     } else {
       // The property was valid. Remove it from the list.
-      properties.erase(it);
+      varDecls.erase(it);
     }
   }
 
-  if (!propertiesAreValid)
+  if (!varDeclsAreValid)
     return false;
 
-  // If there are any remaining properties which the CodingKeys did not cover,
+  // If there are any remaining var decls which the CodingKeys did not cover,
   // we can skip them on encode. On decode, though, we can only skip them if
   // they have a default value.
   if (derived.Protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
-    for (auto &entry : properties) {
+    for (auto &entry : varDecls) {
       const auto *pbd = entry.second->getParentPatternBinding();
       if (pbd && pbd->isDefaultInitializable()) {
         continue;
@@ -245,19 +233,48 @@ static bool validateCodingKeysEnum(DerivedConformance &derived) {
         continue;
       }
 
+      if (auto *paramDecl = dyn_cast<ParamDecl>(entry.second)) {
+        if (paramDecl->hasDefaultExpr()) {
+          continue;
+        }
+      }
+
       // The var was not default initializable, and did not have an explicit
       // initial value.
-      propertiesAreValid = false;
+      varDeclsAreValid = false;
       entry.second->diagnose(diag::codable_non_decoded_property_here,
                              derived.getProtocolType(), entry.first);
     }
   }
 
-  return propertiesAreValid;
+  return varDeclsAreValid;
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
-/// match with the stored vars of the given EnumElementDecl.
+/// match with the stored vars of the given type.
+///
+/// \param codingKeysDecl The \c CodingKeys enum decl to validate.
+static bool validateCodingKeysEnum(const DerivedConformance &derived,
+                                   EnumDecl *codingKeysDecl) {
+  // Look through all var decls in the given type.
+  // * Filter out lazy/computed vars.
+  // * Filter out ones which are present in the given decl (by name).
+
+  // Here we'll hold on to properties by name -- when we've validated a property
+  // against its CodingKey entry, it will get removed.
+  llvm::SmallMapVector<Identifier, VarDecl *, 8> properties;
+  for (auto *varDecl : derived.Nominal->getStoredProperties()) {
+    if (!varDecl->isUserAccessible())
+      continue;
+
+    properties[getVarNameForCoding(varDecl)] = varDecl;
+  }
+
+  return validateCodingKeysEnum(derived, properties, codingKeysDecl);
+}
+
+/// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
+/// match with the parameters of the given EnumElementDecl.
 ///
 /// \param elementDecl The \c EnumElementDecl to validate against.
 /// \param codingKeysDecl The \c CodingKeys enum decl to validate.
@@ -265,88 +282,25 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
                                        EnumElementDecl *elementDecl,
                                        EnumDecl *codingKeysDecl) {
   auto &C = derived.Context;
-  auto conformanceDC = derived.getConformanceContext();
-
-  // Look through all var decls in the given type.
-  // * Filter out lazy/computed vars.
-  // * Filter out ones which are present in the given decl (by name).
-  //
-  // If any of the entries in the CodingKeys decl are not present in the type
-  // by name, then this decl doesn't match.
-  // If there are any vars left in the type which don't have a default value
-  // (for Decodable), then this decl doesn't match.
-
-  // Here we'll hold on to properties by name -- when we've validated a property
+  // Here we'll hold on to parameters by name -- when we've validated a parameter
   // against its CodingKey entry, it will get removed.
-  llvm::SmallMapVector<Identifier, ParamDecl *, 8> properties;
+  llvm::SmallMapVector<Identifier, VarDecl *, 8> properties;
   if (elementDecl->hasAssociatedValues()) {
-    int i = 0;
-    auto params = elementDecl->getParameterList();
-    for (auto it = params->begin(); it != params->end(); it++, i++) {
-      auto varDecl = *it;
-      if (!varDecl->isUserAccessible())
+    for (auto entry : llvm::enumerate(*elementDecl->getParameterList())) {
+      auto paramDecl = entry.value();
+      if (!paramDecl->isUserAccessible())
         continue;
 
-      auto identifier = getVarNameForCoding(varDecl);
+      auto identifier = getVarNameForCoding(paramDecl);
       if (identifier.empty()) {
-        identifier = C.getIdentifier("_" + std::to_string(i));
+        identifier = C.getIdentifier("_" + std::to_string(entry.index()));
       }
 
-      properties[identifier] = varDecl;
+      properties[identifier] = paramDecl;
     }
   }
 
-  bool propertiesAreValid = true;
-  for (auto elt : codingKeysDecl->getAllElements()) {
-    auto it = properties.find(elt->getBaseIdentifier());
-    if (it == properties.end()) {
-      elt->diagnose(diag::codable_extraneous_codingkey_case_here,
-                    elt->getBaseIdentifier());
-      // TODO: Investigate typo-correction here; perhaps the case name was
-      //       misspelled and we can provide a fix-it.
-      propertiesAreValid = false;
-      continue;
-    }
-
-    // We have a property to map to. Ensure it's {En,De}codable.
-    auto target =
-        conformanceDC->mapTypeIntoContext(it->second->getValueInterfaceType());
-    if (TypeChecker::conformsToProtocol(target, derived.Protocol, conformanceDC)
-            .isInvalid()) {
-      TypeLoc typeLoc = {
-          it->second->getTypeReprOrParentPatternTypeRepr(),
-          it->second->getType(),
-      };
-      it->second->diagnose(diag::codable_non_conforming_property_here,
-                           derived.getProtocolType(), typeLoc);
-      propertiesAreValid = false;
-    } else {
-      // The property was valid. Remove it from the list.
-      properties.erase(it);
-    }
-  }
-
-  if (!propertiesAreValid)
-    return false;
-
-  // If there are any remaining properties which the CodingKeys did not cover,
-  // we can skip them on encode. On decode, though, we can only skip them if
-  // they have a default value.
-  if (derived.Protocol->isSpecificProtocol(KnownProtocolKind::Decodable)) {
-    for (auto &entry : properties) {
-      if (entry.second->hasDefaultExpr()) {
-        continue;
-      }
-
-      // The var was not default initializable, and did not have an explicit
-      // initial value.
-      propertiesAreValid = false;
-      entry.second->diagnose(diag::codable_non_decoded_property_here,
-                             derived.getProtocolType(), entry.first);
-    }
-  }
-
-  return propertiesAreValid;
+  return validateCodingKeysEnum(derived, properties, codingKeysDecl);
 }
 
 
@@ -364,19 +318,6 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
 /// \return A retrieved canonical \c CodingKeys enum if \c target has a valid
 /// one; \c nullptr otherwise.
 static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
-                                               NominalTypeDecl *target) {
-  auto codingKeyDecls = target->lookupDirect(DeclName(C.Id_CodingKeys));
-  if (codingKeyDecls.empty())
-    return nullptr;
-
-  auto *codingKeysDecl = codingKeyDecls.front();
-  if (auto *typealiasDecl = dyn_cast<TypeAliasDecl>(codingKeysDecl))
-    codingKeysDecl = typealiasDecl->getDeclaredInterfaceType()->getAnyNominal();
-
-  return dyn_cast<EnumDecl>(codingKeysDecl);
-}
-
-static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
                                                NominalTypeDecl *target,
                                                Identifier identifier) {
   auto codingKeyDecls = target->lookupDirect(DeclName(identifier));
@@ -388,6 +329,11 @@ static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
     codingKeysDecl = typealiasDecl->getDeclaredInterfaceType()->getAnyNominal();
 
   return dyn_cast<EnumDecl>(codingKeysDecl);
+}
+
+static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
+                                               NominalTypeDecl *target) {
+  return lookupEvaluatedCodingKeysEnum(C, target, C.Id_CodingKeys);
 }
 
 static EnumElementDecl *lookupEnumCase(ASTContext &C, NominalTypeDecl *target,
@@ -884,10 +830,10 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
       // This case should not be encodable, so throw an error if an attempt is
       // made to encode it
       llvm::SmallString<128> buffer;
-      buffer.append("Case `");
+      buffer.append("Case '");
       buffer.append(elt->getBaseIdentifier().str());
       buffer.append(
-          "` cannot be decoded because it is not defined in CodingKeys.");
+          "' cannot be decoded because it is not defined in CodingKeys.");
       auto *debugMessage = new (C) StringLiteralExpr(
           C.AllocateCopy(buffer.str()), SourceRange(), /* Implicit */ true);
       auto *selfRefExpr = new (C) DeclRefExpr(
@@ -903,7 +849,7 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
       auto *nestedContainerDecl = createKeyedContainer(
           C, funcDC, C.getKeyedEncodingContainerDecl(),
           caseCodingKeys->getDeclaredInterfaceType(), VarDecl::Introducer::Var,
-          C.getIdentifier(StringRef("nestedContainer")));
+          C.Id_nestedContainer);
 
       auto *nestedContainerCall = createNestedContainerKeyedByForKeyCall(
           C, funcDC, containerExpr, caseCodingKeys, codingKeyCase);
@@ -917,18 +863,17 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
       caseStatements.push_back(nestedContainerDecl);
 
       // TODO: use param decls to get names
-      int i = 0;
-      for (auto it = payloadVars.begin(); it != payloadVars.end(); it++, i++) {
-        auto *payloadVar = *it;
+      for (auto entry : llvm::enumerate(payloadVars)) {
+        auto *payloadVar = entry.value();
         auto *nestedContainerExpr = new (C)
             DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
                         /*Implicit=*/true, AccessSemantics::DirectToStorage);
         auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
                                                  /*implicit*/ true);
-        auto *paramDecl = elt->getParameterList()->get(i);
+        auto *paramDecl = elt->getParameterList()->get(entry.index());
         auto caseCodingKeyIdentifier = getVarNameForCoding(paramDecl);
         if (caseCodingKeyIdentifier.empty()) {
-          caseCodingKeyIdentifier = C.getIdentifier("_" + std::to_string(i));
+          caseCodingKeyIdentifier = C.getIdentifier("_" + std::to_string(entry.index()));
         }
         auto *caseCodingKey =
             lookupEnumCase(C, caseCodingKeys, caseCodingKeyIdentifier);
@@ -1372,14 +1317,12 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
 
       llvm::SmallVector<Expr *, 3> decodeCalls;
       llvm::SmallVector<Identifier, 3> params;
-      int i = 0;
-      auto *paramList = elt->getParameterList();
-      if (paramList) {
-        for (auto it = paramList->begin(); it != paramList->end(); it++, i++) {
-          auto *paramDecl = *it;
+      if (elt->hasAssociatedValues()) {
+        for (auto entry : llvm::enumerate(*elt->getParameterList())) {
+          auto *paramDecl = entry.value();
           Identifier identifier = getVarNameForCoding(paramDecl);
           if (identifier.empty()) {
-            identifier = C.getIdentifier("_" + std::to_string(i));
+            identifier = C.getIdentifier("_" + std::to_string(entry.index()));
           }
           auto *caseCodingKey = lookupEnumCase(C, caseCodingKeys, identifier);
 

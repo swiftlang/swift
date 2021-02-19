@@ -2909,7 +2909,8 @@ NOTE(decodable_suggest_overriding_init_here,none,
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
 NOTE(codable_enum_duplicate_case_name_here,none,
-     "cannot automatically synthesize %0 because %1 has duplicate case name %2", (Type, Type, Identifier))
+     "cannot automatically synthesize %0 because %1 has duplicate "
+     "case name %2", (Type, Type, Identifier))
 
 WARNING(decodable_property_will_not_be_decoded, none,
         "immutable property will not be decoded because it is declared with "
