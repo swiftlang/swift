@@ -989,8 +989,13 @@ private:
   /// The allocator for the connection graphs in Function2ConGraph.
   llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
 
+  // TODO: Use per-function caches, at least for Resilient types, to use Maximal
+  // expansion.
+
   /// Cache for isPointer().
   PointerKindCache pointerKindCache;
+  /// Cache for checking the aggregate pointerness of class properties.
+  PointerKindCache classPropertiesKindCache;
 
   SILModule *M;
 
@@ -1013,6 +1018,12 @@ private:
   PointerKind findRecursivePointerKind(SILType Ty, const SILFunction &F) const;
 
   PointerKind findCachedPointerKind(SILType Ty, const SILFunction &F) const;
+
+  PointerKind findClassPropertiesPointerKind(SILType Ty,
+                                             const SILFunction &F) const;
+
+  PointerKind findCachedClassPropertiesKind(SILType Ty,
+                                            const SILFunction &F) const;
 
   // Returns true if the type \p Ty must be a reference or must transitively
   // contain a reference and no other pointer or address type.

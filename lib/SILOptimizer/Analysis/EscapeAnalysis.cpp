@@ -101,6 +101,54 @@ EscapeAnalysis::findRecursivePointerKind(SILType Ty,
   return NoPointer;
 }
 
+// Return the PointerKind that summarizes a class's stored properties.
+//
+// If a class only holds fields of non-pointer types, then it is guaranteed not
+// to point to any other objects.
+EscapeAnalysis::PointerKind
+EscapeAnalysis::findClassPropertiesPointerKind(SILType Ty,
+                                               const SILFunction &F) const {
+  if (Ty.isAddress())
+    return AnyPointer;
+
+  auto *classDecl = Ty.getClassOrBoundGenericClass();
+  if (!classDecl)
+    return AnyPointer;
+
+  auto &M = F.getModule();
+  auto expansion = F.getTypeExpansionContext();
+
+  // Start with the most precise pointer kind
+  PointerKind propertiesKind = NoPointer;
+  auto meetAggregateKind = [&](PointerKind otherKind) {
+    if (otherKind > propertiesKind)
+      propertiesKind = otherKind;
+  };
+  for (Type classTy = Ty.getASTType(); classTy;
+       classTy = classTy->getSuperclass()) {
+    classDecl = classTy->getClassOrBoundGenericClass();
+    assert(classDecl && "superclass must be a class");
+
+    // Return AnyPointer unless we have guaranteed visibility into all class and
+    // superclass properties. Use Minimal resilience expansion because the cache
+    // is not per-function.
+    if (classDecl->isResilient())
+      return AnyPointer;
+
+    // For each field in the class, get the pointer kind for that field. For
+    // reference-type properties, this will be ReferenceOnly. For aggregates, it
+    // will be the meet over all aggregate fields.
+    SILType objTy =
+      SILType::getPrimitiveObjectType(classTy->getCanonicalType());
+    for (VarDecl *property : classDecl->getStoredProperties()) {
+      SILType fieldTy =
+          objTy.getFieldType(property, M, expansion).getObjectType();
+      meetAggregateKind(findCachedPointerKind(fieldTy, F));
+    }
+  }
+  return propertiesKind;
+}
+
 // Returns the kind of pointer that \p Ty recursively contains.
 EscapeAnalysis::PointerKind
 EscapeAnalysis::findCachedPointerKind(SILType Ty, const SILFunction &F) const {
@@ -110,6 +158,19 @@ EscapeAnalysis::findCachedPointerKind(SILType Ty, const SILFunction &F) const {
 
   PointerKind pointerKind = findRecursivePointerKind(Ty, F);
   const_cast<EscapeAnalysis *>(this)->pointerKindCache[Ty] = pointerKind;
+  return pointerKind;
+}
+
+EscapeAnalysis::PointerKind
+EscapeAnalysis::findCachedClassPropertiesKind(SILType Ty,
+                                              const SILFunction &F) const {
+  auto iter = classPropertiesKindCache.find(Ty);
+  if (iter != classPropertiesKindCache.end())
+    return iter->second;
+
+  PointerKind pointerKind = findClassPropertiesPointerKind(Ty, F);
+  const_cast<EscapeAnalysis *>(this)
+    ->classPropertiesKindCache[Ty] = pointerKind;
   return pointerKind;
 }
 
@@ -2124,11 +2185,18 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       if (!fieldNode) {
         // In the unexpected case that the object has no field content, create
         // escaping unknown content.
+        //
+        // TODO: Why does this need to be "escaping"? The fields can't escape
+        // during deinitialization.
         ConGraph->getOrCreateUnknownContent(objNode)->markEscaping();
         return;
       }
       if (!deinitIsKnownToNotCapture(OpV)) {
-        ConGraph->getOrCreateUnknownContent(fieldNode)->markEscaping();
+        // Find out if the object's fields may have any references or pointers.
+        PointerKind propertiesKind =
+            findCachedClassPropertiesKind(OpV->getType(), *OpV->getFunction());
+        if (propertiesKind != EscapeAnalysis::NoPointer)
+          ConGraph->getOrCreateUnknownContent(fieldNode)->markEscaping();
         return;
       }
       // This deinit is known to not directly capture it's own field content;
