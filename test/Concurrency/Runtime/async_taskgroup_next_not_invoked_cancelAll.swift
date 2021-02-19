@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
+
+import Dispatch
 
 #if canImport(Darwin)
 import Darwin
@@ -15,7 +19,7 @@ func test_skipCallingNext_butInvokeCancelAll() async {
     for n in numbers {
       print("group.add { \(n) }")
       await group.add { () async -> Int in
-        usleep(1000 * 2)
+        sleep(2)
         print("  inside group.add { \(n) }")
         let c = await Task.__unsafeCurrentAsync().isCancelled
         print("  inside group.add { \(n) } (task cancelled: \(c))")

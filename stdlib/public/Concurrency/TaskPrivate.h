@@ -143,8 +143,8 @@ static void runTaskWithPollResult(
       // return a `nil` here (as result of the `group.next()`)
       waitingTaskContext->result.storage = nullptr;
       break;
-    case TaskGroup::GroupPollStatus::Waiting:
-      assert(false && "Must not attempt to run with a Waiting result.");
+    case TaskGroup::GroupPollStatus::MustWait:
+      assert(false && "Must not attempt to run with a MustWait result.");
   }
 
   // FIXME: removing children on next() resumption is not implemented yet; we keep accumulating them until the group exits

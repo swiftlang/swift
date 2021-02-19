@@ -1,9 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
+// REQUIRES: libdispatch
 
 import Dispatch
 
@@ -27,7 +26,7 @@ func test_taskGroup_cancel_parent_affects_group() async {
   let x = Task.runDetached {
     try! await Task.withGroup(resultType: Int.self) { group -> Void in
       await group.add {
-        usleep(3 * 1000)
+        sleep(3)
         let c = await Task.__unsafeCurrentAsync().isCancelled
         print("group task isCancelled: \(c)")
         return 0

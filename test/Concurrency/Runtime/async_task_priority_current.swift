@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck --dump-input=always %s
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
+
+import Dispatch
 
 #if canImport(Darwin)
 import Darwin
@@ -30,7 +34,7 @@ func test_multiple_lo_indirectly_escalated() async {
   @concurrent
   func loopUntil(priority: Task.Priority) async {
     while (await Task.__unsafeCurrentAsync().task.priority != priority) {
-      usleep(1000 * 1)
+      sleep(1)
     }
   }
 

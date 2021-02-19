@@ -91,13 +91,6 @@ void TaskGroup::destroy(AsyncTask *task) {
   swift_task_removeStatusRecord(task, Record);
   swift_task_dealloc(task, Record);
 
-  // TODO: need to release all waiters as well
-//  auto waitHead = waitQueue.load(std::memory_order_acquire);
-//  switch (waitHead.getStatus()) {
-//    case TaskGroup::WaitStatus::Waiting:
-//      assert(false && "destroying a task group that still has waiting tasks");
-//  }
-
   mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
   // Release all ready tasks which are kept retained, the group destroyed,
   // so no other task will ever await on them anymore;
@@ -223,7 +216,7 @@ void swift::swift_task_group_wait_next(
   TaskGroup::PollResult polled = group->poll(waitingTask);
   fprintf(stderr, "[%s:%d] (%s): group polled: %d\n", __FILE__, __LINE__, __FUNCTION__, polled.status);
 
-  if (polled.status == TaskGroup::GroupPollStatus::Waiting) {
+  if (polled.status == TaskGroup::GroupPollStatus::MustWait) {
     fprintf(stderr, "[%s:%d] (%s): group polled: WAITING\n", __FILE__, __LINE__, __FUNCTION__);
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
@@ -280,7 +273,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
       ReadyQueueItem item;
       bool taskDequeued = readyQueue.dequeue(item);
       if (!taskDequeued) {
-        result.status = TaskGroup::GroupPollStatus::Waiting;
+        result.status = TaskGroup::GroupPollStatus::MustWait;
         result.storage = nullptr;
         result.retainedTask = nullptr;
         mutex.unlock(); // TODO: remove group lock, and use status for synchronization
@@ -336,7 +329,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
       fprintf(stderr, "[%s:%d] (%s): added to wait queue\n", __FILE__, __LINE__, __FUNCTION__);
       mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
       // no ready tasks, so we must wait.
-      result.status = TaskGroup::GroupPollStatus::Waiting;
+      result.status = TaskGroup::GroupPollStatus::MustWait;
       return result;
     } // else, try again
   }

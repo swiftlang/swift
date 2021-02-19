@@ -111,9 +111,7 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   assert(queueHead.getStatus() == Status::Executing);
 
   // If this is task group child, notify the parent group about the completion.
-  fprintf(stderr, "[%s:%d] (%s) complete task %d\n", __FILE__, __LINE__, __FUNCTION__, this);
   if (hasGroupChildFragment()) {
-    fprintf(stderr, "[%s:%d] (%s) complete group child task %d\n", __FILE__, __LINE__, __FUNCTION__, this);
     // then we must offer into the parent group that we completed,
     // so it may `next()` poll completed child tasks in completion order.
     auto group = groupChildFragment()->getGroup();
@@ -141,7 +139,6 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
 
   // For a future, destroy the result.
   if (task->isFuture()) {
-    fprintf(stderr, "[%s:%d] (%s): task: %d\n", __FILE__, __LINE__, __FUNCTION__, task);
     task->futureFragment()->destroy();
   }
 
@@ -313,13 +310,7 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
 
   // Perform additional linking between parent and child task.
   if (parent) {
-    // FIXME: we must attach children (`async let` created child tasks to the parent)
-//    if (!flags.task_isGroupChildTask()) {
-//      // just a normal child task
-//      swift_task_attachChild(parent, task); // TODO: this has to be done outside of here (!!!!!!!!!!!!!!!!!!!)
-//    } // else, group children are recorded outside
-
-    // if the parent was already cancelled, we carry this flag forward to the child.
+    // If the parent was already cancelled, we carry this flag forward to the child.
     //
     // In a task group we would not have allowed the `add` to create a child anymore,
     // however better safe than sorry and `async let` are not expressed as task groups,

@@ -51,17 +51,12 @@ namespace swift {
         Error = 0b11,
     };
 
-    /// Describes the status of the waiting task that is suspended on `next()`.
-    enum class WaitStatus : uintptr_t {
-        Waiting = 0,
-    };
-
     enum class GroupPollStatus : uintptr_t {
         /// The channel is known to be empty and we can immediately return nil.
         Empty = 0,
 
         /// The task has been enqueued to the channels wait queue.
-        Waiting = 1,
+        MustWait = 1,
 
         /// The task has completed with result (of type \c resultType).
         Success = 2,
@@ -331,12 +326,17 @@ namespace swift {
       return s;
     }
 
+    /// Add a single pending task to the status counter.
+    /// This is used to implement next() properly, as we need to know if there
+    /// are pending tasks worth suspending/waiting for or not.
+    ///
+    /// Note that the group does *not* store child tasks at all, as they are
+    /// stored in the `TaskGroupTaskStatusRecord` inside the current task, that
+    /// is currently executing the group. Here we only need the counts of
+    /// pending/ready tasks.
+    ///
     /// Returns *assumed* new status, including the just performed +1.
-    GroupStatus statusAddPendingTaskRelaxed(
-//        AsyncTask* pendingTask
-        ) {
-//      assert(pendingTask->isFuture());
-
+    GroupStatus statusAddPendingTaskRelaxed() {
       auto old = status.fetch_add(GroupStatus::onePendingTask, std::memory_order_relaxed);
       auto s = GroupStatus {old + GroupStatus::onePendingTask };
 
@@ -346,29 +346,12 @@ namespace swift {
         s = GroupStatus {o - GroupStatus::onePendingTask };
       }
 
-      fprintf(stderr, "[%s:%d] (%s): status %s\n", __FILE__, __LINE__, __FUNCTION__, s.to_string().c_str());
-
-//      // FIXME: we won't need the +1 in the status, just the queue?
-//      pendingQueue.enqueue(PendingQueueItem::get(pendingTask))
       return s;
     }
 
     GroupStatus statusLoadRelaxed() {
       return GroupStatus{status.load(std::memory_order_relaxed)};
     }
-
-//    /// Returns *assumed* new status, including the just performed +1.
-//    GroupStatus statusAddWaitingTaskAcquire() {
-//      auto old = status.fetch_add(GroupStatus::oneWaitingTask, std::memory_order_acquire);
-//      return GroupStatus { old + GroupStatus::oneWaitingTask };
-//    }
-
-//    /// Remove waiting task, without taking any pending task.
-//    GroupStatus statusRemoveWaitingTask() {
-//      return GroupStatus {
-//          status.fetch_sub(GroupStatus::oneWaitingTask, std::memory_order_relaxed)
-//      };
-//    }
 
     /// Compare-and-set old status to a status derived from the old one,
     /// by simultaneously decrementing one Pending and one Waiting tasks.
@@ -397,7 +380,7 @@ namespace swift {
     /// If unable to complete the waiting task immediately (with an readily
     /// available completed task), either returns an `GroupPollStatus::Empty`
     /// result if it is known that no pending tasks in the group,
-    /// or a `GroupPollStatus::Waiting` result if there are tasks in flight
+    /// or a `GroupPollStatus::MustWait` result if there are tasks in flight
     /// and the waitingTask eventually be woken up by a completion.
     TaskGroup::PollResult poll(AsyncTask *waitingTask);
 

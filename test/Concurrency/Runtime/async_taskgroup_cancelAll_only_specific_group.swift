@@ -1,6 +1,10 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
+
+import Dispatch
 
 #if canImport(Darwin)
 import Darwin
@@ -24,7 +28,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
 
     for i in 1...5 {
       await group.add {
-        usleep(1000 * 1)
+        sleep(1)
         let c = await Task.__unsafeCurrentAsync().isCancelled
         pprint("add: \(i) (cancelled: \(c))")
         return i
@@ -49,7 +53,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
   let g2: Int = try! await Task.withGroup(resultType: Int.self) { group in
     for i in 1...3 {
       await group.add {
-        usleep(1000 * 1)
+        sleep(1)
         let c = await Task.__unsafeCurrentAsync().isCancelled
         pprint("g1 task \(i) (cancelled: \(c))")
         return i

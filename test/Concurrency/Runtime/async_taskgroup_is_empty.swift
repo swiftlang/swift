@@ -1,9 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
+// REQUIRES: libdispatch
 
 import Dispatch
 

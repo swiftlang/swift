@@ -13,12 +13,6 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-//import Darwin // FIXME: remove this
-
-func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-//  fputs("[\(file):\(line)] \(m)\n", stderr)
-}
-
 // ==== Task Group -------------------------------------------------------------
 
 extension Task {
@@ -69,7 +63,6 @@ extension Task {
   public static func withGroup<TaskResult, BodyResult>(
     resultType: TaskResult.Type,
     returning returnType: BodyResult.Type = BodyResult.self,
-//    startingChildTasksOn executor: ExecutorRef? = nil, // TODO: actually respect it
     body: (inout Task.Group<TaskResult>) async throws -> BodyResult
   ) async throws -> BodyResult {
     let task = Builtin.getCurrentAsyncTask()
@@ -184,6 +177,12 @@ extension Task {
     /// Awaiting on an empty group results in the immediate return of a `nil`
     /// value, without the group task having to suspend.
     ///
+    /// It is also possible to use `for await` to collect results of a task groups:
+    ///
+    ///     for await try value in group {
+    ///         collected += value
+    ///     }
+    ///
     /// ### Thread-safety
     /// Please note that the `group` object MUST NOT escape into another task.
     /// The `group.next()` MUST be awaited from the task that had originally
@@ -263,10 +262,13 @@ extension Task {
     /// Any results, including errors thrown by tasks affected by this
     /// cancellation, are silently discarded.
     ///
+    /// This function may be called even from within child (or any other) tasks,
+    /// and will reliably cause the group to become cancelled.
+    ///
     /// - SeeAlso: `Task.addCancellationHandler`
     /// - SeeAlso: `Task.checkCancelled`
     /// - SeeAlso: `Task.isCancelled`
-    public mutating func cancelAll() {
+    public func cancelAll() {
       _taskGroupCancelAll(task: _task, group: _group)
     }
 
