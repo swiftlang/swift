@@ -152,7 +152,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         // unfortunately means that we expect a witness even if one will not be
         // produced, which requires DerivedConformance::deriveCodable to output
         // its own diagnostics.
-        return DC->getASTContext().LangOpts.EnableExperimentalEnumCodableDerivation;
+        return DC->getASTContext()
+            .LangOpts.EnableExperimentalEnumCodableDerivation;
 
       default:
         return false;
