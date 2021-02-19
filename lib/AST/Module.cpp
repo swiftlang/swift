@@ -918,8 +918,8 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
   // Due to an IRGen limitation, witness tables cannot be passed from an
   // existential to an archetype parameter, so for now we restrict this to
-  // @objc protocols.
-  if (!layout.isObjC()) {
+  // @objc protocols and marker protocols.
+  if (!layout.isObjC() && !protocol->isMarkerProtocol()) {
     // There's a specific exception for protocols with self-conforming
     // witness tables, but the existential has to be *exactly* that type.
     // TODO: synthesize witness tables on-demand for protocol compositions
