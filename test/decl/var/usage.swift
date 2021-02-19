@@ -46,18 +46,44 @@ func testStruct() {
   var h = X() // expected-warning {{variable 'h' was written to, but never read}}
   h = g
   
+  _ = X()
+}
+
+func testDuplicateReference() {
   // Variables reference the same value but should only track their own uses
-  let i = X()
-  let j = i // expected-warning {{initialization of immutable value 'j' was never used; consider replacing with assignment to '_' or removing it}}
-  var k = i // expected-warning {{initialization of variable 'k' was never used; consider replacing with assignment to '_' or removing it}}
-  markUsed(i)
+  let a = X() // expected-note {{initially referenced here}}
+  let b = a // expected-warning {{immutable value referenced by 'b' is already referenced by 'a'; consider removing it and replacing all uses of 'b' with 'a'}}
+  var c = a // expected-warning {{initialization of variable 'c' was never used; consider replacing with assignment to '_' or removing it}}
+  markUsed(a)
   
-  let l = X()
-  let m = l
-  var n = m // expected-warning {{initialization of variable 'n' was never used; consider replacing with assignment to '_' or removing it}}
-  markUsed(m)
+  let d = X() // expected-note {{initially referenced here}}
+  let e = d // expected-warning {{immutable value referenced by 'e' is already referenced by 'd'; consider removing it and replacing all uses of 'e' with 'd'}}
+  var f = e // expected-warning {{initialization of variable 'f' was never used; consider replacing with assignment to '_' or removing it}}
+  markUsed(e)
   
-  _ = X() // ok
+  let g = X()
+  var h = g // expected-warning {{initialization of variable 'h' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+func testDuplicateReferenceStructParam(a: X) -> X { // expected-note {{initially referenced here}}
+  let b = a // expected-warning {{immutable value referenced by 'b' is already referenced by 'a'; consider removing it and replacing all uses of 'b' with 'a'}}
+  return b
+}
+
+func testNotDuplicateReferenceStructParam(a: X) -> X {
+  var b = a // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  return b
+}
+
+func testDuplicateReferenceIntParam(a: Int) -> Int { // expected-note {{initially referenced here}}
+  let b = a // expected-warning {{immutable value referenced by 'b' is already referenced by 'a'; consider removing it and replacing all uses of 'b' with 'a'}}
+  return b
+}
+
+func testNotDuplicateReferenceIntParam(a: Int) -> Int {
+  let b = a + 1
+  var c = a // expected-warning {{initialization of variable 'c' was never used; consider replacing with assignment to '_' or removing it}}
+  return b
 }
 
 func takeClosure(_ fn : () -> ()) {}
@@ -76,12 +102,22 @@ enum TestEnum {
   case Test(Int, Int, Int)
 }
 
-func testEnum() -> Int {
+func testEnumNotMutated() -> Int {
   let ev = TestEnum.Test(5, 6, 7)
   switch ev {
   case .Test(var i, var j, var k): // expected-warning {{variable 'i' was never mutated; consider changing to 'let' constant}} {{14-17=let}}
                                    // expected-warning@-1 {{variable 'j' was never mutated; consider changing to 'let' constant}} {{21-24=let}}
                                    // expected-warning@-2 {{variable 'k' was never mutated; consider changing to 'let' constant}} {{28-31=let}}
+    return i + j + k
+  default: // expected-warning {{default will never be executed}}
+    return 0
+  }
+}
+
+func testEnum() -> Int {
+  let ev = TestEnum.Test(5, 6, 7)
+  switch ev {
+  case .Test(let i, let j, let k):
     return i + j + k
   default: // expected-warning {{default will never be executed}}
     return 0
@@ -103,7 +139,7 @@ func nestedFunction() -> Int {
 func neverRead() {
   var x = 42  // expected-warning {{variable 'x' was written to, but never read}}
   
-  x = 97
+  x += 97
   x = 123
 }
 
@@ -1141,7 +1177,7 @@ func testCallable(a: Callable, b: Throwing) {
 // SR-4082
 func foo2() {
   let x = 5
-  if x < 0, let x = Optional(1) { } // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} expected-note {{condition always evaluates to false}} expected-warning {{will never be executed}}
+  if x < 0, let x = Optional(1) { } // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 }
 
 class ForwardReference {

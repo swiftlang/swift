@@ -465,10 +465,27 @@ bool inBlock(SILInstruction *I, SILBasicBlock *BB) {
   return false;
 }
 
+bool instructionPrecedes(SILInstruction *First,
+                         SILInstruction *Second,
+                         SILBasicBlock *BB) {
+  auto i = BB->begin(), e = BB->end();
+  while (i != e) {
+    if (&*i == Second) {
+      return false;
+    } else if (&*i == First) {
+      return true;
+    }
+    ++i;
+  }
+  assert(false);
+  return false;
+}
+
 class VariableReadTraverser {
   
   VarDecl *VD;
   llvm::SetVector<SILInstruction *> DirectCheckWorklist;
+  llvm::SetVector<SILInstruction *> DuplicateReferences;
   SmallVector<SILValue, 32> Worklist;
   llvm::SetVector<SILValue> Seen;
   SILInstruction *EntryInst;
@@ -597,8 +614,12 @@ private:
   }
   
   bool notIgnored(SILInstruction *I) {
-    if (VD->isCaseBodyVariable()) {
-      return inBlock(I, CurBlock);
+    if (auto DebugVD = getVarDecl(I)) {
+      if (auto ParentStmt = DebugVD->getRecursiveParentPatternStmt()) {
+        if (isa<CaseStmt>(ParentStmt)) {
+          return inBlock(I, CurBlock);
+        }
+      }
     }
     return true;
   }
@@ -719,7 +740,7 @@ private:
           return isAssignedToVarDecl(VD, DestVD);
         }
         
-        return false;
+        return true;
 //        return SI->getSrc() == Value && notIgnored(I);
       }
       case SILInstructionKind::AssignInst:
@@ -736,7 +757,7 @@ private:
         if (auto *DebugVD = getVarDecl(I)) {
           return isAssignedToVarDecl(VD, DebugVD);
         }
-        return false;
+        return notIgnored(I);
         
       case SILInstructionKind::BeginAccessInst:
         return (dyn_cast<BeginAccessInst>(I)->getAccessKind() == SILAccessKind::Read);
@@ -793,6 +814,7 @@ private:
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::TryApplyInst: {
         
+        /*
         // The value referenced by the Var Declaration is used as a function
         // parameter. Check that the parameter explicitly refers to this
         // Var Declaration.
@@ -816,22 +838,15 @@ private:
 //            }
           }
         }
+        */
+        
+        appendValues(I);
         
         // This function is defined locally, and we can step in to
         // track variable usage
         if (SILArgument *Arg = getFunctionArgInst(I, Op)) {
-          if (auto FAI = dyn_cast<SILFunctionArgument>(Arg)) {
-            foundVD |= FAI->isSelf();
-          }
-          if (foundVD) {
-            appendValue(Arg);
-          }
+          appendValue(Arg);
         }
-        
-        if (foundVD) {
-          appendValues(I);
-        }
-        
         break;
       }
         
@@ -991,6 +1006,47 @@ static void searchSetterParam(VarDecl *VD,
   }
 }
 
+static VarDecl *initialReference(SILInstruction *I,
+                                 SILBasicBlock *BB) {
+  auto DVI = dyn_cast<DebugValueInst>(I);
+  if (!DVI) {
+    return nullptr;
+  }
+  
+  if (auto DebugVD = getVarDecl(I)) {
+    if (DebugVD->isCaptureList()) {
+      return nullptr;
+    }
+    if (auto ParentStmt = DebugVD->getRecursiveParentPatternStmt()) {
+      if (isa<CaseStmt>(ParentStmt)) {
+        return nullptr;
+      }
+    }
+  }
+  
+  auto ReferencedValue = DVI->getAllOperands()[0].get();
+  
+  DebugValueInst *InitialRef = DVI;
+  for (auto Use : ReferencedValue->getUses()) {
+    auto UserDVI = dyn_cast<DebugValueInst>(Use->getUser()); 
+    if (!DVI) {
+      continue;
+    }
+    if (instructionPrecedes(UserDVI, DVI, BB)) {
+      InitialRef = UserDVI;
+    }
+  }
+  
+  if (InitialRef == DVI) {
+    return nullptr;
+  }
+  
+  if (auto VD = getVarDecl(InitialRef)) {
+    return VD;
+  }
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                         MARK: Diagostics Generator
 //===----------------------------------------------------------------------===//
@@ -1001,6 +1057,19 @@ class DiagnoseVarUsageCollector {
 public:
   
   DiagnoseVarUsageCollector(ASTContext &Context) : Context(Context) {}
+  
+  void diagnoseDuplicateReference(VarDecl *VD, VarDecl *IVD) {
+    Context.Diags.diagnoseWithNotes(
+      Context.Diags.diagnose(VD->getLoc(),       
+                             diag::immutable_value_duplicate_reference,
+                             VD->getName(), IVD->getName()),
+                             [&]() {
+      // Emit a note to swap to mark the initial reference
+      Context.Diags.diagnose(IVD->getLoc(),
+                             diag::value_initial_reference);
+    
+    });
+  }
   
   void diagnoseReadModified(VarDecl *var) {
   }
@@ -1016,11 +1085,12 @@ public:
       if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr &&
           !isa<TypedPattern>(pbd->getPattern(0))) {
         unsigned varKind = var->isLet();
-        SourceRange replaceRange(
-                                 pbd->getStartLoc(),
+        SourceRange replaceRange(pbd->getStartLoc(),
                                  pbd->getPattern(0)->getEndLoc());
-        Context.Diags.diagnose(var->getLoc(), diag::pbd_never_used,
-                               var->getName(), varKind)
+        Context.Diags.diagnose(var->getLoc(),
+                               diag::pbd_never_used,
+                               var->getName(),
+                               varKind)
         .fixItReplace(replaceRange, "_");
         return;
       }
@@ -1216,6 +1286,7 @@ static void checkVarUsage(SILFunction &Fn) {
   llvm::SetVector<VarDecl *> VarReadUnmodified;
   llvm::SetVector<VarDecl *> VarUnreadModified;
   llvm::SetVector<VarDecl *> VarReadModified;
+  llvm::MapVector<VarDecl *, VarDecl *> VarDuplicateReference;
   
   for (auto &bb : Fn) {
     auto i = bb.begin(), e = bb.end();
@@ -1237,6 +1308,12 @@ static void checkVarUsage(SILFunction &Fn) {
       
       if (!VarAll.count(VD)) {
         VarAll.insert(VD);
+      }
+      
+      // TODO: add documentation.
+      if (VarDuplicateReference.lookup(VD)) {
+        ++i;
+        continue;
       }
       
       // If an instruction from the declaration has
@@ -1277,7 +1354,9 @@ static void checkVarUsage(SILFunction &Fn) {
       // Promote new declarations and unread and unmodified declarations
       bool DidRead = didRead(VD, Inst, &bb);
       bool DidModify = didModify(VD, Inst);
-      if (!DidRead && !DidModify) {
+      if (auto InitialVD = initialReference(Inst, &bb)) {
+        VarDuplicateReference.insert(std::make_pair(VD, InitialVD));
+      } else if (!DidRead && !DidModify) {
         VarUnreadUnmodified.insert(VD);
       } else if (DidRead && !DidModify) {
         VarReadUnmodified.insert(VD);
@@ -1333,7 +1412,9 @@ static void checkVarUsage(SILFunction &Fn) {
   // Run Diagnostics
   
   for (VarDecl *VD : VarAll) {
-    if (VarUnreadUnmodified.count(VD)) {
+    if (auto IVD = VarDuplicateReference.lookup(VD)) {
+      DVUC.diagnoseDuplicateReference(VD, IVD);
+    } if (VarUnreadUnmodified.count(VD)) {
       DVUC.diagnoseUnreadUnmodified(VD);
     } else if (VarReadUnmodified.count(VD)) {
       DVUC.diagnoseReadUnmodified(VD);
