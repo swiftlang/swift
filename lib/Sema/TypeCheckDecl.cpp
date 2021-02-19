@@ -934,8 +934,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
           nullptr);
 
   auto reqSignature = std::move(builder).computeGenericSignature(
-                        SourceLoc(),
-                        /*allowConcreteGenericPArams=*/false,
+                        /*allowConcreteGenericParams=*/false,
                         /*allowBuilderToMove=*/false);
   return reqSignature->getRequirements();
 }

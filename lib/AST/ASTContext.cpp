@@ -1743,8 +1743,7 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 
 #if SWIFT_GSB_EXPENSIVE_ASSERTIONS
   auto builderSig =
-    builder->computeGenericSignature(SourceLoc(),
-                                     /*allowConcreteGenericParams=*/true);
+    builder->computeGenericSignature(/*allowConcreteGenericParams=*/true);
   if (builderSig.getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";

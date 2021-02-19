@@ -626,7 +626,6 @@ public:
   /// After this point, one cannot introduce new requirements, and the
   /// generic signature builder no longer has valid state.
   GenericSignature computeGenericSignature(
-                      SourceLoc loc,
                       bool allowConcreteGenericParams = false,
                       bool allowBuilderToMove = true) &&;
 
@@ -639,8 +638,7 @@ private:
   ///
   /// \param allowConcreteGenericParams If true, allow generic parameters to
   /// be made concrete.
-  void finalize(SourceLoc loc,
-                TypeArrayView<GenericTypeParamType> genericParams,
+  void finalize(TypeArrayView<GenericTypeParamType> genericParams,
                 bool allowConcreteGenericParams=false);
 
 public:
