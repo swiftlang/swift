@@ -564,9 +564,14 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
 
   // Child tasks need to be recursively escalated.
-  case TaskStatusRecordKind::ChildTask:
-  case TaskStatusRecordKind::TaskGroup: {
+  case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_escalate(child, newPriority);
+    return;
+  }
+  case TaskStatusRecordKind::TaskGroup: {
+    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_escalate(child, newPriority);
     return;
