@@ -60,8 +60,8 @@ sil_vtable C {
 
 struct S {}
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @structtypeSAndClassinstanceCToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
-// CHECK-LL: define internal swiftcc void @"$s34structtypeSAndClassinstanceCToVoidTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @structtypeSAndClassinstanceCToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s34structtypeSAndClassinstanceCToVoidTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
 sil @structtypeSAndClassinstanceCToVoid : $@async @convention(thin) (@thin S.Type, @owned C) -> () {
 entry(%S_type: $@thin S.Type, %C_instance: $C):
   %S_type_addr = alloc_stack $@thick S.Type

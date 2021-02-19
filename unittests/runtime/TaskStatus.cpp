@@ -38,7 +38,7 @@ using undeduced =
   typename std::enable_if<std::is_same<T, T>::value, T>::type;
 
 template <class T>
-SWIFT_CC(swift)
+SWIFT_CC(swiftasync)
 static void simpleTaskInvokeFunction(AsyncTask *task, ExecutorRef executor,
                                      SWIFT_ASYNC_CONTEXT AsyncContext *context) {
   auto valueContext = static_cast<ValueContext<T>*>(context);

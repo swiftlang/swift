@@ -20,8 +20,8 @@ sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) ->
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
 // CHECK-LL: @inGenericAndInoutGenericToGenericTu =
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @inGenericAndInoutGenericToGeneric(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
-// CHECK-LL: define internal swiftcc void @"$s017inGenericAndInoutb2ToB0TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @inGenericAndInoutGenericToGeneric(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s017inGenericAndInoutb2ToB0TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
 sil @inGenericAndInoutGenericToGeneric : $@async @convention(thin) <T> (@in T, @inout T) -> @out T {
 entry(%out : $*T, %in : $*T, %inout : $*T):
   %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
