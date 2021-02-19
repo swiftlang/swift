@@ -4085,11 +4085,8 @@ ModuleFile::getDeclChecked(
       return deserialized;
 
     auto *decl = declOrOffset.get();
-    if (decl->isInvalid()) {
-      if (!isAllowModuleWithCompilerErrorsEnabled()) {
-        getContext().Diags.diagnose(SourceLoc(),
-                                    diag::serialization_invalid_decl);
-      } else if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
+    if (isAllowModuleWithCompilerErrorsEnabled() && decl->isInvalid()) {
+      if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
         // The parent function will be invalid if the parameter is invalid,
         // implicits should have an invalid explicit as well
         if (auto *VD = dyn_cast<ValueDecl>(decl)) {
