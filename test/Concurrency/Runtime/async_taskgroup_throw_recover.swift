@@ -13,15 +13,9 @@ func boom() async throws -> Int {
   throw Boom()
 }
 
-func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-//  fputs("[\(file):\(line)] \(m)\n", stderr)
-  print(m)
-}
-
-
 func test_taskGroup_throws() async {
   do {
-    pprint("start \(#function)")
+    print("start \(#function)")
     let got = try! await Task.withGroup(resultType: Int.self) {
       group async throws -> Int in
       await group.add { await one() }
@@ -29,10 +23,10 @@ func test_taskGroup_throws() async {
 
       do {
         while let r = try await group.next() {
-          pprint("next: \(r)")
+          print("next: \(r)")
         }
       } catch {
-        pprint("error caught in group: \(error)")
+        print("error caught in group: \(error)")
 
         await group.add { () async -> Int in
           let c = await Task.__unsafeCurrentAsync().isCancelled
@@ -41,24 +35,24 @@ func test_taskGroup_throws() async {
         }
 
         guard let got = try! await group.next() else {
-          pprint("task group failed to get 3 (:\(#line))")
+          print("task group failed to get 3 (:\(#line))")
           return 0
         }
 
-        pprint("task group next: \(got)")
+        print("task group next: \(got)")
 
         if got == 1 {
           // the previous 1 completed before the 3 we just submitted,
           // we still want to see that three so let's await for it
           guard let third = try! await group.next() else {
-            pprint("task group failed to get 3 (:\(#line))")
+            print("task group failed to get 3 (:\(#line))")
             return got
           }
 
-          pprint("task group returning normally: \(third)")
+          print("task group returning normally: \(third)")
           return third
         } else {
-          pprint("task group returning normally: \(got)")
+          print("task group returning normally: \(got)")
           return got
         }
       }
@@ -73,9 +67,9 @@ func test_taskGroup_throws() async {
     // CHECK: task group returning normally: 3
     // CHECK: got: 3
 
-    pprint("got: \(got)")
+    print("got: \(got)")
   } catch {
-    pprint("rethrown: \(error)")
+    print("rethrown: \(error)")
     fatalError("Expected recovered result, but got error: \(error)")
   }
 }

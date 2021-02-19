@@ -16,11 +16,6 @@ func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
-func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-//  fputs("[\(file):\(line)] \(m)\n", stderr)
-  print(m)
-}
-
 /// Tests that only the specific group we cancelAll on is cancelled,
 /// and not accidentally all tasks in all groups within the given parent task.
 func test_taskGroup_cancelAll_onlySpecificGroup() async {
@@ -30,21 +25,21 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
       await group.add {
         sleep(1)
         let c = await Task.__unsafeCurrentAsync().isCancelled
-        pprint("add: \(i) (cancelled: \(c))")
+        print("add: \(i) (cancelled: \(c))")
         return i
       }
     }
 
     var sum = 0
     while let got = try! await group.next() {
-      pprint("next: \(got)")
+      print("next: \(got)")
       sum += got
     }
 
     let c = await Task.__unsafeCurrentAsync().isCancelled
-    pprint("g1 task cancelled: \(c)")
+    print("g1 task cancelled: \(c)")
     let cc = group.isCancelled
-    pprint("g1 group cancelled: \(cc)")
+    print("g1 group cancelled: \(cc)")
 
     return sum
   }
@@ -55,18 +50,18 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
       await group.add {
         sleep(1)
         let c = await Task.__unsafeCurrentAsync().isCancelled
-        pprint("g1 task \(i) (cancelled: \(c))")
+        print("g1 task \(i) (cancelled: \(c))")
         return i
       }
     }
 
-    pprint("cancelAll")
+    print("cancelAll")
     group.cancelAll()
 
     let c = await Task.__unsafeCurrentAsync().isCancelled
-    pprint("g2 task cancelled: \(c)")
+    print("g2 task cancelled: \(c)")
     let cc = group.isCancelled
-    pprint("g2 group cancelled: \(cc)")
+    print("g2 group cancelled: \(cc)")
     return 0
   }
 
@@ -78,8 +73,8 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
   // CHECK: g1 task cancelled: false
   // CHECK: g1 group cancelled: false
 
-  pprint("g1: \(result1)") // CHECK: g1: 15
-  pprint("g2: \(result2)") // CHECK: g2: 0
+  print("g1: \(result1)") // CHECK: g1: 15
+  print("g2: \(result2)") // CHECK: g2: 0
 }
 
 

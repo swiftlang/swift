@@ -16,11 +16,6 @@ func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
-func pprint(_ m: String, file: String = #file, line: UInt = #line) {
-//  fputs("[\(file):\(line)] \(m)\n", stderr)
-  print(m)
-}
-
 func test_taskGroup_cancel_parent_affects_group() async {
 
   let x = Task.runDetached {

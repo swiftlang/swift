@@ -203,16 +203,11 @@ public:
 
   /// Attach the passed in `child` task to this group.
   void attachChild(AsyncTask *child) {
-    fprintf(stderr, "[%s:%d] (%s): attaching GROUP CHILD, group:%d, record:%d child:%d\n", __FILE__, __LINE__, __FUNCTION__,
-            Group, this, child);
-
     assert(child->groupChildFragment());
     assert(child->hasGroupChildFragment());
     assert(child->groupChildFragment()->getGroup() == Group);
 
     if (!FirstChild) {
-      fprintf(stderr, "[%s:%d] (%s): stored (first) CHILD, group:%d, record:%d child:%d\n", __FILE__, __LINE__, __FUNCTION__,
-              Group, this, child);
       // This is the first child we ever attach, so store it as FirstChild.
       FirstChild = child;
       return;
@@ -228,19 +223,13 @@ public:
       // no need to check hasChildFragment, all tasks we store here have them.
       auto fragment = cur->childFragment();
       if (auto next = fragment->getNextChild()) {
-        fprintf(stderr, "[%s:%d] (%s): storing GROUP CHILD, search, is %d [i:%d] the last one?\n", __FILE__, __LINE__, __FUNCTION__,
-                cur, i);
         cur = next;
       } else {
         // we're done searching and `cur` is the last
-        fprintf(stderr, "[%s:%d] (%s): storing GROUP CHILD, done searching, is %d [i:%d] the last one?\n", __FILE__, __LINE__, __FUNCTION__,
-                cur, i);
         break;
       }
     }
 
-    fprintf(stderr, "[%s:%d] (%s): stored %d-th GROUP CHILD, group:%d, record:%d child:%d (was %d <--- %d)\n", __FILE__, __LINE__, __FUNCTION__,
-            i, Group, this, child, FirstChild, child);
     cur->childFragment()->setNextChild(child);
   }
 
