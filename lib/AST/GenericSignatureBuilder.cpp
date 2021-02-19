@@ -820,6 +820,19 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     switch (source->kind) {
     case ProtocolRequirement:
     case InferredProtocolRequirement: {
+      // Special handling for top-level requirement signature requirements;
+      // pretend the root type is the subject type as written in the
+      // protocol, and not 'Self', so that we can consider this requirement
+      // self-derived if it depends on one of the conformances that make
+      // the root type valid.
+      if (requirementSignatureSelfProto) {
+        if (source->getProtocolDecl() == requirementSignatureSelfProto &&
+            source->parent->kind == RequirementSource::RequirementSignatureSelf) {
+          rootType = source->getAffectedType();
+          return false;
+        }
+      }
+
       // Note that we've seen a protocol requirement.
       sawProtocolRequirement = true;
 
