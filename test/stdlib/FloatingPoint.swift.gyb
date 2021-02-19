@@ -530,6 +530,22 @@ FloatingPoint.test("${Self}.round") {
   }
 }
 
+FloatingPoint.test("${Self}.exponentiation") {
+  expectEqual(${Self}(0),    0 ** 42)
+  expectEqual(${Self}(1),    1 ** 42)
+  expectEqual(${Self}(1),    42 ** 0)
+  expectEqual(${Self}(42),   42 ** 1)
+  expectEqual(${Self}(0.5),  2 ** -1)
+  expectEqual(${Self}(0.25), 2 ** -2)
+  expectEqual(${Self}(1024), 2 ** 10)
+  expectEqual(${Self}(2.0).squareRoot(), 2.0 ** 0.5)
+  expectEqual(${Self}(0.5).squareRoot(), 0.5 ** 0.5)
+
+  var actual: ${Self} = 2
+  actual **= 10
+  expectEqual(1024, actual)
+}
+
 FloatingPoint.test("${Self}.remainder") {
   //  Basic sanity tests only; these are only sufficient to provide reassurance
   //  that a known-good remainder function (e.g. from the C stdlib) has been
