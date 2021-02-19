@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -740,6 +740,20 @@ extension ${Self}: BinaryFloatingPoint {
   @_transparent
   public static func /=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fdiv_FPIEEE${bits}(lhs._value, rhs._value)
+  }
+
+  @_alwaysEmitIntoClient
+  public static func ** (_ lhs: Self, _ rhs: Self) -> Self {
+% if bits == 16:
+    Self(_stdlib_powf(.init(lhs), .init(rhs)))
+% else:
+    _stdlib_pow${cFuncSuffix}(lhs, rhs)
+% end
+  }
+
+  @_alwaysEmitIntoClient
+  public static func **= (_ lhs: inout Self, _ rhs: Self) {
+    lhs = lhs ** rhs
   }
 
   @inlinable // FIXME(inline-always)
