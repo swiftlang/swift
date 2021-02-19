@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -123,6 +123,11 @@ static inline __swift_bool _swift_stdlib_has_malloc_size() {
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
+float _stdlib_powf(float _self, float _other) {
+  return __builtin_powf(_self, _other);
+}
+
+static inline SWIFT_ALWAYS_INLINE
 float _stdlib_remainderf(float _self, float _other) {
   return __builtin_remainderf(_self, _other);
 }
@@ -138,6 +143,11 @@ float _stdlib_squareRootf(float _self) {
 }
 
 static inline SWIFT_ALWAYS_INLINE
+double _stdlib_pow(double _self, double _other) {
+  return __builtin_pow(_self, _other);
+}
+
+static inline SWIFT_ALWAYS_INLINE
 double _stdlib_remainder(double _self, double _other) {
   return __builtin_remainder(_self, _other);
 }
@@ -148,6 +158,11 @@ double _stdlib_squareRoot(double _self) {
 }
 
 #if !defined _WIN32 && (defined __i386__ || defined __x86_64__)
+static inline SWIFT_ALWAYS_INLINE
+long double _stdlib_powl(long double _self, long double _other) {
+  return __builtin_powl(_self, _other);
+}
+
 static inline SWIFT_ALWAYS_INLINE
 long double _stdlib_remainderl(long double _self, long double _other) {
   return __builtin_remainderl(_self, _other);
