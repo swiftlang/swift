@@ -1646,7 +1646,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
 
   if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.convertInferableTypes(type, dstLocator);
+    type = cs.replaceInferableTypesWithTypeVars(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 

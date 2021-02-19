@@ -3766,7 +3766,8 @@ public:
   /// \param type The type on which to perform the conversion.
   ///
   /// \returns The converted type.
-  Type convertInferableTypes(Type type, ConstraintLocatorBuilder locator);
+  Type replaceInferableTypesWithTypeVars(Type type,
+                                         ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.

@@ -652,7 +652,7 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
 Type ConstraintSystem::openUnboundGenericType(
     GenericTypeDecl *decl, Type parentTy, ConstraintLocatorBuilder locator) {
   if (parentTy) {
-    parentTy = convertInferableTypes(parentTy, locator);
+    parentTy = replaceInferableTypesWithTypeVars(parentTy, locator);
   }
 
   // Open up the generic type.
@@ -777,7 +777,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
-Type ConstraintSystem::convertInferableTypes(
+Type ConstraintSystem::replaceInferableTypesWithTypeVars(
     Type type, ConstraintLocatorBuilder locator) {
   assert(!type->getCanonicalType()->hasTypeParameter());
 
@@ -1231,7 +1231,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     checkNestedTypeConstraints(*this, type, locator);
 
     // Convert any placeholder types and open generics.
-    type = convertInferableTypes(type, locator);
+    type = replaceInferableTypesWithTypeVars(type, locator);
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
@@ -1487,7 +1487,7 @@ ConstraintSystem::getTypeOfMemberReference(
     checkNestedTypeConstraints(*this, memberTy, locator);
 
     // Convert any placeholders and open any generics.
-    memberTy = convertInferableTypes(memberTy, locator);
+    memberTy = replaceInferableTypesWithTypeVars(memberTy, locator);
 
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
