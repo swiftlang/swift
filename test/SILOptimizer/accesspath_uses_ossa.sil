@@ -897,6 +897,8 @@ bb5:
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  destroy_addr %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
@@ -909,6 +911,8 @@ bb5:
 // CHECK-NEXT:  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  destroy_addr %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
@@ -923,6 +927,8 @@ bb5:
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  destroy_addr %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
@@ -933,6 +939,7 @@ bb0(%0 : @owned $AnyObject):
   store %0 to [init] %2 : $*AnyObject
   inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
   %5 = load [copy] %1 : $*Optional<AnyObject>
+  destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   return %5 : $Optional<AnyObject>
 }
