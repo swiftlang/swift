@@ -30,10 +30,12 @@ protocol P6: P3 { } // okay
 
 func genericOk<T: P3>(_: T) { }
 
-func testGenericOk(i: Int, arr: [Int], nope: [Double]) {
+func testGenericOk(i: Int, arr: [Int], nope: [Double], p3: P3, p3array: [P3]) {
   genericOk(i)
   genericOk(arr)
   genericOk(nope) // expected-error{{global function 'genericOk' requires that 'Double' conform to 'P3'}}
+  genericOk(p3)
+  genericOk(p3array)
 }
 
 // Incorrect uses of marker protocols in types.
