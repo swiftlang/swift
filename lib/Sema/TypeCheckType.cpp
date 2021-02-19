@@ -3906,12 +3906,6 @@ public:
                            proto->getName());
         T->setInvalid();
       }
-      if (proto->isMarkerProtocol()) {
-        Ctx.Diags.diagnose(comp->getNameLoc(),
-                           diag::marker_protocol_value,
-                           proto->getName());
-        T->setInvalid();
-      }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
       type.findIf([&](Type type) -> bool {
@@ -3921,15 +3915,6 @@ public:
           auto layout = type->getExistentialLayout();
           for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
-
-            if (protoDecl->isMarkerProtocol()) {
-              Ctx.Diags.diagnose(comp->getNameLoc(),
-                                 diag::marker_protocol_value,
-                                 protoDecl->getName());
-              T->setInvalid();
-              continue;
-            }
-
             if (protoDecl->existentialTypeSupported())
               continue;
             

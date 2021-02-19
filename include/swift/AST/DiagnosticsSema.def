@@ -5625,8 +5625,8 @@ ERROR(marker_protocol_requirement, none,
 ERROR(marker_protocol_inherit_nonmarker, none,
       "marker protocol %0 cannot inherit non-marker protocol %1",
       (DeclName, DeclName))
-ERROR(marker_protocol_value,none,
-      "marker protocol %0 can only be used in generic constraints", (DeclName))
+ERROR(marker_protocol_cast,none,
+      "marker protocol %0 cannot be used in a conditional cast", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics

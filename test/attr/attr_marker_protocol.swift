@@ -38,14 +38,14 @@ func testGenericOk(i: Int, arr: [Int], nope: [Double]) {
 
 // Incorrect uses of marker protocols in types.
 func testNotOkay(a: Any) {
-  var mp1: P3 = 17 // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
+  var mp1: P3 = 17
   _ = mp1
   mp1 = 17
 
-  if let mp2 = a as? P3 { _ = mp2 } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
-  if let mp3 = a as? AnyObject & P3 { _ = mp3 } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
-  if a is AnyObject & P3 { } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
+  if let mp2 = a as? P3 { _ = mp2 } // expected-error{{marker protocol 'P3' cannot be used in a conditional cast}}
+  if let mp3 = a as? AnyObject & P3 { _ = mp3 } // expected-error{{marker protocol 'P3' cannot be used in a conditional cast}}
+  if a is AnyObject & P3 { } // expected-error{{marker protocol 'P3' cannot be used in a conditional cast}}
 
-  func inner(p3: P3) { } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
+  func inner(p3: P3) { }
 }
 
