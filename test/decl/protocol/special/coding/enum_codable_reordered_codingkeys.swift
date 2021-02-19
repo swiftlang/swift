@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-enum-codable-derivation
 
 // The order of cases in the case specific CodingKeys enum should not matter
 enum SimpleEnum : Codable {

@@ -1946,9 +1946,9 @@ bool DerivedConformance::canDeriveEncodable(NominalTypeDecl *NTD) {
 }
 
 ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
-  // We can only synthesize Encodable for structs and classes.
+  // We can only synthesize Encodable for structs, classes, and enums.
   if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal) &&
-      !isa<EnumDecl>(Nominal))
+      !(Context.LangOpts.EnableExperimentalEnumCodableDerivation && isa<EnumDecl>(Nominal)))
     return nullptr;
 
   if (requirement->getBaseName() != Context.Id_encode) {
@@ -1976,9 +1976,9 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
 }
 
 ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
-  // We can only synthesize Encodable for structs and classes.
+  // We can only synthesize Encodable for structs, classes, and enums.
   if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal) &&
-      !isa<EnumDecl>(Nominal))
+      (Context.LangOpts.EnableExperimentalEnumCodableDerivation && !isa<EnumDecl>(Nominal)))
     return nullptr;
 
   if (requirement->getBaseName() != DeclBaseName::createConstructor()) {
