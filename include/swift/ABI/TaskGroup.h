@@ -27,7 +27,9 @@
 #include "Task.h"
 #include "bitset"
 #include "string"
-#include "queue"
+#include "queue" // TODO: remove and replace with usage of our mpsc queue
+#include <atomic>
+#include <assert.h>
 
 namespace swift {
 
