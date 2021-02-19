@@ -369,7 +369,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         continue;
       }
       // Handle debug_value instructions separately.
-      if (pruneDebug) {
+      if (pruneDebugMode) {
         if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
           // Only instructions potentially outside current pruned liveness are
           // interesting.
@@ -647,7 +647,7 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
   while (true) {
     auto *inst = &*instIter;
 
-    if (pruneDebug) {
+    if (pruneDebugMode) {
       if (auto *dvi = dyn_cast<DebugValueInst>(inst)) {
         if (debugValues.erase(dvi))
           consumes.recordDebugAfterConsume(dvi);
@@ -675,7 +675,8 @@ void CanonicalizeOSSALifetime::findOrInsertDestroyInBlock(SILBasicBlock *bb) {
       return;
     }
     // This is not a potential last user. Keep scanning.
-    // Allow lifetimes to be artificially extended up to the next call.
+    // Allow lifetimes to be artificially extended up to the next call. The goal
+    // is to prevent repeated destroy rewriting without inhibiting optimization.
     if (ApplySite::isa(inst)) {
       existingDestroy = nullptr;
     } else if (!existingDestroy) {
@@ -842,9 +843,10 @@ void CanonicalizeOSSALifetime::rewriteCopies() {
       if (reusedCopyOp) {
         reusedCopyOp->set(srcCopy);
       } else {
-        instsToDelete.insert(srcCopy);
-        LLVM_DEBUG(llvm::dbgs() << "  Removing " << *srcCopy);
-        ++NumCopiesEliminated;
+        if (instsToDelete.insert(srcCopy)) {
+          LLVM_DEBUG(llvm::dbgs() << "  Removing " << *srcCopy);
+          ++NumCopiesEliminated;
+        }
       }
     }
   }
