@@ -32,20 +32,32 @@ public extension MyActor {
 public func globalAsync() async { }
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: public protocol MP
+// CHECK-NEXT: public protocol MP {
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: public typealias MP = Any
+// CHECK-NEXT: #endif
 @_marker public protocol MP { }
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
 // CHECK-NEXT: @_marker public protocol MP2 : FeatureTest.MP {
 // CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: public typealias MP2 = Any
 // CHECK-NEXT: #endif
 @_marker public protocol MP2: MP { }
 
-// CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: public protocol MP3
+// CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK: public protocol MP3 : FeatureTest.MP {
 // CHECK-NEXT: }
 public protocol MP3: MP { }
-// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK-NEXT: extension MP2 {
+// CHECK-NEXT: func inMP2
+extension MP2 {
+  public func inMP2() { }
+}
 
 // CHECK: class OldSchool {
 public class OldSchool: MP {
@@ -55,17 +67,15 @@ public class OldSchool: MP {
   public func takeClass() async { }
 }
 
-// CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension Array : FeatureTest.MP where Element : FeatureTest.MP {
+// CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK: extension Array : FeatureTest.MP where Element : FeatureTest.MP {
 extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 // CHECK-NEXT: }
-// CHECK-NEXT: #endif
 
-// CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension OldSchool : Swift.UnsafeConcurrentValue {
+// CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
+// CHECK: extension OldSchool : Swift.UnsafeConcurrentValue {
 extension OldSchool: UnsafeConcurrentValue { }
 // CHECK-NEXT: }
-// CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $AsyncAwait
 // CHECK-NEXT: func runSomethingSomewhere
