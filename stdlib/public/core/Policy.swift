@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -491,48 +491,3 @@ infix operator   |=: AssignmentPrecedence, BinaryInteger
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~>
-
-//===----------------------------------------------------------------------===//
-// Placeholder operator functions for diagnostic purposes
-//===----------------------------------------------------------------------===//
-
-extension Float {
-  @available(*, unavailable, message: "use 'Foundation.pow' instead")
-  @_alwaysEmitIntoClient
-  public static func ** (lhs: Self, rhs: Self) -> Self {
-    fatalError("Not implemented")
-  }
-  @available(*, unavailable, message: "use 'Foundation.pow' instead")
-  @_alwaysEmitIntoClient
-  public static func **= (lhs: inout Self, rhs: Self) {
-    fatalError("Not implemented")
-  }
-}
-
-extension Double {
-  @available(*, unavailable, message: "use 'Foundation.pow' instead")
-  @_alwaysEmitIntoClient
-  public static func ** (lhs: Self, rhs: Self) -> Self {
-    fatalError("Not implemented")
-  }
-  @available(*, unavailable, message: "use 'Foundation.pow' instead")
-  @_alwaysEmitIntoClient
-  public static func **= (lhs: inout Self, rhs: Self) {
-    fatalError("Not implemented")
-  }
-}
-
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
-extension Float80 {
-  @available(*, unavailable, message: "use 'Foundation.pow' instead")
-  @_alwaysEmitIntoClient
-  public static func ** (lhs: Self, rhs: Self) -> Self {
-    fatalError("Not implemented")
-  }
-  @available(*, unavailable, message: "use 'Foundation.pow' instead")
-  @_alwaysEmitIntoClient
-  public static func **= (lhs: inout Self, rhs: Self) {
-    fatalError("Not implemented")
-  }
-}
-#endif
