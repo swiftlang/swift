@@ -1250,6 +1250,67 @@ void PotentialBindings::infer(Constraint *constraint) {
   }
 }
 
+void PotentialBindings::retract(Constraint *constraint) {
+  Bindings.remove_if([&constraint](const PotentialBinding &binding) {
+    return binding.getSource() == constraint;
+  });
+
+  auto isMatchingConstraint = [&constraint](Constraint *existing) {
+    return existing == constraint;
+  };
+
+  auto hasMatchingSource =
+      [&constraint](
+          const std::pair<TypeVariableType *, Constraint *> &adjacency) {
+        return adjacency.second == constraint;
+      };
+
+  switch (constraint->getKind()) {
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
+    Protocols.erase(llvm::remove_if(Protocols, isMatchingConstraint),
+                    Protocols.end());
+    break;
+
+  case ConstraintKind::LiteralConformsTo:
+    Literals.erase(constraint->getProtocol());
+    break;
+
+  case ConstraintKind::Defaultable:
+  case ConstraintKind::DefaultClosureType: {
+    auto defaultType = constraint->getSecondType();
+    Defaults.erase(defaultType->getCanonicalType());
+    break;
+  }
+
+  default:
+    break;
+  }
+
+  {
+    llvm::SmallPtrSet<TypeVariableType *, 2> unviable;
+    for (const auto &adjacent : AdjacentVars) {
+      if (adjacent.second == constraint)
+        unviable.insert(adjacent.first);
+    }
+
+    for (auto *adjacentVar : unviable)
+      AdjacentVars.erase(std::make_pair(adjacentVar, constraint));
+  }
+
+  for (auto &literal : Literals) {
+    if (literal.second.CoveredBy == constraint)
+      literal.second.resetCoverage();
+  }
+
+  DelayedBy.erase(llvm::remove_if(DelayedBy, isMatchingConstraint),
+                  DelayedBy.end());
+
+  SubtypeOf.remove_if(hasMatchingSource);
+  SupertypeOf.remove_if(hasMatchingSource);
+  EquivalentTo.remove_if(hasMatchingSource);
+}
+
 LiteralBindingKind PotentialBindings::getLiteralKind() const {
   LiteralBindingKind kind = LiteralBindingKind::None;
 

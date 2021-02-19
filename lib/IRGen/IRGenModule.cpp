@@ -547,6 +547,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
+  // TODO: Once clang support is merged this should also use
+  //  clangASTContext.getTargetInfo().isSwiftAsyncCCSupported()
+  SwiftAsyncCC = opts.UseAsyncLowering ? llvm::CallingConv::SwiftTail : SwiftCC;
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,

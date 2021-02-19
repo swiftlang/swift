@@ -89,48 +89,22 @@ extension Task {
   ///
   /// - Parameters:
   ///   - keyPath: key path to the `TaskLocalKey` to be used for lookup
-  ///   - value:
-  ///   - body:
+  ///   - value: value to bind the task local to for the scope of `operation`
+  ///   - operation: the operation to run with the task local value bound
   /// - Returns: the value returned by the `body` function.
   public static func withLocal<Key, BodyResult>(
     _ keyPath: KeyPath<TaskLocalValues, Key>,
     boundTo value: Key.Value,
-    body: @escaping () async -> BodyResult
-  ) async -> BodyResult where Key: TaskLocalKey {
+    operation: () async throws -> BodyResult
+  ) async rethrows -> BodyResult where Key: TaskLocalKey {
     let task = Builtin.getCurrentAsyncTask()
 
     _taskLocalValuePush(task, keyType: Key.self, value: value)
-  
-    defer {
-      _taskLocalValuePop(task)
-    }
+    defer { _taskLocalValuePop(task) }
 
-    return await body()
+    return try await operation()
   }
 
-  /// Bind the task local key to the given value for the scope of the `body` function.
-  /// Any child tasks spawned within this scope will inherit the binding.
-  ///
-  /// - Parameters:
-  ///   - key:
-  ///   - value:
-  ///   - body:
-  /// - Returns: the value returned by the `body` function, or throws.
-  public static func withLocal<Key, BodyResult>(
-    _ keyPath: KeyPath<TaskLocalValues, Key>,
-    boundTo value: Key.Value,
-    body: @escaping () async throws -> BodyResult
-  ) async throws -> BodyResult where Key: TaskLocalKey {
-    let task = Builtin.getCurrentAsyncTask()
-
-    _taskLocalValuePush(task, keyType: Key.self, value: value)
-
-    defer {
-      _taskLocalValuePop(task)
-    }
-
-    return try! await body()
-  }
 }
 
 // ==== ------------------------------------------------------------------------

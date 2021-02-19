@@ -37,8 +37,8 @@ bb0:
 }
 
 // CHECK-LL: @closureTu =
-// CHECK-LL: define internal swiftcc void @closure(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
-// CHECK-LL: define internal swiftcc void @"$s7closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define internal swift{{(tail)?}}cc void @closure(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s7closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> Int64 {
 bb0(%captured : $Int64):
   %closure = function_ref @closure : $@async @convention(thin) (Int64, Int64) -> Int64

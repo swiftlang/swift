@@ -319,6 +319,7 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   return {task, initialContext};
 }
 
+SWIFT_CC(swiftasync)
 void swift::swift_task_future_wait(
     AsyncTask *waitingTask, ExecutorRef executor,
     SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
@@ -569,6 +570,25 @@ void swift::swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *erro
 
 bool swift::swift_task_isCancelled(AsyncTask *task) {
   return task->isCancelled();
+}
+
+CancellationNotificationStatusRecord*
+swift::swift_task_addCancellationHandler(
+    AsyncTask *task, CancellationNotificationStatusRecord::FunctionType handler) {
+  void *allocation =
+      swift_task_alloc(task, sizeof(CancellationNotificationStatusRecord));
+  auto *record =
+      new (allocation) CancellationNotificationStatusRecord(
+          handler, /*arg=*/nullptr);
+
+  swift_task_addStatusRecord(task, record);
+  return record;
+}
+
+void swift::swift_task_removeCancellationHandler(
+    AsyncTask *task, CancellationNotificationStatusRecord *record) {
+  swift_task_removeStatusRecord(task, record);
+  swift_task_dealloc(task, record);
 }
 
 SWIFT_CC(swift)
