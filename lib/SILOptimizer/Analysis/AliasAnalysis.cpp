@@ -723,8 +723,18 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
     if (ArgEffect.mayRelease()) {
       // The function may release this argument, so check if the pointer can
       // escape to it.
-      if (EA->mayReleaseContent(FAS.getArgument(Idx), Ptr))
-        return true;
+      auto arg = FAS.getArgument(Idx);
+      if (arg->getType().isAddress()) {
+        // Handle indirect argument as if they are a release to any references
+        // pointed to by the argument's address.
+        if (EA->mayReleaseAddressContent(arg, Ptr))
+          return true;
+      } else {
+        // Handle direct arguments as if they are a direct release of the
+        // reference (just like a destroy_value).
+        if (EA->mayReleaseReferenceContent(arg, Ptr))
+          return true;
+      }
     }
   }
   return false;
@@ -744,7 +754,7 @@ bool AliasAnalysis::canBuiltinDecrementRefCount(BuiltinInst *BI, SILValue Ptr) {
     // to be an owned reference and disallows addresses. Conservatively handle
     // address type arguments as and conservatively treat all other values
     // potential owned references.
-    if (Arg->getType().isAddress() || EA->mayReleaseContent(Arg, Ptr))
+    if (Arg->getType().isAddress() || EA->mayReleaseReferenceContent(Arg, Ptr))
       return true;
   }
   return false;
@@ -788,7 +798,7 @@ bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(
   // accessedPointer. Access to any objects beyond the first released refcounted
   // object are irrelevant--they must already have sufficient refcount that they
   // won't be released when releasing Ptr.
-  return EA->mayReleaseContent(releasedReference, accessedPointer);
+  return EA->mayReleaseReferenceContent(releasedReference, accessedPointer);
 }
 
 void AliasAnalysis::initialize(SILPassManager *PM) {
