@@ -2736,7 +2736,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                  wrapperInfo.projectedValueVar);
     }
 
-    return PropertyWrapperBackingPropertyInfo(backingVar, projectionVar, nullptr, nullptr);
+    return PropertyWrapperBackingPropertyInfo(backingVar, projectionVar);
   }
 
   if (!wrapperInfo)
@@ -2834,8 +2834,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // value.
   if (!wrappedValue && (!var->allAttachedPropertyWrappersHaveWrappedValueInit() ||
                         initializer)) {
-    return PropertyWrapperBackingPropertyInfo(
-        backingVar, storageVar, nullptr, nullptr);
+    return PropertyWrapperBackingPropertyInfo(backingVar, storageVar);
   }
 
   // Form the initialization of the backing property from a value of the
@@ -2845,11 +2844,11 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
         ctx, var->getSourceRange(), var->getType(), /*wrappedValue=*/nullptr);
     typeCheckSynthesizedWrapperInitializer(
         pbd, backingVar, parentPBD, initializer);
-    wrappedValue = findWrappedValuePlaceholder(initializer);
   }
 
   return PropertyWrapperBackingPropertyInfo(backingVar, storageVar,
-                                            initializer, wrappedValue);
+                                            /*wrappedValueInitExpr=*/initializer,
+                                            /*projectedValueInitExpr=*/nullptr);
 }
 
 VarDecl *

@@ -6034,10 +6034,10 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 
 Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
   auto wrapperInfo = getPropertyWrapperBackingPropertyInfo();
-  if (!wrapperInfo || !wrapperInfo.wrappedValuePlaceholder)
+  if (!wrapperInfo || !wrapperInfo.getWrappedValuePlaceholder())
     return Type();
 
-  Type valueInterfaceTy = wrapperInfo.wrappedValuePlaceholder->getType();
+  Type valueInterfaceTy = wrapperInfo.getWrappedValuePlaceholder()->getType();
   if (valueInterfaceTy->hasArchetype())
     valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
 

@@ -117,7 +117,7 @@ static RValue maybeEmitPropertyWrapperInitFromValue(
     return std::move(arg);
 
   auto wrapperInfo = originalProperty->getPropertyWrapperBackingPropertyInfo();
-  if (!wrapperInfo || !wrapperInfo.initializeFromOriginal)
+  if (!wrapperInfo || !wrapperInfo.hasInitFromWrappedValue())
     return std::move(arg);
 
   return SGF.emitApplyOfPropertyWrapperBackingInitializer(loc, originalProperty,
@@ -246,7 +246,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         // the property wrapper backing initializer.
         if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
           auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
-          auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+          auto *placeholder = wrappedInfo.getWrappedValuePlaceholder();
           if (placeholder && placeholder->getOriginalWrappedValue()) {
             auto arg = SGF.emitRValue(placeholder->getOriginalWrappedValue());
             maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
@@ -291,7 +291,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       // memberwise initialized, use the original wrapped value if it exists.
       if (auto *wrappedVar = field->getOriginalWrappedProperty()) {
         auto wrappedInfo = wrappedVar->getPropertyWrapperBackingPropertyInfo();
-        auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+        auto *placeholder = wrappedInfo.getWrappedValuePlaceholder();
         if (placeholder && placeholder->getOriginalWrappedValue()) {
           init = placeholder->getOriginalWrappedValue();
         }

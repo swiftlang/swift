@@ -900,8 +900,8 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
               ->isPropertyMemberwiseInitializedWithWrappedType()) {
         auto wrapperInfo =
             originalProperty->getPropertyWrapperBackingPropertyInfo();
-        assert(wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue());
-        init = wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue();
+        assert(wrapperInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue());
+        init = wrapperInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue();
       }
     }
 
@@ -934,12 +934,12 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     PrettyStackTraceSILFunction X(
         "silgen emitPropertyWrapperBackingInitializer", f);
     auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
-    assert(wrapperInfo.initializeFromOriginal);
-    f->createProfiler(wrapperInfo.initializeFromOriginal, constant,
+    assert(wrapperInfo.hasInitFromWrappedValue());
+    f->createProfiler(wrapperInfo.getInitFromWrappedValue(), constant,
                       ForDefinition);
     auto varDC = var->getInnermostDeclContext();
     SILGenFunction SGF(*this, *f, varDC);
-    SGF.emitGeneratorFunction(constant, wrapperInfo.initializeFromOriginal);
+    SGF.emitGeneratorFunction(constant, wrapperInfo.getInitFromWrappedValue());
     postEmitFunction(constant, f);
     break;
   }
