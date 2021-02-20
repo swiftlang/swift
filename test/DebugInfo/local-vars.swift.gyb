@@ -141,7 +141,6 @@ public func constvar_${name}() {
   // DWARF: DW_AT_name ("self")
   // DWARF-NOT: DW_TAG
   // DWARF: DW_AT_artificial
-  // DWARF-NOT: DW_TAG
   // DWARF: DW_TAG_variable
   // DWARF-NOT: DW_TAG
   // DWARF: DW_AT_name ("$swift.type.{{T|U}}")
@@ -266,6 +265,7 @@ public func guard_let_${name}() {
     fatalError()
   }
   // DWARF-NOT: DW_TAG
+  // DWARF: DW_TAG_lexical_block
   // DWARF: DW_TAG_variable
   // DWARF-NOT: DW_TAG
   // DWARF: DW_AT_location
