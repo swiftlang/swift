@@ -796,4 +796,9 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
+
+def experimental_has_async_alternative_attribute:
+  Flag<["-"], "experimental-has-async-alternative-attribute">,
+  HelpText<"Allow use of @hasAsyncAlternative">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

@@ -4542,6 +4542,27 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::HasAsyncAlternative_DECL_ATTR: {
+        bool isCompound;
+        ArrayRef<uint64_t> rawPieces;
+        serialization::decls_block::HasAsyncAlternativeDeclAttrLayout::readRecord(
+            scratch, isCompound, rawPieces);
+
+        DeclNameRef name;
+        if (!rawPieces.empty()) {
+          auto baseName = MF.getDeclBaseName(rawPieces[0]);
+          SmallVector<Identifier, 4> pieces;
+          for (auto rawPiece : rawPieces.drop_front())
+            pieces.push_back(MF.getIdentifier(rawPiece));
+          name = !isCompound ? DeclNameRef({baseName})
+                             : DeclNameRef({ctx, baseName, pieces});
+        }
+
+        Attr = new (ctx) HasAsyncAlternativeAttr(name, SourceLoc(),
+                                                 SourceRange());
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
