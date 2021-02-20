@@ -1058,36 +1058,19 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
-  // We're about to try to synthesize Encodable. If something goes wrong,
-  // we'll have to output at least one error diagnostic because we returned
-  // true from NominalTypeDecl::derivesProtocolConformance; if we don't, we're
-  // expected to return a witness here later (and we crash on an assertion).
-  // Producing a diagnostic stops compilation before then.
-  //
-  // A synthesis attempt will produce NOTE diagnostics throughout, but we'll
-  // want to collect them before displaying -- we want NOTEs to display
-  // _after_ a main diagnostic so we don't get a NOTE before the error it
-  // relates to.
-  //
-  // We can do this with a diagnostic transaction -- first collect failure
-  // diagnostics, then potentially collect notes. If we succeed in
-  // synthesizing Encodable, we can cancel the transaction and get rid of the
-  // fake failures.
-  DiagnosticTransaction diagnosticTransaction(Context.Diags);
-  ConformanceDecl->diagnose(diag::type_does_not_conform,
-                            Nominal->getDeclaredType(), getProtocolType());
-  requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Func,
-                        requirement->getName(), getProtocolType(),
-                        /*AddFixIt=*/false);
-
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
-  if (canSynthesize(*this, requirement)) {
-    diagnosticTransaction.abort();
-    return deriveEncodable_encode(*this);
+  if (!canSynthesize(*this, requirement)) {
+    ConformanceDecl->diagnose(diag::type_does_not_conform,
+                              Nominal->getDeclaredType(), getProtocolType());
+    requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Func,
+                          requirement->getName(), getProtocolType(),
+                          /*AddFixIt=*/false);
+
+    return nullptr;
   }
 
-  return nullptr;
+  return deriveEncodable_encode(*this);
 }
 
 ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
@@ -1104,24 +1087,17 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
 
-  // We're about to try to synthesize Decodable. If something goes wrong,
-  // we'll have to output at least one error diagnostic. We need to collate
-  // diagnostics produced by canSynthesize and deriveDecodable_init to produce
-  // them in the right order -- see the comment in deriveEncodable for
-  // background on this transaction.
-  DiagnosticTransaction diagnosticTransaction(Context.Diags);
-  ConformanceDecl->diagnose(diag::type_does_not_conform,
-                            Nominal->getDeclaredType(), getProtocolType());
-  requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Constructor,
-                        requirement->getName(), getProtocolType(),
-                        /*AddFixIt=*/false);
-
   // Check other preconditions for synthesized conformance.
   // This synthesizes a CodingKeys enum if possible.
-  if (canSynthesize(*this, requirement)) {
-    diagnosticTransaction.abort();
-    return deriveDecodable_init(*this);
+  if (!canSynthesize(*this, requirement)) {
+    ConformanceDecl->diagnose(diag::type_does_not_conform,
+                              Nominal->getDeclaredType(), getProtocolType());
+    requirement->diagnose(diag::no_witnesses, diag::RequirementKind::Constructor,
+                          requirement->getName(), getProtocolType(),
+                          /*AddFixIt=*/false);
+
+    return nullptr;
   }
 
-  return nullptr;
+  return deriveDecodable_init(*this);
 }
