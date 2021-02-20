@@ -32,10 +32,10 @@ class SyntaxParseActions;
 class SyntaxParsingContext;
 class SourceLoc;
 class Token;
-enum class tok;
+enum class tok : uint8_t;
 
 namespace syntax {
-  enum class SyntaxKind;
+enum class SyntaxKind : uint16_t;
 }
 
 class ParsedRawSyntaxRecorder final {
