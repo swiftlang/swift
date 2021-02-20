@@ -369,8 +369,12 @@ void PotentialBindings::inferTransitiveBindings(
       addLiteral(literal.second.getSource());
 
     // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults)
+    for (const auto &def : bindings.Defaults) {
+      if (def.getSecond()->getKind() == ConstraintKind::DefaultClosureType)
+        continue;
+
       addDefault(def.second);
+    }
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
