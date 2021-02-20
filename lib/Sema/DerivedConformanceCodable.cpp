@@ -1071,8 +1071,33 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     LLVM_FALLTHROUGH;
   case CodingKeysClassification::Valid:
     return true;
+static bool canDeriveCodable(NominalTypeDecl *NTD,
+                             KnownProtocolKind Kind) {
+  assert(Kind == KnownProtocolKind::Encodable ||
+         Kind == KnownProtocolKind::Decodable);
+
+  // Structs and classes can explicitly derive Encodable and Decodable
+  // conformance (explicitly meaning we can synthesize an implementation if
+  // a type conforms manually).
+  // FIXME: Enums too!
+  if (!isa<StructDecl>(NTD) && !isa<ClassDecl>(NTD)) {
+    return false;
   }
+
+  auto *PD = NTD->getASTContext().getProtocol(Kind);
+  if (!PD) {
+    return false;
+  }
+
   return true;
+}
+
+bool DerivedConformance::canDeriveDecodable(NominalTypeDecl *NTD) {
+  return canDeriveCodable(NTD, KnownProtocolKind::Decodable);
+}
+
+bool DerivedConformance::canDeriveEncodable(NominalTypeDecl *NTD) {
+  return canDeriveCodable(NTD, KnownProtocolKind::Encodable);
 }
 
 ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
