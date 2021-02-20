@@ -1570,6 +1570,44 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacrosComputed = true;
 }
 
+static HasAsyncAlternativeAttr *parseAsyncAlternativeAttribute(
+    Parser &P, StringRef AttrName, SourceLoc AtLoc, DeclAttrKind DK) {
+  SourceLoc Loc = P.PreviousLoc;
+
+  // Unnamed @hasAsyncAlternative attribute
+  if (P.Tok.isNot(tok::l_paren))
+    return new (P.Context) HasAsyncAlternativeAttr(AtLoc, Loc);
+
+  P.consumeToken(tok::l_paren);
+
+  if (!P.Tok.is(tok::string_literal)) {
+    P.diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+    return nullptr;
+  }
+
+  auto Value = P.getStringLiteralIfNotInterpolated(
+      Loc, ("argument of '" + AttrName + "'").str());
+  P.consumeToken(tok::string_literal);
+  if (!Value)
+    return nullptr;
+
+  ParsedDeclName parsedName = parseDeclName(Value.getValue());
+  if (!parsedName || !parsedName.ContextName.empty()) {
+    P.diagnose(AtLoc, diag::has_async_alternative_invalid_name, AttrName);;
+    return nullptr;
+  }
+
+  SourceRange AttrRange = SourceRange(Loc, P.Tok.getRange().getStart());
+  if (!P.consumeIf(tok::r_paren)) {
+    P.diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+    return nullptr;
+  }
+
+  return new (P.Context) HasAsyncAlternativeAttr(
+      parsedName.formDeclNameRef(P.Context), AtLoc, AttrRange);
+}
+
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK, bool isFromClangAttribute) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -2646,6 +2684,22 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     Attributes.add(new (Context) ProjectedValuePropertyAttr(
         name, AtLoc, range, /*implicit*/ false));
+    break;
+  }
+  case DAK_HasAsyncAlternative: {
+    auto *attr = parseAsyncAlternativeAttribute(*this, AttrName, AtLoc, DK);
+    if (!attr) {
+      skipUntilDeclStmtRBrace(tok::r_paren);
+      consumeIf(tok::r_paren);
+      return false;
+    }
+
+    if (!DiscardAttribute) {
+      if (Context.LangOpts.EnableExperimentalHasAsyncAlternative)
+        Attributes.add(attr);
+      else
+        diagnose(Loc, diag::requires_has_async_alternative, AttrName);
+    }
     break;
   }
   }

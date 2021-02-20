@@ -387,6 +387,9 @@ namespace swift {
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
 
+    /// Allow @hasAsyncAlternative attribute
+    bool EnableExperimentalHasAsyncAlternative = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
