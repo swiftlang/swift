@@ -11,6 +11,17 @@
 extension Int: P { }
 extension Array: P where Element: P { }
 
+// CHECK: @"$s15marker_protocol1QMp" = {{(protected )?}}constant
+// CHECK-SAME: i32 trunc{{.*}}s15marker_protocolMXM{{.*}}s15marker_protocol1QMp
+// CHECK-SAME: i32 0, i32 5, i32 0
+public protocol Q: P {
+  func f()
+  func g()
+  func h()
+  func i()
+  func j()
+}
+
 // Note: no witness tables
 // CHECK: swiftcc void @"$s15marker_protocol7genericyyxAA1PRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T)
 public func generic<T: P>(_: T) { }
@@ -19,5 +30,3 @@ public func testGeneric(i: Int, array: [Int]) {
   generic(i)
   generic(array)
 }
-
-public protocol Q: P { }
