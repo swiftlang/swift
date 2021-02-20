@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -4926,3 +4927,29 @@ bb1(%result : @owned $Builtin.NativeObject):
 bb2(%error : @owned $Error):
   unreachable
 }
+
+sil [ossa] @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
+
+// CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: sil shared [ossa] @$s8refcast24main5KlassC_Tg5 : 
+// CHECK_FORWARDING_OWNERSHIP_KIND: unchecked_ref_cast 
+// CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: } // end sil function '$s8refcast24main5KlassC_Tg5'
+sil [ossa] @refcast2 : $@convention(thin) <T> (@in T, @owned Klass) -> () {
+bb0(%0 : $*T, %1 : @owned $Klass):
+  destroy_addr %0 : $*T
+  %2 = unchecked_bitwise_cast %1 : $Klass to $Optional<Klass>
+  %3 = copy_value %2 : $Optional<Klass>
+  destroy_value %1 : $Klass
+  %func = function_ref @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
+  apply %func(%3) : $@convention(thin) (@owned Optional<Klass>) -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @caller : $@convention(thin) (@in Klass, @owned Klass) -> () {
+bb0(%0 :  $*Klass, %1 : @owned $Klass):
+  %f = function_ref @refcast2 : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Klass) -> ()
+  %res = apply %f<Klass>(%0, %1) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
