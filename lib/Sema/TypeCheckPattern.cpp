@@ -732,8 +732,12 @@ static Type validateTypedPattern(TypedPattern *TP, TypeResolution resolution) {
 Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
   DeclContext *dc = pattern.getDeclContext();
   ASTContext &ctx = dc->getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, PatternTypeRequest{pattern}, ErrorType::get(ctx));
+  if (auto type = evaluateOrDefault(ctx.evaluator, PatternTypeRequest{pattern},
+                                    Type())) {
+    return type;
+  }
+
+  return ErrorType::get(ctx);
 }
 
 /// Apply the contextual pattern's context to the type resolution options.
