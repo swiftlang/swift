@@ -1508,8 +1508,7 @@ ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
     bool isDynamicResult,
     FunctionRefKind functionRefKind,
-    ConstraintLocatorBuilder locator,
-    const DeclRefExpr *base,
+    ConstraintLocator *locator,
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
@@ -1534,9 +1533,8 @@ ConstraintSystem::getTypeOfMemberReference(
   bool isStaticMemberRefOnProtocol = false;
   if (resolvedBaseTy->is<MetatypeType>() && baseObjTy->isExistentialType() &&
       value->isStatic()) {
-    if (auto last = locator.last())
-      isStaticMemberRefOnProtocol =
-          last->is<LocatorPathElt::UnresolvedMember>();
+    isStaticMemberRefOnProtocol =
+        locator->isLastElement<LocatorPathElt::UnresolvedMember>();
   }
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
@@ -1568,6 +1566,18 @@ ConstraintSystem::getTypeOfMemberReference(
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
       value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
 
+  const auto getBaseAsDeclRefExpr = [&] {
+    if (auto *E = getAsExpr(locator->getAnchor())) {
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        return dyn_cast<DeclRefExpr>(MRE->getBase());
+      } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+        return dyn_cast<DeclRefExpr>(UDE->getBase());
+      }
+    }
+
+    return (DeclRefExpr *)nullptr;
+  };
+
   AnyFunctionType *funcType;
 
   if (isa<AbstractFunctionDecl>(value) ||
@@ -1583,7 +1593,8 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
 
-      if (doesStorageProduceLValue(subscript, baseTy, useDC, base))
+      if (doesStorageProduceLValue(subscript, baseTy, useDC,
+                                   getBaseAsDeclRefExpr()))
         elementTy = LValueType::get(elementTy);
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1599,9 +1610,9 @@ ConstraintSystem::getTypeOfMemberReference(
                               ->castTo<AnyFunctionType>()->getParams();
       refType = FunctionType::get(indices, elementTy);
     } else {
-      refType =
-          getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC, base,
-                                     /*wantInterfaceType=*/true);
+      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
+                                           getBaseAsDeclRefExpr(),
+                                           /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
@@ -1757,7 +1768,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // (e.g. "colorLiteralRed:") by stripping all the redundant stuff about
   // literals (leaving e.g. "red:").
   {
-    auto anchor = locator.getAnchor();
+    auto anchor = locator->getAnchor();
     if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
       auto fnType = type->castTo<FunctionType>();
 
@@ -2726,28 +2737,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // Retrieve the type of a reference to the specific declaration choice.
       assert(!baseTy->hasTypeParameter());
 
-      auto getDotBase = [](const Expr *E) -> const DeclRefExpr * {
-        if (E == nullptr) return nullptr;
-        switch (E->getKind()) {
-        case ExprKind::MemberRef: {
-          auto Base = cast<MemberRefExpr>(E)->getBase();
-          return dyn_cast<const DeclRefExpr>(Base);
-        }
-        case ExprKind::UnresolvedDot: {
-          auto Base = cast<UnresolvedDotExpr>(E)->getBase();
-          return dyn_cast<const DeclRefExpr>(Base);
-        }
-        default:
-          return nullptr;
-        }
-      };
-      auto *anchor = locator ? getAsExpr(locator->getAnchor()) : nullptr;
-      auto base = getDotBase(anchor);
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(baseTy, choice.getDecl(), useDC,
                                    (kind == OverloadChoiceKind::DeclViaDynamic),
                                    choice.getFunctionRefKind(),
-                                   locator, base, nullptr);
+                                   locator, nullptr);
     } else {
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(),
