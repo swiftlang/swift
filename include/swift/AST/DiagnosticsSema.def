@@ -776,6 +776,9 @@ NOTE(serialization_compatibility_version_mismatch,none,
      "(this is supported but may expose additional compiler issues)",
      (StringRef, StringRef, StringRef))
 
+ERROR(serialization_invalid_decl,none,
+      "deserialization of invalid declaration from module '%0': %1",
+      (StringRef, StringRef))
 ERROR(serialization_allowing_invalid_decl,none,
       "allowing deserialization of invalid declaration %0 from module '%1'",
       (DeclName, StringRef))

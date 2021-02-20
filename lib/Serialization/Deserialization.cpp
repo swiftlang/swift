@@ -4085,14 +4085,23 @@ ModuleFile::getDeclChecked(
       return deserialized;
 
     auto *decl = declOrOffset.get();
-    if (isAllowModuleWithCompilerErrorsEnabled() && decl->isInvalid()) {
-      if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
-        // The parent function will be invalid if the parameter is invalid,
-        // implicits should have an invalid explicit as well
-        if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-          getContext().Diags.diagnose(
-              VD->getLoc(), diag::serialization_allowing_invalid_decl,
-              VD->getName(), VD->getModuleContext()->getNameStr());
+    if (decl->isInvalid()) {
+      if (!isAllowModuleWithCompilerErrorsEnabled()) {
+        SmallString<0> dumped;
+        llvm::raw_svector_ostream dumpStream(dumped);
+        decl->print(dumpStream);
+        getContext().Diags.diagnose(
+            SourceLoc(), diag::serialization_invalid_decl,
+            decl->getModuleContext()->getNameStr(), dumped.str());
+      } else {
+        if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
+          // The parent function will be invalid if the parameter is invalid,
+          // implicits should have an invalid explicit as well
+          if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+            getContext().Diags.diagnose(
+                VD->getLoc(), diag::serialization_allowing_invalid_decl,
+                VD->getName(), VD->getModuleContext()->getNameStr());
+          }
         }
       }
     }
