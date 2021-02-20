@@ -46,6 +46,13 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[VOID_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(), Never>) -> ()
   await slowServer.serverRestart("somewhere")
 
+  // CHECK: function_ref @[[STRING_NONZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, ObjCBool, Optional<NSString>, Optional<NSError>) -> ()
+  let _: String = try await slowServer.doSomethingFlaggy()
+  // CHECK: function_ref @[[STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, Optional<NSString>, ObjCBool, Optional<NSError>) -> ()
+  let _: String = try await slowServer.doSomethingZeroFlaggy()
+  // CHECK: function_ref @[[STRING_STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, String), Error>, ObjCBool, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> ()
+  let _: (String, String) = try await slowServer.doSomethingMultiResultFlaggy()
+
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, Int), Error>, Optional<NSString>, Int, Optional<NSError>) -> ()
   let (_, _): (String, Int) = try await slowServer.findMultipleAnswers()
 
@@ -62,6 +69,7 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   let _: NSObject? = try await slowServer.stopRecording()
   let _: NSObject = try await slowServer.someObject()
+
 }
 
 func testGeneric<T: AnyObject>(x: GenericObject<T>) async throws {
@@ -114,6 +122,30 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeUnsafeContinuation
 // CHECK:   apply [[RESUME]]<()>([[CONT]], [[RESULT_BUF]])
 
+// CHECK: sil{{.*}}@[[STRING_NONZERO_FLAG_THROW_BLOCK]]
+// CHECK:   [[ZERO:%.*]] = integer_literal {{.*}}, 0
+// CHECK:   switch_value {{.*}}, case [[ZERO]]: [[ZERO_BB:bb[0-9]+]], default [[NONZERO_BB:bb[0-9]+]]
+// CHECK: [[ZERO_BB]]:
+// CHECK:   function_ref{{.*}}33_resumeUnsafeThrowingContinuation
+// CHECK: [[NONZERO_BB]]:
+// CHECK:   function_ref{{.*}}42_resumeUnsafeThrowingContinuationWithError
+
+// CHECK: sil{{.*}}@[[STRING_ZERO_FLAG_THROW_BLOCK]]
+// CHECK:   [[ZERO:%.*]] = integer_literal {{.*}}, 0
+// CHECK:   switch_value {{.*}}, case [[ZERO]]: [[ZERO_BB:bb[0-9]+]], default [[NONZERO_BB:bb[0-9]+]]
+// CHECK: [[NONZERO_BB]]:
+// CHECK:   function_ref{{.*}}33_resumeUnsafeThrowingContinuation
+// CHECK: [[ZERO_BB]]:
+// CHECK:   function_ref{{.*}}42_resumeUnsafeThrowingContinuationWithError
+
+// CHECK: sil{{.*}}@[[STRING_STRING_ZERO_FLAG_THROW_BLOCK]]
+// CHECK:   [[ZERO:%.*]] = integer_literal {{.*}}, 0
+// CHECK:   switch_value {{.*}}, case [[ZERO]]: [[ZERO_BB:bb[0-9]+]], default [[NONZERO_BB:bb[0-9]+]]
+// CHECK: [[NONZERO_BB]]:
+// CHECK:   function_ref{{.*}}33_resumeUnsafeThrowingContinuation
+// CHECK: [[ZERO_BB]]:
+// CHECK:   function_ref{{.*}}42_resumeUnsafeThrowingContinuationWithError
+
 // CHECK: sil{{.*}}@[[NSSTRING_INT_THROW_COMPLETION_BLOCK]]
 // CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $(String, Int)
 // CHECK:   [[RESULT_0_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 0
@@ -122,3 +154,4 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   store [[BRIDGED]] to [init] [[RESULT_0_BUF]]
 // CHECK:   [[RESULT_1_BUF:%.*]] = tuple_element_addr [[RESULT_BUF]] {{.*}}, 1
 // CHECK:   store %2 to [trivial] [[RESULT_1_BUF]]
+
