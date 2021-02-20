@@ -643,8 +643,12 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
 bool
 ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
                                            ProtocolDecl *decl) const {
-  // If it's not @objc, it conforms to itself only if it has a self-conformance
-  // witness table.
+  // Marker protocols always self-conform.
+  if (decl->isMarkerProtocol())
+    return true;
+
+  // Otherwise, if it's not @objc, it conforms to itself only if it has a
+  // self-conformance witness table.
   if (!decl->isObjC())
     return decl->requiresSelfConformanceWitnessTable();
 

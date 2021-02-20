@@ -779,9 +779,6 @@ NOTE(serialization_compatibility_version_mismatch,none,
 ERROR(serialization_allowing_invalid_decl,none,
       "allowing deserialization of invalid declaration %0 from module '%1'",
       (DeclName, StringRef))
-ERROR(serialization_invalid_decl,Fatal,
-      "invalid declaration %0 read from module '%1'; "
-      SWIFT_BUG_REPORT_MESSAGE, ())
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -5625,8 +5622,8 @@ ERROR(marker_protocol_requirement, none,
 ERROR(marker_protocol_inherit_nonmarker, none,
       "marker protocol %0 cannot inherit non-marker protocol %1",
       (DeclName, DeclName))
-ERROR(marker_protocol_value,none,
-      "marker protocol %0 can only be used in generic constraints", (DeclName))
+ERROR(marker_protocol_cast,none,
+      "marker protocol %0 cannot be used in a conditional cast", (DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics

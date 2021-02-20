@@ -248,6 +248,34 @@ bool MissingConformance::diagnose(const Solution &solution, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+bool MissingConformance::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto *primaryFix = commonFixes.front().second->getAs<MissingConformance>();
+  assert(primaryFix);
+
+  if (llvm::all_of(
+          commonFixes,
+          [&primaryFix](
+              const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            return primaryFix->isEqual(entry.second);
+          }))
+    return diagnose(*commonFixes.front().first);
+
+  // If the location is the same but there are different requirements
+  // involved let's not attempt to diagnose that as an ambiguity.
+  return false;
+}
+
+bool MissingConformance::isEqual(const ConstraintFix *other) const {
+  auto *conformanceFix = other->getAs<MissingConformance>();
+  if (!conformanceFix)
+    return false;
+
+  return IsContextual == conformanceFix->IsContextual &&
+         NonConformingType->isEqual(conformanceFix->NonConformingType) &&
+         ProtocolType->isEqual(conformanceFix->ProtocolType);
+}
+
 MissingConformance *
 MissingConformance::forContextual(ConstraintSystem &cs, Type type,
                                   Type protocolType,
@@ -837,6 +865,29 @@ bool MoveOutOfOrderArgument::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+bool MoveOutOfOrderArgument::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto *primaryFix =
+      commonFixes.front().second->getAs<MoveOutOfOrderArgument>();
+  assert(primaryFix);
+
+  if (llvm::all_of(
+          commonFixes,
+          [&primaryFix](
+              const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            return primaryFix->isEqual(entry.second);
+          }))
+    return diagnose(*commonFixes.front().first);
+
+  return false;
+}
+
+bool MoveOutOfOrderArgument::isEqual(const ConstraintFix *other) const {
+  auto OoOFix = other->getAs<MoveOutOfOrderArgument>();
+  return OoOFix ? ArgIdx == OoOFix->ArgIdx && PrevArgIdx == OoOFix->PrevArgIdx
+                : false;
+}
+
 MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
     ConstraintSystem &cs, unsigned argIdx, unsigned prevArgIdx,
     ArrayRef<ParamBinding> bindings, ConstraintLocator *locator) {
@@ -923,6 +974,29 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
   }
   }
   llvm_unreachable("covered switch");
+}
+
+bool AllowInvalidRefInKeyPath::diagnoseForAmbiguity(
+    CommonFixesArray commonFixes) const {
+  auto *primaryFix =
+      commonFixes.front().second->getAs<AllowInvalidRefInKeyPath>();
+  assert(primaryFix);
+
+  if (llvm::all_of(
+          commonFixes,
+          [&primaryFix](
+              const std::pair<const Solution *, const ConstraintFix *> &entry) {
+            return primaryFix->isEqual(entry.second);
+          })) {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  return false;
+}
+
+bool AllowInvalidRefInKeyPath::isEqual(const ConstraintFix *other) const {
+  auto *refFix = other->getAs<AllowInvalidRefInKeyPath>();
+  return refFix ? Kind == refFix->Kind && Member == refFix->Member : false;
 }
 
 AllowInvalidRefInKeyPath *

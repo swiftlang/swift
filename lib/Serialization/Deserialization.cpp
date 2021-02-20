@@ -4085,11 +4085,8 @@ ModuleFile::getDeclChecked(
       return deserialized;
 
     auto *decl = declOrOffset.get();
-    if (decl->isInvalid()) {
-      if (!isAllowModuleWithCompilerErrorsEnabled()) {
-        getContext().Diags.diagnose(SourceLoc(),
-                                    diag::serialization_invalid_decl);
-      } else if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
+    if (isAllowModuleWithCompilerErrorsEnabled() && decl->isInvalid()) {
+      if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
         // The parent function will be invalid if the parameter is invalid,
         // implicits should have an invalid explicit as well
         if (auto *VD = dyn_cast<ValueDecl>(decl)) {
@@ -4542,6 +4539,27 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         Attr = SPIAccessControlAttr::create(ctx, SourceLoc(),
                                             SourceRange(), spis);
+        break;
+      }
+
+      case decls_block::HasAsyncAlternative_DECL_ATTR: {
+        bool isCompound;
+        ArrayRef<uint64_t> rawPieces;
+        serialization::decls_block::HasAsyncAlternativeDeclAttrLayout::readRecord(
+            scratch, isCompound, rawPieces);
+
+        DeclNameRef name;
+        if (!rawPieces.empty()) {
+          auto baseName = MF.getDeclBaseName(rawPieces[0]);
+          SmallVector<Identifier, 4> pieces;
+          for (auto rawPiece : rawPieces.drop_front())
+            pieces.push_back(MF.getIdentifier(rawPiece));
+          name = !isCompound ? DeclNameRef({baseName})
+                             : DeclNameRef({ctx, baseName, pieces});
+        }
+
+        Attr = new (ctx) HasAsyncAlternativeAttr(name, SourceLoc(),
+                                                 SourceRange());
         break;
       }
 

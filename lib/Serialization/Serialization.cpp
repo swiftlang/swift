@@ -2614,6 +2614,24 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           origDeclID, paramIndicesVector);
       return;
     }
+
+    case DAK_HasAsyncAlternative: {
+      auto *attr = cast<HasAsyncAlternativeAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[HasAsyncAlternativeDeclAttrLayout::Code];
+
+      SmallVector<IdentifierID, 4> pieces;
+      if (attr->hasName()) {
+        pieces.push_back(S.addDeclBaseNameRef(attr->Name.getBaseName()));
+        for (auto argName : attr->Name.getArgumentNames())
+          pieces.push_back(S.addDeclBaseNameRef(argName));
+      }
+
+      HasAsyncAlternativeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->Name.isCompoundName(),
+          pieces);
+      return;
+    }
     }
   }
 
