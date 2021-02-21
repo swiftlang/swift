@@ -51,3 +51,10 @@ func testNotOkay(a: Any) {
   func inner(p3: P3) { }
 }
 
+
+@_marker protocol P8 { }
+protocol P9: P8 { }
+
+// Implied conditional conformance to P8 is okay because P8 is a marker
+// protocol.
+extension Array: P9 where Element: P9 { }
