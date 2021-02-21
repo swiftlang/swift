@@ -4045,8 +4045,9 @@ namespace {
               // functions get imported into Swift as static member functions
               // that use an additional parameter for the left-hand side operand
               // instead of the receiver object.
-              mdecl->getDeclName().getNameKind() ==
-                  clang::DeclarationName::CXXOperatorName) {
+              (mdecl->getDeclName().getNameKind() ==
+                  clang::DeclarationName::CXXOperatorName &&
+                  isImportedAsStatic(mdecl->getOverloadedOperator()))) {
             selfIdx = None;
           } else {
             selfIdx = 0;
@@ -7925,6 +7926,16 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
     return false;
 
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
+}
+
+bool importer::isImportedAsStatic(const clang::OverloadedOperatorKind op) {
+  switch (op) {
+#define OVERLOADED_OPERATOR(Name,Spelling,Token,Unary,Binary,MemberOnly) \
+  case clang::OO_##Name: return !MemberOnly;
+#include "clang/Basic/OperatorKinds.def"
+  default:
+    llvm_unreachable("not an operator");
+  }
 }
 
 Type ClangImporter::Implementation::getMainActorType() {
