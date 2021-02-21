@@ -41,12 +41,6 @@ void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
 void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
 
 void performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD);
-
-/// Perform diagnostics on the top level code declaration.
-void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);
-
-/// Perform diagnostics on closure body.
-void performClosureBodyDiagnostics(ClosureExpr *closure);
   
 /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
 ///

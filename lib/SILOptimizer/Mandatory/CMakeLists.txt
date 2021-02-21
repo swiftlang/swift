@@ -15,7 +15,6 @@ target_sources(swiftSILOptimizer PRIVATE
   DiagnoseUnreachable.cpp
   DiagnoseVarUsage.cpp
   Differentiation.cpp
-  DVUMemoryUseCollector.cpp
   IRGenPrepare.cpp
   LowerHopToActor.cpp
   MandatoryInlining.cpp
