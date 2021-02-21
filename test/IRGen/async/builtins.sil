@@ -8,7 +8,7 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: define hidden swiftcc void @get_task(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @get_task(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
 sil hidden [ossa] @get_task : $@async @convention(thin) () -> @owned Builtin.NativeObject {
 bb0:
   // CHECK: [[TASKLOC:%.*]] = alloca %swift.task*
@@ -22,9 +22,9 @@ bb0:
   return %1 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: define hidden swiftcc void @cancel_task(%swift.refcounted* %0)
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @cancel_task(%swift.refcounted* %0)
 // CHECK: [[TASK:%.*]] = bitcast %swift.refcounted* %0 to %swift.task*
-// CHECK-NEXT:  call swiftcc void @swift_task_cancel(%swift.task* [[TASK]])
+// CHECK-NEXT:  call swift{{(tail)?}}cc void @swift_task_cancel(%swift.task* [[TASK]])
 sil hidden [ossa] @cancel_task : $@convention(method) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %4 = builtin "cancelAsyncTask"(%0 : $Builtin.NativeObject) : $()
@@ -32,14 +32,14 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return %5 : $()
 }
 
-// CHECK-LABEL: define hidden swiftcc void @launch_task
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_task
 sil hidden [ossa] @launch_task : $@convention(method) @async (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed () -> (@error Error)) -> () {
 bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed () -> (@error Error)):
   %copy = copy_value %1 : $Optional<Builtin.NativeObject>
   %3 = begin_borrow %copy : $Optional<Builtin.NativeObject>
   // CHECK: [[FN_CONTEXT:%.*]] = load %swift.refcounted*, %swift.refcounted** %.data
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT]])
-  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_f(
+  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create_f(
   // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
   // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
   // CHECK-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]]
@@ -52,7 +52,7 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   return %21 : $()
 }
 
-// CHECK-LABEL: define hidden swiftcc void @launch_future
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future
 sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, @in_guaranteed T) -> () {
 bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, %3: $*T):
   %copy = copy_value %1 : $Optional<Builtin.NativeObject>
@@ -63,7 +63,7 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%.*]])
   %9 = metatype $@thick T.Type
   %10 = init_existential_metatype %9 : $@thick T.Type, $@thick Any.Type
-  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_future_f(
+  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create_future_f(
   // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
   // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
   // CHECK-32-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 6
@@ -77,7 +77,7 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   return %21 : $()
 }
 
-// CHECK-LABEL: define hidden swiftcc void @launch_void_future
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_void_future
 sil hidden [ossa] @launch_void_future : $@convention(method) (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
 bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):
   %copy = copy_value %1 : $Optional<Builtin.NativeObject>
@@ -88,7 +88,7 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%.*]])
   %8 = metatype $@thick ().Type                   // user: %9
   %9 = init_existential_metatype %8 : $@thick ().Type, $@thick Any.Type // user: %10
-  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swiftcc %swift.async_task_and_context @swift_task_create_future_f(
+  // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create_future_f(
   // CHECK-NEXT: [[NEW_CONTEXT_RAW:%.*]] = extractvalue %swift.async_task_and_context [[NEW_TASK_AND_CONTEXT]], 1
   // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
   // CHECK-32-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 6

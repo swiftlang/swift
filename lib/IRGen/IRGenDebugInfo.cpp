@@ -2474,7 +2474,6 @@ bool IRGenDebugInfoImpl::verifyCoroutineArgument(llvm::Value *Addr) {
              "unhandled projection");
       Storage = CallInst->getArgOperand(0);
     } else
-
       break;
   }
   return llvm::isa<llvm::Argument>(Storage);

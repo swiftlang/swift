@@ -1527,7 +1527,7 @@ FUNCTION(TaskCreateFutureFunc,
 //                        ExecutorRef currentExecutor,
 //                        ExecutorRef newExecutor);
 FUNCTION(TaskSwitchFunc,
-         swift_task_switch, SwiftCC,
+         swift_task_switch, SwiftAsyncCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftExecutorPtrTy),

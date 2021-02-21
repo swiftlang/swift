@@ -316,7 +316,8 @@ namespace irgen {
       std::pair<bool, bool> values = {true, true},
       Size initialContextSize = Size(0));
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
-                                     SILFunctionTypeRepresentation convention);
+                                     SILFunctionTypeRepresentation convention,
+                                     bool isAsync);
 
   Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
                                       CanSILFunctionType fnType);

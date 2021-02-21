@@ -153,7 +153,7 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
 
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
-
+SWIFT_CC(swiftasync)
 void swift::swift_task_group_wait_next(
     AsyncTask *waitingTask,
     ExecutorRef executor,

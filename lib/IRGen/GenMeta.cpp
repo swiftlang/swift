@@ -5219,10 +5219,10 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
   assert(sig);
   GenericRequirementsMetadata metadata;
   for (auto &requirement : requirements) {
-    ++metadata.NumRequirements;
-
     switch (auto kind = requirement.getKind()) {
     case RequirementKind::Layout:
+      ++metadata.NumRequirements;
+
       switch (auto layoutKind =
                 requirement.getLayoutConstraint()->getKind()) {
       case LayoutConstraintKind::Class: {
@@ -5247,9 +5247,11 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
         ->getDecl();
 
       // Marker protocols do not record generic requirements at all.
-      if (protocol->isMarkerProtocol())
+      if (protocol->isMarkerProtocol()) {
         break;
+      }
 
+      ++metadata.NumRequirements;
       bool needsWitnessTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
@@ -5273,6 +5275,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
     case RequirementKind::SameType:
     case RequirementKind::Superclass: {
+      ++metadata.NumRequirements;
       auto abiKind = kind == RequirementKind::SameType
         ? GenericRequirementKind::SameType
         : GenericRequirementKind::BaseClass;

@@ -2140,6 +2140,30 @@ public:
   }
 };
 
+/// The `@hasAsyncAlternative` attribute marks a function as having an async
+/// alternative, optionally providing a name (for cases when the alternative
+/// has a different name).
+class HasAsyncAlternativeAttr final : public DeclAttribute  {
+public:
+  /// An optional name of the async alternative function, where the name of the
+  /// attributed function is used otherwise.
+  const DeclNameRef Name;
+
+  HasAsyncAlternativeAttr(DeclNameRef Name, SourceLoc AtLoc, SourceRange Range)
+    : DeclAttribute(DAK_HasAsyncAlternative, AtLoc, Range, false),
+      Name(Name) {}
+
+  HasAsyncAlternativeAttr(SourceLoc AtLoc, SourceRange Range)
+    : DeclAttribute(DAK_HasAsyncAlternative, AtLoc, Range, false) {}
+
+  /// Determine whether this attribute has a name associated with it.
+  bool hasName() const { return !Name.getBaseName().empty(); }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_HasAsyncAlternative;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.

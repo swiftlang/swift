@@ -820,6 +820,19 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
     switch (source->kind) {
     case ProtocolRequirement:
     case InferredProtocolRequirement: {
+      // Special handling for top-level requirement signature requirements;
+      // pretend the root type is the subject type as written in the
+      // protocol, and not 'Self', so that we can consider this requirement
+      // self-derived if it depends on one of the conformances that make
+      // the root type valid.
+      if (requirementSignatureSelfProto) {
+        if (source->getProtocolDecl() == requirementSignatureSelfProto &&
+            source->parent->kind == RequirementSource::RequirementSignatureSelf) {
+          rootType = source->getAffectedType();
+          return false;
+        }
+      }
+
       // Note that we've seen a protocol requirement.
       sawProtocolRequirement = true;
 
@@ -2144,37 +2157,40 @@ void EquivalenceClass::dump(llvm::raw_ostream &out,
   }, [&]() {
     out << ", ";
   });
-  out << "\nConformances:";
-  interleave(conformsTo,
-             [&](const std::pair<
-                        ProtocolDecl *,
-                        std::vector<Constraint<ProtocolDecl *>>> &entry) {
-               out << entry.first->getNameStr();
-             },
-             [&] { out << ", "; });
-  out << "\nSame-type constraints:";
-  llvm::interleave(
-      sameTypeConstraints,
-      [&](const Constraint<Type> &constraint) {
-        out << "\n  " << constraint.getSubjectDependentType({})
-            << " == " << constraint.value;
+  out << "\n";
+  out << "Conformance constraints:\n";
+  for (auto entry : conformsTo) {
+    out << "  " << entry.first->getNameStr() << "\n";
+    for (auto constraint : entry.second) {
+      constraint.source->dump(out, &builder->getASTContext().SourceMgr, 4);
+      if (constraint.source->isDerivedRequirement())
+        out << " [derived]";
+      out << "\n";
+    }
+  }
 
-        if (constraint.source->isDerivedRequirement())
-          out << " [derived]";
-      },
-      [&] { out << ", "; });
+  out << "Same-type constraints:\n";
+  for (auto constraint : sameTypeConstraints) {
+    out << "  " << constraint.getSubjectDependentType({})
+        << " == " << constraint.value << "\n";
+    constraint.source->dump(out, &builder->getASTContext().SourceMgr, 4);
+    if (constraint.source->isDerivedRequirement())
+      out << " [derived]";
+    out << "\n";
+  }
+
   if (concreteType)
-    out << "\nConcrete type: " << concreteType.getString();
+    out << "Concrete type: " << concreteType.getString() << "\n";
   if (superclass)
-    out << "\nSuperclass: " << superclass.getString();
+    out << "Superclass: " << superclass.getString() << "\n";
   if (layout)
-    out << "\nLayout: " << layout.getString();
+    out << "Layout: " << layout.getString() << "\n";
 
   if (!delayedRequirements.empty()) {
-    out << "\nDelayed requirements:";
+    out << "Delayed requirements:\n";
     for (const auto &req : delayedRequirements) {
-      out << "\n  ";
       req.dump(out);
+      out << "\n";
     }
   }
 
