@@ -182,6 +182,9 @@ const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
 SWIFT_CC(swiftasync)
 static void completeTask(AsyncTask *task, ExecutorRef executor,
                          SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+  // Set that there's no longer a running task in the current thread.
+  _swift_task_clearCurrent();
+
   // Tear down the task-local allocator immediately;
   // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);

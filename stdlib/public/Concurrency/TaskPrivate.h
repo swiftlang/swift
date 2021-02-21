@@ -32,6 +32,14 @@ void _swift_task_alloc_initialize(AsyncTask *task);
 /// Destroy the task-local allocator in the given task.
 void _swift_task_alloc_destroy(AsyncTask *task);
 
+/// Given that we've already set the given executor as the active
+/// executor, run the given job.  This does additional bookkeeping
+/// related to the active task.
+void runJobInExecutorContext(Job *job, ExecutorRef executor);
+
+/// Clear the active task reference for the current thread.
+void _swift_task_clearCurrent();
+
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
 #else
@@ -94,7 +102,7 @@ static void runTaskWithFutureResult(
   }
 
   // TODO: schedule this task on the executor rather than running it directly.
-  waitingTask->run(executor);
+  swift_job_run(waitingTask, executor);
 }
 
 /// Run the given task, providing it with the result of the future.
@@ -126,7 +134,7 @@ static void runTaskWithGroupPollResult(
   }
 
   // TODO: schedule this task on the executor rather than running it directly.
-  waitingTask->run(executor);
+  swift_job_run(waitingTask, executor);
 
   // TODO: Not entirely sure when to release; we synchronously run the code above so we can't before
   // if we need to, release the now completed task so it can be destroyed

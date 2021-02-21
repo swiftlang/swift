@@ -422,6 +422,16 @@ void swift_continuation_logFailedCheck(const char *message);
 /// Otherwise it uses dispatchMain.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_asyncMainDrainQueue();
+
+/// Establish that the current thread is running as the given
+/// executor, then run a job.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_run(Job *job, ExecutorRef executor);
+
+/// Return the current thread's active task reference.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTask *swift_task_getCurrent(void);
+
 }
 
 #endif
