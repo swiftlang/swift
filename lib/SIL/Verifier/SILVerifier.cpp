@@ -5432,6 +5432,8 @@ public:
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
+      if (SI.getLoc().getKind() == SILLocation::CleanupKind)
+        continue;
 
       // If we haven't seen this debug scope yet, update the
       // map and go on.
