@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -368,7 +368,10 @@ precedencegroup MultiplicationPrecedence {
 precedencegroup BitwiseShiftPrecedence {
   higherThan: MultiplicationPrecedence
 }
-
+precedencegroup ExponentiationPrecedence {
+  associativity: right
+  higherThan: MultiplicationPrecedence
+}
 
 //===----------------------------------------------------------------------===//
 // Standard operators
@@ -397,6 +400,7 @@ prefix operator ..<: Comparable
 // Standard infix operators.
 
 // "Exponentiative"
+infix operator  **: ExponentiationPrecedence
 
 infix operator  <<: BitwiseShiftPrecedence, BinaryInteger
 infix operator &<<: BitwiseShiftPrecedence, FixedWidthInteger
@@ -463,6 +467,7 @@ infix operator ||: LogicalDisjunctionPrecedence, Bool
 
 // Compound
 
+infix operator  **=: AssignmentPrecedence
 infix operator   *=: AssignmentPrecedence, Numeric
 infix operator  &*=: AssignmentPrecedence, FixedWidthInteger
 infix operator   /=: AssignmentPrecedence, BinaryInteger
