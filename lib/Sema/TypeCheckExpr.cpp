@@ -282,6 +282,25 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     return await;
   }
   
+  // Operators in apex precedence groups are unordered relative to prefix and
+  // postfix operators.
+  if (opPrecedence && opPrecedence->isApex()) {
+    if (auto *prefixUnary = dyn_cast<PrefixUnaryExpr>(LHS)) {
+      Ctx.Diags.diagnose(Op->getLoc(),
+                         diag::unordered_adjacent_unary_operator,
+                         Op->getName())
+        .highlight(prefixUnary->getFn()->getSourceRange())
+        .highlight(Op->getSourceRange());
+    }
+    if (auto *postfixUnary = dyn_cast<PostfixUnaryExpr>(RHS)) {
+      Ctx.Diags.diagnose(Op->getLoc(),
+                         diag::unordered_adjacent_unary_operator,
+                         Op->getName())
+        .highlight(Op->getSourceRange())
+        .highlight(postfixUnary->getFn()->getSourceRange());
+    }
+  }
+  
   // If this is an assignment operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
   if (opPrecedence && opPrecedence->isAssignment()) {

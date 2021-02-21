@@ -624,7 +624,7 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   110)
 
-SIMPLE_DECL_ATTR(_apex, Apex,
+SIMPLE_DECL_ATTR(apex, Apex,
   OnPrecedenceGroup |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
   111)

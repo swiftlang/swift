@@ -6994,6 +6994,10 @@ public:
   MutableArrayRef<Relation> getMutableLowerThan() {
     return { getLowerThanBuffer(), NumLowerThan };
   }
+  
+  bool isApex() const {
+    return getAttrs().hasAttribute<ApexAttr>();
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PrecedenceGroup;

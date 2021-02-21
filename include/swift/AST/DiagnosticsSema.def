@@ -968,7 +968,7 @@ ERROR(unknown_precedence_group,none,
 ERROR(precedence_group_cycle,none,
       "cycle in '%select{lowerThan|higherThan}0' relation", (bool))
 ERROR(higher_than_precedence_group_cycle,none,
-      "cycle in higherThan relation: %0", (StringRef))
+      "cycle in 'higherThan' relation: %0", (StringRef))
 ERROR(precedence_group_lower_within_module,none,
       "precedence group cannot be given lower precedence than group in same"
       " module; make the other precedence group higher than this one instead",
@@ -979,6 +979,9 @@ NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
 NOTE(circular_reference_through_precedence_group, none,
      "through reference to precedence group %0 here", (Identifier))
+ERROR(precedence_group_higher_than_apex,none,
+      "precedence group cannot be given higher precedence than '@_apex' group",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
@@ -3384,13 +3387,17 @@ ERROR(construct_protocol_by_name,none,
 
 // Operators
 ERROR(unknown_binop,none,
-       "operator is not a known binary operator", ())
+      "operator is not a known binary operator", ())
 ERROR(non_associative_adjacent_operators,none,
       "adjacent operators are in non-associative precedence group %0",
       (Identifier))
 ERROR(unordered_adjacent_operators,none,
       "adjacent operators are in unordered precedence groups %0 and %1",
       (Identifier, Identifier))
+ERROR(unordered_adjacent_unary_operator,none,
+      "operator %0 has undefined precedence relative to unary operator; use"
+      "grouping parentheses",
+      (Identifier))
 ERROR(missing_builtin_precedence_group,none,
       "broken standard library: missing builtin precedence group %0",
       (Identifier))

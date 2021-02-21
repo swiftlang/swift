@@ -368,7 +368,7 @@ precedencegroup MultiplicationPrecedence {
 precedencegroup BitwiseShiftPrecedence {
   higherThan: MultiplicationPrecedence
 }
-@_apex precedencegroup ExponentiationPrecedence {
+@apex precedencegroup ExponentiationPrecedence {
   associativity: right
   higherThan: MultiplicationPrecedence
 }

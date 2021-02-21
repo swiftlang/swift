@@ -1446,8 +1446,18 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
       continue;
 
     // TODO: Requestify the lookup of a relation's group.
-    rel.Group = lookupPrecedenceGroupForRelation(
+    auto *group = lookupPrecedenceGroupForRelation(
         dc, rel, PrecedenceGroupDescriptor::HigherThan);
+    rel.Group = group;
+    
+    if (group && group->isApex()) {
+      if (!PGD->isInvalid()) {
+        Diags.diagnose(rel.NameLoc, diag::precedence_group_higher_than_apex);
+        Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
+                       DescriptiveDeclKind::PrecedenceGroup);
+      }
+      PGD->setInvalid();
+    }
     if (rel.Group) {
       addedHigherThan = true;
     } else {
@@ -1469,6 +1479,13 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     // allow us to diagnose even if we have a precedence group cycle.
     if (!group)
       group = dc->lookupPrecedenceGroup(rel.Name).getSingle();
+
+    if (group && PGD->isApex()) {
+      if (!PGD->isInvalid()) {
+        Diags.diagnose(rel.NameLoc, diag::precedence_group_higher_than_apex);
+      }
+      PGD->setInvalid();
+    }
 
     if (group &&
         group->getDeclContext()->getParentModule() == dc->getParentModule()) {
