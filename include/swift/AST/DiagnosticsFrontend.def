@@ -394,6 +394,11 @@ REMARK(interface_file_lock_failure,none,
 REMARK(interface_file_lock_timed_out,none,
       "timed out waiting to acquire lock file for module interface '%0'", (StringRef))
 
+ERROR(error_option_required,none, "option '%0' is required", (StringRef))
+ERROR(error_nonexistent_output_dir,none,
+      "'-output-dir' argument '%0' does not exist or is not a directory", (StringRef))
+
+
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
       "expected "
