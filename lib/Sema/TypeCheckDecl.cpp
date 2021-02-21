@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1450,8 +1450,19 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
       continue;
 
     // TODO: Requestify the lookup of a relation's group.
-    rel.Group = lookupPrecedenceGroupForRelation(
+    auto *group = lookupPrecedenceGroupForRelation(
         dc, rel, PrecedenceGroupDescriptor::HigherThan);
+    rel.Group = group;
+
+    if (group && group->isApex()) {
+      if (!PGD->isInvalid()) {
+        Diags.diagnose(rel.NameLoc, diag::precedence_group_higher_than_apex);
+        Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
+                       DescriptiveDeclKind::PrecedenceGroup);
+      }
+      PGD->setInvalid();
+    }
+
     if (rel.Group) {
       addedHigherThan = true;
     } else {
@@ -1473,6 +1484,13 @@ void swift::validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
     // allow us to diagnose even if we have a precedence group cycle.
     if (!group)
       group = dc->lookupPrecedenceGroup(rel.Name).getSingle();
+
+    if (group && PGD->isApex()) {
+      if (!PGD->isInvalid()) {
+        Diags.diagnose(rel.NameLoc, diag::precedence_group_higher_than_apex);
+      }
+      PGD->setInvalid();
+    }
 
     if (group &&
         group->getDeclContext()->getParentModule() == dc->getParentModule()) {

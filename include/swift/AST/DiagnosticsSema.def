@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -976,6 +976,9 @@ NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
 NOTE(circular_reference_through_precedence_group, none,
      "through reference to precedence group %0 here", (Identifier))
+ERROR(precedence_group_higher_than_apex,none,
+      "precedence group cannot be given higher precedence than '@apex' group",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: Expression Type Checking Errors
@@ -3381,7 +3384,11 @@ ERROR(construct_protocol_by_name,none,
 
 // Operators
 ERROR(unknown_binop,none,
-       "operator is not a known binary operator", ())
+      "operator is not a known binary operator", ())
+ERROR(unordered_adjacent_unary_operator,none,
+      "operator in precedence group %0 and adjacent unary operator have"
+      "undefined relative precedence; use grouping parentheses",
+      (Identifier))
 ERROR(non_associative_adjacent_operators,none,
       "adjacent operators are in non-associative precedence group %0",
       (Identifier))

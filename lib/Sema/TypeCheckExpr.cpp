@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -281,7 +281,24 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     await->setSubExpr(sub);
     return await;
   }
-  
+
+  // Operators in apex precedence groups are unordered relative to prefix and
+  // postfix operators.
+  if (opPrecedence && opPrecedence->isApex()) {
+    if (auto *prefixUnary = dyn_cast<PrefixUnaryExpr>(LHS)) {
+      Ctx.Diags.diagnose(Op->getLoc(),
+                         diag::unordered_adjacent_unary_operator,
+                         opPrecedence->getName())
+      .highlight(prefixUnary->getFn()->getSourceRange());
+    }
+    if (auto *postfixUnary = dyn_cast<PostfixUnaryExpr>(RHS)) {
+      Ctx.Diags.diagnose(Op->getLoc(),
+                         diag::unordered_adjacent_unary_operator,
+                         opPrecedence->getName())
+      .highlight(postfixUnary->getFn()->getSourceRange());
+    }
+  }
+
   // If this is an assignment operator, and the left operand is an optional
   // evaluation, pull the operator into the chain.
   if (opPrecedence && opPrecedence->isAssignment()) {
