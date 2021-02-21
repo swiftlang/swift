@@ -980,7 +980,7 @@ NOTE(previous_precedence_group_decl,none,
 NOTE(circular_reference_through_precedence_group, none,
      "through reference to precedence group %0 here", (Identifier))
 ERROR(precedence_group_higher_than_apex,none,
-      "precedence group cannot be given higher precedence than '@_apex' group",
+      "precedence group cannot be given higher precedence than '@apex' group",
       ())
 
 //------------------------------------------------------------------------------
