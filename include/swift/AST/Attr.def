@@ -624,10 +624,16 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   110)
 
+DECL_ATTR(hasAsyncAlternative, HasAsyncAlternative,
+  OnAbstractFunction | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIStableToRemove,
+  111)
+
 SIMPLE_DECL_ATTR(apex, Apex,
   OnPrecedenceGroup |
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  111)
+  112)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
