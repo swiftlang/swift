@@ -6,6 +6,8 @@
 // CHECK-NOT: $s15marker_protocol1PP
 // CHECK-NOT: $s15marker_protocol1PMp
 
+// REQUIRES: PTRSIZE=64
+
 @_marker public protocol P { }
 
 extension Int: P { }
