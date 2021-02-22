@@ -2308,7 +2308,8 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
-void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
+void swift::checkConcurrentValueConformance(
+    ProtocolConformance *conformance, bool asWarning) {
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
@@ -2326,7 +2327,9 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
   if (!conformanceDC->getParentSourceFile() ||
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(
-        diag::concurrent_value_outside_source_file,
+        asWarning
+          ? diag::concurrent_value_outside_source_file_warn
+          : diag::concurrent_value_outside_source_file,
         nominal->getDescriptiveKind(), nominal->getName());
     return;
   }
@@ -2335,8 +2338,11 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
     // An open class cannot conform to `ConcurrentValue`.
     if (classDecl->getFormalAccess() == AccessLevel::Open) {
       classDecl->diagnose(
-          diag::concurrent_value_open_class, classDecl->getName());
-      return;
+          asWarning ? diag::concurrent_value_open_class_warn
+                    : diag::concurrent_value_open_class,
+          classDecl->getName());
+      if (!asWarning)
+        return;
     }
 
     // A 'ConcurrentValue' class cannot inherit from another class, although
@@ -2345,10 +2351,12 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         if (!superclassDecl->isNSObject()) {
           classDecl->diagnose(
-              diag::concurrent_value_inherit,
+              asWarning ? diag::concurrent_value_inherit_warn
+                        : diag::concurrent_value_inherit,
               nominal->getASTContext().LangOpts.EnableObjCInterop,
               classDecl->getName());
-          return;
+          if (!asWarning)
+            return;
         }
       }
     }
@@ -2359,7 +2367,10 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
   if (isa<StructDecl>(nominal) || classDecl) {
     for (auto property : nominal->getStoredProperties()) {
       if (classDecl && property->supportsMutation()) {
-        property->diagnose(diag::concurrent_value_class_mutable_property, property->getName(), nominal->getDescriptiveKind(),
+        property->diagnose(
+            asWarning ? diag::concurrent_value_class_mutable_property_warn
+                      : diag::concurrent_value_class_mutable_property,
+            property->getName(), nominal->getDescriptiveKind(),
             nominal->getName());
         continue;
       }
@@ -2368,7 +2379,9 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
           conformanceDC->mapTypeIntoContext(property->getInterfaceType());
       if (!isConcurrentValueType(conformanceDC, propertyType)) {
         property->diagnose(
-            diag::non_concurrent_type_member, false, property->getName(),
+            asWarning ? diag::non_concurrent_type_member_warn
+                      : diag::non_concurrent_type_member,
+            false, property->getName(),
             nominal->getDescriptiveKind(), nominal->getName(), propertyType);
         continue;
       }
@@ -2389,7 +2402,9 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
             element->getArgumentInterfaceType());
         if (!isConcurrentValueType(conformanceDC, elementType)) {
           element->diagnose(
-              diag::non_concurrent_type_member, true, element->getName(),
+              asWarning ? diag::non_concurrent_type_member_warn
+                        : diag::non_concurrent_type_member,
+              true, element->getName(),
               nominal->getDescriptiveKind(), nominal->getName(), elementType);
           continue;
         }
