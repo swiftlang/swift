@@ -18,7 +18,7 @@ func test_cancellation_guard_isCancelled(_ any: Any) async -> PictureData {
   return PictureData.value("...")
 }
 
-struct SomeFile {
+struct SomeFile: ConcurrentValue {
   func close() {}
 }
 

@@ -134,7 +134,7 @@ func test_taskGroup_quorum_thenCancel() async {
     case yay
     case nay
   }
-  struct Follower {
+  struct Follower: ConcurrentValue {
     init(_ name: String) {}
     func vote() async throws -> Vote {
       // "randomly" vote yes or no
@@ -181,13 +181,13 @@ func test_taskGroup_quorum_thenCancel() async {
   _ = await gatherQuorum(followers: [Follower("A"), Follower("B"), Follower("C")])
 }
 
-extension Collection {
+extension Collection where Self: ConcurrentValue, Element: ConcurrentValue, Self.Index: ConcurrentValue {
 
   /// Just another example of how one might use task groups.
-  func map<T>(
+  func map<T: ConcurrentValue>(
     parallelism requestedParallelism: Int? = nil/*system default*/,
     // ordered: Bool = true, /
-    _ transform: (Element) async throws -> T
+    _ transform: @concurrent (Element) async throws -> T
   ) async throws -> [T] { // TODO: can't use rethrows here, maybe that's just life though; rdar://71479187 (rethrows is a bit limiting with async functions that use task groups)
     let defaultParallelism = 2
     let parallelism = requestedParallelism ?? defaultParallelism
