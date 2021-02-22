@@ -1213,9 +1213,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       return I->second;
     }
 
-    diags.diagnose(L, diag::cannot_find_type_in_scope,
-                comp->getNameRef())
-      .highlight(R);
+    diags.diagnose(L, diag::cannot_find_type_in_scope, comp->getNameRef())
+        .highlight(R);
 
     return ErrorType::get(ctx);
   }
