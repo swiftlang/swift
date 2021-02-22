@@ -218,10 +218,6 @@ def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_concurrent_value_checking :
-  Flag<["-"], "enable-experimental-concurrent-value-checking">,
-  HelpText<"Enable ConcurrentValue checking">;
-
 def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
   HelpText<"Enable flow-sensitive concurrent captures">;

@@ -823,7 +823,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind) {
   // Bail out immediately if we aren't supposed to do this checking.
-  if (!dc->getASTContext().LangOpts.EnableExperimentalConcurrentValueChecking)
+  if (!dc->getASTContext().LangOpts.EnableExperimentalConcurrency)
     return false;
 
   // For functions, check the parameter and result types.
@@ -1118,7 +1118,7 @@ namespace {
           if (!indexExpr || !indexExpr->getType())
             continue;
 
-          if (ctx.LangOpts.EnableExperimentalConcurrentValueChecking &&
+          if (ctx.LangOpts.EnableExperimentalConcurrency &&
               !isConcurrentValueType(getDeclContext(), indexExpr->getType())) {
             ctx.Diags.diagnose(
                 component.getLoc(), diag::non_concurrent_keypath_capture,
