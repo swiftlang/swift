@@ -160,7 +160,6 @@
                 "sourcekit-lsp": "main",
                 "swift-format": "main",
                 "swift-installer-scripts": "main",
-<<<<<<< HEAD
                 "swift-experimental-string-processing": "dev/6"
             }
         },
