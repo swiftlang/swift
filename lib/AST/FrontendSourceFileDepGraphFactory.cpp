@@ -84,13 +84,13 @@ DependencyKey::Builder DependencyKey::Builder::fromReference(
   case Kind::Tombstone:
     llvm_unreachable("Cannot enumerate dead reference!");
   case Kind::PotentialMember:
-    return Builder{kind, aspect}.withContext(ref.subject);
+    return Builder{kind, aspect}.withContext(ref.subject->getAsDecl());
   case Kind::TopLevel:
   case Kind::Dynamic:
     return Builder{kind, aspect, nullptr, ref.name.userFacingName()};
   case Kind::UsedMember:
     return Builder{kind, aspect, nullptr, ref.name.userFacingName()}
-        .withContext(ref.subject);
+        .withContext(ref.subject->getAsDecl());
   }
 }
 
@@ -455,14 +455,14 @@ private:
   void enumerateNominalUses(UseEnumerator enumerator) {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
-      const NominalTypeDecl *subject = ref.subject;
+      const DeclContext *subject = ref.subject;
       if (!subject) {
         return;
       }
 
       auto key =
           DependencyKey::Builder(NodeKind::nominal, DeclAspect::interface)
-              .withContext(subject)
+              .withContext(subject->getAsDecl())
               .build();
       enumerateUse(key, enumerator);
     });

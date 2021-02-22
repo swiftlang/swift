@@ -395,12 +395,12 @@ bool DependencyVerifier::constructObligations(const SourceFile *SF,
       llvm_unreachable("Cannot enumerate dead dependency!");
 
     case NodeKind::PotentialMember: {
-      auto key = copyQualifiedTypeName(Ctx, reference.subject);
+      auto key = copyQualifiedTypeName(Ctx, reference.subject->getSelfNominalTypeDecl());
       Obligations.insert({Obligation::Key::forPotentialMember(key),
                           {"", Expectation::Kind::PotentialMember}});
     } break;
     case NodeKind::UsedMember: {
-      auto demContext = copyQualifiedTypeName(Ctx, reference.subject);
+      auto demContext = copyQualifiedTypeName(Ctx, reference.subject->getSelfNominalTypeDecl());
       auto name = reference.name.userFacingName();
       auto key = Ctx.AllocateCopy((demContext + "." + name).str());
       Obligations.insert(
