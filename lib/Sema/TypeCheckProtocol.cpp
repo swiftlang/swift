@@ -5660,6 +5660,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   ProtocolConformance *concurrentValueConformance = nullptr;
   ProtocolConformance *unsafeConcurrentValueConformance = nullptr;
+  ProtocolConformance *errorConformance = nullptr;
+  ProtocolConformance *codingKeyConformance = nullptr;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -5691,12 +5693,18 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeConcurrentValue)) {
       unsafeConcurrentValueConformance = conformance;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
+      errorConformance = conformance;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
+      codingKeyConformance = conformance;
     }
   }
 
   // Check constraints of ConcurrentValue.
-  if (concurrentValueConformance && !unsafeConcurrentValueConformance)
-    checkConcurrentValueConformance(concurrentValueConformance);
+  if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
+    bool asWarning = errorConformance || codingKeyConformance;
+    checkConcurrentValueConformance(concurrentValueConformance, asWarning);
+  }
 
   // Check all conformances.
   groupChecker.checkAllConformances();
