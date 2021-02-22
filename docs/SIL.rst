@@ -3492,12 +3492,12 @@ load_borrow
    %1 = load_borrow %0 : $*T
    // $T must be a loadable type
 
-Loads the value ``%1`` from the memory location ``%0``. The ``load_borrow``
+Loads the value ``%1`` from the memory location ``%0``. The `load_borrow`_
 instruction creates a borrowed scope in which a read-only borrow value ``%1``
 can be used to read the value stored in ``%0``. The end of scope is delimited
-by an ``end_borrow`` instruction. All ``load_borrow`` instructions must be
-paired with exactly one ``end_borrow`` instruction along any path through the
-program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
+by an `end_borrow`_ instruction. All `load_borrow`_ instructions must be
+paired with exactly one `end_borrow`_ instruction along any path through the
+program. Until `end_borrow`_, it is illegal to invalidate or store to ``%0``.
 
 begin_borrow
 ````````````
@@ -3558,12 +3558,12 @@ The type of %1 is ``*T`` and the type of ``%0`` is ``T``, which must be a
 loadable type. This will overwrite the memory at ``%1`` and destroy the value
 currently held there.
 
-The purpose of the ``assign`` instruction is to simplify the
+The purpose of the `assign`_ instruction is to simplify the
 definitive initialization analysis on loadable variables by removing
 what would otherwise appear to be a load and use of the current value.
 It is produced by SILGen, which cannot know which assignments are
 meant to be initializations.  If it is deemed to be an initialization,
-it can be replaced with a ``store``; otherwise, it must be replaced
+it can be replaced with a `store`_; otherwise, it must be replaced
 with a sequence that also correctly destroys the current value.
 
 This instruction is only valid in Raw SIL and is rewritten as appropriate
@@ -3581,7 +3581,7 @@ assign_by_wrapper
   // $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
   // $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
 
-Similar to the ``assign`` instruction, but the assignment is done via a
+Similar to the `assign`_ instruction, but the assignment is done via a
 delegate.
 
 In case of an initialization, the function ``%2`` is called with ``%0`` as
