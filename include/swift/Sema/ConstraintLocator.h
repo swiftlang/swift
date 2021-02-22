@@ -781,6 +781,20 @@ public:
   }
 };
 
+class LocatorPathElt::PlaceholderType final
+    : public StoredPointerElement<PlaceholderTypeRepr> {
+public:
+  PlaceholderType(PlaceholderTypeRepr *placeholderRepr)
+      : StoredPointerElement(PathElementKind::PlaceholderType,
+                             placeholderRepr) {}
+
+  PlaceholderTypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PlaceholderType;
+  }
+};
+
 namespace details {
   template <typename CustomPathElement>
   class PathElement {

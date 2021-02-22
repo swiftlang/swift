@@ -96,7 +96,7 @@ public:
                    bool wantRValue = true) const {
     auto &cs = getConstraintSystem();
 
-    if (rawType->hasTypeVariable() || rawType->hasHole()) {
+    if (rawType->hasTypeVariable() || rawType->hasPlaceholder()) {
       rawType = rawType.transform([&](Type type) {
         if (auto *typeVar = type->getAs<TypeVariableType>()) {
           auto resolvedType = S.simplifyType(typeVar);
@@ -106,8 +106,9 @@ public:
                      : resolvedType;
         }
 
-        return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType)
-                              : type;
+        return type->isPlaceholder()
+                   ? Type(cs.getASTContext().TheUnresolvedType)
+                   : type;
       });
     }
 

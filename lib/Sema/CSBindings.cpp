@@ -50,7 +50,7 @@ bool PotentialBinding::isViableForJoin() const {
          !BindingType->hasLValueType() &&
          !BindingType->hasUnresolvedType() &&
          !BindingType->hasTypeVariable() &&
-         !BindingType->hasHole() &&
+         !BindingType->hasPlaceholder() &&
          !BindingType->hasUnboundGenericType() &&
          !hasDefaultedLiteralProtocol() &&
          !isDefaultableBinding();
@@ -391,7 +391,7 @@ void PotentialBindings::inferTransitiveBindings(
 
       auto type = binding.BindingType;
 
-      if (type->isHole())
+      if (type->isPlaceholder())
         continue;
 
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
@@ -579,7 +579,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding,
   do {
     // Conformance check on type variable would always return true,
     // but type variable can't cover anything until it's bound.
-    if (type->isTypeVariableOrMember() || type->isHole())
+    if (type->isTypeVariableOrMember() || type->isPlaceholder())
       return std::make_pair(false, Type());
 
     if (isCoveredBy(type, useDC)) {
@@ -1691,7 +1691,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
 
   if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.openUnboundGenericTypes(type, dstLocator);
+    type = cs.replaceInferableTypesWithTypeVars(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
@@ -1701,7 +1701,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.isDefaultableBinding()) {
     cs.DefaultedConstraints.push_back(srcLocator);
 
-    if (type->isHole()) {
+    if (type->isPlaceholder()) {
       // Reflect in the score that this type variable couldn't be
       // resolved and had to be bound to a placeholder "hole" type.
       cs.increaseScore(SK_Hole);

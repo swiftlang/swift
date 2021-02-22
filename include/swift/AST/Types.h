@@ -67,6 +67,7 @@ class Identifier;
 class InOutType;
 class OpaqueTypeDecl;
 class OpenedArchetypeType;
+class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
 class SILModule;
@@ -126,7 +127,7 @@ public:
 
     /// This type expression contains an UnresolvedType.
     HasUnresolvedType    = 0x08,
-    
+
     /// Whether this type expression contains an unbound generic type.
     HasUnboundGeneric    = 0x10,
 
@@ -145,14 +146,14 @@ public:
 
     /// This type contains a DependentMemberType.
     HasDependentMember   = 0x200,
-    
+
     /// This type contains an OpaqueTypeArchetype.
     HasOpaqueArchetype   = 0x400,
 
-    /// This type contains a type hole.
-    HasTypeHole          = 0x800,
+    /// This type contains a type placeholder.
+    HasPlaceholder       = 0x800,
 
-    Last_Property = HasTypeHole
+    Last_Property = HasPlaceholder
   };
   enum { BitWidth = countBitsUsed(Property::Last_Property) };
 
@@ -207,9 +208,8 @@ public:
   /// generic type?
   bool hasUnboundGeneric() const { return Bits & HasUnboundGeneric; }
 
-  /// Does a type with these properties structurally contain a
-  /// type hole?
-  bool hasTypeHole() const { return Bits & HasTypeHole; }
+  /// Does a type with these properties structurally contain a placeholder?
+  bool hasPlaceholder() const { return Bits & HasPlaceholder; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
@@ -546,7 +546,7 @@ public:
   /// Is this the 'Any' type?
   bool isAny();
 
-  bool isHole();
+  bool isPlaceholder();
 
   /// Does the type have outer parenthesis?
   bool hasParenSugar() const { return getKind() == TypeKind::Paren; }
@@ -580,8 +580,10 @@ public:
     return getRecursiveProperties().hasUnresolvedType();
   }
 
-  /// Determine whether this type involves a hole.
-  bool hasHole() const { return getRecursiveProperties().hasTypeHole(); }
+  /// Determine whether this type involves a \c PlaceholderType.
+  bool hasPlaceholder() const {
+    return getRecursiveProperties().hasPlaceholder();
+  }
 
   /// Determine whether the type involves a context-dependent archetype.
   bool hasArchetype() const {
@@ -5809,20 +5811,20 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
-/// HoleType - This represents a placeholder type for a type variable
+/// PlaceholderType - This represents a placeholder type for a type variable
 /// or dependent member type that cannot be resolved to a concrete type
 /// because the expression is ambiguous. This type is only used by the
 /// constraint solver and transformed into UnresolvedType to be used in AST.
-class HoleType : public TypeBase {
-  using Originator = llvm::PointerUnion<TypeVariableType *,
-                                        DependentMemberType *, VarDecl *,
-                                        ErrorExpr *>;
+class PlaceholderType : public TypeBase {
+  using Originator =
+      llvm::PointerUnion<TypeVariableType *, DependentMemberType *, VarDecl *,
+                         ErrorExpr *, PlaceholderTypeRepr *>;
 
   Originator O;
 
-  HoleType(ASTContext &C, Originator originator,
-           RecursiveTypeProperties properties)
-      : TypeBase(TypeKind::Hole, &C, properties), O(originator) {}
+  PlaceholderType(ASTContext &C, Originator originator,
+                  RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Placeholder, &C, properties), O(originator) {}
 
 public:
   static Type get(ASTContext &ctx, Originator originator);
@@ -5830,10 +5832,10 @@ public:
   Originator getOriginator() const { return O; }
 
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Hole;
+    return T->getKind() == TypeKind::Placeholder;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(HoleType, Type)
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 
 inline bool TypeBase::isTypeVariableOrMember() {
   if (is<TypeVariableType>())
