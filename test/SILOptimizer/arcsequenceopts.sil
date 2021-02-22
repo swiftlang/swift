@@ -630,9 +630,18 @@ bb0(%0 : $Cls):
 // 'Container' object, so the child will be destroyed with the parent.
 // The original SIL already has an over-release of the parent.
 //
+// TODO: This optimization is currently defeated because
+// - release_container marks anything '%2 = alloc_ref $Container' points to as escaping
+// - in this function, '%2 = alloc_ref $Container' points to '%1 = alloc_ref $Cls'
+// - therefore, the 'apply' may potentially release '%1 = alloc_ref $Cls'
+//
+// To hoist this 'release %1 : $Cls', AliasAnalysis alsos need to prove that
+// it isn't being hoisted above the last use. This information is not
+// properly communicated between AliasAnalysis and EscapeAnalysis.
+//
 // CHECK-LABEL: sil @remove_as_local_object_indirectly_escapes_to_callee
-// CHECK-NOT: retain_value
-// CHECK-NOT: release_value
+// CHECK: retain_value
+// CHECK: release_value
 sil @remove_as_local_object_indirectly_escapes_to_callee : $@convention(thin) (Cls) -> () {
 bb0(%0 : $Cls):
   %1 = alloc_ref $Cls
