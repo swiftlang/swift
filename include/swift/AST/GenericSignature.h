@@ -234,13 +234,6 @@ class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
   mutable llvm::PointerUnion<const GenericSignatureImpl *, ASTContext *>
     CanonicalSignatureOrASTContext;
 
-  void buildConformanceAccessPath(
-      SmallVectorImpl<ConformanceAccessPath::Entry> &path,
-      ArrayRef<Requirement> reqs,
-      const void /*GenericSignatureBuilder::RequirementSource*/ *source,
-      ProtocolDecl *conformingProto, Type rootType,
-      ProtocolDecl *requirementSignatureProto) const;
-
   friend class ArchetypeType;
 
 public:
