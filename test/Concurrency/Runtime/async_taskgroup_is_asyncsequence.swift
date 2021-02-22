@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// FIXME: unlock on other OSes
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 import Dispatch
 

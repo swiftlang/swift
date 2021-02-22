@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// FIXME: unlock on other OSes
+// REQUIRES: OS=macosx
+// REQUIRES: CPU=x86_64
 
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
@@ -35,7 +38,7 @@ func test_taskGroup_throws() async {
 
       guard let third = try! await group.next() else {
         print("task group failed to get 3")
-        return 0 
+        return 0
       }
 
       print("task group returning normally: \(third)")
