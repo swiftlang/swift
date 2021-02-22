@@ -12,7 +12,7 @@ _swift_complete()
   prevWord="${COMP_WORDS[COMP_CWORD-1]}"
 
   if [[ ${currentWord} != -* ]] ; then
-    COMPREPLY=( $(compgen -f "${currentWord}") )
+    COMPREPLY=()
     return 0
   fi
 
@@ -103,16 +103,16 @@ _ninja_complete()
   return 0
 }
 
-complete -F _swift_complete swiftc
-complete -F _swift_complete swift
-complete -F _swift_complete sil-opt
-complete -F _swift_complete sil-func-extractor
-complete -F _swift_complete swift-demangle
-complete -F _swift_complete swift-llvm-opt
-complete -F _swift_complete swift-ide-test
-complete -F _swift_complete swift-ios-test
-complete -F _swift_complete swift-sdk-analyzer
-complete -F _swift_complete swift-stdlib-tool
-complete -F _swift_complete lldb-moduleimport-test
-complete -F _ninja_complete ninja
+complete -o default -F _swift_complete swiftc
+complete -o default -F _swift_complete swift
+complete -o default -F _swift_complete sil-opt
+complete -o default -F _swift_complete sil-func-extractor
+complete -o default -F _swift_complete swift-demangle
+complete -o default -F _swift_complete swift-llvm-opt
+complete -o default -F _swift_complete swift-ide-test
+complete -o default -F _swift_complete swift-ios-test
+complete -o default -F _swift_complete swift-sdk-analyzer
+complete -o default -F _swift_complete swift-stdlib-tool
+complete -o default -F _swift_complete lldb-moduleimport-test
+complete -o default -F _ninja_complete ninja
 
