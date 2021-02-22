@@ -52,3 +52,7 @@ Struct DiscontiguousSlice has been removed
 Struct RangeSet has been removed
 Subscript Collection.subscript(_:) has been removed
 Subscript MutableCollection.subscript(_:) has been removed
+Protocol CodingKey has added inherited protocol ConcurrentValue
+Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.ConcurrentValue, Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible>
+Protocol Error has added inherited protocol ConcurrentValue
+Protocol Error has generic signature change from to <Self : Swift.ConcurrentValue>
