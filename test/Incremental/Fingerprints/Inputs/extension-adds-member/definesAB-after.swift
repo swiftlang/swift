@@ -3,7 +3,7 @@ struct A {
 struct B {
 }
 extension A {
-  init(_ x: String = "") {}
+  var x: Int {17}
 }
 extension B {
 }
