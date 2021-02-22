@@ -2944,6 +2944,7 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e, SGFAccessKind accessKind,
                                       LValueOptions options) {
+  assert(!e->isImplicitlyAsync() && "TODO: Implement SILGen lowering");
   return emitLValueForNonMemberVarDecl(SGF, e, e->getDeclRef(),
                                        getSubstFormalRValueType(e),
                                        accessKind, options,

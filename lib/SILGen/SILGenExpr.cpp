@@ -927,6 +927,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 }
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "TODO: Implement SILGen lowering");
   return SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(),
                                E->getAccessSemantics(), C);
 }
@@ -2182,6 +2183,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
   assert(!e->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   assert(isa<VarDecl>(e->getMember().getDecl()));
+  assert(!e->isImplicitlyAsync() && "TODO: Implement SILGen lowering");
 
   // Everything else should use the l-value logic.
 
@@ -2198,6 +2200,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "actors do not have @objc members");
   return SGF.emitDynamicMemberRefExpr(E, C);
 }
 
@@ -2208,6 +2211,7 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "TODO: Implement SILGen lowering");
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
 
@@ -2219,6 +2223,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(
                                       DynamicSubscriptExpr *E, SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "actors do not have @objc members");
   return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
