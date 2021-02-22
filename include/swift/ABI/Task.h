@@ -873,6 +873,10 @@ public:
     /// Destroy the storage associated with the future.
     void destroy();
 
+    const Metadata *getResultType() const {
+      return resultType;
+    }
+
     /// Retrieve a pointer to the storage of result.
     OpaqueValue *getStoragePtr() {
       return reinterpret_cast<OpaqueValue *>(

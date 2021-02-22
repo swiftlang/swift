@@ -562,7 +562,8 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM) const {
     return TheSignature;
 
   // Update the cache and return.
-  TheSignature = Signature::getUncached(IGM, FormalType);
+  TheSignature = Signature::getUncached(IGM, FormalType,
+                                        /*suppress generics*/ false);
   assert(TheSignature.isValid());
   return TheSignature;
 }
@@ -587,7 +588,12 @@ getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
 }
 
 Signature
-IRGenModule::getSignature(CanSILFunctionType type) {
+IRGenModule::getSignature(CanSILFunctionType type,
+                          bool suppressGenerics) {
+  // Don't bother caching if we've been asked to suppress generics.
+  if (suppressGenerics)
+    return Signature::getUncached(*this, type, suppressGenerics);
+
   auto &sigInfo = getFuncSignatureInfoForLowered(*this, type);
   return sigInfo.getSignature(*this);
 }
@@ -1081,7 +1087,10 @@ public:
       : PartialApplicationForwarderEmission(
             IGM, subIGF, fwd, staticFnPtr, calleeHasContext, origSig, origType,
             substType, outType, subs, layout, conventions),
-        layout(getAsyncContextLayout(subIGF.IGM, origType, substType, subs)),
+        layout(getAsyncContextLayout(subIGF.IGM, origType, substType, subs,
+                                     staticFnPtr
+                                       ? staticFnPtr->suppressGenerics()
+                                       : false)),
         currentArgumentIndex(outType->getNumParameters()) {
     task = origParams.claimNext();
     executor = origParams.claimNext();
@@ -1151,7 +1160,7 @@ public:
     auto *rawFunction = subIGF.Builder.CreateBitCast(
         dynamicFunction->pointer, origSig.getType()->getPointerTo());
     auto functionPointer =
-        FunctionPointer(FunctionPointer::KindTy::AsyncFunctionPointer,
+        FunctionPointer(FunctionPointer::Kind::AsyncFunctionPointer,
                         rawFunction, authInfo, origSig);
     llvm::Value *size = nullptr;
     llvm::Value *function = nullptr;
@@ -1434,7 +1443,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // captured arguments which we will do later. Otherwise, we have to
   // potentially bind polymorphic arguments from the context if it was a
   // partially applied argument.
-  bool hasPolymorphicParams = hasPolymorphicParameters(origType);
+  bool hasPolymorphicParams = hasPolymorphicParameters(origType) &&
+    (!staticFnPtr || !staticFnPtr->suppressGenerics());
   if (!layout && hasPolymorphicParams) {
     assert(conventions.size() == 1);
     // We could have either partially applied an argument from the function
@@ -1746,7 +1756,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
-    return FunctionPointer(FunctionPointer::KindTy::Function, fnPtr, authInfo,
+    return FunctionPointer(FunctionPointer::Kind::Function, fnPtr, authInfo,
                            origSig);
   }();
 

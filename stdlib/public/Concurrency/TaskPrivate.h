@@ -21,6 +21,7 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Error.h"
 
 namespace swift {
 
@@ -70,9 +71,7 @@ public:
   // Error result is always present.
   SwiftError **errorResult = nullptr;
 
-  // No indirect results.
-
-  TaskFutureWaitResult result;
+  OpaqueValue *successResultPointer;
 
   // FIXME: Currently, this is always here, but it isn't technically
   // necessary.
@@ -81,67 +80,28 @@ public:
   // Arguments.
   AsyncTask *task;
 
+  // Only in swift_task_group_next
+  const Metadata *successType;
+
   using AsyncContext::AsyncContext;
+
+  void fillWithSuccess(AsyncTask::FutureFragment *future) {
+    fillWithSuccess(future->getStoragePtr(), future->getResultType());
+  }
+  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
+    successType->vw_initializeWithCopy(successResultPointer, src);
+  }
+
+  void fillWithError(AsyncTask::FutureFragment *future) {
+    fillWithError(future->getError());
+  }
+  void fillWithError(SwiftError *error) {
+    *errorResult = error;
+    swift_errorRetain(error);
+  }
 };
 
-}
-
-/// Run the given task, providing it with the result of the future.
-static void runTaskWithFutureResult(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncTask::FutureFragment *futureFragment, bool hadErrorResult) {
-  auto waitingTaskContext =
-      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
-
-  waitingTaskContext->result.hadErrorResult = hadErrorResult;
-  if (hadErrorResult) {
-    waitingTaskContext->result.storage =
-        reinterpret_cast<OpaqueValue *>(futureFragment->getError());
-  } else {
-    waitingTaskContext->result.storage = futureFragment->getStoragePtr();
-  }
-
-  // TODO: schedule this task on the executor rather than running it directly.
-  swift_job_run(waitingTask, executor);
-}
-
-/// Run the given task, providing it with the result of the future.
-static void runTaskWithGroupPollResult(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncTask::GroupFragment::GroupPollResult result) {
-  auto waitingTaskContext =
-      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
-
-  // Was it an error or successful return?
-  waitingTaskContext->result.hadErrorResult =
-      result.status == AsyncTask::GroupFragment::GroupPollStatus::Error;
-
-  // Extract the stored value into the waiting task's result storage:
-  switch (result.status) {
-    case AsyncTask::GroupFragment::GroupPollStatus::Success:
-      waitingTaskContext->result.storage = result.storage;
-      break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Error:
-      waitingTaskContext->result.storage =
-        reinterpret_cast<OpaqueValue *>(result.storage);
-      break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Empty:
-      // return a `nil` here (as result of the `group.next()`)
-      waitingTaskContext->result.storage = nullptr;
-      break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Waiting:
-      assert(false && "Must not attempt to run with a Waiting result.");
-  }
-
-  // TODO: schedule this task on the executor rather than running it directly.
-  swift_job_run(waitingTask, executor);
-
-  // TODO: Not entirely sure when to release; we synchronously run the code above so we can't before
-  // if we need to, release the now completed task so it can be destroyed
-//  if (result.retainedTask) {
-//    swift_release(result.retainedTask);
-//  }
-}
+} // end anonymous namespace
 
 } // end namespace swift
 
