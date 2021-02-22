@@ -65,14 +65,6 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
 // MARK: DependencyKey::Builder
 //==============================================================================
 
-template <NodeKind kindArg, typename Entity>
-DependencyKey DependencyKey::createForProvidedEntityInterface(Entity entity) {
-  return DependencyKey::Builder{kindArg, DeclAspect::interface}
-      .withContext(entity)
-      .withName(entity)
-      .build();
-}
-
 DependencyKey DependencyKey::Builder::build() && {
   return DependencyKey{
     kind,

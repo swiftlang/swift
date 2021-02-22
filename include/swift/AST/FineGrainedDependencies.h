@@ -535,11 +535,6 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
-  /// Create just the interface half of the keys for a provided Decl or Decl
-  /// pair
-  template <NodeKind kind, typename Entity>
-  static DependencyKey createForProvidedEntityInterface(Entity);
-
   DependencyKey correspondingImplementation() const {
     return withAspect(DeclAspect::implementation);
   }
