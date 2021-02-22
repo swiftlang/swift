@@ -2280,11 +2280,30 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   setLoweredFunctionPointer(i, FunctionPointer(fnType, diffWitness, signature));
 }
 
+static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
+  using SpecialKind = FunctionPointer::SpecialKind;
+
+  // Check for some special cases, which are currently all async:
+  if (fn->isAsync()) {
+    auto name = fn->getName();
+    if (name.equals("swift_task_future_wait"))
+      return SpecialKind::TaskFutureWait;
+    if (name.equals("swift_task_future_wait_throwing"))
+      return SpecialKind::TaskFutureWaitThrowing;
+    if (name.equals("swift_task_group_wait_next"))
+      return SpecialKind::TaskGroupWaitNext;
+  }
+
+  return fn->getLoweredFunctionType();
+}
+
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
   auto fnType = fn->getLoweredFunctionType();
 
-  auto sig = IGM.getSignature(fnType);
+  auto fpKind = classifyFunctionPointerKind(fn);
+
+  auto sig = IGM.getSignature(fnType, fpKind.suppressGenerics());
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
@@ -2292,18 +2311,20 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
   llvm::Constant *value;
-  auto isSpecialAsyncWithoutCtxtSize =
-      fn->isAsync() && (
-          fn->getName().equals("swift_task_future_wait") ||
-          fn->getName().equals("swift_task_group_wait_next"));
-  if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
+  if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
   } else {
     value = fnPtr;
+
+    // HACK: the swiftasync argument treatment is currently using
+    // a register that can be clobbered by the linker.  Use nonlazybind
+    // as a workaround.
+    if (fpKind.isSpecial()) {
+      cast<llvm::Function>(value)->addFnAttr(llvm::Attribute::NonLazyBind);
+    }
   }
-  FunctionPointer fp =
-      FunctionPointer(fnType, value, sig, isSpecialAsyncWithoutCtxtSize);
+  FunctionPointer fp = FunctionPointer(fpKind, value, sig);
 
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
@@ -2806,7 +2827,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Pass the generic arguments.
-  if (hasPolymorphicParameters(origCalleeType)) {
+  if (hasPolymorphicParameters(origCalleeType) &&
+      !emission->getCallee().getFunctionPointer().suppressGenerics()) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);

@@ -2666,7 +2666,7 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
                         : PointerAuthEntity::Special::TypeDescriptor;
   auto authInfo = PointerAuthInfo::emit(IGF, schema, fnPtrAddr, authEntity);
   auto *Res =
-      IGF.Builder.CreateCall(FunctionPointer(FunctionPointer::KindTy::Function,
+      IGF.Builder.CreateCall(FunctionPointer(FunctionPointer::Kind::Function,
                                              typeFnPtr, authInfo, signature),
                              forwardedArgs);
 

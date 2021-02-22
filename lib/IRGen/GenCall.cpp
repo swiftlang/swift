@@ -88,14 +88,16 @@ AsyncContextLayout irgen::getAsyncContextLayout(IRGenModule &IGM,
       IGM.getSILModule(), forwardingSubstitutionMap,
       IGM.getMaximalTypeExpansionContext());
   auto layout = getAsyncContextLayout(IGM, originalType, substitutedType,
-                                      forwardingSubstitutionMap);
+                                      forwardingSubstitutionMap,
+                                      /*suppressGenerics*/false);
   return layout;
 }
 
 AsyncContextLayout
 irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
                              CanSILFunctionType substitutedType,
-                             SubstitutionMap substitutionMap) {
+                             SubstitutionMap substitutionMap,
+                             bool suppressGenerics) {
   SmallVector<const TypeInfo *, 4> typeInfos;
   SmallVector<SILType, 4> valTypes;
   SmallVector<AsyncContextLayout::ArgumentInfo, 4> paramInfos;
@@ -244,8 +246,10 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     typeInfos.push_back(&ti);
     paramInfos.push_back({ty, parameter.getConvention()});
   }
-  auto bindings = NecessaryBindings::forAsyncFunctionInvocation(
-      IGM, originalType, substitutionMap);
+  auto bindings = suppressGenerics
+      ? NecessaryBindings()
+      : NecessaryBindings::forAsyncFunctionInvocation(
+          IGM, originalType, substitutionMap);
   if (!bindings.empty()) {
     auto bindingsSize = bindings.getBufferSize(IGM);
     auto &bindingsTI =
@@ -571,9 +575,11 @@ namespace {
     bool CanUseSRet = true;
     bool CanUseError = true;
     bool CanUseSelf = true;
+    bool SuppressGenerics;
 
-    SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType)
-      : IGM(IGM), FnType(fnType) {}
+    SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
+                       bool suppressGenerics)
+      : IGM(IGM), FnType(fnType), SuppressGenerics(suppressGenerics) {}
 
     /// Expand the components of the primary entrypoint of the function type.
     void expandFunctionType();
@@ -1763,7 +1769,7 @@ void SignatureExpansion::expandParameters() {
   }
 
   // Next, the generic signature.
-  if (hasPolymorphicParameters(FnType))
+  if (hasPolymorphicParameters(FnType) && !SuppressGenerics)
     expandPolymorphicSignature(IGM, FnType, ParamIRTypes);
 
   // Context is next.
@@ -1875,9 +1881,10 @@ Signature SignatureExpansion::getSignature() {
 }
 
 Signature Signature::getUncached(IRGenModule &IGM,
-                                 CanSILFunctionType formalType) {
+                                 CanSILFunctionType formalType,
+                                 bool suppressGenerics) {
   GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
-  SignatureExpansion expansion(IGM, formalType);
+  SignatureExpansion expansion(IGM, formalType, suppressGenerics);
   expansion.expandFunctionType();
   return expansion.getSignature();
 }
@@ -1885,7 +1892,7 @@ Signature Signature::getUncached(IRGenModule &IGM,
 Signature Signature::forCoroutineContinuation(IRGenModule &IGM,
                                               CanSILFunctionType fnType) {
   assert(fnType->isCoroutine());
-  SignatureExpansion expansion(IGM, fnType);
+  SignatureExpansion expansion(IGM, fnType, /*suppress generics*/false);
   expansion.expandCoroutineContinuationType();
   return expansion.getSignature();
 }
@@ -1916,8 +1923,7 @@ std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
     FunctionPointer functionPointer, llvm::Value *thickContext,
     std::pair<bool, bool> values, Size initialContextSize) {
   assert(values.first || values.second);
-  assert(functionPointer.getKind() ==
-         FunctionPointer::KindTy::AsyncFunctionPointer);
+  assert(functionPointer.getKind() != FunctionPointer::Kind::Function);
   bool emitFunction = values.first;
   bool emitSize = values.second;
   // TODO: This calculation should be extracted out into standalone functions
@@ -2355,7 +2361,9 @@ class AsyncCallEmission final : public CallEmission {
     if (!asyncContextLayout) {
       asyncContextLayout.emplace(::getAsyncContextLayout(
           IGF.IGM, getCallee().getOrigFunctionType(),
-          getCallee().getSubstFunctionType(), getCallee().getSubstitutions()));
+          getCallee().getSubstFunctionType(),
+          getCallee().getSubstitutions(),
+          getCallee().suppressGenerics()));
     }
     return *asyncContextLayout;
   }
@@ -2412,7 +2420,7 @@ public:
   }
   FunctionPointer getCalleeFunctionPointer() override {
     return FunctionPointer(
-        FunctionPointer::KindTy::Function, calleeFunction,
+        FunctionPointer::Kind::Function, calleeFunction,
         CurCallee.getFunctionPointer().getAuthInfo(),
         IGF.IGM.getSignature(getCallee().getSubstFunctionType()));
   }
@@ -2622,7 +2630,7 @@ llvm::CallInst *CallEmission::emitCallSite() {
 
   // Make the call and clear the arguments array.
   FunctionPointer fn = getCalleeFunctionPointer();
-  assert(fn.getKind() == FunctionPointer::KindTy::Function);
+  assert(fn.getKind() == FunctionPointer::Kind::Function);
   auto fnTy = fn.getFunctionType();
 
   // Coerce argument types for those cases where the IR type required
@@ -2701,7 +2709,7 @@ fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
 
 llvm::CallInst *IRBuilder::CreateCall(const FunctionPointer &fn,
                                       ArrayRef<llvm::Value*> args) {
-  assert(fn.getKind() == FunctionPointer::KindTy::Function);
+  assert(fn.getKind() == FunctionPointer::Kind::Function);
   SmallVector<llvm::OperandBundleDef, 1> bundles;
 
   // Add a pointer-auth bundle if necessary.
@@ -3775,7 +3783,8 @@ llvm::Value *irgen::emitTaskCreate(
     substTaskFunctionType = taskFunctionType;
   }
   auto layout = getAsyncContextLayout(
-      IGF.IGM, taskFunctionType, substTaskFunctionType, subs);
+      IGF.IGM, taskFunctionType, substTaskFunctionType, subs,
+      /*suppress generics*/ false);
 
   CanSILFunctionType taskContinuationFunctionTy = [&]() {
     ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
@@ -4642,7 +4651,7 @@ Callee irgen::getBlockPointerCallee(IRGenFunction &IGF,
                                         invokeFnPtrAddr.getAddress(),
                                         info.OrigFnType);
 
-  FunctionPointer fn(FunctionPointer::KindTy::Function, invokeFnPtr, authInfo,
+  FunctionPointer fn(FunctionPointer::Kind::Function, invokeFnPtr, authInfo,
                      sig);
 
   return Callee(std::move(info), fn, blockPtr);
@@ -4671,7 +4680,7 @@ Callee irgen::getCFunctionPointerCallee(IRGenFunction &IGF,
   auto authInfo =
     PointerAuthInfo::forFunctionPointer(IGF.IGM, calleeInfo.OrigFnType);
 
-  FunctionPointer fn(FunctionPointer::KindTy::Function, fnPtr, authInfo, sig);
+  FunctionPointer fn(FunctionPointer::Kind::Function, fnPtr, authInfo, sig);
 
   return Callee(std::move(calleeInfo), fn);
 }
@@ -4684,10 +4693,10 @@ FunctionPointer FunctionPointer::forDirect(IRGenModule &IGM,
 
 StringRef FunctionPointer::getName(IRGenModule &IGM) const {
   assert(isConstant());
-  switch (Kind.value) {
-  case KindTy::Value::Function:
+  switch (getBasicKind()) {
+  case BasicKind::Function:
     return getRawPointer()->getName();
-  case KindTy::Value::AsyncFunctionPointer:
+  case BasicKind::AsyncFunctionPointer:
     return IGM
         .getSILFunctionForAsyncFunctionPointer(
             cast<llvm::Constant>(getDirectPointer()->getOperand(0)))
@@ -4697,29 +4706,24 @@ StringRef FunctionPointer::getName(IRGenModule &IGM) const {
 }
 
 llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
-  switch (Kind.value) {
-  case KindTy::Value::Function:
+  switch (getBasicKind()) {
+  case BasicKind::Function:
     return Value;
-  case KindTy::Value::AsyncFunctionPointer: {
-    if (!isFunctionPointerWithoutContext) {
-      auto *fnPtr = Value;
-      if (auto authInfo = AuthInfo) {
-        fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);
-      }
-      auto *descriptorPtr =
-          IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.AsyncFunctionPointerPtrTy);
-      auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
-      auto *result = IGF.emitLoadOfRelativePointer(
-          Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
-          /*expectedType*/ getFunctionType()->getPointerTo());
-      if (auto authInfo = AuthInfo) {
-        result = emitPointerAuthSign(IGF, result, authInfo);
-      }
-      return result;
-    } else {
-      return IGF.Builder.CreateBitOrPointerCast(
-          Value, getFunctionType()->getPointerTo());
+  case BasicKind::AsyncFunctionPointer: {
+    auto *fnPtr = Value;
+    if (auto authInfo = AuthInfo) {
+      fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);
     }
+    auto *descriptorPtr =
+        IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.AsyncFunctionPointerPtrTy);
+    auto *addrPtr = IGF.Builder.CreateStructGEP(descriptorPtr, 0);
+    auto *result = IGF.emitLoadOfRelativePointer(
+        Address(addrPtr, IGF.IGM.getPointerAlignment()), /*isFar*/ false,
+        /*expectedType*/ getFunctionType()->getPointerTo());
+    if (auto authInfo = AuthInfo) {
+      result = emitPointerAuthSign(IGF, result, authInfo);
+    }
+    return result;
   }
   }
   llvm_unreachable("unhandled case");
@@ -4754,7 +4758,7 @@ FunctionPointer::getExplosionValue(IRGenFunction &IGF,
 }
 
 FunctionPointer FunctionPointer::getAsFunction(IRGenFunction &IGF) const {
-  return FunctionPointer(KindTy::Function, getPointer(IGF), AuthInfo, Sig);
+  return FunctionPointer(Kind::Function, getPointer(IGF), AuthInfo, Sig);
 }
 
 void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
@@ -4777,7 +4781,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   }
 
   auto sig = emitCastOfFunctionPointer(IGF, fnVal, fnType);
-  FunctionPointer fnPtr(FunctionPointer::KindTy::Function, fnVal,
+  FunctionPointer fnPtr(FunctionPointer::Kind::Function, fnVal,
                         PointerAuthInfo(), sig);
 
   SmallVector<llvm::Value*, 4> Args;
@@ -4814,7 +4818,7 @@ IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
   auto signature =
       Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftAsyncCC);
   auto fnPtr = FunctionPointer(
-      FunctionPointer::KindTy::Function,
+      FunctionPointer::Kind::Function,
       Builder.CreateBitOrPointerCast(resume, fnTy->getPointerTo()),
       PointerAuthInfo(), signature);
   return fnPtr;

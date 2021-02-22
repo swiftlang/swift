@@ -117,36 +117,35 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 
-/// The result of waiting for a task future.
-struct TaskFutureWaitResult {
-  /// Whether the storage represents the error result vs. the successful
-  /// result.
-  bool hadErrorResult;
-
-  /// Storage for the result of the future.
-  ///
-  /// When the future completed normally, this is a pointer to the storage
-  /// of the result value, which lives inside the future task itself.
-  ///
-  /// When the future completed by throwing an error, this is the error
-  /// object itself.
-  OpaqueValue *storage;
-};
-
 using TaskFutureWaitSignature =
-  AsyncSignature<TaskFutureWaitResult(AsyncTask *), /*throws*/ false>;
+  AsyncSignature<void(AsyncTask *, OpaqueValue *), /*throws*/ false>;
 
-/// Wait for a future task to complete.
+/// Wait for a non-throwing future task to complete.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_future_wait(on task: Builtin.NativeObject) async
-///     -> TaskFutureWaitResult
+/// func swift_task_future_wait(on task: _owned Builtin.NativeObject) async
+///     -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitSignature::FunctionType
 swift_task_future_wait;
+
+using TaskFutureWaitThrowingSignature =
+  AsyncSignature<void(AsyncTask *, OpaqueValue *), /*throws*/ true>;
+
+/// Wait for a potentially-throwing future task to complete.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_future_wait_throwing(on task: _owned Builtin.NativeObject)
+///    async throws -> Success
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+TaskFutureWaitThrowingSignature::FunctionType
+swift_task_future_wait_throwing;
 
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
@@ -422,6 +421,16 @@ void swift_continuation_logFailedCheck(const char *message);
 /// Otherwise it uses dispatchMain.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_asyncMainDrainQueue();
+
+/// Establish that the current thread is running as the given
+/// executor, then run a job.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_run(Job *job, ExecutorRef executor);
+
+/// Return the current thread's active task reference.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTask *swift_task_getCurrent(void);
+
 }
 
 #endif

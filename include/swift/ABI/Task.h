@@ -80,8 +80,17 @@ public:
     return Flags.getPriority();
   }
 
-  /// Run this job.
-  void run(ExecutorRef currentExecutor);
+  /// Given that we've fully established the job context in the current
+  /// thread, actually start running this job.  To establish the context
+  /// correctly, call swift_job_run or runJobInExecutorContext.
+  void runInFullyEstablishedContext(ExecutorRef currentExecutor);
+
+  /// Given that we've fully established the job context in the
+  /// current thread, and that the job is a simple (non-task) job,
+  /// actually start running this job.
+  void runSimpleInFullyEstablishedContext(ExecutorRef currentExecutor) {
+    RunJob(this, currentExecutor);
+  }
 };
 
 // The compiler will eventually assume these.
@@ -173,7 +182,11 @@ public:
     assert(flags.isAsyncTask());
   }
 
-  void run(ExecutorRef currentExecutor) {
+  /// Given that we've already fully established the job context
+  /// in the current thread, start running this task.  To establish
+  /// the job context correctly, call swift_job_run or
+  /// runInExecutorContext.
+  void runInFullyEstablishedContext(ExecutorRef currentExecutor) {
     ResumeTask(this, currentExecutor, ResumeContext);
   }
   
@@ -860,6 +873,10 @@ public:
     /// Destroy the storage associated with the future.
     void destroy();
 
+    const Metadata *getResultType() const {
+      return resultType;
+    }
+
     /// Retrieve a pointer to the storage of result.
     OpaqueValue *getStoragePtr() {
       return reinterpret_cast<OpaqueValue *>(
@@ -941,11 +958,11 @@ static_assert(sizeof(AsyncTask) == 12 * sizeof(void*),
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
 
-inline void Job::run(ExecutorRef currentExecutor) {
+inline void Job::runInFullyEstablishedContext(ExecutorRef currentExecutor) {
   if (auto task = dyn_cast<AsyncTask>(this))
-    task->run(currentExecutor);
+    task->runInFullyEstablishedContext(currentExecutor);
   else
-    RunJob(this, currentExecutor);
+    runSimpleInFullyEstablishedContext(currentExecutor);
 }
 
 /// An asynchronous context within a task.  Generally contexts are

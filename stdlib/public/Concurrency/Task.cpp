@@ -122,11 +122,22 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
   while (waitingTask) {
-    // Find the next waiting task.
+    // Find the next waiting task before we invalidate it by resuming
+    // the task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
 
-    // Run the task.
-    runTaskWithFutureResult(waitingTask, executor, fragment, hadErrorResult);
+    // Fill in the return context.
+    auto waitingContext =
+      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
+    if (hadErrorResult) {
+      waitingContext->fillWithError(fragment);
+    } else {
+      waitingContext->fillWithSuccess(fragment);
+    }
+
+    // Enqueue the waiter on the global executor.
+    // TODO: allow waiters to fill in a suggested executor
+    swift_task_enqueueGlobal(waitingTask);
 
     // Move to the next task.
     waitingTask = nextWaitingTask;
@@ -182,6 +193,9 @@ const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
 SWIFT_CC(swiftasync)
 static void completeTask(AsyncTask *task, ExecutorRef executor,
                          SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+  // Set that there's no longer a running task in the current thread.
+  _swift_task_clearCurrent();
+
   // Tear down the task-local allocator immediately;
   // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
@@ -317,7 +331,6 @@ AsyncTaskAndContext swift::swift_task_create_future_f(
   return {task, initialContext};
 }
 
-SWIFT_CC(swiftasync)
 void swift::swift_task_future_wait(
     AsyncTask *waitingTask, ExecutorRef executor,
     SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
@@ -337,19 +350,43 @@ void swift::swift_task_future_wait(
 
   case FutureFragment::Status::Success:
     // Run the task with a successful result.
-    // FIXME: Want to guarantee a tail call here
-    runTaskWithFutureResult(
-        waitingTask, executor, task->futureFragment(),
-        /*hadErrorResult=*/false);
+    context->fillWithSuccess(task->futureFragment());
+    // FIXME: force tail call
+    return waitingTask->runInFullyEstablishedContext(executor);
+
+  case FutureFragment::Status::Error:
+    fatalError(0, "future reported an error, but wait cannot throw");
+  }
+}
+
+void swift::swift_task_future_wait_throwing(
+    AsyncTask *waitingTask, ExecutorRef executor,
+    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
+  // Suspend the waiting task.
+  waitingTask->ResumeTask = rawContext->ResumeParent;
+  waitingTask->ResumeContext = rawContext;
+
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  auto task = context->task;
+
+  // Wait on the future.
+  assert(task->isFuture());
+  switch (task->waitFuture(waitingTask)) {
+  case FutureFragment::Status::Executing:
+    // The waiting task has been queued on the future.
     return;
+
+  case FutureFragment::Status::Success:
+    // Run the task with a successful result.
+    context->fillWithSuccess(task->futureFragment());
+    // FIXME: force tail call
+    return waitingTask->runInFullyEstablishedContext(executor);
 
  case FutureFragment::Status::Error:
     // Run the task with an error result.
-    // FIXME: Want to guarantee a tail call here
-    runTaskWithFutureResult(
-        waitingTask, executor, task->futureFragment(),
-        /*hadErrorResult=*/true);
-    return;
+    context->fillWithError(task->futureFragment());
+    // FIXME: force tail call
+    return waitingTask->runInFullyEstablishedContext(executor);
   }
 }
 
