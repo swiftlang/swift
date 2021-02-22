@@ -328,6 +328,12 @@ func testTuple() {
 
 }
 
+func halfUsedTuple() -> (Int, Int) {
+  var (a, b) = (1, 2) // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+  a += 1
+  let (c, d) = (1, 2) // expected-warning {{immutable value 'd' was never used; consider replacing with '_' or removing it}}
+  return (a, c)
+}
 
 /// <rdar://problem/20911927> False positive in the "variable was never mutated" warning with IUO
 func testForceValueExpr() {
@@ -544,9 +550,29 @@ for i in 0..<10 { // expected-warning {{immutable value 'i' was never used; cons
 
 // Tests fix to SR-2421
 func sr2421() {
-  // FIXME: "consider removing it"?
-  let x: Int // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+  let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
   x = 42
+}
+
+func sr2421Continued(a: Bool) {
+  let x: Int // expected-warning {{immutable value 'x' was never used; consider removing it}}
+  if a {
+    x = 42
+  } else {
+    x = 12
+  }
+  
+  let y: Int // expected-warning {{immutable value 'y' was never used; consider removing it}}
+  switch a {
+  case true:
+    y = 1
+  default:
+    break
+  }
+  
+  let z: Int
+  z = 0
+  markUsed(z)
 }
 
 // Tests fix to SR-964

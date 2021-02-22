@@ -59,7 +59,8 @@ static bool isSetterParam(SILInstruction *I) {
   return false;
 }
 
-/// Returns the SILInstruction if it is part of a VarDecl we want to track.
+/// Returns if the SILInstruction if it is part of a VarDecl we want to
+/// track for diagnostics.
 static bool shouldTrackVarDecl(SILInstruction *I) {
   if (auto *VD = getVarDecl(I)) {
     
@@ -89,8 +90,7 @@ static bool shouldTrackVarDecl(SILInstruction *I) {
     if (!VD->hasName() || VD->getName().str() == "_")
       return false;
     
-    return (VD->getDeclContext()->isLocalContext() &&
-            !isa<ParamDecl>(VD));
+    return (VD->getDeclContext()->isLocalContext() && !isa<ParamDecl>(VD));
   }
   return false;
 }
@@ -141,12 +141,12 @@ static SILValue getDebugVarAddrValue(SILInstruction *I) {
 static bool shouldTrackDebugVar(SILInstruction *I) {
   if (auto *DVI = dyn_cast<DebugValueInst>(I)) {
     
-    // Var Declaration is setter parameter 'newValue'
+    // Var declaration is setter parameter 'newValue'
     if (isSetterParam(I)) {
       return true;
     }
     
-    // Var Declaration is a parameter that we do not track
+    // Var declaration is a parameter that we do not track
     if (DVI->getVarInfo().hasValue()) {
       if (DVI->getVarInfo().getValue().ArgNo) {
         
@@ -155,7 +155,7 @@ static bool shouldTrackDebugVar(SILInstruction *I) {
       }
     }
     
-    // Otherwise, this is just a local Var Declaration
+    // Otherwise, this is just a local var declaration
     return shouldTrackVarDecl(DVI);
   }
   return false;
@@ -254,6 +254,9 @@ class VariableModifyTraverser {
   llvm::SetVector<SILValue> Seen;
   SILInstruction *EntryInst;
   
+  bool isUninitialized = false;
+  bool isAssigned = false;
+  
 public:
   VariableModifyTraverser(SILInstruction *EntryInst) : EntryInst(EntryInst) {
     appendValues(EntryInst);
@@ -310,7 +313,6 @@ private:
   /// the entry instruction.
   bool isDirectModier(SILInstruction *I, Operand *Op) {
     switch (I->getKind()) {
-        
       case SILInstructionKind::BeginAccessInst:
         return dyn_cast<BeginAccessInst>(I)->getAccessKind() ==
         SILAccessKind::Modify;
@@ -333,14 +335,23 @@ private:
   /// Stage values for def-use traversal
   void search(SILInstruction *I, Operand *Op) {
     switch (I->getKind()) {
+      case SILInstructionKind::MarkUninitializedInst:
+        isUninitialized = true;
+        appendValues(I);
+        break;
+      case SILInstructionKind::BeginAccessInst:
       case SILInstructionKind::BeginBorrowInst:
       case SILInstructionKind::ConvertEscapeToNoEscapeInst:
       case SILInstructionKind::CopyValueInst:
       case SILInstructionKind::EnumInst:
-      case SILInstructionKind::MarkUninitializedInst:
       case SILInstructionKind::ProjectBoxInst:
-      case SILInstructionKind::BeginAccessInst:
         appendValues(I);
+        break;
+        
+      case SILInstructionKind::AssignInst:
+        if (Seen.count(dyn_cast<AssignInst>(I)->getDest())) {
+          isAssigned = true;
+        }
         break;
         
       case SILInstructionKind::ApplyInst:
@@ -358,6 +369,13 @@ private:
   }
   
 public:
+  
+  /// Return if the value is declared and initialized in seperate locations.
+  /// In these cases, we do not want to suggest replacing the declaration
+  /// with assignment to '_'
+  bool isDeferredInit() {
+    return isUninitialized && isAssigned;
+  }
   
   /// Perform the traversal and return if a modify was found.
   bool didModify() {
@@ -432,6 +450,64 @@ private:
       Worklist.push_back(Value);
       Seen.insert(Value);
     }
+  }
+  
+  /// Look for a \c PartialApplyInst before the next capture reference
+  static bool didReadCapture(SILInstruction *I) {
+    
+    auto VD = getVarDecl(I);
+    assert(isa<DebugValueInst>(I) && "Expected a DebugValueInst");
+    assert(VD->isCaptureList() && "Expected a Capture List");
+    auto CapturedValue = dyn_cast<DebugValueInst>(I)->getOperand();
+    SILInstruction *NextCapture = nullptr;
+    SILBasicBlock *BB = I->getParent();
+    auto i = BB->begin(), e = BB->end();
+    
+    // Find the next capture reference
+    bool foundI = false;
+    while (i != e) {
+      if (&*i == I) {
+        foundI = true;
+      }
+      
+      if (!foundI || !isa<DebugValueInst>(&*i)) {
+        ++i;
+        continue;
+      }
+      if (auto OtherVD = getVarDecl(&*i)) {
+        if (OtherVD->isCaptureList() &&
+            OtherVD != VD &&
+            getDebugVarValue(&*i) == CapturedValue) {
+          NextCapture = &*i;
+          break;
+        }
+      }
+      ++i;
+      continue;
+    }
+    
+    // Search for a Partial Apply Use
+    for (auto Use : CapturedValue->getUses()) {
+      auto User = Use->getUser();
+      if (isa<PartialApplyInst>(User)) {
+        i = BB->begin();
+        foundI = false;
+        
+        // Check the Partial Apply is after this capture reference and before
+        // the next capture reference
+        while (i != e) {
+          if (&*i == I) {
+            foundI = true;
+          } else if (&*i == NextCapture) {
+            break;
+          } else if (foundI && &*i == User) {
+            return true;
+          }
+          ++i;
+        }
+      }
+    }
+    return false;
   }
   
   /// Check the AST to determine if a var declaration is directly assigned
@@ -615,10 +691,10 @@ private:
       return true;
     }
     
-    // The destination of this store is a Var Declaration.
+    // The destination of this store is a var declaration.
     // Because we are tracking the use of a value, which may be referenced
-    // by multiple Var Declarations, check in the AST if the assignment
-    // specifically uses the current Var Declaration.
+    // by multiple var declarations, check in the AST if the assignment
+    // specifically uses the current var declaration.
     if (auto *DestVD = getVarDecl(DI)) {
       auto VD = getVarDecl(EntryInst);
       return isAssignedToVarDecl(VD, DestVD);
@@ -627,7 +703,7 @@ private:
     return true;
   }
   
-  /// Checks if a SILInstruction belongs to any block accessible by the SILBasicBlock
+  /// Checks if a SILInstruction belongs to any block accessible by the entry block
   bool inAccessibleBlock(SILInstruction *I) {
     SmallVector<SILBasicBlock *, 32> BlockList;
     llvm::SetVector<SILBasicBlock *> SeenBlocks;
@@ -764,53 +840,32 @@ private:
     }
     
     switch (I->getKind()) {
-      
-      // Returning this value is a direct read
-      case SILInstructionKind::ReturnInst:
-      
-      // FIXME: Is this true?
-      // Builtin Instructions found in the standard library
-      // are responsible for logging and other utilities.
-      // count this as a read.
-      case SILInstructionKind::BuiltinInst:  
-        
-      // This value is read in an if-statement
+      case SILInstructionKind::BuiltinInst:
       case SILInstructionKind::CondBranchInst:
-        
-      // This value is thrown, and therefore read
-      case SILInstructionKind::ThrowInst:
-      
-      // FIXME: Should this be handled like SwitchEnumInst?
-      case SILInstructionKind::SwitchEnumAddrInst:
-      
-      // FIXME: why?
-      // FIXME: Should we search?
-      case SILInstructionKind::StoreBorrowInst:
-        
-      // FIXME: why?
-      // FIXME: Should we search?
-      case SILInstructionKind::OpenExistentialAddrInst:
-      
-      // These instructions may not be the actual read of the variable, but
-      // the def-use always terminates in a read for these instructions, so 
-      // end the traversal early
       case SILInstructionKind::CopyValueInst:
       case SILInstructionKind::PointerToAddressInst:
+      case SILInstructionKind::ReturnInst:
+      case SILInstructionKind::StoreBorrowInst:
+      case SILInstructionKind::SwitchEnumAddrInst:
+      case SILInstructionKind::SwitchEnumInst:
+      case SILInstructionKind::SwitchValueInst:
+      case SILInstructionKind::ThrowInst:
         return true;
         
-      case SILInstructionKind::StoreInst:
-        return storeInstIsRead(I, Value);
       case SILInstructionKind::AssignInst:
         return dyn_cast<AssignInst>(I)->getSrc() == Value;
+      case SILInstructionKind::BeginAccessInst:
+        return (dyn_cast<BeginAccessInst>(I)->getAccessKind()
+                == SILAccessKind::Read);
+      case SILInstructionKind::BeginUnpairedAccessInst:
+        return (dyn_cast<BeginUnpairedAccessInst>(I)->getAccessKind()
+                == SILAccessKind::Read);
       case SILInstructionKind::CopyAddrInst:
         return dyn_cast<CopyAddrInst>(I)->getSrc() == Value;
+      case SILInstructionKind::StoreInst:
+        return storeInstIsRead(I, Value);
         
-        // FIXME: Check for other binding assignments?
-      case SILInstructionKind::SwitchValueInst:
-      case SILInstructionKind::SwitchEnumInst: 
-        return true;
-        
-      case SILInstructionKind::DebugValueInst:
+      case SILInstructionKind::DebugValueInst: {
         if (auto *DebugVD = getVarDecl(I)) {
           auto VD = getVarDecl(EntryInst);
           
@@ -819,19 +874,15 @@ private:
             return true;
           }
           
-          // The value described by a Var Declaration may be assigned to multiple
-          // Var Declarations, but this does not always mean the Var Declaration
-          // is read by others, so we must explicitly check the DeclRefExpr in
-          // the AST.
+          // The value described by a var declaration may be assigned to
+          // multiple var declarations, but this does not always mean the
+          // var declaration is read by others, so we must explicitly check
+          // the DeclRefExpr in the AST.
           return isAssignedToVarDecl(VD, DebugVD);
         }
         return true;
-        
-      case SILInstructionKind::BeginAccessInst:
-        return (dyn_cast<BeginAccessInst>(I)->getAccessKind() == SILAccessKind::Read);
-      case SILInstructionKind::BeginUnpairedAccessInst:
-        return (dyn_cast<BeginUnpairedAccessInst>(I)->getAccessKind() == SILAccessKind::Read);
-        
+      }
+      
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::BeginApplyInst:
       case SILInstructionKind::PartialApplyInst:
@@ -900,6 +951,11 @@ public:
   /// Perform the traversal and return if a read was found.
   bool didRead() {
     
+    if (getVarDecl(EntryInst)->isCaptureList() &&
+        isa<DebugValueInst>(EntryInst)) {
+      return didReadCapture(EntryInst);
+    }
+    
     if (isSelfParam(EntryInst)) {
       return true;
     } else if (auto DVO = getDebugVarValue(EntryInst)) {
@@ -957,10 +1013,11 @@ class SetterReadsGetterTraverser {
   /// The setter function to perform the search
   SILFunction *SetterFn;
   
+public:
+  
   /// The instruction referencing the getter function if found
   SILInstruction *GetterInst;
   
-public:
   SetterReadsGetterTraverser(SILFunction *SetterFn) : SetterFn(SetterFn) { }
   
   /// Returns the instruction referencing the getter function or \c nullptr
@@ -1006,153 +1063,117 @@ public:
     }
     return false;
   }
-  
-  void diagnoseGetterUse(VarDecl *var) {
-    
-    auto &diags = SetterFn->getModule().getASTContext().Diags;
-    
-  diags.diagnose(GetterInst->getLoc().getSourceLoc(),
-                 diag::unused_setter_parameter,
-                 var->getName());
-    diags.diagnose(GetterInst->getLoc().getSourceLoc(),
-                   diag::fixit_for_unused_setter_parameter,
-                   var->getName())
-    .fixItReplace(GetterInst->getLoc().getSourceRange(),
-                  var->getName().str());
-  }
 };
 
 //===----------------------------------------------------------------------===//
-//                        MARK: Traverser Interfaces
+//                         MARK: Traverser Interface
 //===----------------------------------------------------------------------===//
 
-/// Look for a \c PartialApplyInst before the next capture reference
-static bool didReadCapture(SILInstruction *I) {
+class VarUsageInfo {
   
-  auto VD = getVarDecl(I);
-  assert(isa<DebugValueInst>(I) && "Expected a DebugValueInst");
-  assert(VD->isCaptureList() && "Expected a Capture List");
-  auto CapturedValue = dyn_cast<DebugValueInst>(I)->getOperand();
-  SILInstruction *NextCapture = nullptr;
-  SILBasicBlock *BB = I->getParent();
-  auto i = BB->begin(), e = BB->end();
+public:
+
+  SILInstruction *EntryInst;
   
-  // Find the next capture reference
-  bool foundI = false;
-  while (i != e) {
-    if (&*i == I) {
-      foundI = true;
-    }
-    
-    if (!foundI || !isa<DebugValueInst>(&*i)) {
-      ++i;
-      continue;
-    }
-    if (auto OtherVD = getVarDecl(&*i)) {
-      if (OtherVD->isCaptureList() &&
-          OtherVD != VD &&
-          getDebugVarValue(&*i) == CapturedValue) {
-        NextCapture = &*i;
-        break;
-      }
-    }
-    ++i;
-    continue;
+  SILInstruction *MisusedGetter = nullptr;
+  bool DidRead = false;
+  bool DidModify = false;
+  bool DidDeferInit = false;
+  VarDecl *InitialReference = nullptr;
+  
+  VarUsageInfo(SILInstruction *EntryInst) : EntryInst(EntryInst) {
+    collectUsageInfo();
   }
   
-  // Search for a Partial Apply Use
-  for (auto Use : CapturedValue->getUses()) {
-    auto User = Use->getUser();
-    if (isa<PartialApplyInst>(User)) {
-      i = BB->begin();
-      foundI = false;
-      
-      // Check the Partial Apply is after this capture reference and before
-      // the next capture reference
-      while (i != e) {
-        if (&*i == I) {
-          foundI = true;
-        } else if (&*i == NextCapture) {
-          break;
-        } else if (foundI && &*i == User) {
-          return true;
+  void addEntryInst(SILInstruction *I) {
+    EntryInst = I;
+    collectUsageInfo();
+  }
+  
+private:
+  
+  void searchSetterParam() {
+    auto VRT = VariableReadTraverser(EntryInst);
+    if (!VRT.didRead()) {
+      if (auto Fn = EntryInst->getFunction()) {
+        auto SRGT = SetterReadsGetterTraverser(Fn);
+        if (SRGT.findGetterAccess()) {
+          MisusedGetter = SRGT.GetterInst;
         }
-        ++i;
       }
     }
-  }
-  return false;
-}
-
-static bool didModify(SILInstruction *I) {
-  auto VMT = VariableModifyTraverser(I);
-  return VMT.didModify();
-}
-
-static bool didRead(SILInstruction *I) {
-  auto VD = getVarDecl(I);
-  assert(VD && "Expected an instruction belonging to a VarDecl");
-  if (VD->isCaptureList() && isa<DebugValueInst>(I)) {
-    return didReadCapture(I);
-  }
-  auto VRT = VariableReadTraverser(I);
-  return VRT.didRead();
-}
-
-static void searchSetterParam(SILInstruction *I) {
-  auto VD = getVarDecl(I);
-  assert(VD && "Expected an instruction belonging to a VarDecl");
-  auto VRT = VariableReadTraverser(I);
-  if (!VRT.didRead()) {
-    if (auto Fn = I->getFunction()) {
-      auto SRGT = SetterReadsGetterTraverser(Fn);
-      if (SRGT.findGetterAccess()) {
-        SRGT.diagnoseGetterUse(VD);
-      }
-    }
-  }
-}
-
-/// Get the first \c DebugValueInst to reference the value
-static VarDecl *getInitialReference(SILInstruction *I) {
-  auto DVI = dyn_cast<DebugValueInst>(I);
-  if (!DVI) {
-    return nullptr;
+    DidRead = true; // Set this to mute other diagnostics
   }
   
-  if (auto DebugVD = getVarDecl(I)) {
-    if (DebugVD->isCaptureList()) {
+  /// Get the first \c DebugValueInst to reference the value if it is not
+  /// the entry instruction
+  VarDecl *getInitialReference() {
+    auto DVI = dyn_cast<DebugValueInst>(EntryInst);
+    if (!DVI) {
       return nullptr;
     }
-    if (auto ParentStmt = DebugVD->getRecursiveParentPatternStmt()) {
-      if (isa<CaseStmt>(ParentStmt)) {
+    
+    if (auto DebugVD = getVarDecl(EntryInst)) {
+      if (DebugVD->isCaptureList()) {
         return nullptr;
       }
+      if (auto ParentStmt = DebugVD->getRecursiveParentPatternStmt()) {
+        if (isa<CaseStmt>(ParentStmt)) {
+          return nullptr;
+        }
+      }
+    }
+    
+    auto ReferencedValue = DVI->getAllOperands()[0].get();
+    
+    DebugValueInst *InitialRefInst = DVI;
+    for (auto Use : ReferencedValue->getUses()) {
+      auto UserDVI = dyn_cast<DebugValueInst>(Use->getUser()); 
+      if (!DVI) {
+        continue;
+      }
+      if (instructionPrecedes(UserDVI, DVI, EntryInst->getParent())) {
+        InitialRefInst = UserDVI;
+      }
+    }
+    
+    if (InitialRefInst == DVI) {
+      return nullptr;
+    }
+    
+    return getVarDecl(InitialRefInst);
+  }
+  
+  void collectUsageInfo() {
+    
+    if (DidRead && DidModify) {
+      // Already used; no need for further diagnostic information
+      return;
+    }
+    
+    if (isSetterParam(EntryInst)) {
+      searchSetterParam();
+      // Quit here; setter parameters do not neet further
+      // diagnostic information
+      return;
+    }
+    
+    if (!DidRead) {
+      auto VRT = VariableReadTraverser(EntryInst);
+      DidRead = VRT.didRead();
+    }
+    
+    if (!DidModify || !DidDeferInit) {
+      auto VMT = VariableModifyTraverser(EntryInst);
+      DidModify |= VMT.didModify();
+      DidDeferInit |= VMT.isDeferredInit();
+    }
+    
+    if (!InitialReference) {
+      InitialReference = getInitialReference();
     }
   }
-  
-  auto ReferencedValue = DVI->getAllOperands()[0].get();
-  
-  DebugValueInst *InitialRef = DVI;
-  for (auto Use : ReferencedValue->getUses()) {
-    auto UserDVI = dyn_cast<DebugValueInst>(Use->getUser()); 
-    if (!DVI) {
-      continue;
-    }
-    if (instructionPrecedes(UserDVI, DVI, I->getParent())) {
-      InitialRef = UserDVI;
-    }
-  }
-  
-  if (InitialRef == DVI) {
-    return nullptr;
-  }
-  
-  if (auto VD = getVarDecl(InitialRef)) {
-    return VD;
-  }
-  return nullptr;
-}
+};
 
 //===----------------------------------------------------------------------===//
 //                         MARK: Diagostics Generator
@@ -1177,7 +1198,17 @@ public:
     });
   }
   
-  void diagnoseUnreadUnmodified(VarDecl *var) {
+  void diagnoseUnreadUnmodified(VarDecl *var, bool DidDeferInit) {
+    
+    // The let is assigned and initialized in seperate lines
+    //    let a: Int
+    //    a = 1
+    if (var->isLet() && DidDeferInit) {
+      diags.diagnose(var->getLoc(),
+                     diag::immutable_value_never_used_but_assigned,
+                     var->getName());
+      return;
+    }
     
     // If the source of the VarDecl is a trivial PatternBinding with only a
     // single binding, rewrite the whole thing into an assignment.
@@ -1251,7 +1282,6 @@ public:
           }
         }
       }
-      
     }
     
     // If the variable is defined in a pattern that isn't one of the usual
@@ -1288,19 +1318,9 @@ public:
       return;
     }
     
-    // FIXME: Never run?
-    // Otherwise, this is something more complex, perhaps
-    //    let (a,b) = foo()
-//    if (var->isLet() && false) {
-//      diags.diagnose(var->getLoc(),
-//                             diag::immutable_value_never_used_but_assigned,
-//                             var->getName());
-//    }
-    
-    unsigned varKind = var->isLet();
     // Just rewrite the one variable with a _.
     diags.diagnose(var->getLoc(), diag::variable_never_used,
-                   var->getName(), varKind)
+                   var->getName(), var->isLet())
     .fixItReplace(var->getLoc(), "_");
   }
   
@@ -1356,15 +1376,25 @@ public:
                                  var->getName(), suggestLet);
       
       if (suggestLet) {
-        // FIXME: Not emitting?
         diag.fixItReplace(FixItLoc, "let");
       } else {
         diag.fixItRemove(FixItLoc);
       }
     }
   }
+  
+  void diagnoseGetterUse(VarDecl *var, SILInstruction *GetterInst) {
+    
+    diags.diagnose(GetterInst->getLoc().getSourceLoc(),
+                   diag::unused_setter_parameter,
+                   var->getName());
+    diags.diagnose(GetterInst->getLoc().getSourceLoc(),
+                   diag::fixit_for_unused_setter_parameter,
+                   var->getName())
+    .fixItReplace(GetterInst->getLoc().getSourceRange(),
+                  var->getName().str());
+  }
 };
-
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Top Level Driver
@@ -1381,15 +1411,8 @@ class DiagnoseVarUsage : public SILFunctionTransform {
     LLVM_DEBUG(llvm::dbgs() << "*** Diagnose Var Usage visiting function: "
                <<  Fn.getName() << "\n");
     
-    SILModule &M = Fn.getModule();
-    
-    // Create collections for each diagnostic pipeline
-    llvm::SetVector<VarDecl *> VarAll;
-    llvm::SetVector<VarDecl *> VarUnreadUnmodified;
-    llvm::SetVector<VarDecl *> VarReadUnmodified;
-    llvm::SetVector<VarDecl *> VarUnreadModified;
-    llvm::SetVector<VarDecl *> VarReadModified;
-    llvm::MapVector<VarDecl *, VarDecl *> VarDuplicateReference;
+    llvm::SetVector<VarDecl *> SeenVarDecls;
+    llvm::MapVector<VarDecl *, VarUsageInfo *> VarDeclUsageInfoPairs;
     
     for (auto &bb : Fn) {
       auto i = bb.begin(), e = bb.end();
@@ -1403,72 +1426,15 @@ class DiagnoseVarUsage : public SILFunctionTransform {
         
         VarDecl *VD = getVarDecl(Inst);
         
-        if (isSetterParam(Inst)) {
-          searchSetterParam(Inst);
-          ++i;
-          continue;
-        }
-        
-        if (!VarAll.count(VD)) {
-          VarAll.insert(VD);
-        }
-        
-        // Since this diagnostic takes priority, if an instruction from the declaration has
-        // already been marked as a duplicate reference, skip recheck.
-        if (VarDuplicateReference.lookup(VD)) {
-          ++i;
-          continue;
-        }
-        
-        // If an instruction from the declaration has
-        // already been marked as read and modified, skip recheck.
-        if (VarReadModified.count(VD)) {
-          ++i;
-          continue;
-        }
-        
-        // Pop read and unmodified declarations to consider promotion to read
-        // and modified.
-        // Promote declarations if the instruction is modified.
-        if (VarReadUnmodified.count(VD)) {
-          if (didModify(Inst)) {
-            VarReadUnmodified.remove(VD);
-            VarReadModified.insert(VD);
-          }
-          ++i;
-          continue;
-        }
-        
-        // Pop unread and modified declarations to consider promotion to read
-        // and modified.
-        if (VarUnreadModified.count(VD)) {
-          if (didRead(Inst)) {
-            VarUnreadModified.remove(VD);
-            VarReadModified.insert(VD);
-          }
-          ++i;
-          continue;
-        }
-        
-        // Pop unread and unmodified declarations to consider any promotion.
-        if (VarUnreadUnmodified.count(VD)) {
-          VarUnreadUnmodified.remove(VD);
-        }
-        
-        // Promote new declarations and unread and unmodified declarations
-        bool DidRead = didRead(Inst);
-        bool DidModify = didModify(Inst);
-        if (auto InitialVD = getInitialReference(Inst)) {
-          VarDuplicateReference.insert(std::make_pair(VD, InitialVD));
-        } else if (!DidRead && !DidModify) {
-          VarUnreadUnmodified.insert(VD);
-        } else if (DidRead && !DidModify) {
-          VarReadUnmodified.insert(VD);
-        } else if (!DidRead && DidModify) {
-          VarUnreadModified.insert(VD);
+        if (SeenVarDecls.count(VD)) {
+          auto CurrentInfo = VarDeclUsageInfoPairs.lookup(VD);
+          CurrentInfo->addEntryInst(Inst);
         } else {
-          VarReadModified.insert(VD);
+          VarUsageInfo *UsageInfo = new VarUsageInfo(Inst);
+          VarDeclUsageInfoPairs.insert(std::make_pair(VD, UsageInfo));
+          SeenVarDecls.insert(VD);
         }
+        
         ++i;
         continue;
       }
@@ -1484,7 +1450,9 @@ class DiagnoseVarUsage : public SILFunctionTransform {
     //   a += 1
     //
     llvm::SetVector<VarDecl *> Promoted;
-    for (VarDecl *VD : VarAll) {
+    for (auto InfoPair : VarDeclUsageInfoPairs) {
+      auto VD = InfoPair.first;
+      auto UsageInfo = InfoPair.second;
       
       // Skip promotion of tuple siblings if already promoted.
       if (Promoted.count(VD)) {
@@ -1492,7 +1460,7 @@ class DiagnoseVarUsage : public SILFunctionTransform {
       }
       
       // Only modified variables are elligible to promote siblings.
-      if (VarReadUnmodified.count(VD) || VarUnreadUnmodified.count(VD)) {
+      if (!UsageInfo->DidModify) {
         continue;
       }
       
@@ -1504,14 +1472,9 @@ class DiagnoseVarUsage : public SILFunctionTransform {
         }
         if (Kind == PatternKind::Tuple) {
           Pattern->forEachVariable([&](VarDecl *SiblingVD) {
-            if (VarUnreadUnmodified.count(SiblingVD)) {
-              // FIXME: does this make sense? or should this not promote?
-              VarUnreadUnmodified.remove(SiblingVD);
-              VarUnreadModified.insert(SiblingVD);
-              Promoted.insert(SiblingVD);
-            } else if (VarReadUnmodified.count(SiblingVD)) {
-              VarReadUnmodified.remove(SiblingVD);
-              VarReadModified.insert(SiblingVD);
+            auto SiblingInfo = VarDeclUsageInfoPairs.lookup(SiblingVD);
+            if (SiblingInfo->DidRead && !SiblingInfo->DidModify) {
+              SiblingInfo->DidModify = true;
               Promoted.insert(SiblingVD);
             }
           });
@@ -1521,15 +1484,20 @@ class DiagnoseVarUsage : public SILFunctionTransform {
     
     // Run Diagnostics
     
+    SILModule &M = Fn.getModule();
     UsageDiagnosticsGenerator UDG(M.getASTContext());
-    for (VarDecl *VD : VarAll) {
-      if (auto IVD = VarDuplicateReference.lookup(VD)) {
+    for (auto InfoPair : VarDeclUsageInfoPairs) {
+      auto VD = InfoPair.first;
+      auto UsageInfo = InfoPair.second;
+      if (auto GetterInst = UsageInfo->MisusedGetter) {
+        UDG.diagnoseGetterUse(VD, GetterInst);
+      } else if (auto IVD = UsageInfo->InitialReference) {
         UDG.diagnoseDuplicateReference(VD, IVD);
-      } if (VarUnreadUnmodified.count(VD)) {
-        UDG.diagnoseUnreadUnmodified(VD);
-      } else if (VarReadUnmodified.count(VD)) {
+      } if (!UsageInfo->DidRead && !UsageInfo->DidModify) {
+        UDG.diagnoseUnreadUnmodified(VD, UsageInfo->DidDeferInit);
+      } else if (UsageInfo->DidRead && !UsageInfo->DidModify) {
         UDG.diagnoseReadUnmodified(VD);
-      } else if (VarUnreadModified.count(VD)) {
+      } else if (!UsageInfo->DidRead && UsageInfo->DidModify) {
         UDG.diagnoseUnreadModified(VD);
       }
     }
