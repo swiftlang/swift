@@ -2316,6 +2316,13 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
   } else {
     value = fnPtr;
+
+    // HACK: the swiftasync argument treatment is currently using
+    // a register that can be clobbered by the linker.  Use nonlazybind
+    // as a workaround.
+    if (fpKind.isSpecial()) {
+      cast<llvm::Function>(value)->addFnAttr(llvm::Attribute::NonLazyBind);
+    }
   }
   FunctionPointer fp = FunctionPointer(fpKind, value, sig);
 
