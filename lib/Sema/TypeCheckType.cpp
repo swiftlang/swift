@@ -63,16 +63,18 @@ using namespace swift;
 
 TypeResolution
 TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener) {
+                              OpenUnboundGenericTypeFn unboundTyOpener,
+                              HandlePlaceholderTypeReprFn placeholderHandler) {
   return TypeResolution(dc, TypeResolutionStage::Structural, options,
-                        unboundTyOpener);
+                        unboundTyOpener, placeholderHandler);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
-                             OpenUnboundGenericTypeFn unboundTyOpener) {
+                             OpenUnboundGenericTypeFn unboundTyOpener,
+                             HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
-                        unboundTyOpener);
+                        unboundTyOpener, placeholderHandler);
   result.complete.genericSig = dc->getGenericSignatureOfContext();
   result.complete.builder = nullptr;
   return result;
@@ -80,23 +82,25 @@ TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
 
 TypeResolution
 TypeResolution::forContextual(DeclContext *dc, TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener) {
+                              OpenUnboundGenericTypeFn unboundTyOpener,
+                              HandlePlaceholderTypeReprFn placeholderHandler) {
   return forContextual(dc, dc->getGenericEnvironmentOfContext(), options,
-                       unboundTyOpener);
+                       unboundTyOpener, placeholderHandler);
 }
 
 TypeResolution
 TypeResolution::forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
                               TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener) {
+                              OpenUnboundGenericTypeFn unboundTyOpener,
+                              HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Contextual, options,
-                        unboundTyOpener);
+                        unboundTyOpener, placeholderHandler);
   result.genericEnv = genericEnv;
   return result;
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
-  TypeResolution result(dc, stage, opts, unboundTyOpener);
+  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
   result.genericEnv = genericEnv;
   result.complete = complete;
   return result;
@@ -707,6 +711,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (!options.is(TypeResolverContext::TypeAliasDecl)) {
         // If the resolution object carries an opener, attempt to open
         // the unbound generic type.
+        // TODO: We should be able to just open the generic arguments as N
+        // different PlaceholderTypes.
         if (const auto openerFn = resolution.getUnboundTypeOpener())
           if (const auto boundTy = openerFn(unboundTy))
             return boundTy;
@@ -2022,6 +2028,20 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                        : ErrorType::get(getASTContext());
   }
 
+  case TypeReprKind::Placeholder: {
+    // Fill in the placeholder if there's an appropriate handler.
+    if (const auto handlerFn = resolution.getPlaceholderHandler())
+      if (const auto ty = handlerFn(cast<PlaceholderTypeRepr>(repr)))
+        return ty;
+
+    // Complain if we're allowed to and bail out with an error.
+    if (!options.contains(TypeResolutionFlags::SilenceErrors))
+      getASTContext().Diags.diagnose(repr->getLoc(),
+                                     diag::placeholder_type_not_allowed);
+
+    return ErrorType::get(resolution.getASTContext());
+  }
+
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();
   }
@@ -2882,7 +2902,8 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     if (genericParams) {
       fieldResolution = TypeResolution::forContextual(
           getDeclContext(), genericEnv, options,
-          resolution.getUnboundTypeOpener());
+          resolution.getUnboundTypeOpener(),
+          resolution.getPlaceholderHandler());
     }
 
     TypeResolver fieldResolver{fieldResolution,
@@ -2967,7 +2988,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     if (componentTypeEnv) {
       functionResolution = TypeResolution::forContextual(
           getDeclContext(), componentTypeEnv, options,
-          resolution.getUnboundTypeOpener());
+          resolution.getUnboundTypeOpener(),
+          resolution.getPlaceholderHandler());
     }
     
     auto argsTuple = repr->getArgsTypeRepr();
@@ -3031,7 +3053,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     if (genericEnv) {
       auto resolveSILParameters =
           TypeResolution::forContextual(getDeclContext(), genericEnv, options,
-                                        resolution.getUnboundTypeOpener());
+                                        resolution.getUnboundTypeOpener(),
+                                        resolution.getPlaceholderHandler());
       patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
@@ -4016,7 +4039,8 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
     };
   }
 
-  const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener)
+  const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener,
+                                                  /*placeholderHandler*/nullptr)
                         .resolveType(attr->getTypeRepr());
 
   // We always require the type to resolve to a nominal type. If the type was

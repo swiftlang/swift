@@ -138,7 +138,7 @@ public:
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
-    return {HoleType::get(typeVar->getASTContext(), typeVar),
+    return {PlaceholderType::get(typeVar->getASTContext(), typeVar),
             AllowedBindingKind::Exact,
             /*source=*/locator};
   }
@@ -307,9 +307,9 @@ struct PotentialBindings {
   bool isPotentiallyIncomplete() const;
 
   /// If this type variable doesn't have any viable bindings, or
-  /// if there is only one binding and it's a hole type, consider
+  /// if there is only one binding and it's a placeholder type, consider
   /// this type variable to be a hole in a constraint system
-  /// regardless of where hole type originated.
+  /// regardless of where the placeholder type originated.
   bool isHole() const {
     if (isDirectHole())
       return true;
@@ -318,14 +318,14 @@ struct PotentialBindings {
       return false;
 
     const auto &binding = Bindings.front();
-    return binding.BindingType->is<HoleType>();
+    return binding.BindingType->is<PlaceholderType>();
   }
 
   /// Determines whether the only possible binding for this type variable
-  /// would be a hole type. This is different from `isHole` method because
-  /// type variable could also acquire a hole type transitively if one
-  /// of the type variables in its subtype/equivalence chain has been
-  /// bound to a hole type.
+  /// would be a placeholder type. This is different from `isHole` method
+  /// because type variable could also acquire a placeholder type transitively
+  /// if one of the type variables in its subtype/equivalence chain has been
+  /// bound to a placeholder type.
   bool isDirectHole() const;
 
   /// Determine if the bindings only constrain the type variable from above

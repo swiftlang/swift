@@ -7537,8 +7537,8 @@ namespace {
       //       "Mismatched types!");
       assert(!exprType->hasTypeVariable() &&
              "Should not write type variable into expression!");
-      assert(!exprType->hasHole() &&
-             "Should not write type holes into expression!");
+      assert(!exprType->hasPlaceholder() &&
+             "Should not write type placeholders into expression!");
       expr->setType(exprType);
 
       if (auto kp = dyn_cast<KeyPathExpr>(expr)) {
@@ -7548,8 +7548,8 @@ namespace {
             componentType = solution.simplifyType(cs.getType(kp, i));
             assert(!componentType->hasTypeVariable() &&
                    "Should not write type variable into key-path component");
-            assert(!componentType->hasHole() &&
-                   "Should not write type hole into key-path component");
+            assert(!componentType->hasPlaceholder() &&
+                   "Should not write type placeholder into key-path component");
             kp->getMutableComponents()[i].setComponentType(componentType);
           }
         }

@@ -255,7 +255,7 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to a non-escaping type or not.
   TVO_CanBindToNoEscape = 0x04,
 
-  /// Whether the type variable can be bound to a hole type or not.
+  /// Whether the type variable can be bound to a hole or not.
   TVO_CanBindToHole = 0x08,
 
   /// Whether a more specific deduction for this type variable implies a
@@ -327,7 +327,7 @@ public:
   /// Whether this type variable can bind to an inout type.
   bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
-  /// Whether this type variable can bind to a hole type.
+  /// Whether this type variable can bind to a hole.
   bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
@@ -3759,14 +3759,15 @@ public:
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
                               ConstraintLocatorBuilder locator);
 
-  /// "Open" the given type by replacing any occurrences of unbound
-  /// generic types with bound generic types with fresh type variables as
-  /// generic arguments.
+  /// Replace placeholder types with fresh type variables, and unbound generic
+  /// types with bound generic types whose generic args are fresh type
+  /// variables.
   ///
-  /// \param type The type to open.
+  /// \param type The type on which to perform the conversion.
   ///
-  /// \returns The opened type.
-  Type openUnboundGenericTypes(Type type, ConstraintLocatorBuilder locator);
+  /// \returns The converted type.
+  Type replaceInferableTypesWithTypeVars(Type type,
+                                         ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -5021,6 +5022,26 @@ public:
   Type operator()(UnboundGenericType *unboundTy) const {
     return cs.openUnboundGenericType(unboundTy->getDecl(),
                                      unboundTy->getParent(), locator);
+  }
+};
+
+class HandlePlaceholderType {
+  ConstraintSystem &cs;
+  ConstraintLocator *locator;
+
+public:
+  explicit HandlePlaceholderType(ConstraintSystem &cs,
+                                 const ConstraintLocatorBuilder &locator)
+      : cs(cs) {
+    this->locator = cs.getConstraintLocator(locator);
+  }
+
+  Type operator()(PlaceholderTypeRepr *placeholderRepr) const {
+    return cs.createTypeVariable(
+        cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+            TVO_CanBindToHole);
   }
 };
 

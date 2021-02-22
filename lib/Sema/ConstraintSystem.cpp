@@ -652,7 +652,7 @@ Optional<std::pair<unsigned, Expr *>> ConstraintSystem::getExprDepthAndParent(
 Type ConstraintSystem::openUnboundGenericType(
     GenericTypeDecl *decl, Type parentTy, ConstraintLocatorBuilder locator) {
   if (parentTy) {
-    parentTy = openUnboundGenericTypes(parentTy, locator);
+    parentTy = replaceInferableTypesWithTypeVars(parentTy, locator);
   }
 
   // Open up the generic type.
@@ -693,7 +693,8 @@ Type ConstraintSystem::openUnboundGenericType(
   // call to BoundGenericType::get().
   return TypeChecker::applyUnboundGenericArguments(
       decl, parentTy, SourceLoc(),
-      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr),
+      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
+                                    /*placeholderHandler*/ nullptr),
       arguments);
 }
 
@@ -776,17 +777,27 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
   checkNestedTypeConstraints(cs, parentTy, locator);
 }
 
-Type ConstraintSystem::openUnboundGenericTypes(
+Type ConstraintSystem::replaceInferableTypesWithTypeVars(
     Type type, ConstraintLocatorBuilder locator) {
   assert(!type->getCanonicalType()->hasTypeParameter());
 
-  if (!type->hasUnboundGenericType())
+  if (!type->hasUnboundGenericType() && !type->hasPlaceholder())
     return type;
 
   type = type.transform([&](Type type) -> Type {
       if (auto unbound = type->getAs<UnboundGenericType>()) {
         return openUnboundGenericType(unbound->getDecl(), unbound->getParent(),
                                       locator);
+      } else if (auto *placeholderTy = type->getAs<PlaceholderType>()) {
+        if (auto *placeholderRepr = placeholderTy->getOriginator()
+                                        .dyn_cast<PlaceholderTypeRepr *>()) {
+
+          return createTypeVariable(
+              getConstraintLocator(
+                  locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
+              TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+                  TVO_CanBindToHole);
+        }
       }
 
       return type;
@@ -1202,13 +1213,14 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     auto type = TypeChecker::resolveTypeInContext(
         typeDecl, nullptr,
         TypeResolution::forContextual(useDC, TypeResolverContext::InExpression,
-                                      /*unboundTyOpener*/ nullptr),
+                                      /*unboundTyOpener*/ nullptr,
+                                      /*placeholderHandler*/ nullptr),
         /*isSpecialized=*/false);
 
     checkNestedTypeConstraints(*this, type, locator);
 
-    // Open the type.
-    type = openUnboundGenericTypes(type, locator);
+    // Convert any placeholder types and open generics.
+    type = replaceInferableTypesWithTypeVars(type, locator);
 
     // Module types are not wrapped in metatypes.
     if (type->is<ModuleType>())
@@ -1463,8 +1475,8 @@ ConstraintSystem::getTypeOfMemberReference(
 
     checkNestedTypeConstraints(*this, memberTy, locator);
 
-    // Open the type if it was a reference to a generic type.
-    memberTy = openUnboundGenericTypes(memberTy, locator);
+    // Convert any placeholders and open any generics.
+    memberTy = replaceInferableTypesWithTypeVars(memberTy, locator);
 
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
@@ -2219,7 +2231,8 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
         if (auto castTypeRepr = isp->getCastTypeRepr()) {
           castType = TypeResolution::forContextual(
                          DC, TypeResolverContext::InExpression,
-                         /*unboundTyOpener*/ nullptr)
+                         /*unboundTyOpener*/ nullptr,
+                         /*placeholderHandler*/ nullptr)
                          .resolveType(castTypeRepr);
         } else {
           castType = isp->getCastType();
@@ -2850,7 +2863,7 @@ Type ConstraintSystem::simplifyTypeImpl(Type type,
           auto memberTy = DependentMemberType::get(lookupBaseType, assocType);
           if (shouldAttemptFixes() &&
               getPhase() == ConstraintSystemPhase::Solving) {
-            return HoleType::get(getASTContext(), memberTy);
+            return PlaceholderType::get(getASTContext(), memberTy);
           }
 
           return memberTy;
@@ -2885,7 +2898,7 @@ Type ConstraintSystem::simplifyType(Type type) const {
 }
 
 Type Solution::simplifyType(Type type) const {
-  if (!(type->hasTypeVariable() || type->hasHole()))
+  if (!(type->hasTypeVariable() || type->hasPlaceholder()))
     return type;
 
   // Map type variables to fixed types from bindings.
@@ -2893,11 +2906,12 @@ Type Solution::simplifyType(Type type) const {
   auto resolvedType = cs.simplifyTypeImpl(
       type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
 
-  // Holes shouldn't be reachable through a solution, they are only
+  // Placeholders shouldn't be reachable through a solution, they are only
   // useful to determine what went wrong exactly.
-  if (resolvedType->hasHole()) {
+  if (resolvedType->hasPlaceholder()) {
     return resolvedType.transform([&](Type type) {
-      return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType) : type;
+      return type->isPlaceholder() ? Type(cs.getASTContext().TheUnresolvedType)
+                                   : type;
     });
   }
 
@@ -5248,7 +5262,7 @@ void ConstraintSystem::recordFixedRequirement(ConstraintLocator *reqLocator,
   }
 }
 
-// Replace any error types encountered with holes.
+// Replace any error types encountered with placeholders.
 Type ConstraintSystem::getVarType(const VarDecl *var) {
   auto type = var->getType();
 
@@ -5262,7 +5276,7 @@ Type ConstraintSystem::getVarType(const VarDecl *var) {
   return type.transform([&](Type type) {
     if (!type->is<ErrorType>())
       return type;
-    return HoleType::get(Context, const_cast<VarDecl *>(var));
+    return PlaceholderType::get(Context, const_cast<VarDecl *>(var));
   });
 }
 
@@ -5309,7 +5323,7 @@ TypeVarBindingProducer::TypeVarBindingProducer(PotentialBindings &bindings)
   if (bindings.isDirectHole()) {
     auto *locator = getLocator();
     // If this type variable is associated with a code completion token
-    // and it failed to infer any bindings let's adjust hole's locator
+    // and it failed to infer any bindings let's adjust holes's locator
     // to point to a code completion token to avoid attempting to "fix"
     // this problem since its rooted in the fact that constraint system
     // is under-constrained.

@@ -957,8 +957,10 @@ DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
   TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();
   if (defaultDefinition) {
     return TypeResolution::forInterface(assocType->getDeclContext(), None,
-                                        // Diagnose unbound generics.
-                                        /*unboundTyOpener*/ nullptr)
+                                        // Diagnose unbound generics and
+                                        // placeholders.
+                                        /*unboundTyOpener*/ nullptr,
+                                        /*placeholderHandler*/ nullptr)
         .resolveType(defaultDefinition);
   }
 
@@ -1527,7 +1529,8 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
       TypeResolution::forInterface(DC, options,
                                    // FIXME: Should unbound generics be allowed
                                    // to appear amongst designated types?
-                                   /*unboundTyOpener*/ nullptr)
+                                   /*unboundTyOpener*/ nullptr,
+                                   /*placeholderHandler*/ nullptr)
           .resolveType(TyR);
 
   if (result->hasError())
@@ -1832,9 +1835,11 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(typeAlias->getASTContext());
   }
 
-  const auto result = TypeResolution::forInterface(typeAlias, options,
-                                                   /*unboundTyOpener*/ nullptr)
-                          .resolveType(underlyingRepr);
+  const auto result =
+      TypeResolution::forInterface(typeAlias, options,
+                                   /*unboundTyOpener*/ nullptr,
+                                   /*placeholderHandler*/ nullptr)
+          .resolveType(underlyingRepr);
 
   if (result->hasError()) {
     typeAlias->setInvalid();
@@ -2089,7 +2094,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   const auto options =
       TypeResolutionOptions(TypeResolverContext::FunctionResult);
   auto *const dc = decl->getInnermostDeclContext();
-  return TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr)
+  return TypeResolution::forInterface(dc, options, /*unboundTyOpener*/ nullptr,
+                                      /*placeholderHandler*/ nullptr)
       .resolveType(resultTyRepr);
 }
 
@@ -2166,9 +2172,11 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
 
 static Type validateParameterType(ParamDecl *decl) {
   auto *dc = decl->getDeclContext();
+  auto &ctx = dc->getASTContext();
 
   TypeResolutionOptions options(None);
   OpenUnboundGenericTypeFn unboundTyOpener = nullptr;
+  HandlePlaceholderTypeReprFn placeholderHandler = nullptr;
   if (isa<AbstractClosureExpr>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
@@ -2176,6 +2184,11 @@ static Type validateParameterType(ParamDecl *decl) {
       // FIXME: Don't let unbound generic types escape type resolution.
       // For now, just return the unbound generic type.
       return unboundTy;
+    };
+    placeholderHandler = [&](auto placeholderRepr) {
+      // FIXME: Don't let placeholder types escape type resolution.
+      // For now, just return the placeholder type.
+      return PlaceholderType::get(ctx, placeholderRepr);
     };
   } else if (isa<AbstractFunctionDecl>(dc)) {
     options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
@@ -2198,10 +2211,10 @@ static Type validateParameterType(ParamDecl *decl) {
     options |= TypeResolutionFlags::AllowUsableFromInline;
 
   const auto resolution =
-      TypeResolution::forInterface(dc, options, unboundTyOpener);
+      TypeResolution::forInterface(dc, options, unboundTyOpener,
+                                   placeholderHandler);
   auto Ty = resolution.resolveType(decl->getTypeRepr());
 
-  auto &ctx = dc->getASTContext();
   if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
@@ -2773,6 +2786,12 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
         // FIXME: Don't let unbound generic types escape type resolution.
         // For now, just return the unbound generic type.
         return unboundTy;
+      },
+      /*placeholderHandler*/
+      [&](auto placeholderRepr) {
+        // FIXME: Don't let placeholder types escape type resolution.
+        // For now, just return the placeholder type.
+        return PlaceholderType::get(ext->getASTContext(), placeholderRepr);
       });
 
   const auto extendedType = resolution.resolveType(extendedRepr);

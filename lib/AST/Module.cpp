@@ -1023,8 +1023,8 @@ LookupConformanceInModuleRequest::evaluate(
 
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
-  // intended type might have.
-  if (type->is<UnresolvedType>())
+  // intended type might have. Same goes for PlaceholderType.
+  if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
     return ProtocolConformanceRef(protocol);
 
   auto nominal = type->getAnyNominal();

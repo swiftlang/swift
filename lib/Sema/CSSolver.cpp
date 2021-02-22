@@ -1015,9 +1015,11 @@ void ConstraintSystem::shrink(Expr *expr) {
                 TypeResolution::forContextual(
                     CS.DC, None,
                     // FIXME: Should we really be unconditionally complaining
-                    // about unbound generics here? For example:
+                    // about unbound generics and placeholders here? For
+                    // example:
                     // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
-                    /*unboundTyOpener*/ nullptr)
+                    // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
+                    /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr)
                     .resolveType(typeRepr);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
