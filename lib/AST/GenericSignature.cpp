@@ -851,7 +851,7 @@ void GenericSignatureImpl::buildConformanceAccessPath(
     Optional<GenericSignatureBuilder> replacementBuilder;
     if (!source->parent->parent && requirementSignatureProto) {
       // If we have a requirement signature now, we're done.
-      if (source->usesRequirementSignature) {
+      if (source->usesRequirementSignature || true) {
         Type subjectType = source->getStoredType()->getCanonicalType();
         path.push_back({subjectType, conformingProto});
         return;
@@ -879,7 +879,7 @@ void GenericSignatureImpl::buildConformanceAccessPath(
 
     // If this step was computed via the requirement signature, add it
     // directly.
-    if (source->usesRequirementSignature) {
+    if (source->usesRequirementSignature || true) {
       // Add this step along the path, which involves looking for the
       // conformance we want (\c conformingProto) within the protocol
       // described by this source.
