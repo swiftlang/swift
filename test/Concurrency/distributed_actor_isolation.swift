@@ -1,22 +1,26 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-actor class LocalActor_1 {
+actor LocalActor_1 {
   let name: String = "alice"
   var mutable: String = "" // expected-note{{mutable state is only available within the actor instance}}
 
   distributed func nope() {
-    // expected-error@-1{{'distributed' function can only be declared within 'distributed actor class'}}
+    // expected-error@-1{{'distributed' function can only be declared within 'distributed actor'}}
   }
 }
 
 struct NotCodableValue { }
 
 distributed struct StructNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
-distributed class ClassNope {} // expected-error{{'distributed' can only be applied to 'actor class' definitions, and distributed actor-isolated async functions}}
+distributed class ClassNope {} // expected-error{{'distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
 distributed enum EnumNope {} // expected-error{{distributed' modifier cannot be applied to this declaration}}
 
-distributed actor class DistributedActor_1 {
+distributed actor class DistributedActor_0 { // expected-warning{{'actor class' has been renamed to 'actor'}}
+  distributed func okey() {}
+}
+
+distributed actor DistributedActor_1 {
 
   let name: String = "alice" // expected-note{{mutable state is only available within the actor instance}}
   var mutable: String = "alice" // expected-note{{mutable state is only available within the actor instance}}

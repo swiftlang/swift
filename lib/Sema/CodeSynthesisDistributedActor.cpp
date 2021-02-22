@@ -384,7 +384,7 @@ static void collectNonOveriddenDistributedActorInits(
 }
 
 
-/// For a distributed actor class, automatically define initializers
+/// For a distributed actor, automatically define initializers
 /// that match the DistributedActor requirements.
 // TODO: inheritance is tricky here?
 static void addImplicitDistributedActorConstructors(ClassDecl *decl) {

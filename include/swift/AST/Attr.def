@@ -631,7 +631,7 @@ DECL_ATTR(hasAsyncAlternative, HasAsyncAlternative,
   111)
 
 CONTEXTUAL_DECL_ATTR(distributed, DistributedActor,
-  OnClass | OnFunc | ConcurrencyOnly |
+  DeclModifier | OnClass | OnFunc | ConcurrencyOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   112)

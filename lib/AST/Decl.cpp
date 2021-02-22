@@ -6884,12 +6884,6 @@ bool AbstractFunctionDecl::canBeAsyncHandler() const {
                            false);
 }
 
-FunctionRethrowingKind AbstractFunctionDecl::getRethrowingKind() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-    FunctionRethrowingKindRequest{const_cast<AbstractFunctionDecl *>(this)}, 
-    FunctionRethrowingKind::Invalid);
-}
-
 bool AbstractFunctionDecl::isDistributed() const {
   auto func = dyn_cast<FuncDecl>(this);
   if (!func)

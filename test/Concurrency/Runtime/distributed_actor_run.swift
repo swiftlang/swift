@@ -1,9 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) 2>&1 | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-import Dispatch
 import _Concurrency
 
 //protocol DA {
@@ -21,7 +20,7 @@ import _Concurrency
 //}
 
 
-distributed actor class SomeSpecificDistributedActor {
+distributed actor SomeSpecificDistributedActor {
 //  // @derived let actorTransport: ActorTransport
 //  // @derived let actorAddress: ActorAddress
 
@@ -63,7 +62,7 @@ let transport = FakeTransport()
 
 func test_initializers() {
   _ = SomeSpecificDistributedActor(transport: transport)
-  _ = SomeSpecificDistributedActor(resolve: address, using: transport)
+  _ = try! SomeSpecificDistributedActor(resolve: address, using: transport)
 }
 
 func test_address() {
@@ -77,4 +76,8 @@ func test_run() async {
   print("after") // CHECK: after
 }
 
-runAsyncAndBlock(test_run)
+@main struct Main {
+  static func main() async {
+    await test_run()
+  }
+}

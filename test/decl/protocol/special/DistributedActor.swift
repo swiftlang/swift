@@ -1,18 +1,18 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-// Synthesis of distributed actor classes.
+// Synthesis of distributed actors.
 
-distributed actor class D1 {
+distributed actor D1 {
   var x: Int = 17
 }
 
-distributed actor class D2 {
+distributed actor D2 {
   let actorTransport: String // expected-error{{}}
 }
 
 // TODO: produce better errors if users attempt to manually write synthesized fields
-//distributed actor class D3 {
+//distributed actor D3 {
 //  let actorTransport: ActorTransport
 //}
 

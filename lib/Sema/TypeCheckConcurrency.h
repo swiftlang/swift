@@ -164,6 +164,16 @@ public:
     return result;
   }
 
+  /// Accesses to the given declaration can only be made via the 'self' of
+  /// the current actor.
+  // FIXME: we likely don't need this isolation level?
+  static ActorIsolationRestriction forDistributedActorSelf(
+      ClassDecl *actorClass) {
+    ActorIsolationRestriction result(DistributedActor);
+    result.data.actorClass = actorClass;
+    return result;
+  }
+
   /// Accesses to the given declaration can only be made via this particular
   /// global actor or is a cross-actor access.
   static ActorIsolationRestriction forGlobalActor(

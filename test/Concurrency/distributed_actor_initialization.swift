@@ -1,36 +1,36 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
-distributed actor class OK0 { }
+distributed actor OK0 { }
 
-distributed actor class OK1 {
+distributed actor OK1 {
   var x: Int = 1
   // ok, since all fields are initialized, the constructors can be synthesized
 }
 
 // TODO: test all the FIXITs in this file (!!!)
 
-distributed actor class Bad1 {
+distributed actor Bad1 {
   init() {
     // expected-error@-1 {{'distributed actor' initializer 'init()' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local-initializer, which other initializers must delegate to}}
     // expected-error@-2 {{'distributed actor' initializer 'init()' must (directly or indirectly) delegate to 'init(transport:)}}
   }
 }
 
-distributed actor class Bad11 {
+distributed actor Bad11 {
   convenience init() {
     // expected-error@-1 {{'distributed actor' initializer 'init()' must (directly or indirectly) delegate to 'init(transport:)'}}
   }
 }
 
-distributed actor class Bad12 {
+distributed actor Bad12 {
   init(x: String) {
     // expected-error@-1 {{'distributed actor' initializer 'init(x:)' must be 'convenience' initializer. Distributed actors have an implicitly synthesized designated 'init(transport:)' local-initializer, which other initializers must delegate to}}
     // expected-error@-2 {{'distributed actor' initializer 'init(x:)' must (directly or indirectly) delegate to 'init(transport:)}}
   }
 }
 
-distributed actor class OK2 {
+distributed actor OK2 {
   var x: Int
 
   convenience init(x: Int, transport: ActorTransport) {
@@ -39,7 +39,7 @@ distributed actor class OK2 {
   }
 }
 
-distributed actor class Bad2 {
+distributed actor Bad2 {
   var x: Int
 
   convenience init(x: Int, transport: ActorTransport) {
@@ -48,7 +48,7 @@ distributed actor class Bad2 {
   }
 }
 
-distributed actor class Bad3 {
+distributed actor Bad3 {
   var x: Int
 
   convenience init(y: Int, transport: ActorTransport) {
@@ -58,7 +58,7 @@ distributed actor class Bad3 {
   }
 }
 
-distributed actor class OKMulti {
+distributed actor OKMulti {
   // @derived init(transport:)
 
   convenience init(y: Int, transport: ActorTransport) { // ok
@@ -71,7 +71,7 @@ distributed actor class OKMulti {
   }
 }
 
-distributed actor class BadMulti {
+distributed actor BadMulti {
   // @derived init(transport:)
 
   convenience init(y: Int, transport: ActorTransport) {
@@ -90,7 +90,7 @@ distributed actor class BadMulti {
 // because it may result in "not a real instance" i.e. a proxy
 // and a proxy does not have any storage, so it would be wrong to allow other
 // initializers to keep running while we actually created a proxy with no storage.
-distributed actor class BadResolveInitCall {
+distributed actor BadResolveInitCall {
   convenience init(any: Any, address: ActorAddress, transport: ActorTransport) throws {
     // expected-error@-1 {{'distributed actor' initializer 'init(any:address:transport:)' cannot delegate to resolve-initializer 'init(resolve:using:)', as it may result resolving a storageless proxy instance}}
     // expected-error@-2 {{'distributed actor' initializer 'init(any:address:transport:)' must (directly or indirectly) delegate to 'init(transport:)'}}
@@ -98,7 +98,7 @@ distributed actor class BadResolveInitCall {
   }
 }
 
-distributed actor class BadRedeclare1 { // expected-error {{type 'BadRedeclare1' does not conform to protocol 'DistributedActor'}}
+distributed actor BadRedeclare1 { // expected-error {{type 'BadRedeclare1' does not conform to protocol 'DistributedActor'}}
   convenience init(transport: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' local-initializer 'init(transport:)' cannot be implemented explicitly}}
   // expected-error@-2 {{invalid redeclaration of synthesized 'init(transport:)'}}
@@ -106,7 +106,7 @@ distributed actor class BadRedeclare1 { // expected-error {{type 'BadRedeclare1'
   // expected-note@-4 {{candidate exactly matches}}
 }
 
-distributed actor class BadRedeclare11 { // expected-error {{type 'BadRedeclare11' does not conform to protocol 'DistributedActor'}}
+distributed actor BadRedeclare11 { // expected-error {{type 'BadRedeclare11' does not conform to protocol 'DistributedActor'}}
   convenience init(transport xxx: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' local-initializer 'init(transport:)' cannot be implemented explicitly}}
   // expected-error@-2 {{invalid redeclaration of synthesized 'init(transport:)'}}
@@ -114,7 +114,7 @@ distributed actor class BadRedeclare11 { // expected-error {{type 'BadRedeclare1
   // expected-note@-4 {{candidate exactly matches}}
 }
 
-distributed actor class BadRedeclare2 { // expected-error {{type 'BadRedeclare2' does not conform to protocol 'DistributedActor'}}
+distributed actor BadRedeclare2 { // expected-error {{type 'BadRedeclare2' does not conform to protocol 'DistributedActor'}}
   convenience init(resolve address: ActorAddress, using transport: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
   // expected-note@-2 {{candidate exactly matches}}
@@ -122,7 +122,7 @@ distributed actor class BadRedeclare2 { // expected-error {{type 'BadRedeclare2'
   // expected-error@-4 {{invalid redeclaration of synthesized initializer 'init(resolve:using:)'}}
 }
 
-distributed actor class BadRedeclare21 { //expected-error {{type 'BadRedeclare21' does not conform to protocol 'DistributedActor'}}
+distributed actor BadRedeclare21 { //expected-error {{type 'BadRedeclare21' does not conform to protocol 'DistributedActor'}}
   convenience init(resolve xxx: ActorAddress, using yyy: ActorTransport) {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
   // expected-note@-2 {{candidate exactly matches}}
@@ -130,7 +130,7 @@ distributed actor class BadRedeclare21 { //expected-error {{type 'BadRedeclare21
   // expected-error@-4 {{invalid redeclaration of synthesized initializer 'init(resolve:using:)'}}
 }
 
-distributed actor class BadRedeclare22 { //expected-error {{type 'BadRedeclare22' does not conform to protocol 'DistributedActor'}}
+distributed actor BadRedeclare22 { //expected-error {{type 'BadRedeclare22' does not conform to protocol 'DistributedActor'}}
   convenience init(resolve: ActorAddress, using yyy: ActorTransport) throws {}
   // expected-error@-1 {{'distributed actor' resolve-initializer 'init(resolve:using:)' cannot be implemented explicitly}}
   // expected-note@-2 {{candidate exactly matches}}

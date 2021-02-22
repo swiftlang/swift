@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency) 2>&1 | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -6,7 +6,7 @@
 import Dispatch
 import _Concurrency
 
-distributed actor class SomeSpecificDistributedActor {
+distributed actor SomeSpecificDistributedActor {
 }
 
 // ==== Fake Transport ---------------------------------------------------------
@@ -44,4 +44,8 @@ func test_remote() async {
   print("done") // CHECK: done
 }
 
-runAsyncAndBlock(test_remote)
+@main struct Main {
+  static func main() async {
+    await test_remote()
+  }
+}

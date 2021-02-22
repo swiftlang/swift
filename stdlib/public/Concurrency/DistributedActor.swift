@@ -13,7 +13,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// Common protocol to which all distributed actor classes conform.
+/// Common protocol to which all distributed actors conform.
 ///
 /// The \c DistributedActor protocol provides the core functionality of any
 /// distributed actor, which involves transforming actor

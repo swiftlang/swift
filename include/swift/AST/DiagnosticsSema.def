@@ -4460,7 +4460,7 @@ ERROR(distributed_actor_storage,none,
       "Only functions can be 'distributed'",
       ())
 ERROR(distributed_actor_not_actor,none,
-      "'distributed' can only be applied to 'actor class' definitions, "
+      "'distributed' can only be applied to 'actor' definitions, "
       "and distributed actor-isolated async functions",
       ())
 ERROR(distributed_actor_not_actor_func,none,
@@ -4470,7 +4470,7 @@ ERROR(distributed_actor_func_static,none,
       "'distributed' functions cannot be 'static'",
       ())
 ERROR(distributed_actor_func_not_in_distributed_actor,none,
-      "'distributed' function can only be declared within 'distributed actor class'",
+      "'distributed' function can only be declared within 'distributed actor'",
       ())
 ERROR(distributed_actor_independent_property_must_be_let,none,
       "_distributedActorIndependent can be applied to properties, however they must be 'let'",
