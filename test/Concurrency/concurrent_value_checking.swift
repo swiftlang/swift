@@ -123,6 +123,23 @@ func testConcurrency() {
 }
 
 // ----------------------------------------------------------------------
+// ConcurrentValue restriction on key paths.
+// ----------------------------------------------------------------------
+class NC: Hashable {
+  func hash(into: inout Hasher) { }
+  static func==(_: NC, _: NC) -> Bool { true }
+}
+
+class HasNC {
+  var dict: [NC: Int] = [:]
+}
+
+func testKeyPaths(dict: [NC: Int], nc: NC) {
+  _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-concurrent-value type 'NC'}}
+}
+
+
+// ----------------------------------------------------------------------
 // ConcurrentValue restriction on conformances.
 // ----------------------------------------------------------------------
 protocol AsyncProto {

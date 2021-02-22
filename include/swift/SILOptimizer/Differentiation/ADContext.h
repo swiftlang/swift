@@ -115,6 +115,8 @@ private:
   mutable FuncDecl *cachedPlusFn = nullptr;
   /// `AdditiveArithmetic.+=` declaration.
   mutable FuncDecl *cachedPlusEqualFn = nullptr;
+  /// `AdditiveArithmetic.zero` declaration.
+  mutable AccessorDecl *cachedZeroGetter = nullptr;
 
 public:
   /// Construct an ADContext for the given module.
@@ -201,6 +203,7 @@ public:
 
   FuncDecl *getPlusDecl() const;
   FuncDecl *getPlusEqualDecl() const;
+  AccessorDecl *getAdditiveArithmeticZeroGetter() const;
 
   /// Cleans up all the internal state.
   void cleanUp();
@@ -268,6 +271,10 @@ public:
   emitNondifferentiabilityError(SourceLoc loc, DifferentiationInvoker invoker,
                                 Diag<T...> diag, U &&... args);
 };
+
+raw_ostream &getADDebugStream();
+SILLocation getValidLocation(SILValue v);
+SILLocation getValidLocation(SILInstruction *inst);
 
 template <typename... T, typename... U>
 InFlightDiagnostic
