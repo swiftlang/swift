@@ -3386,7 +3386,7 @@ ERROR(construct_protocol_by_name,none,
 ERROR(unknown_binop,none,
       "operator is not a known binary operator", ())
 ERROR(unordered_adjacent_unary_operator,none,
-      "operator in precedence group %0 and adjacent unary operator have"
+      "operator in precedence group %0 and adjacent unary operator have "
       "undefined relative precedence; use grouping parentheses",
       (Identifier))
 ERROR(non_associative_adjacent_operators,none,

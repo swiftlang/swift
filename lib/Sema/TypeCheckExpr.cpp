@@ -291,6 +291,16 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
                          opPrecedence->getName())
       .highlight(prefixUnary->getFn()->getSourceRange());
     }
+    // Prefix '-' (but not '+') is lexed as part of a number literal rather than
+    // as a standalone operator.
+    else if (auto *numberLiteral = dyn_cast<NumberLiteralExpr>(LHS)) {
+      if (numberLiteral->isNegative()) {
+        Ctx.Diags.diagnose(Op->getLoc(),
+                           diag::unordered_adjacent_unary_operator,
+                           opPrecedence->getName())
+        .highlight(numberLiteral->getMinusLoc());
+      }
+    }
     if (auto *postfixUnary = dyn_cast<PostfixUnaryExpr>(RHS)) {
       Ctx.Diags.diagnose(Op->getLoc(),
                          diag::unordered_adjacent_unary_operator,
