@@ -186,12 +186,9 @@ std::string DependencyKey::demangleTypeAsContext(StringRef s) {
 DependencyKey DependencyKey::createKeyForWholeSourceFile(DeclAspect aspect,
                                                          StringRef swiftDeps) {
   assert(!swiftDeps.empty());
-  const std::string context = DependencyKey::computeContextForProvidedEntity<
-      NodeKind::sourceFileProvide>(swiftDeps);
-  const std::string name =
-      DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
-          swiftDeps);
-  return DependencyKey(NodeKind::sourceFileProvide, aspect, context, name);
+  return DependencyKey::Builder(NodeKind::sourceFileProvide, aspect)
+      .withName(swiftDeps)
+      .build();
 }
 
 //==============================================================================
