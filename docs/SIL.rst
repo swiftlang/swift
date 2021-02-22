@@ -3502,32 +3502,46 @@ program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
 begin_borrow
 ````````````
 
-TODO
+::
+
+   sil-instruction ::= 'begin_borrow' sil-operand
+
+   %1 = begin_borrow %0 : $T
+
+Given a value ``%0`` with `Owned`_ or `Guaranteed`_ ownership, produces a new
+same typed value with `Guaranteed`_ ownership: ``%1``. ``%1`` is guaranteed to
+have a lifetime ending use (e.x.: `end_borrow`_) along all paths that do not end
+in `Dead End Blocks`_. This `begin_borrow`_ and the lifetime ending uses of
+``%1`` are considered to be liveness requiring uses of ``%0`` and as such in the
+region in between this borrow and its lifetime ending use, ``%0`` must be
+live. This makes sense semantically since ``%1`` is modeling a new value with a
+dependent lifetime on ``%0``.
+
+This instruction is only valid in functions in Ownership SSA form.
 
 end_borrow
 ``````````
 
 ::
 
-   sil-instruction ::= 'end_borrow' sil-value 'from' sil-value : sil-type, sil-type
+   sil-instruction ::= 'end_borrow' sil-operand
 
-   end_borrow %1 from %0 : $T, $T
-   end_borrow %1 from %0 : $T, $*T
-   end_borrow %1 from %0 : $*T, $T
-   end_borrow %1 from %0 : $*T, $*T
-   // We allow for end_borrow to be specified in between values and addresses
-   // all of the same type T.
+   // somewhere earlier
+   // %1 = begin_borrow %0
+   end_borrow %1 : $T
 
-Ends the scope for which the SILValue ``%1`` is borrowed from the SILValue
-``%0``. Must be paired with at most 1 borrowing instruction (like
-``load_borrow``) along any path through the program. In the region in between
-the borrow instruction and the ``end_borrow``, the original SILValue can not be
-modified. This means that:
+Ends the scope for which the `Guaranteed`_ ownership possessing SILValue ``%1``
+is borrowed from the SILValue ``%0``. Must be paired with at most 1 borrowing
+instruction (like `load_borrow`_, `begin_borrow`_) along any path through the
+program. In the region in between the borrow instruction and the `end_borrow`_,
+the original SILValue can not be modified. This means that:
 
 1. If ``%0`` is an address, ``%0`` can not be written to.
 2. If ``%0`` is a non-trivial value, ``%0`` can not be destroyed.
 
 We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
+
+This instruction is only valid in functions in Ownership SSA form.
 
 assign
 ``````
