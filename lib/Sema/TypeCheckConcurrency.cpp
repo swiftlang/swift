@@ -2259,8 +2259,7 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
-void swift::checkConcurrentValueConformance(
-    ProtocolConformance *conformance, bool asWarning) {
+void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
@@ -2278,9 +2277,7 @@ void swift::checkConcurrentValueConformance(
   if (!conformanceDC->getParentSourceFile() ||
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(
-        asWarning
-          ? diag::concurrent_value_outside_source_file_warn
-          : diag::concurrent_value_outside_source_file,
+        diag::concurrent_value_outside_source_file,
         nominal->getDescriptiveKind(), nominal->getName());
     return;
   }
@@ -2289,11 +2286,8 @@ void swift::checkConcurrentValueConformance(
     // An open class cannot conform to `ConcurrentValue`.
     if (classDecl->getFormalAccess() == AccessLevel::Open) {
       classDecl->diagnose(
-          asWarning ? diag::concurrent_value_open_class_warn
-                    : diag::concurrent_value_open_class,
-          classDecl->getName());
-      if (!asWarning)
-        return;
+          diag::concurrent_value_open_class, classDecl->getName());
+      return;
     }
 
     // A 'ConcurrentValue' class cannot inherit from another class, although
@@ -2302,12 +2296,10 @@ void swift::checkConcurrentValueConformance(
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         if (!superclassDecl->isNSObject()) {
           classDecl->diagnose(
-              asWarning ? diag::concurrent_value_inherit_warn
-                        : diag::concurrent_value_inherit,
+              diag::concurrent_value_inherit,
               nominal->getASTContext().LangOpts.EnableObjCInterop,
               classDecl->getName());
-          if (!asWarning)
-            return;
+          return;
         }
       }
     }
@@ -2318,10 +2310,7 @@ void swift::checkConcurrentValueConformance(
   if (isa<StructDecl>(nominal) || classDecl) {
     for (auto property : nominal->getStoredProperties()) {
       if (classDecl && property->supportsMutation()) {
-        property->diagnose(
-            asWarning ? diag::concurrent_value_class_mutable_property_warn
-                      : diag::concurrent_value_class_mutable_property,
-            property->getName(), nominal->getDescriptiveKind(),
+        property->diagnose(diag::concurrent_value_class_mutable_property, property->getName(), nominal->getDescriptiveKind(),
             nominal->getName());
         continue;
       }
@@ -2330,9 +2319,7 @@ void swift::checkConcurrentValueConformance(
           conformanceDC->mapTypeIntoContext(property->getInterfaceType());
       if (!isConcurrentValueType(conformanceDC, propertyType)) {
         property->diagnose(
-            asWarning ? diag::non_concurrent_type_member_warn
-                      : diag::non_concurrent_type_member,
-            false, property->getName(),
+            diag::non_concurrent_type_member, false, property->getName(),
             nominal->getDescriptiveKind(), nominal->getName(), propertyType);
         continue;
       }
@@ -2353,9 +2340,7 @@ void swift::checkConcurrentValueConformance(
             element->getArgumentInterfaceType());
         if (!isConcurrentValueType(conformanceDC, elementType)) {
           element->diagnose(
-              asWarning ? diag::non_concurrent_type_member_warn
-                        : diag::non_concurrent_type_member,
-              true, element->getName(),
+              diag::non_concurrent_type_member, true, element->getName(),
               nominal->getDescriptiveKind(), nominal->getName(), elementType);
           continue;
         }

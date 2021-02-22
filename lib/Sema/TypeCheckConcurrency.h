@@ -208,8 +208,7 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcurrentReferenceKind refKind);
 
 /// Check the correctness of the given ConcurrentValue conformance.
-void checkConcurrentValueConformance(
-    ProtocolConformance *conformance, bool asWarning);
+void checkConcurrentValueConformance(ProtocolConformance *conformance);
 
 } // end namespace swift
 

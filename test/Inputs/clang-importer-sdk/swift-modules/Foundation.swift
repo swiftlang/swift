@@ -221,7 +221,7 @@ public struct URL : _ObjectiveCBridgeable {
  }
 }
 
-extension NSError : Error, UnsafeConcurrentValue {
+extension NSError : Error {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
