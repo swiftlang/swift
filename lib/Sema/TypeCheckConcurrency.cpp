@@ -1111,6 +1111,22 @@ namespace {
         }
       }
 
+      // Key paths require any captured values to be ConcurrentValue-conforming.
+      if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
+        for (const auto &component : keyPath->getComponents()) {
+          auto indexExpr = component.getIndexExpr();
+          if (!indexExpr || !indexExpr->getType())
+            continue;
+
+          if (ctx.LangOpts.EnableExperimentalConcurrentValueChecking &&
+              !isConcurrentValueType(getDeclContext(), indexExpr->getType())) {
+            ctx.Diags.diagnose(
+                component.getLoc(), diag::non_concurrent_keypath_capture,
+                indexExpr->getType());
+          }
+        }
+      }
+
       // The children of #selector expressions are not evaluated, so we do not
       // need to do isolation checking there. This is convenient because such
       // expressions tend to violate restrictions on the use of instance

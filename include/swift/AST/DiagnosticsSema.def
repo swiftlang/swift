@@ -4316,6 +4316,9 @@ WARNING(non_concurrent_property_type,none,
         "cannot use %0 %1 with a non-concurrent-value type %2 "
         "%select{across actors|from concurrently-executed code}3",
         (DescriptiveDeclKind, DeclName, Type, bool))
+WARNING(non_concurrent_keypath_capture,none,
+        "cannot form key path that captures non-concurrent-value type %0",
+        (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
       "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
