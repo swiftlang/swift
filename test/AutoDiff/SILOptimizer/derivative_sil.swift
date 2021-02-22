@@ -69,6 +69,7 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL-LABEL: sil private [ossa] @fooTJpSpSr : $@convention(thin) (Float, @owned _AD__foo_bb0__PB__src_0_wrt_0) -> Float {
 // CHECK-SIL: bb0([[DY:%.*]] : $Float, [[PB_STRUCT:%.*]] : @owned $_AD__foo_bb0__PB__src_0_wrt_0):
 // CHECK-SIL:   [[ADD_PB:%.*]] = destructure_struct [[PB_STRUCT]] : $_AD__foo_bb0__PB__src_0_wrt_0
+// CHECK-SIL:   debug_value [[DY]] : $Float, let, name "y"
 // CHECK-SIL:   [[ADD_PB_RES:%.*]] = apply [[ADD_PB]]([[DY]]) : $@callee_guaranteed (Float) -> (Float, Float)
 // CHECK-SIL:   ([[DX_1:%.*]], [[DX_2:%.*]]) = destructure_tuple [[ADD_PB_RES]] : $(Float, Float)
 // CHECK-SIL:   [[TMP_BUF_RES:%.*]] = alloc_stack $Float
@@ -84,6 +85,7 @@ func foo(_ x: Float) -> Float {
 // CHECK-SIL:   dealloc_stack [[TMP_BUF_LHS]] : $*Float
 // CHECK-SIL:   [[DX:%.*]] = load [trivial] [[TMP_BUF_RES]] : $*Float
 // CHECK-SIL:   dealloc_stack [[TMP_BUF_RES]] : $*Float
+// CHECK-SIL:   debug_value [[DX]] : $Float, let, name "x", argno 1
 // CHECK-SIL:   return [[DX]] : $Float
 // CHECK-SIL: }
 

@@ -1161,7 +1161,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
       std::tie(thunk, interfaceSubs) =
           getOrCreateSubsetParametersThunkForDerivativeFunction(
               fb, origFnOperand, derivativeFn, derivativeFnKind, desiredConfig,
-              actualConfig);
+              actualConfig, context);
       auto *thunkFRI = builder.createFunctionRef(loc, thunk);
       if (auto genSig =
               thunk->getLoweredFunctionType()->getSubstGenericSignature()) {
