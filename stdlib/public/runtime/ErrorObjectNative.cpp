@@ -106,4 +106,12 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
   out->errorConformance = errorObject->errorConformance;
 }
 
+SwiftError *swift::swift_errorRetain(SwiftError *error) {
+  return static_cast<SwiftError*>(swift_retain(error));
+}
+
+void swift::swift_errorRelease(SwiftError *error) {
+  swift_release(error);
+}
+
 #endif

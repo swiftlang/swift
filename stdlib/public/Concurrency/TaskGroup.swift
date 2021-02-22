@@ -186,24 +186,7 @@ extension Task {
     /// It is possible to directly rethrow such error out of a `withGroup` body
     /// function's body, causing all remaining tasks to be implicitly cancelled.
     public mutating func next() async throws -> TaskResult? {
-      let rawResult = await _taskGroupWaitNext(on: self.task)
-
-      if rawResult.hadErrorResult {
-        // Throw the result on error.
-        let error = unsafeBitCast(rawResult.storage, to: Error.self)
-        throw error
-      }
-
-      guard let storage = rawResult.storage else {
-        // The group was empty, return nil
-        return nil
-      }
-
-      // Take the value on success.
-      let storagePtr =
-        storage.bindMemory(to: TaskResult.self, capacity: 1)
-      let value = UnsafeMutablePointer<TaskResult>(mutating: storagePtr).pointee
-      return value
+      return try await _taskGroupWaitNext(on: self.task)
     }
 
     /// Query whether the group has any remaining tasks.
@@ -281,9 +264,9 @@ func taskGroupOffer(
 )
 
 @_silgen_name("swift_task_group_wait_next")
-func _taskGroupWaitNext(
+func _taskGroupWaitNext<T>(
   on groupTask: Builtin.NativeObject
-) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+) async throws -> T?
 
 enum GroupPollStatus: Int {
   case empty   = 0

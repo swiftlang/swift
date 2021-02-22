@@ -54,6 +54,39 @@ void GroupFragment::destroy() {
 // =============================================================================
 // ==== groupOffer -------------------------------------------------------------
 
+static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
+                     AsyncTask::GroupFragment::GroupPollResult result) {
+  switch (result.status) {
+  case GroupFragment::GroupPollStatus::Waiting:
+    assert(false && "filling a waiting status?");
+    return;
+
+  case GroupFragment::GroupPollStatus::Error:
+    context->fillWithError(reinterpret_cast<SwiftError*>(result.storage));
+    return;
+
+  case GroupFragment::GroupPollStatus::Success: {
+    // Initialize the result as an Optional<Success>.
+    const Metadata *successType = context->successType;
+    OpaqueValue *destPtr = context->successResultPointer;
+    // TODO: figure out a way to try to optimistically take the
+    // value out of the finished task's future, if there are no
+    // remaining references to it.
+    successType->vw_initializeWithCopy(destPtr, result.storage);
+    successType->vw_storeEnumTagSinglePayload(destPtr, 0, 1);
+    return;
+  }
+
+  case GroupFragment::GroupPollStatus::Empty: {
+    // Initialize the result as a nil Optional<Success>.
+    const Metadata *successType = context->successType;
+    OpaqueValue *destPtr = context->successResultPointer;
+    successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
+    return;
+  }
+  }
+}
+
 void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
                            ExecutorRef executor) {
   assert(completedTask);
@@ -133,7 +166,14 @@ void AsyncTask::groupOffer(AsyncTask *completedTask, AsyncContext *context,
                 completedTask, hadErrorResult, /*needsRelease*/ false);
 
             fragment->mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-            swift::runTaskWithGroupPollResult(waitingTask, executor, result);
+
+            auto waitingContext =
+              static_cast<TaskFutureWaitAsyncContext *>(
+                waitingTask->ResumeContext);
+            fillGroupNextResult(waitingContext, result);
+
+            // TODO: allow the caller to suggest an executor
+            swift_task_enqueueGlobal(waitingTask);
             return;
           } else {
             waitingTask = waitHead.getTask();
@@ -166,13 +206,18 @@ void swift::swift_task_group_wait_next(
   assert(task->isTaskGroup());
 
   GroupPollResult polled = task->groupPoll(waitingTask);
-  if (polled.status == GroupFragment::GroupPollStatus::Waiting) {
+  switch (polled.status) {
+  case GroupFragment::GroupPollStatus::Waiting:
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
     return;
-  }
 
-  runTaskWithGroupPollResult(waitingTask, executor, polled);
+  case GroupFragment::GroupPollStatus::Empty:
+  case GroupFragment::GroupPollStatus::Error:
+  case GroupFragment::GroupPollStatus::Success:
+    fillGroupNextResult(context, polled);
+    return waitingTask->runInFullyEstablishedContext(executor);
+  }
 }
 
 GroupFragment::GroupPollResult AsyncTask::groupPoll(AsyncTask *waitingTask) {

@@ -1383,7 +1383,8 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
-  Signature getSignature(CanSILFunctionType fnType);
+  Signature getSignature(CanSILFunctionType fnType,
+                         bool suppressGenerics = false);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
