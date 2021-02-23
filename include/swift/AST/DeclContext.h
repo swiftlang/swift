@@ -881,6 +881,8 @@ public:
   /// available.
   Optional<Fingerprint> getBodyFingerprint() const;
 
+  bool areTokensHashedForThisBodyInsteadOfInterfaceHash() const;
+
 private:
   /// Add a member to the list for iteration purposes, but do not notify the
   /// subclass that we have done so.

@@ -1032,6 +1032,16 @@ Optional<Fingerprint> IterableDeclContext::getBodyFingerprint() const {
       .fingerprint;
 }
 
+bool IterableDeclContext::areTokensHashedForThisBodyInsteadOfInterfaceHash()
+    const {
+  // Do not keep separate hashes for extension bodies because the dependencies
+  // can miss the addition of a member in an extension because there is nothing
+  // corresponding to the fingerprinted nominal dependency node.
+  if (isa<ExtensionDecl>(this))
+    return false;
+  return true;
+}
+
 /// Return the DeclContext to compare when checking private access in
 /// Swift 4 mode. The context returned is the type declaration if the context
 /// and the type declaration are in the same file, otherwise it is the types
