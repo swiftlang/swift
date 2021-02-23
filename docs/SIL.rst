@@ -2320,6 +2320,54 @@ The current list of interior pointer SIL instructions are:
 (*) We still need to finish adding support for project_box, but all other
 interior pointers are guarded already.
 
+Memory Lifetime
+~~~~~~~~~~~~~~~
+
+Similar to Ownership SSA, there are also lifetime rules for values in memory.
+With "memory" we refer to memory which is addressed by SIL instruction with
+address-type operands, like ``load``, ``store``, ``switch_enum_addr``, etc.
+
+Each memory location which holds a non-trivial value is either uninitialized
+or initialized. A memory location gets initialized by storing values into it
+(except assignment, which expects a location to be already initialized).
+A memory location gets de-initialized by "taking" from it or destroying it, e.g.
+with ``destroy_addr``. It is illegal to re-initialize a memory location or to
+use a location after it was de-initialized.
+
+If a memory location holds a trivial value (e.g. an ``Int``), it is not
+required to de-initialize the location.
+
+The SIL verifier checks this rule for memory locations which can be uniquely
+identified, for example and ``alloc_stack`` or an indirect parameter. The
+verifier cannot check memory locations which are potentially aliased, e.g.
+a ``ref_element_addr`` (a stored class property).
+
+Lifetime of Enums in Memory
+```````````````````````````
+
+The situation is a bit more complicated with enums, because an enum can have
+both, cases with non-trivial payloads and cases with no payload or trivial
+payloads.
+
+Even if an enum itself is not trivial (because it has at least on case with a
+non-trivial payload), it is not required to de-initialize such an enum memory
+location on paths where it's statically provable that the enum contains a
+trivial or non-payload case.
+
+That's the case if the destroy point is jointly dominated by:
+
+* a ``store [trivial]`` to the enum memory location.
+
+or
+
+* an ``inject_enum_addr`` to the enum memory location with a non-trivial or
+  non-payload case.
+
+or
+
+* a successor of a ``switch_enum`` or ``switch_enum_addr`` for a non-trivial
+  or non-payload case.
+
 Dead End Blocks
 ~~~~~~~~~~~~~~~
 
