@@ -3278,7 +3278,7 @@ public:
 bool swift::diagnoseTypeReprAvailability(const TypeRepr *T,
                                          const ExportContext &where,
                                          DeclAvailabilityFlags flags) {
-  if (!T)
+  if (!T || where.isImplicit())
     return false;
   TypeReprAvailabilityWalker walker(where, flags);
   const_cast<TypeRepr*>(T)->walk(walker);
