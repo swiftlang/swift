@@ -46,11 +46,11 @@ func testSlowServer(slowServer: SlowServer) async throws {
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[VOID_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(), Never>) -> ()
   await slowServer.serverRestart("somewhere")
 
-  // CHECK: function_ref @[[STRING_NONZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, ObjCBool, Optional<NSString>, Optional<NSError>) -> ()
+  // CHECK: function_ref @[[STRING_NONZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, {{.*}}Bool, Optional<NSString>, Optional<NSError>) -> ()
   let _: String = try await slowServer.doSomethingFlaggy()
-  // CHECK: function_ref @[[STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, Optional<NSString>, ObjCBool, Optional<NSError>) -> ()
+  // CHECK: function_ref @[[STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<String, Error>, Optional<NSString>, {{.*}}Bool, Optional<NSError>) -> ()
   let _: String = try await slowServer.doSomethingZeroFlaggy()
-  // CHECK: function_ref @[[STRING_STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, String), Error>, ObjCBool, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> ()
+  // CHECK: function_ref @[[STRING_STRING_ZERO_FLAG_THROW_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, String), Error>, {{.*}}Bool, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> ()
   let _: (String, String) = try await slowServer.doSomethingMultiResultFlaggy()
 
   // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSSTRING_INT_THROW_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<(String, Int), Error>, Optional<NSString>, Int, Optional<NSError>) -> ()
