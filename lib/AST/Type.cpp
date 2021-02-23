@@ -818,7 +818,6 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
 
     auto loadedTy = getWithoutSpecifierType();
     if (auto objectType = loadedTy->getOptionalObjectType()) {
-      assert(!newResultType->getOptionalObjectType());
       newResultType = OptionalType::get(
           objectType->replaceCovariantResultType(newResultType, uncurryLevel));
     }
