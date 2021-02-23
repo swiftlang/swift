@@ -3417,13 +3417,16 @@ static bool checkAccess(const DeclContext *useDC, const ValueDecl *VD,
 }
 
 bool ValueDecl::isMoreVisibleThan(ValueDecl *other) const {
-  auto scope = getFormalAccessScope();
+  auto scope = getFormalAccessScope(/*UseDC=*/nullptr,
+                                    /*treatUsableFromInlineAsPublic=*/true);
 
   // 'other' may have come from a @testable import, so we need to upgrade it's
   // visibility to public here. That is not the same as whether 'other' is
   // being built with -enable-testing though -- we don't want to treat it
   // differently in that case.
-  auto otherScope = other->getFormalAccessScope(getDeclContext());
+  auto otherScope =
+      other->getFormalAccessScope(getDeclContext(),
+                                  /*treatUsableFromInlineAsPublic=*/true);
 
   if (scope.isPublic())
     return !otherScope.isPublic();

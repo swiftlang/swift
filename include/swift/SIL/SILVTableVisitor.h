@@ -120,8 +120,11 @@ template <class T> class SILVTableVisitor {
       //   replace the vtable entry for B.f(); a call to A.f()
       //   will correctly dispatch to the implementation of B.f()
       //   in the subclass.
+      auto *UseDC = declRef.getDecl()->getDeclContext();
       if (!baseRef.getDecl()->isAccessibleFrom(
-            declRef.getDecl()->getDeclContext()))
+            UseDC,
+            /*forConformance=*/false,
+            /*allowUsableFromInline=*/true))
         break;
 
       asDerived().addMethodOverride(baseRef, declRef);
