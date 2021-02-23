@@ -426,14 +426,14 @@ public:
   private:
     const NodeKind kind;
     const DeclAspect aspect;
-    const NominalTypeDecl *context;
+    const DeclContext *context;
     StringRef name;
 
   private:
     // A private copy constructor so our clients are forced to use the
     // move-only builder interface.
     explicit Builder(NodeKind kind, DeclAspect aspect,
-                     const NominalTypeDecl *context, StringRef name)
+                     const DeclContext *context, StringRef name)
         : kind(kind), aspect(aspect), context(context), name(name) {}
 
   public:

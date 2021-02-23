@@ -56,9 +56,18 @@ using namespace fine_grained_dependencies;
 // MARK: Helpers for key construction that must be in frontend
 //==============================================================================
 
-static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
+static std::string identifierForContext(const DeclContext *DC) {
+  if (!DC) return "";
+
   Mangle::ASTMangler Mangler;
-  return !NTD ? "" : Mangler.mangleTypeAsContextUSR(NTD);
+  if (const auto *context = dyn_cast<NominalTypeDecl>(DC)) {
+    return Mangler.mangleTypeAsContextUSR(context);
+  }
+
+  const auto *ext = cast<ExtensionDecl>(DC);
+  auto fp = ext->getBodyFingerprint().getValueOr(Fingerprint::ZERO());
+  auto typeStr = Mangler.mangleTypeAsContextUSR(ext->getExtendedNominal());
+  return (typeStr + "@" + fp.getRawValue()).str();
 }
 
 //==============================================================================
@@ -69,7 +78,7 @@ DependencyKey DependencyKey::Builder::build() && {
   return DependencyKey{
     kind,
     aspect,
-    context ? mangleTypeAsContext(context) : "",
+    identifierForContext(context),
     name.str()
   };
 }
@@ -98,10 +107,15 @@ DependencyKey::Builder DependencyKey::Builder::withContext(const Decl *D) && {
   switch (kind) {
   case NodeKind::nominal:
   case NodeKind::potentialMember:
-  case NodeKind::member:
+  case NodeKind::member: {
     /// nominal and potential member dependencies are created from a Decl and
     /// use the context field.
-    return Builder{kind, aspect, cast<NominalTypeDecl>(D), name};
+    const DeclContext *context = dyn_cast<NominalTypeDecl>(D);
+    if (!context) {
+      context = cast<ExtensionDecl>(D);
+    }
+    return Builder{kind, aspect, context, name};
+  }
   case NodeKind::topLevel:
   case NodeKind::dynamicLookup:
   case NodeKind::externalDepend:
@@ -403,6 +417,7 @@ void FrontendSourceFileDepGraphFactory::addAllDefinedDecls() {
   addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topNominals);
   addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topValues);
   addAllDefinedDeclsOfAGivenType<NodeKind::nominal>(declFinder.allNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::nominal>(declFinder.extensions);
   addAllDefinedDeclsOfAGivenType<NodeKind::potentialMember>(
       declFinder.potentialMemberHolders);
   addAllDefinedDeclsOfAGivenType<NodeKind::member>(
@@ -460,11 +475,23 @@ private:
         return;
       }
 
-      auto key =
+      auto nominalKey =
+          DependencyKey::Builder(NodeKind::nominal, DeclAspect::interface)
+              .withContext(subject->getSelfNominalTypeDecl())
+              .build();
+      enumerateUse(nominalKey, enumerator);
+
+      auto declKey =
           DependencyKey::Builder(NodeKind::nominal, DeclAspect::interface)
               .withContext(subject->getAsDecl())
               .build();
-      enumerateUse(key, enumerator);
+
+      // If the subject of this dependency is not the nominal type itself,
+      // record another arc for the extension this member came from.
+      if (nominalKey != declKey) {
+        assert(isa<ExtensionDecl>(subject));
+        enumerateUse(declKey, enumerator);
+      }
     });
   }
 
@@ -571,6 +598,7 @@ void ModuleDepGraphFactory::addAllDefinedDecls() {
   addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topNominals);
   addAllDefinedDeclsOfAGivenType<NodeKind::topLevel>(declFinder.topValues);
   addAllDefinedDeclsOfAGivenType<NodeKind::nominal>(declFinder.allNominals);
+  addAllDefinedDeclsOfAGivenType<NodeKind::nominal>(declFinder.extensions);
   addAllDefinedDeclsOfAGivenType<NodeKind::potentialMember>(
       declFinder.potentialMemberHolders);
   addAllDefinedDeclsOfAGivenType<NodeKind::member>(

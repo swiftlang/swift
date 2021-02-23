@@ -305,6 +305,13 @@ void DirectLookupRequest::writeDependencySink(
     evaluator::DependencyCollector &tracker,
     const TinyPtrVector<ValueDecl *> &result) const {
   auto &desc = std::get<0>(getStorage());
+  // Add used members from the perspective of
+  // 1) The decl context they are found in
+  // 2) The decl context of the request
+  // This gets us a dependency not just on `Foo.bar` but on `extension Foo.bar`.
+  for (const auto *member : result) {
+    tracker.addUsedMember(member->getDeclContext(), desc.Name.getBaseName());
+  }
   tracker.addUsedMember(desc.DC, desc.Name.getBaseName());
 }
 
