@@ -195,3 +195,32 @@ struct VarToFunc {
   }
 }
 
+struct DeferBody {
+  func foo() {
+    enum No: Error {
+      case no
+    }
+
+    defer {
+      do {
+        throw No.no
+      } catch No.no {
+      } catch {
+      }
+    }
+    _ = ()
+  }
+
+  func bar() {
+    @available(*, unavailable)
+    enum No: Error { // expected-note 2 {{'No' has been explicitly marked unavailable here}}
+      case no
+    }
+    do {
+      throw No.no
+      // expected-error@-1 {{'No' is unavailable}}
+    } catch No.no {} catch _ {}
+    // expected-error@-1 {{'No' is unavailable}}
+  }
+}
+
