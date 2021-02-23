@@ -53,7 +53,7 @@ func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
 
 struct ComputedPropertyDupeAttributes<T: Differentiable>: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   var value: T
 
@@ -85,7 +85,7 @@ protocol WrtOnlySelfProtocol: Differentiable {
 
 class Class: Differentiable {
   typealias TangentVector = DummyTangentVector
-  func move(along _: TangentVector) {}
+  func move(by _: TangentVector) {}
 }
 @differentiable(reverse, wrt: x)
 func invalidDiffWrtClass(_ x: Class) -> Class {
@@ -144,7 +144,7 @@ struct InstanceMethod {
 // Test instance methods for a `Differentiable` type.
 struct DifferentiableInstanceMethod: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   @differentiable(reverse) // ok
   func noParams() -> Float {
@@ -155,7 +155,7 @@ struct DifferentiableInstanceMethod: Differentiable {
 // Test subscript methods.
 struct SubscriptMethod: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   @differentiable(reverse) // ok
   subscript(implicitGetter x: Float) -> Float {
@@ -245,7 +245,7 @@ protocol ProtocolRequirementsRefined: ProtocolRequirements {
 
 struct InternalDiffAttrConformance: ProtocolRequirements {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   var x: Float
   var y: Float
@@ -283,7 +283,7 @@ struct InternalDiffAttrConformance: ProtocolRequirements {
 // expected-error @+1 {{does not conform to protocol 'ProtocolRequirements'}}
 public struct PublicDiffAttrConformance: ProtocolRequirements {
   public typealias TangentVector = DummyTangentVector
-  public mutating func move(along _: TangentVector) {}
+  public mutating func move(by _: TangentVector) {}
 
   var x: Float
   var y: Float
@@ -366,7 +366,7 @@ protocol TF285: Differentiable {
 
 struct TF285MissingOneDiffAttr: TF285 {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   // Requirement is missing the required `@differentiable(reverse, wrt: (x, y))` attribute.
   // Since `TF285MissingOneDiffAttr.foo` is internal, the attribute is implicitly created.
@@ -414,7 +414,7 @@ func infer2(_ fn: @differentiable(reverse) (Float) -> Float, x: Float) -> Float 
 
 struct DiffableStruct: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   var a: Float
 
@@ -437,7 +437,7 @@ struct NonDiffableStruct {
 
 struct NumberWrtStruct: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   var a, b: Float
 
@@ -579,7 +579,7 @@ extension ProtocolRequirementUnsupported {
 
 class Super: Differentiable {
   typealias TangentVector = DummyTangentVector
-  func move(along _: TangentVector) {}
+  func move(by _: TangentVector) {}
 
   var base: Float
 
@@ -644,7 +644,7 @@ class Sub: Super {
 
 final class FinalClass: Differentiable {
   typealias TangentVector = DummyTangentVector
-  func move(along _: TangentVector) {}
+  func move(by _: TangentVector) {}
 
   var base: Float
 
@@ -669,7 +669,7 @@ func swap(x: inout Float, y: inout Float) {}
 
 struct InoutParameters: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 }
 
 extension InoutParameters {
@@ -694,7 +694,7 @@ extension InoutParameters {
 
 struct Accessors: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   var stored: Float
   var computed: Float {

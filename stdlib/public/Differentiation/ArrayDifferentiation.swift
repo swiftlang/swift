@@ -72,14 +72,14 @@ where Element: Differentiable {
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
 
-  public mutating func move(along direction: TangentVector) {
+  public mutating func move(by offset: TangentVector) {
     precondition(
-      base.count == direction.base.count, """
-        Count mismatch: \(base.count) ('self') and \(direction.base.count) \
+      base.count == offset.base.count, """
+        Count mismatch: \(base.count) ('self') and \(offset.base.count) \
         ('direction')
         """)
     for i in base.indices {
-      base[i].move(along: direction.base[i])
+      base[i].move(by: offset.base[i])
     }
   }
 }
@@ -172,9 +172,9 @@ extension Array: Differentiable where Element: Differentiable {
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
 
-  public mutating func move(along direction: TangentVector) {
+  public mutating func move(by offset: TangentVector) {
     var view = DifferentiableView(self)
-    view.move(along: direction)
+    view.move(by: offset)
     self = view.base
   }
 }

@@ -144,7 +144,7 @@ struct StructTangentVectorNotStruct: Differentiable {
     static func +(_: Self, _: Self) -> Self { fatalError() }
     static func -(_: Self, _: Self) -> Self { fatalError() }
   }
-  mutating func move(along direction: TangentVector) {}
+  mutating func move(by offset: TangentVector) {}
 }
 
 // expected-error @+2 {{function is not differentiable}}
@@ -168,7 +168,7 @@ struct StructOriginalPropertyNotDifferentiable: Differentiable {
   struct TangentVector: Differentiable & AdditiveArithmetic {
     var nondiff: Float
   }
-  mutating func move(along direction: TangentVector) {}
+  mutating func move(by offset: TangentVector) {}
 }
 
 // expected-error @+2 {{function is not differentiable}}
@@ -189,7 +189,7 @@ struct StructTangentVectorPropertyNotFound: Differentiable {
   struct TangentVector: Differentiable, AdditiveArithmetic {
     var y: Float
   }
-  mutating func move(along direction: TangentVector) {}
+  mutating func move(by offset: TangentVector) {}
 }
 
 // expected-error @+2 {{function is not differentiable}}
@@ -212,7 +212,7 @@ struct StructTangentPropertyWrongType: Differentiable {
   struct TangentVector: Differentiable, AdditiveArithmetic {
     var x: Double
   }
-  mutating func move(along direction: TangentVector) {}
+  mutating func move(by offset: TangentVector) {}
 }
 
 // expected-error @+2 {{function is not differentiable}}
@@ -235,7 +235,7 @@ final class ClassTangentPropertyWrongType: Differentiable {
   struct TangentVector: Differentiable, AdditiveArithmetic {
     var x: Double
   }
-  func move(along direction: TangentVector) {}
+  func move(by offset: TangentVector) {}
 }
 
 // SR-13464: Missing support for classes in forward-mode AD
@@ -261,7 +261,7 @@ struct StructTangentPropertyNotStored: Differentiable {
   struct TangentVector: Differentiable, AdditiveArithmetic {
     var x: Float { 0 }
   }
-  mutating func move(along direction: TangentVector) {}
+  mutating func move(by offset: TangentVector) {}
 }
 
 // expected-error @+2 {{function is not differentiable}}
@@ -284,7 +284,7 @@ final class ClassTangentPropertyNotStored: Differentiable {
   struct TangentVector: Differentiable, AdditiveArithmetic {
     var x: Float { 0 }
   }
-  func move(along direction: TangentVector) {}
+  func move(by offset: TangentVector) {}
 }
 
 // SR-13464: Missing support for classes in forward-mode AD

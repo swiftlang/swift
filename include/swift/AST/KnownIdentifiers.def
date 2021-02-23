@@ -228,9 +228,9 @@ IDENTIFIER(AtomicStoreOrdering)
 IDENTIFIER(AtomicUpdateOrdering)
 
 // Differentiable programming
-IDENTIFIER(along)
+IDENTIFIER(by)
 IDENTIFIER(differential)
-IDENTIFIER(direction)
+IDENTIFIER(offset)
 IDENTIFIER(move)
 IDENTIFIER(pullback)
 IDENTIFIER(TangentVector)

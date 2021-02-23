@@ -15,9 +15,9 @@ struct Generic<T: Differentiable & Equatable>: Differentiable, Equatable {
 
 extension AnyDerivative {
   // This exists only to faciliate testing.
-  func moved(along direction: TangentVector) -> Self {
+  func moved(along offset: TangentVector) -> Self {
     var result = self
-    result.move(along: direction)
+    result.move(by: offset)
     return result
   }
 }
@@ -26,14 +26,14 @@ TypeErasureTests.test("AnyDifferentiable operations") {
   do {
     var any = AnyDifferentiable(Vector(x: 1, y: 1))
     let tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
-    any.move(along: tan)
+    any.move(by: tan)
     expectEqual(Vector(x: 2, y: 2), any.base as? Vector)
   }
 
   do {
     var any = AnyDifferentiable(Generic<Float>(x: 1))
     let tan = AnyDerivative(Generic<Float>.TangentVector(x: 1))
-    any.move(along: tan)
+    any.move(by: tan)
     expectEqual(Generic<Float>(x: 2), any.base as? Generic<Float>)
   }
 }

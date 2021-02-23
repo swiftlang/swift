@@ -535,7 +535,7 @@ ClassTests.test("LetProperties") {
   let bar = Bar()
   let grad = gradient(at: bar) { bar in (bar.x.x * bar.x.x).value }
   expectEqual(Bar.TangentVector(x: .init(x: 6.0)), grad)
-  bar.move(along: grad)
+  bar.move(by: grad)
   expectEqual(8.0, bar.x.x)
 }
 

@@ -401,8 +401,8 @@ where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
   typealias TangentVector = Struct<T.TangentVector>
-  mutating func move(along direction: TangentVector) {
-    x.move(along: direction.x)
+  mutating func move(by offset: TangentVector) {
+    x.move(by: offset.x)
   }
 }
 
@@ -740,7 +740,7 @@ func vjpMultipleSemanticResults(x: inout Float) -> (
 
 struct InoutParameters: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 }
 
 extension InoutParameters {

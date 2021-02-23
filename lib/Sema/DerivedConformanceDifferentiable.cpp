@@ -34,24 +34,24 @@
 
 using namespace swift;
 
-/// Return true if `move(along:)` can be invoked on the given `Differentiable`-
+/// Return true if `move(by:)` can be invoked on the given `Differentiable`-
 /// conforming property.
 ///
-/// If the given property is a `var`, return true because `move(along:)` can be
+/// If the given property is a `var`, return true because `move(by:)` can be
 /// invoked regardless.  Otherwise, return true if and only if the property's
-/// type's 'Differentiable.move(along:)' witness is non-mutating.
+/// type's 'Differentiable.move(by:)' witness is non-mutating.
 static bool canInvokeMoveAlongOnProperty(
     VarDecl *vd, ProtocolConformanceRef diffableConformance) {
   assert(diffableConformance && "Property must conform to 'Differentiable'");
-  // `var` always supports `move(along:)` since it is mutable.
+  // `var` always supports `move(by:)` since it is mutable.
   if (vd->getIntroducer() == VarDecl::Introducer::Var)
     return true;
   // When the property is a `let`, the only case that would be supported is when
-  // it has a `move(along:)` protocol requirement witness that is non-mutating.
+  // it has a `move(by:)` protocol requirement witness that is non-mutating.
   auto interfaceType = vd->getInterfaceType();
   auto &C = vd->getASTContext();
   auto witness = diffableConformance.getWitnessByName(
-      interfaceType, DeclName(C, C.Id_move, {C.Id_along}));
+      interfaceType, DeclName(C, C.Id_move, {C.Id_by}));
   if (!witness)
     return false;
   auto *decl = cast<FuncDecl>(witness.getDecl());
@@ -70,7 +70,7 @@ getStoredPropertiesForDifferentiation(
   for (auto *vd : nominal->getStoredProperties()) {
     // Peer through property wrappers: use original wrapped properties instead.
     if (auto *originalProperty = vd->getOriginalWrappedProperty()) {
-      // Skip immutable wrapped properties. `mutating func move(along:)` cannot
+      // Skip immutable wrapped properties. `mutating func move(by:)` cannot
       // be synthesized to update these properties.
       if (!originalProperty->isSettable(DC))
         continue;
@@ -87,8 +87,8 @@ getStoredPropertiesForDifferentiation(
         varType, diffableProto, nominal);
     if (!conformance)
       continue;
-    // Skip `let` stored properties with a mutating `move(along:)` if requested.
-    // `mutating func move(along:)` cannot be synthesized to update `let`
+    // Skip `let` stored properties with a mutating `move(by:)` if requested.
+    // `mutating func move(by:)` cannot be synthesized to update `let`
     // properties.
     if (!includeLetPropertiesWithNonmutatingMoveAlong && 
         !canInvokeMoveAlongOnProperty(vd, conformance))
@@ -214,14 +214,14 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   });
 }
 
-/// Synthesize body for `move(along:)`.
+/// Synthesize body for `move(by:)`.
 static std::pair<BraceStmt *, bool>
 deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
 
-  // Get `Differentiable.move(along:)` protocol requirement.
+  // Get `Differentiable.move(by:)` protocol requirement.
   auto *diffProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *requirement = getProtocolRequirement(diffProto, C.Id_move);
 
@@ -236,8 +236,8 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
-  // Create call expression applying a member `move(along:)` method to a
-  // parameter member: `self.<member>.move(along: direction.<member>)`.
+  // Create call expression applying a member `move(by:)` method to a
+  // parameter member: `self.<member>.move(by: offset.<member>)`.
   auto createMemberMethodCallExpr = [&](VarDecl *member) -> Expr * {
     auto *module = nominal->getModuleContext();
     auto memberType =
@@ -245,14 +245,14 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
     auto confRef = module->lookupConformance(memberType, diffProto);
     assert(confRef && "Member does not conform to `Differentiable`");
 
-    // Get member type's requirement witness: `<Member>.move(along:)`.
+    // Get member type's requirement witness: `<Member>.move(by:)`.
     ValueDecl *memberWitnessDecl = requirement;
     if (confRef.isConcrete())
       if (auto *witness = confRef.getConcrete()->getWitnessDecl(requirement))
         memberWitnessDecl = witness;
     assert(memberWitnessDecl && "Member witness declaration must exist");
 
-    // Create reference to member method: `self.<member>.move(along:)`.
+    // Create reference to member method: `self.<member>.move(by:)`.
     Expr *memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
@@ -260,7 +260,7 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
         new (C) MemberRefExpr(memberExpr, SourceLoc(), memberWitnessDecl,
                               DeclNameLoc(), /*Implicit*/ true);
 
-    // Create reference to parameter member: `direction.<member>`.
+    // Create reference to parameter member: `offset.<member>`.
     VarDecl *paramMember = nullptr;
     auto *paramNominal = paramDecl->getType()->getAnyNominal();
     assert(paramNominal && "Parameter should have a nominal type");
@@ -275,12 +275,12 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
     auto *paramMemberExpr =
         new (C) MemberRefExpr(paramDRE, SourceLoc(), paramMember, DeclNameLoc(),
                               /*Implicit*/ true);
-    // Create expression: `self.<member>.move(along: direction.<member>)`.
+    // Create expression: `self.<member>.move(by: offset.<member>)`.
     return CallExpr::createImplicit(C, memberMethodExpr, {paramMemberExpr},
-                                    {C.Id_along});
+                                    {C.Id_by});
   };
 
-  // Collect member `move(along:)` method call expressions.
+  // Collect member `move(by:)` method call expressions.
   SmallVector<ASTNode, 2> memberMethodCallExprs;
   SmallVector<Identifier, 2> memberNames;
   for (auto *member : diffProperties) {
@@ -326,14 +326,14 @@ static ValueDecl *deriveDifferentiable_method(
   return funcDecl;
 }
 
-/// Synthesize the `move(along:)` function declaration.
+/// Synthesize the `move(by:)` function declaration.
 static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
   auto &C = derived.Context;
   auto *parentDC = derived.getConformanceContext();
   auto tangentType =
       getTangentVectorInterfaceType(parentDC->getSelfTypeInContext(), parentDC);
   return deriveDifferentiable_method(
-      derived, C.Id_move, C.Id_along, C.Id_direction, tangentType,
+      derived, C.Id_move, C.Id_by, C.Id_offset, tangentType,
       C.TheEmptyTupleType, {deriveBodyDifferentiable_move, nullptr});
 }
 
@@ -561,7 +561,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       if (originalProperty->getAttrs().hasAttribute<NoDerivativeAttr>())
         continue;
       // Diagnose wrapped properties whose property wrappers do not define
-      // `wrappedValue.set`. `mutating func move(along:)` cannot be synthesized
+      // `wrappedValue.set`. `mutating func move(by:)` cannot be synthesized
       // to update these properties.
       if (!originalProperty->isSettable(DC)) {
         auto *wrapperDecl =
