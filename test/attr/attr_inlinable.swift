@@ -357,3 +357,12 @@ public struct PrivateInlinableCrash {
     // expected-error@-2 {{initializer 'init()' is private and cannot be referenced from an '@inlinable' function}}
   }
 }
+
+// Just make sure we don't crash.
+private func deferBodyTestCall() {} // expected-note {{global function 'deferBodyTestCall()' is not '@usableFromInline' or public}}
+@inlinable public func deferBodyTest() {
+  defer {
+    deferBodyTestCall() // expected-error {{global function 'deferBodyTestCall()' is private and cannot be referenced from an '@inlinable' function}}
+  }
+  _ = ()
+}
