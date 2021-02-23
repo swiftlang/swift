@@ -422,14 +422,14 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
     caseEnum->setImplicit();
     caseEnum->setAccess(AccessLevel::Private);
 
-    auto *elementParams = elementDecl->getParameterList();
     bool conforms = true;
-    if (elementParams) {
-      for (size_t i = 0; i < elementParams->size(); i++) {
-        auto *paramDecl = elementParams->get(i);
-        auto target = conformanceDC->mapTypeIntoContext(
+    llvm::SmallMapVector<Identifier, ParamDecl*, 4> params;
+    if (elementDecl->hasAssociatedValues()) {
+      for (auto entry : llvm::enumerate(*elementDecl->getParameterList())) {
+        auto *paramDecl = entry.value();
+        auto paramType = conformanceDC->mapTypeIntoContext(
             paramDecl->getValueInterfaceType());
-        if (TypeChecker::conformsToProtocol(target, derived.Protocol,
+        if (TypeChecker::conformsToProtocol(paramType, derived.Protocol,
                                             conformanceDC)
                 .isInvalid()) {
           TypeLoc typeLoc = {
@@ -443,8 +443,30 @@ static bool synthesizeCodingKeysEnum_enum(DerivedConformance &derived,
         } else {
           // if the type conforms to {En,De}codable, add it to the enum.
           Identifier paramIdentifier = getVarNameForCoding(paramDecl);
+          bool generatedName = false;
           if (paramIdentifier.empty()) {
-            paramIdentifier = C.getIdentifier("_" + std::to_string(i));
+            paramIdentifier = C.getIdentifier("_" + std::to_string(entry.index()));
+            generatedName = true;
+          }
+          auto inserted = params.insert(std::make_pair(paramIdentifier, paramDecl));
+          if (!inserted.second) {
+            // duplicate identifier found
+            auto userDefinedParam = paramDecl;
+            if (generatedName) {
+              // at most we have one user defined and one generated identifier
+              // with this name, so if this is the generated, the other one
+              // must be the user defined
+              // TODO: add diagnostic
+              userDefinedParam = inserted.first->second;
+            }
+
+            userDefinedParam->diagnose(diag::codable_enum_duplicate_parameter_name_here,
+                                  derived.getProtocolType(),
+                                  target->getDeclaredType(),
+                                  paramIdentifier,
+                                  elementDecl->getBaseIdentifier());
+            conforms = false;
+            continue;
           }
           auto *elt =
               new (C) EnumElementDecl(SourceLoc(), paramIdentifier, nullptr,
