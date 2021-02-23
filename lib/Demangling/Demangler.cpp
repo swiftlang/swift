@@ -2301,13 +2301,14 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case 'z':
     case 'Z': {
+      NodePointer flagMode = demangleIndexAsNode();
       NodePointer sig = popNode(Node::Kind::DependentGenericSignature);
       NodePointer resultType = popNode(Node::Kind::Type);
       NodePointer implType = popNode(Node::Kind::Type);
       auto node = createWithChildren(c == 'z'
                                   ? Node::Kind::ObjCAsyncCompletionHandlerImpl
                                   : Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl,
-                                implType, resultType);
+                                implType, resultType, flagMode);
       if (sig)
         addChild(node, sig);
       return node;

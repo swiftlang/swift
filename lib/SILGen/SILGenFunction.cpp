@@ -1071,3 +1071,22 @@ SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
 
   return value;
 }
+
+SILValue SILGenFunction::emitWrapIntegerLiteral(SILLocation loc,
+                                                SILType ty,
+                                                unsigned value) {
+  // Create a builtin integer literal value.
+  if (auto intTy = ty.getAs<BuiltinIntegerType>()) {
+    return B.createIntegerLiteral(loc, ty, value);
+  }
+  
+  // Or wrap a value in a struct, potentially multiple times to handle types
+  // that wrap integer types like ObjCBool (which may be Bool or Int8).
+  auto structDecl = ty.getStructOrBoundGenericStruct();
+  assert(structDecl && "value for error result wasn't of struct type!");
+  assert(structDecl->getStoredProperties().size() == 1);
+  auto property = structDecl->getStoredProperties()[0];
+  auto propertyTy = ty.getFieldType(property, SGM.Types, getTypeExpansionContext());
+  auto propertyValue = emitWrapIntegerLiteral(loc, propertyTy, value);
+  return B.createStruct(loc, ty, propertyValue);
+}

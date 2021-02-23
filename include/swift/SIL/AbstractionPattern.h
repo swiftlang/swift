@@ -276,6 +276,20 @@ class AbstractionPattern {
       Async,
     };
     
+    enum {
+      AsyncCompletionParameterIndexMask = 0xFFEu,
+      AsyncCompletionParameterIndexShift = 1,
+      
+      AsyncCompletionErrorParameterIndexMask = 0x1FF000u,
+      AsyncCompletionErrorParameterIndexShift = 12,
+      
+      AsyncCompletionErrorFlagParameterIndexMask = 0x3FE00000u,
+      AsyncCompletionErrorFlagParameterIndexShift = 21,
+      
+      AsyncCompletionErrorFlagParameterPolarityMask = 0x40000000u,
+      AsyncCompletionErrorFlagParameterPolarityShift = 30,
+    };
+    
   public:
     enum ForeignKind {
       IsNotForeign,
@@ -304,16 +318,24 @@ class AbstractionPattern {
 
     EncodedForeignInfo(Async_t,
                        unsigned completionParameterIndex,
-                       Optional<unsigned> completionErrorParameterIndex)
-      : Value(1
-              + (unsigned(IsAsync) - 1)
-              + (unsigned(completionParameterIndex) << 1)
-              + ((completionErrorParameterIndex ? *completionErrorParameterIndex + 1
-                                                : 0) << 21)) {
-        assert(getKind() == IsAsync);
-        assert(getAsyncCompletionHandlerParamIndex() == completionParameterIndex);
-        assert(getAsyncCompletionHandlerErrorParamIndex() == completionErrorParameterIndex);
-      }
+                       Optional<unsigned> completionErrorParameterIndex,
+                       Optional<unsigned> completionErrorFlagParameterIndex,
+                       bool completionErrorFlagIsZeroOnError)
+    : Value(1
+      + (unsigned(IsAsync) - 1)
+      + (unsigned(completionParameterIndex) << AsyncCompletionParameterIndexShift)
+      + ((completionErrorParameterIndex ? *completionErrorParameterIndex + 1
+                                        : 0) << AsyncCompletionErrorParameterIndexShift)
+      + ((completionErrorFlagParameterIndex ? *completionErrorFlagParameterIndex + 1
+                                            : 0) << AsyncCompletionErrorFlagParameterIndexShift)
+      + (unsigned(completionErrorFlagIsZeroOnError) << AsyncCompletionErrorFlagParameterPolarityShift)){
+
+      assert(getKind() == IsAsync);
+      assert(getAsyncCompletionHandlerParamIndex() == completionParameterIndex);
+      assert(getAsyncCompletionHandlerErrorParamIndex() == completionErrorParameterIndex);
+      assert(getAsyncCompletionHandlerErrorFlagParamIndex() == completionErrorFlagParameterIndex);
+      assert(isCompletionErrorFlagZeroOnError() == completionErrorFlagIsZeroOnError);
+    }
 
   public:
     static EncodedForeignInfo
@@ -345,17 +367,36 @@ class AbstractionPattern {
     
     unsigned getAsyncCompletionHandlerParamIndex() const {
       assert(getKind() == IsAsync);
-      return ((Value - 1) >> 1) & 0xFFFFFu;
+      return ((Value - 1) & AsyncCompletionParameterIndexMask)
+        >> AsyncCompletionParameterIndexShift;
     }
     
     Optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
       assert(getKind() == IsAsync);
 
-      unsigned encodedValue = (Value - 1) >> 21;
+      unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorParameterIndexMask)
+        >> AsyncCompletionErrorParameterIndexShift;
       if (encodedValue == 0) {
         return llvm::None;
       }
       return encodedValue - 1;
+    }
+
+    Optional<unsigned> getAsyncCompletionHandlerErrorFlagParamIndex() const {
+      assert(getKind() == IsAsync);
+
+      unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorFlagParameterIndexMask)
+        >> AsyncCompletionErrorFlagParameterIndexShift;
+      if (encodedValue == 0) {
+        return llvm::None;
+      }
+      return encodedValue - 1;
+    }
+    
+    bool isCompletionErrorFlagZeroOnError() const {
+      assert(getKind() == IsAsync);
+
+      return (Value - 1) & AsyncCompletionErrorFlagParameterPolarityMask;
     }
 
     unsigned getForeignParamIndex() const {
