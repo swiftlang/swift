@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
@@ -2572,6 +2573,34 @@ static bool usesFeatureGlobalActors(Decl *decl) {
     if (auto nominal = ext->getExtendedNominal())
       if (usesFeatureGlobalActors(nominal))
         return true;
+  }
+
+  return false;
+}
+
+static bool usesFeatureBuiltinJob(Decl *decl) {
+  auto typeHasBuiltinJob = [](Type type) {
+    return type.findIf([&](Type type) {
+      if (auto builtinTy = type->getAs<BuiltinType>())
+        return builtinTy->getBuiltinTypeKind() == BuiltinTypeKind::BuiltinJob;
+
+      return false;
+    });
+  };
+
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      if (typeHasBuiltinJob(type))
+        return true;
+    }
+  }
+
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+    for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
+      if (Type type = patternBinding->getPattern(idx)->getType())
+        if (typeHasBuiltinJob(type))
+          return true;
+    }
   }
 
   return false;
