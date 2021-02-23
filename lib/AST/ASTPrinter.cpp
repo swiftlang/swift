@@ -2511,6 +2511,57 @@ static bool usesFeatureConcurrentFunctions(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureRethrowsProtocol(
+    Decl *decl, SmallPtrSet<Decl *, 16> &checked) {
+  // Make sure we don't recurse.
+  if (!checked.insert(decl).second)
+    return false;
+
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->getAttrs().hasAttribute<AtRethrowsAttr>())
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto proto = ext->getSelfProtocolDecl())
+      if (usesFeatureRethrowsProtocol(proto, checked))
+        return true;
+  }
+
+  if (auto genericSig = decl->getInnermostDeclContext()
+          ->getGenericSignatureOfContext()) {
+    for (const auto &req : genericSig->getRequirements()) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          usesFeatureRethrowsProtocol(
+            req.getSecondType()->getAs<ProtocolType>()->getDecl(), checked))
+        return true;
+    }
+  }
+
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasRethrowsProtocol = type.findIf([&](Type type) {
+        if (auto nominal = type->getAnyNominal()) {
+          if (usesFeatureRethrowsProtocol(nominal, checked))
+            return true;
+        }
+
+        return false;
+      });
+
+      if (hasRethrowsProtocol)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+static bool usesFeatureRethrowsProtocol(Decl *decl) {
+  SmallPtrSet<Decl *, 16> checked;
+  return usesFeatureRethrowsProtocol(decl, checked);
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll
