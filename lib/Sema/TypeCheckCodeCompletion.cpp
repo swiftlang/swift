@@ -418,8 +418,8 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   assert(exprType && !exprType->hasTypeVariable() &&
          "free type variable with FreeTypeVariableBinding::GenericParameters?");
-  assert(exprType && !exprType->hasHole() &&
-         "type hole with FreeTypeVariableBinding::GenericParameters?");
+  assert(exprType && !exprType->hasPlaceholder() &&
+         "type placeholder with FreeTypeVariableBinding::GenericParameters?");
 
   if (exprType->hasError()) {
     recoverOriginalType();
@@ -1100,7 +1100,7 @@ fallbackTypeCheck(DeclContext *DC) {
 static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
   auto &CS = S.getConstraintSystem();
 
-  // To aid code completion, we need to attempt to convert type holes
+  // To aid code completion, we need to attempt to convert type placeholders
   // back into underlying generic parameters if possible, since type
   // of the code completion expression is used as "expected" (or contextual)
   // type so it's helpful to know what requirements it has to filter
@@ -1124,9 +1124,9 @@ static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
     });
 
     return S.simplifyType(completionTy.transform([&](Type type) {
-      if (auto *hole = type->getAs<HoleType>()) {
+      if (auto *placeholder = type->getAs<PlaceholderType>()) {
         if (auto *typeVar =
-                hole->getOriginator().dyn_cast<TypeVariableType *>()) {
+                placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
           if (auto *GP = typeVar->getImpl().getGenericParameter()) {
             // Code completion depends on generic parameter type being
             // represented in terms of `ArchetypeType` since it's easy

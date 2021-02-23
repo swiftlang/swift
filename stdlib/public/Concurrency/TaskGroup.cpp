@@ -104,6 +104,39 @@ void TaskGroup::destroy(AsyncTask *task) {
 // =============================================================================
 // ==== offer ------------------------------------------------------------------
 
+static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
+                     AsyncTask::GroupFragment::GroupPollResult result) {
+  switch (result.status) {
+  case GroupFragment::GroupPollStatus::Waiting:
+    assert(false && "filling a waiting status?");
+    return;
+
+  case GroupFragment::GroupPollStatus::Error:
+    context->fillWithError(reinterpret_cast<SwiftError*>(result.storage));
+    return;
+
+  case GroupFragment::GroupPollStatus::Success: {
+    // Initialize the result as an Optional<Success>.
+    const Metadata *successType = context->successType;
+    OpaqueValue *destPtr = context->successResultPointer;
+    // TODO: figure out a way to try to optimistically take the
+    // value out of the finished task's future, if there are no
+    // remaining references to it.
+    successType->vw_initializeWithCopy(destPtr, result.storage);
+    successType->vw_storeEnumTagSinglePayload(destPtr, 0, 1);
+    return;
+  }
+
+  case GroupFragment::GroupPollStatus::Empty: {
+    // Initialize the result as a nil Optional<Success>.
+    const Metadata *successType = context->successType;
+    OpaqueValue *destPtr = context->successResultPointer;
+    successType->vw_storeEnumTagSinglePayload(destPtr, 1, 1);
+    return;
+  }
+  }
+}
+
 void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
                       ExecutorRef completingExecutor) {
   assert(completedTask);
@@ -199,6 +232,12 @@ void swift::swift_task_group_wait_next(
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
     return;
+
+  case GroupFragment::GroupPollStatus::Empty:
+  case GroupFragment::GroupPollStatus::Error:
+  case GroupFragment::GroupPollStatus::Success:
+    fillGroupNextResult(context, polled);
+    return waitingTask->runInFullyEstablishedContext(executor);
   }
 
   runTaskWithPollResult(waitingTask, executor, polled);

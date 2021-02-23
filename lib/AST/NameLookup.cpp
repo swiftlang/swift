@@ -2231,6 +2231,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Protocol:
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
+  case TypeReprKind::Placeholder:
     return { };
       
   case TypeReprKind::OpaqueReturn:

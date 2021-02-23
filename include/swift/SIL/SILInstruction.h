@@ -4800,10 +4800,11 @@ class ConvertFunctionInst final
 
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
                       ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
-                      bool WithoutActuallyEscaping)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty,
-            Operand.getOwnershipKind()) {
+                      bool WithoutActuallyEscaping,
+                      ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands, Ty,
+                                                      forwardingOwnershipKind) {
     SILNode::Bits.ConvertFunctionInst.WithoutActuallyEscaping =
         WithoutActuallyEscaping;
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
@@ -4813,11 +4814,10 @@ class ConvertFunctionInst final
            "Change of escapeness is not ABI compatible");
   }
 
-  static ConvertFunctionInst *create(SILDebugLocation DebugLoc,
-                                     SILValue Operand, SILType Ty,
-                                     SILModule &Mod, SILFunction *F,
-                                     SILOpenedArchetypesState &OpenedArchetypes,
-                                     bool WithoutActuallyEscaping);
+  static ConvertFunctionInst *create(
+      SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
+      SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes,
+      bool WithoutActuallyEscaping, ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   /// Returns `true` if this converts a non-escaping closure into an escaping
@@ -4917,14 +4917,17 @@ class UpcastInst final : public UnaryInstructionWithTypeDependentOperandsBase<
   friend SILBuilder;
 
   UpcastInst(SILDebugLocation DebugLoc, SILValue Operand,
-             ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty,
-            Operand.getOwnershipKind()) {}
+             ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+             ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands, Ty,
+                                                      forwardingOwnershipKind) {
+  }
 
-  static UpcastInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  static UpcastInst *create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILFunction &F,
+                            SILOpenedArchetypesState &OpenedArchetypes,
+                            ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// AddressToPointerInst - Convert a SIL address to a Builtin.RawPointer value.
@@ -4976,13 +4979,17 @@ class UncheckedRefCastInst final
   friend SILBuilder;
 
   UncheckedRefCastInst(SILDebugLocation DebugLoc, SILValue Operand,
-                       ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty,
-            Operand.getOwnershipKind()) {}
+                       ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+                       ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands, Ty,
+                                                      forwardingOwnershipKind) {
+  }
+
   static UncheckedRefCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Convert a value's binary representation to a trivial type of the same size.
@@ -5032,13 +5039,17 @@ class UncheckedValueCastInst final
   friend SILBuilder;
 
   UncheckedValueCastInst(SILDebugLocation DebugLoc, SILValue Operand,
-                         ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty,
-            Operand.getOwnershipKind()) {}
+                         ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+                         ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands, Ty,
+                                                      forwardingOwnershipKind) {
+  }
+
   static UncheckedValueCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
+         ValueOwnershipKind forwardingOwnershipKind);
 };
 
 /// Build a Builtin.BridgeObject from a heap object reference by bitwise-or-ing
@@ -5050,9 +5061,9 @@ class RefToBridgeObjectInst
 
   FixedOperandList<2> Operands;
   RefToBridgeObjectInst(SILDebugLocation DebugLoc, SILValue ConvertedValue,
-                        SILValue MaskValue, SILType BridgeObjectTy)
-      : InstructionBase(DebugLoc, BridgeObjectTy,
-                        ConvertedValue.getOwnershipKind()),
+                        SILValue MaskValue, SILType BridgeObjectTy,
+                        ValueOwnershipKind forwardingOwnershipKind)
+      : InstructionBase(DebugLoc, BridgeObjectTy, forwardingOwnershipKind),
         Operands(this, ConvertedValue, MaskValue) {}
 
 public:
@@ -5080,9 +5091,9 @@ class BridgeObjectToRefInst
                                   OwnershipForwardingConversionInst> {
   friend SILBuilder;
 
-  BridgeObjectToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty,
-                             Operand.getOwnershipKind()) {}
+  BridgeObjectToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+                        ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionBase(DebugLoc, Operand, Ty, forwardingOwnershipKind) {}
 };
 
 /// Sets the BridgeObject to a tagged pointer representation holding its
@@ -5159,14 +5170,18 @@ class ThinToThickFunctionInst final
   friend SILBuilder;
 
   ThinToThickFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
-                          ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
-      : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, Ty,
-            Operand.getOwnershipKind()) {}
+                          ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+                          ValueOwnershipKind forwardingOwnershipKind)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands, Ty,
+                                                      forwardingOwnershipKind) {
+  }
 
   static ThinToThickFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
-         SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes);
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILModule &Mod, SILFunction *F,
+         SILOpenedArchetypesState &OpenedArchetypes,
+         ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   /// Return the callee of the thin_to_thick_function.
@@ -5257,16 +5272,18 @@ class UnconditionalCheckedCastInst final
 
   UnconditionalCheckedCastInst(SILDebugLocation DebugLoc, SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
-                               SILType DestLoweredTy, CanType DestFormalTy)
+                               SILType DestLoweredTy, CanType DestFormalTy,
+                               ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestLoweredTy,
-          Operand.getOwnershipKind()),
+            forwardingOwnershipKind),
         DestFormalTy(DestFormalTy) {}
 
   static UnconditionalCheckedCastInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand,
-         SILType DestLoweredTy, CanType DestFormalTy,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestLoweredTy,
+         CanType DestFormalTy, SILFunction &F,
+         SILOpenedArchetypesState &OpenedArchetypes,
+         ValueOwnershipKind forwardingOwnershipKind);
 
 public:
   SILType getSourceLoweredType() const { return getOperand()->getType(); }

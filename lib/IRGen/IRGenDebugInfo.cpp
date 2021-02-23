@@ -1631,7 +1631,7 @@ private:
     case TypeKind::Unresolved:
     case TypeKind::LValue:
     case TypeKind::TypeVariable:
-    case TypeKind::Hole:
+    case TypeKind::Placeholder:
     case TypeKind::Module:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILToken:
@@ -2474,7 +2474,6 @@ bool IRGenDebugInfoImpl::verifyCoroutineArgument(llvm::Value *Addr) {
              "unhandled projection");
       Storage = CallInst->getArgOperand(0);
     } else
-
       break;
   }
   return llvm::isa<llvm::Argument>(Storage);

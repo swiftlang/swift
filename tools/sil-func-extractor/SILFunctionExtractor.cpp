@@ -110,6 +110,12 @@ DisableASTDump("sil-disable-ast-dump", llvm::cl::Hidden,
                llvm::cl::init(false),
                llvm::cl::desc("Do not dump AST."));
 
+static llvm::cl::opt<bool> EnableOSSAModules(
+    "enable-ossa-modules",
+    llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
+                   "this is disabled we do not serialize in OSSA "
+                   "form when optimizing."));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -247,6 +253,7 @@ int main(int argc, char **argv) {
   SILOptions &Opts = Invocation.getSILOptions();
   Opts.EmitVerboseSIL = EmitVerboseSIL;
   Opts.EmitSortedSIL = EmitSortedSIL;
+  Opts.EnableOSSAModules = EnableOSSAModules;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

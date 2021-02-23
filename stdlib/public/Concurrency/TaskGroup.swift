@@ -414,7 +414,7 @@ func _taskGroupIsCancelled(
 ) -> Bool
 
 @_silgen_name("swift_task_group_wait_next")
-func _taskGroupWaitNext(
+func _taskGroupWaitNext<T>(
   waitingTask: Builtin.NativeObject,
   group: Builtin.NativeObject
 ) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)

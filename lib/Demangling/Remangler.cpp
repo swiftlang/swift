@@ -820,8 +820,12 @@ void Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node) {
 }
 
 void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNode(node, 0);
+  mangleChildNode(node, 1);
+  if (node->getNumChildren() == 4)
+    mangleChildNode(node, 3);
   Buffer << "Tz";
+  mangleChildNode(node, 2);
 }
 
 void Remangler::mangleDeallocator(Node *node) {

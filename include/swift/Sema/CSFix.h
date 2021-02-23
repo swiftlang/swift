@@ -478,6 +478,8 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
   static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
                                             Type protocolType,
                                             ConstraintLocator *locator);
@@ -489,6 +491,12 @@ public:
   Type getNonConformingType() { return NonConformingType; }
 
   Type getProtocolType() { return ProtocolType; }
+
+  bool isEqual(const ConstraintFix *other) const;
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AddConformance;
+  }
 };
 
 /// Skip same-type generic requirement constraint,
@@ -1386,11 +1394,19 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
+  bool isEqual(const ConstraintFix *other) const;
+
   static MoveOutOfOrderArgument *create(ConstraintSystem &cs,
                                         unsigned argIdx,
                                         unsigned prevArgIdx,
                                         ArrayRef<ParamBinding> bindings,
                                         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::MoveOutOfOrderArgument;
+  }
 };
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
@@ -1512,9 +1528,17 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override;
+
   /// Determine whether give reference requires a fix and produce one.
   static AllowInvalidRefInKeyPath *
   forRef(ConstraintSystem &cs, ValueDecl *member, ConstraintLocator *locator);
+
+  bool isEqual(const ConstraintFix *other) const;
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowInvalidRefInKeyPath;
+  }
 
 private:
   static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,

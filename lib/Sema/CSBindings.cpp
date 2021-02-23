@@ -50,7 +50,7 @@ bool PotentialBinding::isViableForJoin() const {
          !BindingType->hasLValueType() &&
          !BindingType->hasUnresolvedType() &&
          !BindingType->hasTypeVariable() &&
-         !BindingType->hasHole() &&
+         !BindingType->hasPlaceholder() &&
          !BindingType->hasUnboundGenericType() &&
          !hasDefaultedLiteralProtocol() &&
          !isDefaultableBinding();
@@ -369,8 +369,12 @@ void PotentialBindings::inferTransitiveBindings(
       addLiteral(literal.second.getSource());
 
     // Infer transitive defaults.
-    for (const auto &def : bindings.Defaults)
+    for (const auto &def : bindings.Defaults) {
+      if (def.getSecond()->getKind() == ConstraintKind::DefaultClosureType)
+        continue;
+
       addDefault(def.second);
+    }
 
     // TODO: We shouldn't need this in the future.
     if (entry.second->getKind() != ConstraintKind::Subtype)
@@ -387,7 +391,7 @@ void PotentialBindings::inferTransitiveBindings(
 
       auto type = binding.BindingType;
 
-      if (type->isHole())
+      if (type->isPlaceholder())
         continue;
 
       if (ConstraintSystem::typeVarOccursInType(TypeVar, type))
@@ -575,7 +579,7 @@ LiteralRequirement::isCoveredBy(const PotentialBinding &binding,
   do {
     // Conformance check on type variable would always return true,
     // but type variable can't cover anything until it's bound.
-    if (type->isTypeVariableOrMember() || type->isHole())
+    if (type->isTypeVariableOrMember() || type->isPlaceholder())
       return std::make_pair(false, Type());
 
     if (isCoveredBy(type, useDC)) {
@@ -1687,26 +1691,40 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto *dstLocator = TypeVar->getImpl().getLocator();
 
   if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.openUnboundGenericTypes(type, dstLocator);
+    type = cs.replaceInferableTypesWithTypeVars(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
   cs.addConstraint(ConstraintKind::Bind, TypeVar, type, srcLocator);
 
+  auto reportHole = [&]() {
+    if (cs.isForCodeCompletion()) {
+      // Don't penalize solutions with unresolved generics.
+      if (TypeVar->getImpl().getGenericParameter())
+        return false;
+      // Don't penalize solutions with holes due to missing arguments after the
+      // code completion position.
+      auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
+      if (argLoc && argLoc->isAfterCodeCompletionLoc())
+        return false;
+    }
+    // Reflect in the score that this type variable couldn't be
+    // resolved and had to be bound to a placeholder "hole" type.
+    cs.increaseScore(SK_Hole);
+
+    if (auto fix = fixForHole(cs)) {
+      if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))
+        return true;
+    }
+    return false;
+  };
+
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
     cs.DefaultedConstraints.push_back(srcLocator);
 
-    if (type->isHole()) {
-      // Reflect in the score that this type variable couldn't be
-      // resolved and had to be bound to a placeholder "hole" type.
-      cs.increaseScore(SK_Hole);
-
-      if (auto fix = fixForHole(cs)) {
-        if (cs.recordFix(/*fix=*/fix->first, /*impact=*/fix->second))
-          return true;
-      }
-    }
+    if (type->isPlaceholder() && reportHole())
+      return true;
   }
 
   return !cs.failedConstraint && !cs.simplify();

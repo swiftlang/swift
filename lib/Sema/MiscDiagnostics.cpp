@@ -19,6 +19,7 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -65,6 +66,7 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Warn about promotions to optional in specific syntactic forms.
 ///   - Error about collection literals that default to Any collections in
 ///     invalid positions.
+///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -311,9 +313,31 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
+      // Diagnose checked casts that involve marker protocols.
+      if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
+        checkCheckedCastExpr(cast);
+      }
+      
       return { true, E };
     }
 
+    void checkCheckedCastExpr(CheckedCastExpr *cast) {
+      if (!isa<ConditionalCheckedCastExpr>(cast) && !isa<IsExpr>(cast))
+        return;
+
+      Type castType = cast->getCastType();
+      if (!castType || !castType->isExistentialType())
+        return;
+
+      auto layout = castType->getExistentialLayout();
+      for (auto proto : layout.getProtocols()) {
+        if (proto->getDecl()->isMarkerProtocol()) {
+          Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
+                             proto->getDecl()->getName());
+        }
+      }
+    }
+    
     /// Visit the argument/s represented by either a ParenExpr or TupleExpr,
     /// unshuffling if needed. If any other kind of expression, will pass it
     /// straight back.

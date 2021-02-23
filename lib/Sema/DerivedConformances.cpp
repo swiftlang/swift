@@ -88,6 +88,14 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*derivableKind == KnownDerivableProtocolKind::Differentiable)
     return true;
 
+  if (*derivableKind == KnownDerivableProtocolKind::Encodable) {
+    return canDeriveEncodable(Nominal);
+  }
+
+  if (*derivableKind == KnownDerivableProtocolKind::Decodable) {
+    return canDeriveDecodable(Nominal);
+  }
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*derivableKind) {
         // The presence of a raw type is an explicit declaration that
@@ -137,31 +145,13 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
       default:
         return false;
     }
-  } else if (isa<StructDecl>(Nominal) || isa<ClassDecl>(Nominal)) {
-    // Structs and classes can explicitly derive Encodable and Decodable
-    // conformance (explicitly meaning we can synthesize an implementation if
-    // a type conforms manually).
-    if (*derivableKind == KnownDerivableProtocolKind::Encodable ||
-        *derivableKind == KnownDerivableProtocolKind::Decodable) {
-      // FIXME: This is not actually correct. We cannot promise to always
-      // provide a witness here for all structs and classes. Unfortunately,
-      // figuring out whether this is actually possible requires much more
-      // context -- a TypeChecker and the parent decl context at least -- and is
-      // tightly coupled to the logic within DerivedConformance.
-      // This unfortunately means that we expect a witness even if one will not
-      // be produced, which requires DerivedConformance::deriveCodable to output
-      // its own diagnostics.
-      return true;
-    }
-
-    // Structs can explicitly derive Equatable conformance.
-    if (isa<StructDecl>(Nominal)) {
-      switch (*derivableKind) {
-        case KnownDerivableProtocolKind::Equatable:
-          return canDeriveEquatable(DC, Nominal);
-        default:
-          return false;
-      }
+  } else if (isa<StructDecl>(Nominal)) {
+    switch (*derivableKind) {
+    case KnownDerivableProtocolKind::Equatable:
+      // Structs can explicitly derive Equatable conformance.
+      return canDeriveEquatable(DC, Nominal);
+    default:
+      return false;
     }
   }
   return false;

@@ -399,13 +399,17 @@ std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
                                                    CanSILFunctionType BlockType,
                                                    CanType ResultType,
                                                    CanGenericSignature Sig,
+                                                   Optional<bool> ErrorOnZero,
                                                    bool predefined) {
   beginMangling();
   appendType(BlockType);
   appendType(ResultType);
   if (Sig)
     appendGenericSignature(Sig);
-  appendOperator(predefined ? "TZ" : "Tz");
+  if (ErrorOnZero)
+    appendOperator(predefined ? "TZ" : "Tz", Index(*ErrorOnZero + 1));
+  else
+    appendOperator(predefined ? "TZ" : "Tz", Index(0));
   return finalize();
 }
 
@@ -998,7 +1002,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
     case TypeKind::TypeVariable:
-    case TypeKind::Hole:
+    case TypeKind::Placeholder:
       llvm_unreachable("mangling type variable");
 
     case TypeKind::Module:

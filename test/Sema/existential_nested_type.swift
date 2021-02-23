@@ -10,7 +10,7 @@ protocol HasAssoc {
 }
 
 enum MyError : Error {
-  case bad(Any)
+  case bad(Any) // expected-warning{{associated value 'bad' of 'ConcurrentValue'-conforming enum 'MyError' has non-concurrent-value type 'Any'}}
 }
 
 func checkIt(_ js: Any) throws {

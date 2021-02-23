@@ -244,9 +244,6 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental ConcurrentValue checking.
-    bool EnableExperimentalConcurrentValueChecking = false;
-
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
@@ -386,6 +383,9 @@ namespace swift {
     };
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
+
+    /// Allow @hasAsyncAlternative attribute
+    bool EnableExperimentalHasAsyncAlternative = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

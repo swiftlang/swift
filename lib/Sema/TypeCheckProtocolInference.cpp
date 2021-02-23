@@ -1881,9 +1881,11 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
           }
 
           // Otherwise, we have a default.
-          diags.diagnose(assocType, diag::associated_type_deduction_default,
-                         type)
-            .highlight(assocType->getDefaultDefinitionTypeRepr()->getSourceRange());
+          auto defaultDiag =
+            diags.diagnose(assocType, diag::associated_type_deduction_default,
+                           type);
+          if (auto defaultTypeRepr = assocType->getDefaultDefinitionTypeRepr())
+            defaultDiag.highlight(defaultTypeRepr->getSourceRange());
         };
 
         diagnoseWitness(firstMatch, firstType);

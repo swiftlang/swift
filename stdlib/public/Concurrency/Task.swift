@@ -221,7 +221,7 @@ extension Task.Handle where Failure == Never {
   /// value of the `Success` type, or encode that cancellation has occurred in
   /// that type itself.
   public func get() async -> Success {
-    return try! await _taskFutureGetThrowing(_task) // try-! safe, cannot throw
+    return await _taskFutureGet(_task)
   }
   
 }
@@ -604,34 +604,14 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
   _asyncMainDrainQueue()
 }
 
+// FIXME: both of these ought to take their arguments _owned so that
+// we can do a move out of the future in the common case where it's
+// unreferenced
 @_silgen_name("swift_task_future_wait")
-func _taskFutureWait(
-  on task: Builtin.NativeObject
-) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer)
+public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 
-public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
-  let rawResult = await _taskFutureWait(on: task)
-  assert(!rawResult.hadErrorResult)
-
-  // Take the value.
-  let storagePtr = rawResult.storage.bindMemory(to: T.self, capacity: 1)
-  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
-}
-
-public func _taskFutureGetThrowing<T>(
-    _ task: Builtin.NativeObject
-) async throws -> T {
-  let rawResult = await _taskFutureWait(on: task)
-  if rawResult.hadErrorResult {
-    // Throw the result on error.
-    throw unsafeBitCast(rawResult.storage, to: Error.self)
-  }
-
-  // Take the value on success
-  let storagePtr =
-    rawResult.storage.bindMemory(to: T.self, capacity: 1)
-  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
-}
+@_silgen_name("swift_task_future_wait_throwing")
+public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 
 public func _runChildTask<T>(
   operation: @concurrent @escaping () async throws -> T

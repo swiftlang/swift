@@ -793,71 +793,6 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
   return checker.visit(type);
 }
 
-Optional<NonConcurrentType> NonConcurrentType::get(
-    const DeclContext *dc, ConcreteDeclRef declRef) {
-  // For functions, check the parameter and result types.
-  SubstitutionMap subs = declRef.getSubstitutions();
-  if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
-    for (auto param : *function->getParameters()) {
-      Type paramType = param->getInterfaceType().subst(subs);
-      if (!isConcurrentValueType(dc, paramType)) {
-        return NonConcurrentType {
-            Kind::Parameter, ConcreteDeclRef(param, subs), paramType };
-      }
-    }
-
-    // Check the result type of a function.
-    if (auto func = dyn_cast<FuncDecl>(function)) {
-      Type resultType = func->getResultInterfaceType().subst(subs);
-      if (!isConcurrentValueType(dc, resultType)) {
-        return NonConcurrentType { Kind::Result, declRef, resultType };
-      }
-    }
-
-    // Check the "self" type of an instance method.
-    if (function->isInstanceMember()) {
-      if (auto selfParam = function->getImplicitSelfDecl()) {
-        Type paramType = selfParam->getInterfaceType().subst(subs);
-        if (!isConcurrentValueType(dc, paramType)) {
-          return NonConcurrentType {
-              Kind::Parameter, ConcreteDeclRef(selfParam, subs),
-              paramType };
-        }
-      }
-    }
-  } else if (auto var = dyn_cast<VarDecl>(declRef.getDecl())) {
-    Type propertyType = var->getValueInterfaceType().subst(subs);
-    if (!isConcurrentValueType(dc, propertyType)) {
-      return NonConcurrentType {
-        Kind::Property, declRef, propertyType };
-    }
-  }
-
-  return None;
-}
-
-void NonConcurrentType::diagnose(SourceLoc loc) {
-  ASTContext &ctx = declRef.getDecl()->getASTContext();
-
-  switch (kind) {
-  case Parameter:
-    ctx.Diags.diagnose(loc, diag::non_concurrent_param_type, type);
-    break;
-
-  case Result:
-    ctx.Diags.diagnose(loc, diag::non_concurrent_result_type, type);
-    break;
-
-  case Property: {
-    auto var = cast<VarDecl>(declRef.getDecl());
-    ctx.Diags.diagnose(loc, diag::non_concurrent_property_type,
-                       var->getDescriptiveKind(), var->getName(),
-                       type, var->isLocalCapture());
-    break;
-  }
-  }
-}
-
 static bool diagnoseNonConcurrentParameter(
     SourceLoc loc, ConcurrentReferenceKind refKind, ConcreteDeclRef declRef,
     ParamDecl *param, Type paramType) {
@@ -888,7 +823,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind) {
   // Bail out immediately if we aren't supposed to do this checking.
-  if (!dc->getASTContext().LangOpts.EnableExperimentalConcurrentValueChecking)
+  if (!dc->getASTContext().LangOpts.EnableExperimentalConcurrency)
     return false;
 
   // For functions, check the parameter and result types.
@@ -1173,6 +1108,22 @@ namespace {
           applyStack.pop_back();
 
           return { false, expr };
+        }
+      }
+
+      // Key paths require any captured values to be ConcurrentValue-conforming.
+      if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
+        for (const auto &component : keyPath->getComponents()) {
+          auto indexExpr = component.getIndexExpr();
+          if (!indexExpr || !indexExpr->getType())
+            continue;
+
+          if (ctx.LangOpts.EnableExperimentalConcurrency &&
+              !isConcurrentValueType(getDeclContext(), indexExpr->getType())) {
+            ctx.Diags.diagnose(
+                component.getLoc(), diag::non_concurrent_keypath_capture,
+                indexExpr->getType());
+          }
         }
       }
 
@@ -2308,7 +2259,8 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
-void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
+void swift::checkConcurrentValueConformance(
+    ProtocolConformance *conformance, bool asWarning) {
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
@@ -2326,7 +2278,9 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
   if (!conformanceDC->getParentSourceFile() ||
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(
-        diag::concurrent_value_outside_source_file,
+        asWarning
+          ? diag::concurrent_value_outside_source_file_warn
+          : diag::concurrent_value_outside_source_file,
         nominal->getDescriptiveKind(), nominal->getName());
     return;
   }
@@ -2335,8 +2289,11 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
     // An open class cannot conform to `ConcurrentValue`.
     if (classDecl->getFormalAccess() == AccessLevel::Open) {
       classDecl->diagnose(
-          diag::concurrent_value_open_class, classDecl->getName());
-      return;
+          asWarning ? diag::concurrent_value_open_class_warn
+                    : diag::concurrent_value_open_class,
+          classDecl->getName());
+      if (!asWarning)
+        return;
     }
 
     // A 'ConcurrentValue' class cannot inherit from another class, although
@@ -2345,10 +2302,12 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         if (!superclassDecl->isNSObject()) {
           classDecl->diagnose(
-              diag::concurrent_value_inherit,
+              asWarning ? diag::concurrent_value_inherit_warn
+                        : diag::concurrent_value_inherit,
               nominal->getASTContext().LangOpts.EnableObjCInterop,
               classDecl->getName());
-          return;
+          if (!asWarning)
+            return;
         }
       }
     }
@@ -2359,7 +2318,10 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
   if (isa<StructDecl>(nominal) || classDecl) {
     for (auto property : nominal->getStoredProperties()) {
       if (classDecl && property->supportsMutation()) {
-        property->diagnose(diag::concurrent_value_class_mutable_property, property->getName(), nominal->getDescriptiveKind(),
+        property->diagnose(
+            asWarning ? diag::concurrent_value_class_mutable_property_warn
+                      : diag::concurrent_value_class_mutable_property,
+            property->getName(), nominal->getDescriptiveKind(),
             nominal->getName());
         continue;
       }
@@ -2368,7 +2330,9 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
           conformanceDC->mapTypeIntoContext(property->getInterfaceType());
       if (!isConcurrentValueType(conformanceDC, propertyType)) {
         property->diagnose(
-            diag::non_concurrent_type_member, false, property->getName(),
+            asWarning ? diag::non_concurrent_type_member_warn
+                      : diag::non_concurrent_type_member,
+            false, property->getName(),
             nominal->getDescriptiveKind(), nominal->getName(), propertyType);
         continue;
       }
@@ -2389,7 +2353,9 @@ void swift::checkConcurrentValueConformance(ProtocolConformance *conformance) {
             element->getArgumentInterfaceType());
         if (!isConcurrentValueType(conformanceDC, elementType)) {
           element->diagnose(
-              diag::non_concurrent_type_member, true, element->getName(),
+              asWarning ? diag::non_concurrent_type_member_warn
+                        : diag::non_concurrent_type_member,
+              true, element->getName(),
               nominal->getDescriptiveKind(), nominal->getName(), elementType);
           continue;
         }

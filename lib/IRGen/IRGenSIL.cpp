@@ -853,6 +853,8 @@ public:
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
                                              VarInfo, Indirection);
   }
+  /// Emit a direct path to an Argument.
+  llvm::Value *getDirectCoroutineArgument(llvm::Value *Addr);
 
   void emitFailBB() {
     if (!FailBBs.empty()) {
@@ -2278,11 +2280,30 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   setLoweredFunctionPointer(i, FunctionPointer(fnType, diffWitness, signature));
 }
 
+static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
+  using SpecialKind = FunctionPointer::SpecialKind;
+
+  // Check for some special cases, which are currently all async:
+  if (fn->isAsync()) {
+    auto name = fn->getName();
+    if (name.equals("swift_task_future_wait"))
+      return SpecialKind::TaskFutureWait;
+    if (name.equals("swift_task_future_wait_throwing"))
+      return SpecialKind::TaskFutureWaitThrowing;
+    if (name.equals("swift_task_group_wait_next"))
+      return SpecialKind::TaskGroupWaitNext;
+  }
+
+  return fn->getLoweredFunctionType();
+}
+
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
   auto fnType = fn->getLoweredFunctionType();
 
-  auto sig = IGM.getSignature(fnType);
+  auto fpKind = classifyFunctionPointerKind(fn);
+
+  auto sig = IGM.getSignature(fnType, fpKind.suppressGenerics());
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
@@ -2290,18 +2311,20 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
   llvm::Constant *value;
-  auto isSpecialAsyncWithoutCtxtSize =
-      fn->isAsync() && (
-          fn->getName().equals("swift_task_future_wait") ||
-          fn->getName().equals("swift_task_group_wait_next"));
-  if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
+  if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
   } else {
     value = fnPtr;
+
+    // HACK: the swiftasync argument treatment is currently using
+    // a register that can be clobbered by the linker.  Use nonlazybind
+    // as a workaround.
+    if (fpKind.isSpecial()) {
+      cast<llvm::Function>(value)->addFnAttr(llvm::Attribute::NonLazyBind);
+    }
   }
-  FunctionPointer fp =
-      FunctionPointer(fnType, value, sig, isSpecialAsyncWithoutCtxtSize);
+  FunctionPointer fp = FunctionPointer(fpKind, value, sig);
 
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
@@ -2804,7 +2827,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Pass the generic arguments.
-  if (hasPolymorphicParameters(origCalleeType)) {
+  if (hasPolymorphicParameters(origCalleeType) &&
+      !emission->getCallee().getFunctionPointer().suppressGenerics()) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
@@ -4297,6 +4321,53 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
                                          IndirectValue, ArtificialValue);
 }
 
+llvm::Value *IRGenSILFunction::getDirectCoroutineArgument(llvm::Value *Addr) {
+  auto getDirect = [&](llvm::Instruction *Orig) {
+    llvm::Value *Buffered = Orig->getOperand(0);
+    llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
+    if (Buffered == Direct)
+      return Orig;
+    llvm::Instruction *Cloned = Orig->clone();
+    Cloned->setOperand(0, Direct);
+    Cloned->insertBefore(Orig);
+    return Cloned;
+  };
+  if (auto *LdInst = dyn_cast<llvm::LoadInst>(Addr))
+    return getDirect(LdInst);
+  if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Addr))
+    return getDirect(GEPInst);
+  if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Addr))
+    return getDirect(BCInst);
+  if (auto *CallInst = dyn_cast<llvm::CallInst>(Addr)) {
+    llvm::Value *Buffered = CallInst->getArgOperand(0);
+    if (CallInst->getCalledFunction() != IGM.getProjectBoxFn()) {
+      assert(false && "unhandled projection");
+      return CallInst;
+    }
+    llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
+    if (Buffered == Direct)
+      return CallInst;
+    auto *Cloned = cast<llvm::CallInst>(CallInst->clone());
+    Cloned->setArgOperand(0, Direct);
+    Cloned->insertBefore(CallInst);
+    return Cloned;
+  }
+  if (auto *AllocaInst = dyn_cast<llvm::AllocaInst>(Addr)) {
+    llvm::Value *Direct = nullptr;
+    unsigned NumStores = 0;
+    for (auto &AIUse : AllocaInst->uses()) {
+      llvm::User *U = AIUse.getUser();
+      if (llvm::StoreInst *StInst = llvm::dyn_cast<llvm::StoreInst>(U)) {
+        ++NumStores;
+        Direct = StInst->getOperand(0);
+      }
+    }
+    if (NumStores == 1)
+      return Direct;
+  }
+  return Addr;
+}
+
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
@@ -4322,8 +4393,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
         Decl, RealTy, getTypeInfo(SILVal->getType()));
-  } else if (i->getFunction()->isBare() &&
-             !SILTy.hasArchetype() && !VarInfo->Name.empty()) {
+  } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
+             !VarInfo->Name.empty()) {
     // Preliminary support for .sil debug information.
     DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy));
   } else
@@ -4337,8 +4408,19 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (!IGM.DebugInfo)
     return;
 
+  IndirectionKind Indirection = DirectValue;
+  if (CurSILFn->isAsync() && VarInfo->ArgNo &&
+      !i->getDebugScope()->InlinedCallSite) {
+    for (auto &Val : Copy) {
+      Val = getDirectCoroutineArgument(Val);
+      assert(IGM.DebugInfo->verifyCoroutineArgument(Val) &&
+             "arg expected to be load from inside %swift.context");
+    }
+    Indirection = CoroDirectValue;
+  }
+
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
-                               i->getDecl(), *VarInfo);
+                               i->getDecl(), *VarInfo, Indirection);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -4363,7 +4445,8 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto *Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
-  if (CurSILFn->isAsync() && VarInfo->ArgNo) {
+  if (CurSILFn->isAsync() && VarInfo->ArgNo &&
+      !i->getDebugScope()->InlinedCallSite) {
     if (IGM.DebugInfo)
       assert(IGM.DebugInfo->verifyCoroutineArgument(Addr) &&
              "arg expected to be load from inside %swift.context");
@@ -5322,7 +5405,7 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
     in.transferInto(out, in.size());
     return;
   }
-  
+
   // TODO: We could do bitcasts entirely in the value domain in some cases, but
   // for simplicity, let's just always go through the stack for now.
   
@@ -5427,7 +5510,7 @@ static void trivialRefConversion(IRGenSILFunction &IGF,
     }
     out.add(value);
   }
-  
+
   IGF.setLoweredExplosion(result, out);
 }
 
@@ -5627,7 +5710,7 @@ void IRGenSILFunction::visitBridgeObjectToRefInst(
     // If it's not a tagged pointer, mask off the spare bits.
     Builder.emitBlock(notTagged);
   }
-  
+
   // Mask off the spare bits (if they exist).
   auto &spareBits = IGM.getHeapObjectSpareBits();
   llvm::Value *result;
@@ -5715,7 +5798,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
       llvm::ConstantPointerNull::get(cast<llvm::PointerType>(val->getType()));
     castResult.succeeded = Builder.CreateICmpNE(val, nil);
   }
-  
+
   // Branch on the success of the cast.
   // All cast operations currently return null on failure.
 
@@ -5783,7 +5866,7 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
       argsBufSize = llvm::ConstantInt::get(IGM.SizeTy, 0);
       argsBufAlign = llvm::ConstantInt::get(IGM.SizeTy, 0);
     }
-    
+
     SmallVector<llvm::Value *, 4> operandOffsets;
     for (unsigned i : indices(I->getAllOperands())) {
       auto operand = I->getAllOperands()[i].get();

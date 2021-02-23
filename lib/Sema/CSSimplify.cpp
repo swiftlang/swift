@@ -986,8 +986,35 @@ constraints::matchCallArguments(
   };
 }
 
-static Optional<unsigned>
-getCompletionArgIndex(ASTNode anchor, ConstraintSystem &CS) {
+struct CompletionArgInfo {
+  unsigned completionIdx;
+  Optional<unsigned> firstTrailingIdx;
+
+  bool isAllowableMissingArg(unsigned argInsertIdx,
+                             AnyFunctionType::Param param) {
+    // If the argument is before or at the index of the argument containing the
+    // completion, the user would likely have already written it if they
+    // intended this overload.
+    if (completionIdx >= argInsertIdx)
+      return false;
+
+    // If the argument is after the first trailing closure, the user can only
+    // continue on to write more trailing arguments, so only allow this overload
+    // if the missing argument is of function type.
+    if (firstTrailingIdx && argInsertIdx > *firstTrailingIdx) {
+      if (param.isInOut())
+        return false;
+
+      Type expectedTy = param.getPlainType()->lookThroughAllOptionalTypes();
+      return expectedTy->is<FunctionType>() || expectedTy->isAny() ||
+          expectedTy->isTypeVariableOrMember();
+    }
+    return true;
+  }
+};
+
+static Optional<CompletionArgInfo>
+getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
   Expr *arg = nullptr;
   if (auto *CE = getAsExpr<CallExpr>(anchor))
     arg = CE->getArg();
@@ -999,16 +1026,15 @@ getCompletionArgIndex(ASTNode anchor, ConstraintSystem &CS) {
   if (!arg)
     return None;
 
-  if (auto *TE = dyn_cast<TupleExpr>(arg)) {
-    auto elems = TE->getElements();
-    auto idx = llvm::find_if(elems, [&](Expr *elem) {
-      return CS.containsCodeCompletionLoc(elem);
-    });
-    if (idx != elems.end())
-      return std::distance(elems.begin(), idx);
-  } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
+  auto trailingIdx = arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  if (auto *PE = dyn_cast<ParenExpr>(arg)) {
     if (CS.containsCodeCompletionLoc(PE->getSubExpr()))
-      return 0;
+      return CompletionArgInfo{ 0, trailingIdx };
+  } else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
+    for (unsigned i: indices(TE->getElements())) {
+      if (CS.containsCodeCompletionLoc(TE->getElement(i)))
+        return CompletionArgInfo{ i, trailingIdx };
+    }
   }
   return None;
 }
@@ -1021,7 +1047,7 @@ class ArgumentFailureTracker : public MatchCallArgumentListener {
 
   SmallVector<SynthesizedArg, 4> MissingArguments;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
-  Optional<unsigned> CompletionArgIdx;
+  Optional<CompletionArgInfo> CompletionArgInfo;
 
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
@@ -1048,10 +1074,19 @@ public:
     const auto &param = Parameters[paramIdx];
 
     unsigned newArgIdx = Arguments.size();
+
+    bool isAfterCodeCompletionLoc = false;
+    if (CS.isForCodeCompletion()) {
+      if (!CompletionArgInfo)
+        CompletionArgInfo = getCompletionArgInfo(Locator.getAnchor(), CS);
+      isAfterCodeCompletionLoc = CompletionArgInfo &&
+        CompletionArgInfo->isAllowableMissingArg(argInsertIdx, param);
+    }
+
     auto *argLoc = CS.getConstraintLocator(
         Locator, {LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx,
                                                   param.getParameterFlags()),
-                  LocatorPathElt::SynthesizedArgument(newArgIdx)});
+                  LocatorPathElt::SynthesizedArgument(newArgIdx, isAfterCodeCompletionLoc)});
 
     auto *argType =
         CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
@@ -1060,16 +1095,12 @@ public:
     auto synthesizedArg = param.withType(argType);
     Arguments.push_back(synthesizedArg);
 
-    if (CS.isForCodeCompletion()) {
-      // When solving for code completion, if any argument contains the
-      // completion location, later arguments shouldn't be considered missing
-      // (causing the solution to have a worse score) as the user just hasn't
-      // written them yet. Early exit to avoid recording them in this case.
-      if (!CompletionArgIdx)
-        CompletionArgIdx = getCompletionArgIndex(Locator.getAnchor(), CS);
-      if (CompletionArgIdx && *CompletionArgIdx < argInsertIdx)
-        return newArgIdx;
-    }
+    // When solving for code completion, if any argument contains the
+    // completion location, later arguments shouldn't be considered missing
+    // (causing the solution to have a worse score) as the user just hasn't
+    // written them yet. Early exit to avoid recording them in this case.
+    if (isAfterCodeCompletionLoc)
+      return newArgIdx;
 
     MissingArguments.push_back(SynthesizedArg{paramIdx, synthesizedArg});
 
@@ -2579,7 +2610,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
               if (!req)
                 return getTypeMatchFailure(locator);
 
-              if (type1->isHole() ||
+              if (type1->isPlaceholder() ||
                   req->getRequirementKind() == RequirementKind::Superclass)
                 return getTypeMatchSuccess();
 
@@ -4038,7 +4069,7 @@ bool ConstraintSystem::repairFailures(
     // with generic argument mismatches.
     if (matchKind == ConstraintKind::BindToPointerType) {
       auto *member = rhs->getAs<DependentMemberType>();
-      if (!(member && member->getBase()->hasHole()))
+      if (!(member && member->getBase()->hasPlaceholder()))
         break;
     }
 
@@ -4079,8 +4110,8 @@ bool ConstraintSystem::repairFailures(
                        locator);
     }
 
-    // If either type has a hole, consider this fixed.
-    if (lhs->hasHole() || rhs->hasHole())
+    // If either type has a placeholder, consider this fixed.
+    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
       return true;
 
     // `lhs` - is an argument and `rhs` is a parameter type.
@@ -4226,8 +4257,8 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TypeParameterRequirement:
   case ConstraintLocator::ConditionalRequirement: {
-    // If either type has a hole, consider this fixed.
-    if (lhs->hasHole() || rhs->hasHole())
+    // If either type has a placeholder, consider this fixed.
+    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
       return true;
 
     // If requirement is something like `T == [Int]` let's let
@@ -4267,8 +4298,8 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ContextualType: {
-    // If either type is a hole, consider this fixed
-    if (lhs->isHole() || rhs->isHole())
+    // If either type is a placeholder, consider this fixed
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
     // If either side is not yet resolved, it's too early for this fix.
@@ -4557,7 +4588,7 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::InstanceType: {
-    if (lhs->hasHole() || rhs->hasHole())
+    if (lhs->hasPlaceholder() || rhs->hasPlaceholder())
       return true;
 
     break;
@@ -4605,8 +4636,8 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::PatternMatch: {
-    // If either type is a hole, consider this fixed.
-    if (lhs->isHole() || rhs->isHole())
+    // If either type is a placeholder, consider this fixed.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
     // If the left-hand side is a function type and the pattern is an enum
@@ -4624,8 +4655,8 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::GenericArgument: {
-    // If any of the types is a hole, consider it fixed.
-    if (lhs->isHole() || rhs->isHole())
+    // If any of the types is a placeholder, consider it fixed.
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
 
     // Ignoring the generic argument because we may have a generic requirement
@@ -4645,7 +4676,7 @@ bool ConstraintSystem::repairFailures(
     // If result type of the body couldn't be determined
     // there is going to be other fix available to diagnose
     // the underlying issue.
-    if (lhs->isHole())
+    if (lhs->isPlaceholder())
       return true;
 
     conversionsOrFixes.push_back(ContextualMismatch::create(
@@ -4901,7 +4932,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Unresolved:
       return getTypeMatchFailure(locator);
 
-    case TypeKind::Hole: {
+    case TypeKind::Placeholder: {
       // If it's allowed to attempt fixes, let's delegate
       // decision to `repairFailures`, since depending on
       // locator we might either ignore such a mismatch,
@@ -4924,7 +4955,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // member couldn't be simplified down to the actual type, and
       // we wouldn't be able to solve this constraint, so let's just fail.
       // This should only happen outside of diagnostic mode, as otherwise the
-      // member is replaced by a hole in simplifyType.
+      // member is replaced by a placeholder in simplifyType.
       if (!desugar1->hasTypeVariable() || !desugar2->hasTypeVariable())
         return getTypeMatchFailure(locator);
 
@@ -5597,7 +5628,7 @@ ConstraintSystem::simplifyConstructionConstraint(
     
   case TypeKind::Unresolved:
   case TypeKind::Error:
-  case TypeKind::Hole:
+  case TypeKind::Placeholder:
     return SolutionKind::Error;
 
   case TypeKind::GenericFunction:
@@ -5741,7 +5772,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
-  if (shouldAttemptFixes() && type->isHole()) {
+  if (shouldAttemptFixes() && type->isPlaceholder()) {
     // If the type associated with this conformance check is a "hole" in the
     // constraint system, let's consider this check a success without recording
     // a fix, because it's just a consequence of the other failure, e.g.
@@ -6236,9 +6267,8 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
 
     return SolutionKind::Unsolved;
   }
-  
 
-  if (optTy->isHole()) {
+  if (optTy->isPlaceholder()) {
     if (auto *typeVar = second->getAs<TypeVariableType>())
       recordPotentialHole(typeVar);
     return SolutionKind::Solved;
@@ -6252,7 +6282,7 @@ ConstraintSystem::simplifyOptionalObjectConstraint(
       return SolutionKind::Error;
     
     // Let's see if we can apply a specific fix here.
-    if (optTy->isHole())
+    if (optTy->isPlaceholder())
       return SolutionKind::Solved;
     
     auto fnType = optTy->getAs<FunctionType>();
@@ -6311,7 +6341,7 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
       ++unwrapCount;
     }
 
-    if (simplified->isHole()) {
+    if (simplified->isPlaceholder()) {
       if (auto *typeVar = second->getAs<TypeVariableType>())
         recordPotentialHole(typeVar);
       return SolutionKind::Solved;
@@ -7369,7 +7399,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       // of this constraint is delayed until base could be resolved),
       // or it is certain that base type can't be bound to any other
       // type but a hole.
-      auto shouldRecordFixForHole = [&](HoleType *baseType) {
+      auto shouldRecordFixForHole = [&](PlaceholderType *baseType) {
         auto *originator =
             baseType->getOriginator().dyn_cast<TypeVariableType *>();
 
@@ -7390,7 +7420,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         return originatorLoc == locator;
       };
 
-      if (auto *hole = underlyingType->getAs<HoleType>()) {
+      if (auto *hole = underlyingType->getAs<PlaceholderType>()) {
         if (shouldRecordFixForHole(hole)) {
           auto *fix = SpecifyBaseTypeForContextualMember::create(*this, member,
                                                                  locator);
@@ -7403,7 +7433,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       }
     } else if ((kind == ConstraintKind::ValueMember ||
                 kind == ConstraintKind::ValueWitness) &&
-               baseObjTy->getMetatypeInstanceType()->isHole()) {
+               baseObjTy->getMetatypeInstanceType()->isPlaceholder()) {
       // If base type is a "hole" there is no reason to record any
       // more "member not found" fixes for chained member references.
       markMemberTypeAsPotentialHole(memberTy);
@@ -7869,7 +7899,7 @@ ConstraintSystem::simplifyOneWayConstraint(
   }
 
   // Propagate holes through one-way constraints.
-  if (secondSimplified->isHole()) {
+  if (secondSimplified->isPlaceholder()) {
     first.visit([&](Type subType) {
       if (auto *typeVar = subType->getAs<TypeVariableType>())
         recordPotentialHole(typeVar);
@@ -8565,11 +8595,11 @@ ConstraintSystem::simplifyKeyPathConstraint(
 
     return true;
   };
-  
+
   // If we have a hole somewhere in the key path, the solver won't be able to
   // infer the key path type. So let's just assume this is solved.
   if (shouldAttemptFixes()) {
-    if (keyPathTy->isHole())
+    if (keyPathTy->isPlaceholder())
       return SolutionKind::Solved;
 
     // If we have a malformed KeyPathExpr e.g. let _: KeyPath<A, C> = \A
@@ -8581,14 +8611,14 @@ ConstraintSystem::simplifyKeyPathConstraint(
     }
 
     // If the root type has been bound to a hole, we cannot infer it.
-    if (getFixedTypeRecursive(rootTy, /*wantRValue*/ true)->isHole())
+    if (getFixedTypeRecursive(rootTy, /*wantRValue*/ true)->isPlaceholder())
       return SolutionKind::Solved;
 
     // If we have e.g a missing member somewhere, a component type variable
     // will have been marked as a potential hole.
     // FIXME: This relies on the fact that we only mark an overload type
     // variable as a potential hole once we've added a corresponding fix. We
-    // can't use 'isHole' instead, as that doesn't handle cases where the
+    // can't use 'isPlaceholder' instead, as that doesn't handle cases where the
     // overload type variable gets bound to another type from the context rather
     // than a hole. We need to come up with a better way of handling the
     // relationship between key paths and overloads.
@@ -8920,7 +8950,7 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
         arguments.size() > 0 &&
         llvm::all_of(arguments, [&](const AnyFunctionType::Param &arg) -> bool {
           auto argType = arg.getPlainType();
-          if (argType->isHole())
+          if (argType->isPlaceholder())
             return true;
 
           if (auto *typeVar = argType->getAs<TypeVariableType>())
@@ -9138,7 +9168,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   if (shouldAttemptFixes()) {
     if (auto *typeVar = type2->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
-      if (typeVar->isHole() || hasFixFor(locator))
+      if (typeVar->isPlaceholder() || hasFixFor(locator))
         recordPotentialHole(func1);
     }
   }
@@ -9373,7 +9403,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // they have to be marked as "holes".
     recordPotentialHole(func1);
 
-    if (desugar2->isHole())
+    if (desugar2->isPlaceholder())
       return SolutionKind::Solved;
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));

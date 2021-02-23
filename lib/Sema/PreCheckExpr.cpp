@@ -811,6 +811,12 @@ namespace {
     /// The expressions that are direct arguments of call expressions.
     llvm::SmallPtrSet<Expr *, 4> CallArgs;
 
+    /// Keep track of acceptable DiscardAssignmentExpr's.
+    llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
+
+    /// The current number of nested \c SequenceExprs that we're within.
+    unsigned SequenceExprDepth = 0;
+
     /// Simplify expressions which are type sugar productions that got parsed
     /// as expressions due to the parser not knowing which identifiers are
     /// type names.
@@ -933,6 +939,27 @@ namespace {
 
       ISLE->getAppendingExpr()->walk(
           StrangeInterpolationRewriter(getASTContext()));
+    }
+
+    /// Scout out the specified destination of an AssignExpr to recursively
+    /// identify DiscardAssignmentExpr in legal places.  We can only allow them
+    /// in simple pattern-like expressions, so we reject anything complex here.
+    void markAcceptableDiscardExprs(Expr *E) {
+      if (!E) return;
+
+      if (auto *PE = dyn_cast<ParenExpr>(E))
+        return markAcceptableDiscardExprs(PE->getSubExpr());
+      if (auto *TE = dyn_cast<TupleExpr>(E)) {
+        for (auto &elt : TE->getElements())
+          markAcceptableDiscardExprs(elt);
+        return;
+      }
+      if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
+        return markAcceptableDiscardExprs(BOE->getSubExpr());
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
+        CorrectDiscardAssignmentExprs.insert(DAE);
+
+      // Otherwise, we can't support this.
     }
 
   public:
@@ -1118,6 +1145,12 @@ namespace {
       if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr))
         correctInterpolationIfStrange(ISLE);
 
+      if (auto *assignment = dyn_cast<AssignExpr>(expr))
+        markAcceptableDiscardExprs(assignment->getDest());
+
+      if (isa<SequenceExpr>(expr))
+        SequenceExprDepth++;
+
       return finish(true, expr);
     }
 
@@ -1133,6 +1166,7 @@ namespace {
       // Fold sequence expressions.
       if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
         auto result = TypeChecker::foldSequence(seqExpr, DC);
+        SequenceExprDepth--;
         return result->walk(*this);
       }
 
@@ -1244,13 +1278,27 @@ namespace {
       // generating any of the unnecessary constraints.
       if (auto BOE = dyn_cast<BindOptionalExpr>(expr)) {
         if (auto DAE = dyn_cast<DiscardAssignmentExpr>(BOE->getSubExpr()))
-          return DAE;
+          if (CorrectDiscardAssignmentExprs.count(DAE))
+            return DAE;
       }
 
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.
       if (auto *simplified = simplifyTypeExpr(expr))
         return simplified;
+
+      // Diagnose a '_' that isn't on the immediate LHS of an assignment. We
+      // skip diagnostics if we've explicitly marked the expression as valid,
+      // or if we're inside a SequenceExpr (since the whole tree will be
+      // re-checked when we finish folding anyway).
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(expr)) {
+        if (!CorrectDiscardAssignmentExprs.count(DAE) &&
+            SequenceExprDepth == 0) {
+          ctx.Diags.diagnose(expr->getLoc(),
+                             diag::discard_expr_outside_of_assignment);
+          return nullptr;
+        }
+      }
 
       if (auto KPE = dyn_cast<KeyPathExpr>(expr)) {
         resolveKeyPathExpr(KPE);
@@ -1365,11 +1413,18 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     // Resolve the TypeRepr to get the base type for the lookup.
     const auto options =
         TypeResolutionOptions(TypeResolverContext::InExpression);
-    const auto resolution =
-        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+    const auto resolution = TypeResolution::forContextual(
+        DC, options,
+        [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
+        },
+        /*placeholderHandler*/
+        [&](auto placeholderRepr) {
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          return PlaceholderType::get(getASTContext(), placeholderRepr);
         });
     const auto BaseTy = resolution.resolveType(InnerTypeRepr);
 
@@ -1420,6 +1475,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
     return simplifyNestedTypeExpr(UDE);
   }
+
+  // TODO: Fold DiscardAssignmentExpr into a placeholder type here once parsing
+  // them is supported.
 
   // Fold T? into an optional type when T is a TypeExpr.
   if (isa<OptionalEvaluationExpr>(E) || isa<BindOptionalExpr>(E)) {
@@ -1892,11 +1950,18 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
         TypeResolutionOptions(TypeResolverContext::InExpression) |
         TypeResolutionFlags::SilenceErrors;
 
-    const auto resolution =
-        TypeResolution::forContextual(DC, options, [](auto unboundTy) {
+    const auto resolution = TypeResolution::forContextual(
+        DC, options,
+        [](auto unboundTy) {
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           return unboundTy;
+        },
+        /*placeholderHandler*/
+        [&](auto placeholderRepr) {
+          // FIXME: Don't let placeholder types escape type resolution.
+          // For now, just return the placeholder type.
+          return PlaceholderType::get(getASTContext(), placeholderRepr);
         });
     const auto result = resolution.resolveType(typeExpr->getTypeRepr());
     if (result->hasError())

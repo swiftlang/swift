@@ -7,8 +7,8 @@ class Cat {}
 enum HomeworkError : Error {
   case TooHard
   case TooMuch
-  case CatAteIt(Cat)
-  case CatHidIt(Cat)
+  case CatAteIt(Cat) // expected-warning{{associated value 'CatAteIt' of 'ConcurrentValue'-conforming enum 'HomeworkError' has non-concurrent-value type 'Cat'}}
+  case CatHidIt(Cat) // expected-warning{{associated value 'CatHidIt' of 'ConcurrentValue'-conforming enum 'HomeworkError' has non-concurrent-value type 'Cat'}}
 }
 
 func someValidPointer<T>() -> UnsafePointer<T> { fatalError() }

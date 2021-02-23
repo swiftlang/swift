@@ -1497,8 +1497,23 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           swiftAsyncAttr->getCompletionHandlerIndex().getASTIndex();
     }
     
-    // TODO: Check for the swift_async_error attribute here when Clang
-    // implements it
+    if (const auto *asyncErrorAttr = D->getAttr<clang::SwiftAsyncErrorAttr>()) {
+      switch (auto convention = asyncErrorAttr->getConvention()) {
+      // No flag parameter in these cases.
+      case clang::SwiftAsyncErrorAttr::NonNullError:
+      case clang::SwiftAsyncErrorAttr::None:
+        break;
+      
+      // Get the flag argument index and polarity from the attribute.
+      case clang::SwiftAsyncErrorAttr::NonZeroArgument:
+      case clang::SwiftAsyncErrorAttr::ZeroArgument:
+        // NB: Attribute is 1-based rather than 0-based.
+        completionHandlerFlagParamIndex = asyncErrorAttr->getHandlerParamIdx() - 1;
+        completionHandlerFlagIsZeroOnError =
+          convention == clang::SwiftAsyncErrorAttr::ZeroArgument;
+        break;
+      }
+    }
   }
 
   // FIXME: ugly to check here, instead perform unified check up front in

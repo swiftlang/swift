@@ -299,7 +299,8 @@ namespace irgen {
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
-                                           SubstitutionMap substitutionMap);
+                                           SubstitutionMap substitutionMap,
+                                           bool suppressGenerics);
 
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.

@@ -385,8 +385,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
-  Opts.EnableExperimentalConcurrentValueChecking |=
-    Args.hasArg(OPT_enable_experimental_concurrent_value_checking);
   Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
     Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
 
@@ -714,6 +712,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
           "Should have found one of enable/disable ast verifier?!");
     }
   }
+
+  Opts.EnableExperimentalHasAsyncAlternative |=
+      Args.hasArg(OPT_experimental_has_async_alternative_attribute);
 
   return HadError || UnsupportedOS || UnsupportedArch;
 }
@@ -1185,6 +1186,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
+  Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);

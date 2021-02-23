@@ -792,9 +792,6 @@ namespace {
       = { nullptr, nullptr };
     unsigned currentEditorPlaceholderVariable = 0;
 
-    /// Keep track of acceptable DiscardAssignmentExpr's.
-    llvm::SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
-
     /// A map from each UnresolvedMemberExpr to the respective (implicit) base
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
@@ -1017,7 +1014,7 @@ namespace {
       if (CS.containsCodeCompletionLoc(E))
         return nullptr;
 
-      return HoleType::get(CS.getASTContext(), E);
+      return PlaceholderType::get(CS.getASTContext(), E);
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
@@ -1227,7 +1224,7 @@ namespace {
             return hole;
           }
 
-          if (!knownType->hasHole()) {
+          if (!knownType->hasPlaceholder()) {
             // Set the favored type for this expression to the known type.
             CS.setFavoredType(E, knownType.getPointer());
           }
@@ -1241,8 +1238,12 @@ namespace {
         // FIXME: We should eliminate this case.
         if (auto *PD = dyn_cast<ParamDecl>(VD)) {
           if (!CS.hasType(PD)) {
-            if (knownType && knownType->hasUnboundGenericType())
-              knownType = CS.openUnboundGenericTypes(knownType, locator);
+            if (knownType &&
+                (knownType->hasUnboundGenericType() ||
+                 knownType->hasPlaceholder())) {
+              knownType = CS.replaceInferableTypesWithTypeVars(knownType,
+                                                               locator);
+            }
 
             CS.setType(
                 PD, knownType ? knownType
@@ -1292,9 +1293,12 @@ namespace {
     resolveTypeReferenceInExpression(TypeRepr *repr, TypeResolverContext resCtx,
                                      const ConstraintLocatorBuilder &locator) {
       // Introduce type variables for unbound generics.
-      const auto opener = OpenUnboundGenericType(CS, locator);
-      const auto result = TypeResolution::forContextual(CS.DC, resCtx, opener)
-                              .resolveType(repr);
+      const auto genericOpener = OpenUnboundGenericType(CS, locator);
+      const auto placeholderHandler = HandlePlaceholderType(CS, locator);
+      const auto result = TypeResolution::forContextual(CS.DC, resCtx,
+                                                        genericOpener,
+                                                        placeholderHandler)
+              .resolveType(repr);
       if (result->hasError()) {
         return Type();
       }
@@ -1308,7 +1312,7 @@ namespace {
       if (E->isImplicit()) {
         type = CS.getInstanceType(CS.cacheType(E));
         assert(type && "Implicit type expr must have type set!");
-        type = CS.openUnboundGenericTypes(type, locator);
+        type = CS.replaceInferableTypesWithTypeVars(type, locator);
       } else if (CS.hasType(E)) {
         // If there's a type already set into the constraint system, honor it.
         // FIXME: This supports the result builder transform, which sneakily
@@ -1558,7 +1562,8 @@ namespace {
             const auto resolution = TypeResolution::forContextual(
                 CS.DC, options,
                 // Introduce type variables for unbound generics.
-                OpenUnboundGenericType(CS, locator));
+                OpenUnboundGenericType(CS, locator),
+                HandlePlaceholderType(CS, locator));
             const auto result = resolution.resolveType(specializations[i]);
             if (result->hasError())
               return Type();
@@ -1988,7 +1993,8 @@ namespace {
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = CS.getVarType(param);
-            externalType = CS.openUnboundGenericTypes(declaredTy, paramLoc);
+            externalType = CS.replaceInferableTypesWithTypeVars(declaredTy,
+                                                                paramLoc);
           } else {
             // Let's allow parameters which haven't been explicitly typed
             // to become holes by default, this helps in situations like
@@ -2204,7 +2210,7 @@ namespace {
         // Look through reference storage types.
         type = type->getReferenceStorageReferent();
 
-        Type openedType = CS.openUnboundGenericTypes(type, locator);
+        Type openedType = CS.replaceInferableTypesWithTypeVars(type, locator);
         assert(openedType);
 
         auto *subPattern = cast<TypedPattern>(pattern)->getSubPattern();
@@ -2365,7 +2371,8 @@ namespace {
             // contained within the type resolver.
             if (const auto preresolvedTy = enumPattern->getParentType()) {
               const auto openedTy =
-                  CS.openUnboundGenericTypes(preresolvedTy, patternMatchLoc);
+                  CS.replaceInferableTypesWithTypeVars(preresolvedTy,
+                                                       patternMatchLoc);
               assert(openedTy);
               return openedTy;
             }
@@ -2843,13 +2850,6 @@ namespace {
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
-      /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
-      if (!CorrectDiscardAssignmentExprs.count(expr)) {
-        auto &DE = CS.getASTContext().Diags;
-        DE.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment);
-        return Type();
-      }
-
       auto locator = CS.getConstraintLocator(expr);
       auto typeVar = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
       return LValueType::get(typeVar);
@@ -2885,25 +2885,6 @@ namespace {
                          exprType, locator);
         return destTy;
       }
-    }
-
-    /// Scout out the specified destination of an AssignExpr to recursively
-    /// identify DiscardAssignmentExpr in legal places.  We can only allow them
-    /// in simple pattern-like expressions, so we reject anything complex here.
-    void markAcceptableDiscardExprs(Expr *E) {
-      if (!E) return;
-
-      if (auto *PE = dyn_cast<ParenExpr>(E))
-        return markAcceptableDiscardExprs(PE->getSubExpr());
-      if (auto *TE = dyn_cast<TupleExpr>(E)) {
-        for (auto &elt : TE->getElements())
-          markAcceptableDiscardExprs(elt);
-        return;
-      }
-      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
-        CorrectDiscardAssignmentExprs.insert(DAE);
-
-      // Otherwise, we can't support this.
     }
 
     Type visitAssignExpr(AssignExpr *expr) {
@@ -3429,7 +3410,7 @@ namespace {
       if (CG.getConstraintSystem().shouldReusePrecheckedType()) {
         if (expr->getType()) {
           assert(!expr->getType()->hasTypeVariable());
-          assert(!expr->getType()->hasHole());
+          assert(!expr->getType()->hasPlaceholder());
           CG.getConstraintSystem().cacheType(expr);
           return { false, expr };
         }
@@ -3490,9 +3471,6 @@ namespace {
         if (!ifExpr->getThenExpr() || !ifExpr->getElseExpr())
           return { false, expr };
       }
-
-      if (auto *assignment = dyn_cast<AssignExpr>(expr))
-        CG.markAcceptableDiscardExprs(assignment->getDest());
 
       return { true, expr };
     }
@@ -3600,7 +3578,8 @@ static bool generateWrappedPropertyTypeConstraints(
       auto *typeRepr = wrapperAttributes[i]->getTypeRepr();
       auto *locator =
           cs.getConstraintLocator(typeRepr, LocatorPathElt::ContextualType());
-      wrapperType = cs.openUnboundGenericTypes(rawWrapperType, locator);
+      wrapperType = cs.replaceInferableTypesWithTypeVars(rawWrapperType,
+                                                         locator);
       cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType,
                        locator);
       cs.setContextualType(typeRepr, TypeLoc::withoutLoc(wrappedValueType),
@@ -3795,16 +3774,40 @@ bool ConstraintSystem::generateConstraints(
       // Determine whether we know more about the contextual type.
       ContextualTypePurpose ctp = target.getExprContextualTypePurpose();
       bool isOpaqueReturnType = target.infersOpaqueReturnType();
+      auto *convertTypeLocator =
+          getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
-      // Substitute type variables in for unresolved types.
+      auto getLocator = [&](Type ty) -> ConstraintLocator * {
+        // If we have a placeholder originating from a PlaceholderTypeRepr,
+        // tack that on to the locator.
+        if (auto *placeholderTy = ty->getAs<PlaceholderType>())
+          if (auto *placeholderRepr = placeholderTy->getOriginator()
+                                          .dyn_cast<PlaceholderTypeRepr *>())
+            return getConstraintLocator(
+                convertTypeLocator,
+                LocatorPathElt::PlaceholderType(placeholderRepr));
+        return convertTypeLocator;
+      };
+
+      // Substitute type variables in for placeholder types (and unresolved
+      // types, if allowed).
       if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-        auto *convertTypeLocator =
-            getConstraintLocator(expr, LocatorPathElt::ContextualType());
-
         convertType = convertType.transform([&](Type type) -> Type {
-          if (type->is<UnresolvedType>()) {
-            return createTypeVariable(
-                convertTypeLocator, TVO_CanBindToNoEscape);
+          if (type->is<UnresolvedType>() || type->is<PlaceholderType>()) {
+            return createTypeVariable(getLocator(type),
+                                      TVO_CanBindToNoEscape |
+                                          TVO_PrefersSubtypeBinding |
+                                          TVO_CanBindToHole);
+          }
+          return type;
+        });
+      } else {
+        convertType = convertType.transform([&](Type type) -> Type {
+          if (type->is<PlaceholderType>()) {
+            return createTypeVariable(getLocator(type),
+                                      TVO_CanBindToNoEscape |
+                                          TVO_PrefersSubtypeBinding |
+                                          TVO_CanBindToHole);
           }
           return type;
         });
@@ -3887,8 +3890,8 @@ bool ConstraintSystem::generateConstraints(
     auto *wrappedVar = target.getAsUninitializedWrappedVar();
     auto *outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
     auto *typeRepr = outermostWrapper->getTypeRepr();
-    auto backingType = openUnboundGenericTypes(outermostWrapper->getType(),
-                                               getConstraintLocator(typeRepr));
+    auto backingType = replaceInferableTypesWithTypeVars(
+        outermostWrapper->getType(),getConstraintLocator(typeRepr));
     setType(typeRepr, backingType);
 
     auto propertyType = getVarType(wrappedVar);

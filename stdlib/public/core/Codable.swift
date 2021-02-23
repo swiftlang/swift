@@ -51,7 +51,8 @@ public typealias Codable = Encodable & Decodable
 //===----------------------------------------------------------------------===//
 
 /// A type that can be used as a key for encoding and decoding.
-public protocol CodingKey: CustomStringConvertible,
+public protocol CodingKey: ConcurrentValue,
+                           CustomStringConvertible,
                            CustomDebugStringConvertible {
   /// The string to use in a named collection (e.g. a string-keyed dictionary).
   var stringValue: String { get }
@@ -3179,7 +3180,7 @@ public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable, Concurre
 /// An error that occurs during the encoding of a value.
 public enum EncodingError: Error {
   /// The context in which the error occurred.
-  public struct Context {
+  public struct Context: ConcurrentValue {
     /// The path of coding keys taken to get to the point of the failing encode
     /// call.
     public let codingPath: [CodingKey]
@@ -3262,7 +3263,7 @@ public enum EncodingError: Error {
 /// An error that occurs during the decoding of a value.
 public enum DecodingError: Error {
   /// The context in which the error occurred.
-  public struct Context {
+  public struct Context: ConcurrentValue {
     /// The path of coding keys taken to get to the point of the failing decode
     /// call.
     public let codingPath: [CodingKey]

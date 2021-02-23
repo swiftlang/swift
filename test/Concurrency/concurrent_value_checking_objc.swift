@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-concurrent-value-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
