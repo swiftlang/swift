@@ -660,9 +660,9 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
           failureBB->getArgument(0)->getType() == op->getType()) &&
          "failureBB's argument doesn't match incoming argument type");
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, op,
-      destLoweredTy, destFormalTy, successBB, failureBB,
-      getFunction(), C.OpenedArchetypes, target1Count, target2Count));
+      getSILDebugLocation(Loc), isExact, op, destLoweredTy, destFormalTy,
+      successBB, failureBB, getFunction(), C.OpenedArchetypes, target1Count,
+      target2Count, op.getOwnershipKind()));
 }
 
 void SILBuilderWithScope::insertAfter(SILInstruction *inst,
