@@ -347,12 +347,11 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addDevirtualizer();
   P.addARCSequenceOpts();
 
-  if (!P.getOptions().SerializeStdlibWithOwnershipWithOpts) {
+  if (P.getOptions().EnableOSSAModules) {
     // We earlier eliminated ownership if we are not compiling the stdlib. Now
     // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
     P.addCopyPropagation();
     P.addSemanticARCOpts();
-    P.addNonTransparentFunctionOwnershipModelEliminator();
   }
 
   switch (OpLevel) {
@@ -372,7 +371,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
 
   // Clean up Semantic ARC before we perform additional post-inliner opts.
-  if (P.getOptions().SerializeStdlibWithOwnershipWithOpts) {
+  if (P.getOptions().EnableOSSAModules) {
     P.addCopyPropagation();
     P.addSemanticARCOpts();
   }
@@ -437,7 +436,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addARCSequenceOpts();
 
   // Run a final round of ARC opts when ownership is enabled.
-  if (P.getOptions().SerializeStdlibWithOwnershipWithOpts) {
+  if (P.getOptions().EnableOSSAModules) {
     P.addCopyPropagation();
     P.addSemanticARCOpts();
   }
@@ -490,7 +489,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
     return;
 
-  P.addNonStdlibNonTransparentFunctionOwnershipModelEliminator();
+  if (!P.getOptions().EnableOSSAModules)
+    P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
@@ -778,15 +778,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   //
   // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
   // pipeline to save compile time.
-  //
-  // NOTE: Ownership is now stripped within this function for the stdlib.
   addHighLevelFunctionPipeline(P);
 
   addHighLevelModulePipeline(P);
 
   // Run one last copy propagation/semantic arc opts run before serialization/us
   // lowering ownership.
-  if (P.getOptions().SerializeStdlibWithOwnershipWithOpts) {
+  if (P.getOptions().EnableOSSAModules) {
     P.addCopyPropagation();
     P.addSemanticARCOpts();
   }
