@@ -986,8 +986,35 @@ constraints::matchCallArguments(
   };
 }
 
-static Optional<unsigned>
-getCompletionArgIndex(ASTNode anchor, ConstraintSystem &CS) {
+struct CompletionArgInfo {
+  unsigned completionIdx;
+  Optional<unsigned> firstTrailingIdx;
+
+  bool isAllowableMissingArg(unsigned argInsertIdx,
+                             AnyFunctionType::Param param) {
+    // If the argument is before or at the index of the argument containing the
+    // completion, the user would likely have already written it if they
+    // intended this overload.
+    if (completionIdx >= argInsertIdx)
+      return false;
+
+    // If the argument is after the first trailing closure, the user can only
+    // continue on to write more trailing arguments, so only allow this overload
+    // if the missing argument is of function type.
+    if (firstTrailingIdx && argInsertIdx > *firstTrailingIdx) {
+      if (param.isInOut())
+        return false;
+
+      Type expectedTy = param.getPlainType()->lookThroughAllOptionalTypes();
+      return expectedTy->is<FunctionType>() || expectedTy->isAny() ||
+          expectedTy->isTypeVariableOrMember();
+    }
+    return true;
+  }
+};
+
+static Optional<CompletionArgInfo>
+getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
   Expr *arg = nullptr;
   if (auto *CE = getAsExpr<CallExpr>(anchor))
     arg = CE->getArg();
@@ -999,16 +1026,15 @@ getCompletionArgIndex(ASTNode anchor, ConstraintSystem &CS) {
   if (!arg)
     return None;
 
-  if (auto *TE = dyn_cast<TupleExpr>(arg)) {
-    auto elems = TE->getElements();
-    auto idx = llvm::find_if(elems, [&](Expr *elem) {
-      return CS.containsCodeCompletionLoc(elem);
-    });
-    if (idx != elems.end())
-      return std::distance(elems.begin(), idx);
-  } else if (auto *PE = dyn_cast<ParenExpr>(arg)) {
+  auto trailingIdx = arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
+  if (auto *PE = dyn_cast<ParenExpr>(arg)) {
     if (CS.containsCodeCompletionLoc(PE->getSubExpr()))
-      return 0;
+      return CompletionArgInfo{ 0, trailingIdx };
+  } else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
+    for (unsigned i: indices(TE->getElements())) {
+      if (CS.containsCodeCompletionLoc(TE->getElement(i)))
+        return CompletionArgInfo{ i, trailingIdx };
+    }
   }
   return None;
 }
@@ -1021,7 +1047,7 @@ class ArgumentFailureTracker : public MatchCallArgumentListener {
 
   SmallVector<SynthesizedArg, 4> MissingArguments;
   SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
-  Optional<unsigned> CompletionArgIdx;
+  Optional<CompletionArgInfo> CompletionArgInfo;
 
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
@@ -1048,10 +1074,19 @@ public:
     const auto &param = Parameters[paramIdx];
 
     unsigned newArgIdx = Arguments.size();
+
+    bool isAfterCodeCompletionLoc = false;
+    if (CS.isForCodeCompletion()) {
+      if (!CompletionArgInfo)
+        CompletionArgInfo = getCompletionArgInfo(Locator.getAnchor(), CS);
+      isAfterCodeCompletionLoc = CompletionArgInfo &&
+        CompletionArgInfo->isAllowableMissingArg(argInsertIdx, param);
+    }
+
     auto *argLoc = CS.getConstraintLocator(
         Locator, {LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx,
                                                   param.getParameterFlags()),
-                  LocatorPathElt::SynthesizedArgument(newArgIdx)});
+                  LocatorPathElt::SynthesizedArgument(newArgIdx, isAfterCodeCompletionLoc)});
 
     auto *argType =
         CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
@@ -1060,16 +1095,12 @@ public:
     auto synthesizedArg = param.withType(argType);
     Arguments.push_back(synthesizedArg);
 
-    if (CS.isForCodeCompletion()) {
-      // When solving for code completion, if any argument contains the
-      // completion location, later arguments shouldn't be considered missing
-      // (causing the solution to have a worse score) as the user just hasn't
-      // written them yet. Early exit to avoid recording them in this case.
-      if (!CompletionArgIdx)
-        CompletionArgIdx = getCompletionArgIndex(Locator.getAnchor(), CS);
-      if (CompletionArgIdx && *CompletionArgIdx < argInsertIdx)
-        return newArgIdx;
-    }
+    // When solving for code completion, if any argument contains the
+    // completion location, later arguments shouldn't be considered missing
+    // (causing the solution to have a worse score) as the user just hasn't
+    // written them yet. Early exit to avoid recording them in this case.
+    if (isAfterCodeCompletionLoc)
+      return newArgIdx;
 
     MissingArguments.push_back(SynthesizedArg{paramIdx, synthesizedArg});
 
