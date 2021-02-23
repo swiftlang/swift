@@ -802,8 +802,10 @@ enum ScoreKind {
   SK_KeyPathSubscript,
   /// A conversion from a string, array, or inout to a pointer.
   SK_ValueToPointerConversion,
+  /// A closure/function conversion to an autoclosure parameter.
+  SK_FunctionToAutoClosureConversion,
 
-  SK_LastScoreKind = SK_ValueToPointerConversion,
+  SK_LastScoreKind = SK_FunctionToAutoClosureConversion,
 };
 
 /// The number of score kinds.

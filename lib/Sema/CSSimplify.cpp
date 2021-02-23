@@ -1355,7 +1355,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         //
         //    f { } // OK
         if (isExpr<ClosureExpr>(argExpr)) {
-          cs.increaseScore(SK_FunctionConversion);
+          cs.increaseScore(SK_FunctionToAutoClosureConversion);
         }
 
         // If the argument is not marked as @autoclosure or
@@ -2233,7 +2233,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (func1Param.isAutoClosure() &&
         (!func2Param.isAutoClosure() &&
          func2Param.getPlainType()->is<FunctionType>())) {
-      increaseScore(SK_FunctionConversion);
+      increaseScore(SK_FunctionToAutoClosureConversion);
     }
 
     // Variadic bit must match.
