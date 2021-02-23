@@ -562,53 +562,34 @@ void BindingSet::determineLiteralCoverage() {
 
   bool allowsNil = canBeNil();
 
-  for (auto binding = Bindings.begin(); binding != Bindings.end();) {
-    bool isCovered = false;
-    Type adjustedTy;
+  for (auto &entry : Literals) {
+    auto &literal = entry.second;
 
-    // Tracks the number of covered literal requirements,
-    // so checking could be stopped as soon as all of the
-    // requirements are satisfied.
-    unsigned numCoveredRequirements = 0;
-    for (auto &literalRequirement : Literals) {
-      auto &literalInfo = literalRequirement.second;
+    if (!literal.viableAsBinding())
+      continue;
 
-      if (!literalInfo.viableAsBinding()) {
-        ++numCoveredRequirements;
-        continue;
-      }
+    for (auto binding = Bindings.begin(); binding != Bindings.end();
+         ++binding) {
+
+      bool isCovered = false;
+      Type adjustedTy;
 
       std::tie(isCovered, adjustedTy) =
-          literalInfo.isCoveredBy(*binding, allowsNil, CS.DC);
+          literal.isCoveredBy(*binding, allowsNil, CS.DC);
 
-      if (isCovered) {
-        literalInfo.setCoveredBy(binding->getSource());
-        ++numCoveredRequirements;
-        break;
+      if (!isCovered)
+        continue;
+
+      literal.setCoveredBy(binding->getSource());
+
+      if (adjustedTy) {
+        Bindings.erase(binding);
+        Bindings.insert(binding->withType(adjustedTy));
       }
-    }
 
-    // If the type has been adjusted, we need to re-insert
-    // the binding but skip all of the previous checks.
-    //
-    // It's okay to do this here since iteration stops after
-    // first covering binding has been found.
-    if (isCovered && adjustedTy) {
-      binding = Bindings.erase(binding);
-      adjustedBindings.push_back(binding->withType(adjustedTy));
-      continue;
-    }
-
-    // If all of the literal requirements are now covered
-    // by existing bindings, there is nothing left to do.
-    if (numCoveredRequirements == Literals.size())
       break;
-
-    ++binding;
+    }
   }
-
-  for (auto &newBinding : adjustedBindings)
-    (void)Bindings.insert(std::move(newBinding));
 }
 
 void BindingSet::addLiteralRequirement(Constraint *constraint) {
