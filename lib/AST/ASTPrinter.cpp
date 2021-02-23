@@ -968,8 +968,21 @@ public:
 
     ASTVisitor::visit(D);
 
-    if (haveFeatureChecks)
+    if (haveFeatureChecks) {
+      // If we guarded a marker protocol, print an alternative typealias
+      // for Any.
+      if (auto proto = dyn_cast<ProtocolDecl>(D)) {
+        if (proto->isMarkerProtocol()) {
+          Printer.printNewline();
+          Printer << "#else";
+          Printer.printNewline();
+          printAccess(proto);
+          Printer << "typealias " << proto->getName() << " = Any";
+        }
+      }
+
       printCompatibilityFeatureChecksPost(Printer);
+    }
 
     if (Synthesize) {
       Printer.setSynthesizedTarget({});
@@ -2426,53 +2439,16 @@ static bool usesFeatureAsyncAwait(Decl *decl) {
 }
 
 static bool usesFeatureMarkerProtocol(Decl *decl) {
-  // Check an inheritance clause for a marker protocol.
-  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
-    for (const auto &inheritedEntry : inherited) {
-      if (auto inheritedType = inheritedEntry.getType()) {
-        if (inheritedType->isExistentialType()) {
-          auto layout = inheritedType->getExistentialLayout();
-          for (ProtocolType *protoTy : layout.getProtocols()) {
-            if (protoTy->getDecl()->isMarkerProtocol())
-              return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  };
-
-  // Check generic requirements for a marker protocol.
-  auto checkRequirements = [&](ArrayRef<Requirement> requirements) -> bool {
-    for (const auto &req: requirements) {
-      if (req.getKind() == RequirementKind::Conformance &&
-          req.getSecondType()->castTo<ProtocolType>()->getDecl()
-              ->isMarkerProtocol())
-        return true;
-    }
-
-    return false;
-  };
-
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     if (proto->isMarkerProtocol())
-      return true;
-
-    if (checkInherited(proto->getInherited()))
-      return true;
-
-    if (checkRequirements(proto->getRequirementSignature()))
       return true;
   }
 
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (checkRequirements(ext->getGenericRequirements()))
-      return true;
-
-    if (checkInherited(ext->getInherited()))
-      return true;
-  }
+    if (auto proto = ext->getSelfProtocolDecl())
+      if (proto->isMarkerProtocol())
+        return true;
+  }       
 
   return false;
 }
@@ -3152,7 +3128,10 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
   if (AFD->hasAsync()) {
     Printer << " ";
-    Printer.printKeyword("async", Options);
+    if (AFD->getAttrs().hasAttribute<ReasyncAttr>())
+      Printer.printKeyword("reasync", Options);
+    else
+      Printer.printKeyword("async", Options);
   }
 
   if (AFD->hasThrows()) {
@@ -4165,9 +4144,9 @@ public:
       Printer << "_";
   }
 
-  void visitHoleType(HoleType *T) {
+  void visitPlaceholderType(PlaceholderType *T) {
     if (Options.PrintTypesForDebugging) {
-      Printer << "<<hole for ";
+      Printer << "<<placeholder for ";
       auto originator = T->getOriginator();
       if (auto *typeVar = originator.dyn_cast<TypeVariableType *>()) {
         visit(typeVar);
@@ -4176,8 +4155,10 @@ public:
         Printer << VD->getName();
       } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
         Printer << "error_expr";
+      } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
+        visit(DMT);
       } else {
-        visit(originator.get<DependentMemberType *>());
+        Printer << "placeholder_type_repr";
       }
       Printer << ">>";
     } else {

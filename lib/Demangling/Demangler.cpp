@@ -2301,12 +2301,16 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case 'z':
     case 'Z': {
+      NodePointer sig = popNode(Node::Kind::DependentGenericSignature);
       NodePointer resultType = popNode(Node::Kind::Type);
       NodePointer implType = popNode(Node::Kind::Type);
-      return createWithChildren(c == 'z'
+      auto node = createWithChildren(c == 'z'
                                   ? Node::Kind::ObjCAsyncCompletionHandlerImpl
                                   : Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl,
                                 implType, resultType);
+      if (sig)
+        addChild(node, sig);
+      return node;
     }
     case 'V': {
       NodePointer Base = popNode(isEntity);
@@ -2570,6 +2574,32 @@ NodePointer Demangler::demangleAutoDiffSelfReorderingReabstractionThunk() {
   result = addChild(result, popNode(Node::Kind::Type));
   result->reverseChildren();
   result = addChild(result, demangleAutoDiffFunctionKind());
+  return result;
+}
+
+NodePointer Demangler::demangleDifferentiabilityWitness() {
+  auto result = createNode(Node::Kind::DifferentiabilityWitness);
+  auto optionalGenSig = popNode(Node::Kind::DependentGenericSignature);
+  while (auto *node = popNode())
+    result = addChild(result, node);
+  result->reverseChildren();
+  MangledDifferentiabilityKind kind;
+  switch (auto c = nextChar()) {
+  case 'f': kind = MangledDifferentiabilityKind::Forward; break;
+  case 'r': kind = MangledDifferentiabilityKind::Reverse; break;
+  case 'd': kind = MangledDifferentiabilityKind::Normal; break;
+  case 'l': kind = MangledDifferentiabilityKind::Linear; break;
+  default: return nullptr;
+  }
+  result = addChild(
+      result, createNode(Node::Kind::Index, (Node::IndexType)kind));
+  result = addChild(result, demangleIndexSubset());
+  if (!nextIf('p'))
+    return nullptr;
+  result = addChild(result, demangleIndexSubset());
+  if (!nextIf('r'))
+    return nullptr;
+  addChild(result, optionalGenSig);
   return result;
 }
 
@@ -3002,6 +3032,8 @@ NodePointer Demangler::demangleWitness() {
                                 context,
                                 declList);
     }
+    case 'J':
+      return demangleDifferentiabilityWitness();
     default:
       return nullptr;
   }

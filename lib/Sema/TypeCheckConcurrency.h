@@ -66,36 +66,6 @@ enum class ConcurrentReferenceKind {
   ConcurrentFunction,
 };
 
-/// Describes why or where a particular entity has a non-concurrent-value type.
-struct NonConcurrentType {
-  enum Kind {
-    /// A function parameter is a non-concurrent-value type.
-    Parameter,
-    /// The result of a function is a non-concurrent-value type.
-    Result,
-    /// The type of a property is a non-concurrent-value type.
-    Property,
-  } kind;
-
-  /// The declaration reference.
-  ConcreteDeclRef declRef;
-
-  /// The non-concurrent-value type being diagnosed.
-  Type type;
-
-  /// Determine whether a reference to the given declaration involves a
-  /// non-concurrent-value type. If it does, return the reason. Otherwise,
-  /// return \c None.
-  ///
-  /// \param dc The declaration context from which the reference occurs.
-  /// \param declRef The reference to the declaration.
-  static Optional<NonConcurrentType> get(
-      const DeclContext *dc, ConcreteDeclRef declRef);
-
-  /// Diagnose the non-concurrent-value type at the given source location.
-  void diagnose(SourceLoc loc);
-};
-
 /// The isolation restriction in effect for a given declaration that is
 /// referenced from source.
 class ActorIsolationRestriction {
@@ -238,7 +208,8 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcurrentReferenceKind refKind);
 
 /// Check the correctness of the given ConcurrentValue conformance.
-void checkConcurrentValueConformance(ProtocolConformance *conformance);
+void checkConcurrentValueConformance(
+    ProtocolConformance *conformance, bool asWarning);
 
 } // end namespace swift
 

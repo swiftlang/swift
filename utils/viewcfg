@@ -67,7 +67,7 @@ class Block(object):
         if self.succs is None:
             self.succs = []
             if self.last_line is not None:
-                for match in re.finditer(r'\bbb[0-9]+\b', self.last_line):
+                for match in re.finditer(r'\bbb[0-9]+\w*\b', self.last_line):
                     self.succs.append(match.group())
 
                 it = re.finditer(r'\blabel %"?([^\s"]+)\b', self.last_line)

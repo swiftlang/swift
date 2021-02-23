@@ -75,6 +75,10 @@ extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 void *MainAddr);
 
+/// Run 'swift-api-extract'
+extern int swift_api_extract_main(ArrayRef<const char *> Args,
+                                  const char *Argv0, void *MainAddr);
+
 /// Determine if the given invocation should run as a "subcommand".
 ///
 /// Examples of "subcommands" are 'swift build' or 'swift test', which are
@@ -230,6 +234,10 @@ static int run_driver(StringRef ExecName,
       argv[0], (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::SymbolGraph:
       return swift_symbolgraph_extract_main(TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0], (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::APIExtract:
+    return swift_api_extract_main(
+        TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0],
+        (void *)(intptr_t)getExecutablePath);
   default:
     break;
   }

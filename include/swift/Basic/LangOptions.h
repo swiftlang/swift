@@ -244,17 +244,11 @@ namespace swift {
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental ConcurrentValue checking.
-    bool EnableExperimentalConcurrentValueChecking = false;
-
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
-
-    /// Enable experimental support for `@_specialize(exported: true,...)` .
-    bool EnableExperimentalPrespecialization = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -389,6 +383,9 @@ namespace swift {
     };
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
+
+    /// Allow @hasAsyncAlternative attribute
+    bool EnableExperimentalHasAsyncAlternative = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

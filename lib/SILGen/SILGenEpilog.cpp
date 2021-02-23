@@ -297,7 +297,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
 
   Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation(), IsForUnwind);
 
-  B.createThrow(throwLoc, exn);
+  B.createThrow(CleanupLocation(throwLoc), exn);
 
   ThrowDest = JumpDest::invalid();
 }

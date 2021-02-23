@@ -112,7 +112,7 @@ void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
   Job *job = (Job*) _job;
-  job->run(ExecutorRef::generic());
+  swift_job_run(job, ExecutorRef::generic());
 }
 
 /// A specialized version of __swift_run_job to execute the job on the main
@@ -120,7 +120,7 @@ static void __swift_run_job(void *_job) {
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
 static void __swift_run_job_main_executor(void *_job) {
   Job *job = (Job*) _job;
-  job->run(ExecutorRef::mainExecutor());
+  swift_job_run(job, ExecutorRef::mainExecutor());
 }
 
 #endif

@@ -563,13 +563,15 @@ swift::matchWitness(
     // else the witness can be by conformance, throwing or non throwing
     if (reqAttrs.hasAttribute<RethrowsAttr>() &&
         !witnessAttrs.hasAttribute<RethrowsAttr>()) {
-      auto reqRethrowingKind = funcReq->getRethrowingKind();
-      auto witnessRethrowingKind = funcWitness->getRethrowingKind();
-      if (reqRethrowingKind == FunctionRethrowingKind::ByConformance) {
+      auto reqRethrowingKind =
+          funcReq->getPolymorphicEffectKind(EffectKind::Throws);
+      auto witnessRethrowingKind =
+          funcWitness->getPolymorphicEffectKind(EffectKind::Throws);
+      if (reqRethrowingKind == PolymorphicEffectKind::ByConformance) {
         switch (witnessRethrowingKind) {
-        case FunctionRethrowingKind::ByConformance:
-        case FunctionRethrowingKind::Throws:
-        case FunctionRethrowingKind::None:
+        case PolymorphicEffectKind::ByConformance:
+        case PolymorphicEffectKind::Always:
+        case PolymorphicEffectKind::None:
           break;
         default:
           return RequirementMatch(witness, MatchKind::RethrowsConflict);
@@ -1933,6 +1935,23 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
 
       nestedType = nestedType.getNominalParent();
     }
+
+    // If the protocol to which we are conditionally conforming is not a marker
+    // protocol, the conditional requirements must not involve conformance to a
+    // marker protocol. We cannot evaluate such a conformance at runtime.
+    if (!Proto->isMarkerProtocol()) {
+      for (const auto &req : *conditionalReqs) {
+        if (req.getKind() == RequirementKind::Conformance &&
+            req.getSecondType()->castTo<ProtocolType>()->getDecl()
+              ->isMarkerProtocol()) {
+          C.Diags.diagnose(
+            ComplainLoc, diag::marker_protocol_conditional_conformance,
+            Proto->getName(), req.getFirstType(),
+            req.getSecondType()->castTo<ProtocolType>()->getDecl()->getName());
+          conformance->setInvalid();
+        }
+      }
+    }
   }
 
   // If the protocol contains missing requirements, it can't be conformed to
@@ -1960,7 +1979,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   }
 
   bool impliedDisablesMissingWitnessFixits = false;
-  if (conformance->getSourceKind() == ConformanceEntryKind::Implied) {
+  if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
+      !Proto->isMarkerProtocol()) {
     // We've got something like:
     //
     //   protocol Foo : Proto {}
@@ -5640,6 +5660,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   ProtocolConformance *concurrentValueConformance = nullptr;
   ProtocolConformance *unsafeConcurrentValueConformance = nullptr;
+  ProtocolConformance *errorConformance = nullptr;
+  ProtocolConformance *codingKeyConformance = nullptr;
   bool anyInvalid = false;
   for (auto conformance : conformances) {
     // Check and record normal conformances.
@@ -5671,12 +5693,18 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     } else if (proto->isSpecificProtocol(
                    KnownProtocolKind::UnsafeConcurrentValue)) {
       unsafeConcurrentValueConformance = conformance;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
+      errorConformance = conformance;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
+      codingKeyConformance = conformance;
     }
   }
 
   // Check constraints of ConcurrentValue.
-  if (concurrentValueConformance && !unsafeConcurrentValueConformance)
-    checkConcurrentValueConformance(concurrentValueConformance);
+  if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
+    bool asWarning = errorConformance || codingKeyConformance;
+    checkConcurrentValueConformance(concurrentValueConformance, asWarning);
+  }
 
   // Check all conformances.
   groupChecker.checkAllConformances();

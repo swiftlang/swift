@@ -761,7 +761,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
 /// Parse a function definition signature.
 ///   func-signature:
-///     func-arguments 'async'? func-throws? func-signature-result?
+///     func-arguments ('async'|'reasync')? func-throws? func-signature-result?
 ///   func-signature-result:
 ///     '->' type
 ///
@@ -772,6 +772,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                ParameterList *&bodyParams,
                                DefaultArgumentInfo &defaultArgs,
                                SourceLoc &asyncLoc,
+                               bool &reasync,
                                SourceLoc &throwsLoc,
                                bool &rethrows,
                                TypeRepr *&retType) {
@@ -786,8 +787,11 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   FullName = DeclName(Context, SimpleName, NamePieces);
 
   // Check for the 'async' and 'throws' keywords.
+  reasync = false;
   rethrows = false;
-  Status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc, &rethrows);
+  Status |= parseEffectsSpecifiers(SourceLoc(),
+                                   asyncLoc, &reasync,
+                                   throwsLoc, &rethrows);
 
   // If there's a trailing arrow, parse the rest as the result type.
   SourceLoc arrowLoc;
@@ -800,9 +804,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       arrowLoc = consumeToken(tok::colon);
     }
 
-    // Check for 'throws' and 'rethrows' after the arrow, but
-    // before the type, and correct it.
-    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    // Check for effect specifiers after the arrow, but before the type, and
+    // correct it.
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
 
     ParserResult<TypeRepr> ResultType =
         parseDeclResultType(diag::expected_type_function_result);
@@ -811,8 +815,8 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     if (Status.isErrorOrHasCompletion())
       return Status;
 
-    // Check for 'throws' and 'rethrows' after the type and correct it.
-    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, &rethrows);
+    // Check for effect specifiers after the type and correct it.
+    parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows);
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
@@ -825,7 +829,8 @@ bool Parser::isEffectsSpecifier(const Token &T) {
   // NOTE: If this returns 'true', that token must be handled in
   //       'parseEffectsSpecifiers()'.
 
-  if (T.isContextualKeyword("async"))
+  if (T.isContextualKeyword("async") ||
+      T.isContextualKeyword("reasync"))
     return true;
 
   if (T.isAny(tok::kw_throws, tok::kw_rethrows) ||
@@ -837,35 +842,48 @@ bool Parser::isEffectsSpecifier(const Token &T) {
 
 ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
                                             SourceLoc &asyncLoc,
+                                            bool *reasync,
                                             SourceLoc &throwsLoc,
                                             bool *rethrows) {
   ParserStatus status;
 
   while (true) {
     // 'async'
-    if (Tok.isContextualKeyword("async")) {
-
+    bool isReasync = Tok.isContextualKeyword("reasync");
+    if (Tok.isContextualKeyword("async") ||
+        isReasync) {
       if (asyncLoc.isValid()) {
         diagnose(Tok, diag::duplicate_effects_specifier, Tok.getText())
             .highlight(asyncLoc)
             .fixItRemove(Tok.getLoc());
+      } else if (!reasync && isReasync) {
+        // Replace 'reasync' with 'async' unless it's allowed.
+        diagnose(Tok, diag::reasync_function_type)
+            .fixItReplace(Tok.getLoc(), "async");
       } else if (existingArrowLoc.isValid()) {
         SourceLoc insertLoc = existingArrowLoc;
         if (throwsLoc.isValid() &&
             SourceMgr.isBeforeInBuffer(throwsLoc, insertLoc))
           insertLoc = throwsLoc;
-        diagnose(Tok, diag::async_or_throws_in_wrong_position, "async")
+        diagnose(Tok, diag::async_or_throws_in_wrong_position,
+                 (reasync && isReasync) ? "reasync" : "async")
             .fixItRemove(Tok.getLoc())
-            .fixItInsert(insertLoc, "async ");
+            .fixItInsert(insertLoc,
+                         (reasync && isReasync) ? "reasync " : "async ");
       } else if (throwsLoc.isValid()) {
         // 'async' cannot be after 'throws'.
         assert(existingArrowLoc.isInvalid());
-        diagnose(Tok, diag::async_after_throws, rethrows && *rethrows)
+        diagnose(Tok, diag::async_after_throws,
+                 reasync && isReasync,
+                 rethrows && *rethrows)
             .fixItRemove(Tok.getLoc())
-            .fixItInsert(throwsLoc, "async ");
+            .fixItInsert(throwsLoc, isReasync ? "reasync " : "async ");
       }
-      if (asyncLoc.isInvalid())
+      if (asyncLoc.isInvalid()) {
+        if (reasync)
+          *reasync = isReasync;
         asyncLoc = Tok.getLoc();
+      }
       consumeToken();
       continue;
     }

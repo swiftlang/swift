@@ -8,7 +8,7 @@ import Builtin
 import Swift
 import SwiftShims
 
-protocol ClassP : class {
+protocol ClassP : AnyObject {
   func foo()
 }
 
@@ -1774,7 +1774,7 @@ class IntWrapper {
 
 // CHECK-LABEL: CG of testInteriorCycle
 // CHECK-NEXT:   Arg [ref] %0 Esc: A, Succ: (%2)
-// CHECK-NEXT:   Con [int] %2 Esc: G, Succ: (%2)
+// CHECK-NEXT:   Con [int] %2 Esc: A, Succ: (%2)
 // CHECK-NEXT:   Val %6 Esc: , Succ: %0, %2
 // CHECK-NEXT:   Ret return Esc: , Succ: %6
 // CHECK-LABEL: End

@@ -138,7 +138,7 @@ public:
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
-    return {HoleType::get(typeVar->getASTContext(), typeVar),
+    return {PlaceholderType::get(typeVar->getASTContext(), typeVar),
             AllowedBindingKind::Exact,
             /*source=*/locator};
   }
@@ -185,11 +185,38 @@ struct LiteralRequirement {
     CoveredBy = coveredBy;
   }
 
-  bool isCoveredBy(Type type, DeclContext *useDC) const;
+  /// Determines whether this literal requirement is "covered"
+  /// by the given binding - type of the binding could either be
+  /// equal (in canonical sense) to the protocol's default type,
+  /// or conform to a protocol.
+  ///
+  /// \param binding The binding to check for coverage.
+  ///
+  /// \param canBeNil The flag that determines whether given type
+  /// variable requires all of its bindings to be optional.
+  ///
+  /// \param useDC The declaration context in which this literal
+  /// requirement is used.
+  ///
+  /// \returns a pair of bool and a type:
+  ///    - bool, true if binding covers given literal protocol;
+  ///    - type, non-null if binding type has to be adjusted
+  ///      to cover given literal protocol;
+  std::pair<bool, Type> isCoveredBy(const PotentialBinding &binding,
+                                    bool canBeNil,
+                                    DeclContext *useDC) const;
+
+  void resetCoverage() {
+    assert(isCovered() && "literal requirement is uncovered");
+    CoveredBy = nullptr;
+  }
 
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
+
+private:
+  bool isCoveredBy(Type type, DeclContext *useDC) const;
 };
 
 struct PotentialBindings {
@@ -231,7 +258,8 @@ struct PotentialBindings {
   /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
   /// reachable through subtype/conversion  relationship e.g.
   /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
-  llvm::SmallPtrSet<TypeVariableType *, 2> AdjacentVars;
+  llvm::SmallDenseSet<std::pair<TypeVariableType *, Constraint *>, 2>
+      AdjacentVars;
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
@@ -279,9 +307,9 @@ struct PotentialBindings {
   bool isPotentiallyIncomplete() const;
 
   /// If this type variable doesn't have any viable bindings, or
-  /// if there is only one binding and it's a hole type, consider
+  /// if there is only one binding and it's a placeholder type, consider
   /// this type variable to be a hole in a constraint system
-  /// regardless of where hole type originated.
+  /// regardless of where the placeholder type originated.
   bool isHole() const {
     if (isDirectHole())
       return true;
@@ -290,14 +318,14 @@ struct PotentialBindings {
       return false;
 
     const auto &binding = Bindings.front();
-    return binding.BindingType->is<HoleType>();
+    return binding.BindingType->is<PlaceholderType>();
   }
 
   /// Determines whether the only possible binding for this type variable
-  /// would be a hole type. This is different from `isHole` method because
-  /// type variable could also acquire a hole type transitively if one
-  /// of the type variables in its subtype/equivalence chain has been
-  /// bound to a hole type.
+  /// would be a placeholder type. This is different from `isHole` method
+  /// because type variable could also acquire a placeholder type transitively
+  /// if one of the type variables in its subtype/equivalence chain has been
+  /// bound to a placeholder type.
   bool isDirectHole() const;
 
   /// Determine if the bindings only constrain the type variable from above
@@ -391,26 +419,6 @@ struct PotentialBindings {
 
   void addLiteral(Constraint *constraint);
 
-  /// Determines whether the given literal protocol is "covered"
-  /// by the given binding - type of the binding could either be
-  /// equal (in canonical sense) to the protocol's default type,
-  /// or conform to a protocol.
-  ///
-  /// \param literal The literal protocol requirement to check.
-  ///
-  /// \param binding The binding to check for coverage.
-  ///
-  /// \param canBeNil The flag that determines whether given type
-  /// variable requires all of its bindings to be optional.
-  ///
-  /// \returns a pair of bool and a type:
-  ///    - bool, true if binding covers given literal protocol;
-  ///    - type, non-null if binding type has to be adjusted
-  ///      to cover given literal protocol;
-  std::pair<bool, Type> isLiteralCoveredBy(const LiteralRequirement &literal,
-                                           const PotentialBinding &binding,
-                                           bool canBeNil) const;
-
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
   void addPotentialBinding(PotentialBinding binding, bool allowJoinMeet = true);
@@ -461,6 +469,13 @@ private:
 
 public:
   void infer(Constraint *constraint);
+
+  /// Retract all bindings and other information related to a given
+  /// constraint from this binding set.
+  ///
+  /// This would happen when constraint is simplified or solver backtracks
+  /// (either from overload choice or (some) type variable binding).
+  void retract(Constraint *constraint);
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.

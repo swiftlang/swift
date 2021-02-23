@@ -4972,16 +4972,17 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   auto subs = declRef.getSubstitutions();
   bool throws = false;
   bool markedAsRethrows = call->getAttrs().hasAttribute<swift::RethrowsAttr>();
-  FunctionRethrowingKind rethrowingKind = call->getRethrowingKind();
-  if (rethrowingKind == FunctionRethrowingKind::ByConformance) {
+  PolymorphicEffectKind rethrowingKind =
+      call->getPolymorphicEffectKind(EffectKind::Throws);
+  if (rethrowingKind == PolymorphicEffectKind::ByConformance) {
     for (auto conformanceRef : subs.getConformances()) {
-      if (conformanceRef.classifyAsThrows()) {
+      if (conformanceRef.hasEffect(EffectKind::Throws)) {
         throws = true;
         break;
       }
     }
   } else if (markedAsRethrows && 
-             rethrowingKind == FunctionRethrowingKind::Throws) {
+             rethrowingKind == PolymorphicEffectKind::Always) {
     throws = true;
   }
   

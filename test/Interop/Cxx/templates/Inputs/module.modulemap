@@ -112,3 +112,8 @@ module MemberTemplates {
   header "member-templates.h"
   requires cplusplus
 }
+
+module LargeClassTemplates {
+  header "large-class-templates.h"
+  requires cplusplus
+}

@@ -102,6 +102,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
   .Case("swift-indent", DriverKind::SwiftIndent)
   .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
+  .Case("swift-api-extract", DriverKind::APIExtract)
   .Default(None);
   
   if (Kind.hasValue())
@@ -3467,6 +3468,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
+  case DriverKind::APIExtract:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

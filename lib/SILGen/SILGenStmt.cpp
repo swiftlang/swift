@@ -729,11 +729,10 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
   // Emit the condition bindings, branching to the bodyBB if they fail.
   auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
   auto NumNonTaken = SGF.loadProfilerCount(S);
-  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
-
   // Begin a new 'guard' scope, which is popped when the next innermost debug
   // scope ends.
   SGF.enterDebugScope(S, /*isGuardScope=*/true);
+  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {

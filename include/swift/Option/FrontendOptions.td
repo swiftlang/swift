@@ -214,17 +214,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
-  def enable_experimental_prespecialization :
-    Flag<["-"], "enable-experimental-prespecialization">,
-    HelpText<"Enable experimental pre-specialization support">;
-
 def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
-
-def enable_experimental_concurrent_value_checking :
-  Flag<["-"], "enable-experimental-concurrent-value-checking">,
-  HelpText<"Enable ConcurrentValue checking">;
 
 def enable_experimental_flow_sensitive_concurrent_captures :
   Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
@@ -800,4 +792,9 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
+
+def experimental_has_async_alternative_attribute:
+  Flag<["-"], "experimental-has-async-alternative-attribute">,
+  HelpText<"Allow use of @hasAsyncAlternative">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

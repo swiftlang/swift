@@ -95,6 +95,17 @@ FuncDecl *ADContext::getPlusEqualDecl() const {
   return cachedPlusEqualFn;
 }
 
+AccessorDecl *ADContext::getAdditiveArithmeticZeroGetter() const {
+  if (cachedZeroGetter)
+    return cachedZeroGetter;
+  auto zeroDeclLookup = getAdditiveArithmeticProtocol()
+      ->lookupDirect(getASTContext().Id_zero);
+  auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
+  assert(zeroDecl->isProtocolRequirement());
+  cachedZeroGetter = zeroDecl->getOpaqueAccessor(AccessorKind::Get);
+  return cachedZeroGetter;
+}
+
 void ADContext::cleanUp() {
   // Delete all references to generated functions.
   for (auto fnRef : generatedFunctionReferences) {

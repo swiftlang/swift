@@ -657,7 +657,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   Selector selector(method);
   llvm::Value *selectorValue = IGF.emitObjCSelectorRefLoad(selector.str());
 
-  auto fn = FunctionPointer::forDirect(FunctionPointer::KindTy::Function,
+  auto fn = FunctionPointer::forDirect(FunctionPointer::Kind::Function,
                                        messenger, sig);
   return Callee(std::move(info), fn, receiverValue, selectorValue);
 }
@@ -710,8 +710,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                            MANGLE_AS_STRING(OBJC_PARTIAL_APPLY_THUNK_SYM),
                            &IGM.Module);
-  fwd->setCallingConv(
-      expandCallingConv(IGM, SILFunctionTypeRepresentation::Thick));
+  fwd->setCallingConv(expandCallingConv(
+      IGM, SILFunctionTypeRepresentation::Thick, false/*isAsync*/));
 
   fwd->setAttributes(attrs);
   // Merge initial attributes with attrs.

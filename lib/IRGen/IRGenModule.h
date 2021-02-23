@@ -753,6 +753,7 @@ public:
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
+  llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
 
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
 
@@ -1382,7 +1383,8 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
-  Signature getSignature(CanSILFunctionType fnType);
+  Signature getSignature(CanSILFunctionType fnType,
+                         bool suppressGenerics = false);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);

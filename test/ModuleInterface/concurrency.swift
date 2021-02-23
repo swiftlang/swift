@@ -8,6 +8,10 @@ public func fn() async {
   fatalError()
 }
 
+public func reasyncFn(_: () async -> ()) reasync {
+  fatalError()
+}
+
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -I %t
 
 #else
@@ -21,3 +25,4 @@ func callFn() async {
 // RUN: %FileCheck %s <%t/Library.swiftinterface
 // CHECK: // swift-module-flags:{{.*}} -enable-experimental-concurrency
 // CHECK: public func fn() async
+// CHECK: public func reasyncFn(_: () async -> ()) reasync

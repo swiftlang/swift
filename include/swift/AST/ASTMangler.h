@@ -171,6 +171,7 @@ public:
   /// predefined in the Swift runtime for the given type signature.
   std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
                                                    CanType ResultType,
+                                                   CanGenericSignature Sig,
                                                    bool predefined);
   
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
@@ -203,6 +204,11 @@ public:
       CanType fromType, CanType toType, GenericSignature signature,
       AutoDiffLinearMapKind linearMapKind);
 
+  /// Mangle a SIL differentiability witness.
+  std::string mangleSILDifferentiabilityWitness(StringRef originalName,
+                                                DifferentiabilityKind kind,
+                                                AutoDiffConfig config);
+
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
   /// - Mangled original function name.
@@ -215,14 +221,6 @@ public:
                                      StringRef origFnName, unsigned bbId,
                                      AutoDiffLinearMapKind linearMapKind,
                                      AutoDiffConfig config);
-
-  /// Mangle a SIL differentiability witness key:
-  /// - Mangled original function name.
-  /// - Parameter indices.
-  /// - Result indices.
-  /// - Derivative generic signature (optional).
-  std::string
-  mangleSILDifferentiabilityWitnessKey(SILDifferentiabilityWitnessKey key);
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,

@@ -372,9 +372,11 @@ void getInheritedProtocols(Decl *decl, SmallPtrSetImpl<ProtocolDecl *> &protos) 
 
   for (auto loc : inheritedTypeLocs) {
     if (loc.getTypeRepr())
-      handleInheritedType(TypeResolution::forStructural(
-          cast<DeclContext>(decl), None, /*unboundTyOpener*/ nullptr)
-        .resolveType(loc.getTypeRepr()));
+      handleInheritedType(
+          TypeResolution::forStructural(cast<DeclContext>(decl), None,
+                                        /*unboundTyOpener*/ nullptr,
+                                        /*placeholderHandler*/ nullptr)
+              .resolveType(loc.getTypeRepr()));
     else
       handleInheritedType(loc.getType());
   }

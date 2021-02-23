@@ -30,22 +30,36 @@ protocol P6: P3 { } // okay
 
 func genericOk<T: P3>(_: T) { }
 
-func testGenericOk(i: Int, arr: [Int], nope: [Double]) {
+func testGenericOk(i: Int, arr: [Int], nope: [Double], p3: P3, p3array: [P3]) {
   genericOk(i)
   genericOk(arr)
   genericOk(nope) // expected-error{{global function 'genericOk' requires that 'Double' conform to 'P3'}}
+  genericOk(p3)
+  genericOk(p3array)
 }
 
 // Incorrect uses of marker protocols in types.
 func testNotOkay(a: Any) {
-  var mp1: P3 = 17 // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
+  var mp1: P3 = 17
   _ = mp1
   mp1 = 17
 
-  if let mp2 = a as? P3 { _ = mp2 } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
-  if let mp3 = a as? AnyObject & P3 { _ = mp3 } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
-  if a is AnyObject & P3 { } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
+  if let mp2 = a as? P3 { _ = mp2 } // expected-error{{marker protocol 'P3' cannot be used in a conditional cast}}
+  if let mp3 = a as? AnyObject & P3 { _ = mp3 } // expected-error{{marker protocol 'P3' cannot be used in a conditional cast}}
+  if a is AnyObject & P3 { } // expected-error{{marker protocol 'P3' cannot be used in a conditional cast}}
 
-  func inner(p3: P3) { } // expected-error{{marker protocol 'P3' can only be used in generic constraints}}
+  func inner(p3: P3) { }
 }
 
+
+@_marker protocol P8 { }
+protocol P9: P8 { }
+
+// Implied conditional conformance to P8 is okay because P8 is a marker
+// protocol.
+extension Array: P9 where Element: P9 { }
+
+protocol P10 { }
+
+extension Array: P10 where Element: P10, Element: P8 { }
+// expected-error@-1{{conditional conformance to non-marker protocol 'P10' cannot depend on conformance of 'Element' to non-marker protocol 'P8'}}

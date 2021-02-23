@@ -80,8 +80,17 @@ public:
     return Flags.getPriority();
   }
 
-  /// Run this job.
-  void run(ExecutorRef currentExecutor);
+  /// Given that we've fully established the job context in the current
+  /// thread, actually start running this job.  To establish the context
+  /// correctly, call swift_job_run or runJobInExecutorContext.
+  void runInFullyEstablishedContext(ExecutorRef currentExecutor);
+
+  /// Given that we've fully established the job context in the
+  /// current thread, and that the job is a simple (non-task) job,
+  /// actually start running this job.
+  void runSimpleInFullyEstablishedContext(ExecutorRef currentExecutor) {
+    RunJob(this, currentExecutor);
+  }
 };
 
 // The compiler will eventually assume these.
@@ -173,7 +182,11 @@ public:
     assert(flags.isAsyncTask());
   }
 
-  void run(ExecutorRef currentExecutor) {
+  /// Given that we've already fully established the job context
+  /// in the current thread, start running this task.  To establish
+  /// the job context correctly, call swift_job_run or
+  /// runInExecutorContext.
+  void runInFullyEstablishedContext(ExecutorRef currentExecutor) {
     ResumeTask(this, currentExecutor, ResumeContext);
   }
   
@@ -300,7 +313,7 @@ public:
                 // therefore skip also skip pointing to that parent and point
                 // to whichever parent it was pointing to as well, it may be its
                 // immediate parent, or some super-parent.
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext());
+                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) |
                                   static_cast<uintptr_t>(NextLinkType::IsParent);
                 break;
               case NextLinkType::IsNext:
@@ -308,7 +321,7 @@ public:
                                 "this should not happen, as it implies the parent must have stored some value.");
                 break;
               case NextLinkType::IsTerminal:
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext());
+                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) | 
                                   static_cast<uintptr_t>(NextLinkType::IsTerminal);
                 break;
             }
@@ -845,8 +858,10 @@ public:
     /// The type of the result that will be produced by the future.
     const Metadata *resultType;
 
-    // Trailing storage for the result itself. The storage will be uninitialized,
-    // contain an instance of \c resultType, or contain an an \c Error.
+    SwiftError *error = nullptr;
+
+    // Trailing storage for the result itself. The storage will be
+    // uninitialized, contain an instance of \c resultType.
 
     friend class AsyncTask;
 
@@ -858,6 +873,10 @@ public:
     /// Destroy the storage associated with the future.
     void destroy();
 
+    const Metadata *getResultType() const {
+      return resultType;
+    }
+
     /// Retrieve a pointer to the storage of result.
     OpaqueValue *getStoragePtr() {
       return reinterpret_cast<OpaqueValue *>(
@@ -865,25 +884,20 @@ public:
     }
 
     /// Retrieve the error.
-    SwiftError *&getError() {
-      return *reinterpret_cast<SwiftError **>(
-           reinterpret_cast<char *>(this) + storageOffset(resultType));
-    }
+    SwiftError *&getError() { return *&error; }
 
     /// Compute the offset of the storage from the base of the future
     /// fragment.
     static size_t storageOffset(const Metadata *resultType)  {
       size_t offset = sizeof(FutureFragment);
-      size_t alignment =
-          std::max(resultType->vw_alignment(), alignof(SwiftError *));
+      size_t alignment = resultType->vw_alignment();
       return (offset + alignment - 1) & ~(alignment - 1);
     }
 
     /// Determine the size of the future fragment given a particular future
     /// result type.
     static size_t fragmentSize(const Metadata *resultType) {
-      return storageOffset(resultType) +
-          std::max(resultType->vw_size(), sizeof(SwiftError *));
+      return storageOffset(resultType) + resultType->vw_size();
     }
   };
 
@@ -944,11 +958,11 @@ static_assert(sizeof(AsyncTask) == 12 * sizeof(void*),
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
 
-inline void Job::run(ExecutorRef currentExecutor) {
+inline void Job::runInFullyEstablishedContext(ExecutorRef currentExecutor) {
   if (auto task = dyn_cast<AsyncTask>(this))
-    task->run(currentExecutor);
+    task->runInFullyEstablishedContext(currentExecutor);
   else
-    RunJob(this, currentExecutor);
+    runSimpleInFullyEstablishedContext(currentExecutor);
 }
 
 /// An asynchronous context within a task.  Generally contexts are
@@ -1038,7 +1052,7 @@ public:
 /// futures.
 class FutureAsyncContext : public AsyncContext {
 public:
-  SwiftError *errorResult = nullptr;
+  SwiftError **errorResult = nullptr;
   OpaqueValue *indirectResult;
 
   using AsyncContext::AsyncContext;

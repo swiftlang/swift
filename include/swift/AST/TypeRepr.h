@@ -1085,6 +1085,34 @@ private:
   friend class TypeRepr;
 };
 
+/// TypeRepr for a user-specified placeholder (essentially, a user-facing
+/// representation of an anonymous type variable.
+///
+/// Can occur anywhere a normal type would occur, though usually expected to be
+/// used in structural positions like \c Generic<Int,_>.
+class PlaceholderTypeRepr: public TypeRepr {
+  SourceLoc UnderscoreLoc;
+
+public:
+  PlaceholderTypeRepr(SourceLoc loc)
+    : TypeRepr(TypeReprKind::Placeholder), UnderscoreLoc(loc)
+  {}
+
+    SourceLoc getUnderscoreLoc() const { return UnderscoreLoc; }
+
+    static bool classof(const TypeRepr *T) {
+      return T->getKind() == TypeReprKind::Placeholder;
+    }
+    static bool classof(const PlaceholderTypeRepr *T) { return true; }
+
+  private:
+    SourceLoc getStartLocImpl() const { return UnderscoreLoc; }
+    SourceLoc getEndLocImpl() const { return UnderscoreLoc; }
+    SourceLoc getLocImpl() const { return UnderscoreLoc; }
+    void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+    friend class TypeRepr;
+};
+
 /// SIL-only TypeRepr for box types.
 ///
 /// Boxes are either concrete: { var Int, let String }
@@ -1198,6 +1226,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::SILBox:
   case TypeReprKind::Shared:
   case TypeReprKind::Owned:
+  case TypeReprKind::Placeholder:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

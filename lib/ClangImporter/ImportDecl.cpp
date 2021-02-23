@@ -3475,7 +3475,8 @@ namespace {
 
         // If we've already imported this decl, skip it so we don't add the same
         // member twice.
-        if (Impl.ImportedDecls.count({nd->getCanonicalDecl(), getVersion()}))
+        if (Impl.ImportedDecls.find({nd->getCanonicalDecl(), getVersion()}) !=
+            Impl.ImportedDecls.end())
           continue;
 
         auto member = Impl.importDecl(nd, getActiveSwiftVersion());
@@ -3697,6 +3698,22 @@ namespace {
       return VisitRecordDecl(decl);
     }
 
+    bool isSpecializationDepthGreaterThan(
+        const clang::ClassTemplateSpecializationDecl *decl, unsigned maxDepth) {
+      for (auto arg : decl->getTemplateArgs().asArray()) {
+        if (arg.getKind() == clang::TemplateArgument::Type) {
+          if (auto classSpec =
+                  dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+                      arg.getAsType()->getAsCXXRecordDecl())) {
+            if (maxDepth == 0 ||
+                isSpecializationDepthGreaterThan(classSpec, maxDepth - 1))
+              return true;
+          }
+        }
+      }
+      return false;
+    }
+
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
       // `Sema::isCompleteType` will try to instantiate the class template as a
@@ -3713,6 +3730,13 @@ namespace {
       auto def = dyn_cast<clang::ClassTemplateSpecializationDecl>(
           decl->getDefinition());
       assert(def && "Class template instantiation didn't have definition");
+
+      // Currently this is a relatively low number, in the future we might
+      // consider increasing it, but this should keep compile time down,
+      // especially for types that become exponentially large when
+      // instantiating.
+      if (isSpecializationDepthGreaterThan(def, 8))
+        return nullptr;
 
       // FIXME: This will instantiate all members of the specialization (and detect
       // instantiation failures in them), which can be more than is necessary
@@ -8133,9 +8157,10 @@ void ClangImporter::Implementation::importAttributes(
     // __attribute__((swift_attr("attribute")))
     //
     if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
-      // FIXME: Hard-core @MainActor, because we don't have a point at which to
-      // do name lookup for imported entities.
-      if (swiftAttr->getAttribute() == "@MainActor") {
+      // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
+      // point at which to do name lookup for imported entities.
+      if (swiftAttr->getAttribute() == "@MainActor" ||
+          swiftAttr->getAttribute() == "@UIActor") {
         if (Type mainActorType = getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
@@ -9067,8 +9092,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   // If we're in concurrency mode, mark the constant as @actorIndependent
   if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    auto actorIndependentAttr = new (C) ActorIndependentAttr(SourceLoc(),
-        SourceRange(), ActorIndependentKind::Safe);
+    auto actorIndependentAttr = new (C) ActorIndependentAttr(
+        ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
     var->getAttrs().add(actorIndependentAttr);
   }
   // Set the function up as the getter.

@@ -2166,6 +2166,20 @@ void Remangler::mangleAutoDiffFunctionKind(Node *node) {
   Buffer << (char)node->getIndex();
 }
 
+void Remangler::mangleDifferentiabilityWitness(Node *node) {
+  auto childIt = node->begin();
+  while (childIt != node->end() && (*childIt)->getKind() != Node::Kind::Index)
+    mangle(*childIt++);
+  if (node->getLastChild()->getKind() ==
+          Node::Kind::DependentGenericSignature)
+    mangle(node->getLastChild());
+  Buffer << "WJ" << (char)(*childIt++)->getIndex();
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
+}
+
 void Remangler::mangleIndexSubset(Node *node) {
   Buffer << node->getText();
 }

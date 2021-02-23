@@ -12,7 +12,7 @@ import _Differentiation
 // 2.	While evaluating request ExecuteSILPipelineRequest(Run pipelines { Mandatory Diagnostic Passes + Enabling Optimization Passes } on SIL for main.main)
 // 3.	While running pass #17 SILModuleTransform "Differentiation".
 // 4.	While processing // differentiability witness for foo(_:)
-// sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s4main3fooyS2fF : $@convention(thin) (Float) -> Float {
+// sil_differentiability_witness [serialized] [reverse] [parameters 0] [results 0] @$s4main3fooyS2fF : $@convention(thin) (Float) -> Float {
 // }
 @differentiable(reverse, wrt: x)
 public func i_have_a_pullback_struct(_ x: Float) -> Float {
@@ -25,7 +25,7 @@ public func i_have_a_pullback_struct(_ x: Float) -> Float {
 // 2.	While evaluating request ExecuteSILPipelineRequest(Run pipelines { Mandatory Diagnostic Passes + Enabling Optimization Passes } on SIL for main.main)
 // 3.	While running pass #24 SILModuleTransform "Differentiation".
 // 4.	While processing // differentiability witness for i_have_a_branching_trace_enum(_:)
-// sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s4main29i_have_a_branching_trace_enumyS2fF : $@convention(thin) (Float) -> Float {
+// sil_differentiability_witness [serialized] [reverse] [parameters 0] [results 0] @$s4main29i_have_a_branching_trace_enumyS2fF : $@convention(thin) (Float) -> Float {
 // }
 @differentiable(reverse, wrt: x)
 public func i_have_a_branching_trace_enum(_ x: Float) -> Float {

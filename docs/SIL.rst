@@ -1590,11 +1590,14 @@ Differentiability Witnesses
   sil-differentiability-witness ::=
       'sil_differentiability_witness'
       sil-linkage?
+      '[' differentiability-kind ']'
       '[' 'parameters' sil-differentiability-witness-function-index-list ']'
       '[' 'results' sil-differentiability-witness-function-index-list ']'
       generic-parameter-clause?
       sil-function-name ':' sil-type
       sil-differentiability-witness-body?
+
+  differentiability-kind ::= 'forward' | 'reverse' | 'normal' | 'linear'
 
   sil-differentiability-witness-body ::=
       '{' sil-differentiability-witness-entry?
@@ -1625,7 +1628,7 @@ based on the key.
 
 ::
 
-  sil_differentiability_witness hidden [parameters 0] [results 0] <T where T : Differentiable> @id : $@convention(thin) (T) -> T {
+  sil_differentiability_witness hidden [normal] [parameters 0] [results 0] <T where T : Differentiable> @id : $@convention(thin) (T) -> T {
     jvp: @id_jvp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
     vjp: @id_vjp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
   }
@@ -7066,6 +7069,7 @@ differentiability_witness_function
   sil-instruction ::=
       'differentiability_witness_function'
       '[' sil-differentiability-witness-function-kind ']'
+      '[' differentiability-kind ']'
       '[' 'parameters' sil-differentiability-witness-function-index-list ']'
       '[' 'results' sil-differentiability-witness-function-index-list ']'
       generic-parameter-clause?
@@ -7074,7 +7078,7 @@ differentiability_witness_function
   sil-differentiability-witness-function-kind ::= 'jvp' | 'vjp' | 'transpose'
   sil-differentiability-witness-function-index-list ::= [0-9]+ (' ' [0-9]+)*
 
-  differentiability_witness_function [jvp] [parameters 0] [results 0] \
+  differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] \
     <T where T: Differentiable> @foo : $(T) -> T
 
 Looks up a differentiability witness function (JVP, VJP, or transpose) for
@@ -7086,6 +7090,7 @@ look up: ``[jvp]``, ``[vjp]``, or ``[transpose]``.
 The remaining components identify the SIL differentiability witness:
 
 - Original function name.
+- Differentiability kind.
 - Parameter indices.
 - Result indices.
 - Witness generic parameter clause (optional). When parsing SIL, the parsed

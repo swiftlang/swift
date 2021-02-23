@@ -225,13 +225,6 @@ ERROR(cannot_apply_lvalue_binop_to_subelement,none,
 ERROR(cannot_apply_lvalue_binop_to_rvalue,none,
       "left side of mutating operator has immutable type %0", (Type))
 
-ERROR(cannot_subscript_base,none,
-      "cannot subscript a value of type %0",
-      (Type))
-
-ERROR(cannot_subscript_ambiguous_base,none,
-      "cannot subscript a value of incorrect or ambiguous type", ())
-
 ERROR(cannot_subscript_nil_literal,none,
       "cannot subscript a nil literal value", ())
 ERROR(conditional_cast_from_nil,none,
@@ -282,6 +275,10 @@ FIXIT(insert_closure_return_type_placeholder,
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
+
+ERROR(unsupported_closure_attr,none,
+      "%select{attribute |}0 '%1' is not supported on a closure",
+      (bool, StringRef))
 
 NOTE(suggest_expected_match,none,
      "%select{expected an argument list|produces result}0 of type '%1'",
@@ -778,6 +775,10 @@ NOTE(serialization_compatibility_version_mismatch,none,
      "compiling as Swift %0, with '%1' built as Swift %2 "
      "(this is supported but may expose additional compiler issues)",
      (StringRef, StringRef, StringRef))
+
+ERROR(serialization_allowing_invalid_decl,none,
+      "allowing deserialization of invalid declaration %0 from module '%1'",
+      (DeclName, StringRef))
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
@@ -2994,8 +2995,10 @@ ERROR(override_rethrows_with_non_rethrows,none,
       "be 'rethrows'", (bool))
 ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
-ERROR(rethrows_attr_on_non_protocol,none,
-      "@rethrows may only be used on 'protocol' declarations", ())
+
+ERROR(override_reasync_with_non_reasync,none,
+      "override of 'reasync' %select{method|initializer}0 should also "
+      "be 'reasync'", (bool))
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
@@ -3539,6 +3542,9 @@ ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
 NOTE(descriptive_generic_type_declared_here,none,
      "%0 declared here", (StringRef))
+
+ERROR(placeholder_type_not_allowed,none,
+      "you cannot use a placeholder type here", ())
 
 WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
@@ -4313,24 +4319,45 @@ WARNING(non_concurrent_property_type,none,
         "cannot use %0 %1 with a non-concurrent-value type %2 "
         "%select{across actors|from concurrently-executed code}3",
         (DescriptiveDeclKind, DeclName, Type, bool))
+WARNING(non_concurrent_keypath_capture,none,
+        "cannot form key path that captures non-concurrent-value type %0",
+        (Type))
 ERROR(non_concurrent_type_member,none,
+      "%select{stored property %1|associated value %1}0 of "
+      "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
+      (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
+WARNING(non_concurrent_type_member_warn,none,
       "%select{stored property %1|associated value %1}0 of "
       "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
+WARNING(concurrent_value_class_mutable_property_warn,none,
+      "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
+      (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_outside_source_file,none,
-      "conformance 'ConcurrentValue' must occur in the same source file as "
+      "conformance to 'ConcurrentValue' must occur in the same source file as "
+      "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
+      (DescriptiveDeclKind, DeclName))
+WARNING(concurrent_value_outside_source_file_warn,none,
+      "conformance to 'ConcurrentValue' must occur in the same source file as "
       "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_open_class,none,
+      "open class %0 cannot conform to `ConcurrentValue`; "
+      "use `UnsafeConcurrentValue`", (DeclName))
+WARNING(concurrent_value_open_class_warn,none,
       "open class %0 cannot conform to `ConcurrentValue`; "
       "use `UnsafeConcurrentValue`", (DeclName))
 ERROR(concurrent_value_inherit,none,
       "`ConcurrentValue` class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
+WARNING(concurrent_value_inherit_warn,none,
+        "`ConcurrentValue` class %1 cannot inherit from another class"
+        "%select{| other than 'NSObject'}0",
+        (bool, DeclName))
 
 ERROR(actorindependent_let,none,
       "'@actorIndependent' is meaningless on 'let' declarations because "
@@ -5619,8 +5646,12 @@ ERROR(marker_protocol_requirement, none,
 ERROR(marker_protocol_inherit_nonmarker, none,
       "marker protocol %0 cannot inherit non-marker protocol %1",
       (DeclName, DeclName))
-ERROR(marker_protocol_value,none,
-      "marker protocol %0 can only be used in generic constraints", (DeclName))
+ERROR(marker_protocol_cast,none,
+      "marker protocol %0 cannot be used in a conditional cast", (DeclName))
+ERROR(marker_protocol_conditional_conformance,none,
+      "conditional conformance to non-marker protocol %0 cannot depend on "
+      "conformance of %1 to non-marker protocol %2",
+      (Identifier, Type, Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics

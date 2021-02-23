@@ -255,7 +255,7 @@ enum TypeVariableOptions {
   /// Whether the type variable can be bound to a non-escaping type or not.
   TVO_CanBindToNoEscape = 0x04,
 
-  /// Whether the type variable can be bound to a hole type or not.
+  /// Whether the type variable can be bound to a hole or not.
   TVO_CanBindToHole = 0x08,
 
   /// Whether a more specific deduction for this type variable implies a
@@ -327,7 +327,7 @@ public:
   /// Whether this type variable can bind to an inout type.
   bool canBindToNoEscape() const { return getRawOptions() & TVO_CanBindToNoEscape; }
 
-  /// Whether this type variable can bind to a hole type.
+  /// Whether this type variable can bind to a hole.
   bool canBindToHole() const { return getRawOptions() & TVO_CanBindToHole; }
 
   /// Whether this type variable prefers a subtype binding over a supertype
@@ -3759,14 +3759,15 @@ public:
   Type openUnboundGenericType(GenericTypeDecl *decl, Type parentTy,
                               ConstraintLocatorBuilder locator);
 
-  /// "Open" the given type by replacing any occurrences of unbound
-  /// generic types with bound generic types with fresh type variables as
-  /// generic arguments.
+  /// Replace placeholder types with fresh type variables, and unbound generic
+  /// types with bound generic types whose generic args are fresh type
+  /// variables.
   ///
-  /// \param type The type to open.
+  /// \param type The type on which to perform the conversion.
   ///
-  /// \returns The opened type.
-  Type openUnboundGenericTypes(Type type, ConstraintLocatorBuilder locator);
+  /// \returns The converted type.
+  Type replaceInferableTypesWithTypeVars(Type type,
+                                         ConstraintLocatorBuilder locator);
 
   /// "Open" the given type by replacing any occurrences of generic
   /// parameter types and dependent member types with fresh type variables.
@@ -4905,61 +4906,6 @@ public:
     return getExpressionTooComplex(solutionMemory);
   }
 
-  // Utility class that can collect information about the type of an
-  // argument in an apply.
-  //
-  // For example, when given a type variable type that represents the
-  // argument of a function call, it will walk the constraint graph
-  // finding any concrete types that are reachable through various
-  // subtype constraints and will also collect all the literal types
-  // conformed to by the types it finds on the walk.
-  //
-  // This makes it possible to get an idea of the kinds of literals
-  // and types of arguments that are used in the subexpression rooted
-  // in this argument, which we can then use to make better choices
-  // for how we partition the operators in a disjunction (in order to
-  // avoid visiting all the options).
-  class ArgumentInfoCollector {
-    ConstraintSystem &CS;
-    llvm::SetVector<Type> Types;
-    llvm::SetVector<ProtocolDecl *> LiteralProtocols;
-
-    void addType(Type ty) {
-      assert(!ty->is<TypeVariableType>());
-      Types.insert(ty);
-    }
-
-    void addLiteralProtocol(ProtocolDecl *proto) {
-      LiteralProtocols.insert(proto);
-    }
-
-    void walk(Type argType);
-    void minimizeLiteralProtocols();
-
-  public:
-    ArgumentInfoCollector(ConstraintSystem &cs, FunctionType *fnTy) : CS(cs) {
-      for (auto &param : fnTy->getParams())
-        walk(param.getPlainType());
-
-      minimizeLiteralProtocols();
-    }
-
-    ArgumentInfoCollector(ConstraintSystem &cs, AnyFunctionType::Param param)
-        : CS(cs) {
-      walk(param.getPlainType());
-      minimizeLiteralProtocols();
-    }
-
-    const llvm::SetVector<Type> &getTypes() const { return Types; }
-    const llvm::SetVector<ProtocolDecl *> &getLiteralProtocols() const {
-      return LiteralProtocols;
-    }
-
-    SWIFT_DEBUG_DUMP;
-  };
-
-  bool haveTypeInformationForAllArguments(FunctionType *fnType);
-
   typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
   typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
       ConstraintMatchLoop;
@@ -5021,6 +4967,26 @@ public:
   Type operator()(UnboundGenericType *unboundTy) const {
     return cs.openUnboundGenericType(unboundTy->getDecl(),
                                      unboundTy->getParent(), locator);
+  }
+};
+
+class HandlePlaceholderType {
+  ConstraintSystem &cs;
+  ConstraintLocator *locator;
+
+public:
+  explicit HandlePlaceholderType(ConstraintSystem &cs,
+                                 const ConstraintLocatorBuilder &locator)
+      : cs(cs) {
+    this->locator = cs.getConstraintLocator(locator);
+  }
+
+  Type operator()(PlaceholderTypeRepr *placeholderRepr) const {
+    return cs.createTypeVariable(
+        cs.getConstraintLocator(
+            locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
+        TVO_CanBindToNoEscape | TVO_PrefersSubtypeBinding |
+            TVO_CanBindToHole);
   }
 };
 

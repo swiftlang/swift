@@ -118,7 +118,7 @@ IRGenThunk::IRGenThunk(IRGenFunction &IGF, SILDeclRef declRef)
 
   if (isAsync) {
     asyncLayout.emplace(irgen::getAsyncContextLayout(
-        IGF.IGM, origTy, substTy, subMap));
+        IGF.IGM, origTy, substTy, subMap, /*suppress generics*/ false));
   }
 }
 
@@ -154,8 +154,11 @@ void IRGenThunk::prepareArguments() {
     }
 
     if (origTy->hasErrorResult()) {
-      Address addr = asyncLayout->getErrorLayout().project(
-          IGF, context, llvm::None);
+      auto errorLayout = asyncLayout->getErrorLayout();
+      Address pointerToAddress =
+          errorLayout.project(IGF, context, /*offsets*/ llvm::None);
+      auto load = IGF.Builder.CreateLoad(pointerToAddress);
+      auto addr = Address(load, IGF.IGM.getPointerAlignment());
       IGF.setCallerErrorResultSlot(addr.getAddress());
     }
 
@@ -338,7 +341,8 @@ void IRGenThunk::emit() {
 
   if (isAsync && origTy->hasErrorResult()) {
     SILType errorType = conv.getSILErrorType(expansionContext);
-    Address calleeErrorSlot = emission->getCalleeErrorSlot(errorType);
+    Address calleeErrorSlot = emission->getCalleeErrorSlot(
+        errorType, /*isCalleeAsync=*/origTy->isAsync());
     errorValue = IGF.Builder.CreateLoad(calleeErrorSlot);
   }
 

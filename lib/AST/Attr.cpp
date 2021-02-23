@@ -724,6 +724,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_ObjCBridged:
   case DAK_SynthesizedProtocol:
   case DAK_Rethrows:
+  case DAK_Reasync:
   case DAK_Infix:
     return false;
   case DAK_Override: {
@@ -1222,6 +1223,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "derivative";
   case DAK_Transpose:
     return "transpose";
+  case DAK_HasAsyncAlternative:
+    return "hasAsyncAlternative";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

@@ -70,7 +70,7 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) returnToCaller;
   //   SwiftActor * __ptrauth(...) callerActor;
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
-  //   SwiftError *errorResult;
+  //   SwiftError **errorResult;
   //   IndirectResultTypes *indirectResults...;
   //   union {
   //     struct {
@@ -299,7 +299,8 @@ namespace irgen {
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
-                                           SubstitutionMap substitutionMap);
+                                           SubstitutionMap substitutionMap,
+                                           bool suppressGenerics);
 
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.
@@ -316,7 +317,8 @@ namespace irgen {
       std::pair<bool, bool> values = {true, true},
       Size initialContextSize = Size(0));
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
-                                     SILFunctionTypeRepresentation convention);
+                                     SILFunctionTypeRepresentation convention,
+                                     bool isAsync);
 
   Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
                                       CanSILFunctionType fnType);
