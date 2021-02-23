@@ -4557,7 +4557,7 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::UnresolvedMemberChainResult: {
     // Ignore this mismatch if result is already a hole.
-    if (rhs->isHole())
+    if (rhs->isPlaceholder())
       return true;
 
     if (repairViaOptionalUnwrap(*this, lhs, rhs, matchKind, conversionsOrFixes,
