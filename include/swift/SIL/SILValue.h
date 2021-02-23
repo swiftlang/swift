@@ -515,6 +515,16 @@ public:
   /// result index, or None if it is not defined by an instruction.
   Optional<DefiningInstructionResult> getDefiningInstructionResult();
 
+  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
+  /// semantics if the SILValue has ownership semantics. Returns is a value
+  /// without any Ownership Semantics.
+  ///
+  /// An example of a SILValue without ownership semantics is a
+  /// struct_element_addr.
+  ///
+  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
+  ValueOwnershipKind getOwnershipKind() const;
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;
@@ -592,6 +602,8 @@ public:
 
   /// If this SILValue is a result of an instruction, return its
   /// defining instruction. Returns nullptr otherwise.
+  ///
+  /// FIXME: remove this redundant API from SILValue.
   SILInstruction *getDefiningInstruction() {
     return Value->getDefiningInstruction();
   }
@@ -610,7 +622,11 @@ public:
   /// struct_element_addr.
   ///
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
-  ValueOwnershipKind getOwnershipKind() const;
+  ///
+  /// FIXME: remove this redundant API from SILValue.
+  ValueOwnershipKind getOwnershipKind() const {
+    return Value->getOwnershipKind();
+  }
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
