@@ -67,6 +67,16 @@ public class OldSchool: MP {
   public func takeClass() async { }
 }
 
+// CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+// CHECK-NEXT: @rethrows public protocol RP
+@rethrows public protocol RP {
+  func f() throws
+}
+
+// CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+// CHECK-NEXT: public func acceptsRP
+public func acceptsRP<T: RP>(_: T) { }
+
 // CHECK-NOT: #if compiler(>=5.3) && $MarkerProtocol
 // CHECK: extension Array : FeatureTest.MP where Element : FeatureTest.MP {
 extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
@@ -76,6 +86,14 @@ extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 // CHECK: extension OldSchool : Swift.UnsafeConcurrentValue {
 extension OldSchool: UnsafeConcurrentValue { }
 // CHECK-NEXT: }
+
+// CHECK: #if compiler(>=5.3) && $GlobalActors
+// CHECK-NEXT: @globalActor public struct SomeGlobalActor
+@globalActor
+public struct SomeGlobalActor {
+  public static let shared = MyActor()
+}
+
 
 // CHECK: #if compiler(>=5.3) && $AsyncAwait
 // CHECK-NEXT: func runSomethingSomewhere
