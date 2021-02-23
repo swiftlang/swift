@@ -238,6 +238,30 @@ static bool diagnoseRangeOperatorMisspell(DiagnosticEngine &Diags,
   return false;
 }
 
+static bool diagnoseNonexistentPowerOperator(DiagnosticEngine &Diags,
+                                             UnresolvedDeclRefExpr *UDRE,
+                                             DeclContext *DC) {
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!(name.isOperator() && name.is("**")))
+    return false;
+
+  DC = DC->getModuleScopeContext();
+
+  auto &ctx = DC->getASTContext();
+  DeclNameRef powerName(ctx.getIdentifier("pow"));
+
+  // Look if 'pow(_:_:)' exists within current context.
+  auto lookUp = TypeChecker::lookupUnqualified(
+      DC, powerName, UDRE->getLoc(), defaultUnqualifiedLookupOptions);
+  if (lookUp) {
+    Diags.diagnose(UDRE->getLoc(), diag::nonexistent_power_operator)
+        .highlight(UDRE->getSourceRange());
+    return true;
+  }
+
+  return false;
+}
+
 static bool diagnoseIncDecOperator(DiagnosticEngine &Diags,
                                    UnresolvedDeclRefExpr *UDRE) {
   auto name = UDRE->getName().getBaseIdentifier();
@@ -427,7 +451,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     // e.g. (x*-4) that needs whitespace.
     if (diagnoseRangeOperatorMisspell(Context.Diags, UDRE) ||
         diagnoseIncDecOperator(Context.Diags, UDRE) ||
-        diagnoseOperatorJuxtaposition(UDRE, DC)) {
+        diagnoseOperatorJuxtaposition(UDRE, DC) ||
+        diagnoseNonexistentPowerOperator(Context.Diags, UDRE, DC)) {
       return errorResult();
     }
 
