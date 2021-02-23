@@ -56,136 +56,161 @@ using namespace fine_grained_dependencies;
 // MARK: Helpers for key construction that must be in frontend
 //==============================================================================
 
-template <typename DeclT> static std::string getBaseName(const DeclT *decl) {
-  return decl->getBaseName().userFacingName().str();
-}
-
 static std::string mangleTypeAsContext(const NominalTypeDecl *NTD) {
   Mangle::ASTMangler Mangler;
   return !NTD ? "" : Mangler.mangleTypeAsContextUSR(NTD);
 }
 
 //==============================================================================
-// MARK: DependencyKey - creation for Decls
+// MARK: DependencyKey::Builder
 //==============================================================================
 
 template <NodeKind kindArg, typename Entity>
 DependencyKey DependencyKey::createForProvidedEntityInterface(Entity entity) {
-  return DependencyKey(
-      kindArg, DeclAspect::interface,
-      DependencyKey::computeContextForProvidedEntity<kindArg>(entity),
-      DependencyKey::computeNameForProvidedEntity<kindArg>(entity));
+  return DependencyKey::Builder{kindArg, DeclAspect::interface}
+      .withContext(entity)
+      .withName(entity)
+      .build();
 }
 
-//==============================================================================
-// MARK: computeContextForProvidedEntity
-//==============================================================================
-
-template <NodeKind kind, typename Entity>
-std::string DependencyKey::computeContextForProvidedEntity(Entity) {
-  // Context field is not used for most kinds
-  return "";
+DependencyKey DependencyKey::Builder::build() && {
+  return DependencyKey{
+    kind,
+    aspect,
+    context ? mangleTypeAsContext(context) : "",
+    name.str()
+  };
 }
 
-// \ref nominal dependencies are created from a Decl and use the context field.
-template <>
-std::string DependencyKey::computeContextForProvidedEntity<
-    NodeKind::nominal, NominalTypeDecl const *>(NominalTypeDecl const *D) {
-  return mangleTypeAsContext(D);
+DependencyKey::Builder DependencyKey::Builder::fromReference(
+    const evaluator::DependencyCollector::Reference &ref) {
+  // Assume that what is depended-upon is the interface
+  using Kind = evaluator::DependencyCollector::Reference::Kind;
+
+  switch (ref.kind) {
+  case Kind::Empty:
+  case Kind::Tombstone:
+    llvm_unreachable("Cannot enumerate dead reference!");
+  case Kind::PotentialMember:
+    return Builder{kind, aspect}.withContext(ref.subject);
+  case Kind::TopLevel:
+  case Kind::Dynamic:
+    return Builder{kind, aspect, nullptr, ref.name.userFacingName()};
+  case Kind::UsedMember:
+    return Builder{kind, aspect, nullptr, ref.name.userFacingName()}
+        .withContext(ref.subject);
+  }
 }
 
-/// \ref potentialMember dependencies are created from a Decl and use the
-/// context field.
-template <>
-std::string
-DependencyKey::computeContextForProvidedEntity<NodeKind::potentialMember,
-                                               NominalTypeDecl const *>(
-    const NominalTypeDecl *D) {
-  return mangleTypeAsContext(D);
+DependencyKey::Builder DependencyKey::Builder::withContext(const Decl *D) && {
+  switch (kind) {
+  case NodeKind::nominal:
+  case NodeKind::potentialMember:
+  case NodeKind::member:
+    /// nominal and potential member dependencies are created from a Decl and
+    /// use the context field.
+    return Builder{kind, aspect, cast<NominalTypeDecl>(D), name};
+  case NodeKind::topLevel:
+  case NodeKind::dynamicLookup:
+  case NodeKind::externalDepend:
+  case NodeKind::sourceFileProvide:
+    // Context field is not used for most kinds
+    return Builder{kind, aspect, nullptr, name};
+  case NodeKind::kindCount:
+    llvm_unreachable("saw count!");
+  }
 }
 
-template <>
-std::string DependencyKey::computeContextForProvidedEntity<
-    NodeKind::member, const NominalTypeDecl *>(const NominalTypeDecl *holder) {
-  return mangleTypeAsContext(holder);
+DependencyKey::Builder DependencyKey::Builder::withContext(
+    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) && {
+  /// \ref member dependencies are created from a pair and use the context
+  /// field.
+  return std::move(*this).withContext(holderAndMember.first);
 }
 
-/// \ref member dependencies are created from a pair and use the context field.
-template <>
-std::string DependencyKey::computeContextForProvidedEntity<
-    NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
-    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
-  return computeContextForProvidedEntity<NodeKind::member>(
-      holderAndMember.first);
+DependencyKey::Builder DependencyKey::Builder::withName(StringRef name) && {
+  assert(!name.empty());
+  return Builder{kind, aspect, context, name};
 }
 
-// Linux compiler requires the following:
-template std::string
-    DependencyKey::computeContextForProvidedEntity<NodeKind::sourceFileProvide,
-                                                   StringRef>(StringRef);
-
-//==============================================================================
-// MARK: computeNameForProvidedEntity
-//==============================================================================
-
-template <>
-std::string
-DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide,
-                                            StringRef>(StringRef swiftDeps) {
-  assert(!swiftDeps.empty());
-  return swiftDeps.str();
+DependencyKey::Builder DependencyKey::Builder::withName(const Decl *decl) && {
+  switch (kind) {
+  case NodeKind::topLevel: {
+    auto name = getTopLevelName(decl);
+    return Builder{kind, aspect, context, name};
+  }
+  case NodeKind::dynamicLookup: {
+    auto name = cast<ValueDecl>(decl)->getBaseName().userFacingName();
+    return Builder{kind, aspect, context, name};
+  }
+  case NodeKind::nominal:
+  case NodeKind::potentialMember:
+  case NodeKind::member:
+  case NodeKind::externalDepend:
+  case NodeKind::sourceFileProvide:
+    return Builder{kind, aspect, context, ""};
+  case NodeKind::kindCount:
+    llvm_unreachable("saw count!");
+  }
 }
 
-template <>
-std::string
-DependencyKey::computeNameForProvidedEntity<NodeKind::topLevel,
-                                            PrecedenceGroupDecl const *>(
-    const PrecedenceGroupDecl *D) {
-  return D->getName().str().str();
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, FuncDecl const *>(const FuncDecl *D) {
-  return getBaseName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, OperatorDecl const *>(const OperatorDecl *D) {
-  return D->getName().str().str();
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return D->getName().str().str();
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::topLevel, ValueDecl const *>(const ValueDecl *D) {
-  return getBaseName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::dynamicLookup, ValueDecl const *>(const ValueDecl *D) {
-  return getBaseName(D);
-}
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::nominal, NominalTypeDecl const *>(const NominalTypeDecl *D) {
-  return "";
-}
-template <>
-std::string
-DependencyKey::computeNameForProvidedEntity<NodeKind::potentialMember,
-                                            NominalTypeDecl const *>(
-    const NominalTypeDecl *D) {
-  return "";
+DependencyKey::Builder DependencyKey::Builder::withName(
+    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) && {
+  return std::move(*this).withName(
+      holderAndMember.second->getBaseName().userFacingName());
 }
 
-template <>
-std::string DependencyKey::computeNameForProvidedEntity<
-    NodeKind::member, std::pair<const NominalTypeDecl *, const ValueDecl *>>(
-    std::pair<const NominalTypeDecl *, const ValueDecl *> holderAndMember) {
-  return getBaseName(holderAndMember.second);
+StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
+  switch (decl->getKind()) {
+  case DeclKind::PrecedenceGroup:
+    // Precedence groups are referenced by name.
+    return cast<PrecedenceGroupDecl>(decl)->getName().str();
+  case DeclKind::Func:
+    // Functions are referenced by base name.
+    return cast<FuncDecl>(decl)->getBaseName().userFacingName();
+
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    // N.B. It's critical we cast to OperatorDecl here as
+    // OperatorDecl::getName is shadowed.
+    return cast<OperatorDecl>(decl)->getName().str();
+
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+    // Nominal types are referenced by name.
+    return cast<NominalTypeDecl>(decl)->getName().str();
+  case DeclKind::Extension:
+    // FIXME: We ought to provide an identifier for extensions so we can
+    // register type body fingerprints for them.
+    return "";
+  case DeclKind::TypeAlias:
+  case DeclKind::Var:
+  case DeclKind::Accessor:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::Subscript:
+  case DeclKind::EnumElement:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::Param:
+  case DeclKind::OpaqueType:
+    return cast<ValueDecl>(decl)->getBaseName().userFacingName();
+
+  case DeclKind::Import:
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::TopLevelCode:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+  case DeclKind::MissingMember:
+  case DeclKind::Module:
+    return "";
+  }
+
+  llvm_unreachable("Invalid decl kind!");
 }
 
 //==============================================================================
@@ -419,42 +444,20 @@ public:
   void enumerateAllUses(UseEnumerator enumerator) {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&](const auto &ref) {
-      std::string name = ref.name.userFacingName().str();
-      const auto *nominal = ref.subject;
-      using Kind = evaluator::DependencyCollector::Reference::Kind;
-
-      switch (ref.kind) {
-      case Kind::Empty:
-      case Kind::Tombstone:
-        llvm_unreachable("Cannot enumerate dead reference!");
-      case Kind::TopLevel:
-        return enumerateUse<NodeKind::topLevel>("", name, enumerator);
-      case Kind::Dynamic:
-        return enumerateUse<NodeKind::dynamicLookup>("", name, enumerator);
-      case Kind::PotentialMember: {
-        std::string context = DependencyKey::computeContextForProvidedEntity<
-            NodeKind::potentialMember>(nominal);
-        return enumerateUse<NodeKind::potentialMember>(context, "", enumerator);
-      }
-      case Kind::UsedMember: {
-        std::string context =
-            DependencyKey::computeContextForProvidedEntity<NodeKind::member>(
-                nominal);
-        return enumerateUse<NodeKind::member>(context, name, enumerator);
-      }
-      }
+      // Assume that what is depended-upon is the interface
+      auto key =
+          DependencyKey::Builder(translateKind(ref.kind), DeclAspect::interface)
+              .fromReference(ref)
+              .build();
+      return enumerateUse(key, enumerator);
     });
     enumerateNominalUses(enumerator);
   }
 
 private:
-  template <NodeKind kind>
-  void enumerateUse(StringRef context, StringRef name,
-                    UseEnumerator createDefUse) {
+  void enumerateUse(DependencyKey key, UseEnumerator createDefUse) {
     // Assume that what is depended-upon is the interface
-    createDefUse(
-        DependencyKey(kind, DeclAspect::interface, context.str(), name.str()),
-        sourceFileImplementation);
+    createDefUse(key, sourceFileImplementation);
   }
 
   void enumerateNominalUses(UseEnumerator enumerator) {
@@ -465,11 +468,30 @@ private:
         return;
       }
 
-      std::string context =
-          DependencyKey::computeContextForProvidedEntity<NodeKind::nominal>(
-              subject);
-      enumerateUse<NodeKind::nominal>(context, "", enumerator);
+      auto key =
+          DependencyKey::Builder(NodeKind::nominal, DeclAspect::interface)
+              .withContext(subject)
+              .build();
+      enumerateUse(key, enumerator);
     });
+  }
+
+  using ReferenceKind = evaluator::DependencyCollector::Reference::Kind;
+  static NodeKind translateKind(ReferenceKind kind) {
+    switch (kind) {
+    case ReferenceKind::UsedMember:
+      return NodeKind::member;
+    case ReferenceKind::PotentialMember:
+      return NodeKind::potentialMember;
+    case ReferenceKind::TopLevel:
+      return NodeKind::topLevel;
+    case ReferenceKind::Dynamic:
+      return NodeKind::dynamicLookup;
+    case ReferenceKind::Empty:
+      llvm_unreachable("Found invalid reference kind!");
+    case ReferenceKind::Tombstone:
+      llvm_unreachable("Found invalid reference kind!");
+    }
   }
 };
 } // end namespace
