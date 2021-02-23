@@ -5482,7 +5482,7 @@ void Serializer::writeToStream(
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
-    if (options.ExperimentalCrossModuleIncrementalInfo && DepGraph) {
+    if (!options.DisableCrossModuleIncrementalInfo && DepGraph) {
       fine_grained_dependencies::writeFineGrainedDependencyGraph(
           S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
     }
