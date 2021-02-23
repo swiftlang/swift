@@ -921,10 +921,6 @@ private:
   /// Whether there is a trailing written requirement location.
   const bool hasTrailingWrittenRequirementLoc;
 
-public:
-  /// Whether a protocol requirement came from the requirement signature.
-  const bool usesRequirementSignature;
-
 private:
   /// The actual storage, described by \c storageKind.
   union {
@@ -1020,7 +1016,7 @@ public:
                     WrittenRequirementLoc writtenReqLoc)
     : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
-      usesRequirementSignature(false), parent(nullptr) {
+      parent(nullptr) {
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
@@ -1036,7 +1032,6 @@ public:
                     WrittenRequirementLoc writtenReqLoc)
     : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
-      usesRequirementSignature(!protocol->isComputingRequirementSignature()),
       parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
@@ -1053,8 +1048,7 @@ public:
   RequirementSource(Kind kind, const RequirementSource *parent,
                     ProtocolConformanceRef conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
-      hasTrailingWrittenRequirementLoc(false),
-      usesRequirementSignature(false), parent(parent) {
+      hasTrailingWrittenRequirementLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -1066,8 +1060,7 @@ public:
   RequirementSource(Kind kind, const RequirementSource *parent,
                     AssociatedTypeDecl *assocType)
     : kind(kind), storageKind(StorageKind::AssociatedTypeDecl),
-      hasTrailingWrittenRequirementLoc(false),
-      usesRequirementSignature(false), parent(parent) {
+      hasTrailingWrittenRequirementLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -1078,8 +1071,7 @@ public:
 
   RequirementSource(Kind kind, const RequirementSource *parent)
     : kind(kind), storageKind(StorageKind::None),
-      hasTrailingWrittenRequirementLoc(false),
-      usesRequirementSignature(false), parent(parent) {
+      hasTrailingWrittenRequirementLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -1089,8 +1081,7 @@ public:
   RequirementSource(Kind kind, const RequirementSource *parent,
                     Type newType)
     : kind(kind), storageKind(StorageKind::StoredType),
-      hasTrailingWrittenRequirementLoc(false),
-      usesRequirementSignature(false), parent(parent) {
+      hasTrailingWrittenRequirementLoc(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
