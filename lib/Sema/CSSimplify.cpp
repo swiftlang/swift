@@ -2230,9 +2230,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     //
     //   let _ = autoclosure as (() -> (Int)) -> () // non-autoclosure preferred
     //
-    if (func1Param.isAutoClosure() &&
-        (!func2Param.isAutoClosure() &&
-         func2Param.getPlainType()->is<FunctionType>())) {
+    auto isAutoClosureFunctionMatch = [](AnyFunctionType::Param &param1,
+                                         AnyFunctionType::Param &param2) {
+      return param1.isAutoClosure() &&
+             (!param2.isAutoClosure() &&
+              param2.getPlainType()->is<FunctionType>());
+    };
+
+    if (isAutoClosureFunctionMatch(func1Param, func2Param) ||
+        isAutoClosureFunctionMatch(func2Param, func1Param)) {
       increaseScore(SK_FunctionToAutoClosureConversion);
     }
 

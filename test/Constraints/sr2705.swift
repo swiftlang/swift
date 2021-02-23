@@ -26,3 +26,10 @@ func autoclosure(f: Int) { }
 
 autoclosure(f: { 0 }) // OK
 let _ = autoclosure as (() -> (Int)) -> () // OK
+
+func test(_: (@autoclosure () -> Int) -> Void) {}
+func test(_: (() -> Int) -> Void) {}
+
+func fn(_: () -> Int) {}
+
+test(fn) // OK
