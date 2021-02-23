@@ -139,6 +139,8 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
 
+  Opts.AllowModuleWithCompilerErrors |= Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
+
   computeDumpScopeMapLocations();
 
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
@@ -159,6 +161,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   } else {
     HaveNewInputsAndOutputs = true;
     Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
+    if (Opts.AllowModuleWithCompilerErrors)
+      Opts.InputsAndOutputs.setShouldRecoverMissingInputs();
   }
 
   if (Args.hasArg(OPT_parse_sil) || Opts.InputsAndOutputs.shouldTreatAsSIL()) {
@@ -230,7 +234,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
   Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
-  Opts.AllowModuleWithCompilerErrors = Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
 
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
