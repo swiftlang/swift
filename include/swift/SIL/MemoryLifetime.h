@@ -114,6 +114,11 @@ public:
     /// Bit 2 is never set because Inner is completly represented by its
     /// sub-locations 3 and 4. But bit 0 is set in location 0 (the "self" bit),
     /// because it represents the untracked field ``Outer.z``.
+    ///
+    /// Single-payload enums are represented by a location with a single sub-
+    /// location (the projected payload address, i.e. an ``init_enum_data_addr``
+    /// or an ``unchecked_take_enum_data_addr``.
+    /// Multi-payload enums are not supported right now.
     Bits subLocations;
 
     /// The accumulated parent bits, including the "self" bit.
@@ -141,6 +146,12 @@ public:
     ///    location 4 (Inner.b):     2
     /// \endcode
     int parentIdx;
+
+    /// Returns true if the location with index \p idx is this location or a
+    /// sub location of this location.
+    bool isSubLocation(unsigned idx) const {
+      return idx < subLocations.size() && subLocations.test(idx);
+    }
 
   private:
     friend class MemoryLocations;
@@ -178,11 +189,18 @@ private:
   /// small. They can be handled separately with handleSingleBlockLocations().
   llvm::SmallVector<SingleValueInstruction *, 16> singleBlockLocations;
 
+  /// A Cache for single-payload enums.
+  llvm::DenseMap<SILType, EnumElementDecl *> singlePayloadEnums;
+
   /// The bit-set of locations for which numNonTrivialFieldsNotCovered is > 0.
   Bits nonTrivialLocations;
 
+  /// If true, support init_enum_data_addr and unchecked_take_enum_data_addr
+  bool handleEnumDataProjections;
+
 public:
-  MemoryLocations() {}
+  MemoryLocations(bool handleEnumDataProjections) :
+    handleEnumDataProjections(handleEnumDataProjections) {}
 
   MemoryLocations(const MemoryLocations &) = delete;
   MemoryLocations &operator=(const MemoryLocations &) = delete;
@@ -207,6 +225,9 @@ public:
   const Location *getLocation(unsigned index) const {
     return &locations[index];
   }
+  
+  /// Returns the root location of \p index.
+  const Location *getRootLocation(unsigned index) const;
 
   /// Registers an address projection instruction for a location.
   void registerProjection(SingleValueInstruction *projection, unsigned locIdx) {
@@ -261,6 +282,15 @@ private:
 
   // (locationIdx, fieldNr) -> subLocationIdx
   using SubLocationMap = llvm::DenseMap<std::pair<unsigned, unsigned>, unsigned>;
+
+  /// Returns the payload case of a single-payload enum.
+  ///
+  /// Returns null if \p enumTy is not a single-payload enum.
+  /// We are currently only handling enum data projections for single-payload
+  /// enums, because it's much simpler to represent them with Locations. We
+  /// could also support multi-payload enums, but that gets complicated. Most
+  /// importantly, we can handle Swift.Optional.
+  EnumElementDecl *getSinglePayloadEnumCase(SILType enumTy);
 
   /// Helper function called by analyzeLocation to check all uses of the
   /// location recursively.

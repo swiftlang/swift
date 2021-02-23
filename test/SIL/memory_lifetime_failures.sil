@@ -168,3 +168,73 @@ bb0(%0 : $Int):
   return %3 : $Int
 }
 
+// CHECK: SIL memory lifetime failure in @test_switch_enum_addr: memory is initialized at function return but shouldn't
+sil [ossa] @test_switch_enum_addr : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  switch_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_switch_enum: memory is initialized at function return but shouldn't
+sil [ossa] @test_switch_enum : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  %1 = load_borrow %0 : $*Optional<T>
+  switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : $T):
+  end_borrow %1 : $Optional<T>
+  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  br bb3
+
+bb2:
+  end_borrow %1 : $Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_init_enum: indirect argument is not alive at function return
+sil [ossa] @test_init_enum : $@convention(thin) (@in_guaranteed T) -> @out Optional<T> {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  inject_enum_addr %0 : $*Optional<T>, #Optional.none!enumelt
+  br bb3
+
+bb2:
+  %5 = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_to_enum: memory is initialized, but shouldn't
+sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $Optional<T>
+  %2 = enum $Optional<T>, #Optional.none!enumelt
+  store %2 to [trivial] %1 : $*Optional<T>
+  destroy_addr %1 : $*Optional<T>
+  %3 = enum $Optional<T>, #Optional.some!enumelt, %0 : $T
+  store %3 to [init] %1 : $*Optional<T>
+  dealloc_stack %1 : $*Optional<T>
+  %r = tuple ()
+  return %r : $()
+}
+
