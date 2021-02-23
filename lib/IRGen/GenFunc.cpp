@@ -2519,6 +2519,7 @@ void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
 
   // Setup the suspend point.
   SmallVector<llvm::Value *, 8> arguments;
+  arguments.push_back(IGM.getInt32(2)); // swiftasync context index
   arguments.push_back(asyncResume);
   auto resumeProjFn = getOrCreateResumeFromSuspensionFn();
   arguments.push_back(

@@ -387,7 +387,7 @@ llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(ArrayRef<llvm::Value *> args
 
   auto *calleeContext = Builder.CreateExtractValue(id,
       (unsigned)AsyncFunctionArgumentIndex::Context);
-  llvm::Constant *projectFn = cast<llvm::Constant>(args[1])->stripPointerCasts();
+  llvm::Constant *projectFn = cast<llvm::Constant>(args[2])->stripPointerCasts();
   // Get the caller context from the callee context.
   llvm::Value *context = Builder.CreateCall(projectFn, {calleeContext});
   context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
@@ -2548,6 +2548,7 @@ public:
     auto &Builder = IGF.Builder;
     // Setup the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
+    arguments.push_back(IGM.getInt32(2)); // Index of swiftasync context.
     arguments.push_back(currentResumeFn);
     auto resumeProjFn = IGF.getOrCreateResumePrjFn();
     arguments.push_back(
