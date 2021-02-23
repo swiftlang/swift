@@ -222,8 +222,8 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
-  global ::= impl-function-type type 'Tz'     // objc-to-swift-async completion handler block implementation
-  global ::= impl-function-type type 'TZ'     // objc-to-swift-async completion handler block implementation (predefined by runtime)
+  global ::= impl-function-type type 'Tz' index? // objc-to-swift-async completion handler block implementation
+  global ::= impl-function-type type 'TZ' index? // objc-to-swift-async completion handler block implementation (predefined by runtime)
   global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
   global ::= impl-function-type type generic-signature? 'Tz'     // objc-to-swift-async completion handler block implementation
   global ::= impl-function-type type generic-signature? 'TZ'     // objc-to-swift-async completion handler block implementation (predefined by runtime)

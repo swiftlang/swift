@@ -2742,9 +2742,24 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     LLVM_FALLTHROUGH;
   case Node::Kind::ObjCAsyncCompletionHandlerImpl:
     Printer << "@objc completion handler block implementation for ";
+    if (Node->getNumChildren() >= 4)
+      print(Node->getChild(3));
     print(Node->getChild(0));
     Printer << " with result type ";
     print(Node->getChild(1));
+    switch (Node->getChild(2)->getIndex()) {
+    case 0:
+      break;
+    case 1:
+      Printer << " nonzero on error";
+      break;
+    case 2:
+      Printer << " zero on error";
+      break;
+    default:
+      Printer << " <invalid error flag>";
+      break;
+    }
     return nullptr;
   case Node::Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
     Printer << "flag for loading of canonical specialized generic type "
