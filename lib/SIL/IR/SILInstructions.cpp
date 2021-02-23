@@ -2142,7 +2142,8 @@ BeginCOWMutationInst::create(SILDebugLocation loc, SILValue operand,
 UncheckedRefCastInst *
 UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                              SILType Ty, SILFunction &F,
-                             SILOpenedArchetypesState &OpenedArchetypes) {
+                             SILOpenedArchetypesState &OpenedArchetypes,
+                             ValueOwnershipKind forwardingOwnershipKind) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2150,14 +2151,15 @@ UncheckedRefCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UncheckedRefCastInst));
-  return ::new (Buffer) UncheckedRefCastInst(DebugLoc, Operand,
-                                             TypeDependentOperands, Ty);
+  return ::new (Buffer) UncheckedRefCastInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, forwardingOwnershipKind);
 }
 
 UncheckedValueCastInst *
 UncheckedValueCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                SILType Ty, SILFunction &F,
-                               SILOpenedArchetypesState &OpenedArchetypes) {
+                               SILOpenedArchetypesState &OpenedArchetypes,
+                               ValueOwnershipKind forwardingOwnershipKind) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2165,8 +2167,8 @@ UncheckedValueCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UncheckedValueCastInst));
-  return ::new (Buffer)
-      UncheckedValueCastInst(DebugLoc, Operand, TypeDependentOperands, Ty);
+  return ::new (Buffer) UncheckedValueCastInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, forwardingOwnershipKind);
 }
 
 UncheckedAddrCastInst *
@@ -2216,9 +2218,10 @@ UncheckedBitwiseCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 }
 
 UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand,
-    SILType DestLoweredTy, CanType DestFormalTy,
-    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes) {
+    SILDebugLocation DebugLoc, SILValue Operand, SILType DestLoweredTy,
+    CanType DestFormalTy, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes,
+    ValueOwnershipKind forwardingOwnershipKind) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2226,10 +2229,9 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
-  return ::new (Buffer) UnconditionalCheckedCastInst(DebugLoc, Operand,
-                                                     TypeDependentOperands,
-                                                     DestLoweredTy,
-                                                     DestFormalTy);
+  return ::new (Buffer) UnconditionalCheckedCastInst(
+      DebugLoc, Operand, TypeDependentOperands, DestLoweredTy, DestFormalTy,
+      forwardingOwnershipKind);
 }
 
 UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
@@ -2303,7 +2305,8 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
 
 UpcastInst *UpcastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                SILType Ty, SILFunction &F,
-                               SILOpenedArchetypesState &OpenedArchetypes) {
+                               SILOpenedArchetypesState &OpenedArchetypes,
+                               ValueOwnershipKind forwardingOwnershipKind) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -2311,14 +2314,15 @@ UpcastInst *UpcastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UpcastInst));
-  return ::new (Buffer) UpcastInst(DebugLoc, Operand,
-                                   TypeDependentOperands, Ty);
+  return ::new (Buffer) UpcastInst(DebugLoc, Operand, TypeDependentOperands, Ty,
+                                   forwardingOwnershipKind);
 }
 
 ThinToThickFunctionInst *
 ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILType Ty, SILModule &Mod, SILFunction *F,
-                                SILOpenedArchetypesState &OpenedArchetypes) {
+                                SILOpenedArchetypesState &OpenedArchetypes,
+                                ValueOwnershipKind forwardingOwnershipKind) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   if (F) {
     assert(&F->getModule() == &Mod);
@@ -2328,8 +2332,8 @@ ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ThinToThickFunctionInst));
-  return ::new (Buffer) ThinToThickFunctionInst(DebugLoc, Operand,
-                                                TypeDependentOperands, Ty);
+  return ::new (Buffer) ThinToThickFunctionInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, forwardingOwnershipKind);
 }
 
 PointerToThinFunctionInst *
@@ -2349,8 +2353,8 @@ PointerToThinFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 
 ConvertFunctionInst *ConvertFunctionInst::create(
     SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
-    SILFunction *F,
-    SILOpenedArchetypesState &OpenedArchetypes, bool WithoutActuallyEscaping) {
+    SILFunction *F, SILOpenedArchetypesState &OpenedArchetypes,
+    bool WithoutActuallyEscaping, ValueOwnershipKind forwardingOwnershipKind) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   if (F) {
     assert(&F->getModule() == &Mod);
@@ -2360,8 +2364,9 @@ ConvertFunctionInst *ConvertFunctionInst::create(
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
-  auto *CFI = ::new (Buffer) ConvertFunctionInst(
-      DebugLoc, Operand, TypeDependentOperands, Ty, WithoutActuallyEscaping);
+  auto *CFI = ::new (Buffer)
+      ConvertFunctionInst(DebugLoc, Operand, TypeDependentOperands, Ty,
+                          WithoutActuallyEscaping, forwardingOwnershipKind);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //
