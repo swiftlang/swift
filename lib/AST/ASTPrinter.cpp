@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
@@ -2505,6 +2506,100 @@ static bool usesFeatureConcurrentFunctions(Decl *decl) {
 
       if (hasConcurrent)
         return true;
+    }
+  }
+
+  return false;
+}
+
+static bool usesFeatureRethrowsProtocol(
+    Decl *decl, SmallPtrSet<Decl *, 16> &checked) {
+  // Make sure we don't recurse.
+  if (!checked.insert(decl).second)
+    return false;
+
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->getAttrs().hasAttribute<AtRethrowsAttr>())
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto proto = ext->getSelfProtocolDecl())
+      if (usesFeatureRethrowsProtocol(proto, checked))
+        return true;
+  }
+
+  if (auto genericSig = decl->getInnermostDeclContext()
+          ->getGenericSignatureOfContext()) {
+    for (const auto &req : genericSig->getRequirements()) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          usesFeatureRethrowsProtocol(
+            req.getSecondType()->getAs<ProtocolType>()->getDecl(), checked))
+        return true;
+    }
+  }
+
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      bool hasRethrowsProtocol = type.findIf([&](Type type) {
+        if (auto nominal = type->getAnyNominal()) {
+          if (usesFeatureRethrowsProtocol(nominal, checked))
+            return true;
+        }
+
+        return false;
+      });
+
+      if (hasRethrowsProtocol)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+static bool usesFeatureRethrowsProtocol(Decl *decl) {
+  SmallPtrSet<Decl *, 16> checked;
+  return usesFeatureRethrowsProtocol(decl, checked);
+}
+
+static bool usesFeatureGlobalActors(Decl *decl) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (nominal->getAttrs().hasAttribute<GlobalActorAttr>())
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto nominal = ext->getExtendedNominal())
+      if (usesFeatureGlobalActors(nominal))
+        return true;
+  }
+
+  return false;
+}
+
+static bool usesFeatureBuiltinJob(Decl *decl) {
+  auto typeHasBuiltinJob = [](Type type) {
+    return type.findIf([&](Type type) {
+      if (auto builtinTy = type->getAs<BuiltinType>())
+        return builtinTy->getBuiltinTypeKind() == BuiltinTypeKind::BuiltinJob;
+
+      return false;
+    });
+  };
+
+  if (auto value = dyn_cast<ValueDecl>(decl)) {
+    if (Type type = value->getInterfaceType()) {
+      if (typeHasBuiltinJob(type))
+        return true;
+    }
+  }
+
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+    for (unsigned idx : range(patternBinding->getNumPatternEntries())) {
+      if (Type type = patternBinding->getPattern(idx)->getType())
+        if (typeHasBuiltinJob(type))
+          return true;
     }
   }
 

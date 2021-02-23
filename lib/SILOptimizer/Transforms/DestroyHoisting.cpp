@@ -123,7 +123,10 @@ class DestroyHoisting {
 
 public:
   DestroyHoisting(SILFunction *function, DominanceAnalysis *DA) :
-    function(function), DA(DA) { }
+    function(function),
+    // We currently don't handle enum data projections, because they cannot
+    // re-created easily. We could support this in future.
+    locations(/*handleEnumDataProjections*/ false), DA(DA) {}
 
   bool hoistDestroys();
 };
@@ -348,6 +351,7 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::CopyAddrInst:
+    case SILInstructionKind::InjectEnumAddrInst:
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::YieldInst:

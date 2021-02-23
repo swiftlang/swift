@@ -60,7 +60,12 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 
 // Property & async method overloading
 -(void)getOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))handler;
+
 @property (readonly, nonatomic) NSArray<NSString *> *operations;
+
+-(void)doSomethingFlaggyWithCompletionHandler:(void (^)(BOOL, NSString *_Nullable, NSError *_Nullable))completionHandler __attribute__((swift_async_error(nonzero_argument, 1)));
+-(void)doSomethingZeroFlaggyWithCompletionHandler:(void (^)(NSString *_Nullable, BOOL, NSError *_Nullable))completionHandler __attribute__((swift_async_error(zero_argument, 2)));
+-(void)doSomethingMultiResultFlaggyWithCompletionHandler:(void (^)(BOOL, NSString *_Nullable, NSError *_Nullable, NSString *_Nullable))completionHandler __attribute__((swift_async_error(zero_argument, 1)));
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

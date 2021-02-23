@@ -13,7 +13,7 @@
 extension Int: P { }
 extension Array: P where Element: P { }
 
-// CHECK: @"$s15marker_protocol1QMp" = {{(protected )?}}constant
+// CHECK: @"$s15marker_protocol1QMp" = {{(dllexport |protected )?}}constant
 // CHECK-SAME: i32 trunc{{.*}}s15marker_protocolMXM{{.*}}s15marker_protocol1QMp
 // CHECK-SAME: i32 0, i32 5, i32 0
 public protocol Q: P {

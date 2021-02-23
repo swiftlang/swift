@@ -1405,7 +1405,8 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createConvertFunction(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                getOpType(Inst->getType()), Inst->withoutActuallyEscaping()));
+                getOpType(Inst->getType()), Inst->withoutActuallyEscaping(),
+                Inst->getForwardingOwnershipKind()));
 }
 
 template <typename ImplClass>
@@ -1445,7 +1446,8 @@ SILCloner<ImplClass>::visitUpcastInst(UpcastInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createUpcast(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getOperand()),
-                                      getOpType(Inst->getType())));
+                                      getOpType(Inst->getType()),
+                                      Inst->getForwardingOwnershipKind()));
 }
 
 template<typename ImplClass>
@@ -1474,10 +1476,11 @@ void
 SILCloner<ImplClass>::
 visitUncheckedRefCastInst(UncheckedRefCastInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createUncheckedRefCast(getOpLocation(Inst->getLoc()),
-                                                getOpValue(Inst->getOperand()),
-                                                getOpType(Inst->getType())));
+  recordClonedInstruction(Inst, getBuilder().createUncheckedRefCast(
+                                    getOpLocation(Inst->getLoc()),
+                                    getOpValue(Inst->getOperand()),
+                                    getOpType(Inst->getType()),
+                                    Inst->getForwardingOwnershipKind()));
 }
 
 template<typename ImplClass>
@@ -1542,7 +1545,8 @@ void SILCloner<ImplClass>::visitUncheckedValueCastInst(
   recordClonedInstruction(Inst, getBuilder().createUncheckedValueCast(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
+                                    getOpType(Inst->getType()),
+                                    Inst->getForwardingOwnershipKind()));
 }
 
 template<typename ImplClass>
@@ -1553,7 +1557,8 @@ visitRefToBridgeObjectInst(RefToBridgeObjectInst *Inst) {
   recordClonedInstruction(Inst, getBuilder().createRefToBridgeObject(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getConverted()),
-                                    getOpValue(Inst->getBitsOperand())));
+                                    getOpValue(Inst->getBitsOperand()),
+                                    Inst->getForwardingOwnershipKind()));
 }
 
 template<typename ImplClass>
@@ -1564,7 +1569,8 @@ visitBridgeObjectToRefInst(BridgeObjectToRefInst *Inst) {
   recordClonedInstruction(Inst, getBuilder().createBridgeObjectToRef(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getConverted()),
-                                    getOpType(Inst->getType())));
+                                    getOpType(Inst->getType()),
+                                    Inst->getForwardingOwnershipKind()));
 }
 
 template<typename ImplClass>
@@ -1615,7 +1621,8 @@ visitThinToThickFunctionInst(ThinToThickFunctionInst *Inst) {
   recordClonedInstruction(Inst, getBuilder().createThinToThickFunction(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
+                                    getOpType(Inst->getType()),
+                                    Inst->getForwardingOwnershipKind()));
 }
 
 template<typename ImplClass>
@@ -1650,8 +1657,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
   CanType OpFormalType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createUnconditionalCheckedCast(
-                                    OpLoc, OpValue,
-                                    OpLoweredType, OpFormalType));
+                                    OpLoc, OpValue, OpLoweredType, OpFormalType,
+                                    Inst->getForwardingOwnershipKind()));
 }
 
 template<typename ImplClass>

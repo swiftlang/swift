@@ -172,6 +172,7 @@ public:
   std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
                                                    CanType ResultType,
                                                    CanGenericSignature Sig,
+                                                   Optional<bool> FlagParamIsZeroOnError,
                                                    bool predefined);
   
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry

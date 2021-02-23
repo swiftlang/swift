@@ -1021,13 +1021,13 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
 }
 
-SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
-                                                 SILType ty) {
+SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
+                                                 bool hasDynamicLifetime) {
   ty = ty.getObjectType();
   Optional<SILDebugVariable> DbgVar;
   if (auto *VD = loc.getAsASTNode<VarDecl>())
     DbgVar = SILDebugVariable(VD->isLet(), 0);
-  auto alloc = B.createAllocStack(loc, ty, DbgVar);
+  auto alloc = B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime);
   enterDeallocStackCleanup(alloc);
   return alloc;
 }
