@@ -2562,6 +2562,21 @@ static bool usesFeatureRethrowsProtocol(Decl *decl) {
   return usesFeatureRethrowsProtocol(decl, checked);
 }
 
+static bool usesFeatureGlobalActors(Decl *decl) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (nominal->getAttrs().hasAttribute<GlobalActorAttr>())
+      return true;
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (auto nominal = ext->getExtendedNominal())
+      if (usesFeatureGlobalActors(nominal))
+        return true;
+  }
+
+  return false;
+}
+
 /// Determine the set of "new" features used on a given declaration.
 ///
 /// Note: right now, all features we check for are "new". At some point, we'll

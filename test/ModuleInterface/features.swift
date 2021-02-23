@@ -87,6 +87,14 @@ extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 extension OldSchool: UnsafeConcurrentValue { }
 // CHECK-NEXT: }
 
+// CHECK: #if compiler(>=5.3) && $GlobalActors
+// CHECK-NEXT: @globalActor public struct SomeGlobalActor
+@globalActor
+public struct SomeGlobalActor {
+  public static let shared = MyActor()
+}
+
+
 // CHECK: #if compiler(>=5.3) && $AsyncAwait
 // CHECK-NEXT: func runSomethingSomewhere
 // CHECK-NEXT: #endif
