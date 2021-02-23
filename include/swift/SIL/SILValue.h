@@ -880,15 +880,20 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   }
 }
 
-/// Return the OperandOwnership for a forwarded operand when the forwarded
-/// result has this ValueOwnershipKind. \p allowUnowned is true for a subset
-/// of forwarding operations that are allowed to propagate Unowned values.
+/// Return the OperandOwnership for a forwarded operand when the forwarding
+/// operation has this "forwarding ownership" (as returned by
+/// getForwardingOwnershipKind()). \p allowUnowned is true for a subset of
+/// forwarding operations that are allowed to propagate Unowned values.
 ///
-/// The ownership of a forwarded value is derived from the forwarding
-/// instruction's constant ownership attribute. If the result is owned, then the
-/// instruction moves owned operand to its result, ending its lifetime. If the
-/// result is guaranteed value, then the instruction propagates the lifetime of
-/// its borrows operand through its result.
+/// Forwarding ownership is determined by the forwarding instruction's constant
+/// ownership attribute. If forwarding ownership is owned, then the instruction
+/// moves owned operand to its result, ending its lifetime. If forwarding
+/// ownership is guaranteed, then the instruction propagates the lifetime of its
+/// borrows operand through its result.
+///
+/// The resulting forwarded value typically has forwarding ownership, but may
+/// differ when the result is trivial type. e.g. an owned or guaranteed value
+/// can be cast to a trivial type using owned or guaranteed forwarding.
 inline OperandOwnership
 ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
   switch (value) {
