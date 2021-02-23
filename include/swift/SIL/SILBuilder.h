@@ -1028,9 +1028,17 @@ public:
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
                                              SILType Ty,
                                              bool WithoutActuallyEscaping) {
-    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
-                                              getModule(), F, C.OpenedArchetypes,
-                                              WithoutActuallyEscaping));
+    return createConvertFunction(Loc, Op, Ty, WithoutActuallyEscaping,
+                                 Op.getOwnershipKind());
+  }
+
+  ConvertFunctionInst *
+  createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
+                        bool WithoutActuallyEscaping,
+                        ValueOwnershipKind forwardingOwnershipKind) {
+    return insert(ConvertFunctionInst::create(
+        getSILDebugLocation(Loc), Op, Ty, getModule(), F, C.OpenedArchetypes,
+        WithoutActuallyEscaping, forwardingOwnershipKind));
   }
 
   ConvertEscapeToNoEscapeInst *
@@ -1054,8 +1062,14 @@ public:
   }
 
   UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty) {
+    return createUpcast(Loc, Op, Ty, Op.getOwnershipKind());
+  }
+
+  UpcastInst *createUpcast(SILLocation Loc, SILValue Op, SILType Ty,
+                           ValueOwnershipKind forwardingOwnershipKind) {
     return insert(UpcastInst::create(getSILDebugLocation(Loc), Op, Ty,
-                                     getFunction(), C.OpenedArchetypes));
+                                     getFunction(), C.OpenedArchetypes,
+                                     forwardingOwnershipKind));
   }
 
   AddressToPointerInst *createAddressToPointer(SILLocation Loc, SILValue Op,
@@ -1075,7 +1089,16 @@ public:
   UncheckedRefCastInst *createUncheckedRefCast(SILLocation Loc, SILValue Op,
                                                SILType Ty) {
     return insert(UncheckedRefCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes,
+        Op.getOwnershipKind()));
+  }
+
+  UncheckedRefCastInst *
+  createUncheckedRefCast(SILLocation Loc, SILValue Op, SILType Ty,
+                         ValueOwnershipKind forwardingOwnershipKind) {
+    return insert(UncheckedRefCastInst::create(
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes,
+        forwardingOwnershipKind));
   }
 
   UncheckedRefCastAddrInst *
@@ -1107,22 +1130,41 @@ public:
 
   UncheckedValueCastInst *createUncheckedValueCast(SILLocation Loc, SILValue Op,
                                                    SILType Ty) {
+    return createUncheckedValueCast(Loc, Op, Ty, Op.getOwnershipKind());
+  }
+
+  UncheckedValueCastInst *
+  createUncheckedValueCast(SILLocation Loc, SILValue Op, SILType Ty,
+                           ValueOwnershipKind forwardingOwnershipKind) {
     assert(hasOwnership());
     return insert(UncheckedValueCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes,
+        forwardingOwnershipKind));
   }
 
   RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc, SILValue Ref,
                                                  SILValue Bits) {
+    return createRefToBridgeObject(Loc, Ref, Bits, Ref.getOwnershipKind());
+  }
+
+  RefToBridgeObjectInst *
+  createRefToBridgeObject(SILLocation Loc, SILValue Ref, SILValue Bits,
+                          ValueOwnershipKind forwardingOwnershipKind) {
     auto Ty = SILType::getBridgeObjectType(getASTContext());
     return insert(new (getModule()) RefToBridgeObjectInst(
-        getSILDebugLocation(Loc), Ref, Bits, Ty));
+        getSILDebugLocation(Loc), Ref, Bits, Ty, forwardingOwnershipKind));
   }
 
   BridgeObjectToRefInst *createBridgeObjectToRef(SILLocation Loc, SILValue Op,
                                                  SILType Ty) {
+    return createBridgeObjectToRef(Loc, Op, Ty, Op.getOwnershipKind());
+  }
+
+  BridgeObjectToRefInst *
+  createBridgeObjectToRef(SILLocation Loc, SILValue Op, SILType Ty,
+                          ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) BridgeObjectToRefInst(
-        getSILDebugLocation(Loc), Op, Ty));
+        getSILDebugLocation(Loc), Op, Ty, forwardingOwnershipKind));
   }
 
   ValueToBridgeObjectInst *createValueToBridgeObject(SILLocation Loc,
@@ -1158,8 +1200,15 @@ public:
 
   ThinToThickFunctionInst *createThinToThickFunction(SILLocation Loc,
                                                      SILValue Op, SILType Ty) {
+    return createThinToThickFunction(Loc, Op, Ty, Op.getOwnershipKind());
+  }
+
+  ThinToThickFunctionInst *
+  createThinToThickFunction(SILLocation Loc, SILValue Op, SILType Ty,
+                            ValueOwnershipKind forwardingOwnershipKind) {
     return insert(ThinToThickFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getModule(), F, C.OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getModule(), F, C.OpenedArchetypes,
+        forwardingOwnershipKind));
   }
 
   ThickToObjCMetatypeInst *createThickToObjCMetatype(SILLocation Loc,
@@ -1201,9 +1250,17 @@ public:
   createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
                                  SILType destLoweredTy,
                                  CanType destFormalTy) {
+    return createUnconditionalCheckedCast(Loc, op, destLoweredTy, destFormalTy,
+                                          op.getOwnershipKind());
+  }
+
+  UnconditionalCheckedCastInst *
+  createUnconditionalCheckedCast(SILLocation Loc, SILValue op,
+                                 SILType destLoweredTy, CanType destFormalTy,
+                                 ValueOwnershipKind forwardingOwnershipKind) {
     return insert(UnconditionalCheckedCastInst::create(
         getSILDebugLocation(Loc), op, destLoweredTy, destFormalTy,
-        getFunction(), C.OpenedArchetypes));
+        getFunction(), C.OpenedArchetypes, forwardingOwnershipKind));
   }
 
   UnconditionalCheckedCastAddrInst *
