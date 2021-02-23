@@ -669,21 +669,6 @@ func jvpInvalid<T: Differentiable>(x: T) -> (
   return (x, { $0 })
 }
 
-// Test invalid derivative type context: instance vs static method mismatch.
-
-struct InvalidTypeContext<T: Differentiable> {
-  // expected-note @+1 {{candidate static method does not have type equal to or less constrained than '<T where T : Differentiable> (InvalidTypeContext<T>) -> (T) -> T'}}
-  static func staticMethod(_ x: T) -> T { x }
-
-  // expected-error @+1 {{referenced declaration 'staticMethod' could not be resolved}}
-  @derivative(of: staticMethod)
-  func jvpStatic(_ x: T) -> (
-    value: T, differential: (T.TangentVector) -> (T.TangentVector)
-  ) {
-    return (x, { $0 })
-  }
-}
-
 // Test stored property original declaration.
 
 struct HasStoredProperty {
@@ -1165,3 +1150,38 @@ func opaqueResult(_ x: Float) -> some Differentiable { x }
 func vjpOpaqueResult(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
+
+// Test instance vs static method mismatch.
+
+struct StaticMismatch<T: Differentiable> {
+  init(_ x: T) {}
+  func instanceMethod(_ x: T) -> T { x }
+  static func staticMethod(_ x: T) -> T { x }
+
+  @derivative(of: init)
+  // expected-error @+2 {{derivative function must match usege of static declaration modifier from original function 'init(_:)'}}
+  // expected-note @+1 {{mark the derivative function 'vjpInit' as static}}{{3-3=static }}
+  func vjpInit(_ x: T) -> (value: Self, pullback: (T.TangentVector) -> T.TangentVector) {
+    fatalError()
+  }
+
+  @derivative(of: instanceMethod)
+  // expected-error @+2 {{derivative function must match usege of static declaration modifier from original function 'instanceMethod'}}
+  // expected-note @+1 {{remove static declaration modifier for function 'jvpInstance'}}{{3-10=}}
+  static func jvpInstance(_ x: T) -> (
+    value: T, differential: (T.TangentVector) -> (T.TangentVector)
+  ) {
+    return (x, { $0 })
+  }
+
+  @derivative(of: staticMethod)
+  // expected-error @+2 {{derivative function must match usege of static declaration modifier from original function 'staticMethod'}}
+  // expected-note @+1 {{mark the derivative function 'jvpStatic' as static}}{{3-3=static }}
+  func jvpStatic(_ x: T) -> (
+    value: T, differential: (T.TangentVector) -> (T.TangentVector)
+  ) {
+    return (x, { $0 })
+  }
+}
+
+

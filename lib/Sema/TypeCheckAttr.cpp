@@ -4007,7 +4007,9 @@ static bool checkFunctionSignature(
   if (!std::equal(required->getParams().begin(), required->getParams().end(),
                   candidateFnTy->getParams().begin(),
                   [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
-                    return x.getOldType()->isEqual(mapType(y.getOldType()));
+                    auto xInstanceTy = x.getOldType()->getMetatypeInstanceType();
+                    auto yInstanceTy = y.getOldType()->getMetatypeInstanceType();
+                    return xInstanceTy->isEqual(mapType(yInstanceTy));
                   }))
     return false;
 
@@ -4581,6 +4583,42 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   (void)attr->getParameterIndices();
 }
 
+/// Checks if original candidate and registered derivative match in terms
+/// of static declaration. If the original candidate is a constructor or is
+/// defined as static method then the registered derivative is expected to be static.
+/// Otherwise the registered derivative should be an instance method.
+/// \returns true if mismatch is found, false otherwise.
+static bool checkStaticDeclMismatch(AbstractFunctionDecl *originalCandidate,
+ AbstractFunctionDecl *registred) {
+  return (isa<ConstructorDecl>(originalCandidate) || originalCandidate->isStatic()) !=
+      registred->isStatic();
+}
+
+/// Produces diagnostics for mismatch in static/instance method declaration
+/// between original candidate and registered derivative.
+static void diagnoseStaticDeclMismatch(AbstractFunctionDecl *originalCandidate,
+ FuncDecl *registred) {
+  auto &diags = originalCandidate->getASTContext().Diags;
+  diags.diagnose(registred->getNameLoc(),
+                  diag::autodiff_attr_static_decl_mismatch,
+                  registred->getName());
+  if (registred->isStatic()) {
+    diags
+        .diagnose(registred->getStartLoc(),
+                  diag::autodiff_attr_remove_static_decl_modifier,
+                  registred->getName())
+        .fixItRemove(registred->getStaticLoc());
+  } else {
+    diags
+        .diagnose(registred->getStartLoc(),
+                  diag::autodiff_attr_add_static_decl_modifier,
+                  registred->getName())
+        .fixItInsert(
+            registred->getAttributeInsertionLoc(/*forModifier*/ true),
+            "static ");
+  }
+ }
+
 /// Type-checks the given `@derivative` attribute `attr` on declaration `D`.
 ///
 /// Effects are:
@@ -4805,6 +4843,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
         return true;
       }
     }
+  }
+
+  // Diagnose if original function and derivative differ in terms of static declaration.
+  if (checkStaticDeclMismatch(originalAFD, derivative)) {
+    diagnoseStaticDeclMismatch(originalAFD, derivative);
+    return true;
   }
   attr->setOriginalFunction(originalAFD);
 
@@ -5210,8 +5254,9 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   // If the transpose function is curried and `self` is a linearity parameter,
   // check that the instance and static `Self` types are equal.
   Type staticSelfType, instanceSelfType;
+  bool doSelfTypesMatch = false;
   if (isCurried && wrtSelf) {
-    bool doSelfTypesMatch = doTransposeStaticAndInstanceSelfTypesMatch(
+    doSelfTypesMatch = doTransposeStaticAndInstanceSelfTypesMatch(
         transposeInterfaceType, staticSelfType, instanceSelfType);
     if (!doSelfTypesMatch) {
       diagnose(attr->getLocation(),
@@ -5320,6 +5365,13 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
     return;
+  }
+
+  // Diagnose if original function and transpose differ in terms of static declaration.
+  if (!doSelfTypesMatch && checkStaticDeclMismatch(originalAFD, transpose)) {
+      diagnoseStaticDeclMismatch(originalAFD, transpose);
+      attr->setInvalid();
+      return;
   }
 
   // Set the resolved linearity parameter indices in the attribute.

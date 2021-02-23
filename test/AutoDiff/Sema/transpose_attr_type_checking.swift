@@ -474,7 +474,6 @@ extension Float {
 
 // Test non-`func` original declarations.
 
-// expected-note @+1 {{candidate initializer does not have type equal to or less constrained than '<T where T : Differentiable, T == T.TangentVector> (Struct<T>) -> (Float) -> Struct<T>'}}
 struct Struct<T> {}
 extension Struct: Equatable where T: Equatable {}
 extension Struct: Differentiable & AdditiveArithmetic
@@ -499,9 +498,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
 
 // Test initializers.
 extension Struct {
-  // expected-note @+1 {{candidate initializer does not have type equal to or less constrained than '<T where T : Differentiable, T == T.TangentVector> (Struct<T>) -> (Float) -> Struct<T>'}}
   init(_ x: Float) {}
-  // expected-note @+1 {{candidate initializer does not have type equal to or less constrained than '<T where T : Differentiable, T == T.TangentVector> (Struct<T>) -> (Float) -> Struct<T>'}}
   init(_ x: T, y: Float) {}
 }
 
@@ -517,9 +514,9 @@ extension Struct where T: Differentiable, T == T.TangentVector {
   }
 
   // Test instance transpose for static original initializer.
-  // TODO(TF-1015): Add improved instance/static member mismatch error.
-  // expected-error @+1 {{referenced declaration 'init' could not be resolved}}
   @transpose(of: init, wrt: 0)
+  // expected-error @+2 {{function must match usege of static declaration modifier from original function 'vjpInitStaticMismatch'}}
+  // expected-note @+1 {{mark the function 'vjpInitStaticMismatch' as static}}{{3-3=static }}
   func vjpInitStaticMismatch(_ x: Self) -> Float {
     fatalError()
   }
