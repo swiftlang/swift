@@ -119,12 +119,35 @@ private:
   /// Remove a type variable which used to reference this type variable.
   void removeReferencedBy(TypeVariableType *typeVar);
 
-  /// Experimental {
-  void introduceToInference(Constraint *constraint, bool notifyFixedBindings);
-  void retractFromInference(Constraint *constraint, bool notifyFixedBindings);
-  void reintroduceToInference(Constraint *constraint, bool notifyFixedBindings);
+  /// Binding Inference {
+
+  /// Infer bindings from the given constraint and notify referenced variables
+  /// about its arrival (if requested). This happens every time a new constraint
+  /// gets added to a constraint graph node.
+  void introduceToInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Forget about the given constraint. This happens every time a constraint
+  /// gets removed for a constraint graph.
+  void retractFromInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Re-evaluate the given constraint. This happens when there are changes
+  /// in associated type variables e.g. bound/unbound to/from a fixed type,
+  /// equivalence class changes.
+  void reintroduceToInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Drop all previously collected bindings and re-infer based on the
+  /// current set constraints associated with this equivalence class.
   void resetBindingSet();
-  void updateAdjacentVars() const;
+
+  /// Notify all of the type variables that have this one (or any member of
+  /// its equivalence class) referenced in their fixed type.
+  ///
+  /// This is a traversal up the reference change which triggers constraint
+  /// re-introduction to affected type variables.
+  ///
+  /// This is useful in situations when type variable gets bound and unbound,
+  /// or equivalence class changes.
+  void notifyReferencingVars() const;
   /// }
 
   /// The constraint graph this node belongs to.
