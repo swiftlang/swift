@@ -470,9 +470,6 @@ struct GenericSignatureBuilder::Implementation {
   /// Whether there were any errors.
   bool HadAnyError = false;
 
-  /// FIXME: Hack to work around a small number of minimization bugs.
-  bool HadAnyRedundantConstraints = false;
-
 #ifndef NDEBUG
   /// Whether we've already finalized the builder.
   bool finalized = false;
@@ -5302,9 +5299,8 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
 }
 
 void
-GenericSignatureBuilder::finalize(SourceLoc loc,
-                              TypeArrayView<GenericTypeParamType> genericParams,
-                              bool allowConcreteGenericParams) {
+GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericParams,
+                                  bool allowConcreteGenericParams) {
   // Process any delayed requirements that we can handle now.
   processDelayedRequirements();
 
@@ -5871,7 +5867,6 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     case ConstraintRelation::Redundant:
       // If this requirement is not derived or inferred (but has a useful
       // location) complain that it is redundant.
-      Impl->HadAnyRedundantConstraints = true;
       if (constraint.source->shouldDiagnoseRedundancy(true) &&
           representativeConstraint &&
           representativeConstraint->source->shouldDiagnoseRedundancy(false)) {
@@ -7188,11 +7183,10 @@ static void collectRequirements(GenericSignatureBuilder &builder,
 }
 
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
-                                          SourceLoc loc,
                                           bool allowConcreteGenericParams,
                                           bool allowBuilderToMove) && {
   // Finalize the builder, producing any necessary diagnostics.
-  finalize(loc, getGenericParams(), allowConcreteGenericParams);
+  finalize(getGenericParams(), allowConcreteGenericParams);
 
   // Collect the requirements placed on the generic parameter types.
   SmallVector<Requirement, 4> requirements;
@@ -7206,10 +7200,7 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // will produce the same thing.
   //
   // We cannot do this when there were errors.
-  // FIXME: The HadAnyRedundantConstraints bit is a hack because we are
-  // over-minimizing.
-  if (allowBuilderToMove && !Impl->HadAnyError &&
-      !Impl->HadAnyRedundantConstraints) {
+  if (allowBuilderToMove && !Impl->HadAnyError) {
     // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));
@@ -7258,9 +7249,7 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
     // Form a generic signature from the result.
     auto newSig =
       std::move(builder).computeGenericSignature(
-                                      SourceLoc(),
-                                      /*allowConcreteGenericParams=*/true,
-                                      /*allowBuilderToMove=*/true);
+                                      /*allowConcreteGenericParams=*/true);
 
     // The new signature should be equal.
     if (!newSig->isEqual(sig)) {
@@ -7294,9 +7283,7 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
     // Form a generic signature from the result.
     auto newSig =
       std::move(builder).computeGenericSignature(
-                                      SourceLoc(),
-                                      /*allowConcreteGenericParams=*/true,
-                                      /*allowBuilderToMove=*/true);
+                                      /*allowConcreteGenericParams=*/true);
 
     // If the removed requirement is satisfied by the new generic signature,
     // it is redundant. Complain.
@@ -7474,7 +7461,7 @@ AbstractGenericSignatureRequest::evaluate(
     builder.addRequirement(req, source, nullptr);
 
   return std::move(builder).computeGenericSignature(
-      SourceLoc(), /*allowConcreteGenericParams=*/true);
+      /*allowConcreteGenericParams=*/true);
 }
 
 GenericSignature
@@ -7605,5 +7592,5 @@ InferredGenericSignatureRequest::evaluate(
     builder.addRequirement(req, source, parentModule);
   
   return std::move(builder).computeGenericSignature(
-      SourceLoc(), allowConcreteGenericParams);
+      allowConcreteGenericParams);
 }
