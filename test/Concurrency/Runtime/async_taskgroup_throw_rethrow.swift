@@ -1,10 +1,7 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: libdispatch
-
-import Dispatch
 
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
@@ -29,11 +26,11 @@ func test_taskGroup_throws_rethrows() async {
         throw error
       }
 
-      fatalError("should have thrown")
+      print("should have thrown")
+      return 0
     }
 
-      print("got: \(got)")
-      fatalError("Expected error to be thrown, but got: \(got)")
+    print("Expected error to be thrown, but got: \(got)")
   } catch {
     // CHECK: rethrown: Boom()
     print("rethrown: \(error)")

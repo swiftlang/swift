@@ -3,7 +3,6 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-import Dispatch
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)

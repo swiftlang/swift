@@ -146,6 +146,16 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
   assert(completedTask->hasGroupChildFragment());
   assert(completedTask->groupChildFragment()->getGroup() == this);
 
+  // We retain the completed task, because we will either:
+  // - (a) schedule the waiter to resume on the next() that it is waiting on, or
+  // - (b) will need to store this task until the group task enters next() and
+  //       picks up this task.
+  // either way, there is some time between us returning here, and the `completeTask`
+  // issuing a swift_release on this very task. We need to keep it alive until
+  // we have the chance to poll it from the queue (via the waiter task entering
+  // calling next()).
+  swift_retain(completedTask);
+
   mutex.lock(); // TODO: remove fragment lock, and use status for synchronization
 
   // Immediately increment ready count and acquire the status
@@ -179,11 +189,10 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
           /*failure*/ std::memory_order_acquire) &&
           statusCompletePendingReadyWaiting(assumed)) {
         // Run the task.
-        auto result = PollResult::get(
-            completedTask, hadErrorResult, /*needsRelease*/ false);
+        auto result = PollResult::get(completedTask, hadErrorResult);
 
         mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-        // swift::runTaskWithPollResult(waitingTask, completingExecutor, result);
+
         auto waitingContext =
           static_cast<TaskFutureWaitAsyncContext *>(
             waitingTask->ResumeContext);
@@ -193,8 +202,6 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
         swift_task_enqueueGlobal(waitingTask);
         return;
       } // else, try again
-
-      assert(false && "why should this have to try again ever?"); // FIXME
     }
   }
 
@@ -234,9 +241,8 @@ void swift::swift_task_group_wait_next_throwing(
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
   auto group = context->group;
-fprintf(stderr, "[%s:%d](%s) group: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, group);
-
-assert(group && "swift_task_group_wait_next_throwing was passed context without group!");
+  assert(waitingTask == task && "attempted to wait on group.next() from other task, which is illegal!");
+  assert(group && "swift_task_group_wait_next_throwing was passed context without group!");
 
   TaskGroup::PollResult polled = group->poll(waitingTask);
   switch (polled.status) {

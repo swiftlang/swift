@@ -115,7 +115,6 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     // then we must offer into the parent group that we completed,
     // so it may `next()` poll completed child tasks in completion order.
     auto group = groupChildFragment()->getGroup();
-    assert(group);
     group->offer(this, context, executor);
   }
 
@@ -147,7 +146,6 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
-
   // For a future, destroy the result.
   if (task->isFuture()) {
     task->futureFragment()->destroy();

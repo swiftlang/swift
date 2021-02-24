@@ -161,11 +161,8 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitThrowingSignature::FunctionType
 swift_task_future_wait_throwing;
 
-//using TaskFutureWaitSignature =
-//  AsyncSignature<void(AsyncTask *, OpaqueValue *), /*throws*/ false>;
-
-using TaskGroupFutureWaitSignature =
-  AsyncSignature<void(AsyncTask *, TaskGroup *, OpaqueValue *), /*throws*/ true>; // TODO: is this correct?
+using TaskGroupFutureWaitThrowingSignature =
+  AsyncSignature<void(AsyncTask *, TaskGroup *, Metadata *), /*throws*/ true>;
 
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
@@ -178,7 +175,7 @@ using TaskGroupFutureWaitSignature =
 /// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-TaskGroupFutureWaitSignature::FunctionType
+TaskGroupFutureWaitThrowingSignature::FunctionType
 swift_task_group_wait_next_throwing;
 
 /// Create a new `TaskGroup` using the task's allocator.
@@ -194,23 +191,6 @@ swift_task_group_wait_next_throwing;
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 swift::TaskGroup* swift_task_group_create(AsyncTask *task);
 
-///// Attach the task group to the passed in (current) task that runs it.
-/////
-///// Returns the allocated and attached record that must be removed from the task,
-///// when the group exits.
-/////
-///// Its Swift signature is
-/////
-///// \code
-///// func swift_task_group_attach(
-/////     group: Builtin.NativeObject
-/////     to task: Builtin.NativeObject
-///// ) -> UnsafeRawPointer
-///// \endcode
-//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-//TaskGroupTaskStatusRecord*
-//swift_task_group_attach(TaskGroup *group, AsyncTask *task);
-
 /// Attach a child task to the parent task's task group record.
 ///
 /// Its Swift signature is
@@ -225,20 +205,6 @@ swift::TaskGroup* swift_task_group_create(AsyncTask *task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_group_attachChild(TaskGroup *group,
                                   AsyncTask *parent, AsyncTask *child);
-
-///// Detach the group from its parent and remove the passed in record.
-/////
-///// Its Swift signature is
-/////
-///// \code
-///// func swift_task_group_detach(
-/////     group: UnsafeRawPointer,
-/////     from task: Builtin.NativeObject
-///// ) -> UnsafeRawPointer
-///// \endcode
-//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-//void
-//swift_task_group_detach(TaskGroupTaskStatusRecord *record, AsyncTask *task);
 
 /// Its Swift signature is
 ///

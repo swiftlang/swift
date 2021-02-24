@@ -37,9 +37,9 @@ namespace swift {
 
   class TaskGroup {
   public:
-    /// Describes the status of the channel.
+    /// Describes the status of the group.
     enum class ReadyStatus : uintptr_t {
-        /// The channel is empty, no tasks are pending.
+        /// The task group is empty, no tasks are pending.
         /// Return immediately, there is no point in suspending.
         ///
         /// The storage is not accessible.
@@ -54,10 +54,10 @@ namespace swift {
     };
 
     enum class PollStatus : uintptr_t {
-        /// The channel is known to be empty and we can immediately return nil.
+        /// The group is known to be empty and we can immediately return nil.
         Empty = 0,
 
-        /// The task has been enqueued to the channels wait queue.
+        /// The task has been enqueued to the groups wait queue.
         MustWait = 1,
 
         /// The task has completed with result (of type \c resultType).
@@ -68,7 +68,7 @@ namespace swift {
         Error = 3,
     };
 
-    /// The result of waiting on a Channel (TaskGroup).
+    /// The result of waiting on the TaskGroup.
     struct PollResult {
         PollStatus status; // TODO: pack it into storage pointer or not worth it?
 
@@ -81,10 +81,10 @@ namespace swift {
         /// object itself.
         OpaqueValue *storage;
 
-        /// Optional, the completed task that was polled out of the ready queue.
+        /// The completed task, if necessary to keep alive until consumed by next().
         ///
         /// # Important: swift_release
-        /// If if a task is returned here, the task MUST be swift_release'd
+        /// If if a task is returned here, the task MUST be swift_released
         /// once we are done with it, to balance out the retain made before
         /// when the task was enqueued into the ready queue to keep it alive
         /// until a next() call eventually picks it up.
@@ -96,8 +96,7 @@ namespace swift {
               status == PollStatus::Empty;
         }
 
-        static PollResult get(AsyncTask *asyncTask, bool hadErrorResult,
-                                   bool needsSwiftRelease) {
+        static PollResult get(AsyncTask *asyncTask, bool hadErrorResult) {
           auto fragment = asyncTask->futureFragment();
           return PollResult{
               /*status*/ hadErrorResult ?
@@ -106,14 +105,12 @@ namespace swift {
               /*storage*/ hadErrorResult ?
                   reinterpret_cast<OpaqueValue *>(fragment->getError()) :
                   fragment->getStoragePtr(),
-              /*task*/ needsSwiftRelease ?
-                  asyncTask :
-                  nullptr
+              /*task*/ asyncTask
           };
         }
     };
 
-    /// An item within the message queue of a channel.
+    /// An item within the message queue of a group.
     struct ReadyQueueItem {
         /// Mask used for the low status bits in a message queue item.
         static const uintptr_t statusMask = 0x03;
@@ -263,7 +260,7 @@ namespace swift {
     /// we have to keep this pointer here so we know which record to remove then.
     TaskGroupTaskStatusRecord* Record;
 
-    /// Queue containing completed tasks offered into this channel.
+    /// Queue containing completed tasks offered into this group.
     ///
     /// The low bits contain the status, the rest of the pointer is the
     /// AsyncTask.
@@ -284,7 +281,7 @@ namespace swift {
 //          readyQueue(ReadyQueueItem::get(ReadyStatus::Empty, nullptr)),
           waitQueue(nullptr) {}
 
-    /// Destroy the storage associated with the channel.
+    /// Destroy the storage associated with the group.
     void destroy(AsyncTask *task);
 
     bool isEmpty() {
@@ -373,8 +370,11 @@ namespace swift {
     }
 
 
-    /// Offer result of a task into this channel.
-    /// The value is enqueued at the end of the channel.
+    /// Offer result of a task into this task group.
+    ///
+    /// If possible, and an existing task is already waiting on next(), this will
+    /// schedule it immediately. If not, the result is enqueued and will be picked
+    /// up whenever a task calls next() the next time.
     void offer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
 
     /// Attempt to dequeue ready tasks and complete the waitingTask.
