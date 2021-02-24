@@ -530,9 +530,8 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
   case DeclKind::Func:
   case DeclKind::Subscript: {
     // Local captures are checked separately.
-    if (cast<ValueDecl>(decl)->isLocalCapture()) {
-      return forLocalCapture(decl->getDeclContext());
-    }
+    if (cast<ValueDecl>(decl)->isLocalCapture())
+      return forUnrestricted();
 
     // 'let' declarations are immutable, so they can be accessed across
     // actors.
@@ -886,6 +885,11 @@ namespace {
     SmallVector<const DeclContext *, 4> contextStack;
     SmallVector<ApplyExpr*, 4> applyStack;
 
+    /// Keeps track of the capture context of variables that have been
+    /// explicitly captured in closures.
+    llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
+      captureContexts;
+
     using MutableVarSource = llvm::PointerUnion<DeclRefExpr *, InOutExpr *>;
     using MutableVarParent = llvm::PointerUnion<InOutExpr *, LoadExpr *>;
 
@@ -1134,6 +1138,13 @@ namespace {
       if (isa<ObjCSelectorExpr>(expr))
         return { false, expr };
 
+      // Track the capture contexts for variables.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        for (const auto &entry : captureList->getCaptureList()) {
+          captureContexts[entry.Var].push_back(captureList->getClosureBody());
+        }
+      }
+
       return { true, expr };
     }
 
@@ -1154,6 +1165,17 @@ namespace {
       }
       if (auto *inoutExpr = dyn_cast<InOutExpr>(expr)) {
         mutableLocalVarParent.erase(inoutExpr);
+      }
+
+      // Remove the tracked capture contexts.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        for (const auto &entry : captureList->getCaptureList()) {
+          auto &contexts = captureContexts[entry.Var];
+          assert(contexts.back() == captureList->getClosureBody());
+          contexts.pop_back();
+          if (contexts.empty())
+            captureContexts.erase(entry.Var);
+        }
       }
 
       return expr;
@@ -1257,7 +1279,6 @@ namespace {
         auto isolation = ActorIsolationRestriction::forDeclaration(decl);
         switch (isolation) {
         case ActorIsolationRestriction::Unrestricted:
-        case ActorIsolationRestriction::LocalCapture:
         case ActorIsolationRestriction::Unsafe:
           break;
         case ActorIsolationRestriction::CrossGlobalActor:
@@ -1526,6 +1547,84 @@ namespace {
       llvm_unreachable("unhandled actor isolation kind!");
     }
 
+    /// Find the innermost context in which this declaration was explicitly
+    /// captured.
+    const DeclContext *findCapturedDeclContext(ValueDecl *value) {
+      assert(value->isLocalCapture());
+      auto var = dyn_cast<VarDecl>(value);
+      if (!var)
+        return value->getDeclContext();
+
+      auto knownContexts = captureContexts.find(var);
+      if (knownContexts == captureContexts.end())
+        return value->getDeclContext();
+
+      return knownContexts->second.back();
+    }
+
+    /// Check a reference to a local capture.
+    bool checkLocalCapture(
+        ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
+      auto value = valueRef.getDecl();
+
+      // Check whether we are in a context that will not execute concurrently
+      // with the context of 'self'. If not, it's safe.
+      if (!mayExecuteConcurrentlyWith(
+              getDeclContext(), findCapturedDeclContext(value)))
+        return false;
+
+      // Check whether this is a local variable, in which case we can
+      // determine whether it was safe to access concurrently.
+      if (auto var = dyn_cast<VarDecl>(value)) {
+        auto parent = mutableLocalVarParent[declRefExpr];
+
+        // If the variable is immutable, it's fine so long as it involves
+        // ConcurrentValue types.
+        //
+        // When flow-sensitive concurrent captures are enabled, we also
+        // allow reads, depending on a SIL diagnostic pass to identify the
+        // remaining race conditions.
+        if (!var->supportsMutation() ||
+            (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
+             parent.dyn_cast<LoadExpr *>())) {
+          return diagnoseNonConcurrentTypesInReference(
+              valueRef, getDeclContext(), loc,
+              ConcurrentReferenceKind::LocalCapture);
+        }
+
+        // Otherwise, we have concurrent access. Complain.
+        ctx.Diags.diagnose(
+            loc, diag::concurrent_access_of_local_capture,
+            parent.dyn_cast<LoadExpr *>(),
+            var->getDescriptiveKind(), var->getName());
+        return true;
+      }
+
+      if (auto func = dyn_cast<FuncDecl>(value)) {
+        if (func->isConcurrent())
+          return false;
+
+        func->diagnose(
+            diag::local_function_executed_concurrently,
+            func->getDescriptiveKind(), func->getName())
+          .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
+
+        // Add the @concurrent attribute implicitly, so we don't diagnose
+        // again.
+        const_cast<FuncDecl *>(func)->getAttrs().add(
+            new (ctx) ConcurrentAttr(true));
+        return true;
+      }
+
+      // Concurrent access to some other local.
+      ctx.Diags.diagnose(
+          loc, diag::concurrent_access_local,
+          value->getDescriptiveKind(), value->getName());
+      value->diagnose(
+          diag::kind_declared_here, value->getDescriptiveKind());
+      return true;
+    }
+
     /// Check a reference to a local or global.
     bool checkNonMemberReference(
         ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
@@ -1533,6 +1632,10 @@ namespace {
         return false;
 
       auto value = valueRef.getDecl();
+
+      if (value->isLocalCapture())
+        return checkLocalCapture(valueRef, loc, declRefExpr);
+
       switch (auto isolation =
                   ActorIsolationRestriction::forDeclaration(valueRef)) {
       case ActorIsolationRestriction::Unrestricted:
@@ -1547,64 +1650,6 @@ namespace {
         return checkGlobalActorReference(
             valueRef, loc, isolation.getGlobalActor(),
             isolation == ActorIsolationRestriction::CrossGlobalActor);
-
-      case ActorIsolationRestriction::LocalCapture:
-        // Check whether we are in a context that will not execute concurrently
-        // with the context of 'self'. If not, it's safe.
-        if (!mayExecuteConcurrentlyWith(
-                getDeclContext(), isolation.getLocalContext()))
-          return false;
-
-        // Check whether this is a local variable, in which case we can
-        // determine whether it was safe to access concurrently.
-        if (auto var = dyn_cast<VarDecl>(value)) {
-          auto parent = mutableLocalVarParent[declRefExpr];
-
-          // If the variable is immutable, it's fine so long as it involves
-          // ConcurrentValue types.
-          //
-          // When flow-sensitive concurrent captures are enabled, we also
-          // allow reads, depending on a SIL diagnostic pass to identify the
-          // remaining race conditions.
-          if (!var->supportsMutation() ||
-              (ctx.LangOpts.EnableExperimentalFlowSensitiveConcurrentCaptures &&
-               parent.dyn_cast<LoadExpr *>())) {
-            return diagnoseNonConcurrentTypesInReference(
-                valueRef, getDeclContext(), loc,
-                ConcurrentReferenceKind::LocalCapture);
-          }
-
-          // Otherwise, we have concurrent access. Complain.
-          ctx.Diags.diagnose(
-              loc, diag::concurrent_access_of_local_capture,
-              parent.dyn_cast<LoadExpr *>(),
-              var->getDescriptiveKind(), var->getName());
-          return true;
-        }
-
-        if (auto func = dyn_cast<FuncDecl>(value)) {
-          if (func->isConcurrent())
-            return false;
-
-          func->diagnose(
-              diag::local_function_executed_concurrently,
-              func->getDescriptiveKind(), func->getName())
-            .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
-
-          // Add the @concurrent attribute implicitly, so we don't diagnose
-          // again.
-          const_cast<FuncDecl *>(func)->getAttrs().add(
-              new (ctx) ConcurrentAttr(true));
-          return true;
-        }
-
-        // Concurrent access to some other local.
-        ctx.Diags.diagnose(
-            loc, diag::concurrent_access_local,
-            value->getDescriptiveKind(), value->getName());
-        value->diagnose(
-            diag::kind_declared_here, value->getDescriptiveKind());
-        return true;
 
       case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafeGlobal(value, loc);
@@ -1755,9 +1800,6 @@ namespace {
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
             isolation == ActorIsolationRestriction::CrossGlobalActor);
-
-      case ActorIsolationRestriction::LocalCapture:
-        llvm_unreachable("Locals cannot be referenced with member syntax");
 
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
