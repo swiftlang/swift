@@ -1446,8 +1446,8 @@ namespace {
       // whole chain, and the type of the whole chain must be equal to the base.
       CS.addConstraint(ConstraintKind::Conversion, memberTy, chainResultTy,
                        locator);
-      CS.addConstraint(ConstraintKind::Equal, chainBaseTy, chainResultTy,
-                       locator);
+      CS.addConstraint(ConstraintKind::UnresolvedMemberChainBase, chainResultTy,
+                       chainBaseTy, locator);
 
       return chainResultTy;
     }

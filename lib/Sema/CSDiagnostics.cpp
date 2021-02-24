@@ -7189,6 +7189,40 @@ bool MemberMissingExplicitBaseTypeFailure::diagnoseAsError() {
               .fixItInsert(UME->getDotLoc(), baseTypeName);
         });
   }
+
+  return true;
+}
+
+bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto overload = getOverloadChoiceIfAvailable(locator);
+  if (!overload)
+    return false;
+
+  auto *member = overload->choice.getDeclOrNull();
+  assert(member);
+
+  emitDiagnostic(
+      diag::contextual_member_ref_on_protocol_requires_self_requirement,
+      member->getDescriptiveKind(), member->getName());
+
+  auto *extension = dyn_cast<ExtensionDecl>(member->getDeclContext());
+
+  // If this was a protocol requirement we can't suggest a fix-it.
+  if (!extension)
+    return true;
+
+  auto note =
+      emitDiagnosticAt(extension, diag::missing_sametype_requirement_on_self);
+
+  if (auto *whereClause = extension->getTrailingWhereClause()) {
+    auto sourceRange = whereClause->getSourceRange();
+    note.fixItInsertAfter(sourceRange.End, ", Self == <#Type#> ");
+  } else {
+    auto nameRepr = extension->getExtendedTypeRepr();
+    note.fixItInsertAfter(nameRepr->getEndLoc(), " where Self == <#Type#>");
+  }
+
   return true;
 }
 
