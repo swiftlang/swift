@@ -64,8 +64,7 @@ enum Tree {
 
 func testUnreachableCase1(a : Tree) {
   switch a {
-  case let Leaf:
-    _ = Leaf
+  case let Leaf: // expected-warning {{immutable value 'Leaf' was never used; consider replacing with '_' or removing it}}
     return
   case .Branch(_): // expected-warning {{case is already handled by previous patterns; consider removing it}}
     return
@@ -74,8 +73,7 @@ func testUnreachableCase1(a : Tree) {
 
 func testUnreachableCase2(a : Tree) {
   switch a {
-  case let Leaf:
-    _ = Leaf
+  case let Leaf: // expected-warning {{immutable value 'Leaf' was never used; consider replacing with '_' or removing it}}
     fallthrough
   case .Branch(_): // expected-warning {{case is already handled by previous patterns; consider removing it}}
     return

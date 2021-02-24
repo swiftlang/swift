@@ -8,16 +8,18 @@ func doSomething() -> Int { return 0 }
 class TestCaptureUse {
   var x = 42
   func method() -> Int {
-    doVoidStuff({ [y = self] in doNothing() })
-    doVoidStuff({ [weak self] in doNothing() })
-    doVoidStuff({ [self = self.x] in doNothing() })
+    doVoidStuff({ [y = self] in doNothing() }) // expected-warning {{capture 'y' was never used}}
+    doStuff({ [y = self] in doSomething() }) // expected-warning {{capture 'y' was never used}}
     
-    doStuff({ [y = self] in doSomething() })
-    doStuff({ [weak self] in doSomething() })
-    doStuff({ [self = self.x] in doSomething() })
+    doVoidStuff({ [self = self.x] in doNothing() }) // expected-warning {{capture 'self' was never used}}
+    doStuff({ [self = self.x] in doSomething() }) // expected-warning {{capture 'self' was never used}}
+    
+    // FIXME: Do these warnings make sense?
+    doVoidStuff({ [weak self] in doNothing() }) // expected-warning {{variable 'self' was written to, but never read}}
+    doStuff({ [weak self] in doSomething() }) // expected-warning {{variable 'self' was written to, but never read}}
     
     let y = 1
-    doVoidStuff { [y] in doNothing() }
+    doVoidStuff { [y] in doNothing() } // expected-warning {{capture 'y' was never used}}
     doStuff { [y] in doSomething() } // expected-warning {{capture 'y' was never used}}
 
     return 42
@@ -26,7 +28,7 @@ class TestCaptureUse {
 
 class SomeClass {
   var field : SomeClass?
-  func foo() -> Int {}
+  func foo() -> Int { return 0 }
 }
 
 func testCaptureBehavior(_ ptr : SomeClass) {
@@ -46,15 +48,14 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   let v2 : SomeClass = ptr
 
   doStuff { [weak v1] in v1!.foo() }
-  // expected-warning @+1 {{variable 'v1' was written to, but never read}}
   doStuff { [weak v1] in v1!.foo() }
   doStuff { [unowned v2] in v2.foo() }
   doStuff { [unowned(unsafe) v2] in v2.foo() }
   doStuff { [unowned(safe) v2] in v2.foo() }
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
-  let i = 42
-  // expected-warning @+1 {{variable 'i' was never mutated}}
+  var i: Int?  = 42
+  // expected-warning @-1 {{variable 'i' was never mutated; consider changing to 'let' constant}}
   doStuff { [i] in i! }
 }
 
@@ -63,9 +64,7 @@ extension SomeClass {
     doStuff { [unowned self] in self.foo() }
     doStuff { [unowned xyz = self.field!] in xyz.foo() }
     doStuff { [weak xyz = self.field] in xyz!.foo() }
-    // expected-warning @+1 {{variable 'self' was written to, but never read}}
-    doStuff { [weak self] in 42 }
-
+    doStuff { [weak self] in 42 } // expected-warning {{variable 'self' was written to, but never read}}
   }
 }
 

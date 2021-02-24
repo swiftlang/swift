@@ -212,8 +212,8 @@ func intConstantTest() -> Int{
 }
 
 func intConstantTest2() -> Int{
-  let y:Int = 1
-  let x:Int = y
+  let y:Int = 1 // expected-note {{initially referenced here}}
+  let x:Int = y // expected-warning {{immutable value referenced by 'x' is already referenced by 'y'; consider removing it and replacing all uses of 'x' with 'y'}}
 
   if x != 1 { // expected-note {{condition always evaluates to false}}
     return y // expected-warning {{will never be executed}}

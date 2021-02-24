@@ -673,9 +673,10 @@ struct TestYieldInSwitchWhere {
   var computed: Int {
     _read {
       switch stored {
-      case let x where x > 0:
+      case let x where x > 0: // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
         yield stored
       case let x where x < 0: // expected-note {{missing yield when the condition is true}}
+        // expected-warning@-1 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
         return
       default:
         yield 3

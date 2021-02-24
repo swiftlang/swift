@@ -473,7 +473,7 @@ func inoutSameTupleNamedElement() {
 }
 
 func inoutSamePropertyInSameTuple() {
-  var t = (name1: 1, name2: StructWithTwoStoredProp()) // expected-warning {{variable 't' was written to, but never read}}
+  var t = (name1: 1, name2: StructWithTwoStoredProp())
   takesTwoInouts(&t.name2.f1, &t.name2.f1)
   // expected-error@-1{{overlapping accesses to 't.name2.f1', but modification requires exclusive access; consider copying to a local variable}}
   // expected-note@-2{{conflicting access is here}}

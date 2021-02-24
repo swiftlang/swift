@@ -321,9 +321,6 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   doStuff { [unowned(unsafe) v2] in v2.foo() }
   doStuff { [unowned(safe) v2] in v2.foo() }
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
-
-  let i = 42
-  doStuff { [weak i] in i! }   // expected-error {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
 }
 
 extension SomeClass {
@@ -481,18 +478,6 @@ func rdar65155671(x: Int) {
     { a in
       _ = { [a] in a }
     }(x)
-}
-
-func sr3186<T, U>(_ f: (@escaping (@escaping (T) -> U) -> ((T) -> U))) -> ((T) -> U) {
-    return { x in return f(sr3186(f))(x) }
-}
-
-class SR3186 {
-  init() {
-    // expected-warning@+1{{capture 'self' was never used}}
-    let v = sr3186 { f in { [unowned self, f] x in x != 1000 ? f(x + 1) : "success" } }(0)
-    print("\(v)")
-  }
 }
 
 // Apply the explicit 'self' rule even if it referrs to a capture, if

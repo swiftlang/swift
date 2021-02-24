@@ -104,28 +104,29 @@ func test2() {
   
   
   // Weak
+  // expected-warnind @+1 {{variable 'w1' was never mutated; consider changing to 'let' constant}}
   weak var w1 : SomeClass?
-  _ = w1                // ok: default-initialized
+  markUsed(w1)          // ok: default-initialized
 
   // Note: with -enable-copy-propagation, we also expect: {{weak reference will always be nil because the referenced object is deallocated here}}
   // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'w2' declared here}}
   weak var w2 = SomeClass()
-  _ = w2                // ok
+  markUsed(w2)          // ok
   
   
   // Unowned. This is immediately crashing code (it causes a retain of a
   // released object).
   // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
-  _ = u1                // expected-error {{variable 'u1' used before being initialized}}
+  markUsed(u1)          // expected-error {{variable 'u1' used before being initialized}}
 
   // expected-warning@+3 {{instance will be immediately deallocated because variable 'u2' is 'unowned'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()
-  _ = u2                // ok
+  markUsed(u2)          // ok
 }
 
 
@@ -294,7 +295,11 @@ func emptyStructTest() {
   useEmptyStruct(g.1)
 }
 
-func takesTuplePair(_ a : inout (SomeClass, SomeClass)) {}
+func takesTuplePair(_ a : inout (SomeClass, SomeClass)) {
+  markUsed(a.0)
+  markUsed(a.1)
+  (a.0, a.1) = (SomeClass(), SomeClass())
+}
 
 // This tests cases where a store might be an init or assign based on control
 // flow path reaching it.
@@ -829,7 +834,7 @@ struct LetProperties {
   init() throws {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
-    var variable = 42
+    var variable = 42 // expected-warning {{variable 'variable' was written to, but never read}}
     swap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
     try throwingSwap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
 
@@ -891,21 +896,21 @@ func testLocalProperties(_ b : Int) -> Int {
     z = b
   }
 
-  _ = z
+  markUsed(z)
   return x
 }
 
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}} expected-warning {{variable 'x' was written to, but never read}}
   let y : T
   let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
   y = b
   x = b   // expected-error {{immutable value 'x' may only be initialized once}}
 
-  var tmp = b
+  var tmp = b // expected-warning {{variable 'tmp' was written to, but never read}}
   swap(&x, &tmp)   // expected-error {{immutable value 'x' must not be passed inout}}
   return y
 }
@@ -1050,7 +1055,7 @@ func testReassignment() {
   let c : Int  // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   c = 12
   c = 32  // expected-error {{immutable value 'c' may only be initialized once}}
-  _ = c
+  markUsed(c)
 }
 
 
@@ -1354,7 +1359,7 @@ func testDontDiagnoseUnownedImmediateDeallocationThroughStrong() {
   let c4Tmp = SomeClass()
   c4 = c4Tmp
 
-  _ = c1; _ = c2; _ = c3; _ = c4
+  markUsed(c1); markUsed(c2); markUsed(c3); markUsed(c4)
 }
 
 class ClassWithUnownedProperties {

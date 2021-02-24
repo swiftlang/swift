@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -emit-sil %s -verify
 
 // <rdar://problem/20872721> QoI: warn about unused variables
 // <rdar://problem/15975935> warning that you can use 'let' not 'var'
@@ -12,7 +12,24 @@ func basicTests() -> Int {
   return y
 }
 
+func testUnderscoreAssignment() {
+  var a: Int {
+    get { return 0 }
+    set { print(newValue) }
+  }
+  _ = a // a is used because a getter is called
+  
+  var b = 0 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  _ = b
+  
+  // c is unused because constants have no getter,
+  // and the underscore assignment has no effects.
+  let c = 0 // expected-warning {{initialization of immutable value 'c' was never used; consider replacing with assignment to '_' or removing it}}
+  _ = c
+}
+
 struct X {
+  var value = 1
   func f() {}
   mutating func g() {}
 }
@@ -47,6 +64,18 @@ func testStruct() {
   let g = X()
   var h = X() // expected-warning {{variable 'h' was written to, but never read}}
   h = g
+  
+  var i = X()
+  i.value = 2
+  
+  var j = X() // expected-warning {{variable 'j' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
+  markUsed(j.value)
+  
+  var k = X()
+  k.value += 1
+  
+  let l = X()
+  markUsed(l.value)
   
   _ = X()
 }
@@ -468,44 +497,8 @@ func testIfLets(_ a : Int?, b : Any) {
   if let x = b as? Int {  // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{6-14=}} {{16-19=is}}
   }
 
-  // SR-14646. Special case, turn this into an 'is' test with optional value. 
-  let bb: Any? = 3
-  if let bbb = bb as? Int {}  // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{19-22=is}}
-  if let bbb = (bb) as? Int {}  // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{21-24=is}}
-
-  func aa() -> Any? { return 1 }
-  if let aaa = aa() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{21-24=is}}
-  if let aaa = (aa()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{23-26=is}}
-
-  func bb() -> Any { return 1 }
-  if let aaa = aa() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{21-24=is}}
-  if let aaa = (aa()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{23-26=is}}
-
-
-  func throwingAA() throws -> Any? { return 1 }
-  do {
-    if let aaa = try! throwingAA() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{36-39=is}}
-    if let aaa = (try! throwingAA()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{38-41=is}}
-    if let aaa = try throwingAA() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{35-38=is}}
-    if let aaa = (try throwingAA()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{37-40=is}}
-  } catch { }
-  if let aaa = try? throwingAA() as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=(}} {{41-41=) != nil}}
-  if let aaa = (try? throwingAA()) as? Int {} // expected-warning {{value 'aaa' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{36-39=is}}
-  
-  func throwingBB() throws -> Any { return 1 }
-  do { 
-    if let bbb = try! throwingBB() as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{36-39=is}}
-    if let bbb = (try! throwingBB()) as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{38-41=is}}
-    if let bbb = try throwingBB() as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{35-38=is}}
-    if let bbb = (try throwingBB()) as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{8-18=}} {{37-40=is}}
-  } catch { }
-  if let bbb = try? throwingBB() as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=(}} {{41-41=) != nil}}
-  if let bbb = (try? throwingBB()) as? Int {} // expected-warning {{value 'bbb' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{36-39=is}}
-
-  let cc: (Any?, Any) = (1, 2)
-  if let (cc1, cc2) = cc as? (Int, Int) {} // expected-warning {{immutable value 'cc1' was never used; consider replacing with '_' or removing it}} expected-warning {{immutable value 'cc2' was never used; consider replacing with '_' or removing it}}
-
   // SR-1112
+
   let xxx: Int? = 0
 
   if let yyy = xxx { } // expected-warning{{with boolean test}} {{6-16=}} {{19-19= != nil}}
@@ -519,6 +512,29 @@ func testIfLets(_ a : Int?, b : Any) {
 
 }
 
+func testOptionalWrite() {
+  let a: Int? // expected-note {{constant defined here}}
+  // expected-warning@-1 {{immutable value 'a' was never used; consider removing it}}
+  a? = 0 // expected-error {{constant 'a' used before being initialized}}
+  
+  var b: Int? // expected-warning {{variable 'b' was written to, but never read}}
+  b? = 0
+  
+  var c: Int? = 1 // expected-warning {{variable 'c' was written to, but never read}}
+  c? = 0
+  
+  let d: Int? // expected-note {{constant defined here}}
+  // expected-warning@-1 {{immutable value 'd' was never used; consider removing it}}
+  d! = 0 // expected-error {{constant 'd' used before being initialized}}
+  
+  var e: Int? // expected-warning {{variable 'e' was written to, but never read}}
+  e! = 0
+  
+  var f: Int? = 1 // expected-warning {{variable 'f' was written to, but never read}}
+  f! = 0
+}
+
+
 func testPatterns() {
   let a = 4 // expected-warning {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}} {{3-8=_}}
   var ( b ) = 6 // expected-warning {{initialization of variable 'b' was never used; consider replacing with assignment to '_' or removing it}} {{3-12=_}}
@@ -530,7 +546,7 @@ let optionalString: String? = "check"
 if let string = optionalString {}  // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=}} {{31-31= != nil}}
 
 let optionalAny: Any? = "check"
-if let string = optionalAny as? String {} // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=}} {{29-32=is}}
+if let string = optionalAny as? String {} // expected-warning {{value 'string' was defined but never used; consider replacing with boolean test}} {{4-17=(}} {{39-39=) != nil}}
 
 // Due to the complexities of global variable tracing, these will not generate warnings
 let unusedVariable = ""
@@ -859,6 +875,30 @@ func testBindingTupleValueSwitch() -> Int {
   }
 }
 
+// TODO: product more narrow warnings and fixits for unused conditional bindings in switch
+func testSwitchBindingCondition(a: Int) {
+  
+  // Example where x is not bound within the case block
+  switch a {
+  case let x where x > 0:
+    break
+  case let x where x < 0:
+    break
+  default:
+    break
+  }
+  
+  // Should provide more narrow warnings and fixits
+  // to deduce here:
+  switch a {
+  case _ where a > 0:
+    break
+  case _ where a < 0:
+    break
+  default:
+    break
+  }
+}
 
 var closure_var_unused: () -> Int = {
   var unused = 42 // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
@@ -940,17 +980,6 @@ class A {
     }
   }
 }
-
-// Tests fix to SR-14646
-func testUselessCastWithInvalidParam(foo: Any?) -> Int {
-  class Foo { }
-  if let bar = foo as? Foo { return 42 } // expected-warning {{value 'bar' was defined but never used; consider replacing with boolean test}} {{6-16=}} {{20-23=is}}
-  else { return 54 }
-}
-  
-//===----------------------------------------------------------------------===//
-// FIXME: rename Other SIL Failure Cases
-//===----------------------------------------------------------------------===//
 
 struct Y {
   var v: Int
@@ -1042,7 +1071,7 @@ struct IfLetInGetter {
   }
   
   public var varRead: String {
-    if var u = x { // expected-warning {{variable 'u' was written to, but never read}}
+    if var u = x {
       u.string += "."
       return ""
     } else {
@@ -1526,6 +1555,14 @@ func calls(_ arg: (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
 
+func doStuff(_ fn : @escaping () -> Int) {}
+func foo() {
+  let i = 42 // expected-warning {{initialization of immutable value 'i' was never used; consider replacing with assignment to '_' or removing it}}
+  doStuff { [weak i] in i! }
+  // expected-warning@-1 {{variable 'i' was never mutated; consider changing to 'let' constant}}
+  // expected-error@-2 {{'weak' may only be applied to class and class-bound protocol types, not 'Int'}}
+}
+
 func capture_list_no_captures_param(x: Int) {
   calls({ [x] in $0 }, 0) // expected-warning {{capture 'x' was never used}}
 }
@@ -1596,11 +1633,4 @@ func testVarReadInClosure() {
   takes_closure {
     markUsed(b1)
   }
-}
-
-func mutableParameter(_ a : Int, h : Int, var i : Int, j: Int, g: Int) -> Int { // expected-warning {{'var' in this position is interpreted as an argument label}} {{43-46=`var`}}
-  i += 1 // expected-error {{left side of mutating operator isn't mutable: 'i' is a 'let' constant}}
-  var j = j
-  swap(&i, &j) // expected-error {{cannot pass immutable value as inout argument: 'i' is a 'let' constant}}
-  return i+g
 }

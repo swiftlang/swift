@@ -125,8 +125,7 @@ static SILValue getDebugVarAddrValue(SILInstruction *I) {
   if (auto DVAI = dyn_cast<DebugValueAddrInst>(I)) {
     // DebugValueAddrInst are unused, so use the instruction it references.
     if (SILValue Value = DVAI->getOperand()) {
-      // FIXME: what else?
-      // Do we need this one?
+      // FIXME: what else can we step into?
       if (auto Inst = Value->getDefiningInstruction()) {
         if (auto LI = dyn_cast<LoadInst>(Inst)) {
           return LI->getOperand();
@@ -182,7 +181,6 @@ static bool instructionPrecedes(SILInstruction *First,
 /// declaration that should be checked for diagnostics.
 static SILInstruction *getEntryInst(SILInstruction *I) {
   
-  // FIXME: VarDecl are lowered to AllocBoxInst or EnumInst
   if (!isa<AllocBoxInst>(I) &&
       !isa<AllocStackInst>(I) &&
       !isa<DebugValueInst>(I) &&
@@ -254,8 +252,9 @@ class VariableModifyTraverser {
   llvm::SetVector<SILValue> Seen;
   SILInstruction *EntryInst;
   
-  bool isUninitialized = false;
-  bool isAssigned = false;
+  bool IsUninitialized = false;
+  bool IsAssigned = false;
+  bool IsWeakCapture = false;
   
 public:
   VariableModifyTraverser(SILInstruction *EntryInst) : EntryInst(EntryInst) {
@@ -309,16 +308,62 @@ private:
     return false;
   }
   
+  // A narrow case for Builtin.convertUnownedUnsafeToGuaranteed
+  //
+  // Check that the order of instructions is:
+  //  - begin_access [read]
+  //  - struct_element_addr
+  //  - load
+  //  - unmanaged_to_ref
+  //
+  bool isConvertUnownedUnsafeToGuaranteed(BeginAccessInst *BAI) {
+    for (SILValue Value : BAI->getResults()) {
+      for (auto Use : Value->getUses()) {
+        auto User = Use->getUser();
+        
+        if (isa<StructElementAddrInst>(User)) {
+          for (SILValue SEAValue : User->getResults()) {
+            for (auto SEAUse : SEAValue->getUses()) {
+              auto SEAUser = SEAUse->getUser();
+              
+              if (isa<LoadInst>(SEAUser)) {
+                for (SILValue LIValue : SEAUser->getResults()) {
+                  for (auto LIUse : LIValue->getUses()) {
+                    auto LIUser = LIUse->getUser();
+                    
+                    if (isa<UnmanagedToRefInst>(LIUser)) {
+                      return true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+  
   /// Determines if an instruction terminates the traversal as a modier of
   /// the entry instruction.
-  bool isDirectModier(SILInstruction *I, Operand *Op) {
+  bool isDirectModifier(SILInstruction *I, Operand *Op) {
     switch (I->getKind()) {
       case SILInstructionKind::BeginAccessInst:
-        return dyn_cast<BeginAccessInst>(I)->getAccessKind() ==
-        SILAccessKind::Modify;
+        if (dyn_cast<BeginAccessInst>(I)->getAccessKind() ==
+            SILAccessKind::Modify) {
+          return true;
+        }
+        return isConvertUnownedUnsafeToGuaranteed(dyn_cast<BeginAccessInst>(I));
       case SILInstructionKind::AddressToPointerInst:
-      case SILInstructionKind::StoreWeakInst:
       case SILInstructionKind::MarkDependenceInst:
+        return true;
+        
+      case SILInstructionKind::StoreWeakInst:
+        if (getVarDecl(EntryInst)->isCaptureList()) {
+          IsWeakCapture = true;
+          return false;
+        }
         return true;
         
       case SILInstructionKind::ApplyInst:
@@ -336,8 +381,17 @@ private:
   void search(SILInstruction *I, Operand *Op) {
     switch (I->getKind()) {
       case SILInstructionKind::MarkUninitializedInst:
-        isUninitialized = true;
+        IsUninitialized = true;
         appendValues(I);
+        break;
+      case SILInstructionKind::SelectEnumAddrInst:
+        IsUninitialized = true;
+        IsAssigned = true;
+        break;
+        
+      case SILInstructionKind::SwitchEnumAddrInst:
+        IsUninitialized = true;
+        IsAssigned = true;
         break;
       case SILInstructionKind::BeginAccessInst:
       case SILInstructionKind::BeginBorrowInst:
@@ -350,7 +404,7 @@ private:
         
       case SILInstructionKind::AssignInst:
         if (Seen.count(dyn_cast<AssignInst>(I)->getDest())) {
-          isAssigned = true;
+          IsAssigned = true;
         }
         break;
         
@@ -372,9 +426,13 @@ public:
   
   /// Return if the value is declared and initialized in seperate locations.
   /// In these cases, we do not want to suggest replacing the declaration
-  /// with assignment to '_'
+  /// with assignment to '_'.
   bool isDeferredInit() {
-    return isUninitialized && isAssigned;
+    return IsUninitialized && IsAssigned;
+  }
+  
+  bool isWeakCapture() {
+    return IsWeakCapture;
   }
   
   /// Perform the traversal and return if a modify was found.
@@ -393,7 +451,7 @@ public:
       // Return Trivial Cases
       for (Operand *Use : Value->getUses()) {
         if (SILInstruction *User = Use->getUser()) {
-          if (isDirectModier(User, Use)) {
+          if (isDirectModifier(User, Use)) {
             return true;
           }
         }
@@ -486,25 +544,44 @@ private:
       continue;
     }
     
-    // Search for a Partial Apply Use
+    SmallVector<SILInstruction *> CaptureWorklist;
     for (auto Use : CapturedValue->getUses()) {
-      auto User = Use->getUser();
-      if (isa<PartialApplyInst>(User)) {
-        i = BB->begin();
-        foundI = false;
-        
-        // Check the Partial Apply is after this capture reference and before
-        // the next capture reference
-        while (i != e) {
-          if (&*i == I) {
-            foundI = true;
-          } else if (&*i == NextCapture) {
-            break;
-          } else if (foundI && &*i == User) {
-            return true;
+      CaptureWorklist.push_back(Use->getUser());
+    }
+    
+    // The capture is either passed into a partial apply, or the value is
+    // copied before the partial apply
+    while (!CaptureWorklist.empty()) {
+      auto User = CaptureWorklist.pop_back_val();
+      switch (User->getKind()) {
+        case SILInstructionKind::CopyValueInst: {
+          for (SILValue Value : User->getResults()) {
+            for (auto CVUse : Value->getUses()) {
+              CaptureWorklist.push_back(CVUse->getUser());
+            }
           }
-          ++i;
+          break;
         }
+        case SILInstructionKind::PartialApplyInst: {
+          i = BB->begin();
+          foundI = false;
+          
+          // Check the Partial Apply is after this capture reference and before
+          // the next capture reference
+          while (i != e) {
+            if (&*i == I) {
+              foundI = true;
+            } else if (&*i == NextCapture) {
+              break;
+            } else if (foundI && &*i == User) {
+              return true;
+            }
+            ++i;
+          }
+          break;
+        }
+        default:
+          break;
       }
     }
     return false;
@@ -621,8 +698,6 @@ private:
       } else if (isa<BuiltinInst>(OpInst)) {
         return true;
       } else if (isa<BeginBorrowInst>(OpInst)) {
-        // FIXME: check if it is operand index 1?
-        //          if (I->getAllOperands()[])
         return true;
       } else if (isa<ObjCMethodInst>(OpInst)) {
         // FIXME: Can we know if it is read or inout?
@@ -630,11 +705,11 @@ private:
       } 
     }
     
-    if (auto Operand = I->getAllOperands()[0].get()) {
-      if (Operand == Value) {
+    if (auto Callee = I->getAllOperands()[0].get()) {
+      if (Callee == Value) {
         // This variable is a closure and is being called.
         return true;
-      } else if (isa<SILFunctionArgument>(Operand)) {
+      } else if (isa<SILFunctionArgument>(Callee)) {
         // This is calling a closure passed in as a function argument
         // A read can not be guaranteed in runtime, but can be assumed
         return true;
@@ -841,16 +916,19 @@ private:
     
     switch (I->getKind()) {
       case SILInstructionKind::BuiltinInst:
-      case SILInstructionKind::CondBranchInst:
       case SILInstructionKind::CopyValueInst:
       case SILInstructionKind::PointerToAddressInst:
       case SILInstructionKind::ReturnInst:
       case SILInstructionKind::StoreBorrowInst:
-      case SILInstructionKind::SwitchEnumAddrInst:
+      case SILInstructionKind::StructElementAddrInst:
       case SILInstructionKind::SwitchEnumInst:
       case SILInstructionKind::SwitchValueInst:
       case SILInstructionKind::ThrowInst:
+      case SILInstructionKind::YieldInst:
         return true;
+        
+      case SILInstructionKind::CondBranchInst:
+        return !(isa<SelectEnumAddrInst>(I->getAllOperands()[0].get().getDefiningInstruction()));
         
       case SILInstructionKind::AssignInst:
         return dyn_cast<AssignInst>(I)->getSrc() == Value;
@@ -1079,6 +1157,7 @@ public:
   bool DidRead = false;
   bool DidModify = false;
   bool DidDeferInit = false;
+  bool IsWeakCapture = false;
   VarDecl *InitialReference = nullptr;
   
   VarUsageInfo(SILInstruction *EntryInst) : EntryInst(EntryInst) {
@@ -1167,6 +1246,7 @@ private:
       auto VMT = VariableModifyTraverser(EntryInst);
       DidModify |= VMT.didModify();
       DidDeferInit |= VMT.isDeferredInit();
+      IsWeakCapture |= VMT.isWeakCapture();
     }
     
     if (!InitialReference) {
@@ -1493,12 +1573,17 @@ class DiagnoseVarUsage : public SILFunctionTransform {
         UDG.diagnoseGetterUse(VD, GetterInst);
       } else if (auto IVD = UsageInfo->InitialReference) {
         UDG.diagnoseDuplicateReference(VD, IVD);
-      } if (!UsageInfo->DidRead && !UsageInfo->DidModify) {
-        UDG.diagnoseUnreadUnmodified(VD, UsageInfo->DidDeferInit);
-      } else if (UsageInfo->DidRead && !UsageInfo->DidModify) {
-        UDG.diagnoseReadUnmodified(VD);
-      } else if (!UsageInfo->DidRead && UsageInfo->DidModify) {
+      } else if (!UsageInfo->DidRead &&
+                 (UsageInfo->DidModify || UsageInfo->IsWeakCapture)) {
         UDG.diagnoseUnreadModified(VD);
+      } else if (!UsageInfo->DidRead &&
+                 !UsageInfo->DidModify &&
+                 !UsageInfo->IsWeakCapture) {
+        UDG.diagnoseUnreadUnmodified(VD, UsageInfo->DidDeferInit);
+      } else if (UsageInfo->DidRead &&
+                 !UsageInfo->DidModify &&
+                 !UsageInfo->IsWeakCapture) {
+        UDG.diagnoseReadUnmodified(VD);
       }
     }
   }
