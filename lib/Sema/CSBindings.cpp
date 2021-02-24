@@ -453,7 +453,7 @@ void BindingSet::finalize(
       if (!hasViableBindings() && TransitiveProtocols.hasValue()) {
         for (auto *constraint : *TransitiveProtocols) {
           auto protocolTy = constraint->getSecondType();
-          addPotentialBinding(
+          addBinding(
               {protocolTy, AllowedBindingKind::Exact, constraint});
         }
       }
