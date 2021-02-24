@@ -49,10 +49,8 @@ extension Task {
   ///
   /// All functions available on the Task
   // TODO: once we can have async properties land make this computed property
-  @available(*, deprecated, message: "Please use Builtin.getCurrentAsyncTask() or Task.__unsafeCurrentAsync() until this function becomes implemented.")
-  public static func current(file: StaticString = #file, line: UInt = #line) async -> Task {
-    fatalError("Task.current() is not implemented yet!", file: file, line: line)
-    Task.unsafeCurrent!.task // !-safe, guaranteed to have a Task available within an async function.
+  public static func current() async -> Task {
+    return Task(Builtin.getCurrentAsyncTask())
   }
 
 }
