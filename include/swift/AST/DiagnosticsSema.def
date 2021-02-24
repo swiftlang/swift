@@ -3265,7 +3265,7 @@ ERROR(autodiff_attr_result_not_differentiable,none,
 ERROR(autodiff_attr_opaque_result_type_unsupported,none,
       "cannot differentiate functions returning opaque result types", ())
 ERROR(autodiff_attr_static_decl_mismatch,none,
-      "function must match usege of static declaration modifier "
+      "function must match usage of static declaration modifier "
       "from original function %0", (/*original*/ DeclName))
 NOTE(autodiff_attr_add_static_decl_modifier,none,
       "mark the function %0 as static", (/*derivative*/ DeclName))
