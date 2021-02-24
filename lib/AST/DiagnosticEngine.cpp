@@ -807,7 +807,7 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
-DiagnosticBehavior DiagnosticState::determineBehavior(DiagID id) {
+DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
   auto set = [this](DiagnosticBehavior lvl) {
     if (lvl == DiagnosticBehavior::Fatal) {
       fatalErrorOccurred = true;
@@ -830,7 +830,7 @@ DiagnosticBehavior DiagnosticState::determineBehavior(DiagID id) {
   //      that
   //   4) Otherwise remap the diagnostic kind
 
-  auto diagInfo = storedDiagnosticInfos[(unsigned)id];
+  auto diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
   bool isNote = diagInfo.kind == DiagnosticKind::Note;
 
   //   1) If current state dictates a certain behavior, follow that
@@ -907,7 +907,7 @@ static AccessLevel getBufferAccessLevel(const Decl *decl) {
 
 Optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
-  auto behavior = state.determineBehavior(diagnostic.getID());
+  auto behavior = state.determineBehavior(diagnostic);
   if (behavior == DiagnosticBehavior::Ignore)
     return None;
 

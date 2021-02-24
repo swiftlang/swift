@@ -636,7 +636,7 @@ namespace swift {
 
     /// Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    DiagnosticBehavior determineBehavior(DiagID id);
+    DiagnosticBehavior determineBehavior(const Diagnostic &diag);
 
     bool hadAnyError() const { return anyErrorOccurred; }
     bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
@@ -1105,7 +1105,7 @@ namespace swift {
                                        Engine.TentativeDiagnostics.end());
 
       for (auto &diagnostic : diagnostics) {
-        auto behavior = Engine.state.determineBehavior(diagnostic.getID());
+        auto behavior = Engine.state.determineBehavior(diagnostic);
         if (behavior == DiagnosticBehavior::Fatal ||
             behavior == DiagnosticBehavior::Error)
           return true;
