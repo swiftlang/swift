@@ -211,7 +211,7 @@ public:
     bool recordConformanceConstraint(GenericSignatureBuilder &builder,
                                      ResolvedType type,
                                      ProtocolDecl *proto,
-                                     FloatingRequirementSource source);
+                                     const RequirementSource *source);
 
     /// Find a source of the same-type constraint that maps a potential
     /// archetype in this equivalence class to a concrete type along with
