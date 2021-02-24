@@ -47,6 +47,14 @@ inline TransformRange<Range, UserTransform> makeUserRange(Range range) {
   return makeTransformRange(range, UserTransform(toUser));
 }
 
+/// Transform a use_iterator range (Operand*) into an llvm::iterator_range
+/// of users (SILInstruction *)
+inline iterator_range<llvm::mapped_iterator<ValueBase::use_iterator, UserTransform>>
+makeUserIteratorRange(iterator_range<ValueBase::use_iterator> useRange) {
+  auto toUser = [](Operand *operand) { return operand->getUser(); };
+  return llvm::map_range(useRange, UserTransform(toUser));
+}
+
 using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
 
 /// Create a retain of \p Ptr before the \p InsertPt.
