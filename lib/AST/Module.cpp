@@ -1553,7 +1553,7 @@ Fingerprint ModuleDecl::getFingerprint() const {
   StableHasher hasher = StableHasher::defaultHasher();
   SmallVector<Fingerprint, 16> FPs;
   collectBasicSourceFileInfo([&](const BasicSourceFileInfo &bsfi) {
-    FPs.emplace_back(bsfi.InterfaceHash);
+    FPs.emplace_back(bsfi.InterfaceHashIncludingTypeMembers);
   });
   
   // Sort the fingerprints lexicographically so we have a stable hash despite
