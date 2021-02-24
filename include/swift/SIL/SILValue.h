@@ -676,6 +676,11 @@ public:
     return lifetimeConstraint;
   }
 
+  bool isConsuming() const {
+    return ownershipKind == OwnershipKind::Owned
+      && lifetimeConstraint == UseLifetimeConstraint::LifetimeEnding;
+  }
+
   bool satisfiedBy(const Operand *use) const;
 
   bool satisfiesConstraint(ValueOwnershipKind testKind) const {
