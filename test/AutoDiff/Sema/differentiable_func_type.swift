@@ -183,7 +183,7 @@ extension Vector: Differentiable where T: Differentiable {
     static func - (lhs: Self, rhs: Self) -> Self { fatalError() }
     typealias TangentVector = Self
   }
-  mutating func move(along direction: TangentVector) { fatalError() }
+  mutating func move(by offset: TangentVector) { fatalError() }
 }
 
 // expected-note@+1 2 {{found this candidate}}

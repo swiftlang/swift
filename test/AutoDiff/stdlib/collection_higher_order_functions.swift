@@ -15,19 +15,19 @@ CollectionHOFTests.test("differentiableMap(_:)") {
   func double(_ array: [Float]) -> [Float] {
     array.differentiableMap { $0 * $0 }
   }
-  expectEqual([], pullback(at: array, in: double)([]))
-  expectEqual([0], pullback(at: array, in: double)([0]))
-  expectEqual([2], pullback(at: array, in: double)([1]))
-  expectEqual([2, 4, 6, 8, 10], pullback(at: array, in: double)([1, 1, 1, 1, 1]))
+  expectEqual([], pullback(at: array, of: double)([]))
+  expectEqual([0], pullback(at: array, of: double)([0]))
+  expectEqual([2], pullback(at: array, of: double)([1]))
+  expectEqual([2, 4, 6, 8, 10], pullback(at: array, of: double)([1, 1, 1, 1, 1]))
 }
 
 CollectionHOFTests.test("differentiableReduce(_:_:)") {
   func product(_ array: [Float]) -> Float {
     array.differentiableReduce(1) { $0 * $1 }
   }
-  expectEqual([1], gradient(at: [0], in: product))
-  expectEqual([1], gradient(at: [1], in: product))
-  expectEqual([120, 60, 40, 30, 24], gradient(at: array, in: product))
+  expectEqual([1], gradient(at: [0], of: product))
+  expectEqual([1], gradient(at: [1], of: product))
+  expectEqual([120, 60, 40, 30, 24], gradient(at: array, of: product))
 }
 
 runAllTests()

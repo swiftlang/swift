@@ -82,7 +82,7 @@ func generic_vjp<T: Differentiable>(_ x: T, _ y: Float) -> (
 
 public struct Foo: Differentiable {
   public typealias TangentVector = DummyTangentVector
-  public mutating func move(along _: TangentVector) {}
+  public mutating func move(by _: TangentVector) {}
 
   @differentiable(reverse)
   public var x: Float

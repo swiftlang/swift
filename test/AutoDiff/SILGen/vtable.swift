@@ -20,7 +20,7 @@ struct DummyTangentVector: Differentiable & AdditiveArithmetic {
 
 class Super: Differentiable {
   typealias TangentVector = DummyTangentVector
-  func move(along _: TangentVector) {}
+  func move(by _: TangentVector) {}
 
   var base: Float
   // FIXME(TF-648): Dummy to make `Super.TangentVector` be nontrivial.

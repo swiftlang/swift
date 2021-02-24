@@ -20,8 +20,8 @@ ControlFlowTests.test("Conditionals") {
     }
     return x + x
   }
-  expectEqual(8, gradient(at: 4, in: cond1))
-  expectEqual(2, gradient(at: -10, in: cond1))
+  expectEqual(8, gradient(at: 4, of: cond1))
+  expectEqual(2, gradient(at: -10, of: cond1))
 
   func cond2(_ x: Float) -> Float {
     let y: Float
@@ -34,9 +34,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y
   }
-  expectEqual(8, gradient(at: 4, in: cond2))
-  expectEqual(2, gradient(at: -10, in: cond2))
-  expectEqual(0, gradient(at: -1337, in: cond2))
+  expectEqual(8, gradient(at: 4, of: cond2))
+  expectEqual(2, gradient(at: -10, of: cond2))
+  expectEqual(0, gradient(at: -1337, of: cond2))
 
   func cond2_var(_ x: Float) -> Float {
     var y: Float = x
@@ -51,9 +51,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y
   }
-  expectEqual(8, gradient(at: 4, in: cond2_var))
-  expectEqual(2, gradient(at: -10, in: cond2_var))
-  expectEqual(0, gradient(at: -1337, in: cond2_var))
+  expectEqual(8, gradient(at: 4, of: cond2_var))
+  expectEqual(2, gradient(at: -10, of: cond2_var))
+  expectEqual(0, gradient(at: -1337, of: cond2_var))
 
   func cond3(_ x: Float, _ y: Float) -> Float {
     if x > 0 {
@@ -61,8 +61,8 @@ ControlFlowTests.test("Conditionals") {
     }
     return y - x
   }
-  expectEqual((5, 4), gradient(at: 4, 5, in: cond3))
-  expectEqual((-1, 1), gradient(at: -3, -2, in: cond3))
+  expectEqual((5, 4), gradient(at: 4, 5, of: cond3))
+  expectEqual((-1, 1), gradient(at: -3, -2, of: cond3))
 
   func cond4_var(_ x: Float) -> Float {
     var outer = x
@@ -76,7 +76,7 @@ ControlFlowTests.test("Conditionals") {
     }
     return outer
   }
-  expectEqual((9, 6), valueWithGradient(at: 3, in: cond4_var))
+  expectEqual((9, 6), valueWithGradient(at: 3, of: cond4_var))
 
   func cond_tuple(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -86,9 +86,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y.0 + y.0 - y.1 + y.0
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_tuple))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_tuple))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_tuple))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_tuple))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_tuple))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_tuple))
 
   func cond_tuple2(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -102,9 +102,9 @@ ControlFlowTests.test("Conditionals") {
     let y1 = y.1
     return y0_double - y1 + y.0
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_tuple2))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_tuple2))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_tuple2))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_tuple2))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_tuple2))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_tuple2))
 
   func cond_tuple_var(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -121,9 +121,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y.0 + y.1 - z.0 + z.1
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_tuple_var))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_tuple_var))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_tuple_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_tuple_var))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_tuple_var))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_tuple_var))
 
   func cond_nestedtuple_var(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -140,9 +140,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y.0 + y.1 - z.0.0 + z.0.1
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_nestedtuple_var))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_nestedtuple_var))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_nestedtuple_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_nestedtuple_var))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_nestedtuple_var))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_nestedtuple_var))
 
   struct FloatPair : Differentiable {
     var first, second: Float
@@ -169,9 +169,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y.first + y.first - y.second + y.first
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_struct))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_struct))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_struct))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_struct))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_struct))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_struct))
 
   func cond_struct2(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -185,9 +185,9 @@ ControlFlowTests.test("Conditionals") {
     let y1 = y.second
     return y0_double - y1 + y.first
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_struct2))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_struct2))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_struct2))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_struct2))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_struct2))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_struct2))
 
   func cond_struct_var(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -204,9 +204,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y.first + y.second - z.first + z.second
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_struct_var))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_struct_var))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_struct_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_struct_var))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_struct_var))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_struct_var))
 
   func cond_nestedstruct_var(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
@@ -223,9 +223,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y.first + y.second - z.first.first + z.first.second
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_nestedstruct_var))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_nestedstruct_var))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_nestedstruct_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: cond_nestedstruct_var))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: cond_nestedstruct_var))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: cond_nestedstruct_var))
 
   func guard1(_ x: Float, _ y: Float) -> Float {
     guard x > 0 else {
@@ -233,8 +233,8 @@ ControlFlowTests.test("Conditionals") {
     }
     return y * y
   }
-  expectEqual((0, 10), gradient(at: 4, 5, in: guard1))
-  expectEqual((-6, 0), gradient(at: -3, -2, in: guard1))
+  expectEqual((0, 10), gradient(at: 4, 5, of: guard1))
+  expectEqual((-6, 0), gradient(at: -3, -2, of: guard1))
 
   func guard2(_ x: Float, _ y: Float) -> Float {
     guard x > 0 else {
@@ -247,10 +247,10 @@ ControlFlowTests.test("Conditionals") {
     }
     return y * y
   }
-  expectEqual((0, 10), gradient(at: 4, 5, in: guard2))
-  expectEqual((5, -1337), gradient(at: -1337, 5, in: guard2))
-  expectEqual((-2674, 0), gradient(at: -1337, -5, in: guard2))
-  expectEqual((2, -3), gradient(at: -3, 2, in: guard2))
+  expectEqual((0, 10), gradient(at: 4, 5, of: guard2))
+  expectEqual((5, -1337), gradient(at: -1337, 5, of: guard2))
+  expectEqual((-2674, 0), gradient(at: -1337, -5, of: guard2))
+  expectEqual((2, -3), gradient(at: -3, 2, of: guard2))
 
   func guard2_var(_ x: Float, _ y: Float) -> Float {
     var z = y
@@ -267,10 +267,10 @@ ControlFlowTests.test("Conditionals") {
     }
     return z * y
   }
-  expectEqual((0, 10), gradient(at: 4, 5, in: guard2_var))
-  expectEqual((5, -1337), gradient(at: -1337, 5, in: guard2_var))
-  expectEqual((-2674, 0), gradient(at: -1337, -5, in: guard2_var))
-  expectEqual((2, -3), gradient(at: -3, 2, in: guard2_var))
+  expectEqual((0, 10), gradient(at: 4, 5, of: guard2_var))
+  expectEqual((5, -1337), gradient(at: -1337, 5, of: guard2_var))
+  expectEqual((-2674, 0), gradient(at: -1337, -5, of: guard2_var))
+  expectEqual((2, -3), gradient(at: -3, 2, of: guard2_var))
 
   func guard3(_ x: Float, _ y: Float) -> Float {
     guard x > 0 else {
@@ -278,9 +278,9 @@ ControlFlowTests.test("Conditionals") {
     }
     return y * y
   }
-  expectEqual((0, 10), gradient(at: 4, 5, in: guard3))
+  expectEqual((0, 10), gradient(at: 4, 5, of: guard3))
   expectCrash {
-    _ = gradient(at: -3, -2, in: guard3)
+    _ = gradient(at: -3, -2, of: guard3)
   }
 
   func cond_empty(_ x: Float) -> Float {
@@ -289,8 +289,8 @@ ControlFlowTests.test("Conditionals") {
     }
     return x * x
   }
-  expectEqual(4, gradient(at: 2, in: cond_empty))
-  expectEqual(-6, gradient(at: -3, in: cond_empty))
+  expectEqual(4, gradient(at: 2, of: cond_empty))
+  expectEqual(-6, gradient(at: -3, of: cond_empty))
 
   func cond_generic<T : Differentiable & FloatingPoint>(
     _ x: T, _ y: T
@@ -300,8 +300,8 @@ ControlFlowTests.test("Conditionals") {
     }
     return y
   }
-  expectEqual((1, 0), gradient(at: 4, 5, in: { x, y in cond_generic(x, y) }))
-  expectEqual((0, 1), gradient(at: -4, 5, in: { x, y in cond_generic(x, y) }))
+  expectEqual((1, 0), gradient(at: 4, 5, of: { x, y in cond_generic(x, y) }))
+  expectEqual((0, 1), gradient(at: -4, 5, of: { x, y in cond_generic(x, y) }))
 }
 
 ControlFlowTests.test("NestedConditionals") {
@@ -315,9 +315,9 @@ ControlFlowTests.test("NestedConditionals") {
     }
     return x * -x
   }
-  expectEqual(23, gradient(at: 11, in: nested1))
-  expectEqual(8, gradient(at: 4, in: nested1))
-  expectEqual(20, gradient(at: -10, in: nested1))
+  expectEqual(23, gradient(at: 11, of: nested1))
+  expectEqual(8, gradient(at: 4, of: nested1))
+  expectEqual(20, gradient(at: -10, of: nested1))
 
   func nested2(_ x: Float, _ y: Float) -> Float {
     if x > 0 {
@@ -329,9 +329,9 @@ ControlFlowTests.test("NestedConditionals") {
     }
     return -y
   }
-  expectEqual((20, 4), gradient(at: 4, 20, in: nested2))
-  expectEqual((1, 1), gradient(at: 4, 5, in: nested2))
-  expectEqual((0, -1), gradient(at: -3, -2, in: nested2))
+  expectEqual((20, 4), gradient(at: 4, 20, of: nested2))
+  expectEqual((1, 1), gradient(at: 4, 5, of: nested2))
+  expectEqual((0, -1), gradient(at: -3, -2, of: nested2))
 
   func nested3(_ x: Float, _ y: Float) -> Float {
     if x > 0 {
@@ -348,10 +348,10 @@ ControlFlowTests.test("NestedConditionals") {
     }
     return -y
   }
-  expectEqual((40, 8), gradient(at: 4, 20, in: nested3))
-  expectEqual((0, -1), gradient(at: 4, 21, in: nested3))
-  expectEqual((1, 1), gradient(at: 4, 5, in: nested3))
-  expectEqual((0, -1), gradient(at: -3, -2, in: nested3))
+  expectEqual((40, 8), gradient(at: 4, 20, of: nested3))
+  expectEqual((0, -1), gradient(at: 4, 21, of: nested3))
+  expectEqual((1, 1), gradient(at: 4, 5, of: nested3))
+  expectEqual((0, -1), gradient(at: -3, -2, of: nested3))
 
   func nested3_var(_ x: Float, _ y: Float) -> Float {
     var w = y
@@ -373,10 +373,10 @@ ControlFlowTests.test("NestedConditionals") {
     w = -w
     return w
   }
-  expectEqual((40, 8), gradient(at: 4, 20, in: nested3))
-  expectEqual((0, -1), gradient(at: 4, 21, in: nested3))
-  expectEqual((1, 1), gradient(at: 4, 5, in: nested3))
-  expectEqual((0, -1), gradient(at: -3, -2, in: nested3))
+  expectEqual((40, 8), gradient(at: 4, 20, of: nested3))
+  expectEqual((0, -1), gradient(at: 4, 21, of: nested3))
+  expectEqual((1, 1), gradient(at: 4, 5, of: nested3))
+  expectEqual((0, -1), gradient(at: -3, -2, of: nested3))
 
   // TF-781: nested if derivative correctness.
   do {
@@ -424,11 +424,11 @@ ControlFlowTests.test("Recursion") {
     }
     return x * factorial(x - 1)
   }
-  expectEqual(0, gradient(at: 1, in: factorial))
-  expectEqual(1, gradient(at: 2, in: factorial))
-  expectEqual(5, gradient(at: 3, in: factorial))
-  expectEqual(26, gradient(at: 4, in: factorial))
-  expectEqual(154, gradient(at: 5, in: factorial))
+  expectEqual(0, gradient(at: 1, of: factorial))
+  expectEqual(1, gradient(at: 2, of: factorial))
+  expectEqual(5, gradient(at: 3, of: factorial))
+  expectEqual(26, gradient(at: 4, of: factorial))
+  expectEqual(154, gradient(at: 5, of: factorial))
 
   func factorial_var1(_ x: Float) -> Float {
     var y: Float = x
@@ -440,11 +440,11 @@ ControlFlowTests.test("Recursion") {
     }
     return y
   }
-  expectEqual(0, gradient(at: 1, in: factorial_var1))
-  expectEqual(1, gradient(at: 2, in: factorial_var1))
-  expectEqual(5, gradient(at: 3, in: factorial_var1))
-  expectEqual(26, gradient(at: 4, in: factorial_var1))
-  expectEqual(154, gradient(at: 5, in: factorial_var1))
+  expectEqual(0, gradient(at: 1, of: factorial_var1))
+  expectEqual(1, gradient(at: 2, of: factorial_var1))
+  expectEqual(5, gradient(at: 3, of: factorial_var1))
+  expectEqual(26, gradient(at: 4, of: factorial_var1))
+  expectEqual(154, gradient(at: 5, of: factorial_var1))
 
   func factorial_var2(_ x: Float) -> Float {
     // Next line is the only difference with `factorial_var1`.
@@ -457,11 +457,11 @@ ControlFlowTests.test("Recursion") {
     }
     return y
   }
-  expectEqual(0, gradient(at: 1, in: factorial_var2))
-  expectEqual(1, gradient(at: 2, in: factorial_var2))
-  expectEqual(5, gradient(at: 3, in: factorial_var2))
-  expectEqual(26, gradient(at: 4, in: factorial_var2))
-  expectEqual(154, gradient(at: 5, in: factorial_var2))
+  expectEqual(0, gradient(at: 1, of: factorial_var2))
+  expectEqual(1, gradient(at: 2, of: factorial_var2))
+  expectEqual(5, gradient(at: 3, of: factorial_var2))
+  expectEqual(26, gradient(at: 4, of: factorial_var2))
+  expectEqual(154, gradient(at: 5, of: factorial_var2))
 
   func product(_ x: Float, count: Int) -> Float {
     precondition(count > 0)
@@ -470,9 +470,9 @@ ControlFlowTests.test("Recursion") {
     }
     return x * product(x, count: count - 1)
   }
-  expectEqual(300, gradient(at: 10, in: { x in product(x, count: 3) }))
-  expectEqual(-20, gradient(at: -10, in: { x in product(x, count: 2) }))
-  expectEqual(1, gradient(at: 100, in: { x in product(x, count: 1) }))
+  expectEqual(300, gradient(at: 10, of: { x in product(x, count: 3) }))
+  expectEqual(-20, gradient(at: -10, of: { x in product(x, count: 2) }))
+  expectEqual(1, gradient(at: 100, of: { x in product(x, count: 1) }))
 }
 
 ControlFlowTests.test("Enums") {
@@ -494,10 +494,10 @@ ControlFlowTests.test("Enums") {
     case let .b(b1, b2): return x * b1 * b2
     }
   }
-  expectEqual(10, gradient(at: 2, in: { x in enum_notactive1(.a(10), x) }))
-  expectEqual(10, gradient(at: 2, in: { x in Enum.a(10).enum_notactive1(x) }))
-  expectEqual(20, gradient(at: 2, in: { x in enum_notactive1(.b(4, 5), x) }))
-  expectEqual(20, gradient(at: 2, in: { x in Enum.b(4, 5).enum_notactive1(x) }))
+  expectEqual(10, gradient(at: 2, of: { x in enum_notactive1(.a(10), x) }))
+  expectEqual(10, gradient(at: 2, of: { x in Enum.a(10).enum_notactive1(x) }))
+  expectEqual(20, gradient(at: 2, of: { x in enum_notactive1(.b(4, 5), x) }))
+  expectEqual(20, gradient(at: 2, of: { x in Enum.b(4, 5).enum_notactive1(x) }))
 
   func enum_notactive2(_ e: Enum, _ x: Float) -> Float {
     var y = x
@@ -517,10 +517,10 @@ ControlFlowTests.test("Enums") {
     }
     return x + y
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: { x in enum_notactive2(.a(10), x) }))
-  expectEqual((20, 2), valueWithGradient(at: 10, in: { x in enum_notactive2(.b(4, 5), x) }))
-  expectEqual((-20, 2), valueWithGradient(at: -10, in: { x in enum_notactive2(.a(10), x) }))
-  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: { x in enum_notactive2(.b(4, 5), x) }))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((20, 2), valueWithGradient(at: 10, of: { x in enum_notactive2(.b(4, 5), x) }))
+  expectEqual((-20, 2), valueWithGradient(at: -10, of: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, of: { x in enum_notactive2(.b(4, 5), x) }))
 
   func optional_notactive1(_ optional: Float?, _ x: Float) -> Float {
     if let y = optional {
@@ -528,8 +528,8 @@ ControlFlowTests.test("Enums") {
     }
     return x + x
   }
-  expectEqual(2, gradient(at: 2, in: { x in optional_notactive1(nil, x) }))
-  expectEqual(10, gradient(at: 2, in: { x in optional_notactive1(10, x) }))
+  expectEqual(2, gradient(at: 2, of: { x in optional_notactive1(nil, x) }))
+  expectEqual(10, gradient(at: 2, of: { x in optional_notactive1(10, x) }))
 
   struct Dense : Differentiable {
     var w1: Float
@@ -565,8 +565,8 @@ ControlFlowTests.test("Enums") {
   }
   do {
     let ind: Indirect = .e(10, .a(3))
-    expectEqual(120, gradient(at: 2, in: { x in enum_indirect_notactive1(ind, x) }))
-    expectEqual(120, gradient(at: 2, in: { x in enum_indirect_notactive1(.indirect(ind), x) }))
+    expectEqual(120, gradient(at: 2, of: { x in enum_indirect_notactive1(ind, x) }))
+    expectEqual(120, gradient(at: 2, of: { x in enum_indirect_notactive1(.indirect(ind), x) }))
   }
 }
 
@@ -578,8 +578,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  expectEqual((8, 12), valueWithGradient(at: 2, in: for_loop))
-  expectEqual((27, 27), valueWithGradient(at: 3, in: for_loop))
+  expectEqual((8, 12), valueWithGradient(at: 2, of: for_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, of: for_loop))
 
   func for_loop_nonactive_initial_value(_ x: Float) -> Float {
     var result: Float = 1
@@ -588,8 +588,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  expectEqual((4, 4), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
-  expectEqual((9, 6), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
+  expectEqual((4, 4), valueWithGradient(at: 2, of: for_loop_nonactive_initial_value))
+  expectEqual((9, 6), valueWithGradient(at: 3, of: for_loop_nonactive_initial_value))
 
   func while_loop(_ x: Float) -> Float {
     var result = x
@@ -600,8 +600,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  expectEqual((8, 12), valueWithGradient(at: 2, in: while_loop))
-  expectEqual((27, 27), valueWithGradient(at: 3, in: while_loop))
+  expectEqual((8, 12), valueWithGradient(at: 2, of: while_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, of: while_loop))
 
   func while_loop_nonactive_initial_value(_ x: Float) -> Float {
     var result: Float = 1
@@ -612,8 +612,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  expectEqual((4, 4), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
-  expectEqual((9, 6), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
+  expectEqual((4, 4), valueWithGradient(at: 2, of: while_loop_nonactive_initial_value))
+  expectEqual((9, 6), valueWithGradient(at: 3, of: while_loop_nonactive_initial_value))
 
   func repeat_while_loop(_ x: Float) -> Float {
     var result = x
@@ -626,10 +626,10 @@ ControlFlowTests.test("Loops") {
   }
   // FIXME(TF-584): Investigate incorrect (too big) gradient values for
   // repeat-while loops.
-  // expectEqual((8, 12), valueWithGradient(at: 2, in: repeat_while_loop))
-  // expectEqual((27, 27), valueWithGradient(at: 3, in: repeat_while_loop))
-  expectEqual((8, 18), valueWithGradient(at: 2, in: repeat_while_loop))
-  expectEqual((27, 36), valueWithGradient(at: 3, in: repeat_while_loop))
+  // expectEqual((8, 12), valueWithGradient(at: 2, of: repeat_while_loop))
+  // expectEqual((27, 27), valueWithGradient(at: 3, of: repeat_while_loop))
+  expectEqual((8, 18), valueWithGradient(at: 2, of: repeat_while_loop))
+  expectEqual((27, 36), valueWithGradient(at: 3, of: repeat_while_loop))
 
   func repeat_while_loop_nonactive_initial_value(_ x: Float) -> Float {
     var result: Float = 1
@@ -642,10 +642,10 @@ ControlFlowTests.test("Loops") {
   }
   // FIXME(TF-584): Investigate incorrect (too big) gradient values for
   // repeat-while loops.
-  // expectEqual((4, 4), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
-  // expectEqual((9, 6), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
-  expectEqual((4, 5), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
-  expectEqual((9, 7), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
+  // expectEqual((4, 4), valueWithGradient(at: 2, of: repeat_while_loop_nonactive_initial_value))
+  // expectEqual((9, 6), valueWithGradient(at: 3, of: repeat_while_loop_nonactive_initial_value))
+  expectEqual((4, 5), valueWithGradient(at: 2, of: repeat_while_loop_nonactive_initial_value))
+  expectEqual((9, 7), valueWithGradient(at: 3, of: repeat_while_loop_nonactive_initial_value))
 
   func loop_continue(_ x: Float) -> Float {
     var result = x
@@ -657,8 +657,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  expectEqual((64, 192), valueWithGradient(at: 2, in: loop_continue))
-  expectEqual((729, 1458), valueWithGradient(at: 3, in: loop_continue))
+  expectEqual((64, 192), valueWithGradient(at: 2, of: loop_continue))
+  expectEqual((729, 1458), valueWithGradient(at: 3, of: loop_continue))
 
   func loop_break(_ x: Float) -> Float {
     var result = x
@@ -670,8 +670,8 @@ ControlFlowTests.test("Loops") {
     }
     return result
   }
-  expectEqual((64, 192), valueWithGradient(at: 2, in: loop_break))
-  expectEqual((729, 1458), valueWithGradient(at: 3, in: loop_break))
+  expectEqual((64, 192), valueWithGradient(at: 2, of: loop_break))
+  expectEqual((729, 1458), valueWithGradient(at: 3, of: loop_break))
 
   func nested_loop1(_ x: Float) -> Float {
     var outer = x
@@ -688,8 +688,8 @@ ControlFlowTests.test("Loops") {
     }
     return outer
   }
-  expectEqual((20, 22), valueWithGradient(at: 2, in: nested_loop1))
-  expectEqual((104, 66), valueWithGradient(at: 4, in: nested_loop1))
+  expectEqual((20, 22), valueWithGradient(at: 2, of: nested_loop1))
+  expectEqual((104, 66), valueWithGradient(at: 4, of: nested_loop1))
 
   func nested_loop2(_ x: Float, count: Int) -> Float {
     var outer = x
@@ -712,10 +712,10 @@ ControlFlowTests.test("Loops") {
     }
     return outer
   }
-  expectEqual((6, 5), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 1) }))
-  expectEqual((20, 22), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
-  expectEqual((52, 80), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
-  expectEqual((24, 28), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
+  expectEqual((6, 5), valueWithGradient(at: 2, of: { x in nested_loop2(x, count: 1) }))
+  expectEqual((20, 22), valueWithGradient(at: 2, of: { x in nested_loop2(x, count: 2) }))
+  expectEqual((52, 80), valueWithGradient(at: 2, of: { x in nested_loop2(x, count: 3) }))
+  expectEqual((24, 28), valueWithGradient(at: 2, of: { x in nested_loop2(x, count: 4) }))
 
   // SR13945: Loops in methods caused a runtime segfault.
   struct SR13945 {
@@ -727,8 +727,8 @@ ControlFlowTests.test("Loops") {
       return result
     }
   }
-  expectEqual((0, 0), valueWithGradient(at: 0, in: { SR13945().loopInMethod($0) }))
-  expectEqual((1, 4), valueWithGradient(at: 1, in: { SR13945().loopInMethod($0) }))
+  expectEqual((0, 0), valueWithGradient(at: 0, of: { SR13945().loopInMethod($0) }))
+  expectEqual((1, 4), valueWithGradient(at: 1, of: { SR13945().loopInMethod($0) }))
 }
 
 ControlFlowTests.test("BranchingCastInstructions") {
@@ -739,8 +739,8 @@ ControlFlowTests.test("BranchingCastInstructions") {
     }
     return x * x
   }
-  expectEqual((6, 2), valueWithGradient(at: 3, in: { typeCheckOperator($0, Int.self) }))
-  expectEqual((9, 6), valueWithGradient(at: 3, in: { typeCheckOperator($0, Float.self) }))
+  expectEqual((6, 2), valueWithGradient(at: 3, of: { typeCheckOperator($0, Int.self) }))
+  expectEqual((9, 6), valueWithGradient(at: 3, of: { typeCheckOperator($0, Float.self) }))
 
   // checked_cast_addr_br
   func conditionalCast<T: Differentiable>(_ x: T) -> T {
@@ -749,7 +749,7 @@ ControlFlowTests.test("BranchingCastInstructions") {
     }
     return x
   }
-  expectEqual((3, 1), valueWithGradient(at: Float(3), in: conditionalCast))
+  expectEqual((3, 1), valueWithGradient(at: Float(3), of: conditionalCast))
 }
 
 ControlFlowTests.test("ThrowingCalls") {
@@ -761,14 +761,14 @@ ControlFlowTests.test("ThrowingCalls") {
     try! throwing()
     return x
   }
-  expectEqual(10, pullback(at: 3, in: testThrowing)(10))
+  expectEqual(10, pullback(at: 3, of: testThrowing)(10))
 
   @differentiable(reverse)
   func testThrowingGeneric<T: Differentiable>(_ x: T) -> T {
     try! throwing()
     return x
   }
-  expectEqual(10, pullback(at: 3, in: testThrowingGeneric)(10))
+  expectEqual(10, pullback(at: 3, of: testThrowingGeneric)(10))
 
   func rethrowing(_ body: () throws -> Void) rethrows -> Void {}
 
@@ -777,14 +777,14 @@ ControlFlowTests.test("ThrowingCalls") {
     rethrowing({}) // non-active `try_apply`
     return x
   }
-  expectEqual(10, pullback(at: 3, in: testRethrowingIdentity)(10))
+  expectEqual(10, pullback(at: 3, of: testRethrowingIdentity)(10))
 
   @differentiable(reverse)
   func testRethrowingIdentityGeneric<T: Differentiable>(_ x: T) -> T {
     rethrowing({}) // non-active `try_apply`
     return x
   }
-  expectEqual(10, pullback(at: 3, in: testRethrowingIdentityGeneric)(10))
+  expectEqual(10, pullback(at: 3, of: testRethrowingIdentityGeneric)(10))
 
   @differentiable(reverse)
   func testComplexControlFlow(_ x: Float) -> Float {
@@ -798,7 +798,7 @@ ControlFlowTests.test("ThrowingCalls") {
     rethrowing({})
     return x
   }
-  expectEqual(10, pullback(at: 3, in: testComplexControlFlow)(10))
+  expectEqual(10, pullback(at: 3, of: testComplexControlFlow)(10))
 
   @differentiable(reverse)
   func testComplexControlFlowGeneric<T: Differentiable>(_ x: T) -> T {
@@ -812,7 +812,7 @@ ControlFlowTests.test("ThrowingCalls") {
     rethrowing({})
     return x
   }
-  expectEqual(10, pullback(at: 3, in: testComplexControlFlowGeneric)(10))
+  expectEqual(10, pullback(at: 3, of: testComplexControlFlowGeneric)(10))
 
   // Test `Array.map(_:)`, which is rethrowing.
   func testArrayMap(_ x: [Float]) -> [Float] {
@@ -820,7 +820,7 @@ ControlFlowTests.test("ThrowingCalls") {
     _blackHole(max)
     return x
   }
-  expectEqual([10, 10], pullback(at: [2, 3], in: testArrayMap)([10, 10]))
+  expectEqual([10, 10], pullback(at: [2, 3], of: testArrayMap)([10, 10]))
 
   // Test `Bool.&&(_:)`, which is rethrowing.
   func testBooleanShortCircuitingOperations(_ x: Float, bool: Bool) -> Float {
@@ -829,8 +829,8 @@ ControlFlowTests.test("ThrowingCalls") {
     }
     return x + x
   }
-  expectEqual(6, gradient(at: 3, in: { x in testBooleanShortCircuitingOperations(x, bool: true) }))
-  expectEqual(2, gradient(at: 3, in: { x in testBooleanShortCircuitingOperations(x, bool: false) }))
+  expectEqual(6, gradient(at: 3, of: { x in testBooleanShortCircuitingOperations(x, bool: true) }))
+  expectEqual(2, gradient(at: 3, of: { x in testBooleanShortCircuitingOperations(x, bool: false) }))
 }
 
 runAllTests()
