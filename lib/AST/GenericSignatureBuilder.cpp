@@ -7062,41 +7062,6 @@ void GenericSignatureBuilder::dump() {
 }
 
 void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
-  out << "Requirements:";
-  enumerateRequirements(getGenericParams(),
-                        [&](RequirementKind kind,
-                            Type type,
-                            RequirementRHS constraint,
-                            const RequirementSource *source) {
-    switch (kind) {
-    case RequirementKind::Conformance:
-    case RequirementKind::Superclass:
-      out << "\n  ";
-      out << type.getString() << " : "
-          << constraint.get<Type>().getString() << " [";
-      source->print(out, &Context.SourceMgr);
-      out << "]";
-      break;
-    case RequirementKind::Layout:
-      out << "\n  ";
-      out << type.getString() << " : "
-          << constraint.get<LayoutConstraint>().getString() << " [";
-      source->print(out, &Context.SourceMgr);
-      out << "]";
-      break;
-    case RequirementKind::SameType:
-      out << "\n  ";
-      out << type.getString() << " == " ;
-      auto secondType = constraint.get<Type>();
-      out << secondType.getString();
-      out << " [";
-      source->print(out, &Context.SourceMgr);
-      out << "]";
-      break;
-    }
-  });
-  out << "\n";
-
   out << "Potential archetypes:\n";
   for (auto pa : Impl->PotentialArchetypes) {
     pa->dump(out, &Context.SourceMgr, 2);
