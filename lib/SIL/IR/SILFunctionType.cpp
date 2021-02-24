@@ -4319,6 +4319,9 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 // match exactly.
 // TODO: More sophisticated param and return ABI compatibility rules could
 // diverge.
+//
+// Note: all cases recognized here must be handled in the SILOptimizer's
+// castValueToABICompatibleType().
 static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
                                             SILFunction *inFunction) {
   // Address parameters are all ABI-compatible, though the referenced

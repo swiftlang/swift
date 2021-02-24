@@ -260,7 +260,6 @@ SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
       auto flagIndex = convention.completionHandlerFlagParamIndex();
 
       FuncDecl *resumeIntrinsic;
-      Type replacementTypes[] = {resumeType};
 
       SILBasicBlock *returnBB = nullptr;
       if (errorIndex) {

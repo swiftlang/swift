@@ -461,9 +461,11 @@ replaceApplyInst(SILBuilder &builder, SILLocation loc, ApplyInst *oldAI,
     }
   }
 
-  // Check if any casting is required for the return value.
+  // Check if any casting is required for the return value.  newAI cannot be a
+  // guaranteed value, so this cast cannot generate borrow scopes and it can be
+  // used anywhere the original oldAI was used.
   auto castRes = castValueToABICompatibleType(
-      &builder, loc, newAI, newAI->getType(), oldAI->getType());
+    &builder, loc, newAI, newAI->getType(), oldAI->getType(), /*usePoints*/ {});
 
   oldAI->replaceAllUsesWith(castRes.first);
   return {newAI, castRes.second};
@@ -519,8 +521,11 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
     builder.setInsertionPoint(resultBB);
 
     SILValue resultValue = resultBB->getArgument(0);
+    // resultValue cannot be a guaranteed value, so this cast cannot generate
+    // borrow scopes and it can be used anywhere the original oldAI was
+    // used--usePoints are not required.
     std::tie(resultValue, std::ignore) = castValueToABICompatibleType(
-        &builder, loc, resultValue, newResultTy, oldResultTy);
+        &builder, loc, resultValue, newResultTy, oldResultTy, /*usePoints*/ {});
     builder.createBranch(loc, normalBB, {resultValue});
   }
 
@@ -548,8 +553,12 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
   for (auto i : indices(oldYields)) {
     auto oldYield = oldYields[i];
     auto newYield = newYields[i];
+    // Insert any end_borrow if the yielded value before the token's uses.
+    SmallVector<SILInstruction *, 4> users(
+      makeUserIteratorRange(oldBAI->getTokenResult()->getUses()));
     auto yieldCastRes = castValueToABICompatibleType(
-        &builder, loc, newYield, newYield->getType(), oldYield->getType());
+      &builder, loc, newYield, newYield->getType(), oldYield->getType(),
+      users);
     oldYield->replaceAllUsesWith(yieldCastRes.first);
     changedCFG |= yieldCastRes.second;
   }
@@ -584,8 +593,11 @@ replacePartialApplyInst(SILBuilder &builder, SILLocation loc,
       builder.createPartialApply(loc, newFn, newSubs, newArgs, convention);
 
   // Check if any casting is required for the partially-applied function.
+  // A non-guaranteed cast needs no usePoints.
+  assert(newPAI->getOwnershipKind() != OwnershipKind::Guaranteed);
   auto castRes = castValueToABICompatibleType(
-      &builder, loc, newPAI, newPAI->getType(), oldPAI->getType());
+    &builder, loc, newPAI, newPAI->getType(), oldPAI->getType(),
+    /*usePoints*/ {});
   oldPAI->replaceAllUsesWith(castRes.first);
 
   return {newPAI, castRes.second};
@@ -768,7 +780,7 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
            applySite.getFunction()->getTypeExpansionContext())) {
     auto castRes = castValueToABICompatibleType(
         &builder, loc, *indirectResultArgIter, indirectResultArgIter->getType(),
-        resultTy);
+        resultTy, {applySite.getInstruction()});
     newArgs.push_back(castRes.first);
     changedCFG |= castRes.second;
     ++indirectResultArgIter;
@@ -787,8 +799,10 @@ swift::devirtualizeClassMethod(FullApplySite applySite,
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
     }
-    auto argCastRes = castValueToABICompatibleType(&builder, loc, arg,
-                                       paramArgIter->getType(), paramType);
+    auto argCastRes =
+      castValueToABICompatibleType(&builder, loc, arg,
+                                   paramArgIter->getType(), paramType,
+                                   {applySite.getInstruction()});
 
     newArgs.push_back(argCastRes.first);
     changedCFG |= argCastRes.second;
@@ -1017,7 +1031,8 @@ devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
         borrowedArgs.push_back(arg);
       }
       auto argCastRes = castValueToABICompatibleType(
-          &argBuilder, applySite.getLoc(), arg, arg->getType(), paramType);
+        &argBuilder, applySite.getLoc(), arg, arg->getType(), paramType,
+        applySite.getInstruction());
       arg = argCastRes.first;
       changedCFG |= argCastRes.second;
     }

@@ -273,9 +273,15 @@ SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
+///
+/// \p usePoints is required when \p value has guaranteed ownership. It must be
+/// the last users of the returned, casted value. A usePoint cannot be a
+/// BranchInst (a phi is never the last guaranteed user). \p builder's current
+/// insertion point must dominate all \p usePoints.
 std::pair<SILValue, bool /* changedCFG */>
 castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
-                             SILValue value, SILType srcTy, SILType destTy);
+                             SILValue value, SILType srcTy, SILType destTy,
+                             ArrayRef<SILInstruction *> usePoints);
 /// Peek through trivial Enum initialization, typically for pointless
 /// Optionals.
 ///
