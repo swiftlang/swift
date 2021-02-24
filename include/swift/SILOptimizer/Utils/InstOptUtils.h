@@ -47,6 +47,14 @@ inline TransformRange<Range, UserTransform> makeUserRange(Range range) {
   return makeTransformRange(range, UserTransform(toUser));
 }
 
+/// Transform a use_iterator range (Operand*) into an llvm::iterator_range
+/// of users (SILInstruction *)
+inline iterator_range<llvm::mapped_iterator<ValueBase::use_iterator, UserTransform>>
+makeUserIteratorRange(iterator_range<ValueBase::use_iterator> useRange) {
+  auto toUser = [](Operand *operand) { return operand->getUser(); };
+  return llvm::map_range(useRange, UserTransform(toUser));
+}
+
 using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
 
 /// Create a retain of \p Ptr before the \p InsertPt.
@@ -265,9 +273,15 @@ SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
+///
+/// \p usePoints is required when \p value has guaranteed ownership. It must be
+/// the last users of the returned, casted value. A usePoint cannot be a
+/// BranchInst (a phi is never the last guaranteed user). \p builder's current
+/// insertion point must dominate all \p usePoints.
 std::pair<SILValue, bool /* changedCFG */>
 castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
-                             SILValue value, SILType srcTy, SILType destTy);
+                             SILValue value, SILType srcTy, SILType destTy,
+                             ArrayRef<SILInstruction *> usePoints);
 /// Peek through trivial Enum initialization, typically for pointless
 /// Optionals.
 ///
@@ -700,10 +714,18 @@ makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock);
 /// Given a newly created @owned value \p value without any uses, this utility
 /// inserts control equivalent copy and destroy at leaking blocks to adjust
 /// ownership and make \p value available for use at \p inBlock.
+///
+/// inBlock must be the only point at which \p value will be consumed. If this
+/// consuming point is within a loop, this will create and return a copy of \p
+/// value inside \p inBlock.
 SILValue
 makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock);
 
 /// Given an ssa value \p value, create destroy_values at leaking blocks
+///
+/// Warning: This does not properly cleanup an OSSA lifetime with a consuming
+/// use blocks inside a loop relative to \p value. The client must create
+/// separate copies for any uses within the loop.
 void endLifetimeAtLeakingBlocks(SILValue value,
                                 ArrayRef<SILBasicBlock *> userBBs);
 
