@@ -49,10 +49,8 @@ extension Task {
   ///
   /// All functions available on the Task
   // TODO: once we can have async properties land make this computed property
-  @available(*, deprecated, message: "Please use Builtin.getCurrentAsyncTask() or Task.__unsafeCurrentAsync() until this function becomes implemented.")
-  public static func current(file: StaticString = #file, line: UInt = #line) async -> Task {
-    fatalError("Task.current() is not implemented yet!", file: file, line: line)
-    Task.unsafeCurrent!.task // !-safe, guaranteed to have a Task available within an async function.
+  public static func current() async -> Task {
+    Task.unsafeCurrent!.task // !-safe, we are guaranteed to have a task available within an async function
   }
 
 }
@@ -67,7 +65,6 @@ extension Task {
   ///
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.priority`
-  @available(*, deprecated, message: "Not implemented yet, until unsafeCurrent is ready. Please use Task.__unsafeCurrentAsync().priority instead.")
   public static var currentPriority: Priority {
     Task.unsafeCurrent?.priority ?? Priority.default
   }
@@ -140,7 +137,7 @@ extension Task {
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
   public struct Handle<Success, Failure: Error> {
-    private let _task: Builtin.NativeObject
+    internal let _task: Builtin.NativeObject
 
     internal init(_ task: Builtin.NativeObject) {
       self._task = task
@@ -510,22 +507,17 @@ extension Task {
   /// asynchronous function present in this functions call stack.
   ///
   /// The returned value must not be accessed from tasks other than the current one.
-  @available(*, deprecated, message: "Not implemented yet, use Builtin.getCurrentAsyncTask() or Task.___unsafeCurrentAsync() until this function is implemented.")
   public static var unsafeCurrent: UnsafeCurrentTask? {
-    // FIXME: rdar://70546948 implement this once getCurrentAsyncTask can be called from sync funcs
-    //    guard let _task = Builtin.getCurrentAsyncTask() else {
-    //      return nil
-    //    }
-    //    return UnsafeCurrentTask(_task)
-    fatalError("\(#function) is not implemented yet")
+    guard let _task = _getActiveAsyncTask() else {
+      return nil
+    }
+    // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+    //        with "destroying a task that never completed" in the task's destroy.
+    //        How do we solve this properly?
+    _swiftRetain(_task)
+    return UnsafeCurrentTask(_task)
   }
 
-  @available(*, deprecated, message: "This will be removed, and replaced by unsafeCurrent().", renamed: "unsafeCurrent()")
-  public static func __unsafeCurrentAsync() async -> UnsafeCurrentTask {
-    let task = Builtin.getCurrentAsyncTask()
-    _swiftRetain(task)
-    return UnsafeCurrentTask(task)
-  }
 }
 
 /// An *unsafe* 'current' task handle.
@@ -542,7 +534,7 @@ extension Task {
 /// and most certainly will break invariants in other places of the program
 /// actively running on this task.
 public struct UnsafeCurrentTask {
-  private let _task: Builtin.NativeObject
+  internal let _task: Builtin.NativeObject
 
   // May only be created by the standard library.
   internal init(_ task: Builtin.NativeObject) {
@@ -576,7 +568,23 @@ public struct UnsafeCurrentTask {
 
 }
 
+extension UnsafeCurrentTask: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
+  }
+}
+
+extension UnsafeCurrentTask: Equatable {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
+      UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
+  }
+}
+
 // ==== Internal ---------------------------------------------------------------
+
+@_silgen_name("swift_task_get_active")
+func _getActiveAsyncTask() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags

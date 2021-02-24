@@ -107,6 +107,10 @@ void swift_task_dealloc(AsyncTask *task, void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel(AsyncTask *task);
 
+/// Get 'active' AsyncTask, depending on platform this may use thread local storage.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTask* swift_task_get_active();
+
 /// Escalate the priority of a task and all of its child tasks.
 ///
 /// This can be called from any thread.

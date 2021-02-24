@@ -15,14 +15,14 @@ func test_skipCallingNext() async {
       print("group.add { \(n) }")
       await group.add { () async -> Int in
         sleep(1)
-        let c = await Task.__unsafeCurrentAsync().isCancelled
+        let c = Task.isCancelled
         print("  inside group.add { \(n) } (canceled: \(c))")
         return n
       }
     }
 
     // return immediately; the group should wait on the tasks anyway
-    let c = await Task.__unsafeCurrentAsync().isCancelled
+    let c = Task.isCancelled
     print("return immediately 0 (canceled: \(c))")
     return 0
   }
