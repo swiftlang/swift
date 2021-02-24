@@ -93,6 +93,11 @@ public:
 
   /// If the instruction \p inst is dead, delete it immediately and record
   /// its operands so that they can be cleaned up later.
+  ///
+  /// \p callback is called on each deleted instruction before deleting any
+  /// instructions. This way, the SIL is valid in the callback. However, the
+  /// callback cannot be used to update instruction iterators since other
+  /// instructions to be deleted remain in the instruction list.
   void deleteIfDead(
       SILInstruction *inst,
       llvm::function_ref<void(SILInstruction *)> callback =
@@ -110,8 +115,10 @@ public:
   /// \pre the instruction to be deleted must not have any use other than
   /// incidental uses.
   ///
-  /// \param callback a callback called whenever an instruction
-  /// is deleted.
+  /// \p callback is called on each deleted instruction before deleting any
+  /// instructions. This way, the SIL is valid in the callback. However, the
+  /// callback cannot be used to update instruction iterators since other
+  /// instructions to be deleted remain in the instruction list.
   void forceDeleteAndFixLifetimes(
       SILInstruction *inst,
       llvm::function_ref<void(SILInstruction *)> callback =
@@ -130,8 +137,10 @@ public:
   /// \pre the instruction to be deleted must not have any use other than
   /// incidental uses.
   ///
-  /// \param callback a callback called whenever an instruction
-  /// is deleted.
+  /// \p callback is called on each deleted instruction before deleting any
+  /// instructions. This way, the SIL is valid in the callback. However, the
+  /// callback cannot be used to update instruction iterators since other
+  /// instructions to be deleted remain in the instruction list.
   void forceDelete(
       SILInstruction *inst,
       llvm::function_ref<void(SILInstruction *)> callback =
@@ -145,7 +154,10 @@ public:
   /// function body in an inconsistent state, it needs to be made consistent
   /// before this method is invoked.
   ///
-  /// \param callback a callback called whenever an instruction is deleted.
+  /// \p callback is called on each deleted instruction before deleting any
+  /// instructions. This way, the SIL is valid in the callback. However, the
+  /// callback cannot be used to update instruction iterators since other
+  /// instructions to be deleted remain in the instruction list.
   void
   cleanUpDeadInstructions(llvm::function_ref<void(SILInstruction *)> callback =
                               [](SILInstruction *) {});
@@ -178,7 +190,10 @@ public:
 /// \pre the SIL function containing the instruction is assumed to be
 /// consistent, i.e., does not have under or over releases.
 ///
-/// \param callback a callback called whenever an instruction is deleted.
+/// \p callback is called on each deleted instruction before deleting any
+/// instructions. This way, the SIL is valid in the callback. However, the
+/// callback cannot be used to update instruction iterators since other
+/// instructions to be deleted remain in the instruction list.
 void eliminateDeadInstruction(
     SILInstruction *inst, llvm::function_ref<void(SILInstruction *)> callback =
                               [](SILInstruction *) {});
