@@ -143,12 +143,28 @@ void ConstraintGraphNode::addToEquivalenceClass(
   EquivalenceClass.append(typeVars.begin(), typeVars.end());
 }
 
-void ConstraintGraphNode::addFixedBinding(TypeVariableType *typeVar) {
-  FixedBindings.push_back(typeVar);
+void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
+  bool inserted = References.insert(typeVar);
+  assert(inserted && "Attempt to reference a duplicate type variable");
+  (void)inserted;
 }
 
-void ConstraintGraphNode::removeFixedBinding(TypeVariableType *typeVar) {
-  FixedBindings.pop_back();
+void ConstraintGraphNode::addReferencedBy(TypeVariableType *typeVar) {
+  bool inserted = ReferencedBy.insert(typeVar);
+  assert(inserted && "Already referenced by the given type variable");
+  (void)inserted;
+}
+
+void ConstraintGraphNode::removeReference(TypeVariableType *typeVar) {
+  auto removed = References.remove(typeVar);
+  assert(removed && "Variables are not connected");
+  (void)removed;
+}
+
+void ConstraintGraphNode::removeReferencedBy(TypeVariableType *typeVar) {
+  auto removed = ReferencedBy.remove(typeVar);
+  assert(removed && "Variables are not connected");
+  (void)removed;
 }
 
 #pragma mark Graph scope management
@@ -349,11 +365,10 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   fixed->getTypeVariables(typeVars);
   auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
-    if (typeVar == otherTypeVar)
-      continue;
+    if (typeVar == otherTypeVar) continue;
 
-    (*this)[otherTypeVar].addFixedBinding(typeVar);
-    node.addFixedBinding(otherTypeVar);
+    (*this)[otherTypeVar].addReferencedBy(typeVar);
+    node.addReferencedVar(otherTypeVar);
   }
 
   // Record the change, if there are active scopes.
@@ -372,8 +387,8 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   fixed->getTypeVariables(typeVars);
   auto &node = (*this)[typeVar];
   for (auto otherTypeVar : typeVars) {
-    (*this)[otherTypeVar].removeFixedBinding(typeVar);
-    node.removeFixedBinding(otherTypeVar);
+    (*this)[otherTypeVar].removeReferencedBy(typeVar);
+    node.removeReference(otherTypeVar);
   }
 }
 
@@ -435,7 +450,8 @@ static void depthFirstSearch(
   }
 
   // Walk any type variables related via fixed bindings.
-  visitAdjacencies(node.getFixedBindings());
+  visitAdjacencies(node.getReferencedBy());
+  visitAdjacencies(node.getReferencedVars());
 }
 
 llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
@@ -513,7 +529,11 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
         constraints.push_back(constraint);
     }
 
-    for (auto adjTypeVar : node.getFixedBindings()) {
+    for (auto adjTypeVar : node.getReferencedBy()) {
+      addTypeVarConstraints(adjTypeVar);
+    }
+
+    for (auto adjTypeVar : node.getReferencedVars()) {
       addTypeVarConstraints(adjTypeVar);
     }
   }
@@ -1202,24 +1222,31 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
     }
   }
 
-  // Print fixed bindings.
-  if (!FixedBindings.empty()) {
-    out.indent(indent + 2);
-    out << "Fixed bindings: ";
-    SmallVector<TypeVariableType *, 4> sortedFixedBindings(
-        FixedBindings.begin(), FixedBindings.end());
-    std::sort(sortedFixedBindings.begin(), sortedFixedBindings.end(),
+  auto printVarList = [&](ArrayRef<TypeVariableType *> typeVars) {
+    SmallVector<TypeVariableType *, 4> sorted(typeVars.begin(), typeVars.end());
+    std::sort(sorted.begin(), sorted.end(),
               [&](TypeVariableType *typeVar1, TypeVariableType *typeVar2) {
                 return typeVar1->getID() < typeVar2->getID();
               });
 
-    interleave(sortedFixedBindings,
-               [&](TypeVariableType *typeVar) {
-                 out << "$T" << typeVar->getID();
-               },
-               [&]() {
-                 out << ", ";
-               });
+    interleave(
+        sorted,
+        [&](TypeVariableType *typeVar) { out << typeVar->getString(PO); },
+        [&out] { out << ", "; });
+  };
+
+  // Print fixed bindings.
+  if (!ReferencedBy.empty()) {
+    out.indent(indent + 2);
+    out << "Referenced By: ";
+    printVarList(getReferencedBy());
+    out << "\n";
+  }
+
+  if (!References.empty()) {
+    out.indent(indent + 2);
+    out << "References: ";
+    printVarList(getReferencedVars());
     out << "\n";
   }
 
