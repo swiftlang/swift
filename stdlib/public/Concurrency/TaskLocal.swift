@@ -70,10 +70,13 @@ extension Task {
   /// - Returns: the value bound to the key, or its default value it if was not
   ///            bound in the current (or any parent) tasks.
   public static func local<Key>(_ keyPath: KeyPath<TaskLocalValues, Key>)
-    async -> Key.Value where Key: TaskLocalKey {
-    let task = Builtin.getCurrentAsyncTask()
+    -> Key.Value where Key: TaskLocalKey {
+    guard let task = Task.unsafeCurrent else {
+      return Key.defaultValue
+    }
 
-    let value = _taskLocalValueGet(task, keyType: Key.self, inheritance: Key.inherit.rawValue)
+    let value = _taskLocalValueGet(
+      task._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
     guard let rawValue = value else {
       return Key.defaultValue
     }
