@@ -533,16 +533,9 @@ public:
 
   /// Enumerate the requirements that describe the signature of this
   /// generic signature builder.
-  ///
-  /// \param f A function object that will be passed each requirement
-  /// and requirement source.
   void enumerateRequirements(
                     TypeArrayView<GenericTypeParamType> genericParams,
-                    llvm::function_ref<
-                      void (RequirementKind kind,
-                            Type type,
-                            RequirementRHS constraint,
-                            const RequirementSource *source)> f);
+                    SmallVectorImpl<Requirement> &requirements);
 
   /// Retrieve the generic parameters used to describe the generic
   /// signature being built.
