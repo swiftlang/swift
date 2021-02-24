@@ -163,4 +163,4 @@ let _ = NonConformingEnum.init(from:) // expected-error {{'NonConformingEnum' ca
 let _ = NonConformingEnum.encode(to:) // expected-error {{type 'NonConformingEnum' has no member 'encode(to:)'}}
 
 // They should not get a CodingKeys type.
-let _ = NonConformingEnum.XCodingKeys.self // expected-error {{type 'NonConformingEnum' has no member 'XCodingKeys'}}
+let _ = NonConformingEnum.XCodingKeys.self // expected-error {{'XCodingKeys' is inaccessible due to 'private' protection level}}

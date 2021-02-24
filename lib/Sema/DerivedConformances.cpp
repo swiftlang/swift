@@ -142,19 +142,6 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
-      case KnownDerivableProtocolKind::Encodable:
-      case KnownDerivableProtocolKind::Decodable:
-        // FIXME: This is not actually correct. We cannot promise to always
-        // provide a witness here for all structs and classes. Unfortunately,
-        // figuring out whether this is actually possible requires much more
-        // context -- a TypeChecker and the parent decl context at least -- and
-        // is tightly coupled to the logic within DerivedConformance. This
-        // unfortunately means that we expect a witness even if one will not be
-        // produced, which requires DerivedConformance::deriveCodable to output
-        // its own diagnostics.
-        return DC->getASTContext()
-            .LangOpts.EnableExperimentalEnumCodableDerivation;
-
       default:
         return false;
     }
