@@ -1902,6 +1902,12 @@ ERROR(type_does_not_conform_owner,none,
 ERROR(type_does_not_conform_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 conform to %4",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(contextual_member_ref_on_protocol_requires_self_requirement,none,
+      "contextual member reference to %0 %1 requires "
+      "'Self' constraint in the protocol extension",
+      (DescriptiveDeclKind, DeclName))
+NOTE(missing_sametype_requirement_on_self,none,
+      "missing same-type requirement on 'Self'", ())
 ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 be a class type",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))

@@ -149,8 +149,8 @@ let _: ImplicitMembers = .implicit[optional: ()] // expected-error {{value of op
 let _: ImplicitMembers = .implicit[funcOptional: ()]() // expected-error {{value of optional type 'ImplicitMembers?' must be unwrapped to a value of type 'ImplicitMembers'}} expected-note {{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{55-55= ?? <#default value#>}} expected-note {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{55-55=!}}
 
 // FIXME: Improve these diagnostics (should probably offer unwrapping, as above)
-let _: ImplicitMembers = .implicit.anotherOptional?.another // expected-error{{type of expression is ambiguous without more context}}
-let _: ImplicitMembers = .implicit[optionalFunc: ()]?() // expected-error{{type of expression is ambiguous without more context}}
+let _: ImplicitMembers = .implicit.anotherOptional?.another // expected-error{{cannot convert value of type 'Optional<_>' to specified type 'ImplicitMembers'}}
+let _: ImplicitMembers = .implicit[optionalFunc: ()]?() // expected-error{{cannot convert value of type 'Optional<_>' to specified type 'ImplicitMembers'}}
 
 
 let _: ImplicitMembers = .other.implicit

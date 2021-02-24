@@ -1166,6 +1166,38 @@ namespace {
         baseIsInstance = false;
         isExistentialMetatype = baseMeta->is<ExistentialMetatypeType>();
         baseTy = baseMeta->getInstanceType();
+
+        // A valid reference to a static member (computed property or a method)
+        // declared on a protocol is only possible if result type conforms to
+        // that protocol, otherwise it would be impossible to find a witness to
+        // use.
+        // Such means that (for valid references) base expression here could be
+        // adjusted to  point to a type conforming to a protocol as-if reference
+        // has originated directly from it e.g.
+        //
+        // \code
+        // protocol P {}
+        // struct S : P {}
+        //
+        // extension P {
+        //   static var foo: S { S() }
+        // }
+        //
+        // _ = P.foo
+        // \endcode
+        //
+        // Here `P.foo` would be replaced with `S.foo`
+        if (!isExistentialMetatype && baseTy->is<ProtocolType>() &&
+            member->isStatic()) {
+          auto selfParam =
+              overload.openedFullType->castTo<FunctionType>()->getParams()[0];
+
+          Type baseTy =
+              simplifyType(selfParam.getPlainType())->getMetatypeInstanceType();
+
+          base = TypeExpr::createImplicitHack(base->getLoc(), baseTy, context);
+          cs.cacheType(base);
+        }
       }
 
       // Build a member reference.
