@@ -888,7 +888,11 @@ void EagerSpecializerTransform::run() {
   // removed.
   for (auto *SA : attrsToRemove)
     F.removeSpecializeAttr(SA);
-  F.verify();
+
+  // If any specializations were created, reverify the original body now that it
+  // has checks.
+  if (!newFunctions.empty())
+    F.verify();
 
   for (SILFunction *newF : newFunctions) {
     addFunctionToPassManagerWorklist(newF, nullptr);
