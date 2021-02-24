@@ -708,10 +708,18 @@ makeCopiedValueAvailable(SILValue value, SILBasicBlock *inBlock);
 /// Given a newly created @owned value \p value without any uses, this utility
 /// inserts control equivalent copy and destroy at leaking blocks to adjust
 /// ownership and make \p value available for use at \p inBlock.
+///
+/// inBlock must be the only point at which \p value will be consumed. If this
+/// consuming point is within a loop, this will create and return a copy of \p
+/// value inside \p inBlock.
 SILValue
 makeNewValueAvailable(SILValue value, SILBasicBlock *inBlock);
 
 /// Given an ssa value \p value, create destroy_values at leaking blocks
+///
+/// Warning: This does not properly cleanup an OSSA lifetime with a consuming
+/// use blocks inside a loop relative to \p value. The client must create
+/// separate copies for any uses within the loop.
 void endLifetimeAtLeakingBlocks(SILValue value,
                                 ArrayRef<SILBasicBlock *> userBBs);
 

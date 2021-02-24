@@ -2052,6 +2052,8 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
   return true;
 }
 
+// The consuming use blocks are assumed either not to inside a loop relative to
+// \p value or they must have their own copies.
 void swift::endLifetimeAtLeakingBlocks(SILValue value,
                                        ArrayRef<SILBasicBlock *> uses) {
   if (!value->getFunction()->hasOwnership())
