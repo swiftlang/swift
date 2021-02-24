@@ -2784,7 +2784,7 @@ private:
   void
   filterSolutions(SmallVectorImpl<Solution> &solutions,
                   bool minimize = false) {
-    if (solutions.size() < 2 || isForCodeCompletion())
+    if (solutions.size() < 2)
       return;
 
     if (auto best = findBestSolution(solutions, minimize)) {
