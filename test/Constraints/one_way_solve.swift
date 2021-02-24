@@ -28,10 +28,10 @@ func testTernaryOneWayOverload(b: Bool) {
   // CHECK: 0: $T2 $T3 $T4
 
   // CHECK: solving component #1
-  // CHECK: Initial bindings: $T11 := Int16, $T11 := Int8
+  // CHECK: Initial bindings: $T11 := Int8, $T11 := Int16
 
   // CHECK: solving component #1
-  // CHECK: Initial bindings: $T11 := Int16, $T11 := Int8
+  // CHECK: Initial bindings: $T11 := Int8, $T11 := Int16
 
   // CHECK: solving component #1
   // CHECK: Initial bindings: $T11 := Int8, $T11 := Int16
