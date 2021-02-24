@@ -413,7 +413,6 @@ static bool checkObjCActorIsolation(const ValueDecl *VD,
     // FIXME: Consider whether to limit @objc on global-actor-qualified
     // declarations.
   case ActorIsolationRestriction::Unrestricted:
-  case ActorIsolationRestriction::LocalCapture:
   case ActorIsolationRestriction::Unsafe:
     return false;
   }

@@ -2,6 +2,7 @@
 // RUN:    -module-name M -enable-experimental-concurrency \
 // RUN:    -parse-as-library | %FileCheck %s
 // REQUIRES: concurrency
+// UNSUPPORTED: CPU=arm64e
 
 func use<T>(_ t: T) {}
 func forceSplit() async {

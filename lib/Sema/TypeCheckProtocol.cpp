@@ -2755,7 +2755,6 @@ bool ConformanceChecker::checkActorIsolation(
   }
 
   case ActorIsolationRestriction::Unsafe:
-  case ActorIsolationRestriction::LocalCapture:
     break;
 
   case ActorIsolationRestriction::Unrestricted:

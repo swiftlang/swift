@@ -77,10 +77,6 @@ public:
     /// Access to the declaration is unsafe in a concurrent context.
     Unsafe,
 
-    /// The declaration is a local entity whose capture could introduce
-    /// data races. The context in which the local was defined is provided.
-    LocalCapture,
-
     /// References to this entity are allowed from anywhere, but doing so
     /// may cross an actor boundary if it is not on \c self.
     CrossActorSelf,
@@ -117,12 +113,6 @@ private:
 public:
   Kind getKind() const { return kind; }
 
-  /// Retrieve the declaration context in which a local was defined.
-  DeclContext *getLocalContext() const {
-    assert(kind == LocalCapture);
-    return data.localContext;
-  }
-
   /// Retrieve the actor class that the declaration is within.
   ClassDecl *getActorClass() const {
     assert(kind == ActorSelf || kind == CrossActorSelf);
@@ -151,13 +141,6 @@ public:
       ClassDecl *actorClass, bool isCrossActor) {
     ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf);
     result.data.actorClass = actorClass;
-    return result;
-  }
-
-  /// Access is restricted to code running within the given local context.
-  static ActorIsolationRestriction forLocalCapture(DeclContext *dc) {
-    ActorIsolationRestriction result(LocalCapture);
-    result.data.localContext = dc;
     return result;
   }
 
