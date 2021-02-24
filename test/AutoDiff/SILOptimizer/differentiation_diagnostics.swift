@@ -762,7 +762,7 @@ public func hasImplicitlyDifferentiatedClosureDefaultArgument(_ f: @differentiab
 public func fragileFuncWithGradient() {
   // expected-error @+2 {{function is not differentiable}}
   // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'}}
-  _ = gradient(at: 0, in: implicitlyDifferentiableFromFragile)
+  _ = gradient(at: 0, of: implicitlyDifferentiableFromFragile)
 }
 
 @inlinable

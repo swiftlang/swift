@@ -141,11 +141,11 @@ The ability to get derivatives of programs enables a new world of numerical
 computing applications, notably machine learning. With first-class support,
 gradient-based learning algorithms can even be built using standard library
 types such as `Float` and `SIMD64<Float>` and be differentiated using
-protocol-oriented APIs such as `valueWithGradient(at:in:)`.
+protocol-oriented APIs such as `valueWithGradient(at:of:)`.
 
 ```swift
 struct Perceptron: @memberwise Differentiable {
-    var weight: SIMD2<Float> = .random(in: -1..<1)
+    var weight: SIMD2<Float> = .random(of: -1..<1)
     var bias: Float = 0
 
     @differentiable
@@ -2171,7 +2171,7 @@ derivative in `B.swift`.
 internal func foo(_ x: Float) -> Float {
     x * x
 }
-let dfdx_A = derivative(at: 3, in: foo)
+let dfdx_A = derivative(at: 3, of: foo)
 // dfdx_A ==> 6
 
 // File B.swift:
@@ -2182,11 +2182,11 @@ fileprivate func _(_ x: Float) -> (
 ) {
     (value: foo(x), differential: { _ in 42 })
 }
-let dfdx_B = derivative(at: 3, in: foo)
+let dfdx_B = derivative(at: 3, of: foo)
 // dfdx_B ==> 42
 
 // File C.swift:
-let dfdx_C = derivative(at: 3, in: foo)
+let dfdx_C = derivative(at: 3, of: foo)
 // dfdx_C ==> 6
 ```
 
@@ -2496,13 +2496,13 @@ inputs and return derivative functions or evaluate derivative values.
 #### Differential-producing differential operators
 
 Among these differential operators, two base APIs,
-`valueWithDifferential(at:in:)` and `transpose(of:)`, are used for implementing
+`valueWithDifferential(at:of:)` and `transpose(of:)`, are used for implementing
 *all other differential operators and differentiation APIs*.
 
 ```swift
 /// Returns `body(x)` and the differential of `body` at `x`.
 func valueWithDifferential<T, R>(
-    at x: T, in body: @differentiable (T) -> R
+    at x: T, of body: @differentiable (T) -> R
 ) -> (value: R,
       differential: @differentiable(linear) (T.TangentVector) -> R.TangentVector) {
     // Compiler built-in.
@@ -2525,22 +2525,22 @@ function whose parameter is a real number.
 
 ```swift
 func valueWithDerivative<T: FloatingPoint, R>(
-    at x: T, in body: @differentiable (T) -> R
+    at x: T, of body: @differentiable (T) -> R
 ) -> (value: R, derivative: R.TangentVector) where T.TangentVector: FloatingPoint {
-    let (value, df) = valueWithDifferential(at: x, in: body)
+    let (value, df) = valueWithDifferential(at: x, of: body)
     return (value, df(T.TangentVector(1)))
 }
 
 func derivative<T: FloatingPoint, R>(
-    at x: T, in body: @differentiable (T) -> R
+    at x: T, of body: @differentiable (T) -> R
 ) -> R.TangentVector where T.TangentVector: FloatingPoint {
-    valueWithDerivative(at: x, in: body).derivative
+    valueWithDerivative(at: x, of: body).derivative
 }
 
 func derivative<T: FloatingPoint, R>(
     of body: @escaping @differentiable (T) -> R
 ) -> (T) -> R.TangentVector where T.TangentVector: FloatingPoint {
-    return { x in derivative(at: x, in: body) }
+    return { x in derivative(at: x, of: body) }
 }
 ```
 
@@ -2548,37 +2548,37 @@ func derivative<T: FloatingPoint, R>(
 
 Unlike directional derivatives, gradients are computed by pullbacks. Based on
 the differential-producing differential operator
-`valueWithDifferential(at:in:)`, `valueWithPullback(at:in:)` is defined as
+`valueWithDifferential(at:of:)`, `valueWithPullback(at:of:)` is defined as
 returning the original value and the transpose of the differential, and
-`valueWithGradient(at:in:)` is defined as evaluating the pullback at `1` when
+`valueWithGradient(at:of:)` is defined as evaluating the pullback at `1` when
 the function being differentiated returns a real number.
 
 ```swift
 func valueWithPullback<T, R>(
-    at x: T, in body: @differentiable (T) -> R
+    at x: T, of body: @differentiable (T) -> R
 ) -> (value: R,
       pullback: @differentiable(linear) (R.TangentVector) -> T.TangentVector) {
-    let (value, df) = valueWithDifferential(at: x, in: body)
+    let (value, df) = valueWithDifferential(at: x, of: body)
     return (value, transpose(of: df))
 }
 
 func valueWithGradient<T, R: FloatingPoint>(
-    at x: T, in body: @differentiable (T) -> R
+    at x: T, of body: @differentiable (T) -> R
 ) -> (value: R, gradient: T.TangentVector) where R.TangentVector: FloatingPoint {
-    let (value, pullback) = valueWithPullback(at: x, in: body)
+    let (value, pullback) = valueWithPullback(at: x, of: body)
     return (value, pullback(R.TangentVector(1)))
 }
 
 func gradient<T, R: FloatingPoint>(
-    at x: T, in body: @differentiable (T) -> R
+    at x: T, of body: @differentiable (T) -> R
 ) -> T.TangentVector where R.TangentVector: FloatingPoint {
-    return valueWithGradient(at: x, in: body).gradient
+    return valueWithGradient(at: x, of: body).gradient
 }
 
 func gradient<T, R: FloatingPoint>(
     of body: @escaping @differentiable (T) -> R
 ) -> (T) -> T.TangentVector where R.TangentVector: FloatingPoint {
-    return { x in gradient(at: x, in: body) }
+    return { x in gradient(at: x, of: body) }
 }
 ```
 
@@ -2608,14 +2608,14 @@ for _ in 0..<1000 {
 Differential operators                                                                                                                                                                                                                                                                                                         | Description
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -----------
 [`transpose(of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L374)                                                                                                                                                                                        | Returns transpose of linear map.
-[`valueWithDifferential(at:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L383) <br> [`valueWithDifferential(at:_:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L390) (arity 2) | Returns original result and differential function.
-[`valueWithPullback(at:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L276) <br> [`valueWithPullback(at:_:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L283)                   | Returns original result and pullback function.
-[`differential(at:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L435) <br> [`differential(at:_:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L442) (arity 2)                   | Returns differential function.
-[`pullback(at:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L302) <br> [`pullback(at:_:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L309)                                     | Returns pullback function.
-[`derivative(at:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L483) <br> [`derivative(at:_:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L491) (arity 2)                       | Returns partial derivatives with respect to arguments ("forward-mode").
-[`gradient(at:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L384) <br> [`gradient(at:_:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L392)                                     | Returns partial derivatives with respect to arguments ("reverse-mode").
-[`valueWithDerivative(at:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L538) <br> [`valueWithDerivative(at:_:in:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L547) (arity 2)     | Returns original result and partial derivatives with respect to arguments ("forward-mode").
-[`valueWithGradient(at:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L327) <br> [`valueWithGradient(at:_:in:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L335)                   | Returns original result and partial derivatives with respect to arguments ("reverse-mode").
+[`valueWithDifferential(at:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L383) <br> [`valueWithDifferential(at:_:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L390) (arity 2) | Returns original result and differential function.
+[`valueWithPullback(at:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L276) <br> [`valueWithPullback(at:_:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L283)                   | Returns original result and pullback function.
+[`differential(at:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L435) <br> [`differential(at:_:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L442) (arity 2)                   | Returns differential function.
+[`pullback(at:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L302) <br> [`pullback(at:_:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L309)                                     | Returns pullback function.
+[`derivative(at:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L483) <br> [`derivative(at:_:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L491) (arity 2)                       | Returns partial derivatives with respect to arguments ("forward-mode").
+[`gradient(at:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L384) <br> [`gradient(at:_:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L392)                                     | Returns partial derivatives with respect to arguments ("reverse-mode").
+[`valueWithDerivative(at:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L538) <br> [`valueWithDerivative(at:_:of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L547) (arity 2)     | Returns original result and partial derivatives with respect to arguments ("forward-mode").
+[`valueWithGradient(at:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L327) <br> [`valueWithGradient(at:_:of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L335)                   | Returns original result and partial derivatives with respect to arguments ("reverse-mode").
 [`derivative(of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L601) <br> [`derivative(of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L609) (arity 2)                               | Returns derivative function, taking original arguments and returning and partial derivatives with respect to arguments ("forward-mode").
 [`gradient(of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L410) <br> [`gradient(of:)`](https://github.com/apple/swift/blob/c1211a3f78992c89a3ab4d638c378c6f45ab8fe8/stdlib/public/core/AutoDiff.swift#L418)                                             | Returns gradient function, taking original arguments and returning and partial derivatives with respect to arguments ("reverse-mode").
 [`valueWithDerivative(of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L656) <br> [`valueWithDerivative(of:)`](https://github.com/apple/swift/blob/9c95e27601e9623f5b53c9cc531d185e267a83d6/stdlib/public/core/AutoDiff.swift#L664) (arity 2)             | Returns function taking original arguments and returning original result and partial derivatives with respect to arguments ("forward-mode").
@@ -2640,7 +2640,7 @@ transpose function or a derivative function, but not of functions that have not
 been marked this way without defining a custom derivative for it. For example,
 if we try to differentiate
 [`sinf(_:)`](https://en.cppreference.com/w/c/numeric/math/sin) with the
-`derivative(at:in:)` API, the compiler will produce error messages at
+`derivative(at:of:)` API, the compiler will produce error messages at
 compile-time instead of producing zero derivatives.
 
 ```swift
@@ -2965,26 +2965,26 @@ mean infinite differentiability.
 func derivative<T: FloatingPoint, U: Differentiable>(
     _ f: @differentiable (T) -> U
 ) -> @differentiable (T) -> U where T: FloatingPoint, T == T.TangentVector {
-    { x in differential(at: x, in: f) }
+    { x in differential(at: x, of: f) }
 }
 ```
 
-Since `derivative(of:)` is implemented in term of `derivative(at:in:)`, which is
-implemented in terms of `valueWithDifferential(at:in:)`, both
-`derivative(at:in:)` and `valueWithDifferential(at:in:)` would need to be marked
+Since `derivative(of:)` is implemented in term of `derivative(at:of:)`, which is
+implemented in terms of `valueWithDifferential(at:of:)`, both
+`derivative(at:of:)` and `valueWithDifferential(at:of:)` would need to be marked
 with `@differentiatiable` with respect to its `x` argument.
 
 ```swift
 @differentiable(wrt: x)
 func derivative<T: FloatingPoint, U: Differentiable>(
-    at x: T, in body: @differentiable (T) -> U) -> U
+    at x: T, of body: @differentiable (T) -> U) -> U
 ) -> U.TangentVector where T: FloatingPoint, T == T.TangentVector {
-    valueWithDifferential(at: x, in: body).differential(T(1))
+    valueWithDifferential(at: x, of: body).differential(T(1))
 }
 
 @differentiable(wrt: x)
 func valueWithDifferential<T: FloatingPoint, U: Differentiable>(
-    at x: T, in body: @differentiable (T) -> U) -> U
+    at x: T, of body: @differentiable (T) -> U) -> U
 ) -> (value: U, differential: @differentiable(linear) (T.TangentVector) -> U.TangentVector)
 ```
 

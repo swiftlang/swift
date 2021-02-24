@@ -15,7 +15,7 @@ ForwardModeTests.test("init(repeating:)") {
   func foo1(x: Float) -> SIMD4<Float> {
     return SIMD4<Float>(repeating: 2 * x)
   }
-  let (val1, df1) = valueWithDifferential(at: 5, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: 5, of: foo1)
   expectEqual(SIMD4<Float>(10, 10, 10, 10), val1)
   expectEqual(SIMD4<Float>(6, 6, 6, 6), df1(3))
 }
@@ -27,7 +27,7 @@ ForwardModeTests.test("Identity") {
   func foo1(x: SIMD4<Float>) -> SIMD4<Float> {
     return x
   }
-  let (val1, df1) = valueWithDifferential(at: a, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: a, of: foo1)
   expectEqual(a, val1)
   expectEqual(g, df1(.init(g)))
 }
@@ -39,7 +39,7 @@ ForwardModeTests.test("Negate") {
   func foo1(x: SIMD4<Float>) -> SIMD4<Float> {
     return -x
   }
-  let (val1, df1) = valueWithDifferential(at: a, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: a, of: foo1)
   expectEqual(-a, val1)
   expectEqual(-g, df1(.init(g)))
 }
@@ -51,7 +51,7 @@ ForwardModeTests.test("subscript") {
     return x[3]
   }
 
-  let (val1, df1) = valueWithDifferential(at: a, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: a, of: foo1)
   expectEqual(4, val1)
   expectEqual(4, df1(a))
 }
@@ -64,7 +64,7 @@ ForwardModeTests.test("Addition") {
   func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x + y
   }
-  let (val1, df1) = valueWithDifferential(at: a, a, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: a, a, of: foo1)
   expectEqual(SIMD4<Float>(2, 4, 6, 8), val1)
   expectEqual(a + g, df1(a, g))
 
@@ -72,7 +72,7 @@ ForwardModeTests.test("Addition") {
   func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x + y
   }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
+  let (val2, df2) = valueWithDifferential(at: a, 5, of: foo2)
   expectEqual(SIMD4<Float>(6, 7, 8, 9), val2)
   expectEqual(g + 1, df2(g, 1))
 
@@ -80,7 +80,7 @@ ForwardModeTests.test("Addition") {
   func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return y + x
   }
-  let (val3, df3) = valueWithDifferential(at: a, 5, in: foo3)
+  let (val3, df3) = valueWithDifferential(at: a, 5, of: foo3)
   expectEqual(SIMD4<Float>(6, 7, 8, 9), val3)
   expectEqual(2 + g, df3(g, 2))
 }
@@ -93,7 +93,7 @@ ForwardModeTests.test("Subtraction") {
   func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x - y
   }
-  let (val1, df1) = valueWithDifferential(at: a, a, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: a, a, of: foo1)
   expectEqual(SIMD4<Float>(0, 0, 0, 0), val1)
   expectEqual(g - a, df1(g, a))
 
@@ -101,7 +101,7 @@ ForwardModeTests.test("Subtraction") {
   func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x - y
   }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
+  let (val2, df2) = valueWithDifferential(at: a, 5, of: foo2)
   expectEqual(SIMD4<Float>(-4, -3, -2, -1), val2)
   expectEqual(g - 1, df2(g, 1))
 
@@ -109,7 +109,7 @@ ForwardModeTests.test("Subtraction") {
   func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return y - x
   }
-  let (val3, df3) = valueWithDifferential(at: a, 5, in: foo3)
+  let (val3, df3) = valueWithDifferential(at: a, 5, of: foo3)
   expectEqual(SIMD4<Float>(4, 3, 2, 1), val3)
   expectEqual(2 - g, df3(g, 2))
 }
@@ -124,7 +124,7 @@ ForwardModeTests.test("Multiplication") {
   func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x * y
   }
-  let (val1, df1) = valueWithDifferential(at: a, a2, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: a, a2, of: foo1)
   expectEqual(a * a2, val1)
   expectEqual(a * g2 + g * a2, df1(g, g2))
 
@@ -132,7 +132,7 @@ ForwardModeTests.test("Multiplication") {
   func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x * y
   }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
+  let (val2, df2) = valueWithDifferential(at: a, 5, of: foo2)
   expectEqual(a * 5, val2)
   expectEqual(a * 2 + g * 5, df2(g, 2))
 
@@ -140,7 +140,7 @@ ForwardModeTests.test("Multiplication") {
   func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return y * x
   }
-  let (val3, df3) = valueWithDifferential(at: a, 5, in: foo3)
+  let (val3, df3) = valueWithDifferential(at: a, 5, of: foo3)
   expectEqual(a * 5, val3)
   expectEqual(a * 3 + g * 5, df3(g, 3))
 }
@@ -153,7 +153,7 @@ ForwardModeTests.test("Division") {
   func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x / y
   }
-  let (val1, df1) = valueWithDifferential(at: a, a, in: foo1)
+  let (val1, df1) = valueWithDifferential(at: a, a, of: foo1)
   expectEqual(a / a, val1)
   expectEqual((g * a - a * g) / (a * a)/* == 0 */, df1(g, g))
 
@@ -161,7 +161,7 @@ ForwardModeTests.test("Division") {
   func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x / y
   }
-  let (val2, df2) = valueWithDifferential(at: a, 5, in: foo2)
+  let (val2, df2) = valueWithDifferential(at: a, 5, of: foo2)
   expectEqual(a / 5, val2)
   expectEqual((g * 5 - a * 2) / (5 * 5), df2(g, 2))
 
@@ -169,7 +169,7 @@ ForwardModeTests.test("Division") {
   func foo3(x: Float, y: SIMD4<Float>) -> SIMD4<Float> {
     return x / y
   }
-  let (val3, df3) = valueWithDifferential(at: 5, a, in: foo3)
+  let (val3, df3) = valueWithDifferential(at: 5, a, of: foo3)
   expectEqual(5 / a, val3)
   expectEqual((3 * a - 5 * g) / (a * a), df3(3, g))
 }
@@ -189,7 +189,7 @@ ForwardModeTests.test("Generics") {
     return SIMDType.init(repeating: x)
   }
   func simd3Init(x: Double) -> SIMD3<Double> { testInit(x: x) }
-  let (val1, df1) = valueWithDifferential(at: 10, in: simd3Init)
+  let (val1, df1) = valueWithDifferential(at: 10, of: simd3Init)
   expectEqual(SIMD3<Double>(10, 10, 10), val1)
   expectEqual(SIMD3<Double>(5, 5, 5), df1(5))
   */
@@ -207,7 +207,7 @@ ForwardModeTests.test("Generics") {
   func simd3Add(lhs: SIMD3<Double>, rhs: SIMD3<Double>) -> SIMD3<Double> {
     return testAddition(lhs: lhs, rhs: rhs)
   }
-  let (val2, df2) = valueWithDifferential(at: a, a, in: simd3Add)
+  let (val2, df2) = valueWithDifferential(at: a, a, of: simd3Add)
   expectEqual(SIMD3<Double>(2, 4, 6), val2)
   expectEqual(g + a, df2(g, a))
 
@@ -224,7 +224,7 @@ ForwardModeTests.test("Generics") {
   func simd3Subtract(lhs: Double, rhs: SIMD3<Double>) -> SIMD3<Double> {
     return testSubtraction(lhs: lhs, rhs: rhs)
   }
-  let (val3, df3) = valueWithDifferential(at: 5, a, in: simd3Subtract)
+  let (val3, df3) = valueWithDifferential(at: 5, a, of: simd3Subtract)
   expectEqual(SIMD3<Double>(4, 3, 2), val3)
   expectEqual(2 - g, df3(2, g))
 
@@ -241,7 +241,7 @@ ForwardModeTests.test("Generics") {
   func simd3Multiply(lhs: SIMD3<Double>, rhs: Double) -> SIMD3<Double> {
     return testMultipication(lhs: lhs, rhs: rhs)
   }
-  let (val4, df4) = valueWithDifferential(at: a, 5, in: simd3Multiply)
+  let (val4, df4) = valueWithDifferential(at: a, 5, of: simd3Multiply)
   expectEqual(SIMD3<Double>(5, 10, 15), val4)
   expectEqual(a * 3 + g * 5 , df4(g, 3))
 }

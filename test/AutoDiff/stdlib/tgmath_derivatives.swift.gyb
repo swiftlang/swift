@@ -56,7 +56,7 @@ func checkGradient<T: BinaryFloatingPoint & Differentiable>(
   ulps: T = 192)
 where T == T.TangentVector {
   let eps = T(0.01)
-  let grad = gradient(at: x, y, in: f)
+  let grad = gradient(at: x, y, of: f)
   let (dfdx, dfdy) = computeDividedDifference(f, x, y, eps: eps)
   expectEqualWithTolerance(TestLiteralType(dfdx), grad.0, ulps: ulps)
   expectEqualWithTolerance(TestLiteralType(dfdy), grad.1, ulps: ulps)
@@ -69,7 +69,7 @@ func checkDerivative<T: BinaryFloatingPoint & Differentiable>(
   ulps: T = 192)
 where T == T.TangentVector {
   let eps = T(0.01)
-  let deriv = derivative(at: x, y, in: f)
+  let deriv = derivative(at: x, y, of: f)
   let (dfdx, dfdy) = computeDividedDifference(f, x, y, eps: eps)
   expectEqualWithTolerance(TestLiteralType(dfdx + dfdy), deriv, ulps: ulps)
 }
@@ -82,37 +82,37 @@ where T == T.TangentVector {
 %end
 
 DerivativeTests.test("${op}_${T}") {
-  expectEqualWithTolerance(7.3890560989306502274, ${op}(at: 2 as ${T}, in: exp))
-  expectEqualWithTolerance(2.772588722239781145, ${op}(at: 2 as ${T}, in: exp2))
-  expectEqualWithTolerance(7.3890560989306502274, ${op}(at: 2 as ${T}, in: expm1))
-  expectEqualWithTolerance(0.5, ${op}(at: 2 as ${T}, in: log))
-  expectEqualWithTolerance(0.21714724095162590833, ${op}(at: 2 as ${T}, in: log10))
-  expectEqualWithTolerance(0.7213475204444817278, ${op}(at: 2 as ${T}, in: log2))
-  expectEqualWithTolerance(0.33333333333333333334, ${op}(at: 2 as ${T}, in: log1p))
-  expectEqualWithTolerance(5.774399204041917612, ${op}(at: 2 as ${T}, in: tan))
-  expectEqualWithTolerance(-0.9092974268256816954, ${op}(at: 2 as ${T}, in: cos))
-  expectEqualWithTolerance(-0.416146836547142387, ${op}(at: 2 as ${T}, in: sin))
-  expectEqualWithTolerance(1.154700538379251529, ${op}(at: 0.5 as ${T}, in: asin))
-  expectEqualWithTolerance(-1.154700538379251529, ${op}(at: 0.5 as ${T}, in: acos))
-  expectEqualWithTolerance(0.8, ${op}(at: 0.5 as ${T}, in: atan))
-  expectEqualWithTolerance(3.7621956910836314597, ${op}(at: 2 as ${T}, in: sinh))
-  expectEqualWithTolerance(3.6268604078470187677, ${op}(at: 2 as ${T}, in: cosh))
-  expectEqualWithTolerance(0.07065082485316446565, ${op}(at: 2 as ${T}, in: tanh))
-  expectEqualWithTolerance(0.44721359549995793928, ${op}(at: 2 as ${T}, in: asinh))
-  expectEqualWithTolerance(0.5773502691896257645, ${op}(at: 2 as ${T}, in: acosh))
-  expectEqualWithTolerance(1.3333333333333333334, ${op}(at: 0.5 as ${T}, in: atanh))
-  expectEqualWithTolerance(0.020666985354092053575, ${op}(at: 2 as ${T}, in: erf))
-  expectEqualWithTolerance(-0.020666985354092053575, ${op}(at: 2 as ${T}, in: erfc))
-  expectEqualWithTolerance(0.35355339059327376222, ${op}(at: 2 as ${T}, in: { sqrt($0) }))
-  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, in: { ceil($0) }))
-  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, in: { floor($0) }))
-  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, in: { round($0) }))
-  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, in: { trunc($0) }))
+  expectEqualWithTolerance(7.3890560989306502274, ${op}(at: 2 as ${T}, of: exp))
+  expectEqualWithTolerance(2.772588722239781145, ${op}(at: 2 as ${T}, of: exp2))
+  expectEqualWithTolerance(7.3890560989306502274, ${op}(at: 2 as ${T}, of: expm1))
+  expectEqualWithTolerance(0.5, ${op}(at: 2 as ${T}, of: log))
+  expectEqualWithTolerance(0.21714724095162590833, ${op}(at: 2 as ${T}, of: log10))
+  expectEqualWithTolerance(0.7213475204444817278, ${op}(at: 2 as ${T}, of: log2))
+  expectEqualWithTolerance(0.33333333333333333334, ${op}(at: 2 as ${T}, of: log1p))
+  expectEqualWithTolerance(5.774399204041917612, ${op}(at: 2 as ${T}, of: tan))
+  expectEqualWithTolerance(-0.9092974268256816954, ${op}(at: 2 as ${T}, of: cos))
+  expectEqualWithTolerance(-0.416146836547142387, ${op}(at: 2 as ${T}, of: sin))
+  expectEqualWithTolerance(1.154700538379251529, ${op}(at: 0.5 as ${T}, of: asin))
+  expectEqualWithTolerance(-1.154700538379251529, ${op}(at: 0.5 as ${T}, of: acos))
+  expectEqualWithTolerance(0.8, ${op}(at: 0.5 as ${T}, of: atan))
+  expectEqualWithTolerance(3.7621956910836314597, ${op}(at: 2 as ${T}, of: sinh))
+  expectEqualWithTolerance(3.6268604078470187677, ${op}(at: 2 as ${T}, of: cosh))
+  expectEqualWithTolerance(0.07065082485316446565, ${op}(at: 2 as ${T}, of: tanh))
+  expectEqualWithTolerance(0.44721359549995793928, ${op}(at: 2 as ${T}, of: asinh))
+  expectEqualWithTolerance(0.5773502691896257645, ${op}(at: 2 as ${T}, of: acosh))
+  expectEqualWithTolerance(1.3333333333333333334, ${op}(at: 0.5 as ${T}, of: atanh))
+  expectEqualWithTolerance(0.020666985354092053575, ${op}(at: 2 as ${T}, of: erf))
+  expectEqualWithTolerance(-0.020666985354092053575, ${op}(at: 2 as ${T}, of: erfc))
+  expectEqualWithTolerance(0.35355339059327376222, ${op}(at: 2 as ${T}, of: { sqrt($0) }))
+  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, of: { ceil($0) }))
+  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, of: { floor($0) }))
+  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, of: { round($0) }))
+  expectEqualWithTolerance(0, ${op}(at: 2 as ${T}, of: { trunc($0) }))
 
   // Differential operator specific tests.
 
   // fma
-  let dfma = ${op}(at: 4 as ${T}, 5 as ${T}, 6 as ${T}, in: fma)
+  let dfma = ${op}(at: 4 as ${T}, 5 as ${T}, 6 as ${T}, of: fma)
 %if op == 'gradient':
   expectEqualWithTolerance(5, dfma.0)
   expectEqualWithTolerance(4, dfma.1)
@@ -149,7 +149,7 @@ DerivativeTests.test("${op}_${T}") {
       let y = ${T}(b)
       let expectedDx =  y * pow(x, y - 1)
       let expectedDy = ${T}.zero
-      let dpow = ${op}(at: x, y, in: pow)
+      let dpow = ${op}(at: x, y, of: pow)
 %if op == 'gradient':
       expectEqualWithTolerance(TestLiteralType(expectedDx), dpow.0)
       expectEqualWithTolerance(TestLiteralType(expectedDy), dpow.1)
@@ -171,7 +171,7 @@ DerivativeTests.test("${op}_${T}") {
       expectedValues = (dx: ${T}.zero, dy: ${T}.zero)
     }
     if let (expectedDx, expectedDy) = expectedValues {
-      let dpow = ${op}(at: 0.0, y, in: pow)
+      let dpow = ${op}(at: 0.0, y, of: pow)
 %if op == 'gradient':
       expectEqualWithTolerance(TestLiteralType(expectedDx), dpow.0)
       expectEqualWithTolerance(TestLiteralType(expectedDy), dpow.1)

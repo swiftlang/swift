@@ -36,7 +36,7 @@ PropertyWrapperTests.test("SimpleStruct") {
   func getter(_ s: Struct) -> Tracked<Float> {
     return s.x
   }
-  expectEqual(.init(x: 1, y: 0, z: 0), gradient(at: Struct(), in: getter))
+  expectEqual(.init(x: 1, y: 0, z: 0), gradient(at: Struct(), of: getter))
 
   func setter(_ s: Struct, _ x: Tracked<Float>) -> Tracked<Float> {
     var s = s
@@ -44,7 +44,7 @@ PropertyWrapperTests.test("SimpleStruct") {
     return s.x
   }
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
-              gradient(at: Struct(), 2, in: setter))
+              gradient(at: Struct(), 2, of: setter))
 
   // TODO(SR-12640): Support `modify` accessors.
   /*
@@ -54,7 +54,7 @@ PropertyWrapperTests.test("SimpleStruct") {
     return s.x
   }
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
-              gradient(at: Struct(), 2, in: modify))
+              gradient(at: Struct(), 2, of: modify))
   */
 }
 
@@ -70,13 +70,13 @@ PropertyWrapperTests.test("GenericStruct") {
     return s.y
   }
   expectEqual(.init(x: 0, y: 1, z: 0),
-              gradient(at: GenericStruct<Tracked<Float>>(y: 20), in: getter))
+              gradient(at: GenericStruct<Tracked<Float>>(y: 20), of: getter))
 
   func getter2<T>(_ s: GenericStruct<T>) -> Tracked<Float> {
     return s.x * s.z
   }
   expectEqual(.init(x: 30, y: 0, z: 10),
-              gradient(at: GenericStruct<Tracked<Float>>(y: 20), in: getter2))
+              gradient(at: GenericStruct<Tracked<Float>>(y: 20), of: getter2))
 
   func setter<T>(_ s: GenericStruct<T>, _ x: Tracked<Float>) -> Tracked<Float> {
     var s = s
@@ -84,7 +84,7 @@ PropertyWrapperTests.test("GenericStruct") {
     return s.x
   }
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
-              gradient(at: GenericStruct<Tracked<Float>>(y: 20), 2, in: setter))
+              gradient(at: GenericStruct<Tracked<Float>>(y: 20), 2, of: setter))
 
   // TODO(SR-12640): Support `modify` accessors.
   /*
@@ -94,7 +94,7 @@ PropertyWrapperTests.test("GenericStruct") {
     return s.x
   }
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
-              gradient(at: GenericStruct<Tracked<Float>>(y: 1), 2, in: modify))
+              gradient(at: GenericStruct<Tracked<Float>>(y: 1), 2, of: modify))
   */
 }
 
@@ -114,7 +114,7 @@ PropertyWrapperTests.test("SimpleClass") {
   func getter(_ c: Class) -> Tracked<Float> {
     return c.x
   }
-  expectEqual(.init(x: 1, y: 0, z: 0), gradient(at: Class(), in: getter))
+  expectEqual(.init(x: 1, y: 0, z: 0), gradient(at: Class(), of: getter))
 
   func setter(_ c: Class, _ x: Tracked<Float>) -> Tracked<Float> {
     var c = c
@@ -125,10 +125,10 @@ PropertyWrapperTests.test("SimpleClass") {
   // This is relevant for `Class.x.setter`, which has type
   // `$@convention(method) (@in Tracked<Float>, @guaranteed Class) -> ()`.
   expectEqual((.init(x: 1, y: 0, z: 0), 0),
-              gradient(at: Class(), 2, in: setter))
+              gradient(at: Class(), 2, of: setter))
   /*
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
-              gradient(at: Class(), 2, in: setter))
+              gradient(at: Class(), 2, of: setter))
   */
 
   // TODO(SR-12640): Support `modify` accessors.
@@ -139,7 +139,7 @@ PropertyWrapperTests.test("SimpleClass") {
     return c.x
   }
   expectEqual((.init(x: 60, y: 0, z: 20), 300),
-              gradient(at: Class(), 2, in: modify))
+              gradient(at: Class(), 2, of: modify))
   */
 }
 
@@ -215,7 +215,7 @@ PropertyWrapperTests.test("RealPropertyWrappers") {
     return s.x * s.y
   }
   expectEqual(.init(x: 4, y: 3),
-              gradient(at: RealPropertyWrappers(x: 3, y: 4), in: multiply))
+              gradient(at: RealPropertyWrappers(x: 3, y: 4), of: multiply))
 }
 
 runAllTests()

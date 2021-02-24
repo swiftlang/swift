@@ -13,7 +13,7 @@ RepeatedCallsTests.testWithLeakChecking("Repeat") {
   func mul4(_ x: Tracked<Float>) -> Tracked<Float> {
     return mul2(mul2(x))
   }
-  expectEqual(4, gradient(at: 0, in: mul4))
+  expectEqual(4, gradient(at: 0, of: mul4))
 }
 
 runAllTests()

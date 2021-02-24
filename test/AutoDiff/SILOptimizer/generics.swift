@@ -6,7 +6,7 @@ import _Differentiation
 func identity<T : Differentiable>(_ x: T) -> T {
   return x
 }
-_ = gradient(at: Float(1), in: { x in identity(x) })
+_ = gradient(at: Float(1), of: { x in identity(x) })
 
 // Test PullbackCloner local buffer allocation.
 // Verify that local buffers are immediately set to zero.
@@ -21,7 +21,7 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // Test TF-201: differentiate direct references to generic function.
 // This involves reabstraction thunk differentiation.
 
-_ = gradient(at: Float(1), in: identity)
+_ = gradient(at: Float(1), of: identity)
 
 protocol DifferentiableAdditiveArithmetic: Differentiable & AdditiveArithmetic {
   @differentiable(reverse)
@@ -31,7 +31,7 @@ extension Float: DifferentiableAdditiveArithmetic {}
 func generic<T: DifferentiableAdditiveArithmetic>(_ x: T) -> T {
   x + x + x
 }
-_ = gradient(at: Float(10), in: generic)
+_ = gradient(at: Float(10), of: generic)
 
 struct Wrapper<Scalar : Differentiable> : Differentiable {
   var value: Scalar
@@ -40,13 +40,13 @@ struct Wrapper<Scalar : Differentiable> : Differentiable {
 func generic<T>(_ x: Wrapper<T>) -> T {
   return x.value
 }
-_ = gradient(at: Wrapper<Float>(1), in: generic)
+_ = gradient(at: Wrapper<Float>(1), of: generic)
 
 func generic2<T: Differentiable, U: Differentiable>(_ x: T, _ y: Float, _ z: U) -> T {
   return x
 }
 func foo<T>(_ x: Wrapper<T>) {
-  _ = gradient(at: Float(1), 2, x, in: generic2)
+  _ = gradient(at: Float(1), 2, x, of: generic2)
 }
 
 // Test case where associated derivative function's requirements are met.
@@ -61,7 +61,7 @@ extension Wrapper where Scalar : Numeric {
     return mean() // ok
   }
 }
-_ = pullback(at: Wrapper<Float>(1), in: { $0.variance() })
+_ = pullback(at: Wrapper<Float>(1), of: { $0.variance() })
 
 // Tests TF-277.
 protocol Layer : Differentiable {
@@ -149,11 +149,11 @@ extension TF_508_Struct : Differentiable where Scalar : Differentiable {
 func TF_508() {
   let x = TF_508_Struct<Float>()
   // Test conformance requirement with dependent member type.
-  _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+  _ = pullback(at: x, of: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
     return x + x
   })
   // Test same-type requirement with dependent member type.
-  _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+  _ = pullback(at: x, of: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
     return x - x
   })
 }
