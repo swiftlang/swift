@@ -886,6 +886,11 @@ namespace {
     SmallVector<const DeclContext *, 4> contextStack;
     SmallVector<ApplyExpr*, 4> applyStack;
 
+    /// Keeps track of the capture context of variables that have been
+    /// explicitly captured in closures.
+    llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
+      captureContexts;
+
     using MutableVarSource = llvm::PointerUnion<DeclRefExpr *, InOutExpr *>;
     using MutableVarParent = llvm::PointerUnion<InOutExpr *, LoadExpr *>;
 
@@ -1134,6 +1139,13 @@ namespace {
       if (isa<ObjCSelectorExpr>(expr))
         return { false, expr };
 
+      // Track the capture contexts for variables.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        for (const auto &entry : captureList->getCaptureList()) {
+          captureContexts[entry.Var].push_back(captureList->getClosureBody());
+        }
+      }
+
       return { true, expr };
     }
 
@@ -1154,6 +1166,17 @@ namespace {
       }
       if (auto *inoutExpr = dyn_cast<InOutExpr>(expr)) {
         mutableLocalVarParent.erase(inoutExpr);
+      }
+
+      // Remove the tracked capture contexts.
+      if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+        for (const auto &entry : captureList->getCaptureList()) {
+          auto &contexts = captureContexts[entry.Var];
+          assert(contexts.back() == captureList->getClosureBody());
+          contexts.pop_back();
+          if (contexts.empty())
+            captureContexts.erase(entry.Var);
+        }
       }
 
       return expr;
@@ -1526,6 +1549,21 @@ namespace {
       llvm_unreachable("unhandled actor isolation kind!");
     }
 
+    /// Find the innermost context in which this declaration was explicitly
+    /// captured.
+    const DeclContext *findCapturedDeclContext(ValueDecl *value) {
+      assert(value->isLocalCapture());
+      auto var = dyn_cast<VarDecl>(value);
+      if (!var)
+        return value->getDeclContext();
+
+      auto knownContexts = captureContexts.find(var);
+      if (knownContexts == captureContexts.end())
+        return value->getDeclContext();
+
+      return knownContexts->second.back();
+    }
+
     /// Check a reference to a local or global.
     bool checkNonMemberReference(
         ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
@@ -1552,7 +1590,7 @@ namespace {
         // Check whether we are in a context that will not execute concurrently
         // with the context of 'self'. If not, it's safe.
         if (!mayExecuteConcurrentlyWith(
-                getDeclContext(), isolation.getLocalContext()))
+                getDeclContext(), findCapturedDeclContext(value)))
           return false;
 
         // Check whether this is a local variable, in which case we can

@@ -139,12 +139,28 @@ extension MyActor {
     }
 
     // Concurrent closures might run... concurrently.
-    acceptConcurrentClosure {
+    var otherLocalVar = 12
+    acceptConcurrentClosure { [otherLocalVar] in
+      defer {
+        _ = otherLocalVar
+      }
+
       _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent closure}}
       _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent closure}}
       _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
       localVar = 25 // expected-error{{mutation of captured var 'localVar' in concurrently-executing code}}
       _ = localConstant
+
+      _ = otherLocalVar
+    }
+    otherLocalVar = 17
+
+    acceptConcurrentClosure { [weak self, otherLocalVar] in
+      defer {
+        _ = self?.actorIndependentVar
+      }
+
+      _ = otherLocalVar
     }
 
     // Escaping closures might run concurrently.
