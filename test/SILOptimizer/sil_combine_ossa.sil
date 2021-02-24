@@ -4931,7 +4931,7 @@ bb2(%error : @owned $Error):
 sil [ossa] @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
 
 // CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: sil shared [ossa] @$s8refcast24main5KlassC_Tg5 : 
-// CHECK_FORWARDING_OWNERSHIP_KIND: unchecked_ref_cast 
+// CHECK_FORWARDING_OWNERSHIP_KIND: unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
 // CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: } // end sil function '$s8refcast24main5KlassC_Tg5'
 sil [ossa] @refcast2 : $@convention(thin) <T> (@in T, @owned Klass) -> () {
 bb0(%0 : $*T, %1 : @owned $Klass):
