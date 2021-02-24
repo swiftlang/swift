@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/Localization/LocalizationFormat.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -627,8 +628,8 @@ namespace swift {
     /// Track the previous emitted Behavior, useful for notes
     DiagnosticBehavior previousBehavior = DiagnosticBehavior::Unspecified;
 
-    /// Track settable, per-diagnostic state that we store
-    std::vector<DiagnosticBehavior> perDiagnosticBehavior;
+    /// Track which diagnostics should be ignored.
+    llvm::BitVector ignoredDiagnostics;
 
   public:
     DiagnosticState();
@@ -660,9 +661,9 @@ namespace swift {
       fatalErrorOccurred = false;
     }
 
-    /// Set per-diagnostic behavior
-    void setDiagnosticBehavior(DiagID id, DiagnosticBehavior behavior) {
-      perDiagnosticBehavior[(unsigned)id] = behavior;
+    /// Set whether a diagnostic should be ignored.
+    void setIgnoredDiagnostic(DiagID id, bool ignored) {
+      ignoredDiagnostics[(unsigned)id] = ignored;
     }
 
   private:
@@ -808,7 +809,7 @@ namespace swift {
     }
 
     void ignoreDiagnostic(DiagID id) {
-      state.setDiagnosticBehavior(id, DiagnosticBehavior::Ignore);
+      state.setIgnoredDiagnostic(id, true);
     }
 
     void resetHadAnyError() {

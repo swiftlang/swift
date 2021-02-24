@@ -136,9 +136,8 @@ static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = Edu
 static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
-  // Initialize our per-diagnostic state to default
-  perDiagnosticBehavior.resize(LocalDiagID::NumDiags,
-                               DiagnosticBehavior::Unspecified);
+  // Initialize our ignored diagnostics to default
+  ignoredDiagnostics.resize(LocalDiagID::NumDiags);
 }
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -826,8 +825,7 @@ DiagnosticBehavior DiagnosticState::determineBehavior(DiagID id) {
 
   // We determine how to handle a diagnostic based on the following rules
   //   1) If current state dictates a certain behavior, follow that
-  //   2) If the user provided a behavior for this specific diagnostic, follow
-  //      that
+  //   2) If the user ignored this specific diagnostic, follow that
   //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
   //   4) Otherwise remap the diagnostic kind
@@ -846,11 +844,9 @@ DiagnosticBehavior DiagnosticState::determineBehavior(DiagID id) {
     if (!showDiagnosticsAfterFatalError && !isNote)
       return set(DiagnosticBehavior::Ignore);
 
-  //   2) If the user provided a behavior for this specific diagnostic, follow
-  //      that
-
-  if (perDiagnosticBehavior[(unsigned)id] != DiagnosticBehavior::Unspecified)
-    return set(perDiagnosticBehavior[(unsigned)id]);
+  //   2) If the user ignored this specific diagnostic, follow that
+  if (ignoredDiagnostics[(unsigned)diag.getID()])
+    return set(DiagnosticBehavior::Ignore);
 
   //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
