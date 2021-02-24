@@ -81,6 +81,9 @@ static StringRef getScoreKindName(ScoreKind kind) {
 
   case SK_ValueToPointerConversion:
     return "value-to-pointer conversion";
+
+  case SK_FunctionToAutoClosureConversion:
+    return "function to autoclosure parameter";
   }
 }
 

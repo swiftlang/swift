@@ -104,7 +104,7 @@ struct TestFunctionsOfX: FunctionsOfX {
 }
 
 @inline(never)  // Prevent specialization, to test all witness code.
-func derivatives<F: FunctionsOfX>(at x: Tracked<Float>, in: F.Type)
+func derivatives<F: FunctionsOfX>(at x: Tracked<Float>, of: F.Type)
   -> (Tracked<Float>, Tracked<Float>, Tracked<Float>, Tracked<Float>)
 {
   let dxdx = gradient(at: x) { x in F(x: x).x }
@@ -117,7 +117,7 @@ func derivatives<F: FunctionsOfX>(at x: Tracked<Float>, in: F.Type)
 ProtocolRequirementAutodiffTests.testWithLeakChecking("constructor, accessor, subscript") {
   expectEqual(
     (1.0, 4.0, 5.0, 5.0),
-    derivatives(at: 2.0, in: TestFunctionsOfX.self))
+    derivatives(at: 2.0, of: TestFunctionsOfX.self))
 }
 
 // MARK: - Test witness method SIL type computation.

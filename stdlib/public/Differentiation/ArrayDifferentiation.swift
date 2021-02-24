@@ -72,14 +72,14 @@ where Element: Differentiable {
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
 
-  public mutating func move(along direction: TangentVector) {
+  public mutating func move(by offset: TangentVector) {
     precondition(
-      base.count == direction.base.count, """
-        Count mismatch: \(base.count) ('self') and \(direction.base.count) \
+      base.count == offset.base.count, """
+        Count mismatch: \(base.count) ('self') and \(offset.base.count) \
         ('direction')
         """)
     for i in base.indices {
-      base[i].move(along: direction.base[i])
+      base[i].move(by: offset.base[i])
     }
   }
 }
@@ -172,9 +172,9 @@ extension Array: Differentiable where Element: Differentiable {
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
 
-  public mutating func move(along direction: TangentVector) {
+  public mutating func move(by offset: TangentVector) {
     var view = DifferentiableView(self)
-    view.move(along: direction)
+    view.move(by: offset)
     self = view.base
   }
 }
@@ -351,7 +351,7 @@ extension Array where Element: Differentiable {
     var values: [Result] = []
     var pullbacks: [(Result.TangentVector) -> Element.TangentVector] = []
     for x in self {
-      let (y, pb) = valueWithPullback(at: x, in: body)
+      let (y, pb) = valueWithPullback(at: x, of: body)
       values.append(y)
       pullbacks.append(pb)
     }
@@ -372,7 +372,7 @@ extension Array where Element: Differentiable {
     var values: [Result] = []
     var differentials: [(Element.TangentVector) -> Result.TangentVector] = []
     for x in self {
-      let (y, df) = valueWithDifferential(at: x, in: body)
+      let (y, df) = valueWithDifferential(at: x, of: body)
       values.append(y)
       differentials.append(df)
     }
@@ -411,7 +411,7 @@ extension Array where Element: Differentiable {
     var result = initialResult
     for element in self {
       let (y, pb) =
-        valueWithPullback(at: result, element, in: nextPartialResult)
+        valueWithPullback(at: result, element, of: nextPartialResult)
       result = y
       pullbacks.append(pb)
     }
@@ -447,7 +447,7 @@ extension Array where Element: Differentiable {
     var result = initialResult
     for element in self {
       let (y, df) =
-        valueWithDifferential(at: result, element, in: nextPartialResult)
+        valueWithDifferential(at: result, element, of: nextPartialResult)
       result = y
       differentials.append(df)
     }

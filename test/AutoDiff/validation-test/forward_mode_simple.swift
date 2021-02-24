@@ -14,7 +14,7 @@ ForwardModeTests.test("Identity") {
   func func_to_diff(x: Float) -> Float {
     return x
   }
-  let (y, differential) = valueWithDifferential(at: 4, in: func_to_diff)
+  let (y, differential) = valueWithDifferential(at: 4, of: func_to_diff)
   expectEqual(4, y)
   expectEqual(1, differential(1))
 }
@@ -23,7 +23,7 @@ ForwardModeTests.test("Unary") {
   func func_to_diff(x: Float) -> Float {
     return x * x
   }
-  let (y, differential) = valueWithDifferential(at: 4, in: func_to_diff)
+  let (y, differential) = valueWithDifferential(at: 4, of: func_to_diff)
   expectEqual(16, y)
   expectEqual(8, differential(1))
 }
@@ -32,7 +32,7 @@ ForwardModeTests.test("Binary") {
   func func_to_diff(x: Float, y: Float) -> Float {
     return x * y
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5, in: func_to_diff)
+  let (y, differential) = valueWithDifferential(at: 4, 5, of: func_to_diff)
   expectEqual(20, y)
   expectEqual(9, differential(1, 1))
 }
@@ -43,7 +43,7 @@ ForwardModeTests.test("BinaryWithLets") {
     let b = a
     return b * -y
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5, in: func_to_diff)
+  let (y, differential) = valueWithDifferential(at: 4, 5, of: func_to_diff)
   expectEqual(-45, y)
   expectEqual(-19, differential(1, 1))
 }
@@ -93,7 +93,7 @@ ForwardModeTests.test("UnaryWithVars") {
     return d
   }
 
-  let (y, differential) = valueWithDifferential(at: 4, in: unary)
+  let (y, differential) = valueWithDifferential(at: 4, of: unary)
   expectEqual(22, y)
   expectEqual(4, differential(1))
 }
@@ -111,7 +111,7 @@ ForwardModeTests.test("StructInit") {
     return A(x: 2 * x)
   }
 
-  let (y, differential) = valueWithDifferential(at: 4, in: structInit)
+  let (y, differential) = valueWithDifferential(at: 4, of: structInit)
   expectEqual(A(x: 8), y)
   expectEqual(A(x: 2), differential(1))
 }
@@ -123,7 +123,7 @@ ForwardModeTests.test("StructExtract") {
 
   let (y, differential) = valueWithDifferential(
     at: A(x: 4),
-    in: structExtract)
+    of: structExtract)
   expectEqual(8, y)
   expectEqual(2, differential(A(x: 1)))
 }
@@ -138,7 +138,7 @@ ForwardModeTests.test("LocalStructVariable") {
 
   let (y, differential) = valueWithDifferential(
     at: A(x: 4),
-    in: structExtract)
+    of: structExtract)
   expectEqual(A(x: 18), y)
   expectEqual(A(x: 4), differential(A(x: 1)))
 }
@@ -204,7 +204,7 @@ ForwardModeTests.testWithLeakChecking("TrackedIdentity") {
   func identity(x: Tracked<Float>) -> Tracked<Float> {
     return x
   }
-  let (y, differential) = valueWithDifferential(at: 4, in: identity)
+  let (y, differential) = valueWithDifferential(at: 4, of: identity)
   expectEqual(4, y)
   expectEqual(1, differential(1))
 }
@@ -213,7 +213,7 @@ ForwardModeTests.testWithLeakChecking("TrackedAddition") {
   func add(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     return x + y
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5, in: add)
+  let (y, differential) = valueWithDifferential(at: 4, 5, of: add)
   expectEqual(9, y)
   expectEqual(2, differential(1, 1))
 }
@@ -222,7 +222,7 @@ ForwardModeTests.testWithLeakChecking("TrackedDivision") {
   func divide(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     return x / y
   }
-  let (y, differential) = valueWithDifferential(at: 10, 5, in: divide)
+  let (y, differential) = valueWithDifferential(at: 10, 5, of: divide)
   expectEqual(2, y)
   expectEqual(-0.2, differential(1, 1))
 }
@@ -231,7 +231,7 @@ ForwardModeTests.testWithLeakChecking("TrackedMultipleMultiplication") {
   func add(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     return x * y * x
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5, in: add)
+  let (y, differential) = valueWithDifferential(at: 4, 5, of: add)
   expectEqual(80, y)
   // 2yx+xx
   expectEqual(56, differential(1, 1))
@@ -245,7 +245,7 @@ ForwardModeTests.testWithLeakChecking("TrackedWithLets") {
     return c
   }
   // (3x^2+2xy-y^2)/x^2+1
-  let (y, differential) = valueWithDifferential(at: 4, 5, in: add)
+  let (y, differential) = valueWithDifferential(at: 4, 5, of: add)
   expectEqual(25.25, y)
   expectEqual(4.9375, differential(1, 1))
 }
@@ -260,7 +260,7 @@ ForwardModeTests.test("TupleLet") {
       let tuple = (2 * x, x)
       return tuple.0
     }
-    let (value, derivative) = valueWithDerivative(at: 4, in: tupleLet)
+    let (value, derivative) = valueWithDerivative(at: 4, of: tupleLet)
     expectEqual(8, value)
     expectEqual(2, derivative)
   }
@@ -272,7 +272,7 @@ ForwardModeTests.test("TupleVar") {
       var tuple = (2 * x, x)
       return tuple.0
     }
-    let (value, derivative) = valueWithDerivative(at: 4, in: tupleVar)
+    let (value, derivative) = valueWithDerivative(at: 4, of: tupleVar)
     expectEqual(8, value)
     expectEqual(2, derivative)
   }
@@ -283,7 +283,7 @@ ForwardModeTests.test("TupleVar") {
       var tuple = (2 * x, 1)
       return tuple.0
     }
-    let (value, derivative) = valueWithDerivative(at: 4, in: TF_964)
+    let (value, derivative) = valueWithDerivative(at: 4, of: TF_964)
     expectEqual(8, value)
     expectEqual(2, derivative)
   }
@@ -295,7 +295,7 @@ ForwardModeTests.test("TupleMutation") {
     tuple.0 = tuple.0 * x
     return x * tuple.0
   }
-  expectEqual(27, derivative(at: 3, in: foo))
+  expectEqual(27, derivative(at: 3, of: foo))
 
   func fifthPower(_ x: Float) -> Float {
     var tuple = (x, x)
@@ -303,7 +303,7 @@ ForwardModeTests.test("TupleMutation") {
     tuple.1 = tuple.0 * x
     return tuple.0 * tuple.1
   }
-  expectEqual(405, derivative(at: 3, in: fifthPower))
+  expectEqual(405, derivative(at: 3, of: fifthPower))
 
   func nested(_ x: Float) -> Float {
     var tuple = ((x, x), x)
@@ -311,13 +311,13 @@ ForwardModeTests.test("TupleMutation") {
     tuple.0.1 = tuple.0.0 * x
     return tuple.0.0 * tuple.0.1
   }
-  expectEqual(405, derivative(at: 3, in: nested))
+  expectEqual(405, derivative(at: 3, of: nested))
 
   func generic<T: Differentiable & AdditiveArithmetic>(_ x: T) -> T {
     var tuple = (x, x)
     return tuple.0
   }
-  expectEqual(1, derivative(at: 3.0, in: generic))
+  expectEqual(1, derivative(at: 3.0, of: generic))
 
   // FIXME(TF-1033): Fix forward-mode ownership error for tuple with non-active
   // initial values.
@@ -330,7 +330,7 @@ ForwardModeTests.test("TupleMutation") {
     tuple.1 = x
     return tuple.0
   }
-  expectEqual(1, derivative(at: 3.0, in: genericInitialNonactive))
+  expectEqual(1, derivative(at: 3.0, of: genericInitialNonactive))
   */
 }
 
@@ -341,7 +341,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
     let tuple = (2 * x, 1)
     return tuple.0
   }
-  expectEqual((8, 2), valueWithDerivative(at: 4, in: tupleLet))
+  expectEqual((8, 2), valueWithDerivative(at: 4, of: tupleLet))
 
   func tupleVar(_ x: Tracked<Float>) -> Tracked<Float> {
     var tuple = (x, 1)
@@ -349,7 +349,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
     tuple.1 = 1
     return tuple.0
   }
-  expectEqual((3, 1), valueWithDerivative(at: 3, in: tupleVar))
+  expectEqual((3, 1), valueWithDerivative(at: 3, of: tupleVar))
 
   @differentiable(reverse)
   func nested(_ x: Tracked<Float>) -> Tracked<Float> {
@@ -362,7 +362,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
     return tuple.1.1 * tuple.2
   }
   // FIXME(SR-12911): Fix runtime segfault.
-  // expectEqual((16, 8), valueWithDerivative(at: 4, in: nested))
+  // expectEqual((16, 8), valueWithDerivative(at: 4, of: nested))
 
   struct Wrapper<T> {
     @differentiable(reverse where T : Differentiable)
@@ -378,7 +378,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
     let w = Wrapper<Tracked<Float>>()
     return w.baz(x)
   }
-  expectEqual((3, 1), valueWithDerivative(at: 3, in: wrapper))
+  expectEqual((3, 1), valueWithDerivative(at: 3, of: wrapper))
 }
 
 //===----------------------------------------------------------------------===//
@@ -484,7 +484,7 @@ extension Tensor where Scalar : Numeric {
     return mean() // ok
   }
 }
-_ = differential(at: Tensor<Float>(1), in: { $0.variance() })
+_ = differential(at: Tensor<Float>(1), of: { $0.variance() })
 
 // Tests TF-508: differentiation requirements with dependent member types.
 protocol TF_508_Proto {
@@ -537,12 +537,12 @@ extension TF_508_Struct : Differentiable where Scalar : Differentiable {
 // func TF_508() {
 //   let x = TF_508_Struct<Float>()
 //   // Test conformance requirement with dependent member type.
-//   _ = differential(at: x, in: {
+//   _ = differential(at: x, of: {
 //     (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
 //     return x + x
 //   })
 //   // Test same-type requirement with dependent member type.
-//   _ = differential(at: x, in: {
+//   _ = differential(at: x, of: {
 //     (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
 //     return x - x
 //   })
@@ -661,7 +661,7 @@ ForwardModeTests.testWithLeakChecking("TrackedDifferentiableFuncType") {
   func valAndDeriv(
     f: @escaping @differentiable(reverse) (Tracked<Float>) -> Tracked<Float>
   ) -> (Tracked<Float>, Tracked<Float>) {
-    let (y, diff) = valueWithDifferential(at: 5, in: f)
+    let (y, diff) = valueWithDifferential(at: 5, of: f)
     return (y, diff(1))
   }
 
@@ -936,7 +936,7 @@ struct TestFunctionsOfX: FunctionsOfX {
 }
 
 @inline(never)  // Prevent specialization, to test all witness code.
-func derivatives<F: FunctionsOfX>(at x: Float, in: F.Type)
+func derivatives<F: FunctionsOfX>(at x: Float, of: F.Type)
   -> (Float, Float, Float, Float)
 {
   let dxdx = derivative(at: x) { x in F(x: x).x }
@@ -949,7 +949,7 @@ func derivatives<F: FunctionsOfX>(at x: Float, in: F.Type)
 ForwardModeTests.test("constructor, accessor, subscript") {
   expectEqual(
     (1.0, 4.0, 5.0, 5.0),
-    derivatives(at: 2.0, in: TestFunctionsOfX.self))
+    derivatives(at: 2.0, of: TestFunctionsOfX.self))
 }
 
 // MARK: - Test witness method SIL type computation.
@@ -1029,37 +1029,37 @@ ForwardModeTests.test("Arithmetics") {
   func foo1(x: Float, y: Float) -> Float {
     return x * y
   }
-  expectEqual(7, derivative(at: 3, 4, in: foo1))
+  expectEqual(7, derivative(at: 3, 4, of: foo1))
   func foo2(x: Float, y: Float) -> Float {
     return -x * y
   }
-  expectEqual(-7, derivative(at: 3, 4, in: foo2))
+  expectEqual(-7, derivative(at: 3, 4, of: foo2))
   func foo3(x: Float, y: Float) -> Float {
     return -x + y
   }
-  expectEqual(0, derivative(at: 3, 4, in: foo3))
+  expectEqual(0, derivative(at: 3, 4, of: foo3))
 }
 
 ForwardModeTests.test("Fanout") {
   func foo1(x: Float) -> Float {
      x - x
   }
-  expectEqual(0, derivative(at: 100, in: foo1))
+  expectEqual(0, derivative(at: 100, of: foo1))
   func foo2(x: Float) -> Float {
      x + x
   }
-  expectEqual(2, derivative(at: 100, in: foo2))
+  expectEqual(2, derivative(at: 100, of: foo2))
   func foo3(x: Float, y: Float) -> Float {
     x + x + x * y
   }
-  expectEqual(7, derivative(at: 3, 2, in: foo3))
+  expectEqual(7, derivative(at: 3, 2, of: foo3))
 }
 
 ForwardModeTests.test("FunctionCall") {
   func foo(_ x: Float, _ y: Float) -> Float {
     return 3 * x + { $0 * 3 }(3) * y
   }
-  expectEqual(12, derivative(at: 3, 4, in: foo))
+  expectEqual(12, derivative(at: 3, 4, of: foo))
   expectEqual(3, derivative(at: 3) { x in foo(x, 4) })
 }
 
@@ -1067,8 +1067,8 @@ ForwardModeTests.test("ResultSelection") {
   func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
   }
-  expectEqual(1, derivative(at: 3, 3, in: { x, y in tuple(x, y).0 }))
-  expectEqual(1, derivative(at: 3, 3, in: { x, y in tuple(x, y).1 }))
+  expectEqual(1, derivative(at: 3, 3, of: { x, y in tuple(x, y).0 }))
+  expectEqual(1, derivative(at: 3, 3, of: { x, y in tuple(x, y).1 }))
 
   // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
   /*
@@ -1077,8 +1077,8 @@ ForwardModeTests.test("ResultSelection") {
   }
   func tupleGenericFirst<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).0 }
   func tupleGenericSecond<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).1 }
-  expectEqual(1, derivative(at: 3, 3, in: tupleGenericFirst))
-  expectEqual(1, derivative(at: 3, 3, in: tupleGenericSecond))
+  expectEqual(1, derivative(at: 3, 3, of: tupleGenericFirst))
+  expectEqual(1, derivative(at: 3, 3, of: tupleGenericSecond))
   */
 }
 
@@ -1094,8 +1094,8 @@ ForwardModeTests.test("MultipleResults") {
     // Note: both results (tuple elements) are active.
     return z.0 * z.1
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply))
-  expectEqual((10, 5), gradient(at: 5, 10, in: multiply))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply))
 
   // Test function with multiple `inout` parameters.
   func swap(_ x: inout Float, _ y: inout Float) {
@@ -1106,8 +1106,8 @@ ForwardModeTests.test("MultipleResults") {
     swap(&tuple.0, &tuple.1)
     return tuple.0 * tuple.1
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swap))
-  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swap))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swap))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swap))
 
   // Test function with multiple `inout` parameters.
   func swapGeneric<T>(_ x: inout T, _ y: inout T) {
@@ -1118,8 +1118,8 @@ ForwardModeTests.test("MultipleResults") {
     swapGeneric(&tuple.0, &tuple.1)
     return tuple.0 * tuple.1
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapGeneric))
-  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swapGeneric))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapGeneric))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapGeneric))
 
   // Test function with multiple `inout` parameters and a formal result.
   func swapAndReturnProduct(_ x: inout Float, _ y: inout Float) -> Float {
@@ -1134,8 +1134,8 @@ ForwardModeTests.test("MultipleResults") {
     let result = swapAndReturnProduct(&x2, &y2)
     return result
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapAndReturnProduct))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapAndReturnProduct))
 }
 */
 
@@ -1144,7 +1144,7 @@ ForwardModeTests.test("CaptureLocal") {
   func foo(_ x: Float) -> Float {
     return z * x
   }
-  expectEqual(10, derivative(at: 0, in: foo))
+  expectEqual(10, derivative(at: 0, of: foo))
 }
 
 var globalVar: Float = 10
@@ -1153,7 +1153,7 @@ ForwardModeTests.test("CaptureGlobal") {
     globalVar += 20
     return globalVar * x
   }
-  expectEqual(30, derivative(at: 0, in: foo))
+  expectEqual(30, derivative(at: 0, of: foo))
 }
 
 ForwardModeTests.test("Mutation") {
@@ -1163,7 +1163,7 @@ ForwardModeTests.test("Mutation") {
     a = a * x
     return a * x
   }
-  expectEqual(4 * 27, derivative(at: 3, in: fourthPower))
+  expectEqual(4 * 27, derivative(at: 3, of: fourthPower))
 }
 
 // Tests TF-21.
@@ -1175,7 +1175,7 @@ ForwardModeTests.test("StructMemberwiseInitializer") {
     }
   }
 
-  let derivFoo = differential(at: Float(4), in: { input -> Foo in
+  let derivFoo = differential(at: Float(4), of: { input -> Foo in
     let foo = Foo(stored: input)
     let foo2 = foo + foo
     return Foo(stored: foo2.stored)
@@ -1204,7 +1204,7 @@ ForwardModeTests.test("StructMemberwiseInitializer") {
     }
   }
 
-  let derivCustom = differential(at: Float(4), in: { input -> Custom in
+  let derivCustom = differential(at: Float(4), of: { input -> Custom in
     let foo = Custom(x: input)
     return foo + foo
   })(1)
@@ -1231,8 +1231,8 @@ ForwardModeTests.test("StructConstantStoredProperty") {
     let model = TF_319(x: 10)
     return model.applied(to: input)
   }
-  expectEqual(6, derivative(at: 10, in: { TF_319(x: $0).applied(to: 3) }))
-  expectEqual(20, derivative(at: 3, in: testStructInit))
+  expectEqual(6, derivative(at: 10, of: { TF_319(x: $0).applied(to: 3) }))
+  expectEqual(20, derivative(at: 3, of: testStructInit))
 }
 
 ForwardModeTests.test("StructMutation") {
@@ -1246,7 +1246,7 @@ ForwardModeTests.test("StructMutation") {
     let point = Point(x: input, y: input, z: input)
     return point + point
   }
-  expectEqual(Point(x: 2, y: 2, z: 2), differential(at: 4, in: double)(1))
+  expectEqual(Point(x: 2, y: 2, z: 2), differential(at: 4, of: double)(1))
 
   func fifthPower(_ input: Float) -> Float {
     var point = Point(x: input, y: input, z: input)
@@ -1254,7 +1254,7 @@ ForwardModeTests.test("StructMutation") {
     point.y = point.x * input
     return point.x * point.y
   }
-  expectEqual(405, derivative(at: 3, in: fifthPower))
+  expectEqual(405, derivative(at: 3, of: fifthPower))
 
   func mix(_ input: Float) -> Float {
     var tuple = (point: Point(x: input, y: input, z: input), float: input)
@@ -1262,7 +1262,7 @@ ForwardModeTests.test("StructMutation") {
     tuple.point.y = tuple.point.x * input
     return tuple.point.x * tuple.point.y
   }
-  expectEqual(405, derivative(at: 3, in: mix))
+  expectEqual(405, derivative(at: 3, of: mix))
 
   // Test TF-282.
   struct Add : Differentiable {
@@ -1283,7 +1283,7 @@ ForwardModeTests.test("StructGeneric") {
     var z: T
   }
 
-  let deriv = differential(at: Float(3), in: { input -> Generic<Float> in
+  let deriv = differential(at: Float(3), of: { input -> Generic<Float> in
     var generic = Generic(x: input, y: input, z: input)
     return generic
   })(1)
@@ -1295,7 +1295,7 @@ ForwardModeTests.test("StructGeneric") {
     generic.y = generic.x * input
     return generic.x * generic.y
   }
-  expectEqual(405, derivative(at: 3, in: fifthPower))
+  expectEqual(405, derivative(at: 3, of: fifthPower))
 }
 
 ForwardModeTests.test("SubsetIndices") {
@@ -1386,7 +1386,7 @@ ForwardModeTests.test("ApplyNonActiveIndirectResult") {
     y = x
     return y
   }
-  expectEqual(1.0, derivative(at: 2, in: applyNonactiveArgumentActiveIndirectResult))
+  expectEqual(1.0, derivative(at: 2, of: applyNonactiveArgumentActiveIndirectResult))
 }
 
 ForwardModeTests.test("SR-13530") {
@@ -1397,7 +1397,7 @@ ForwardModeTests.test("SR-13530") {
     precondition(x >= 0)
     return x
   }
-  expectEqual(1, derivative(at: 2, in: SR_13530))
+  expectEqual(1, derivative(at: 2, of: SR_13530))
 }
 
 runAllTests()

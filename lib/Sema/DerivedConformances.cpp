@@ -329,10 +329,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
     }
 
-    // Differentiable.move(along:)
+    // Differentiable.move(by:)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_move) {
       auto argumentNames = name.getArgumentNames();
-      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_along)
+      if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_by)
         return getRequirement(KnownProtocolKind::Differentiable);
     }
 

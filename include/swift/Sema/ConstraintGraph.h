@@ -63,8 +63,12 @@ public:
 
   /// Retrieve the set of type variables that are adjacent due to fixed
   /// bindings.
-  ArrayRef<TypeVariableType *> getFixedBindings() const {
-    return FixedBindings;
+  ArrayRef<TypeVariableType *> getReferencedVars() const {
+    return References.getArrayRef();
+  }
+
+  ArrayRef<TypeVariableType *> getReferencedBy() const {
+    return ReferencedBy.getArrayRef();
   }
 
   /// Retrieve all of the type variables in the same equivalence class
@@ -95,11 +99,18 @@ private:
   void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
 
   /// Add a type variable related to this type variable through fixed
-  /// bindings.
-  void addFixedBinding(TypeVariableType *typeVar);
-  
-  /// Remove a type variable from the fixed-binding relationship.
-  void removeFixedBinding(TypeVariableType *typeVar);
+  /// binding.
+  void addReferencedVar(TypeVariableType *typeVar);
+
+  /// Add a type variable referencing this type variable - this type
+  /// variable occurs in fixed type of the given type variable.
+  void addReferencedBy(TypeVariableType *typeVar);
+
+  /// Remove a type variable referenced by this node through a fixed binding.
+  void removeReference(TypeVariableType *typeVar);
+
+  /// Remove a type variable which used to reference this type variable.
+  void removeReferencedBy(TypeVariableType *typeVar);
 
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
@@ -112,9 +123,13 @@ private:
   /// to the index within the vector of constraints.
   llvm::SmallDenseMap<Constraint *, unsigned, 2> ConstraintIndex;
 
+  /// The set of type variables that reference type variable associated
+  /// with this constraint graph node.
+  llvm::SmallSetVector<TypeVariableType *, 2> ReferencedBy;
+
   /// The set of type variables that occur within the fixed binding of
   /// this type variable.
-  SmallVector<TypeVariableType *, 2> FixedBindings;
+  llvm::SmallSetVector<TypeVariableType *, 2> References;
 
   /// All of the type variables in the same equivalence class as this
   /// representative type variable.

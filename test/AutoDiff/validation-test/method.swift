@@ -73,8 +73,8 @@ MethodTests.testWithLeakChecking(
   func f(_ p: Parameter) -> Tracked<Float> {
     return 100 * p.squared()
   }
-  expectEqual(Parameter(x: 4 * 100), gradient(at: Parameter(x: 2), in: f))
-  expectEqual(Parameter(x: 40 * 100), gradient(at: Parameter(x: 20), in: f))
+  expectEqual(Parameter(x: 4 * 100), gradient(at: Parameter(x: 2), of: f))
+  expectEqual(Parameter(x: 40 * 100), gradient(at: Parameter(x: 20), of: f))
 }
 
 MethodTests.testWithLeakChecking(
@@ -83,24 +83,24 @@ MethodTests.testWithLeakChecking(
   // This is our current syntax for taking gradients of instance methods
   // directly. If/when we develop nicer syntax for this, change this test.
   func g(p: Parameter) -> Tracked<Float> { p.squared() }
-  expectEqual(Parameter(x: 4), gradient(at: Parameter(x: 2), in: g))
-  expectEqual(Parameter(x: 40), gradient(at: Parameter(x: 20), in: g))
+  expectEqual(Parameter(x: 4), gradient(at: Parameter(x: 2), of: g))
+  expectEqual(Parameter(x: 40), gradient(at: Parameter(x: 20), of: g))
 }
 
 MethodTests.testWithLeakChecking("instance method with generated adjoint, wrt only self") {
   func f(_ p: Parameter) -> Tracked<Float> {
     return 100 * p.multiplied(with: 200)
   }
-  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 1), in: f))
-  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 2), in: f))
+  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 1), of: f))
+  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 2), of: f))
 }
 
 MethodTests.testWithLeakChecking("instance method with generated adjoint, wrt only non-self") {
   func f(_ other: Tracked<Float>) -> Tracked<Float> {
     return 100 * Parameter(x: 200).multiplied(with: other)
   }
-  expectEqual(100 * 200, gradient(at: 1, in: f))
-  expectEqual(100 * 200, gradient(at: 2, in: f))
+  expectEqual(100 * 200, gradient(at: 1, of: f))
+  expectEqual(100 * 200, gradient(at: 2, of: f))
 }
 
 MethodTests.testWithLeakChecking(
@@ -118,39 +118,39 @@ MethodTests.testWithLeakChecking(
   func f(_ p: Parameter) -> Tracked<Float> {
     return 100 * Parameter.squared(p: p)
   }
-  expectEqual(Parameter(x: 4 * 100), gradient(at: Parameter(x: 2), in: f))
-  expectEqual(Parameter(x: 40 * 100), gradient(at: Parameter(x: 20), in: f))
+  expectEqual(Parameter(x: 4 * 100), gradient(at: Parameter(x: 2), of: f))
+  expectEqual(Parameter(x: 40 * 100), gradient(at: Parameter(x: 20), of: f))
 }
 
 MethodTests.testWithLeakChecking(
   "static method with generated adjoint, differentiated directly"
 ) {
-  expectEqual(Parameter(x: 4), gradient(at: Parameter(x: 2), in: Parameter.squared))
-  expectEqual(Parameter(x: 40), gradient(at: Parameter(x: 20), in: Parameter.squared))
+  expectEqual(Parameter(x: 4), gradient(at: Parameter(x: 2), of: Parameter.squared))
+  expectEqual(Parameter(x: 40), gradient(at: Parameter(x: 20), of: Parameter.squared))
 }
 
 MethodTests.testWithLeakChecking("static method with generated adjoint, wrt only first param") {
   func f(_ p: Parameter) -> Tracked<Float> {
     return 100 * (p * Parameter(x: 200))
   }
-  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 1), in: f))
-  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 2), in: f))
+  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 1), of: f))
+  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 2), of: f))
 }
 
 MethodTests.testWithLeakChecking("static method with generated adjoint, wrt only second param") {
   func f(_ p: Parameter) -> Tracked<Float> {
     return 100 * (Parameter(x: 200) * p)
   }
-  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 1), in: f))
-  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 2), in: f))
+  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 1), of: f))
+  expectEqual(Parameter(x: 100 * 200), gradient(at: Parameter(x: 2), of: f))
 }
 
 MethodTests.testWithLeakChecking("static method with generated adjoint, wrt all params") {
   func g(a: Parameter, b: Parameter) -> Tracked<Float> { a * b }
   expectEqual((Parameter(x: 100), Parameter(x: 200)),
-              gradient(at: Parameter(x: 200), Parameter(x: 100), in: g))
+              gradient(at: Parameter(x: 200), Parameter(x: 100), of: g))
   expectEqual((Parameter(x: 200), Parameter(x: 100)),
-              gradient(at: Parameter(x: 100), Parameter(x: 200), in: g))
+              gradient(at: Parameter(x: 100), Parameter(x: 200), of: g))
 }
 
 // ==== Tests with custom adjoint ====
@@ -314,69 +314,69 @@ MethodTests.testWithLeakChecking(
   func f(_ p: CustomParameter) -> Tracked<Float> {
     return 100 * p.squared()
   }
-  expectEqual(CustomParameter(x: 4 * 100), gradient(at: CustomParameter(x: 2), in: f))
-  expectEqual(CustomParameter(x: 10 * 100), gradient(at: CustomParameter(x: 20), in: f))
+  expectEqual(CustomParameter(x: 4 * 100), gradient(at: CustomParameter(x: 2), of: f))
+  expectEqual(CustomParameter(x: 10 * 100), gradient(at: CustomParameter(x: 20), of: f))
 }
 
 MethodTests.testWithLeakChecking("instance method with generated adjoint, differentated directly") {
   // This is our current syntax for taking gradients of instance methods
   // directly. If/when we develop nicer syntax for this, change this test.
   func g(p: CustomParameter) -> Tracked<Float> { p.squared() }
-  expectEqual(CustomParameter(x: 4), gradient(at: CustomParameter(x: 2), in: g))
-  expectEqual(CustomParameter(x: 10), gradient(at: CustomParameter(x: 20), in: g))
+  expectEqual(CustomParameter(x: 4), gradient(at: CustomParameter(x: 2), of: g))
+  expectEqual(CustomParameter(x: 10), gradient(at: CustomParameter(x: 20), of: g))
 }
 
 MethodTests.testWithLeakChecking("static method with custom adjoint, called from differentated func") {
   func f(_ p: CustomParameter) -> Tracked<Float> {
     return 100 * CustomParameter.squared(p: p)
   }
-  expectEqual(CustomParameter(x: 4 * 100), gradient(at: CustomParameter(x: 2), in: f))
-  expectEqual(CustomParameter(x: 10 * 100), gradient(at: CustomParameter(x: 20), in: f))
+  expectEqual(CustomParameter(x: 4 * 100), gradient(at: CustomParameter(x: 2), of: f))
+  expectEqual(CustomParameter(x: 10 * 100), gradient(at: CustomParameter(x: 20), of: f))
 }
 
 MethodTests.testWithLeakChecking("static method with custom adjoint, differentiated directly") {
   expectEqual(
-    CustomParameter(x: 4), gradient(at: CustomParameter(x: 2), in: CustomParameter.squared))
+    CustomParameter(x: 4), gradient(at: CustomParameter(x: 2), of: CustomParameter.squared))
   expectEqual(
-    CustomParameter(x: 10), gradient(at: CustomParameter(x: 20), in: CustomParameter.squared))
+    CustomParameter(x: 10), gradient(at: CustomParameter(x: 20), of: CustomParameter.squared))
 }
 
 MethodTests.testWithLeakChecking("instance method with custom adjoint, wrt only self") {
   func f(_ p: CustomParameter) -> Tracked<Float> {
     return 100 * p.multiplied_constOther(with: 200)
   }
-  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 1), in: f))
-  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 2), in: f))
+  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 1), of: f))
+  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 2), of: f))
 }
 
 MethodTests.testWithLeakChecking("instance method with custom adjoint, wrt only non-self") {
   func f(_ other: Tracked<Float>) -> Tracked<Float> {
     return 100 * CustomParameter(x: 200).multiplied_constSelf(with: other)
   }
-  expectEqual(100 * 10, gradient(at: 1, in: f))
-  expectEqual(100 * 10, gradient(at: 2, in: f))
+  expectEqual(100 * 10, gradient(at: 1, of: f))
+  expectEqual(100 * 10, gradient(at: 2, of: f))
 }
 
 MethodTests.testWithLeakChecking("instance method with custom adjoint, wrt self and non-self") {
   func g(p: CustomParameter, o: Tracked<Float>) -> Tracked<Float> { p.multiplied(with: o) }
-  expectEqual((CustomParameter(x: 5), 10), gradient(at: CustomParameter(x: 100), 5, in: g))
-  expectEqual((CustomParameter(x: 10), 5), gradient(at: CustomParameter(x: 5), 100, in: g))
+  expectEqual((CustomParameter(x: 5), 10), gradient(at: CustomParameter(x: 100), 5, of: g))
+  expectEqual((CustomParameter(x: 10), 5), gradient(at: CustomParameter(x: 5), 100, of: g))
 }
 
 MethodTests.testWithLeakChecking("static method with custom adjoint, wrt only lhs") {
   func f(_ p: CustomParameter) -> Tracked<Float> {
     return 100 * CustomParameter.multiply_constLhs(CustomParameter(x: 200), p)
   }
-  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 1), in: f))
-  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 2), in: f))
+  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 1), of: f))
+  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 2), of: f))
 }
 
 MethodTests.testWithLeakChecking("static method with custom adjoint, wrt only rhs") {
   func f(_ p: CustomParameter) -> Tracked<Float> {
     return 100 * CustomParameter.multiply_constLhs(CustomParameter(x: 200), p)
   }
-  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 1), in: f))
-  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 2), in: f))
+  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 1), of: f))
+  expectEqual(CustomParameter(x: 100 * 10), gradient(at: CustomParameter(x: 2), of: f))
 }
 
 MethodTests.testWithLeakChecking("static method with custom adjoint, wrt all") {
@@ -384,9 +384,9 @@ MethodTests.testWithLeakChecking("static method with custom adjoint, wrt all") {
     return CustomParameter.multiply(a, b)
   }
   expectEqual((CustomParameter(x: 5), CustomParameter(x: 10)),
-              gradient(at: CustomParameter(x: 100), CustomParameter(x: 5), in: f))
+              gradient(at: CustomParameter(x: 100), CustomParameter(x: 5), of: f))
   expectEqual((CustomParameter(x: 10), CustomParameter(x: 5)),
-              gradient(at: CustomParameter(x: 5), CustomParameter(x: 100), in: f))
+              gradient(at: CustomParameter(x: 5), CustomParameter(x: 100), of: f))
 }
 
 runAllTests()

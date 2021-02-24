@@ -8,7 +8,7 @@ var ReabstractionE2ETests = TestSuite("ReabstractionE2E")
 
 ReabstractionE2ETests.test("diff param concrete => generic") {
   func grad<T: Differentiable>(_ f: @differentiable(reverse) (T) -> Float, at x: T) -> T.TangentVector {
-    gradient(at: x, in: f)
+    gradient(at: x, of: f)
   }
   func inner(_ x: Float) -> Float {
     7 * x * x
@@ -38,7 +38,7 @@ ReabstractionE2ETests.test("diff param and nondiff param concrete => generic") {
 
 ReabstractionE2ETests.test("result concrete => generic") {
   func grad<T: Differentiable>(_ f: @differentiable(reverse) (Float) -> T, at x: Float, seed: T.TangentVector) -> Float {
-    pullback(at: x, in: f)(seed)
+    pullback(at: x, of: f)(seed)
   }
   func inner(_ x: Float) -> Float {
     7 * x * x
@@ -69,7 +69,7 @@ ReabstractionE2ETests.test("diff param generic => concrete") {
   }
   let transformed: @differentiable(reverse) (Float) -> Float = inner
   expectEqual(Float(7 * 3 * 3), transformed(3))
-  expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: transformed))
+  expectEqual(Float(7 * 2 * 3), gradient(at: 3, of: transformed))
 }
 #endif
 
@@ -100,7 +100,7 @@ ReabstractionE2ETests.test("result generic => concrete") {
   }
   let transformed: @differentiable(reverse) (Float) -> Float = inner
   expectEqual(Float(7 * 3 * 3), transformed(3))
-  expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: transformed))
+  expectEqual(Float(7 * 2 * 3), gradient(at: 3, of: transformed))
 }
 #endif
 
@@ -112,7 +112,7 @@ ReabstractionE2ETests.test("diff param concrete => generic => concrete") {
   }
   let transformed = id(inner)
   expectEqual(Float(7 * 3 * 3), transformed(3))
-  expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: transformed))
+  expectEqual(Float(7 * 2 * 3), gradient(at: 3, of: transformed))
 }
 
 ReabstractionE2ETests.test("nondiff param concrete => generic => concrete") {
@@ -145,7 +145,7 @@ ReabstractionE2ETests.test("result concrete => generic => concrete") {
   }
   let transformed = id(inner)
   expectEqual(Float(7 * 3 * 3), transformed(3))
-  expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: transformed))
+  expectEqual(Float(7 * 2 * 3), gradient(at: 3, of: transformed))
 }
 
 ReabstractionE2ETests.test("@differentiable(reverse) function => opaque generic => concrete") {
@@ -155,7 +155,7 @@ ReabstractionE2ETests.test("@differentiable(reverse) function => opaque generic 
   // TODO(TF-1122): Actually using `id` causes a segfault at runtime.
   // let transformed = id(inner)
   // expectEqual(Float(7 * 3 * 3), transformed(3))
-  // expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: id(inner)))
+  // expectEqual(Float(7 * 2 * 3), gradient(at: 3, of: id(inner)))
 }
 
 ReabstractionE2ETests.test("@differentiable(reverse) function => opaque Any => concrete") {
@@ -166,7 +166,7 @@ ReabstractionE2ETests.test("@differentiable(reverse) function => opaque Any => c
   // let transformed = id(inner)
   // let casted = transformed as! @differentiable(reverse) (Float) -> Float
   // expectEqual(Float(7 * 3 * 3), casted(3))
-  // expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: casted))
+  // expectEqual(Float(7 * 2 * 3), gradient(at: 3, of: casted))
 }
 
 ReabstractionE2ETests.test("access @differentiable(reverse) function using KeyPath") {
@@ -179,7 +179,7 @@ ReabstractionE2ETests.test("access @differentiable(reverse) function using KeyPa
   // TODO(TF-1122): Actually using `kp` causes a segfault at runtime.
   // let extracted = container[keyPath: kp]
   // expectEqual(Float(7 * 3 * 3), extracted(3))
-  // expectEqual(Float(7 * 2 * 3), gradient(at: 3, in: extracted))
+  // expectEqual(Float(7 * 2 * 3), gradient(at: 3, of: extracted))
 }
 
 runAllTests()

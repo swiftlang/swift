@@ -43,7 +43,7 @@ SupersetVJPTests.testWithLeakChecking("SubsetOfSubset") {
   func foo(_ x: Tracked<Float>, _ y: Tracked<Float>, _ z: Tracked<Float>) -> Tracked<Float> {
     withoutDerivative(at: 0)
   }
-  expectEqual(0, gradient(at: 0, in: { x in foo(x, 0, 0) }))
+  expectEqual(0, gradient(at: 0, of: { x in foo(x, 0, 0) }))
 }
 
 SupersetVJPTests.test("ApplySubset") {
