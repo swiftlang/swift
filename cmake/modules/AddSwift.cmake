@@ -82,6 +82,10 @@ function(_add_host_variant_c_compile_link_flags name)
     set(DEPLOYMENT_VERSION "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_DEPLOYMENT_VERSION}")
   endif()
 
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
+    set(DEPLOYMENT_VERSION ${SWIFT_ANDROID_API_LEVEL})
+  endif()
+
   # MSVC, clang-cl, gcc don't understand -target.
   if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     get_target_triple(target target_variant "${SWIFT_HOST_VARIANT_SDK}" "${SWIFT_HOST_VARIANT_ARCH}"
@@ -272,18 +276,6 @@ function(_add_host_variant_c_compile_flags target)
     target_compile_options(${target} PRIVATE -funwind-tables)
   endif()
 
-  if(SWIFT_HOST_VARIANT_SDK STREQUAL ANDROID)
-    target_compile_options(${target} PRIVATE -nostdinc++)
-    swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
-    swift_android_include_for_arch("${SWIFT_HOST_VARIANT_ARCH}"
-      "${SWIFT_HOST_VARIANT_ARCH}_INCLUDE")
-    target_include_directories(${target} SYSTEM PRIVATE
-      ${CFLAGS_CXX_INCLUDES}
-      ${${SWIFT_HOST_VARIANT_ARCH}_INCLUDE})
-    target_compile_definitions(${target} PRIVATE
-      __ANDROID_API__=${SWIFT_ANDROID_API_LEVEL})
-  endif()
-
   if(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
     if(SWIFT_HOST_VARIANT_ARCH STREQUAL x86_64)
       # this is the minimum architecture that supports 16 byte CAS, which is
@@ -351,7 +343,7 @@ function(_add_host_variant_link_flags target)
     target_link_libraries(${target} PRIVATE
       ${cxx_link_libraries})
 
-    swift_android_lib_for_arch(${SWIFT_HOST_VARIANT_ARCH}
+    swift_android_libgcc_for_arch_cross_compile(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_LIB)
     target_link_directories(${target} PRIVATE
       ${${SWIFT_HOST_VARIANT_ARCH}_LIB})
