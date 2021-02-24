@@ -291,7 +291,7 @@ void ConstraintGraphNode::introduceToInference(Constraint *constraint,
                                                bool notifyReferencedVars) {
   if (forRepresentativeVar()) {
     auto fixedType = TypeVar->getImpl().getFixedType(/*record=*/nullptr);
-    if (!fixedType || fixedType->isTypeVariableOrMember())
+    if (!fixedType)
       getCurrentBindings().infer(constraint);
   } else {
     auto *repr =
@@ -312,7 +312,7 @@ void ConstraintGraphNode::retractFromInference(Constraint *constraint,
                                                bool notifyReferencedVars) {
   if (forRepresentativeVar()) {
     auto fixedType = TypeVar->getImpl().getFixedType(/*record=*/nullptr);
-    if (!fixedType || fixedType->isTypeVariableOrMember())
+    if (!fixedType)
       getCurrentBindings().retract(constraint);
   } else {
     auto *repr =
@@ -539,65 +539,66 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   if (ActiveScope)
     Changes.push_back(Change::boundTypeVariable(typeVar, fixed));
 
-  // If there are no type variables in the fixed type, there's nothing to do.
+  auto &node = (*this)[typeVar];
+
+  // Notify all of the type variables that reference this one.
+  //
+  // Since this type variable has been replaced with a fixed type
+  // all of the concrete types that reference it are going to change,
+  // which means that all of the not-yet-attempted bindings should
+  // change as well.
+  node.notifyReferencingVars();
+
+  if (!fixed->hasTypeVariable())
+    return;
+
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  fixed->getTypeVariables(typeVars);
 
-  if (fixed->hasTypeVariable()) {
-    fixed->getTypeVariables(typeVars);
+  for (auto otherTypeVar : typeVars) {
+    if (typeVar == otherTypeVar)
+      continue;
 
-    auto &node = (*this)[typeVar];
-    for (auto otherTypeVar : typeVars) {
-      if (typeVar == otherTypeVar) continue;
+    auto &otherNode = (*this)[otherTypeVar];
 
-      auto &otherNode = (*this)[otherTypeVar];
+    otherNode.addReferencedBy(typeVar);
+    node.addReferencedVar(otherTypeVar);
 
-      otherNode.addReferencedBy(typeVar);
-      node.addReferencedVar(otherTypeVar);
-
-      // Newly referred vars need to re-introduce all constraints associated
-      // with this type variable.
-      for (auto *constraint : (*this)[typeVar].getConstraints()) {
-        if (isUsefulForReferencedVars(constraint))
-          otherNode.reintroduceToInference(constraint,
-                                           /*notifyReferencedVars=*/false);
-      }
+    // Newly referred vars need to re-introduce all constraints associated
+    // with this type variable since they are now going to be used in
+    // all of the constraints that reference bound type variable.
+    for (auto *constraint : (*this)[typeVar].getConstraints()) {
+      if (isUsefulForReferencedVars(constraint))
+        otherNode.reintroduceToInference(constraint,
+                                         /*notifyReferencedVars=*/false);
     }
-  }
-
-  // All of the type variables associted with bound one need to trigger
-  // re-introduction of constraints that reference them. That includes
-  // whole equivalence class of the current type variable and all of its
-  // fixed bindings.
-  {
-    (*this)[typeVar].notifyReferencingVars();
   }
 }
 
 void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) {
-  // All of the type variables associted with bound one need to trigger
-  // re-introduction of constraints that reference them. That includes
-  // whole equivalence class of the current type variable and all of its
-  // fixed bindings.
-  {
-    auto &node = (*this)[typeVar];
+  auto &node = (*this)[typeVar];
 
-    node.notifyReferencingVars();
+  // Notify referencing variables (just like in bound case) that this
+  // type variable has been modified.
+  node.notifyReferencingVars();
 
-    llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  if (!fixed->hasTypeVariable())
+    return;
 
-    if (fixed->hasTypeVariable()) {
-      fixed->getTypeVariables(typeVars);
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  fixed->getTypeVariables(typeVars);
 
-      for (auto otherTypeVar : typeVars) {
-        auto &otherNode = (*this)[otherTypeVar];
+  for (auto otherTypeVar : typeVars) {
+    auto &otherNode = (*this)[otherTypeVar];
 
-        otherNode.removeReferencedBy(typeVar);
-        node.removeReference(otherTypeVar);
+    otherNode.removeReferencedBy(typeVar);
+    node.removeReference(otherTypeVar);
 
-        if (otherNode.forRepresentativeVar())
-          otherNode.resetBindingSet();
-      }
-    }
+    // TODO: This might be an overkill but it's (currently)
+    // the simpliest way to reliably ensure that all of the
+    // no longer related constraints have been retracted.
+    if (otherNode.forRepresentativeVar())
+      otherNode.resetBindingSet();
   }
 }
 
