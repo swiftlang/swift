@@ -1112,9 +1112,16 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
   // whether the parameter is a function type and if so whether it
   // should be allowed to escape. As a result we allow anything
   // passed in to escape.
-  if (auto *fnTy = type->getAs<AnyFunctionType>())
-    if (isGenericParameter() && !CS.shouldAttemptFixes())
+  if (auto *fnTy = type->getAs<AnyFunctionType>()) {
+    // Since inference now happens during constraint generation,
+    // this hack should be allowed in both `Solving`
+    // (during non-diagnostic mode) and `ConstraintGeneration` phases.
+    if (isGenericParameter() &&
+        (!CS.shouldAttemptFixes() ||
+         CS.getPhase() == ConstraintSystemPhase::ConstraintGeneration)) {
       type = fnTy->withExtInfo(fnTy->getExtInfo().withNoEscape(false));
+    }
+  }
 
   // Check whether we can perform this binding.
   if (auto boundType = checkTypeOfBinding(TypeVar, type)) {
