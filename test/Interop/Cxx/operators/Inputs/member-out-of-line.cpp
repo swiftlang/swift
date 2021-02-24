@@ -1,5 +1,5 @@
 #include "member-out-of-line.h"
 
-IntBox IntBox::operator+(IntBox rhs) const {
-  return IntBox{.value = value + rhs.value};
+LoadableIntWrapper LoadableIntWrapper::operator+(LoadableIntWrapper rhs) const {
+  return LoadableIntWrapper{.value = value + rhs.value};
 }

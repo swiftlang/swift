@@ -1,9 +1,9 @@
 #ifndef TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_OUT_OF_LINE_H
 #define TEST_INTEROP_CXX_OPERATORS_INPUTS_MEMBER_OUT_OF_LINE_H
 
-struct IntBox {
+struct LoadableIntWrapper {
   int value;
-  IntBox operator+(IntBox rhs) const;
+  LoadableIntWrapper operator+(LoadableIntWrapper rhs) const;
 };
 
 #endif
