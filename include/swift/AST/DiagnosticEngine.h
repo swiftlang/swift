@@ -342,7 +342,18 @@ namespace swift {
       return ActorIsolationVal;
     }
   };
-  
+
+  /// Describes the current behavior to take with a diagnostic
+  enum class DiagnosticBehavior : uint8_t {
+    Unspecified,
+    Ignore,
+    Note,
+    Remark,
+    Warning,
+    Error,
+    Fatal,
+  };
+
   struct DiagnosticFormatOptions {
     const std::string OpeningQuotationMark;
     const std::string ClosingQuotationMark;
@@ -597,19 +608,6 @@ namespace swift {
   /// Class to track, map, and remap diagnostic severity and fatality
   ///
   class DiagnosticState {
-  public:
-    /// Describes the current behavior to take with a diagnostic
-    enum class Behavior : uint8_t {
-      Unspecified,
-      Ignore,
-      Note,
-      Remark,
-      Warning,
-      Error,
-      Fatal,
-    };
-
-  private:
     /// Whether we should continue to emit diagnostics, even after a
     /// fatal error
     bool showDiagnosticsAfterFatalError = false;
@@ -627,17 +625,17 @@ namespace swift {
     bool anyErrorOccurred = false;
 
     /// Track the previous emitted Behavior, useful for notes
-    Behavior previousBehavior = Behavior::Unspecified;
+    DiagnosticBehavior previousBehavior = DiagnosticBehavior::Unspecified;
 
     /// Track settable, per-diagnostic state that we store
-    std::vector<Behavior> perDiagnosticBehavior;
+    std::vector<DiagnosticBehavior> perDiagnosticBehavior;
 
   public:
     DiagnosticState();
 
     /// Figure out the Behavior for the given diagnostic, taking current
     /// state such as fatality into account.
-    Behavior determineBehavior(DiagID id);
+    DiagnosticBehavior determineBehavior(DiagID id);
 
     bool hadAnyError() const { return anyErrorOccurred; }
     bool hasFatalErrorOccurred() const { return fatalErrorOccurred; }
@@ -663,7 +661,7 @@ namespace swift {
     }
 
     /// Set per-diagnostic behavior
-    void setDiagnosticBehavior(DiagID id, Behavior behavior) {
+    void setDiagnosticBehavior(DiagID id, DiagnosticBehavior behavior) {
       perDiagnosticBehavior[(unsigned)id] = behavior;
     }
 
@@ -810,7 +808,7 @@ namespace swift {
     }
 
     void ignoreDiagnostic(DiagID id) {
-      state.setDiagnosticBehavior(id, DiagnosticState::Behavior::Ignore);
+      state.setDiagnosticBehavior(id, DiagnosticBehavior::Ignore);
     }
 
     void resetHadAnyError() {
@@ -1107,8 +1105,8 @@ namespace swift {
 
       for (auto &diagnostic : diagnostics) {
         auto behavior = Engine.state.determineBehavior(diagnostic.getID());
-        if (behavior == DiagnosticState::Behavior::Fatal ||
-            behavior == DiagnosticState::Behavior::Error)
+        if (behavior == DiagnosticBehavior::Fatal ||
+            behavior == DiagnosticBehavior::Error)
           return true;
       }
 

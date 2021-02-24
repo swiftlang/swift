@@ -137,7 +137,8 @@ static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
-  perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
+  perDiagnosticBehavior.resize(LocalDiagID::NumDiags,
+                               DiagnosticBehavior::Unspecified);
 }
 
 static CharSourceRange toCharSourceRange(SourceManager &SM, SourceRange SR) {
@@ -778,20 +779,20 @@ void DiagnosticEngine::formatDiagnosticText(
   }
 }
 
-static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
+static DiagnosticKind toDiagnosticKind(DiagnosticBehavior behavior) {
   switch (behavior) {
-  case DiagnosticState::Behavior::Unspecified:
+  case DiagnosticBehavior::Unspecified:
     llvm_unreachable("unspecified behavior");
-  case DiagnosticState::Behavior::Ignore:
+  case DiagnosticBehavior::Ignore:
     llvm_unreachable("trying to map an ignored diagnostic");
-  case DiagnosticState::Behavior::Error:
-  case DiagnosticState::Behavior::Fatal:
+  case DiagnosticBehavior::Error:
+  case DiagnosticBehavior::Fatal:
     return DiagnosticKind::Error;
-  case DiagnosticState::Behavior::Note:
+  case DiagnosticBehavior::Note:
     return DiagnosticKind::Note;
-  case DiagnosticState::Behavior::Warning:
+  case DiagnosticBehavior::Warning:
     return DiagnosticKind::Warning;
-  case DiagnosticState::Behavior::Remark:
+  case DiagnosticBehavior::Remark:
     return DiagnosticKind::Remark;
   }
 
@@ -807,17 +808,17 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
-DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
-  auto set = [this](DiagnosticState::Behavior lvl) {
-    if (lvl == Behavior::Fatal) {
+DiagnosticBehavior DiagnosticState::determineBehavior(DiagID id) {
+  auto set = [this](DiagnosticBehavior lvl) {
+    if (lvl == DiagnosticBehavior::Fatal) {
       fatalErrorOccurred = true;
       anyErrorOccurred = true;
-    } else if (lvl == Behavior::Error) {
+    } else if (lvl == DiagnosticBehavior::Error) {
       anyErrorOccurred = true;
     }
 
     assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-    assert((!AssertOnWarning || (lvl != Behavior::Warning)) &&
+    assert((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
            "We emitted a warning?!");
     previousBehavior = lvl;
     return lvl;
@@ -837,39 +838,40 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   //   1) If current state dictates a certain behavior, follow that
 
   // Notes relating to ignored diagnostics should also be ignored
-  if (previousBehavior == Behavior::Ignore && isNote)
-    return set(Behavior::Ignore);
+  if (previousBehavior == DiagnosticBehavior::Ignore && isNote)
+    return set(DiagnosticBehavior::Ignore);
 
   // Suppress diagnostics when in a fatal state, except for follow-on notes
   if (fatalErrorOccurred)
     if (!showDiagnosticsAfterFatalError && !isNote)
-      return set(Behavior::Ignore);
+      return set(DiagnosticBehavior::Ignore);
 
   //   2) If the user provided a behavior for this specific diagnostic, follow
   //      that
 
-  if (perDiagnosticBehavior[(unsigned)id] != Behavior::Unspecified)
+  if (perDiagnosticBehavior[(unsigned)id] != DiagnosticBehavior::Unspecified)
     return set(perDiagnosticBehavior[(unsigned)id]);
 
   //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
   if (diagInfo.kind == DiagnosticKind::Warning) {
     if (suppressWarnings)
-      return set(Behavior::Ignore);
+      return set(DiagnosticBehavior::Ignore);
     if (warningsAsErrors)
-      return set(Behavior::Error);
+      return set(DiagnosticBehavior::Error);
   }
 
   //   4) Otherwise remap the diagnostic kind
   switch (diagInfo.kind) {
   case DiagnosticKind::Note:
-    return set(Behavior::Note);
+    return set(DiagnosticBehavior::Note);
   case DiagnosticKind::Error:
-    return set(diagInfo.isFatal ? Behavior::Fatal : Behavior::Error);
+    return set(diagInfo.isFatal ? DiagnosticBehavior::Fatal
+                                : DiagnosticBehavior::Error);
   case DiagnosticKind::Warning:
-    return set(Behavior::Warning);
+    return set(DiagnosticBehavior::Warning);
   case DiagnosticKind::Remark:
-    return set(Behavior::Remark);
+    return set(DiagnosticBehavior::Remark);
   }
 
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
@@ -910,7 +912,7 @@ static AccessLevel getBufferAccessLevel(const Decl *decl) {
 Optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
   auto behavior = state.determineBehavior(diagnostic.getID());
-  if (behavior == DiagnosticState::Behavior::Ignore)
+  if (behavior == DiagnosticBehavior::Ignore)
     return None;
 
   // Figure out the source location.
