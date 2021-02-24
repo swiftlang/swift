@@ -21,7 +21,7 @@ actor BankAccount {
   // expected-note@+1 {{calls to instance method 'balance()' from outside of its actor context are implicitly asynchronous}}
   func balance() -> Int { return curBalance }
 
-  // expected-note@+1 {{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1 2{{calls to instance method 'deposit' from outside of its actor context are implicitly asynchronous}}
   func deposit(_ amount : Int) -> Int {
     guard amount >= 0 else { return 0 }
 
@@ -125,14 +125,12 @@ func anotherAsyncFunc() async {
 
 }
 
-// expected-note@+2 {{add 'async' to function 'regularFunc()' to make it asynchronous}} {{19-19= async}}
-// expected-note@+1 {{add '@asyncHandler' to function 'regularFunc()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
 func regularFunc() {
   let a = BankAccount(initialDeposit: 34)
 
   _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can only be referenced inside the actor}}
 
-  _ = a.deposit(1)  // expected-error{{'async' in a function that does not support concurrency}}
+  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can only be referenced inside the actor}}
 }
 
 
