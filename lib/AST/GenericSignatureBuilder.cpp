@@ -5429,7 +5429,9 @@ namespace {
   /// Retrieve the representative constraint that will be used for diagnostics.
   template<typename T>
   Optional<Constraint<T>> findRepresentativeConstraint(
+                            GenericSignatureBuilder &builder,
                             ArrayRef<Constraint<T>> constraints,
+                            RequirementKind kind,
                             llvm::function_ref<bool(const Constraint<T> &)>
                                                    isSuitableRepresentative) {
     Optional<Constraint<T>> fallbackConstraint;
@@ -5451,6 +5453,26 @@ namespace {
       if (!representativeConstraint) {
         representativeConstraint = constraint;
         continue;
+      }
+
+      if (kind != RequirementKind::SameType) {
+        // We prefer non-redundant explicit constraints over everything else.
+        bool thisIsNonRedundantExplicit =
+            (!constraint.source->isDerivedNonRootRequirement() &&
+             !builder.isRedundantExplicitRequirement(
+               ExplicitRequirement::fromExplicitConstraint(
+                 kind, constraint)));
+        bool representativeIsNonRedundantExplicit =
+            (!representativeConstraint->source->isDerivedNonRootRequirement() &&
+             !builder.isRedundantExplicitRequirement(
+               ExplicitRequirement::fromExplicitConstraint(
+                 kind, *representativeConstraint)));
+
+        if (thisIsNonRedundantExplicit != representativeIsNonRedundantExplicit) {
+          if (thisIsNonRedundantExplicit)
+            representativeConstraint = constraint;
+          continue;
+        }
       }
 
       // We prefer derived constraints to non-derived constraints.
@@ -6302,7 +6324,9 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
         // Try to find an exact constraint that matches 'other'.
         auto repConstraint =
           findRepresentativeConstraint<Type>(
+            *this,
             equivClass->sameTypeConstraints,
+            RequirementKind::SameType,
             [pa, other](const Constraint<Type> &constraint) {
               return (constraint.isSubjectEqualTo(pa) &&
                       constraint.value->isEqual(other->getDependentType())) ||
@@ -6315,7 +6339,9 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
         if (!repConstraint) {
           repConstraint =
             findRepresentativeConstraint<Type>(
+              *this,
               equivClass->sameTypeConstraints,
+              RequirementKind::SameType,
               [](const Constraint<Type> &constraint) {
                 return true;
               });
@@ -6466,6 +6492,7 @@ template<typename T>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
+                           RequirementKind kind,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
                            llvm::function_ref<
@@ -6475,7 +6502,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
                            Diag<unsigned, Type, T> otherNoteDiag) {
-  return checkConstraintList<T, T>(genericParams, constraints,
+  return checkConstraintList<T, T>(genericParams, constraints, kind,
                                    isSuitableRepresentative, checkConstraint,
                                    conflictingDiag, redundancyDiag,
                                    otherNoteDiag,
@@ -6570,6 +6597,7 @@ template<typename T, typename DiagT>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
+                           RequirementKind kind,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
                            llvm::function_ref<
@@ -6591,7 +6619,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
 
   // Find a representative constraint.
   auto representativeConstraint =
-    findRepresentativeConstraint<T>(constraints, isSuitableRepresentative);
+    findRepresentativeConstraint<T>(*this, constraints, kind,
+                                    isSuitableRepresentative);
 
   // Local function to provide a note describing the representative constraint.
   auto noteRepresentativeConstraint = [&] {
@@ -6748,7 +6777,7 @@ void GenericSignatureBuilder::checkConformanceConstraints(
     removeSelfDerived(*this, entry.second, entry.first);
 
     checkConstraintList<ProtocolDecl *, ProtocolDecl *>(
-      genericParams, entry.second,
+      genericParams, entry.second, RequirementKind::Conformance,
       [](const Constraint<ProtocolDecl *> &constraint) {
         return true;
       },
@@ -7376,7 +7405,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     if (constraints.empty()) continue;
 
     checkConstraintList<Type, Type>(
-      genericParams, constraints,
+      genericParams, constraints, RequirementKind::SameType,
       [](const Constraint<Type> &) { return true; },
       [](const Constraint<Type> &constraint) {
         // Ignore nested-type-name-match constraints.
@@ -7569,7 +7598,7 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     resolveDependentMemberTypes(*this, equivClass->concreteType);
 
   checkConstraintList<Type>(
-    genericParams, equivClass->concreteTypeConstraints,
+    genericParams, equivClass->concreteTypeConstraints, RequirementKind::SameType,
     [&](const ConcreteConstraint &constraint) {
       if (constraint.value->isEqual(resolvedConcreteType))
         return true;
@@ -7612,7 +7641,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
   auto representativeConstraint =
     checkConstraintList<Type>(
-      genericParams, equivClass->superclassConstraints,
+      genericParams, equivClass->superclassConstraints, RequirementKind::Superclass,
       [&](const ConcreteConstraint &constraint) {
         if (constraint.value->isEqual(resolvedSuperclass))
           return true;
@@ -7692,7 +7721,7 @@ void GenericSignatureBuilder::checkLayoutConstraints(
   if (!equivClass->layout) return;
 
   checkConstraintList<LayoutConstraint>(
-    genericParams, equivClass->layoutConstraints,
+    genericParams, equivClass->layoutConstraints, RequirementKind::Layout,
     [&](const Constraint<LayoutConstraint> &constraint) {
       return constraint.value == equivClass->layout;
     },
@@ -7720,20 +7749,22 @@ bool GenericSignatureBuilder::isRedundantExplicitRequirement(
 }
 
 namespace {
-  /// Retrieve the best requirement source from a set of constraints.
   template<typename T>
-  const RequirementSource *
-  getBestConstraintSource(ArrayRef<Constraint<T>> constraints,
-                          llvm::function_ref<bool(const T&)> matches) {
-    const RequirementSource *bestSource = nullptr;
-    for (const auto &constraint : constraints) {
-      if (!matches(constraint.value)) continue;
+  bool hasNonRedundantRequirementSource(ArrayRef<Constraint<T>> constraints,
+                                        RequirementKind kind,
+                                        GenericSignatureBuilder &builder) {
+    for (auto constraint : constraints) {
+      if (constraint.source->isDerivedRequirement())
+        continue;
 
-      if (!bestSource || constraint.source->compare(bestSource) < 0)
-        bestSource = constraint.source;
+      auto req = ExplicitRequirement::fromExplicitConstraint(kind, constraint);
+      if (builder.isRedundantExplicitRequirement(req))
+        continue;
+
+      return true;
     }
 
-    return bestSource;
+    return false;
   }
 
   using SameTypeComponentRef = std::pair<EquivalenceClass *, unsigned>;
@@ -7855,13 +7886,9 @@ void GenericSignatureBuilder::enumerateRequirements(
     if (equivClass->superclass &&
         !equivClass->recursiveSuperclassType &&
         !equivClass->superclass->hasError()) {
-      auto bestSource =
-        getBestConstraintSource<Type>(equivClass->superclassConstraints,
-           [&](const Type &type) {
-             return type->isEqual(equivClass->superclass);
-          });
-
-      if (!bestSource->isDerivedRequirement()) {
+      if (hasNonRedundantRequirementSource<Type>(
+            equivClass->superclassConstraints,
+            RequirementKind::Superclass, *this)) {
         recordRequirement(RequirementKind::Superclass,
                           subjectType, equivClass->superclass);
       }
@@ -7869,13 +7896,9 @@ void GenericSignatureBuilder::enumerateRequirements(
 
     // If we have a layout constraint, produce a layout requirement.
     if (equivClass->layout) {
-      auto bestSource = getBestConstraintSource<LayoutConstraint>(
-                          equivClass->layoutConstraints,
-                          [&](const LayoutConstraint &layout) {
-                            return layout == equivClass->layout;
-                          });
-
-      if (!bestSource->isDerivedRequirement()) {
+      if (hasNonRedundantRequirementSource<LayoutConstraint>(
+            equivClass->layoutConstraints,
+            RequirementKind::Layout, *this)) {
         recordRequirement(RequirementKind::Layout,
                           subjectType, equivClass->layout);
       }
@@ -7885,14 +7908,10 @@ void GenericSignatureBuilder::enumerateRequirements(
     SmallVector<ProtocolDecl *, 4> protocols;
 
     for (const auto &conforms : equivClass->conformsTo) {
-      auto *bestSource = getBestConstraintSource<ProtocolDecl *>(
-                           conforms.second,
-                           [&](ProtocolDecl *proto) {
-                             return proto == conforms.first;
-                           });
-
-      if (!bestSource->isDerivedRequirement())
+      if (hasNonRedundantRequirementSource<ProtocolDecl *>(
+            conforms.second, RequirementKind::Conformance, *this)) {
         protocols.push_back(conforms.first);
+      }
     }
 
     // Sort the protocols in canonical order.
