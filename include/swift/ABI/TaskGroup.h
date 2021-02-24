@@ -1,4 +1,4 @@
-//===--- Task.h - ABI structures for asynchronous tasks ---------*- C++ -*-===//
+//===--- TaskGroup.h - ABI structures for task groups -00--------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -53,7 +53,7 @@ namespace swift {
         Error = 0b11,
     };
 
-    enum class GroupPollStatus : uintptr_t {
+    enum class PollStatus : uintptr_t {
         /// The channel is known to be empty and we can immediately return nil.
         Empty = 0,
 
@@ -70,7 +70,7 @@ namespace swift {
 
     /// The result of waiting on a Channel (TaskGroup).
     struct PollResult {
-        GroupPollStatus status; // TODO: pack it into storage pointer or not worth it?
+        PollStatus status; // TODO: pack it into storage pointer or not worth it?
 
         /// Storage for the result of the future.
         ///
@@ -91,9 +91,9 @@ namespace swift {
         AsyncTask *retainedTask;
 
         bool isStorageAccessible() {
-          return status == GroupPollStatus::Success ||
-              status == GroupPollStatus::Error ||
-              status == GroupPollStatus::Empty;
+          return status == PollStatus::Success ||
+              status == PollStatus::Error ||
+              status == PollStatus::Empty;
         }
 
         static PollResult get(AsyncTask *asyncTask, bool hadErrorResult,
@@ -101,8 +101,8 @@ namespace swift {
           auto fragment = asyncTask->futureFragment();
           return PollResult{
               /*status*/ hadErrorResult ?
-                  TaskGroup::GroupPollStatus::Error :
-                  TaskGroup::GroupPollStatus::Success,
+                  TaskGroup::PollStatus::Error :
+                  TaskGroup::PollStatus::Success,
               /*storage*/ hadErrorResult ?
                   reinterpret_cast<OpaqueValue *>(fragment->getError()) :
                   fragment->getStoragePtr(),
@@ -380,9 +380,9 @@ namespace swift {
     /// Attempt to dequeue ready tasks and complete the waitingTask.
     ///
     /// If unable to complete the waiting task immediately (with an readily
-    /// available completed task), either returns an `GroupPollStatus::Empty`
+    /// available completed task), either returns an `PollStatus::Empty`
     /// result if it is known that no pending tasks in the group,
-    /// or a `GroupPollStatus::MustWait` result if there are tasks in flight
+    /// or a `PollStatus::MustWait` result if there are tasks in flight
     /// and the waitingTask eventually be woken up by a completion.
     TaskGroup::PollResult poll(AsyncTask *waitingTask);
 

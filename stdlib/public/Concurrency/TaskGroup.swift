@@ -219,29 +219,30 @@ extension Task {
         """)
       #endif
 
-      let rawResult = await _taskGroupWaitNext(waitingTask: _task, group: _group)
-
-      // FIXME: we are now in the parent task again, and can safely modify the
-      //        records again; we should remove this specific child from the
-      //        group->record
-
-      if rawResult.hadErrorResult {
-        // Throw the result on error.
-        let error = unsafeBitCast(rawResult.storage, to: Error.self)
-        throw error
-      }
-
-      guard let storage = rawResult.storage else {
-        // The group was empty, return nil
-        return nil
-      }
-
-      // Take the value on success.
-      let storagePtr =
-        storage.bindMemory(to: TaskResult.self, capacity: 1)
-      let value = UnsafeMutablePointer<TaskResult>(mutating: storagePtr).pointee
-
-      return value
+      return try await _taskGroupWaitNext(waitingTask: _task, group: _group)
+//      let rawResult = await _taskGroupWaitNext(waitingTask: _task, group: _group)
+//
+//      // FIXME: we are now in the parent task again, and can safely modify the
+//      //        records again; we should remove this specific child from the
+//      //        group->record
+//
+//      if rawResult.hadErrorResult {
+//        // Throw the result on error.
+//        let error = unsafeBitCast(rawResult.storage, to: Error.self)
+//        throw error
+//      }
+//
+//      guard let storage = rawResult.storage else {
+//        // The group was empty, return nil
+//        return nil
+//      }
+//
+//      // Take the value on success.
+//      let storagePtr =
+//        storage.bindMemory(to: TaskResult.self, capacity: 1)
+//      let value = UnsafeMutablePointer<TaskResult>(mutating: storagePtr).pointee
+//
+//      return value
     }
 
     /// Query whether the group has any remaining tasks.
@@ -363,13 +364,6 @@ func _taskGroupCreate(
   task: Builtin.NativeObject
 ) -> Builtin.NativeObject
 
-///// Attach the group to the task.
-//@_silgen_name("swift_task_group_attach")
-//func _taskGroupAttach(
-//  group: Builtin.NativeObject,
-//  to task: Builtin.NativeObject
-//) -> UnsafeRawPointer /*TaskGroupTaskStatusRecord*/
-
 /// Attach task group child to the group group to the task.
 @_silgen_name("swift_task_group_attachChild")
 func _taskGroupAttachChild(
@@ -377,16 +371,6 @@ func _taskGroupAttachChild(
   parent: Builtin.NativeObject,
   child: Builtin.NativeObject
 ) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
-
-///// Detach the group to the task.
-/////
-///// - Parameters:
-/////   - record: the TaskGroupTaskStatusRecord returned by _taskGroupAttach
-//@_silgen_name("swift_task_group_detach")
-//func _taskGroupDetach(
-//  record: UnsafeRawPointer,
-//  from task: Builtin.NativeObject
-//)
 
 @_silgen_name("swift_task_group_destroy")
 func _taskGroupDestroy(
@@ -413,13 +397,13 @@ func _taskGroupIsCancelled(
   group: Builtin.NativeObject
 ) -> Bool
 
-@_silgen_name("swift_task_group_wait_next")
+@_silgen_name("swift_task_group_wait_next_throwing")
 func _taskGroupWaitNext<T>(
   waitingTask: Builtin.NativeObject,
   group: Builtin.NativeObject
-) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+) async throws -> T?
 
-enum GroupPollStatus: Int {
+enum PollStatus: Int {
   case empty   = 0
   case waiting = 1
   case success = 2

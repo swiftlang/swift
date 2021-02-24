@@ -161,19 +161,25 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitThrowingSignature::FunctionType
 swift_task_future_wait_throwing;
 
+//using TaskFutureWaitSignature =
+//  AsyncSignature<void(AsyncTask *, OpaqueValue *), /*throws*/ false>;
+
+using TaskGroupFutureWaitSignature =
+  AsyncSignature<void(AsyncTask *, TaskGroup *, OpaqueValue *), /*throws*/ true>; // TODO: is this correct?
+
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_wait_next(
+/// func swift_task_group_wait_next_throwing(
 ///     waitingTask: Builtin.NativeObject, // current task
 ///     group: Builtin.NativeObject,
-/// ) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer?)
+/// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-TaskFutureWaitSignature::FunctionType
-swift_task_group_wait_next;
+TaskGroupFutureWaitSignature::FunctionType
+swift_task_group_wait_next_throwing;
 
 /// Create a new `TaskGroup` using the task's allocator.
 /// The caller is responsible for retaining and managing the group's lifecycle.

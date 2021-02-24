@@ -93,7 +93,7 @@ void TaskGroup::destroy(AsyncTask *task) {
   bool taskDequeued = readyQueue.dequeue(item);
   while (taskDequeued) {
     swift_release(item.getTask());
-    bool taskDequeued = readyQueue.dequeue(item);
+    taskDequeued = readyQueue.dequeue(item);
   }
   mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
 
@@ -105,17 +105,18 @@ void TaskGroup::destroy(AsyncTask *task) {
 // ==== offer ------------------------------------------------------------------
 
 static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
-                     AsyncTask::GroupFragment::GroupPollResult result) {
+                                TaskGroup::PollResult result) {
+  /// Fill in the result value
   switch (result.status) {
-  case GroupFragment::GroupPollStatus::Waiting:
+  case TaskGroup::PollStatus::MustWait:
     assert(false && "filling a waiting status?");
     return;
 
-  case GroupFragment::GroupPollStatus::Error:
+  case TaskGroup::PollStatus::Error:
     context->fillWithError(reinterpret_cast<SwiftError*>(result.storage));
     return;
 
-  case GroupFragment::GroupPollStatus::Success: {
+  case TaskGroup::PollStatus::Success: {
     // Initialize the result as an Optional<Success>.
     const Metadata *successType = context->successType;
     OpaqueValue *destPtr = context->successResultPointer;
@@ -127,7 +128,7 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
     return;
   }
 
-  case GroupFragment::GroupPollStatus::Empty: {
+  case TaskGroup::PollStatus::Empty: {
     // Initialize the result as a nil Optional<Success>.
     const Metadata *successType = context->successType;
     OpaqueValue *destPtr = context->successResultPointer;
@@ -182,7 +183,14 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
             completedTask, hadErrorResult, /*needsRelease*/ false);
 
         mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
-        swift::runTaskWithPollResult(waitingTask, completingExecutor, result);
+        // swift::runTaskWithPollResult(waitingTask, completingExecutor, result);
+        auto waitingContext =
+          static_cast<TaskFutureWaitAsyncContext *>(
+            waitingTask->ResumeContext);
+        fillGroupNextResult(waitingContext, result);
+
+        // TODO: allow the caller to suggest an executor
+        swift_task_enqueueGlobal(waitingTask);
         return;
       } // else, try again
 
@@ -216,31 +224,33 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
 
 SWIFT_CC(swiftasync)
-void swift::swift_task_group_wait_next(
+void swift::swift_task_group_wait_next_throwing(
     AsyncTask *waitingTask,
     ExecutorRef executor,
     SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
-  auto context = static_cast<TaskGroupNextWaitAsyncContext *>(rawContext);
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
   auto group = context->group;
-  TaskGroup::PollResult polled = group->poll(waitingTask);
+fprintf(stderr, "[%s:%d](%s) group: %d\n", __FILE_NAME__, __LINE__, __FUNCTION__, group);
 
-  if (polled.status == TaskGroup::GroupPollStatus::MustWait) {
+assert(group && "swift_task_group_wait_next_throwing was passed context without group!");
+
+  TaskGroup::PollResult polled = group->poll(waitingTask);
+  switch (polled.status) {
+  case TaskGroup::PollStatus::MustWait:
     // The waiting task has been queued on the channel,
     // there were pending tasks so it will be woken up eventually.
     return;
 
-  case GroupFragment::GroupPollStatus::Empty:
-  case GroupFragment::GroupPollStatus::Error:
-  case GroupFragment::GroupPollStatus::Success:
+  case TaskGroup::PollStatus::Empty:
+  case TaskGroup::PollStatus::Error:
+  case TaskGroup::PollStatus::Success:
     fillGroupNextResult(context, polled);
     return waitingTask->runInFullyEstablishedContext(executor);
   }
-
-  runTaskWithPollResult(waitingTask, executor, polled);
 }
 
 TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
@@ -257,7 +267,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
     // was issued, and if we parked here we'd potentially never be woken up.
     // Bail out and return `nil` from `group.next()`.
     statusRemoveWaiting();
-    result.status = TaskGroup::GroupPollStatus::Empty;
+    result.status = TaskGroup::PollStatus::Empty;
     mutex.unlock(); // TODO: remove group lock, and use status for synchronization
     return result;
   }
@@ -277,7 +287,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
       ReadyQueueItem item;
       bool taskDequeued = readyQueue.dequeue(item);
       if (!taskDequeued) {
-        result.status = TaskGroup::GroupPollStatus::MustWait;
+        result.status = TaskGroup::PollStatus::MustWait;
         result.storage = nullptr;
         result.retainedTask = nullptr;
         mutex.unlock(); // TODO: remove group lock, and use status for synchronization
@@ -294,7 +304,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
       switch (item.getStatus()) {
         case ReadyStatus::Success:
           // Immediately return the polled value
-          result.status = TaskGroup::GroupPollStatus::Success;
+          result.status = TaskGroup::PollStatus::Success;
           result.storage = futureFragment->getStoragePtr();
           assert(result.retainedTask && "polled a task, it must be not null");
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -302,7 +312,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
 
         case ReadyStatus::Error:
           // Immediately return the polled value
-          result.status = TaskGroup::GroupPollStatus::Error;
+          result.status = TaskGroup::PollStatus::Error;
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
           assert(result.retainedTask && "polled a task, it must be not null");
@@ -310,7 +320,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
           return result;
 
         case ReadyStatus::Empty:
-          result.status = TaskGroup::GroupPollStatus::Empty;
+          result.status = TaskGroup::PollStatus::Empty;
           result.storage = nullptr;
           result.retainedTask = nullptr;
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
@@ -330,7 +340,7 @@ TaskGroup::PollResult TaskGroup::poll(AsyncTask *waitingTask) {
         /*failure*/ std::memory_order_acquire)) {
       mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
       // no ready tasks, so we must wait.
-      result.status = TaskGroup::GroupPollStatus::MustWait;
+      result.status = TaskGroup::PollStatus::MustWait;
       return result;
     } // else, try again
   }

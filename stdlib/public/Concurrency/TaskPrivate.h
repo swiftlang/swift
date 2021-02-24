@@ -82,6 +82,7 @@ public:
   AsyncTask *task;
 
   // Only in swift_task_group_next
+  TaskGroup *group;
   const Metadata *successType;
 
   using AsyncContext::AsyncContext;

@@ -33,7 +33,6 @@ func test_sum_nextOnCompleted() async {
     var sum = 0
     do {
       while let r = try await group.next() {
-        fputs("error: \(#function)[\(#file):\(#line)]: next: \(r)\n", stderr)
         print("next: \(r)")
         sum += r
         print("sum: \(sum)")
@@ -44,7 +43,6 @@ func test_sum_nextOnCompleted() async {
 
     assert(group.isEmpty, "Group must be empty after we consumed all tasks")
 
-    fputs("error: \(#function)[\(#file):\(#line)]: group returning: \(sum)", stderr)
     print("task group returning: \(sum)")
     return sum
   }

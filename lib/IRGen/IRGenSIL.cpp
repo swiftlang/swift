@@ -2290,7 +2290,7 @@ static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
       return SpecialKind::TaskFutureWait;
     if (name.equals("swift_task_future_wait_throwing"))
       return SpecialKind::TaskFutureWaitThrowing;
-    if (name.equals("swift_task_group_wait_next"))
+    if (name.equals("swift_task_group_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
   }
 
