@@ -4245,7 +4245,9 @@ object. Returns 1 if the strong reference count is 1, and 0 if the
 strong reference count is greater than 1.
 
 A discussion of the semantics can be found here:
-:ref:`arcopts.is_unique`.
+`is_unique instruction <arcopts_is_unique_>`_
+
+.. _arcopts_is_unique: https://github.com/apple/swift/blob/main/docs/ARCOptimization.md#is_unique-instruction
 
 begin_cow_mutation
 ``````````````````
