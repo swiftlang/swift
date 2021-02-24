@@ -515,7 +515,7 @@ extension Struct where T: Differentiable, T == T.TangentVector {
 
   // Test instance transpose for static original initializer.
   @transpose(of: init, wrt: 0)
-  // expected-error @+2 {{function must match usege of static declaration modifier from original function 'vjpInitStaticMismatch'}}
+  // expected-error @+2 {{function must match usege of static declaration modifier from original function 'init'}}
   // expected-note @+1 {{mark the function 'vjpInitStaticMismatch' as static}}{{3-3=static }}
   func vjpInitStaticMismatch(_ x: Self) -> Float {
     fatalError()

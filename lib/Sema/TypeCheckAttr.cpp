@@ -4601,7 +4601,7 @@ static void diagnoseStaticDeclMismatch(AbstractFunctionDecl *originalCandidate,
   auto &diags = originalCandidate->getASTContext().Diags;
   diags.diagnose(registred->getNameLoc(),
                   diag::autodiff_attr_static_decl_mismatch,
-                  registred->getName());
+                  originalCandidate->getName());
   if (registred->isStatic()) {
     diags
         .diagnose(registred->getStartLoc(),
