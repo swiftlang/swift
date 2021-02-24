@@ -6903,14 +6903,14 @@ void GenericSignatureBuilder::checkLayoutConstraints(
 namespace {
   /// Retrieve the best requirement source from a set of constraints.
   template<typename T>
-  Optional<const RequirementSource *>
+  const RequirementSource *
   getBestConstraintSource(ArrayRef<Constraint<T>> constraints,
                           llvm::function_ref<bool(const T&)> matches) {
-    Optional<const RequirementSource *> bestSource;
+    const RequirementSource *bestSource = nullptr;
     for (const auto &constraint : constraints) {
       if (!matches(constraint.value)) continue;
 
-      if (!bestSource || constraint.source->compare(*bestSource) < 0)
+      if (!bestSource || constraint.source->compare(bestSource) < 0)
         bestSource = constraint.source;
     }
 
@@ -6999,18 +6999,17 @@ void GenericSignatureBuilder::enumerateRequirements(
       continue;
 
     // If we have a superclass, produce a superclass requirement
-    if (equivClass->superclass && !equivClass->recursiveSuperclassType) {
+    if (equivClass->superclass &&
+        !equivClass->recursiveSuperclassType &&
+        !equivClass->superclass->hasError()) {
       auto bestSource =
         getBestConstraintSource<Type>(equivClass->superclassConstraints,
            [&](const Type &type) {
              return type->isEqual(equivClass->superclass);
           });
 
-      if (!bestSource)
-        bestSource = RequirementSource::forAbstract(*this, subjectType);
-
       f(RequirementKind::Superclass, subjectType, equivClass->superclass,
-        *bestSource);
+        bestSource);
     }
 
     // If we have a layout constraint, produce a layout requirement.
@@ -7020,10 +7019,9 @@ void GenericSignatureBuilder::enumerateRequirements(
                           [&](const LayoutConstraint &layout) {
                             return layout == equivClass->layout;
                           });
-      if (!bestSource)
-        bestSource = RequirementSource::forAbstract(*this, subjectType);
 
-      f(RequirementKind::Layout, subjectType, equivClass->layout, *bestSource);
+      f(RequirementKind::Layout, subjectType, equivClass->layout,
+        bestSource);
     }
 
     // Enumerate conformance requirements.
@@ -7037,7 +7035,7 @@ void GenericSignatureBuilder::enumerateRequirements(
 
       protocolSources.insert(
         {conforms.first,
-         *getBestConstraintSource<ProtocolDecl *>(conforms.second,
+         getBestConstraintSource<ProtocolDecl *>(conforms.second,
            [&](ProtocolDecl *proto) {
              return proto == conforms.first;
            })});
