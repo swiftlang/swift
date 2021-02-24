@@ -147,11 +147,7 @@ static void computeExportContextBits(ASTContext &Ctx, Decl *D,
   if (D->isSPI())
     *spi = true;
 
-  // Defer bodies are desugared to an implicit closure expression. We need to
-  // dilute the meaning of "implicit" to make sure we're still checking
-  // availability inside of defer statements.
-  const auto isDeferBody = isa<FuncDecl>(D) && cast<FuncDecl>(D)->isDeferBody();
-  if (D->isImplicit() && !isDeferBody)
+  if (D->isImplicit())
     *implicit = true;
 
   if (D->getAttrs().getDeprecated(Ctx))
@@ -3282,7 +3278,7 @@ public:
 bool swift::diagnoseTypeReprAvailability(const TypeRepr *T,
                                          const ExportContext &where,
                                          DeclAvailabilityFlags flags) {
-  if (!T)
+  if (!T || where.isImplicit())
     return false;
   TypeReprAvailabilityWalker walker(where, flags);
   const_cast<TypeRepr*>(T)->walk(walker);
