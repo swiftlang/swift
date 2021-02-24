@@ -71,9 +71,9 @@ func large2small(_ foo: Large) -> Float {
 LBATests.test("Correctness") {
   let one = Large.TangentVector(a: 1, b: 1, c: 1, d: 1)
   expectEqual(one,
-              pullback(at: Large(a: 0, b: 0, c: 0, d: 0, e: 0), in: large2large)(one))
+              pullback(at: Large(a: 0, b: 0, c: 0, d: 0, e: 0), of: large2large)(one))
   expectEqual(Large.TangentVector(a: 1, b: 0, c: 0, d: 0),
-              gradient(at: Large(a: 0, b: 0, c: 0, d: 0, e: 0), in: large2small))
+              gradient(at: Large(a: 0, b: 0, c: 0, d: 0, e: 0), of: large2small))
 }
 
 runAllTests()

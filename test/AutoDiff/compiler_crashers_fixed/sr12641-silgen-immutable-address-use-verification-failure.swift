@@ -19,7 +19,7 @@ public func f(_ c: Class) -> Resilient {
   return Resilient(x: 0)
 }
 
-_ = pullback(at: Class(Resilient(x: 10)), in: f)
+_ = pullback(at: Class(Resilient(x: 10)), of: f)
 
 // swift/lib/SIL/Verifier/SILVerifier.cpp:456: bool (anonymous namespace)::ImmutableAddressUseVerifier::isConsumingOrMutatingArgumentConvention(swift::SILArgumentConvention): Assertion `conv.isIndirectConvention() && "Expect an indirect convention"' failed.
 // Stack dump:

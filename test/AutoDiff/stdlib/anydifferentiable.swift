@@ -15,9 +15,9 @@ struct Generic<T: Differentiable & Equatable>: Differentiable, Equatable {
 
 extension AnyDerivative {
   // This exists only to faciliate testing.
-  func moved(along direction: TangentVector) -> Self {
+  func moved(along offset: TangentVector) -> Self {
     var result = self
-    result.move(along: direction)
+    result.move(by: offset)
     return result
   }
 }
@@ -26,14 +26,14 @@ TypeErasureTests.test("AnyDifferentiable operations") {
   do {
     var any = AnyDifferentiable(Vector(x: 1, y: 1))
     let tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
-    any.move(along: tan)
+    any.move(by: tan)
     expectEqual(Vector(x: 2, y: 2), any.base as? Vector)
   }
 
   do {
     var any = AnyDifferentiable(Generic<Float>(x: 1))
     let tan = AnyDerivative(Generic<Float>.TangentVector(x: 1))
-    any.move(along: tan)
+    any.move(by: tan)
     expectEqual(Generic<Float>(x: 2), any.base as? Generic<Float>)
   }
 }
@@ -112,7 +112,7 @@ TypeErasureTests.test("AnyDifferentiable differentiation") {
   do {
     let x: Float = 3
     let v = AnyDerivative(Float(2))
-    let 𝛁x = pullback(at: x, in: { AnyDifferentiable($0) })(v)
+    let 𝛁x = pullback(at: x, of: { AnyDifferentiable($0) })(v)
     let expectedVJP: Float = 2
     expectEqual(expectedVJP, 𝛁x)
   }
@@ -120,7 +120,7 @@ TypeErasureTests.test("AnyDifferentiable differentiation") {
   do {
     let x = Vector(x: 4, y: 5)
     let v = AnyDerivative(Vector.TangentVector(x: 2, y: 2))
-    let 𝛁x = pullback(at: x, in: { AnyDifferentiable($0) })(v)
+    let 𝛁x = pullback(at: x, of: { AnyDifferentiable($0) })(v)
     let expectedVJP = Vector.TangentVector(x: 2, y: 2)
     expectEqual(expectedVJP, 𝛁x)
   }
@@ -128,7 +128,7 @@ TypeErasureTests.test("AnyDifferentiable differentiation") {
   do {
     let x = Generic<Double>(x: 4)
     let v = AnyDerivative(Generic<Double>.TangentVector(x: 2))
-    let 𝛁x = pullback(at: x, in: { AnyDifferentiable($0) })(v)
+    let 𝛁x = pullback(at: x, of: { AnyDifferentiable($0) })(v)
     let expectedVJP = Generic<Double>.TangentVector(x: 2)
     expectEqual(expectedVJP, 𝛁x)
   }
@@ -147,7 +147,7 @@ TypeErasureTests.test("AnyDerivative differentiation") {
     let v = AnyDerivative(Float(1))
     let expectedVJP: Float = 3
 
-    let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
+    let (𝛁x, 𝛁y) = pullback(at: x, y, of: tripleSum)(v)
     expectEqual(expectedVJP, 𝛁x.base as? Float)
     expectEqual(expectedVJP, 𝛁y.base as? Float)
   }
@@ -158,7 +158,7 @@ TypeErasureTests.test("AnyDerivative differentiation") {
     let v = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
     let expectedVJP = Vector.TangentVector(x: 3, y: 3)
 
-    let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
+    let (𝛁x, 𝛁y) = pullback(at: x, y, of: tripleSum)(v)
     expectEqual(expectedVJP, 𝛁x.base as? Vector.TangentVector)
     expectEqual(expectedVJP, 𝛁y.base as? Vector.TangentVector)
   }
@@ -169,7 +169,7 @@ TypeErasureTests.test("AnyDerivative differentiation") {
     let v = AnyDerivative(Generic<Double>.TangentVector(x: 1))
     let expectedVJP = Generic<Double>.TangentVector(x: 3)
 
-    let (𝛁x, 𝛁y) = pullback(at: x, y, in: tripleSum)(v)
+    let (𝛁x, 𝛁y) = pullback(at: x, y, of: tripleSum)(v)
     expectEqual(expectedVJP, 𝛁x.base as? Generic<Double>.TangentVector)
     expectEqual(expectedVJP, 𝛁y.base as? Generic<Double>.TangentVector)
   }
@@ -184,7 +184,7 @@ TypeErasureTests.test("AnyDerivative differentiation") {
   do {
     let x: Float = 3
     let v = AnyDerivative(Float(1))
-    let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
+    let 𝛁x = pullback(at: x, of: { x in typeErased(x) })(v)
     let expectedVJP: Float = 2
     expectEqual(expectedVJP, 𝛁x)
   }
@@ -192,7 +192,7 @@ TypeErasureTests.test("AnyDerivative differentiation") {
   do {
     let x = Vector.TangentVector(x: 4, y: 5)
     let v = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
-    let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
+    let 𝛁x = pullback(at: x, of: { x in typeErased(x) })(v)
     let expectedVJP = Vector.TangentVector(x: 2, y: 2)
     expectEqual(expectedVJP, 𝛁x)
   }
@@ -200,7 +200,7 @@ TypeErasureTests.test("AnyDerivative differentiation") {
   do {
     let x = Generic<Double>.TangentVector(x: 4)
     let v = AnyDerivative(Generic<Double>.TangentVector(x: 1))
-    let 𝛁x = pullback(at: x, in: { x in typeErased(x) })(v)
+    let 𝛁x = pullback(at: x, of: { x in typeErased(x) })(v)
     let expectedVJP = Generic<Double>.TangentVector(x: 2)
     expectEqual(expectedVJP, 𝛁x)
   }
