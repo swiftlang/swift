@@ -668,7 +668,7 @@ public:
 class ApplyClassifier {
   /// The key to this cache is the function decl or closure being analyzed.  The
   /// value in this cache is nil when the body has an error detected in it.
-  llvm::DenseMap<void*, Optional<ThrowingKind>> Cache;
+  llvm::DenseMap<AnyFunctionRef, Optional<ThrowingKind>> Cache;
 
 public:
   DeclContext *RethrowsDC = nullptr;
@@ -953,7 +953,7 @@ private:
   };
 
   Optional<ThrowingKind>
-  classifyThrowingFunctionBodyImpl(void *key, BraceStmt *body,
+  classifyThrowingFunctionBodyImpl(AnyFunctionRef key, BraceStmt *body,
                                    bool allowNone) {
     // Look for the key in the cache.
     auto existingIter = Cache.find(key);
