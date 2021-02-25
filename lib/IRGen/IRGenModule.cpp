@@ -549,7 +549,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftCC = llvm::CallingConv::Swift;
 
   bool isAsynCCSupported =
-      clangASTContext.getTargetInfo().isSwiftAsyncCCSupported();
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
+    == clang::TargetInfo::CCCR_OK;
   SwiftAsyncCC = (opts.UseAsyncLowering && isAsynCCSupported)
                      ? llvm::CallingConv::SwiftTail
                      : SwiftCC;
