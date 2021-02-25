@@ -1420,6 +1420,13 @@ public:
     }
   }
 
+  void printForwardingOwnershipKind(OwnershipForwardingMixin *inst,
+                                    SILValue op) {
+    if (inst->getForwardingOwnershipKind() != op.getOwnershipKind()) {
+      *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
+    }
+  }
+
   void visitStoreInst(StoreInst *SI) {
     *this << Ctx.getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
@@ -1465,8 +1472,8 @@ public:
       *this << "[delegatingselfallocated] ";
       break;
     }
-
     *this << getIDAndType(MU->getOperand());
+    printForwardingOwnershipKind(MU, MU->getOperand());
   }
 
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
@@ -1516,6 +1523,7 @@ public:
   
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
+    printForwardingOwnershipKind(CI, CI->getOperand());
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
@@ -1564,6 +1572,9 @@ public:
 
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {
     *this << getIDAndType(operand) << " to " << CI->getType();
+    if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(CI)) {
+      printForwardingOwnershipKind(ofci, ofci->getOperand(0));
+    }
   }
 
   void visitUncheckedOwnershipConversionInst(
@@ -1578,6 +1589,7 @@ public:
     if (CI->withoutActuallyEscaping())
       *this << "[without_actually_escaping] ";
     *this << CI->getType();
+    printForwardingOwnershipKind(CI, CI->getOperand());
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
@@ -1661,10 +1673,12 @@ public:
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *I) {
     *this << getIDAndType(I->getConverted()) << ", "
           << getIDAndType(I->getBitsOperand());
+    printForwardingOwnershipKind(I, I->getConverted());
   }
   
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *I) {
     printUncheckedConversionInst(I, I->getOperand());
+    printForwardingOwnershipKind(I, I->getOperand());
   }
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *I) {
     printUncheckedConversionInst(I, I->getOperand());
@@ -1748,6 +1762,7 @@ public:
           << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);
     if (UI->hasOperand()) {
       *this << ", " << getIDAndType(UI->getOperand());
+      printForwardingOwnershipKind(UI, UI->getOperand());
     }
   }
 
@@ -1759,6 +1774,7 @@ public:
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *UDAI) {
     *this << getIDAndType(UDAI->getOperand()) << ", "
           << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+    printForwardingOwnershipKind(UDAI, UDAI->getOperand());
   }
   
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UDAI) {
@@ -1773,6 +1789,7 @@ public:
   
   void visitTupleExtractInst(TupleExtractInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldIndex();
+    printForwardingOwnershipKind(EI, EI->getOperand());
   }
 
   void visitTupleElementAddrInst(TupleElementAddrInst *EI) {
@@ -1782,6 +1799,7 @@ public:
     *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
+    printForwardingOwnershipKind(EI, EI->getOperand());
   }
   void visitStructElementAddrInst(StructElementAddrInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", #";
@@ -1802,10 +1820,12 @@ public:
 
   void visitDestructureStructInst(DestructureStructInst *DSI) {
     *this << getIDAndType(DSI->getOperand());
+    printForwardingOwnershipKind(DSI, DSI->getOperand());
   }
 
   void visitDestructureTupleInst(DestructureTupleInst *DTI) {
     *this << getIDAndType(DTI->getOperand());
+    printForwardingOwnershipKind(DTI, DTI->getOperand());
   }
 
   void printMethodInst(MethodInst *I, SILValue Operand) {
@@ -1859,6 +1879,7 @@ public:
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
   }
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
@@ -1868,9 +1889,11 @@ public:
   }
   void visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
   }
   void visitOpenExistentialValueInst(OpenExistentialValueInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
@@ -1886,6 +1909,7 @@ public:
     *this << getIDAndType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
     printConformances(AEI->getConformances());
+    printForwardingOwnershipKind(AEI, AEI->getOperand());
   }
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *EMI) {
     *this << getIDAndType(EMI->getOperand()) << ", " << EMI->getType();
@@ -1939,6 +1963,7 @@ public:
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
+    printForwardingOwnershipKind(MDI, MDI->getValue());
   }
   void visitCopyBlockInst(CopyBlockInst *RI) {
     *this << getIDAndType(RI->getOperand());
@@ -2133,6 +2158,7 @@ public:
 
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
     printSwitchEnumInst(SOI);
+    printForwardingOwnershipKind(SOI, SOI->getOperand());
   }
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
     printSwitchEnumInst(SOI);
@@ -2156,6 +2182,7 @@ public:
 
   void visitSelectEnumInst(SelectEnumInst *SEI) {
     printSelectEnumInst(SEI);
+    printForwardingOwnershipKind(SEI, SEI->getOperand());
   }
   void visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
     printSelectEnumInst(SEI);
@@ -2174,6 +2201,7 @@ public:
       *this << ", default " << Ctx.getID(SVI->getDefaultResult());
 
     *this << " : " << SVI->getType();
+    printForwardingOwnershipKind(SVI, SVI->getOperand());
   }
   
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -2411,6 +2439,7 @@ public:
       *this << " as ";
       *this << dfei->getType();
     }
+    printForwardingOwnershipKind(dfei, dfei->getOperand());
   }
 
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
@@ -2425,6 +2454,7 @@ public:
     }
     *this << "] ";
     *this << getIDAndType(lfei->getOperand());
+    printForwardingOwnershipKind(lfei, lfei->getOperand());
   }
 
   void visitDifferentiabilityWitnessFunctionInst(
