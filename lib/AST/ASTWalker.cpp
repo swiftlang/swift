@@ -514,6 +514,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E) {
+    if (auto *newValue = doIt(E->getValue())) {
+      E->setValue(newValue);
+    } else {
+      return nullptr;
+    }
+
+    return E;
+  }
+
   Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
 
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {

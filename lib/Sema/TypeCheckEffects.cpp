@@ -1164,6 +1164,9 @@ public:
     /// A default argument expression.
     DefaultArgument,
 
+    /// A property wrapper initialization expression.
+    PropertyWrapper,
+
     /// The initializer for an instance variable.
     IVarInitializer,
 
@@ -1289,6 +1292,10 @@ public:
   static Context forInitializer(Initializer *init) {
     if (isa<DefaultArgumentInitializer>(init)) {
       return Context(Kind::DefaultArgument);
+    }
+
+    if (isa<PropertyWrapperInitializer>(init)) {
+      return Context(Kind::PropertyWrapper);
     }
 
     auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
@@ -1539,6 +1546,7 @@ public:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
     case Kind::DefaultArgument:
+    case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
@@ -1563,6 +1571,7 @@ public:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
     case Kind::DefaultArgument:
+    case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
@@ -1680,6 +1689,7 @@ public:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
     case Kind::DefaultArgument:
+    case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:

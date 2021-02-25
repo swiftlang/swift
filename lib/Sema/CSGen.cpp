@@ -2614,6 +2614,10 @@ namespace {
       return CS.getType(expr);
     }
 
+    Type visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *expr) {
+      return expr->getType();
+    }
+
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
       return expr->getType();
     }

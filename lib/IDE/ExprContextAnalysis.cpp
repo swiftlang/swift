@@ -1097,6 +1097,15 @@ class ExprContextAnalyzer {
       recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
       break;
     }
+    case InitializerKind::PropertyWrapper: {
+      auto initDC = cast<PropertyWrapperInitializer>(DC);
+      auto AFD = dyn_cast<AbstractFunctionDecl>(initDC->getParent());
+      if (!AFD)
+        return;
+      auto *param = initDC->getParam();
+      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      break;
+    }
     }
   }
 

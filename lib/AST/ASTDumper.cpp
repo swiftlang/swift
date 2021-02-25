@@ -1385,6 +1385,9 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
     case InitializerKind::DefaultArgument:
       os << "default argument initializer";
       break;
+    case InitializerKind::PropertyWrapper:
+      os << "property wrapper initializer";
+      break;
     }
     break;
 
@@ -2582,6 +2585,12 @@ public:
       OS << '\n';
       printRec(value);
     }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E) {
+    printCommon(E, "applied_property_wrapper_expr");
+    printRec(E->getValue());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

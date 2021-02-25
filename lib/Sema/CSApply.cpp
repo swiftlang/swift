@@ -3573,6 +3573,10 @@ namespace {
       return expr;
     }
 
+    Expr *visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
     Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
