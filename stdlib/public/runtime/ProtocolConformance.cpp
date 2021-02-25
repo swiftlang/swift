@@ -48,6 +48,12 @@
 #define SHARED_CACHE_LOG(fmt, ...) (void)0
 #endif
 
+// Enable dyld shared cache acceleration only when it's available and we have
+// ObjC interop.
+#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED && SWIFT_OBJC_INTEROP
+#define USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES 1
+#endif
+
 using namespace swift;
 
 #ifndef NDEBUG
@@ -272,7 +278,7 @@ struct ConformanceState {
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
   bool scanSectionsBackwards;
 
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   uintptr_t dyldSharedCacheStart;
   uintptr_t dyldSharedCacheEnd;
   bool hasOverriddenImage;
@@ -291,7 +297,7 @@ struct ConformanceState {
     scanSectionsBackwards =
         runtime::bincompat::workaroundProtocolConformanceReverseIteration();
 
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
     if (_dyld_swift_optimizations_version() ==
         DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION) {
       size_t length;
@@ -390,7 +396,7 @@ void swift::addImageProtocolConformanceBlockCallbackUnsafe(
   // Conformance cache should always be sufficiently initialized by this point.
   auto &C = Conformances.unsafeGetAlreadyInitialized();
 
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   // If any image in the shared cache is overridden, we need to scan all
   // conformance sections in the shared cache. The pre-built table does NOT work
   // if the protocol, type, or descriptor are in overridden images. Example:
@@ -563,7 +569,7 @@ static void validateSharedCacheResults(
     const ProtocolDescriptor *protocol,
     const WitnessTable *dyldCachedWitnessTable,
     const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor) {
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   if (!C.validateSharedCacheResults)
     return;
 
@@ -625,7 +631,7 @@ static std::tuple<const WitnessTable *, const ProtocolConformanceDescriptor *,
                   bool>
 findSharedCacheConformance(ConformanceState &C, const Metadata *type,
                            const ProtocolDescriptor *protocol) {
-#if DYLD_FIND_PROTOCOL_CONFORMANCE_DEFINED
+#if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
   const ContextDescriptor *description;
   llvm::StringRef foreignTypeIdentity;
   std::tie(description, foreignTypeIdentity) = getContextDescriptor(type);
