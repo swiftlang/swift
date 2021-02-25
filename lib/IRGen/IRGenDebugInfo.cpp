@@ -2413,20 +2413,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
                      DBuilder.createExpression(), Line, Loc.column, Scope, DS);
 }
 
-static bool pointsIntoAlloca(llvm::Value *Storage) {
-  while (Storage) {
-    if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
-      Storage = LdInst->getOperand(0);
-    else if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Storage))
-      Storage = GEPInst->getOperand(0);
-    else if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Storage))
-      Storage = BCInst->getOperand(0);
-    else
-      return isa<llvm::AllocaInst>(Storage);
-  }
-  return false;
-}
-
 void IRGenDebugInfoImpl::emitDbgIntrinsic(
     IRBuilder &Builder, llvm::Value *Storage, llvm::DILocalVariable *Var,
     llvm::DIExpression *Expr, unsigned Line, unsigned Col,
@@ -2468,11 +2454,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     else
       DBuilder.insertDeclare(Storage, Var, Expr, DL, &EntryBlock);
   } else {
-    if (pointsIntoAlloca(Storage))
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-    else
-      // Insert a dbg.value at the current insertion point.
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
+    // Insert a dbg.value at the current insertion point.
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
   }
 }
 
