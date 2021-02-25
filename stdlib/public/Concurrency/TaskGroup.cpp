@@ -21,7 +21,6 @@
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
 #include "TaskPrivate.h"
-#include "TaskPrivate.h"
 #include "AsyncCall.h"
 #include "Debug.h"
 
@@ -32,7 +31,6 @@
 #endif
 
 using namespace swift;
-using TaskGroup = swift::TaskGroup;
 using FutureFragment = AsyncTask::FutureFragment;
 
 using ReadyQueueItem = TaskGroup::ReadyQueueItem;
@@ -394,3 +392,4 @@ bool TaskGroup::cancelAll(AsyncTask *task) {
 bool swift::swift_task_group_add_pending(TaskGroup *group) {
   return !group->statusAddPendingTaskRelaxed().isCancelled();
 }
+

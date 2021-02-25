@@ -19,7 +19,6 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
-#include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Error.h"

@@ -17,10 +17,9 @@
 #ifndef SWIFT_ABI_TASK_H
 #define SWIFT_ABI_TASK_H
 
-#include "swift/Basic/RelativePointer.h"
+#include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
-#include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
@@ -158,7 +157,6 @@ public:
 /// * The future fragment is dynamic in size, based on the future result type
 ///   it can hold, and thus must be the *last* fragment.
 class AsyncTask : public HeapObject, public Job {
-  friend TaskGroup;
 public:
   /// The context for resuming the job.  When a task is scheduled
   /// as a job, the next continuation should be installed as the

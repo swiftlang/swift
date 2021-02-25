@@ -17,8 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TaskPrivate.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/ABI/Task.h"
+#include "TaskPrivate.h"
 #include "../runtime/StackAllocator.h"
 #include <stdlib.h>
 

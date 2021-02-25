@@ -17,15 +17,12 @@
 #ifndef SWIFT_ABI_TASK_GROUP_H
 #define SWIFT_ABI_TASK_GROUP_H
 
+#include "swift/Runtime/Concurrency.h"
+#include "swift/ABI/Task.h"
 #include "swift/Basic/RelativePointer.h"
-#include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
-#include "swift/ABI/Metadata.h"
-#include "swift/ABI/TaskStatus.h"
-#include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
-#include "Task.h"
 #include "bitset"
 #include "string"
 #include "queue" // TODO: remove and replace with usage of our mpsc queue
@@ -33,6 +30,8 @@
 #include <assert.h>
 
 namespace swift {
+class TaskGroupTaskStatusRecord;
+class AsyncTask;
 
   // ==== TaskGroup ------------------------------------------------------------
 

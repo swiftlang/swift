@@ -21,6 +21,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ThreadLocal.h"
+#include "swift/ABI/Task.h"
 #include "swift/ABI/Actor.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "TaskPrivate.h"
