@@ -177,6 +177,7 @@ import StringInterpolation
 import StringMatch
 import StringRemoveDupes
 import StringReplaceSubrange
+import StringSplitting
 import StringSwitch
 import StringTests
 import StringWalk
@@ -376,6 +377,11 @@ registerBenchmark(StringMatch)
 registerBenchmark(StringNormalization)
 registerBenchmark(StringRemoveDupes)
 registerBenchmark(StringReplaceSubrange)
+
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+  registerBenchmark(StringSplitting)
+}
+
 registerBenchmark(StringSwitch)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)
