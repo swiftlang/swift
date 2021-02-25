@@ -116,18 +116,14 @@ public:
   ///
   /// This is the most useful order for importing compatibility stubs.
   void forEachOtherImportNameVersion(
-      bool withConcurrency,
       llvm::function_ref<void(ImportNameVersion)> action) const {
     assert(*this >= ImportNameVersion::swift2());
 
     ImportNameVersion nameVersion = *this;
     assert(!nameVersion.supportsConcurrency());
 
-    // If we've been asked to also consider concurrency, do so for the
-    // primary version (only).
-    if (withConcurrency) {
-      action(nameVersion.withConcurrency(true));
-    }
+    // Consider concurrency imports.
+    action(nameVersion.withConcurrency(true));
 
     while (nameVersion > ImportNameVersion::swift2()) {
       --nameVersion.rawValue;
