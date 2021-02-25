@@ -1603,6 +1603,7 @@ public:
       VarDecl *var,
       SubstitutionMap subs,
       RValue &&originalValue,
+      SILDeclRef::Kind initKind = SILDeclRef::Kind::PropertyWrapperBackingInitializer,
       SGFContext C = SGFContext());
 
   /// A convenience method for emitApply that just handles monomorphic

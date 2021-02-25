@@ -231,6 +231,22 @@ public:
     return wrappedValueInit.placeholder;
   }
 
+  bool hasInitFromProjectedValue() const {
+    return projectedValueInit.expr != nullptr;
+  }
+
+  Expr *getInitFromProjectedValue() {
+    return projectedValueInit.expr;
+  }
+
+  PropertyWrapperValuePlaceholderExpr *getProjectedValuePlaceholder() {
+    return projectedValueInit.placeholder;
+  }
+
+  bool hasSynthesizedInitializers() const {
+    return hasInitFromWrappedValue() || hasInitFromProjectedValue();
+  }
+
   explicit operator bool() const { return isValid(); }
 
   friend bool operator==(const PropertyWrapperBackingPropertyInfo &lhs,

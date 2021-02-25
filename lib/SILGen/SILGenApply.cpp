@@ -5028,8 +5028,12 @@ RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
     VarDecl *var,
     SubstitutionMap subs,
     RValue &&originalValue,
+    SILDeclRef::Kind initKind,
     SGFContext C) {
-  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+  assert(initKind == SILDeclRef::Kind::PropertyWrapperBackingInitializer ||
+         initKind == SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue);
+
+  SILDeclRef constant(var, initKind);
 
   FormalEvaluationScope writebackScope(*this);
 

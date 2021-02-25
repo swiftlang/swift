@@ -838,6 +838,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
+
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+    return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
+                                                      SKind);
   }
 
   llvm_unreachable("bad entity kind!");

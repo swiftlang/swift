@@ -19,6 +19,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -242,8 +243,13 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
-    if (auto *backingVar = PD->getPropertyWrapperBackingProperty())
-      PD = cast<ParamDecl>(backingVar);
+    if (auto wrapperInfo = PD->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.hasSynthesizedInitializers()) {
+        SGF.SGM.emitPropertyWrapperBackingInitializer(PD);
+      }
+
+      PD = cast<ParamDecl>(wrapperInfo.backingVar);
+    }
 
     auto type = PD->getType();
 

@@ -528,6 +528,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
       if (!fullSubstitutionMap)
         break;
 
@@ -1708,6 +1709,11 @@ void Remangler::manglePropertyWrapperBackingInitializer(Node *node) {
   Buffer << "fP";
 }
 
+void Remangler::manglePropertyWrapperInitFromProjectedValue(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "fW";
+}
+
 void Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node) {
   mangleChildNodes(node);
   Buffer << "Wl";
@@ -2800,6 +2806,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Getter:
     case Node::Kind::Setter:
@@ -2840,6 +2847,7 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;
