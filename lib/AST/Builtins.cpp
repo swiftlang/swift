@@ -1379,7 +1379,7 @@ static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) 
   builder.addParameter(
       makeConcrete(OptionalType::get(ctx.TheNativeObjectType))); // parent
   builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheNativeObjectType))); // group
+      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));

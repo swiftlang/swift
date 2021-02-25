@@ -176,7 +176,7 @@ using TaskGroupFutureWaitThrowingSignature =
 /// \code
 /// func swift_task_group_wait_next_throwing(
 ///     waitingTask: Builtin.NativeObject, // current task
-///     group: Builtin.NativeObject,
+///     group: UnsafeRawPointer,
 /// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
@@ -202,7 +202,7 @@ swift::TaskGroup* swift_task_group_create(AsyncTask *task);
 ///
 /// \code
 /// func swift_task_group_attachChild(
-///     group: Builtin.NativeObject,
+///     group: UnsafeRawPointer,
 ///     parent: Builtin.NativeObject,
 ///     child: Builtin.NativeObject
 /// )
@@ -216,7 +216,7 @@ void swift_task_group_attachChild(TaskGroup *group,
 /// \code
 /// func swift_task_group_destroy(
 ///     _ task: Builtin.NativeObject,
-///     _ group: Builtin.NativeObject
+///     _ group: UnsafeRawPointer
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -229,7 +229,7 @@ void swift_task_group_destroy(AsyncTask *task, TaskGroup *group);
 ///
 /// \code
 /// func swift_task_group_add_pending(
-///     group: Builtin.NativeObject
+///     group: UnsafeRawPointer
 /// ) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -243,7 +243,7 @@ bool swift_task_group_add_pending(TaskGroup *group);
 /// \code
 /// func swift_task_group_cancel_all(
 ///     task: Builtin.NativeObject,
-///     group: Builtin.NativeObject
+///     group: UnsafeRawPointer
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -259,7 +259,7 @@ void swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group);
 /// \code
 /// func swift_task_group_is_cancelled(
 ///     task: Builtin.NativeObject,
-///     group: Builtin.NativeObject
+///     group: UnsafeRawPointer
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -271,7 +271,7 @@ bool swift_task_group_is_cancelled(AsyncTask *task, TaskGroup *group);
 ///
 /// \code
 /// func swift_task_group_is_empty(
-///     _ group: Builtin.NativeObject
+///     _ group: UnsafeRawPointer
 /// ) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

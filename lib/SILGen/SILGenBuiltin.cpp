@@ -1427,7 +1427,6 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
-// TODO: very duplicated with emitBuiltinCreateAsyncTaskFuture, we pass the additional group param
 // Emit SIL for the named builtin: createAsyncTaskGroupFuture.
 static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,

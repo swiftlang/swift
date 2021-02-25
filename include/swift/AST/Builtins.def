@@ -767,7 +767,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
 /// createAsyncTaskGroupFuture(): (
 ///     Int, // flags
 ///     Builtin.NativeObject?, // parent
-///     Builtin.NativeObject?, // group
+///     Builtin.RawPointer?, // group
 ///     @escaping () async throws -> T
 /// ) -> Builtin.NativeObject
 ///

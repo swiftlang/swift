@@ -17,8 +17,8 @@
 #ifndef SWIFT_ABI_TASK_GROUP_H
 #define SWIFT_ABI_TASK_GROUP_H
 
-#include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
+#include "swift/Runtime/Concurrency.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Config.h"

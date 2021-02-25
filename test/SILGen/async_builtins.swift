@@ -34,7 +34,13 @@ public struct X {
     }
   }
 
-  // TODO: test for the createAsyncTaskGroupFuture?
+  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV16launchGroupChildyyxlF : $@convention(method) <T> (@in_guaranteed T, X) -> () {
+  func launchGroupChild<T>(_ value: T) {
+    // CHECK: builtin "createAsyncTaskGroupFuture"<T>([[ZERO:%.*]] : $Int, [[NIL:%.*]] : $Optional<Builtin.NativeObject>, [[NIL:%.*]] : $Optional<Builtin.RawPointer>, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+    let task = Builtin.createAsyncTaskGroupFuture(0, nil, nil) { () async throws -> T in
+      return value
+    }
+  }
 
   public func launchRocker<T>(closure: @escaping () async throws -> T) {
     _ = Builtin.createAsyncTaskFuture(0, nil, closure)
