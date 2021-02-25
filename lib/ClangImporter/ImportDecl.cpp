@@ -7700,8 +7700,7 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
           members.push_back(alternate);
       }
 
-      if (Impl.SwiftContext.LangOpts.EnableExperimentalConcurrency &&
-          !getVersion().supportsConcurrency()) {
+      if (!getVersion().supportsConcurrency()) {
         auto asyncVersion = getVersion().withConcurrency(true);
         if (auto asyncImport = Impl.importMirroredDecl(
                 objcMethod, dc, asyncVersion, proto)) {
@@ -9090,12 +9089,10 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  // If we're in concurrency mode, mark the constant as @actorIndependent
-  if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    auto actorIndependentAttr = new (C) ActorIndependentAttr(
-        ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
-    var->getAttrs().add(actorIndependentAttr);
-  }
+  auto actorIndependentAttr = new (C) ActorIndependentAttr(
+      ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
+  var->getAttrs().add(actorIndependentAttr);
+
   // Set the function up as the getter.
   makeComputed(var, func, nullptr);
 
