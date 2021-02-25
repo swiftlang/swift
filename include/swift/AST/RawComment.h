@@ -98,9 +98,7 @@ struct BasicDeclLocs {
 
 struct BasicSourceFileInfo {
   StringRef FilePath;
-  /// Used for completion; factors in hashes from type-bodies in order to be sensitive to changes in
-  /// the intefaces of top-level type members.
-  Fingerprint InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
+  Fingerprint InterfaceHash = Fingerprint::ZERO();
   llvm::sys::TimePoint<> LastModified = {};
   uint64_t FileSize = 0;
 

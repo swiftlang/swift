@@ -262,10 +262,10 @@ bool BasicSourceFileInfo::populate(const SourceFile *SF) {
   FileSize = stat->getSize();
 
   if (SF->hasInterfaceHash()) {
-    InterfaceHashIncludingTypeMembers = SF->getInterfaceHashIncludingTypeMembers();
+    InterfaceHash = SF->getInterfaceHashIncludingTypeMembers();
   } else {
     // FIXME: Parse the file with EnableInterfaceHash option.
-    InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
+    InterfaceHash = Fingerprint::ZERO();
   }
 
   return false;
