@@ -848,8 +848,8 @@ public:
   }
 
   SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
-    assert(false && "unexpected storage cast on access path");
-    return SILValue();
+    // We are ok with cloning storage casts.
+    return cloneProjection(cast, sourceOper);
   }
 
   SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
