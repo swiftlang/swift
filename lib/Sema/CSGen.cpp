@@ -4097,16 +4097,7 @@ ConstraintSystem::applyPropertyWrapperParameter(
     initKind = PropertyWrapperInitKind::WrappedValue;
   }
 
-  // Build the wrapper initializer expression and generate constraints.
-  auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
-    getASTContext(), anchor->getSourceRange(), Type(), /*wrappedValue*/nullptr);
-  setType(placeholder, paramType);
-
-  auto *init = buildPropertyWrapperInitCall(param, wrapperType, placeholder, initKind);
-  setType(init, wrapperType);
-  generateConstraints(init, DC);
-
-  appliedPropertyWrappers[anchor].push_back({ init });
+  appliedPropertyWrappers[anchor].push_back({ wrapperType, initKind });
   return getTypeMatchSuccess();
 }
 

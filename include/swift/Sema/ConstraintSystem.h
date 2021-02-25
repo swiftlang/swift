@@ -1187,7 +1187,7 @@ public:
       resultBuilderTransformed;
 
   /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::MapVector<ASTNode, SmallVector<Expr *, 2>> appliedPropertyWrappers;
+  llvm::MapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -2238,7 +2238,7 @@ private:
 
 public:
   /// A map from argument expressions to their applied property wrapper expressions.
-  llvm::SmallMapVector<ASTNode,SmallVector<Expr *, 2>, 4> appliedPropertyWrappers;
+  llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4> appliedPropertyWrappers;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
   std::vector<ConstraintLocator *> DefaultedConstraints;

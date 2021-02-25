@@ -979,7 +979,7 @@ namespace {
 
     AutoClosureExpr *buildPropertyWrapperFnThunk(
         Expr *fnRef, FunctionType *fnType, AnyFunctionRef fnDecl,
-        ArrayRef<Expr *> appliedPropertyWrappers) {
+        ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers) {
       auto &context = cs.getASTContext();
       auto paramInfo = fnType->getParams();
 
@@ -1010,17 +1010,17 @@ namespace {
         if (auto wrapperInfo = innerParam->getPropertyWrapperBackingPropertyInfo()) {
           // Rewrite the parameter ref to the backing wrapper initialization
           // expression.
-          Expr *init = appliedPropertyWrappers[appliedWrapperIndex++];
-          auto *placeholder = findWrappedValuePlaceholder(init);
-          placeholder->setOriginalWrappedValue(paramRef);
+          auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
+          auto wrapperType = appliedWrapper.wrapperType;
+          auto initKind = appliedWrapper.initKind;
 
-          auto target = SolutionApplicationTarget(init, cs.DC, CTP_Unused, Type(),
-                                                  /*isDiscarded=*/false);
-          auto result = cs.applySolution(solution, target);
-          if (!result)
-            return nullptr;
+          using ValueKind = AppliedPropertyWrapperExpr::ValueKind;
+          ValueKind valueKind = (initKind == PropertyWrapperInitKind::ProjectedValue ?
+                                 ValueKind::ProjectedValue : ValueKind::WrappedValue);
 
-          paramRef = result->getAsExpr();
+          paramRef = AppliedPropertyWrapperExpr::create(context, innerParam,
+                                                        innerParam->getStartLoc(),
+                                                        wrapperType, paramRef, valueKind);
           cs.cacheExprTypes(paramRef);
 
           // SILGen knows how to emit property-wrapped parameters, but the
@@ -1836,7 +1836,7 @@ namespace {
                         ConcreteDeclRef callee, ApplyExpr *apply,
                         ArrayRef<Identifier> argLabels,
                         ConstraintLocatorBuilder locator,
-                        ArrayRef<Expr *> appliedPropertyWrappers);
+                        ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers);
 
     /// Coerce the given 'self' argument (e.g., for the base of a
     /// member expression) to the given type.
@@ -5599,7 +5599,7 @@ Expr *ExprRewriter::coerceCallArguments(
     ApplyExpr *apply,
     ArrayRef<Identifier> argLabels,
     ConstraintLocatorBuilder locator,
-    ArrayRef<Expr *> appliedPropertyWrappers) {
+    ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers) {
   auto &ctx = getConstraintSystem().getASTContext();
   auto params = funcType->getParams();
   unsigned appliedWrapperIndex = 0;
@@ -5832,19 +5832,17 @@ Expr *ExprRewriter::coerceCallArguments(
       return true;
     };
 
-    if (paramInfo.getPropertyWrapperParam(paramIdx)) {
-      Expr *init = appliedPropertyWrappers[appliedWrapperIndex++];
-      auto *placeholder = findWrappedValuePlaceholder(init);
-      placeholder->setOriginalWrappedValue(arg);
+    if (auto *param = paramInfo.getPropertyWrapperParam(paramIdx)) {
+      auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
+      auto wrapperType = solution.simplifyType(appliedWrapper.wrapperType);
+      auto initKind = appliedWrapper.initKind;
 
-      // Apply the solution to the property wrapper initializer.
-      auto target = SolutionApplicationTarget(init, cs.DC, CTP_Unused, Type(),
-                                              /*isDiscarded=*/false);
-      auto result = cs.applySolution(solution, target);
-      if (!result)
-        return nullptr;
+      using ValueKind = AppliedPropertyWrapperExpr::ValueKind;
+      ValueKind valueKind = (initKind == PropertyWrapperInitKind::ProjectedValue ?
+                             ValueKind::ProjectedValue : ValueKind::WrappedValue);
 
-      arg = result->getAsExpr();
+      arg = AppliedPropertyWrapperExpr::create(ctx, param, arg->getStartLoc(),
+                                               wrapperType, arg, valueKind);
       cs.cacheExprTypes(arg);
     }
 

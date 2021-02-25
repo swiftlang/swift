@@ -42,6 +42,13 @@ enum class PropertyWrapperInitKind {
   Default
 };
 
+/// Information about an applied property wrapper, including the backing wrapper type
+/// and the initialization kind.
+struct AppliedPropertyWrapper {
+  Type wrapperType;
+  PropertyWrapperInitKind initKind;
+};
+
 /// Describes a property wrapper type.
 struct PropertyWrapperTypeInfo {
   /// The property through which access that uses this wrapper type is

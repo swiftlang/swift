@@ -29,6 +29,12 @@ public func testSimpleWrapperParameter(@Wrapper value: Int) {
   _ = _value
   _ = $value
 
+  // property wrapper backing initializer of value #1 in testSimpleWrapperParameter(value:)
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+
+  // property wrapper init from projected value of value #1 in testSimpleWrapperParameter(value:)
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
+
   // getter of $value #1 in testSimpleWrapperParameter(value:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tF6$valueL_AA10ProjectionVySiGvg : $@convention(thin) (Wrapper<Int>) -> Projection<Int>
 
@@ -39,15 +45,15 @@ public func testSimpleWrapperParameter(@Wrapper value: Int) {
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter28simpleWrapperParameterCaller10projectionyAA10ProjectionVySiG_tF : $@convention(thin) (Projection<Int>) -> ()
 func simpleWrapperParameterCaller(projection: Projection<Int>) {
   testSimpleWrapperParameter(value: projection.wrappedValue)
-  // CHECK: function_ref @$s26property_wrapper_parameter7WrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+  // CHECK: function_ref @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
 
   testSimpleWrapperParameter($value: projection)
-  // CHECK: function_ref @$s26property_wrapper_parameter7WrapperV14projectedValueACyxGAA10ProjectionVyxG_tcfC : $@convention(method) <τ_0_0> (@in Projection<τ_0_0>, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+  // CHECK: function_ref @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter33testSimpleClosureWrapperParameteryyF : $@convention(thin) () -> ()
 func testSimpleClosureWrapperParameter() {
-  let closure: (Int) -> Void = { (@Wrapper value) in
+  let closure: (Int) -> Void = { (@Wrapper value: Int) in
     _ = value
     _ = _value
     _ = $value
@@ -60,6 +66,9 @@ func testSimpleClosureWrapperParameter() {
 
   // closure #1 in implicit closure #1 in testSimpleClosureWrapperParameter()
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter33testSimpleClosureWrapperParameteryyFySicfu_yAA0G0VySiGcfU_ : $@convention(thin) (Wrapper<Int>) -> ()
+
+  // property wrapper backing initializer of value #1 in closure #1 in implicit closure #1 in testSimpleClosureWrapperParameter()
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter33testSimpleClosureWrapperParameteryyFySicfu_yAA0G0VySiGcfU_5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
 
   // getter of $value #1 in closure #1 in implicit closure #1 in testSimpleClosureWrapperParameter()
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter33testSimpleClosureWrapperParameteryyFySicfu_yAA0G0VySiGcfU_6$valueL_AA10ProjectionVySiGvg : $@convention(thin) (Wrapper<Int>) -> Projection<Int>
@@ -96,6 +105,12 @@ func testNonMutatingSetter(@NonMutatingSetterWrapper value1: String, @ClassWrapp
   _ = value1
   value1 = "hello!"
 
+  // property wrapper backing initializer of value1 #1 in testNonMutatingSetter(value1:value2:)
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned NonMutatingSetterWrapper<String>
+
+  // property wrapper backing initializer of value2 #1 in testNonMutatingSetter(value1:value2:)
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFADL_SivpfP : $@convention(thin) (Int) -> @owned ClassWrapper<Int>
+
   // getter of value1 #1 in testNonMutatingSetter(value1:value2:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFACL_SSvg : $@convention(thin) (@guaranteed NonMutatingSetterWrapper<String>) -> @owned String
 
@@ -127,7 +142,7 @@ struct ProjectionWrapper<Value> {
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tF : $@convention(thin) (ProjectionWrapper<Int>) -> ()
 func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
-  let multiStatement: (ProjectionWrapper<Int>) -> Void = { $value in
+  let multiStatement: (ProjectionWrapper<Int>) -> Void = { ($value: ProjectionWrapper<Int>) in
     _ = value
     _ = _value
     _ = $value
@@ -141,13 +156,16 @@ func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
   // closure #1 in implicit closure #1 in testImplicitPropertyWrapper(projection:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_ : $@convention(thin) (ProjectionWrapper<Int>) -> ()
 
+  // property wrapper init from projected value of $value #1 in closure #1 in implicit closure #1 in testImplicitPropertyWrapper(projection:)
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_6$valueL_AFvpfW : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
+
   // getter of $value #1 in closure #1 in implicit closure #1 in testImplicitPropertyWrapper(projection:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_6$valueL_AFvg : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
 
   // getter of value #1 in closure #1 in implicit closure #1 in testImplicitPropertyWrapper(projection:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_5valueL_Sivg : $@convention(thin) () -> Int
 
-  let _: (ProjectionWrapper<Int>) -> (Int, ProjectionWrapper<Int>) = { $value in
+  let _: (ProjectionWrapper<Int>) -> (Int, ProjectionWrapper<Int>) = { ($value: ProjectionWrapper<Int>) in
     (value, $value)
   }
 
@@ -156,6 +174,9 @@ func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
 
   // closure #2 in implicit closure #2 in testImplicitPropertyWrapper(projection:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFSi_AFtAFcfu0_Si_AFtAFcfU0_ : $@convention(thin) (ProjectionWrapper<Int>) -> (Int, ProjectionWrapper<Int>)
+
+  // property wrapper init from projected value of $value #1 in closure #2 in implicit closure #2 in testImplicitPropertyWrapper(projection:)
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFSi_AFtAFcfu0_Si_AFtAFcfU0_6$valueL_AFvpfW : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
 
   // getter of $value #1 in closure #2 in implicit closure #2 in testImplicitPropertyWrapper(projection:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFSi_AFtAFcfu0_Si_AFtAFcfU0_6$valueL_AFvg : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
