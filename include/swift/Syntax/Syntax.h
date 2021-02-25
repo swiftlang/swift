@@ -56,10 +56,10 @@ class Syntax {
   friend struct SyntaxFactory;
 
 protected:
-  SyntaxData Data;
+  RC<const SyntaxData> Data;
 
 public:
-  explicit Syntax(const SyntaxData Data) : Data(Data) {}
+  explicit Syntax(const RC<const SyntaxData> &Data) : Data(Data) {}
 
   virtual ~Syntax() {}
 
@@ -86,9 +86,7 @@ public:
   }
 
   /// Get the Data for this Syntax node.
-  const SyntaxData &getData() const {
-    return Data;
-  }
+  const RC<const SyntaxData> &getData() const { return Data; }
 
   /// Cast this Syntax node to a more specific type, asserting it's of the
   /// right kind.
@@ -113,7 +111,7 @@ public:
 
   /// Returns the child index of this node in its parent,
   /// if it has one, otherwise 0.
-  CursorIndex getIndexInParent() const { return getData().getIndexInParent(); }
+  CursorIndex getIndexInParent() const { return getData()->getIndexInParent(); }
 
   /// Return the number of bytes this node takes when spelled out in the source
   size_t getTextLength() const { return getRaw()->getTextLength(); }
@@ -157,8 +155,8 @@ public:
   SWIFT_DEBUG_DUMP;
 
   bool hasSameIdentityAs(const Syntax &Other) const {
-    return Data.getAbsoluteRaw().getNodeId() ==
-           Other.Data.getAbsoluteRaw().getNodeId();
+    return Data->getAbsoluteRaw().getNodeId() ==
+           Other.Data->getAbsoluteRaw().getNodeId();
   }
 
   static bool kindof(SyntaxKind Kind) {
@@ -180,23 +178,23 @@ public:
 
   /// Get the offset at which the leading trivia of this node starts.
   AbsoluteOffsetPosition getAbsolutePositionBeforeLeadingTrivia() const {
-    return Data.getAbsolutePositionBeforeLeadingTrivia();
+    return Data->getAbsolutePositionBeforeLeadingTrivia();
   }
 
   /// Get the offset at which the actual content (i.e. non-triva) of this node
   /// starts.
   AbsoluteOffsetPosition getAbsolutePositionAfterLeadingTrivia() const {
-    return Data.getAbsolutePositionAfterLeadingTrivia();
+    return Data->getAbsolutePositionAfterLeadingTrivia();
   }
 
   /// Get the offset at which the trailing trivia of this node starts.
   AbsoluteOffsetPosition getAbsoluteEndPositionBeforeTrailingTrivia() const {
-    return Data.getAbsoluteEndPositionBeforeTrailingTrivia();
+    return Data->getAbsoluteEndPositionBeforeTrailingTrivia();
   }
 
   /// Get the offset at which the trailing trivia of this node starts.
   AbsoluteOffsetPosition getAbsoluteEndPositionAfterTrailingTrivia() const {
-    return Data.getAbsoluteEndPositionAfterTrailingTrivia();
+    return Data->getAbsoluteEndPositionAfterTrailingTrivia();
   }
 
   // TODO: hasSameStructureAs ?

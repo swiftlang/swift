@@ -57,8 +57,8 @@ class SyntaxCollection : public Syntax {
   friend class Syntax;
 
 private:
-  static SyntaxData makeData(std::initializer_list<Element> &Elements,
-                             const RC<SyntaxArena> &Arena) {
+  static RC<const SyntaxData> makeData(std::initializer_list<Element> &Elements,
+                                       const RC<SyntaxArena> &Arena) {
     std::vector<const RawSyntax *> List;
     List.reserve(Elements.size());
     for (auto &Elt : Elements)
@@ -69,7 +69,7 @@ private:
   }
 
 public:
-  SyntaxCollection(const SyntaxData Data) : Syntax(Data) {}
+  SyntaxCollection(const RC<const SyntaxData> &Data) : Syntax(Data) {}
 
   SyntaxCollection(std::initializer_list<Element> list):
     SyntaxCollection(SyntaxCollection::makeData(list)) {}
@@ -105,7 +105,7 @@ public:
   Element operator[](const size_t Index) const {
     assert(Index < size());
     assert(!empty());
-    return Element(*Data.getChild(Index));
+    return Element(Data->getChild(Index));
   }
 
   /// Return a new collection with the given element added to the end.
@@ -119,7 +119,7 @@ public:
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout,
                                             getRaw()->getPresence(),
                                             getRaw()->getArena());
-    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
+    return SyntaxCollection<CollectionKind, Element>(Data->replacingSelf(Raw));
   }
 
   /// Return a new collection with an element removed from the end.
@@ -131,7 +131,7 @@ public:
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout,
                                             getRaw()->getPresence(),
                                             getRaw()->getArena());
-    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
+    return SyntaxCollection<CollectionKind, Element>(Data->replacingSelf(Raw));
   }
 
   /// Return a new collection with the given element appended to the front.
@@ -144,7 +144,7 @@ public:
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout,
                                             getRaw()->getPresence(),
                                             getRaw()->getArena());
-    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
+    return SyntaxCollection<CollectionKind, Element>(Data->replacingSelf(Raw));
   }
 
   /// Return a new collection with an element removed from the end.
@@ -156,7 +156,7 @@ public:
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout,
                                             getRaw()->getPresence(),
                                             getRaw()->getArena());
-    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
+    return SyntaxCollection<CollectionKind, Element>(Data->replacingSelf(Raw));
   }
 
   /// Return a new collection with the Element inserted at index i.
@@ -177,7 +177,7 @@ public:
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout,
                                             getRaw()->getPresence(),
                                             getRaw()->getArena());
-    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
+    return SyntaxCollection<CollectionKind, Element>(Data->replacingSelf(Raw));
   }
 
   /// Return a new collection with the element removed at index i.
@@ -190,14 +190,14 @@ public:
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout,
                                             getRaw()->getPresence(),
                                             getRaw()->getArena());
-    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
+    return SyntaxCollection<CollectionKind, Element>(Data->replacingSelf(Raw));
   }
 
   /// Return an empty syntax collection of this type.
   SyntaxCollection<CollectionKind, Element> cleared() const {
     auto Raw = RawSyntax::makeAndCalcLength(
         CollectionKind, {}, getRaw()->getPresence(), getRaw()->getArena());
-    return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
+    return SyntaxCollection<CollectionKind, Element>(Data->replacingSelf(Raw));
   }
 
   static bool kindof(SyntaxKind Kind) {
