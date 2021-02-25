@@ -18,6 +18,7 @@
 #define SWIFT_RUNTIME_CONCURRENCY_H
 
 #include "swift/ABI/TaskStatus.h"
+#include "swift/ABI/TaskGroup.h"
 
 namespace swift {
 class DefaultActor;

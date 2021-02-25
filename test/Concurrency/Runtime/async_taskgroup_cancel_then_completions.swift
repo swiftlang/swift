@@ -26,7 +26,7 @@ func test_taskGroup_cancel_then_completions() async {
       print("start first")
       sleep(1)
       print("done first")
-      return (1, await Task.__unsafeCurrentAsync().isCancelled)
+      return (1, Task.isCancelled)
     }
     print("added first: \(addedFirst)") // CHECK: added first: true
     assert(addedFirst)
@@ -35,7 +35,7 @@ func test_taskGroup_cancel_then_completions() async {
       print("start second")
       sleep(3)
       print("done second")
-      return (2, await Task.__unsafeCurrentAsync().isCancelled)
+      return (2, Task.isCancelled)
     }
     print("added second: \(addedSecond)") // CHECK: added second: true
     assert(addedSecond)

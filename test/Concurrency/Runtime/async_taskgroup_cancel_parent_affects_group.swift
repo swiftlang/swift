@@ -22,16 +22,16 @@ func test_taskGroup_cancel_parent_affects_group() async {
     try! await Task.withGroup(resultType: Int.self) { group -> Void in
       await group.add {
         sleep(3)
-        let c = await Task.__unsafeCurrentAsync().isCancelled
+        let c = Task.isCancelled
         print("group task isCancelled: \(c)")
         return 0
       }
 
       _ = try! await group.next()
-      let c = await Task.__unsafeCurrentAsync().isCancelled
+      let c = Task.isCancelled
       print("group isCancelled: \(c)")
     }
-    let c = await Task.__unsafeCurrentAsync().isCancelled
+    let c = Task.isCancelled
     print("detached task isCancelled: \(c)")
   }
 

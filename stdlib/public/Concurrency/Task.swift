@@ -50,7 +50,7 @@ extension Task {
   /// All functions available on the Task
   // TODO: once we can have async properties land make this computed property
   public static func current() async -> Task {
-    Task.unsafeCurrent!.task // !-safe, we are guaranteed to have a task available within an async function
+    return Task.unsafeCurrent!.task // !-safe, we are guaranteed to have a task available within an async function
   }
 
 }

@@ -24,7 +24,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
     for i in 1...5 {
       await group.add {
         sleep(1)
-        let c = await Task.__unsafeCurrentAsync().isCancelled
+        let c = Task.isCancelled
         print("add: \(i) (cancelled: \(c))")
         return i
       }
@@ -36,7 +36,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
       sum += got
     }
 
-    let c = await Task.__unsafeCurrentAsync().isCancelled
+    let c = Task.isCancelled
     print("g1 task cancelled: \(c)")
     let cc = group.isCancelled
     print("g1 group cancelled: \(cc)")
@@ -49,7 +49,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
     for i in 1...3 {
       await group.add {
         sleep(1)
-        let c = await Task.__unsafeCurrentAsync().isCancelled
+        let c = Task.isCancelled
         print("g1 task \(i) (cancelled: \(c))")
         return i
       }
@@ -58,7 +58,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
     print("cancelAll")
     group.cancelAll()
 
-    let c = await Task.__unsafeCurrentAsync().isCancelled
+    let c = Task.isCancelled
     print("g2 task cancelled: \(c)")
     let cc = group.isCancelled
     print("g2 group cancelled: \(cc)")

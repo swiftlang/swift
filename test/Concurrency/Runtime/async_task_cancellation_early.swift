@@ -17,12 +17,12 @@ func test_runDetached_cancel_child_early() async {
   let h: Task.Handle<Bool, Error> = Task.runDetached {
     async let childCancelled: Bool = { () -> Bool in
       sleep(2)
-      return await Task.__unsafeCurrentAsync().isCancelled
+      return Task.isCancelled
     }()
 
     let xx = await childCancelled
     print("child, cancelled: \(xx)") // CHECK: child, cancelled: true
-    let cancelled =  await Task.__unsafeCurrentAsync().isCancelled
+    let cancelled =  Task.isCancelled
     print("self, cancelled: \(cancelled )") // CHECK: self, cancelled: true
     return cancelled
   }

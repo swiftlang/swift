@@ -20,9 +20,9 @@
 #include "swift/Basic/RelativePointer.h"
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
+#include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
 #include "bitset"
@@ -313,7 +313,7 @@ public:
         assert(task);
         size_t amountToAllocate = TaskLocalItem::itemSize(valueType);
         // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-        void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator
+        void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator rdar://74218679
         TaskLocalItem *item =
             new(allocation) TaskLocalItem(keyType, valueType);
 
