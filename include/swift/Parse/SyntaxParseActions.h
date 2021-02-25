@@ -33,7 +33,7 @@ class SourceFileSyntax;
 enum class SyntaxKind;
 }
 
-typedef void *OpaqueSyntaxNode;
+typedef const void *OpaqueSyntaxNode;
 
 class SyntaxParseActions {
   virtual void _anchor();

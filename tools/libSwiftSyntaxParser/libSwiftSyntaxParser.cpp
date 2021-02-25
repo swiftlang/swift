@@ -183,7 +183,8 @@ private:
     auto numValue = serialization::getNumericValue(kind);
     node.kind = numValue;
     assert(node.kind == numValue && "syntax kind value is too large");
-    node.layout_data.nodes = elements.data();
+    node.layout_data.nodes =
+        const_cast<const swiftparse_client_node_t *>(elements.data());
     node.layout_data.nodes_count = elements.size();
     makeCRange(node.range, range);
     node.present = true;
@@ -302,7 +303,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
     pConsumer = std::make_unique<SynParserDiagConsumer>(*this, bufID);
     PU.getDiagnosticEngine().addConsumer(*pConsumer);
   }
-  return PU.parse();
+  return const_cast<swiftparse_client_node_t>(PU.parse());
 }
 }
 //===--- C API ------------------------------------------------------------===//
