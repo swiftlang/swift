@@ -1304,6 +1304,9 @@ namespace {
 
     bool canRewriteSetAsPropertyWrapperInit(SILGenFunction &SGF) const {
       if (auto *VD = dyn_cast<VarDecl>(Storage)) {
+        if (VD->isImplicit() || isa<ParamDecl>(VD))
+          return false;
+
         // If this is not a wrapper property that can be initialized from
         // a value of the wrapped type, we can't perform the initialization.
         auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo();

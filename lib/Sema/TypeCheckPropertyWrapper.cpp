@@ -339,6 +339,12 @@ PropertyWrapperTypeInfoRequest::evaluate(
   result.projectedValueVar =
     findValueProperty(ctx, nominal, ctx.Id_projectedValue,
                       /*allowMissing=*/true);
+  if (result.projectedValueVar &&
+      findSuitableWrapperInit(ctx, nominal, result.projectedValueVar,
+                              PropertyWrapperInitKind::ProjectedValue, decls)) {
+    result.hasProjectedValueInit = true;
+  }
+
   result.enclosingInstanceWrappedSubscript =
     findEnclosingSelfSubscript(ctx, nominal, ctx.Id_wrapped);
   result.enclosingInstanceProjectedSubscript =
@@ -527,7 +533,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return Type();
 
   // The constraint system will infer closure parameter types
-  if (isa<ParamDecl>(var) && !var->getDeclContext()->getAsDecl())
+  if (isa<ParamDecl>(var) && var->getInterfaceType()->hasError())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the

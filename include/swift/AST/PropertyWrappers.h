@@ -63,6 +63,8 @@ struct PropertyWrapperTypeInfo {
     HasDefaultValueInit
   } defaultInit = NoDefaultValueInit;
 
+  bool hasProjectedValueInit = false;
+
   /// The property through which the projection value ($foo) will be accessed.
   ///
   /// This property is optional. If present, a computed property for `$foo`
