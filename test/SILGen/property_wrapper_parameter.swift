@@ -51,6 +51,25 @@ func simpleWrapperParameterCaller(projection: Projection<Int>) {
   // CHECK: function_ref @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
 }
 
+// CHECK-LABEL: sil [ossa] @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlF : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> ()
+public func testGenericWrapper<T>(@Wrapper value: T) {
+
+  // property wrapper backing initializer of value #1 in testGenericWrapper<A>(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlFACL_xvpfP : $@convention(thin) <T> (@in T) -> @out Wrapper<T>
+
+  // property wrapper init from projected value of value #1 in testGenericWrapper<A>(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlFACL_xvpfW : $@convention(thin) <T> (@in Projection<T>) -> @out Wrapper<T>
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter20genericWrapperCaller10projectionyAA10ProjectionVySiG_tF : $@convention(thin) (Projection<Int>) -> ()
+func genericWrapperCaller(projection: Projection<Int>) {
+  testGenericWrapper(value: projection.wrappedValue)
+  // CHECK: function_ref @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlFACL_xvpfP : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out Wrapper<τ_0_0>
+
+  testGenericWrapper($value: projection)
+  // CHECK: function_ref @$s26property_wrapper_parameter18testGenericWrapper5valueyAA0F0VyxG_tlFACL_xvpfW : $@convention(thin) <τ_0_0> (@in Projection<τ_0_0>) -> @out Wrapper<τ_0_0>
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter33testSimpleClosureWrapperParameteryyF : $@convention(thin) () -> ()
 func testSimpleClosureWrapperParameter() {
   let closure: (Int) -> Void = { (@Wrapper value: Int) in

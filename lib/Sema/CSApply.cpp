@@ -679,7 +679,7 @@ namespace {
              declRefExpr->getFunctionRefKind() == FunctionRefKind::Unapplied)) {
           auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
           result = buildPropertyWrapperFnThunk(result, fullType->getAs<FunctionType>(), fnDecl,
-                                               appliedWrappers);
+                                               ref, appliedWrappers);
         }
       }
 
@@ -978,7 +978,7 @@ namespace {
     }
 
     AutoClosureExpr *buildPropertyWrapperFnThunk(
-        Expr *fnRef, FunctionType *fnType, AnyFunctionRef fnDecl,
+        Expr *fnRef, FunctionType *fnType, AnyFunctionRef fnDecl, ConcreteDeclRef ref,
         ArrayRef<AppliedPropertyWrapper> appliedPropertyWrappers) {
       auto &context = cs.getASTContext();
       auto paramInfo = fnType->getParams();
@@ -1018,7 +1018,7 @@ namespace {
           ValueKind valueKind = (initKind == PropertyWrapperInitKind::ProjectedValue ?
                                  ValueKind::ProjectedValue : ValueKind::WrappedValue);
 
-          paramRef = AppliedPropertyWrapperExpr::create(context, innerParam,
+          paramRef = AppliedPropertyWrapperExpr::create(context, ref, innerParam,
                                                         innerParam->getStartLoc(),
                                                         wrapperType, paramRef, valueKind);
           cs.cacheExprTypes(paramRef);
@@ -1160,8 +1160,9 @@ namespace {
       auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
       if (!appliedWrappers.empty()) {
         auto fnDecl = AnyFunctionRef(dyn_cast<AbstractFunctionDecl>(member));
+        auto callee = resolveConcreteDeclRef(member, locator);
         auto *closure = buildPropertyWrapperFnThunk(selfCall, calleeFnType,
-                                                    fnDecl, appliedWrappers);
+                                                    fnDecl, callee, appliedWrappers);
 
         ref->setType(FunctionType::get(refTy->getParams(), selfCall->getType()));
         cs.cacheType(ref);
@@ -5841,7 +5842,7 @@ Expr *ExprRewriter::coerceCallArguments(
       ValueKind valueKind = (initKind == PropertyWrapperInitKind::ProjectedValue ?
                              ValueKind::ProjectedValue : ValueKind::WrappedValue);
 
-      arg = AppliedPropertyWrapperExpr::create(ctx, param, arg->getStartLoc(),
+      arg = AppliedPropertyWrapperExpr::create(ctx, callee, param, arg->getStartLoc(),
                                                wrapperType, arg, valueKind);
       cs.cacheExprTypes(arg);
     }
@@ -7852,7 +7853,7 @@ namespace {
 
       auto &appliedWrappers = Rewriter.solution.appliedPropertyWrappers[closure];
       return Rewriter.buildPropertyWrapperFnThunk(closure, closureFnType, closure,
-                                                  appliedWrappers);
+                                                  ConcreteDeclRef(), appliedWrappers);
     }
 
     /// Rewrite the function for the given solution.

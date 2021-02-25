@@ -1510,10 +1510,11 @@ PropertyWrapperValuePlaceholderExpr::create(ASTContext &ctx, SourceRange range,
 }
 
 AppliedPropertyWrapperExpr *
-AppliedPropertyWrapperExpr::create(ASTContext &ctx, const ParamDecl *param,
+AppliedPropertyWrapperExpr::create(ASTContext &ctx, ConcreteDeclRef callee,
+                                   const ParamDecl *param,
                                    SourceLoc loc, Type Ty, Expr *value,
                                    AppliedPropertyWrapperExpr::ValueKind kind) {
-  return new (ctx) AppliedPropertyWrapperExpr(param, loc, Ty, value, kind);
+  return new (ctx) AppliedPropertyWrapperExpr(callee, param, loc, Ty, value, kind);
 }
 
 const ParamDecl *DefaultArgumentExpr::getParamDecl() const {

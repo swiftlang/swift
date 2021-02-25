@@ -5248,9 +5248,13 @@ RValue RValueEmitter::visitAppliedPropertyWrapperExpr(
     break;
   }
 
+  SubstitutionMap subs;
+  if (param->getDeclContext()->getAsDecl()) {
+    subs = E->getCallee().getSubstitutions();
+  }
+
   return SGF.emitApplyOfPropertyWrapperBackingInitializer(
-      SILLocation(E), param, SGF.getForwardingSubstitutionMap(),
-      std::move(argument), initKind);
+      SILLocation(E), param, subs, std::move(argument), initKind);
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

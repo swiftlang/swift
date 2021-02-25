@@ -4237,6 +4237,9 @@ public:
   };
 
 private:
+  /// The concrete callee which owns the property wrapper.
+  ConcreteDeclRef Callee;
+
   /// The owning declaration.
   const ParamDecl *Param;
 
@@ -4249,17 +4252,19 @@ private:
   /// The kind of value that the property wrapper is applied to.
   ValueKind Kind;
 
-  AppliedPropertyWrapperExpr(const ParamDecl *param, SourceLoc loc,
+  AppliedPropertyWrapperExpr(ConcreteDeclRef callee, const ParamDecl *param, SourceLoc loc,
                              Type Ty, Expr *value, ValueKind kind)
       : Expr(ExprKind::AppliedPropertyWrapper, /*Implicit=*/true, Ty),
-        Param(param), Loc(loc), Value(value), Kind(kind) {}
+        Callee(callee), Param(param), Loc(loc), Value(value), Kind(kind) {}
 
 public:
   static AppliedPropertyWrapperExpr *
-  create(ASTContext &ctx, const ParamDecl *param, SourceLoc loc,
+  create(ASTContext &ctx, ConcreteDeclRef callee, const ParamDecl *param, SourceLoc loc,
          Type Ty, Expr *value, ValueKind kind);
 
   SourceRange getSourceRange() const { return Loc; }
+
+  ConcreteDeclRef getCallee() { return Callee; }
 
   /// Returns the parameter declaration with the attached property wrapper.
   const ParamDecl *getParamDecl() const { return Param; };
