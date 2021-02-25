@@ -2694,12 +2694,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    if (!DiscardAttribute) {
-      if (Context.LangOpts.EnableExperimentalHasAsyncAlternative)
-        Attributes.add(attr);
-      else
-        diagnose(Loc, diag::requires_has_async_alternative, AttrName);
-    }
+    if (!DiscardAttribute)
+      Attributes.add(attr);
     break;
   }
   }
