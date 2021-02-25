@@ -1248,18 +1248,6 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
   // Local function to determine whether we can implicitly infer @objc.
   auto canInferImplicitObjC = [&](bool allowAnyAccess) {
-    if (VD->isInvalid())
-      return false;
-    if (VD->isOperator())
-      return false;
-
-    // Implicitly generated declarations are not @objc, except for constructors.
-    if (!allowImplicit && VD->isImplicit())
-      return false;
-
-    if (!allowAnyAccess && VD->getFormalAccess() <= AccessLevel::FilePrivate)
-      return false;
-
     if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
       switch (accessor->getAccessorKind()) {
       case AccessorKind::DidSet:
@@ -1275,6 +1263,19 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
         break;
       }
     }
+
+    if (VD->isInvalid())
+      return false;
+    if (VD->isOperator())
+      return false;
+
+    // Implicitly generated declarations are not @objc, except for constructors.
+    if (!allowImplicit && VD->isImplicit())
+      return false;
+
+    if (!allowAnyAccess && VD->getFormalAccess() <= AccessLevel::FilePrivate)
+      return false;
+
     return true;
   };
 

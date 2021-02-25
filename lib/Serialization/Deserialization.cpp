@@ -4085,15 +4085,23 @@ ModuleFile::getDeclChecked(
       return deserialized;
 
     auto *decl = declOrOffset.get();
-    if (isAllowModuleWithCompilerErrorsEnabled() && decl->isInvalid()) {
-      if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
-        // The parent function will be invalid if the parameter is invalid,
-        // implicits should have an invalid explicit as well
-        if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-          getContext().Diags.diagnose(
-              VD->getLoc(), diag::serialization_allowing_invalid_decl,
-              VD->getName(), VD->getModuleContext()->getNameStr());
-        }
+    if (decl->isInvalid() && isa<ValueDecl>(decl)) {
+      auto *VD = cast<ValueDecl>(decl);
+      if (!isAllowModuleWithCompilerErrorsEnabled()) {
+        getContext().Diags.diagnose(
+            SourceLoc(), diag::serialization_invalid_decl,
+            VD->getName(), VD->getModuleContext()->getNameStr());
+      } else if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
+        // Grabbing the location of a parameter gets the location of its
+        // context, which isn't deserialized yet. Since the parent will be
+        // invalid if the parameter is, just skip it and wait for the
+        // parent to output the diagnostic.
+        //
+        // Any invalid implicit should have an invalid explicit, so ignore in
+        // preference for the explicit.
+        getContext().Diags.diagnose(
+            VD->getLoc(), diag::serialization_allowing_invalid_decl,
+            VD->getName(), VD->getModuleContext()->getNameStr());
       }
     }
   } else if (matchAttributes) {

@@ -3242,9 +3242,9 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
 /// Perform diagnostics for func/init/deinit declarations.
 void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
   // Don't produce these diagnostics for implicitly generated code.
-  if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
+  if (AFD->getLoc().isInvalid() || AFD->isImplicit())
     return;
-  
+
   // Check for unused variables, as well as variables that are could be
   // declared as constants. Skip local functions though, since they will
   // be checked as part of their parent function or TopLevelCodeDecl.
