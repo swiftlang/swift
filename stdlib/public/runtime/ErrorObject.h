@@ -209,12 +209,6 @@ id dynamicCastValueToNSError(OpaqueValue *src,
 
 #endif
 
-SWIFT_RUNTIME_STDLIB_SPI
-const size_t _swift_lldb_offsetof_SwiftError_typeMetadata;
-
-SWIFT_RUNTIME_STDLIB_SPI
-const size_t _swift_lldb_sizeof_SwiftError;
-
 } // namespace swift
 
 #if SWIFT_OBJC_INTEROP
