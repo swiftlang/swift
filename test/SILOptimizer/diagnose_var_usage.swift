@@ -17,15 +17,16 @@ func testUnderscoreAssignment() {
     get { return 0 }
     set { print(newValue) }
   }
-  _ = a // a is used because a getter is called
+  _ = a
   
   var b = 0 // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
   _ = b
   
-  // c is unused because constants have no getter,
-  // and the underscore assignment has no effects.
-  let c = 0 // expected-warning {{initialization of immutable value 'c' was never used; consider replacing with assignment to '_' or removing it}}
-  _ = c
+  let c = 0
+  _ = c + 1
+  
+  let d = 0
+  _ = d
 }
 
 struct X {

@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "diagnose-var-usage"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
@@ -246,6 +247,37 @@ static SILArgument *getFunctionArgInst(SILInstruction *Apply,
 //                          MARK: Def-Use Traversers
 //===----------------------------------------------------------------------===//
 
+/// Traverses through the AST to find an underscore assignment to a VarDecl.
+/// Immutable values assigned to underscores do not appear in SIL.
+/// TODO: Cosider adding diagnostics for discarded assignments that produce
+/// no effects.
+class DiscardResultTraverser : public ASTWalker {
+  
+  VarDecl *VD;
+  
+public:
+  
+  bool DiscardsValue = false;
+  
+  DiscardResultTraverser(VarDecl *VD) : VD(VD) {}
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto *AE = dyn_cast<AssignExpr>(E)) {
+      auto destExpr = AE->getDest();
+      auto srcExpr = AE->getSrc();
+      if (auto DRE = dyn_cast<DeclRefExpr>(srcExpr)) {
+        if (auto Value = DRE->getDecl()) {
+          DiscardsValue = isa<DiscardAssignmentExpr>(destExpr) &&
+                          Value->getBaseIdentifier() == VD->getName();
+        }
+      }
+    }
+    
+    return { true, E };
+  }
+};
+
+/// Traverses through the def-use of an instruction representing a var
+/// declaration to find mutations of the value.
 class VariableModifyTraverser {
   
   SmallVector<SILValue, 32> Worklist;
@@ -1084,6 +1116,16 @@ public:
         }
       }
     }
+    
+    // As a last resort, check if the value was discarded in an
+    // underscore assignment.
+    if (auto AFD = dyn_cast<AbstractFunctionDecl>(getVarDecl(EntryInst)->
+                                                  getDeclContext())) {
+      DiscardResultTraverser Walker(getVarDecl(EntryInst));
+      AFD->getBody()->walk(Walker);
+      return Walker.DiscardsValue;
+    }
+    
     return false;
   }
 };
