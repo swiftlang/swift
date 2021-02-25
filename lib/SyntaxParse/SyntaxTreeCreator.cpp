@@ -165,6 +165,3 @@ SyntaxTreeCreator::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
   size_t length = raw->getTextLength();
   return {length, static_cast<OpaqueSyntaxNode>(raw)};
 }
-
-void SyntaxTreeCreator::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
-}
