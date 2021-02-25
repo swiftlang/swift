@@ -1510,8 +1510,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       continue;
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {
-      auto *proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-      insertProtocol(proto);
+      insertProtocol(reqt.getProtocolDecl());
       break;
     }
     case RequirementKind::Superclass:
@@ -1543,8 +1542,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       continue;
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {
-      auto *proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-      removeProtocol(proto);
+      removeProtocol(reqt.getProtocolDecl());
       break;
     }
     case RequirementKind::Superclass:

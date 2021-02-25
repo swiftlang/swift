@@ -5243,8 +5243,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
       break;
 
     case RequirementKind::Conformance: {
-      auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
-        ->getDecl();
+      auto protocol = requirement.getProtocolDecl();
 
       // Marker protocols do not record generic requirements at all.
       if (protocol->isMarkerProtocol()) {

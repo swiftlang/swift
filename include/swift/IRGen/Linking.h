@@ -565,8 +565,7 @@ class LinkEntity {
     for (const auto &reqt : proto->getRequirementSignature()) {
       if (reqt.getKind() == RequirementKind::Conformance &&
           reqt.getFirstType()->getCanonicalType() == associatedType &&
-          reqt.getSecondType()->castTo<ProtocolType>()->getDecl() ==
-                                                                requirement) {
+          reqt.getProtocolDecl() == requirement) {
         return index;
       }
       ++index;
@@ -590,7 +589,7 @@ class LinkEntity {
     auto &reqt = proto->getRequirementSignature()[index];
     assert(reqt.getKind() == RequirementKind::Conformance);
     return { reqt.getFirstType()->getCanonicalType(),
-             reqt.getSecondType()->castTo<ProtocolType>()->getDecl() };
+             reqt.getProtocolDecl() };
   }
 
   static std::pair<CanType, ProtocolDecl*>

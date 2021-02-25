@@ -1381,14 +1381,13 @@ void ConstraintSystem::openGenericRequirements(
     auto kind = req.getKind();
     switch (kind) {
     case RequirementKind::Conformance: {
-      auto proto = req.getSecondType()->castTo<ProtocolType>();
-      auto protoDecl = proto->getDecl();
+      auto protoDecl = req.getProtocolDecl();
       // Determine whether this is the protocol 'Self' constraint we should
       // skip.
       if (skipProtocolSelfConstraint && protoDecl == outerDC &&
           protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
         continue;
-      openedReq = Requirement(kind, openedFirst, proto);
+      openedReq = Requirement(kind, openedFirst, req.getSecondType());
       break;
     }
     case RequirementKind::Superclass:

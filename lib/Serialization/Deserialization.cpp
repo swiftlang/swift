@@ -6244,8 +6244,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     for (const auto &req : proto->getRequirementSignature()) {
       if (req.getKind() != RequirementKind::Conformance)
         continue;
-      ProtocolDecl *proto =
-          req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      ProtocolDecl *proto = req.getProtocolDecl();
       auto iter = conformancesForProtocols.find(proto);
       if (iter != conformancesForProtocols.end()) {
         reqConformances.push_back(iter->getSecond());

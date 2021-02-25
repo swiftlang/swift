@@ -1584,8 +1584,7 @@ static bool containsRetroactiveConformance(
   for (auto requirement : rootConformance->getConditionalRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
-    ProtocolDecl *proto =
-        requirement.getSecondType()->castTo<ProtocolType>()->getDecl();
+    ProtocolDecl *proto = requirement.getProtocolDecl();
     auto conformance = subMap.lookupConformance(
         requirement.getFirstType()->getCanonicalType(), proto);
     if (conformance.isInvalid()) {
@@ -2598,8 +2597,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
   case RequirementKind::Layout: {
   } break;
   case RequirementKind::Conformance: {
-    Type SecondTy = reqt.getSecondType();
-    appendProtocolName(SecondTy->castTo<ProtocolType>()->getDecl());
+    appendProtocolName(reqt.getProtocolDecl());
   } break;
   case RequirementKind::Superclass:
   case RequirementKind::SameType: {
@@ -3047,7 +3045,7 @@ static unsigned conformanceRequirementIndex(
       continue;
 
     if (req.getFirstType()->isEqual(entry.first) &&
-        req.getSecondType()->castTo<ProtocolType>()->getDecl() == entry.second)
+        req.getProtocolDecl() == entry.second)
       return result;
 
     ++result;
@@ -3175,8 +3173,7 @@ void ASTMangler::appendConcreteProtocolConformance(
       if (type->hasArchetype())
         type = type->mapTypeOutOfContext();
       CanType canType = type->getCanonicalType(CurGenericSignature);
-      auto proto =
-        conditionalReq.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto proto = conditionalReq.getProtocolDecl();
       
       ProtocolConformanceRef conformance;
       

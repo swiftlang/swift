@@ -2012,7 +2012,7 @@ public:
       if (req.getKind() != RequirementKind::Conformance) continue;
 
       auto canTy = req.getFirstType()->getCanonicalType();
-      auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto *proto = req.getProtocolDecl();
       auto origConf = origSubMap.lookupConformance(canTy, proto);
       auto substConf = substSubMap.lookupConformance(canTy, proto);
 

@@ -1942,12 +1942,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     if (!Proto->isMarkerProtocol()) {
       for (const auto &req : *conditionalReqs) {
         if (req.getKind() == RequirementKind::Conformance &&
-            req.getSecondType()->castTo<ProtocolType>()->getDecl()
-              ->isMarkerProtocol()) {
+            req.getProtocolDecl()->isMarkerProtocol()) {
           C.Diags.diagnose(
             ComplainLoc, diag::marker_protocol_conditional_conformance,
             Proto->getName(), req.getFirstType(),
-            req.getSecondType()->castTo<ProtocolType>()->getDecl()->getName());
+            req.getProtocolDecl()->getName());
           conformance->setInvalid();
         }
       }
@@ -4448,7 +4447,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   for (auto req : proto->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
       auto depTy = req.getFirstType();
-      auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto *proto = req.getProtocolDecl();
       auto conformance = Conformance->getAssociatedConformance(depTy, proto);
       if (conformance.isConcrete()) {
         auto *concrete = conformance.getConcrete();
@@ -6361,8 +6360,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoContext(defaultAssocType);
-    auto requirementProto =
-      req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto requirementProto = req.getProtocolDecl();
     auto conformance = conformsToProtocol(defaultAssocTypeInContext,
                                           requirementProto, proto);
     if (conformance.isInvalid()) {
