@@ -978,7 +978,7 @@ void ModuleFile::collectBasicSourceFileInfo(
   while (Cursor < End) {
     // FilePath (byte offset in 'SourceLocsTextData').
     auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
-    // InterfaceHashIncludingTypeMembers (fixed length string).
+    // InterfaceHash (fixed length string).
     auto fpStr = StringRef{reinterpret_cast<const char *>(Cursor),
                            Fingerprint::DIGEST_LENGTH};
     Cursor += Fingerprint::DIGEST_LENGTH;
@@ -995,7 +995,7 @@ void ModuleFile::collectBasicSourceFileInfo(
     BasicSourceFileInfo info;
     info.FilePath = filePath;
     if (auto fingerprint = Fingerprint::fromString(fpStr))
-      info.InterfaceHashIncludingTypeMembers = fingerprint.getValue();
+      info.InterfaceHash = fingerprint.getValue();
     else {
       llvm::errs() << "Unconvertable fingerprint '" << fpStr << "'\n";
       abort();
