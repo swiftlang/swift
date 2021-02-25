@@ -1406,7 +1406,9 @@ SILCloner<ImplClass>::visitConvertFunctionInst(ConvertFunctionInst *Inst) {
       Inst, getBuilder().createConvertFunction(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
                 getOpType(Inst->getType()), Inst->withoutActuallyEscaping(),
-                Inst->getForwardingOwnershipKind()));
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template <typename ImplClass>
@@ -1444,10 +1446,12 @@ void
 SILCloner<ImplClass>::visitUpcastInst(UpcastInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createUpcast(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      getOpType(Inst->getType()),
-                                      Inst->getForwardingOwnershipKind()));
+      Inst, getBuilder().createUpcast(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1476,11 +1480,13 @@ void
 SILCloner<ImplClass>::
 visitUncheckedRefCastInst(UncheckedRefCastInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createUncheckedRefCast(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType()),
-                                    Inst->getForwardingOwnershipKind()));
+  recordClonedInstruction(
+      Inst, getBuilder().createUncheckedRefCast(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1542,11 +1548,13 @@ void SILCloner<ImplClass>::visitUncheckedValueCastInst(
                                       getOpType(Inst->getType())));
     return;
   }
-  recordClonedInstruction(Inst, getBuilder().createUncheckedValueCast(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType()),
-                                    Inst->getForwardingOwnershipKind()));
+  recordClonedInstruction(
+      Inst, getBuilder().createUncheckedValueCast(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1554,11 +1562,13 @@ void
 SILCloner<ImplClass>::
 visitRefToBridgeObjectInst(RefToBridgeObjectInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createRefToBridgeObject(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getConverted()),
-                                    getOpValue(Inst->getBitsOperand()),
-                                    Inst->getForwardingOwnershipKind()));
+  recordClonedInstruction(
+      Inst, getBuilder().createRefToBridgeObject(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getConverted()),
+                getOpValue(Inst->getBitsOperand()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1566,11 +1576,13 @@ void
 SILCloner<ImplClass>::
 visitBridgeObjectToRefInst(BridgeObjectToRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createBridgeObjectToRef(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getConverted()),
-                                    getOpType(Inst->getType()),
-                                    Inst->getForwardingOwnershipKind()));
+  recordClonedInstruction(
+      Inst, getBuilder().createBridgeObjectToRef(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getConverted()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1618,11 +1630,13 @@ void
 SILCloner<ImplClass>::
 visitThinToThickFunctionInst(ThinToThickFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createThinToThickFunction(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType()),
-                                    Inst->getForwardingOwnershipKind()));
+  recordClonedInstruction(
+      Inst, getBuilder().createThinToThickFunction(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1656,9 +1670,12 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
   SILType OpLoweredType = getOpType(Inst->getTargetLoweredType());
   CanType OpFormalType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createUnconditionalCheckedCast(
-                                    OpLoc, OpValue, OpLoweredType, OpFormalType,
-                                    Inst->getForwardingOwnershipKind()));
+  recordClonedInstruction(Inst,
+                          getBuilder().createUnconditionalCheckedCast(
+                              OpLoc, OpValue, OpLoweredType, OpFormalType,
+                              getBuilder().hasOwnership()
+                                  ? Inst->getForwardingOwnershipKind()
+                                  : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1838,7 +1855,10 @@ SILCloner<ImplClass>::visitObjectInst(ObjectInst *Inst) {
   recordClonedInstruction(
       Inst,
       getBuilder().createObject(getOpLocation(Inst->getLoc()), Inst->getType(),
-                                Elements, Inst->getBaseElements().size()));
+                                Elements, Inst->getBaseElements().size(),
+                                getBuilder().hasOwnership()
+                                    ? Inst->getForwardingOwnershipKind()
+                                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1847,8 +1867,12 @@ SILCloner<ImplClass>::visitStructInst(StructInst *Inst) {
   auto Elements = getOpValueArray<8>(Inst->getElements());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createStruct(getOpLocation(Inst->getLoc()),
-                                      getOpType(Inst->getType()), Elements));
+      Inst,
+      getBuilder().createStruct(getOpLocation(Inst->getLoc()),
+                                getOpType(Inst->getType()), Elements,
+                                getBuilder().hasOwnership()
+                                    ? Inst->getForwardingOwnershipKind()
+                                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1857,8 +1881,12 @@ SILCloner<ImplClass>::visitTupleInst(TupleInst *Inst) {
   auto Elements = getOpValueArray<8>(Inst->getElements());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createTuple(getOpLocation(Inst->getLoc()),
-                                     getOpType(Inst->getType()), Elements));
+      Inst,
+      getBuilder().createTuple(getOpLocation(Inst->getLoc()),
+                               getOpType(Inst->getType()), Elements,
+                               getBuilder().hasOwnership()
+                                   ? Inst->getForwardingOwnershipKind()
+                                   : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1870,7 +1898,10 @@ SILCloner<ImplClass>::visitEnumInst(EnumInst *Inst) {
       getBuilder().createEnum(
           getOpLocation(Inst->getLoc()),
           Inst->hasOperand() ? getOpValue(Inst->getOperand()) : SILValue(),
-          Inst->getElement(), getOpType(Inst->getType())));
+          Inst->getElement(), getOpType(Inst->getType()),
+          getBuilder().hasOwnership()
+              ? Inst->getForwardingOwnershipKind()
+              : ValueOwnershipKind(OwnershipKind::None)));
 }
   
 template<typename ImplClass>
@@ -1890,7 +1921,10 @@ SILCloner<ImplClass>::visitUncheckedEnumDataInst(UncheckedEnumDataInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createUncheckedEnumData(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getElement(), getOpType(Inst->getType())));
+                Inst->getElement(), getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
   
 template<typename ImplClass>
@@ -1950,7 +1984,10 @@ SILCloner<ImplClass>::visitTupleExtractInst(TupleExtractInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createTupleExtract(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getFieldIndex(), getOpType(Inst->getType())));
+                Inst->getFieldIndex(), getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -1970,7 +2007,10 @@ SILCloner<ImplClass>::visitStructExtractInst(StructExtractInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createStructExtract(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                Inst->getField(), getOpType(Inst->getType())));
+                Inst->getField(), getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2020,7 +2060,10 @@ void SILCloner<ImplClass>::visitDestructureStructInst(
 
   recordClonedInstruction(
       Inst, getBuilder().createDestructureStruct(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template <typename ImplClass>
@@ -2038,7 +2081,10 @@ void SILCloner<ImplClass>::visitDestructureTupleInst(
 
   recordClonedInstruction(
       Inst, getBuilder().createDestructureTuple(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template <typename ImplClass>
@@ -2129,10 +2175,13 @@ void SILCloner<ImplClass>::visitOpenExistentialValueInst(
   remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createOpenExistentialValue(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
+  recordClonedInstruction(
+      Inst, getBuilder().createOpenExistentialValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2173,10 +2222,13 @@ visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createOpenExistentialRef(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
+  recordClonedInstruction(
+      Inst, getBuilder().createOpenExistentialRef(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2201,10 +2253,13 @@ visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *Inst) {
   remapOpenedType(Inst->getType().castTo<OpenedArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createOpenExistentialBoxValue(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
+  recordClonedInstruction(
+      Inst, getBuilder().createOpenExistentialBoxValue(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                getOpType(Inst->getType()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2372,9 +2427,12 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createMarkDependence(getOpLocation(Inst->getLoc()),
-                                              getOpValue(Inst->getValue()),
-                                              getOpValue(Inst->getBase())));
+      Inst, getBuilder().createMarkDependence(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getValue()),
+                getOpValue(Inst->getBase()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2707,9 +2765,12 @@ SILCloner<ImplClass>::visitSwitchEnumInst(SwitchEnumInst *Inst) {
                                      getOpBasicBlock(Inst->getCase(i).second)));
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createSwitchEnum(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand()),
-                                          DefaultBB, CaseBBs));
+      Inst, getBuilder().createSwitchEnum(
+                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+                DefaultBB, CaseBBs, None, ProfileCounter(),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2745,10 +2806,13 @@ SILCloner<ImplClass>::visitSelectEnumInst(SelectEnumInst *Inst) {
   
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createSelectEnum(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getEnumOperand()),
-                                          getOpType(Inst->getType()),
-                                          DefaultResult, CaseResults));
+      Inst, getBuilder().createSelectEnum(
+                getOpLocation(Inst->getLoc()),
+                getOpValue(Inst->getEnumOperand()), getOpType(Inst->getType()),
+                DefaultResult, CaseResults, None, ProfileCounter(),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2785,7 +2849,10 @@ SILCloner<ImplClass>::visitSelectValueInst(SelectValueInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createSelectValue(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                getOpType(Inst->getType()), DefaultResult, CaseResults));
+                getOpType(Inst->getType()), DefaultResult, CaseResults,
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template <typename ImplClass>
@@ -2877,7 +2944,10 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
       Inst, getBuilder().createDifferentiableFunction(
                 getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
                 Inst->getResultIndices(),
-                getOpValue(Inst->getOriginalFunction()), derivativeFns));
+                getOpValue(Inst->getOriginalFunction()), derivativeFns,
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template<typename ImplClass>
@@ -2887,9 +2957,13 @@ void SILCloner<ImplClass>::visitLinearFunctionInst(LinearFunctionInst *Inst) {
   if (transpose)
     transpose = getOpValue(*transpose);
   recordClonedInstruction(
-      Inst, getBuilder().createLinearFunction(
-                getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
-                getOpValue(Inst->getOriginalFunction()), transpose));
+      Inst,
+      getBuilder().createLinearFunction(
+          getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
+          getOpValue(Inst->getOriginalFunction()),
+          getBuilder().hasOwnership() ? Inst->getForwardingOwnershipKind()
+                                      : ValueOwnershipKind(OwnershipKind::None),
+          transpose));
 }
 
 template <typename ImplClass>
@@ -2900,19 +2974,26 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionExtractInst(
   if (Inst->hasExplicitExtracteeType())
     explicitExtracteeType = Inst->getType();
   recordClonedInstruction(
-      Inst, getBuilder().createDifferentiableFunctionExtract(
-                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
-                getOpValue(Inst->getOperand()), explicitExtracteeType));
+      Inst,
+      getBuilder().createDifferentiableFunctionExtract(
+          getOpLocation(Inst->getLoc()), Inst->getExtractee(),
+          getOpValue(Inst->getOperand()),
+          getBuilder().hasOwnership() ? Inst->getForwardingOwnershipKind()
+                                      : ValueOwnershipKind(OwnershipKind::None),
+          explicitExtracteeType));
 }
 
 template<typename ImplClass>
 void SILCloner<ImplClass>::
 visitLinearFunctionExtractInst(LinearFunctionExtractInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createLinearFunctionExtract(
-                                    getOpLocation(Inst->getLoc()),
-                                    Inst->getExtractee(),
-                                    getOpValue(Inst->getOperand())));
+  recordClonedInstruction(
+      Inst, getBuilder().createLinearFunctionExtract(
+                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
+                getOpValue(Inst->getOperand()),
+                getBuilder().hasOwnership()
+                    ? Inst->getForwardingOwnershipKind()
+                    : ValueOwnershipKind(OwnershipKind::None)));
 }
 
 template <typename ImplClass>

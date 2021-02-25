@@ -1157,7 +1157,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
-        const_cast<ConstraintSystem *>(this)->inferBindingsFor(tv).dump(out, 1);
+        const_cast<ConstraintSystem *>(this)->getBindingsFor(tv).dump(out, 1);
       }
     } else {
       out << " equivalent to ";

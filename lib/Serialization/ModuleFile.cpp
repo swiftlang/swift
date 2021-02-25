@@ -118,12 +118,14 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(Identifiers, core->Identifiers);
 }
 
-Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
+Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                            bool recoverFromIncompatibility) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
   assert(!hasError() && "error already detected; should not call this");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
+  Status status = Status::Valid;
 
   ModuleDecl *M = file->getParentModule();
   if (M->getName().str() != Core->Name)
@@ -134,12 +136,14 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
   llvm::Triple moduleTarget(llvm::Triple::normalize(Core->TargetTriple));
   if (!areCompatibleArchitectures(moduleTarget, ctx.LangOpts.Target) ||
       !areCompatibleOSs(moduleTarget, ctx.LangOpts.Target)) {
-    return error(Status::TargetIncompatible);
-  }
-  if (ctx.LangOpts.EnableTargetOSChecking &&
-      !M->isResilient() &&
-      isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
-    return error(Status::TargetTooNew);
+    status = Status::TargetIncompatible;
+    if (!recoverFromIncompatibility)
+      return error(status);
+  } else if (ctx.LangOpts.EnableTargetOSChecking && !M->isResilient() &&
+             isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
+    status = Status::TargetTooNew;
+    if (!recoverFromIncompatibility)
+      return error(status);
   }
 
   for (const auto &searchPath : Core->SearchPaths)
@@ -240,7 +244,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc) {
                                                            None);
   }
 
-  return Status::Valid;
+  return status;
 }
 
 bool ModuleFile::mayHaveDiagnosticsPointingAtBuffer() const {
@@ -974,7 +978,7 @@ void ModuleFile::collectBasicSourceFileInfo(
   while (Cursor < End) {
     // FilePath (byte offset in 'SourceLocsTextData').
     auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
-    // InterfaceHashIncludingTypeMembers (fixed length string).
+    // InterfaceHash (fixed length string).
     auto fpStr = StringRef{reinterpret_cast<const char *>(Cursor),
                            Fingerprint::DIGEST_LENGTH};
     Cursor += Fingerprint::DIGEST_LENGTH;
@@ -991,7 +995,7 @@ void ModuleFile::collectBasicSourceFileInfo(
     BasicSourceFileInfo info;
     info.FilePath = filePath;
     if (auto fingerprint = Fingerprint::fromString(fpStr))
-      info.InterfaceHashIncludingTypeMembers = fingerprint.getValue();
+      info.InterfaceHash = fingerprint.getValue();
     else {
       llvm::errs() << "Unconvertable fingerprint '" << fpStr << "'\n";
       abort();

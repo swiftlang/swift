@@ -315,10 +315,6 @@ void swift::ide::collectPossibleReturnTypesFromContext(
   }
 
   if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
-    // Try type checking the closure signature if it hasn't.
-    if (!ACE->getType())
-      swift::typeCheckASTNodeAtLoc(ACE->getParent(), ACE->getLoc());
-
     // Use the type checked type if it has.
     if (ACE->getType() && !ACE->getType()->hasError() &&
         !ACE->getResultType()->hasUnresolvedType()) {
