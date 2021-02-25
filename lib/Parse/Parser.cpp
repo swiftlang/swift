@@ -321,11 +321,14 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
   return Tokens;
 }
 
-std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+std::vector<
+    std::pair<const syntax::RawSyntax *, syntax::AbsoluteOffsetPosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
-                          unsigned BufferID, unsigned Offset,
-                          unsigned EndOffset, DiagnosticEngine *Diags) {
-  std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+                          unsigned BufferID, const RC<SyntaxArena> &Arena,
+                          unsigned Offset, unsigned EndOffset,
+                          DiagnosticEngine *Diags) {
+  std::vector<
+      std::pair<const syntax::RawSyntax *, syntax::AbsoluteOffsetPosition>>
       Tokens;
   syntax::AbsoluteOffsetPosition RunningPos(0);
 
@@ -340,7 +343,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
                             TrailingTrivia.size();
         auto ThisToken = RawSyntax::make(
             Tok.getKind(), Tok.getRawText(), TextLength, LeadingTrivia,
-            TrailingTrivia, SourcePresence::Present);
+            TrailingTrivia, SourcePresence::Present, Arena);
 
         auto ThisTokenPos =
             RunningPos.advancedBy(ThisToken->getLeadingTriviaLength());

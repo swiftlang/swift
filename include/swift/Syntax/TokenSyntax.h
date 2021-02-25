@@ -35,8 +35,9 @@ protected:
 public:
   TokenSyntax(const SyntaxData Data) : Syntax(Data) {}
 
-  static TokenSyntax missingToken(const tok Kind, StringRef Text) {
-    return makeRoot<TokenSyntax>(RawSyntax::missing(Kind, Text));
+  static TokenSyntax missingToken(const tok Kind, StringRef Text,
+                                  const RC<SyntaxArena> &Arena) {
+    return makeRoot<TokenSyntax>(RawSyntax::missing(Kind, Text, Arena));
   }
 
   StringRef getLeadingTrivia() const { return getRaw()->getLeadingTrivia(); }

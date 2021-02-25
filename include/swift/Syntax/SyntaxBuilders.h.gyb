@@ -34,15 +34,14 @@ class SyntaxArena;
 %     child_count = len(node.children)
 class ${node.name}Builder {
   RC<SyntaxArena> Arena;
-  RC<RawSyntax> Layout[${child_count}] = {
+  const RawSyntax *Layout[${child_count}] = {
 %     for child in node.children:
     nullptr,
 %     end
   };
 
 public:
-  ${node.name}Builder(const RC<SyntaxArena> &Arena = SyntaxArena::make())
-      : Arena(Arena) {}
+  ${node.name}Builder(const RC<SyntaxArena> &Arena) : Arena(Arena) {}
 
 %     for child in node.children:
   ${node.name}Builder &use${child.name}(${child.type_name} ${child.name});

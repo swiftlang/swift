@@ -57,14 +57,15 @@ class SyntaxCollection : public Syntax {
   friend class Syntax;
 
 private:
-  static SyntaxData makeData(std::initializer_list<Element> &Elements) {
-    std::vector<RC<RawSyntax>> List;
+  static SyntaxData makeData(std::initializer_list<Element> &Elements,
+                             const RC<SyntaxArena> &Arena) {
+    std::vector<const RawSyntax *> List;
     List.reserve(Elements.size());
     for (auto &Elt : Elements)
       List.push_back(Elt.getRaw());
     auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, List,
-                                            SourcePresence::Present);
-    return SyntaxData::make(AbsoluteRawSyntax::forRoot(Raw));
+                                            SourcePresence::Present, Arena);
+    return SyntaxData::makeRoot(AbsoluteRawSyntax::forRoot(Raw));
   }
 
 public:
@@ -111,11 +112,11 @@ public:
   SyntaxCollection<CollectionKind, Element>
   appending(Element E) const {
     auto OldLayout = getRaw()->getLayout();
-    std::vector<RC<RawSyntax>> NewLayout;
+    std::vector<const RawSyntax *> NewLayout;
     NewLayout.reserve(OldLayout.size() + 1);
     std::copy(OldLayout.begin(), OldLayout.end(), back_inserter(NewLayout));
     NewLayout.push_back(E.getRaw());
-    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence());
+    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence(), getRaw()->getArena());
     return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
@@ -125,7 +126,7 @@ public:
   SyntaxCollection<CollectionKind, Element> removingLast() const {
     assert(!empty());
     auto NewLayout = getRaw()->getLayout().drop_back();
-    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence());
+    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence(), getRaw()->getArena());
     return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
@@ -133,10 +134,10 @@ public:
   SyntaxCollection<CollectionKind, Element>
   prepending(Element E) const {
     auto OldLayout = getRaw()->getLayout();
-    std::vector<RC<RawSyntax>> NewLayout = { E.getRaw() };
+    std::vector<const RawSyntax *> NewLayout = {E.getRaw()};
     std::copy(OldLayout.begin(), OldLayout.end(),
               std::back_inserter(NewLayout));
-    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence());
+    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence(), getRaw()->getArena());
     return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
@@ -146,7 +147,7 @@ public:
   SyntaxCollection<CollectionKind, Element> removingFirst() const {
     assert(!empty());
     auto NewLayout = getRaw()->getLayout().drop_front();
-    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence());
+    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence(), getRaw()->getArena());
     return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
@@ -157,7 +158,7 @@ public:
   inserting(size_t i, Element E) const {
     assert(i <= size());
     auto OldLayout = getRaw()->getLayout();
-    std::vector<RC<RawSyntax>> NewLayout;
+    std::vector<const RawSyntax *> NewLayout;
     NewLayout.reserve(OldLayout.size() + 1);
 
     std::copy(OldLayout.begin(), OldLayout.begin() + i,
@@ -165,24 +166,24 @@ public:
     NewLayout.push_back(E.getRaw());
     std::copy(OldLayout.begin() + i, OldLayout.end(),
               std::back_inserter(NewLayout));
-    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence());
+    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence(), getRaw()->getArena());
     return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return a new collection with the element removed at index i.
   SyntaxCollection<CollectionKind, Element> removing(size_t i) const {
     assert(i <= size());
-    std::vector<RC<RawSyntax>> NewLayout = getRaw()->getLayout();
+    std::vector<const RawSyntax *> NewLayout = getRaw()->getLayout();
     auto iterator = NewLayout.begin();
     std::advance(iterator, i);
     NewLayout.erase(iterator);
-    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence());
+    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, NewLayout, getRaw()->getPresence(), getRaw()->getArena());
     return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
   /// Return an empty syntax collection of this type.
   SyntaxCollection<CollectionKind, Element> cleared() const {
-    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, {}, getRaw()->getPresence());
+    auto Raw = RawSyntax::makeAndCalcLength(CollectionKind, {}, getRaw()->getPresence(), getRaw()->getArena());
     return SyntaxCollection<CollectionKind, Element>(Data.replacingSelf(Raw));
   }
 
