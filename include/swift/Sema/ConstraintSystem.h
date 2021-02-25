@@ -4633,12 +4633,11 @@ public:
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
 
-  Optional<PotentialBindings> determineBestBindings();
+  Optional<BindingSet> determineBestBindings();
 
-  /// Infer bindings for the given type variable based on current
+  /// Get bindings for the given type variable based on current
   /// state of the constraint system.
-  PotentialBindings inferBindingsFor(TypeVariableType *typeVar,
-                                     bool finalize = true);
+  BindingSet getBindingsFor(TypeVariableType *typeVar, bool finalize = true);
 
 private:
   /// Add a constraint to the constraint system.
@@ -5406,7 +5405,7 @@ class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
 public:
   using Element = TypeVariableBinding;
 
-  TypeVarBindingProducer(PotentialBindings &bindings);
+  TypeVarBindingProducer(BindingSet &bindings);
 
   /// Retrieve a set of bindings available in the current state.
   ArrayRef<Binding> getCurrentBindings() const { return Bindings; }

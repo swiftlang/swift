@@ -100,11 +100,11 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}  // expected-note {{where 'T' = 'Int'}}
-// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
+// expected-note@-1 {{required by global function 'f8' where 'T' = '(Int, Double)'}}
 f8(3, f4) // expected-error {{global function 'f8' requires that 'Int' conform to 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
+f8((1,2.0), f9) // expected-error {{type '(Int, Double)' cannot conform to 'P2'}} expected-note {{only concrete types such as structs, enums and classes can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}

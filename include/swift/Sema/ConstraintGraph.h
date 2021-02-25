@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Sema/CSBindings.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -47,7 +48,8 @@ class ConstraintSystem;
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
 public:
-  explicit ConstraintGraphNode(TypeVariableType *typeVar) : TypeVar(typeVar) { }
+  explicit ConstraintGraphNode(ConstraintGraph &CG, TypeVariableType *typeVar)
+      : CG(CG), TypeVar(typeVar) {}
 
   ConstraintGraphNode(const ConstraintGraphNode&) = delete;
   ConstraintGraphNode &operator=(const ConstraintGraphNode&) = delete;
@@ -75,6 +77,8 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
+  inference::PotentialBindings &getCurrentBindings();
+
 private:
   /// Determines whether the type variable associated with this node
   /// is a representative of an equivalence class.
@@ -98,6 +102,9 @@ private:
   /// Add the given type variables to this node's equivalence class.
   void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
 
+  /// Remove N last members from equivalence class of the current type variable.
+  void truncateEquivalenceClass(unsigned prevSize);
+
   /// Add a type variable related to this type variable through fixed
   /// binding.
   void addReferencedVar(TypeVariableType *typeVar);
@@ -112,8 +119,45 @@ private:
   /// Remove a type variable which used to reference this type variable.
   void removeReferencedBy(TypeVariableType *typeVar);
 
+  /// Binding Inference {
+
+  /// Infer bindings from the given constraint and notify referenced variables
+  /// about its arrival (if requested). This happens every time a new constraint
+  /// gets added to a constraint graph node.
+  void introduceToInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Forget about the given constraint. This happens every time a constraint
+  /// gets removed for a constraint graph.
+  void retractFromInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Re-evaluate the given constraint. This happens when there are changes
+  /// in associated type variables e.g. bound/unbound to/from a fixed type,
+  /// equivalence class changes.
+  void reintroduceToInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Drop all previously collected bindings and re-infer based on the
+  /// current set constraints associated with this equivalence class.
+  void resetBindingSet();
+
+  /// Notify all of the type variables that have this one (or any member of
+  /// its equivalence class) referenced in their fixed type.
+  ///
+  /// This is a traversal up the reference change which triggers constraint
+  /// re-introduction to affected type variables.
+  ///
+  /// This is useful in situations when type variable gets bound and unbound,
+  /// or equivalence class changes.
+  void notifyReferencingVars() const;
+  /// }
+
+  /// The constraint graph this node belongs to.
+  ConstraintGraph &CG;
+
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
+
+  /// The set of bindings associated with this type variable.
+  llvm::Optional<inference::PotentialBindings> Bindings;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
