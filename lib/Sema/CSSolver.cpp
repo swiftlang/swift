@@ -2159,7 +2159,7 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   if (typeVar->getImpl().getFixedType(nullptr))
     return;
 
-  auto bindings = cs.inferBindingsFor(typeVar);
+  auto bindings = cs.getBindingsFor(typeVar);
 
   auto numBindings =
       bindings.Bindings.size() + bindings.getNumViableLiteralBindings();
