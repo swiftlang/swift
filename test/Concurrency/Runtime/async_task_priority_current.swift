@@ -12,28 +12,26 @@ import Darwin
 import Glibc
 #endif
 
-// FIXME: use `Task.currentPriority` once unsafeCurrent works in all these
-
 func test_detach() async {
-  let a1 = await Task.__unsafeCurrentAsync().task.priority
+  let a1 = Task.currentPriority
   print("a1: \(a1)") // CHECK: a1: default
 
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
   // task.
   await Task.runDetached(priority: .userInitiated) {
-    let a2 = await Task.__unsafeCurrentAsync().task.priority
+    let a2 = Task.currentPriority
     print("a2: \(a2)") // CHECK: a2: userInitiated
   }.get()
 
-  let a3 = await Task.__unsafeCurrentAsync().task.priority
+  let a3 = Task.currentPriority
   print("a3: \(a3)") // CHECK: a3: default
 }
 
 func test_multiple_lo_indirectly_escalated() async {
   @concurrent
   func loopUntil(priority: Task.Priority) async {
-    while (await Task.__unsafeCurrentAsync().task.priority != priority) {
+    while (Task.currentPriority != priority) {
       sleep(1)
     }
   }

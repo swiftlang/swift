@@ -515,6 +515,16 @@ public:
   /// result index, or None if it is not defined by an instruction.
   Optional<DefiningInstructionResult> getDefiningInstructionResult();
 
+  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
+  /// semantics if the SILValue has ownership semantics. Returns is a value
+  /// without any Ownership Semantics.
+  ///
+  /// An example of a SILValue without ownership semantics is a
+  /// struct_element_addr.
+  ///
+  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
+  ValueOwnershipKind getOwnershipKind() const;
+
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
            node->getKind() <= SILNodeKind::Last_ValueBase;
@@ -592,6 +602,8 @@ public:
 
   /// If this SILValue is a result of an instruction, return its
   /// defining instruction. Returns nullptr otherwise.
+  ///
+  /// FIXME: remove this redundant API from SILValue.
   SILInstruction *getDefiningInstruction() {
     return Value->getDefiningInstruction();
   }
@@ -610,7 +622,11 @@ public:
   /// struct_element_addr.
   ///
   /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
-  ValueOwnershipKind getOwnershipKind() const;
+  ///
+  /// FIXME: remove this redundant API from SILValue.
+  ValueOwnershipKind getOwnershipKind() const {
+    return Value->getOwnershipKind();
+  }
 
   /// Verify that this SILValue and its uses respects ownership invariants.
   void verifyOwnership(DeadEndBlocks *DEBlocks) const;
@@ -658,6 +674,11 @@ public:
 
   UseLifetimeConstraint getLifetimeConstraint() const {
     return lifetimeConstraint;
+  }
+
+  bool isConsuming() const {
+    return ownershipKind == OwnershipKind::Owned
+      && lifetimeConstraint == UseLifetimeConstraint::LifetimeEnding;
   }
 
   bool satisfiedBy(const Operand *use) const;
@@ -880,15 +901,20 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   }
 }
 
-/// Return the OperandOwnership for a forwarded operand when the forwarded
-/// result has this ValueOwnershipKind. \p allowUnowned is true for a subset
-/// of forwarding operations that are allowed to propagate Unowned values.
+/// Return the OperandOwnership for a forwarded operand when the forwarding
+/// operation has this "forwarding ownership" (as returned by
+/// getForwardingOwnershipKind()). \p allowUnowned is true for a subset of
+/// forwarding operations that are allowed to propagate Unowned values.
 ///
-/// The ownership of a forwarded value is derived from the forwarding
-/// instruction's constant ownership attribute. If the result is owned, then the
-/// instruction moves owned operand to its result, ending its lifetime. If the
-/// result is guaranteed value, then the instruction propagates the lifetime of
-/// its borrows operand through its result.
+/// Forwarding ownership is determined by the forwarding instruction's constant
+/// ownership attribute. If forwarding ownership is owned, then the instruction
+/// moves owned operand to its result, ending its lifetime. If forwarding
+/// ownership is guaranteed, then the instruction propagates the lifetime of its
+/// borrows operand through its result.
+///
+/// The resulting forwarded value typically has forwarding ownership, but may
+/// differ when the result is trivial type. e.g. an owned or guaranteed value
+/// can be cast to a trivial type using owned or guaranteed forwarding.
 inline OperandOwnership
 ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
   switch (value) {

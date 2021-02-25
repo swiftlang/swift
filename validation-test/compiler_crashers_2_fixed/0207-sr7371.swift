@@ -1,6 +1,4 @@
-// RUN: not --crash %target-swift-frontend -emit-ir %s
-// rdar://problem/65571199
-// UNSUPPORTED: asan
+// RUN: %target-swift-frontend -emit-ir %s
 
 public protocol TypedParserResultTransferType {
     // Remove type constraint

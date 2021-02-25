@@ -134,6 +134,11 @@ SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
 
 } // end anonymous namespace
 
+AsyncTask*
+swift::swift_task_get_active() {
+  return ActiveTask::get();
+}
+
 void swift::swift_job_run(Job *job, ExecutorRef executor) {
   ExecutorTrackingInfo trackingInfo;
   trackingInfo.enterAndShadow(executor);

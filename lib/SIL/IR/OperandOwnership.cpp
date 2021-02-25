@@ -443,9 +443,24 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
     : apply.getArgumentConvention(op);
 
-  return getFunctionArgOwnership(
-      argConv,
-      /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+  auto argOwnership = getFunctionArgOwnership(
+    argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+
+  // OSSA cleanup needs to handle each of these callee ownership cases.
+  //
+  // OperandOwnership::ForwardingConsume is only for thick @callee_owned.
+  //
+  // OperandOwnership::Borrow would only happen for a coroutine closure, which
+  // isn't yet possible.
+  if (apply.isCalleeOperand(op)) {
+    assert((argOwnership == OperandOwnership::TrivialUse
+            || argOwnership == OperandOwnership::UnownedInstantaneousUse
+            || argOwnership == OperandOwnership::InstantaneousUse
+            || argOwnership == OperandOwnership::ForwardingConsume
+            || argOwnership == OperandOwnership::Borrow) &&
+           "unsupported callee ownership");
+  }
+  return argOwnership;
 }
 
 OperandOwnership

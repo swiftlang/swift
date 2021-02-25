@@ -1453,19 +1453,32 @@ ConstraintSystem::getTypeOfMemberReference(
     const DeclRefExpr *base,
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
-  Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
+  Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
   // If the base is a module type, just use the type of the decl.
-  if (baseObjTy->is<ModuleType>()) {
+  if (resolvedBaseTy->is<ModuleType>()) {
     return getTypeOfReference(value, functionRefKind, locator, useDC);
   }
 
   // Check to see if the self parameter is applied, in which case we'll want to
   // strip it off later.
-  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseObjTy, value);
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(resolvedBaseTy, value);
 
-  baseObjTy = baseObjTy->getMetatypeInstanceType();
+  auto baseObjTy = resolvedBaseTy->getMetatypeInstanceType();
   FunctionType::Param baseObjParam(baseObjTy);
+
+  // Indicates whether this is a valid reference to a static member on a
+  // protocol metatype. Such a reference is only valid if performed through
+  // leading dot syntax e.g. `foo(.bar)` where implicit base is a protocol
+  // metatype and `bar` is static member declared in a protocol  or its
+  // extension.
+  bool isStaticMemberRefOnProtocol = false;
+  if (resolvedBaseTy->is<MetatypeType>() && baseObjTy->isExistentialType() &&
+      value->isStatic()) {
+    if (auto last = locator.last())
+      isStaticMemberRefOnProtocol =
+          last->is<LocatorPathElt::UnresolvedMember>();
+  }
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
     assert(!isa<ModuleDecl>(typeDecl) && "Nested module?");
@@ -1569,10 +1582,24 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // If we are looking at a member of an existential, open the existential.
   Type baseOpenedTy = baseObjTy;
-  if (baseObjTy->isExistentialType()) {
+
+  if (isStaticMemberRefOnProtocol) {
+    // In diagnostic mode, let's not try to replace base type
+    // if there is already a known issue associated with this
+    // reference e.g. it might be incorrect initializer call
+    // or result type is invalid.
+    if (!(shouldAttemptFixes() && hasFixFor(getConstraintLocator(locator)))) {
+      if (auto concreteSelf =
+              getConcreteReplacementForProtocolSelfType(value)) {
+        // Concrete type replacing `Self` could be generic, so we need
+        // to make sure that it's opened before use.
+        baseOpenedTy = openType(concreteSelf, replacements);
+      }
+    }
+  } else if (baseObjTy->isExistentialType()) {
     auto openedArchetype = OpenedArchetypeType::get(baseObjTy);
-    OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
-                                       openedArchetype });
+    OpenedExistentialTypes.push_back(
+        {getConstraintLocator(locator), openedArchetype});
     baseOpenedTy = openedArchetype;
   }
 
@@ -4504,6 +4531,23 @@ bool constraints::hasExplicitResult(ClosureExpr *closure) {
   auto &ctx = closure->getASTContext();
   return evaluateOrDefault(ctx.evaluator,
                            ClosureHasExplicitResultRequest{closure}, false);
+}
+
+Type constraints::getConcreteReplacementForProtocolSelfType(ValueDecl *member) {
+  auto *DC = member->getDeclContext();
+
+  if (!DC->getSelfProtocolDecl())
+    return Type();
+
+  GenericSignature signature;
+  if (auto *genericContext = member->getAsGenericContext()) {
+    signature = genericContext->getGenericSignature();
+  } else {
+    signature = DC->getGenericSignatureOfContext();
+  }
+
+  auto selfTy = DC->getProtocolSelfType();
+  return signature->getConcreteType(selfTy);
 }
 
 static bool isOperator(Expr *expr, StringRef expectedName) {

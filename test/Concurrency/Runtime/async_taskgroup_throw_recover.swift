@@ -27,7 +27,7 @@ func test_taskGroup_throws() async {
       print("group cancelled: \(gc)")
 
       await group.add { () async -> Int in
-        let c = await Task.__unsafeCurrentAsync().isCancelled
+        let c = Task.isCancelled
         print("task 3 (cancelled: \(c))")
         return 3
       }
@@ -44,7 +44,6 @@ func test_taskGroup_throws() async {
     fatalError("Should have thrown and handled inside the catch block")
   }
 
-  // Optionally, we may get the first result back before the failure:
   // CHECK: error caught in group: Boom()
   // CHECK: group cancelled: false
   // CHECK: task 3 (cancelled: false)

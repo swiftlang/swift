@@ -3540,42 +3540,56 @@ load_borrow
    %1 = load_borrow %0 : $*T
    // $T must be a loadable type
 
-Loads the value ``%1`` from the memory location ``%0``. The ``load_borrow``
+Loads the value ``%1`` from the memory location ``%0``. The `load_borrow`_
 instruction creates a borrowed scope in which a read-only borrow value ``%1``
 can be used to read the value stored in ``%0``. The end of scope is delimited
-by an ``end_borrow`` instruction. All ``load_borrow`` instructions must be
-paired with exactly one ``end_borrow`` instruction along any path through the
-program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
+by an `end_borrow`_ instruction. All `load_borrow`_ instructions must be
+paired with exactly one `end_borrow`_ instruction along any path through the
+program. Until `end_borrow`_, it is illegal to invalidate or store to ``%0``.
 
 begin_borrow
 ````````````
 
-TODO
+::
+
+   sil-instruction ::= 'begin_borrow' sil-operand
+
+   %1 = begin_borrow %0 : $T
+
+Given a value ``%0`` with `Owned`_ or `Guaranteed`_ ownership, produces a new
+same typed value with `Guaranteed`_ ownership: ``%1``. ``%1`` is guaranteed to
+have a lifetime ending use (e.x.: `end_borrow`_) along all paths that do not end
+in `Dead End Blocks`_. This `begin_borrow`_ and the lifetime ending uses of
+``%1`` are considered to be liveness requiring uses of ``%0`` and as such in the
+region in between this borrow and its lifetime ending use, ``%0`` must be
+live. This makes sense semantically since ``%1`` is modeling a new value with a
+dependent lifetime on ``%0``.
+
+This instruction is only valid in functions in Ownership SSA form.
 
 end_borrow
 ``````````
 
 ::
 
-   sil-instruction ::= 'end_borrow' sil-value 'from' sil-value : sil-type, sil-type
+   sil-instruction ::= 'end_borrow' sil-operand
 
-   end_borrow %1 from %0 : $T, $T
-   end_borrow %1 from %0 : $T, $*T
-   end_borrow %1 from %0 : $*T, $T
-   end_borrow %1 from %0 : $*T, $*T
-   // We allow for end_borrow to be specified in between values and addresses
-   // all of the same type T.
+   // somewhere earlier
+   // %1 = begin_borrow %0
+   end_borrow %1 : $T
 
-Ends the scope for which the SILValue ``%1`` is borrowed from the SILValue
-``%0``. Must be paired with at most 1 borrowing instruction (like
-``load_borrow``) along any path through the program. In the region in between
-the borrow instruction and the ``end_borrow``, the original SILValue can not be
-modified. This means that:
+Ends the scope for which the `Guaranteed`_ ownership possessing SILValue ``%1``
+is borrowed from the SILValue ``%0``. Must be paired with at most 1 borrowing
+instruction (like `load_borrow`_, `begin_borrow`_) along any path through the
+program. In the region in between the borrow instruction and the `end_borrow`_,
+the original SILValue can not be modified. This means that:
 
 1. If ``%0`` is an address, ``%0`` can not be written to.
 2. If ``%0`` is a non-trivial value, ``%0`` can not be destroyed.
 
 We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
+
+This instruction is only valid in functions in Ownership SSA form.
 
 assign
 ``````
@@ -3592,12 +3606,12 @@ The type of %1 is ``*T`` and the type of ``%0`` is ``T``, which must be a
 loadable type. This will overwrite the memory at ``%1`` and destroy the value
 currently held there.
 
-The purpose of the ``assign`` instruction is to simplify the
+The purpose of the `assign`_ instruction is to simplify the
 definitive initialization analysis on loadable variables by removing
 what would otherwise appear to be a load and use of the current value.
 It is produced by SILGen, which cannot know which assignments are
 meant to be initializations.  If it is deemed to be an initialization,
-it can be replaced with a ``store``; otherwise, it must be replaced
+it can be replaced with a `store`_; otherwise, it must be replaced
 with a sequence that also correctly destroys the current value.
 
 This instruction is only valid in Raw SIL and is rewritten as appropriate
@@ -3615,7 +3629,7 @@ assign_by_wrapper
   // $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
   // $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
 
-Similar to the ``assign`` instruction, but the assignment is done via a
+Similar to the `assign`_ instruction, but the assignment is done via a
 delegate.
 
 In case of an initialization, the function ``%2`` is called with ``%0`` as
@@ -4245,7 +4259,9 @@ object. Returns 1 if the strong reference count is 1, and 0 if the
 strong reference count is greater than 1.
 
 A discussion of the semantics can be found here:
-:ref:`arcopts.is_unique`.
+`is_unique instruction <arcopts_is_unique_>`_
+
+.. _arcopts_is_unique: https://github.com/apple/swift/blob/main/docs/ARCOptimization.md#is_unique-instruction
 
 begin_cow_mutation
 ``````````````````

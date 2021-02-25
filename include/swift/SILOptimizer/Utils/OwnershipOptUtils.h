@@ -27,6 +27,13 @@
 
 namespace swift {
 
+/// Returns true if this value requires OSSA cleanups.
+inline bool requiresOSSACleanup(SILValue v) {
+  return v->getFunction()->hasOwnership()
+    && v.getOwnershipKind() != OwnershipKind::None
+    && v.getOwnershipKind() != OwnershipKind::Unowned;
+}
+
 // Defined in BasicBlockUtils.h
 struct JointPostDominanceSetComputer;
 

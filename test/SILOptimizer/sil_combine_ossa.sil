@@ -4953,3 +4953,35 @@ bb0(%0 :  $*Klass, %1 : @owned $Klass):
   return %9999 : $()
 }
 
+class KlassWithTailAllocatedElems {
+  var x : Builtin.NativeObject
+  init()
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast : $@convention(thin) () -> Builtin.Word {
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: [[TAIL_ADDR:%.*]] = ref_tail_addr
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: [[CAST_RESULT:%.*]] = unchecked_addr_cast [[TAIL_ADDR]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: load [trivial] [[CAST_RESULT]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: } // end sil function 'unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast'
+sil [ossa] @unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %7 = integer_literal $Builtin.Word, 1
+  %8 = alloc_ref [tail_elems $(Builtin.NativeObject) * %7 : $Builtin.Word] $KlassWithTailAllocatedElems
+  %borrow = begin_borrow %8 : $KlassWithTailAllocatedElems
+  %addr = ref_tail_addr %borrow : $KlassWithTailAllocatedElems, $Builtin.NativeObject
+  %1 = address_to_pointer %addr : $*Builtin.NativeObject to $Builtin.RawPointer
+  end_borrow %borrow : $KlassWithTailAllocatedElems
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %3 = load [trivial] %2 : $*Builtin.Word
+  destroy_value %8 : $KlassWithTailAllocatedElems
+  return %3 : $Builtin.Word
+}
+

@@ -57,6 +57,33 @@ bool PotentialBinding::isViableForJoin() const {
 }
 
 bool PotentialBindings::isDelayed() const {
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+      // If first binding is a "fallback" to a protocol type,
+      // it means that this type variable should be delayed
+      // until it either gains more contextual information, or
+      // there are no other type variables to attempt to make
+      // forward progress.
+      if (Bindings.empty())
+        return true;
+
+
+      if (Bindings[0].BindingType->is<ProtocolType>())
+        return true;
+    }
+
+    // Since force unwrap preserves l-valueness, resulting
+    // type variable has to be delayed until either l-value
+    // binding becomes available or there are no other
+    // variables to attempt.
+    if (locator->directlyAt<ForceValueExpr>() &&
+        TypeVar->getImpl().canBindToLValue()) {
+      return llvm::none_of(Bindings, [](const PotentialBinding &binding) {
+        return binding.BindingType->is<LValueType>();
+      });
+    }
+  }
+
   if (isHole()) {
     auto *locator = TypeVar->getImpl().getLocator();
     assert(locator && "a hole without locator?");
@@ -98,19 +125,6 @@ bool PotentialBindings::isDelayed() const {
     });
   }
 
-  if (auto *locator = TypeVar->getImpl().getLocator()) {
-    // Since force unwrap preserves l-valueness, resulting
-    // type variable has to be delayed until either l-value
-    // binding becomes available or there are no other
-    // variables to attempt.
-    if (locator->directlyAt<ForceValueExpr>() &&
-        TypeVar->getImpl().canBindToLValue()) {
-      return llvm::none_of(Bindings, [](const PotentialBinding &binding) {
-        return binding.BindingType->is<LValueType>();
-      });
-    }
-  }
-
   return !DelayedBy.empty();
 }
 
@@ -140,6 +154,25 @@ bool PotentialBindings::isPotentiallyIncomplete() const {
   if (!locator)
     return false;
 
+  if (locator->isLastElement<LocatorPathElt::MemberRefBase>() &&
+      !Bindings.empty()) {
+    // If the base of the unresolved member reference like `.foo`
+    // couldn't be resolved we'd want to bind it to a hole at the
+    // very last moment possible, just like generic parameters.
+    if (isHole())
+      return true;
+
+    auto &binding = Bindings.front();
+    // If base type of a member chain is inferred to be a protocol type,
+    // let's consider this binding set to be potentially incomplete since
+    // that's done as a last resort effort at resolving first member.
+    if (auto *constraint = binding.getSource()) {
+      if (binding.BindingType->is<ProtocolType>() &&
+          constraint->getKind() == ConstraintKind::ConformsTo)
+        return true;
+    }
+  }
+
   if (locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
     // If subtyping is allowed and this is a result of an implicit member chain,
     // let's delay binding it to an optional until its object type resolved too or
@@ -159,12 +192,6 @@ bool PotentialBindings::isPotentiallyIncomplete() const {
   }
 
   if (isHole()) {
-    // If the base of the unresolved member reference like `.foo`
-    // couldn't be resolved we'd want to bind it to a hole at the
-    // very last moment possible, just like generic parameters.
-    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
-      return true;
-
     // Delay resolution of the code completion expression until
     // the very end to give it a chance to be bound to some
     // contextual type even if it's a hole.
@@ -408,6 +435,50 @@ void PotentialBindings::finalize(
         &inferredBindings) {
   inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
+
+  if (auto *locator = TypeVar->getImpl().getLocator()) {
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>()) {
+      // If this is a base of an unresolved member chain, as a last
+      // resort effort let's infer base to be a protocol type based
+      // on contextual conformance requirements.
+      //
+      // This allows us to find solutions in cases like this:
+      //
+      // \code
+      // func foo<T: P>(_: T) {}
+      // foo(.bar) <- `.bar` should be a static member of `P`.
+      // \endcode
+      if (!hasViableBindings() && TransitiveProtocols.hasValue()) {
+        for (auto *constraint : *TransitiveProtocols) {
+          auto protocolTy = constraint->getSecondType();
+          addPotentialBinding(
+              {protocolTy, AllowedBindingKind::Exact, constraint});
+        }
+      }
+    }
+
+    if (CS.shouldAttemptFixes() &&
+        locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>()) {
+      // Let's see whether this chain is valid, if it isn't then to avoid
+      // diagnosing the same issue multiple different ways, let's infer
+      // result of the chain to be a hole.
+      auto *resultExpr =
+          castToExpr<UnresolvedMemberChainResultExpr>(locator->getAnchor());
+      auto *baseLocator = CS.getConstraintLocator(
+          resultExpr->getChainBase(), ConstraintLocator::UnresolvedMember);
+
+      if (CS.hasFixFor(
+              baseLocator,
+              FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype)) {
+        CS.recordPotentialHole(TypeVar);
+        // Clear all of the previously collected bindings which are inferred
+        // from inside of a member chain.
+        Bindings.remove_if([](const PotentialBinding &binding) {
+          return binding.Kind == AllowedBindingKind::Supertypes;
+        });
+      }
+    }
+  }
 }
 
 PotentialBindings::BindingScore
@@ -450,6 +521,14 @@ Optional<PotentialBindings> ConstraintSystem::determineBestBindings() {
   // attempted next.
   auto isViableForRanking = [this](const PotentialBindings &bindings) -> bool {
     auto *typeVar = bindings.TypeVar;
+
+    // Type variable representing a base of unresolved member chain should
+    // always be considered viable for ranking since it's allow to infer
+    // types from transitive protocol requirements.
+    if (auto *locator = typeVar->getImpl().getLocator()) {
+      if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
+        return true;
+    }
 
     // If type variable is marked as a potential hole there is always going
     // to be at least one binding available for it.
@@ -967,6 +1046,13 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       if (!BGT || !isKnownKeyPathDecl(CS.getASTContext(), BGT->getDecl()))
         return None;
     }
+
+    // Don't allow a protocol type to get propagated from the base to the result
+    // type of a chain, Result should always be a concrete type which conforms
+    // to the protocol inferred for the base.
+    if (constraint->getKind() == ConstraintKind::UnresolvedMemberChainBase &&
+        kind == AllowedBindingKind::Subtypes && type->is<ProtocolType>())
+      return None;
   }
 
   // If the source of the binding is 'OptionalObject' constraint
@@ -1063,7 +1149,8 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
-    case ConstraintKind::Equal: {
+    case ConstraintKind::Equal:
+    case ConstraintKind::UnresolvedMemberChainBase: {
       EquivalentTo.insert({bindingTypeVar, constraint});
       break;
     }
@@ -1118,7 +1205,8 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentConversion:
   case ConstraintKind::OperatorArgumentConversion:
-  case ConstraintKind::OptionalObject: {
+  case ConstraintKind::OptionalObject:
+  case ConstraintKind::UnresolvedMemberChainBase: {
     auto binding = inferFromRelational(constraint);
     if (!binding)
       break;
