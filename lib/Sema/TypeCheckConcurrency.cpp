@@ -1394,6 +1394,21 @@ namespace {
       return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
     }
 
+    bool isInAsynchronousContext() const {
+      auto dc = getDeclContext();
+      if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
+        return func->isAsyncContext();
+
+      if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+        if (auto type = closure->getType()) {
+          if (auto fnType = type->getAs<AnyFunctionType>())
+            return fnType->isAsync();
+        }
+      }
+
+      return false;
+    }
+
     /// Check a reference to an entity within a global actor.
     bool checkGlobalActorReference(
         ConcreteDeclRef valueRef, SourceLoc loc, Type globalActor,
@@ -1403,6 +1418,9 @@ namespace {
       /// Returns true if this global actor reference is the callee of an Apply.
       /// NOTE: This check mutates the identified ApplyExpr if it returns true!
       auto inspectForImplicitlyAsync = [&] () -> bool {
+        // If our current context isn't an asynchronous one, don't
+        if (!isInAsynchronousContext())
+          return false;
 
         // Is this global actor reference outside of an ApplyExpr?
         if (applyStack.size() == 0)
@@ -1727,10 +1745,13 @@ namespace {
       }
 
       case ActorIsolationRestriction::ActorSelf: {
-        // Must reference actor-isolated state on 'self'.
-        auto *selfVar = getReferencedSelf(base);
-        if (!selfVar) {
-          // actor-isolated non-self calls are implicitly async and thus OK.
+        // Local function to check for implicit async promotion.
+        auto checkImplicitlyAsync = [&]() -> Optional<bool> {
+          if (!isInAsynchronousContext())
+            return None;
+
+          // actor-isolated non-isolated-self calls are implicitly async
+          // and thus OK.
           if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
             markNearestCallAsImplicitlyAsync();
 
@@ -1739,6 +1760,16 @@ namespace {
                 memberRef, getDeclContext(), memberLoc,
                 ConcurrentReferenceKind::SynchronousAsAsyncCall);
           }
+
+          return None;
+        };
+
+        // Must reference actor-isolated state on 'self'.
+        auto *selfVar = getReferencedSelf(base);
+        if (!selfVar) {
+          // Check for implicit async.
+          if (auto result = checkImplicitlyAsync())
+            return *result;
 
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_non_self_reference,
@@ -1772,6 +1803,10 @@ namespace {
             return false;
 
           case ActorIsolation::Independent: {
+            // Check for implicit async.
+            if (auto result = checkImplicitlyAsync())
+              return *result;
+
             // The 'self' is for an actor-independent member, which means
             // we cannot refer to actor-isolated state.
             auto diag = findActorIndependentReason(curDC);
@@ -1782,6 +1817,10 @@ namespace {
           }
 
           case ActorIsolation::GlobalActor:
+            // Check for implicit async.
+            if (auto result = checkImplicitlyAsync())
+              return *result;
+
             // The 'self' is for a member that's part of a global actor, which
             // means we cannot refer to actor-isolated state.
             ctx.Diags.diagnose(
