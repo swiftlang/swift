@@ -253,11 +253,11 @@ void PotentialBindings::inferTransitiveProtocolRequirements(
                    const SmallPtrSetImpl<Constraint *> &transitive) {
         auto &destination = protocols[dstVar];
 
-        for (auto *protocol : direct)
-          destination.insert(protocol);
+        if (direct.size() > 0)
+          destination.insert(direct.begin(), direct.end());
 
-        for (auto *protocol : transitive)
-          destination.insert(protocol);
+        if (transitive.size() > 0)
+          destination.insert(transitive.begin(), transitive.end());
       };
 
   addToWorkList(nullptr, TypeVar);
@@ -289,7 +289,7 @@ void PotentialBindings::inferTransitiveProtocolRequirements(
       addToWorkList(currentVar, entry.first);
 
     // If current type variable is part of an equivalence
-    // class, make it a "representative" and let's it infer
+    // class, make it a "representative" and let it infer
     // supertypes and direct protocol requirements from
     // other members.
     for (const auto &entry : bindings.EquivalentTo) {
@@ -325,7 +325,7 @@ void PotentialBindings::inferTransitiveProtocolRequirements(
       propagateProtocolsTo(parent, bindings.Protocols, protocols[currentVar]);
     }
 
-    auto inferredProtocols = std::move(protocols[currentVar]);
+    auto &inferredProtocols = protocols[currentVar];
 
     llvm::SmallPtrSet<Constraint *, 4> protocolsForEquivalence;
 
@@ -348,13 +348,15 @@ void PotentialBindings::inferTransitiveProtocolRequirements(
       auto eqBindings = inferredBindings.find(equivalence.first);
       if (eqBindings != inferredBindings.end()) {
         auto &bindings = eqBindings->getSecond();
-        bindings.TransitiveProtocols.emplace(protocolsForEquivalence);
+        bindings.TransitiveProtocols.emplace(protocolsForEquivalence.begin(),
+                                             protocolsForEquivalence.end());
       }
     }
 
     // Update the bindings associated with current type variable,
     // to avoid repeating this inference process.
-    bindings.TransitiveProtocols.emplace(std::move(inferredProtocols));
+    bindings.TransitiveProtocols.emplace(inferredProtocols.begin(),
+                                         inferredProtocols.end());
   } while (!workList.empty());
 }
 
