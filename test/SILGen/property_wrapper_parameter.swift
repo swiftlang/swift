@@ -30,10 +30,10 @@ public func testSimpleWrapperParameter(@Wrapper value: Int) {
   _ = $value
 
   // property wrapper backing initializer of value #1 in testSimpleWrapperParameter(value:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
 
   // property wrapper init from projected value of value #1 in testSimpleWrapperParameter(value:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tFACL_SivpfW : $@convention(thin) (Projection<Int>) -> Wrapper<Int>
 
   // getter of $value #1 in testSimpleWrapperParameter(value:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter26testSimpleWrapperParameter5valueyAA0F0VySiG_tF6$valueL_AA10ProjectionVySiGvg : $@convention(thin) (Wrapper<Int>) -> Projection<Int>
@@ -183,4 +183,30 @@ func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
 
   // getter of value #1 in closure #2 in implicit closure #2 in testImplicitPropertyWrapper(projection:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFSi_AFtAFcfu0_Si_AFtAFcfU0_5valueL_Sivg : $@convention(thin) () -> Int
+}
+
+@propertyWrapper
+public struct PublicWrapper<T> {
+  public var wrappedValue: T
+
+  public init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+
+  public var projectedValue: PublicWrapper<T> {
+    return self
+  }
+
+  public init(projectedValue: PublicWrapper<T>) {
+    self.wrappedValue = projectedValue.wrappedValue
+  }
+}
+
+// CHECK-LABEL: sil [ossa] @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tF : $@convention(thin) (@guaranteed PublicWrapper<String>) -> ()
+public func publicFunc(@PublicWrapper value: String) {
+  // property wrapper backing initializer of value #1 in publicFunc(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned PublicWrapper<String>
+
+  // property wrapper init from projected value of value #1 in publicFunc(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfW : $@convention(thin) (@owned PublicWrapper<String>) -> @owned PublicWrapper<String>
 }
