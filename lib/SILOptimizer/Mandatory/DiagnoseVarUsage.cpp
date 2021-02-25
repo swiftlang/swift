@@ -651,7 +651,7 @@ private:
       // If a local function captures the value, this isn't a direct read.
       // We will traverse through the function later to determine if it
       // the variable is read.
-      if (!Fn->isExternalDeclaration()) {
+      if (!Fn->isExternalDeclaration() || Fn->isSerialized()) {
         if (auto FnDeclCtx = Fn->getDeclContext()) {
           if (auto FnDecl = dyn_cast<FuncDecl>(FnDeclCtx)) {
             SmallVector<CapturedValue, 2> LocalCaptures;
@@ -668,9 +668,14 @@ private:
       }
       if ((Op->getUser() == Apply) && AS.isArgumentOperand(*Op)) {
         
-        // If the parameter is not an inout, trust that the function reads
-        // the argument.
         if (!argIsInout(AS.getArgumentConvention(*Op))) {
+          // If the parameter is not an inout, trust that the function reads
+          // the argument.
+          return true;
+        } else if (Fn->isExternalDeclaration() && !Fn->isSerialized()) {
+          // If we can not inspect the function, we can not guarantee
+          // that an inout is read. We will assume it is read so as not to
+          // produce an incorrect diagnostic.
           return true;
         }
         

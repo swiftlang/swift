@@ -902,16 +902,17 @@ func testLocalProperties(_ b : Int) -> Int {
 
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(_ b : T) -> T {
+  // expected-warning @+2 {{variable 'x' was written to, but never read}}
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}} expected-warning {{variable 'x' was written to, but never read}}
+  let x : T // expected-note {{change 'let' to 'var' to make it mutable}}
   let y : T
-  let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
+  let z : T // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
   y = b
-  x = b   // expected-error {{immutable value 'x' may only be initialized once}}
+  x = b // expected-error {{immutable value 'x' may only be initialized once}}
 
   var tmp = b // expected-warning {{variable 'tmp' was written to, but never read}}
-  swap(&x, &tmp)   // expected-error {{immutable value 'x' must not be passed inout}}
+  swap(&x, &tmp) // expected-error {{immutable value 'x' must not be passed inout}}
   return y
 }
 

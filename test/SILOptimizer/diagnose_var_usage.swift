@@ -217,6 +217,11 @@ func property() -> Int {
 func testInOut(_ x : inout Int) {  // Ok.
 }
 
+func testInOutNoRead() {
+  var x = 12 // expected-warning {{variable 'x' was written to, but never read}}
+  testInOut(&x)
+}
+
 struct TestStruct {
   var property = 42
 
@@ -1229,7 +1234,7 @@ func testTupleAssignUsedModified() -> Int {
 }
 
 func testDeclareInIf() {
-  var a = [1,2] // expected-warning {{variable 'a' was written to, but never read}}
+  var a = [1, 2] // expected-warning {{variable 'a' was written to, but never read}}
   #if arch(arm64)
   let i = 0
   #else
