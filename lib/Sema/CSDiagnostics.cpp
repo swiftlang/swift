@@ -3291,9 +3291,34 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
     return true;
   }
 
+  if (isa<ParamDecl>(getProperty())) {
+    auto wrapperType = getToType();
+    auto wrappedValueType = computeWrappedValueType(getProperty(), wrapperType);
+    emitDiagnostic(diag::property_wrapper_param_projection_invalid, wrappedValueType);
+    return true;
+  }
+
   emitDiagnostic(diag::incorrect_property_wrapper_reference, getPropertyName(),
                  getFromType(), getToType(), true)
       .fixItRemoveChars(getLoc(), endLoc);
+  return true;
+}
+
+bool MissingProjectedValueFailure::diagnoseAsError() {
+  emitDiagnostic(diag::property_wrapper_param_no_projection, wrapperType);
+  return true;
+}
+
+bool MissingPropertyWrapperAttributeFailure::diagnoseAsError() {
+  if (auto *param = getAsDecl<ParamDecl>(getAnchor())) {
+    emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
+
+    // FIXME: emit a note and fix-it to add '@propertyWrapper' if the
+    // type is a nominal and in the same module.
+  } else {
+    emitDiagnostic(diag::property_wrapper_param_no_wrapper);
+  }
+
   return true;
 }
 

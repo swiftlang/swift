@@ -276,11 +276,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     
     if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
-      param.FirstNameLoc = consumeArgumentLabel(param.FirstName);
+      param.FirstNameLoc = consumeArgumentLabel(param.FirstName,
+                                                /*diagnoseDollarPrefix=*/!isClosure);
 
       // identifier-or-none? for the second name
       if (Tok.canBeArgumentLabel())
-        param.SecondNameLoc = consumeArgumentLabel(param.SecondName);
+        param.SecondNameLoc = consumeArgumentLabel(param.SecondName,
+                                                   /*diagnoseDollarPrefix=*/true);
 
       // Operators, closures, and enum elements cannot have API names.
       if ((paramContext == ParameterContextKind::Operator ||

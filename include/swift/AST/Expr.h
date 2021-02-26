@@ -4228,6 +4228,62 @@ public:
   }
 };
 
+/// An implicit applied property wrapper expression.
+class AppliedPropertyWrapperExpr final : public Expr {
+public:
+  enum class ValueKind {
+    WrappedValue,
+    ProjectedValue
+  };
+
+private:
+  /// The concrete callee which owns the property wrapper.
+  ConcreteDeclRef Callee;
+
+  /// The owning declaration.
+  const ParamDecl *Param;
+
+  /// The source location of the argument list.
+  SourceLoc Loc;
+
+  /// The value to which the property wrapper is applied for initialization.
+  Expr *Value;
+
+  /// The kind of value that the property wrapper is applied to.
+  ValueKind Kind;
+
+  AppliedPropertyWrapperExpr(ConcreteDeclRef callee, const ParamDecl *param, SourceLoc loc,
+                             Type Ty, Expr *value, ValueKind kind)
+      : Expr(ExprKind::AppliedPropertyWrapper, /*Implicit=*/true, Ty),
+        Callee(callee), Param(param), Loc(loc), Value(value), Kind(kind) {}
+
+public:
+  static AppliedPropertyWrapperExpr *
+  create(ASTContext &ctx, ConcreteDeclRef callee, const ParamDecl *param, SourceLoc loc,
+         Type Ty, Expr *value, ValueKind kind);
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  ConcreteDeclRef getCallee() { return Callee; }
+
+  /// Returns the parameter declaration with the attached property wrapper.
+  const ParamDecl *getParamDecl() const { return Param; };
+
+  /// Returns the value that the property wrapper is applied to.
+  Expr *getValue() { return Value; }
+
+  /// Sets the value that the property wrapper is applied to.
+  void setValue(Expr *value) { Value = value; }
+
+  /// Returns the kind of value, between wrapped value and projected
+  /// value, the property wrapper is applied to.
+  ValueKind getValueKind() const { return Kind; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AppliedPropertyWrapper;
+  }
+};
+
 /// An expression referring to a default argument left unspecified at the
 /// call site.
 ///

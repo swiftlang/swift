@@ -1186,6 +1186,9 @@ public:
   llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
       resultBuilderTransformed;
 
+  /// A map from argument expressions to their applied property wrapper expressions.
+  llvm::MapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
+
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
   Type simplifyType(Type type) const;
@@ -2234,6 +2237,9 @@ private:
   llvm::SmallDenseMap<ClosureExpr *, FunctionType::ExtInfo, 4> closureEffectsCache;
 
 public:
+  /// A map from argument expressions to their applied property wrapper expressions.
+  llvm::SmallMapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>, 4> appliedPropertyWrappers;
+
   /// The locators of \c Defaultable constraints whose defaults were used.
   std::vector<ConstraintLocator *> DefaultedConstraints;
 
@@ -2697,6 +2703,9 @@ public:
     unsigned numFavoredConstraints;
 
     unsigned numResultBuilderTransformed;
+
+    /// The length of \c appliedPropertyWrappers
+    unsigned numAppliedPropertyWrappers;
 
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
@@ -4632,6 +4641,12 @@ public:
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
       ConstraintKind bodyResultConstraintKind,
       ConstraintLocatorBuilder locator);
+
+  /// Matches a wrapped or projected value parameter type to its backing
+  /// property wrapper type by applying the property wrapper.
+  TypeMatchResult applyPropertyWrapperToParameter(
+      Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
+      ConstraintKind matchKind, ConstraintLocatorBuilder locator);
 
   Optional<BindingSet> determineBestBindings();
 

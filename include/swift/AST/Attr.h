@@ -1689,6 +1689,7 @@ public:
   unsigned getNumArguments() const { return numArgLabels; }
   bool hasArgumentLabelLocs() const { return hasArgLabelLocs; }
 
+  TypeExpr *getTypeExpr() const { return typeExpr; }
   TypeRepr *getTypeRepr() const;
   Type getType() const;
 

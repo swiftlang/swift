@@ -166,6 +166,14 @@ std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
   return finalize();
 }
 
+std::string ASTMangler::mangleInitFromProjectedValueEntity(const VarDecl *var,
+                                                           SymbolKind SKind) {
+  beginMangling();
+  appendInitFromProjectedValueEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   beginMangling();
   appendAnyGenericType(decl);
@@ -2108,6 +2116,19 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       }
       return;
     }
+
+    case InitializerKind::PropertyWrapper: {
+      auto wrapperInit = cast<PropertyWrapperInitializer>(ctx);
+      switch (wrapperInit->getKind()) {
+      case PropertyWrapperInitializer::Kind::WrappedValue:
+        appendBackingInitializerEntity(wrapperInit->getParam());
+        break;
+      case PropertyWrapperInitializer::Kind::ProjectedValue:
+        appendInitFromProjectedValueEntity(wrapperInit->getParam());
+        break;
+      }
+      return;
+    }
     }
     llvm_unreachable("bad initializer kind");
 
@@ -2804,6 +2825,11 @@ void ASTMangler::appendInitializerEntity(const VarDecl *var) {
 void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
   appendEntity(var, "vp", var->isStatic());
   appendOperator("fP");
+}
+
+void ASTMangler::appendInitFromProjectedValueEntity(const VarDecl *var) {
+  appendEntity(var, "vp", var->isStatic());
+  appendOperator("fW");
 }
 
 /// Is this declaration a method for mangling purposes? If so, we'll leave the

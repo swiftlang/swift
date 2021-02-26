@@ -847,7 +847,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
 
     // Wrapped non-static member properties may have a backing initializer.
     if (auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo()) {
-      if (wrapperInfo.initializeFromOriginal && !VD->isStatic()) {
+      if (wrapperInfo.hasInitFromWrappedValue() && !VD->isStatic()) {
         addSymbol(
             SILDeclRef(VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
       }

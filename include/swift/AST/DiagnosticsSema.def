@@ -4109,11 +4109,11 @@ ERROR(throw_in_nonexhaustive_catch,none,
 
 ERROR(throwing_call_in_illegal_context,none,
       "call can throw, but errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(throw_in_illegal_context,none,
       "errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 
 ERROR(throwing_operator_without_try,none,
@@ -4151,11 +4151,11 @@ WARNING(no_async_in_await,none,
         "no calls to 'async' functions occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
       "'async' call cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(await_in_illegal_context,none,
       "'await' operation cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(async_in_nonasync_function,none,
       "%select{'async'|'await'|'async let'}0 in "
@@ -4197,7 +4197,7 @@ ERROR(async_let_without_await,none,
       "reference to async let %0 is not marked with 'await'", (DeclName))
 ERROR(async_let_in_illegal_context,none,
       "async let %0 cannot be referenced in "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
       (DeclName, unsigned))
 
 ERROR(asynchandler_non_func,none,
@@ -5482,8 +5482,27 @@ ERROR(property_wrapper_dynamic_self_type, none,
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
       (Identifier))
+ERROR(property_wrapper_param_not_supported,none,
+      "property wrapper attribute on parameter not yet supported on %0",
+      (DescriptiveDeclKind))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (Identifier))
+ERROR(property_wrapper_param_no_projection,none,
+      "cannot use property wrapper projection parameter; "
+      "wrapper %0 does not have a 'projectedValue'", (Type))
+ERROR(property_wrapper_param_no_wrapper,none,
+      "cannot use property wrapper projection argument; "
+      "parameter does not have an attached property wrapper",
+      ())
+ERROR(property_wrapper_param_projection_invalid,none,
+      "cannot use property wrapper projection argument; "
+      "pass wrapped value type %0 instead", (Type))
+ERROR(property_wrapper_param_mutating,none,
+      "property wrapper applied to parameter must have a nonmutating "
+      "'wrappedValue' getter", ())
+ERROR(invalid_implicit_property_wrapper,none,
+      "inferred projection type %0 is not a property wrapper",
+      (Type))
 
 ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "
@@ -5505,9 +5524,9 @@ ERROR(property_with_wrapper_conflict_attribute,none,
 ERROR(property_wrapper_not_single_var, none,
       "property wrapper can only apply to a single variable", ())
 ERROR(property_with_wrapper_in_bad_context,none,
-      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{|non-static|non-static}1 %2 %0 declared inside "
       "%select{a protocol|an extension|an enum}1 cannot have a wrapper",
-      (Identifier, int))
+      (Identifier, int, DescriptiveDeclKind))
 ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (Identifier))

@@ -5861,7 +5861,17 @@ llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
 
 /// Whether this property has any attached property wrappers.
 bool VarDecl::hasAttachedPropertyWrapper() const {
-  return !getAttachedPropertyWrappers().empty();
+  return !getAttachedPropertyWrappers().empty() || hasImplicitPropertyWrapper();
+}
+
+bool VarDecl::hasImplicitPropertyWrapper() const {
+  if (!getAttachedPropertyWrappers().empty())
+    return false;
+
+  auto *dc = getDeclContext();
+  bool isClosureParam = isa<ParamDecl>(this) &&
+      dc->getContextKind() == DeclContextKind::AbstractClosureExpr;
+  return !isImplicit() && getName().hasDollarPrefix() && isClosureParam;
 }
 
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
@@ -5877,15 +5887,22 @@ bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
 
 PropertyWrapperTypeInfo
 VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
-  auto attrs = getAttachedPropertyWrappers();
-  if (i >= attrs.size())
-    return PropertyWrapperTypeInfo();
-  
-  auto attr = attrs[i];
-  auto dc = getDeclContext();
-  ASTContext &ctx = getASTContext();
-  auto nominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  NominalTypeDecl *nominal;
+  if (hasImplicitPropertyWrapper()) {
+    assert(i == 0);
+    nominal = getInterfaceType()->getAnyNominal();
+  } else {
+    auto attrs = getAttachedPropertyWrappers();
+    if (i >= attrs.size())
+      return PropertyWrapperTypeInfo();
+
+    auto attr = attrs[i];
+    auto dc = getDeclContext();
+    ASTContext &ctx = getASTContext();
+    nominal = evaluateOrDefault(
+        ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+  }
+
   if (!nominal)
     return PropertyWrapperTypeInfo();
 
@@ -5948,8 +5965,17 @@ VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
   return getPropertyWrapperBackingPropertyInfo().projectionVar;
 }
 
+VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyWrapperWrappedValueVarRequest{mutableThis},
+      nullptr);
+}
+
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
-  if (getDeclContext()->isTypeContext())
+  if (getDeclContext()->isTypeContext() || isImplicit())
     return;
 
   if (getAttrs().hasAttribute<LazyAttr>()) {
@@ -5957,12 +5983,15 @@ void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) con
       visit(backingVar);
   }
 
-  if (getAttrs().hasAttribute<CustomAttr>()) {
+  if (getAttrs().hasAttribute<CustomAttr>() || hasImplicitPropertyWrapper()) {
     if (auto *backingVar = getPropertyWrapperBackingProperty())
       visit(backingVar);
 
     if (auto *projectionVar = getPropertyWrapperProjectionVar())
       visit(projectionVar);
+
+    if (auto *wrappedValueVar = getPropertyWrapperWrappedValueVar())
+      visit(wrappedValueVar);
   }
 }
 
@@ -6005,10 +6034,10 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 
 Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
   auto wrapperInfo = getPropertyWrapperBackingPropertyInfo();
-  if (!wrapperInfo || !wrapperInfo.wrappedValuePlaceholder)
+  if (!wrapperInfo || !wrapperInfo.getWrappedValuePlaceholder())
     return Type();
 
-  Type valueInterfaceTy = wrapperInfo.wrappedValuePlaceholder->getType();
+  Type valueInterfaceTy = wrapperInfo.getWrappedValuePlaceholder()->getType();
   if (valueInterfaceTy->hasArchetype())
     valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
 
@@ -6239,8 +6268,13 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 }
 
 AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
-  if (!type)
-    type = getInterfaceType();
+  if (!type) {
+    if (hasAttachedPropertyWrapper() && !hasImplicitPropertyWrapper()) {
+      type = getPropertyWrapperBackingPropertyType();
+    } else {
+      type = getInterfaceType();
+    }
+  }
 
   if (isVariadic())
     type = ParamDecl::getVarargBaseTy(type);

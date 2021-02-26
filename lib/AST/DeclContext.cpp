@@ -677,6 +677,19 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
       OS << " DefaultArgument index=" << init->getIndex();
       break;
     }
+    case InitializerKind::PropertyWrapper: {
+      auto init = cast<PropertyWrapperInitializer>(this);
+      OS << "PropertyWrapper 0x" << (void*)init->getParam() << ", kind=";
+      switch (init->getKind()) {
+      case PropertyWrapperInitializer::Kind::WrappedValue:
+        OS << "wrappedValue";
+        break;
+      case PropertyWrapperInitializer::Kind::ProjectedValue:
+          OS << "projectedValue";
+        break;
+      }
+      break;
+    }
     }
     break;
 

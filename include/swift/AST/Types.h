@@ -80,6 +80,7 @@ class EnumDecl;
 class EnumElementDecl;
 class SILFunctionType;
 class StructDecl;
+class ParamDecl;
 class ProtocolDecl;
 class TypeVariableType;
 class ValueDecl;
@@ -3280,6 +3281,7 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 struct ParameterListInfo {
   SmallBitVector defaultArguments;
   SmallBitVector acceptsUnlabeledTrailingClosures;
+  SmallVector<const ParamDecl *, 4> propertyWrappers;
 
 public:
   ParameterListInfo() { }
@@ -3293,6 +3295,10 @@ public:
   /// Whether the parameter accepts an unlabeled trailing closure argument
   /// according to the "forward-scan" rule.
   bool acceptsUnlabeledTrailingClosureArgument(unsigned paramIdx) const;
+
+  /// The ParamDecl at the given index if the parameter has an applied
+  /// property wrapper.
+  const ParamDecl *getPropertyWrapperParam(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {

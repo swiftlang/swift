@@ -1135,7 +1135,7 @@ public:
     // If this variable has an attached property wrapper with an initialization
     // function, emit the backing initializer function.
     if (auto wrapperInfo = vd->getPropertyWrapperBackingPropertyInfo()) {
-      if (wrapperInfo.initializeFromOriginal && !vd->isStatic()) {
+      if (wrapperInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
         SGM.emitPropertyWrapperBackingInitializer(vd);
       }
     }
