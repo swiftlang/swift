@@ -167,28 +167,23 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   if (!type->isTypeVariableOrMember()) {
     // If this type variable represents a literal, check whether we picked the
     // default literal type. First, find the corresponding protocol.
-    ProtocolDecl *literalProtocol = nullptr;
+    //
     // If we have the constraint graph, we can check all type variables in
     // the equivalence class. This is the More Correct path.
     // FIXME: Eliminate the less-correct path.
     auto typeVarRep = getRepresentative(typeVar);
-    for (auto tv : CG[typeVarRep].getEquivalenceClass()) {
+    for (auto *tv : CG[typeVarRep].getEquivalenceClass()) {
       auto locator = tv->getImpl().getLocator();
-      if (!locator || !locator->getPath().empty())
+      if (!(locator && (locator->directlyAt<CollectionExpr>() ||
+                        locator->directlyAt<LiteralExpr>())))
+          continue;
+
+      auto *literalProtocol = TypeChecker::getLiteralProtocol(
+          getASTContext(), castToExpr(locator->getAnchor()));
+      if (!literalProtocol)
         continue;
 
-      auto *anchor = getAsExpr(locator->getAnchor());
-      if (!anchor)
-        continue;
-
-      literalProtocol =
-          TypeChecker::getLiteralProtocol(getASTContext(), anchor);
-      if (literalProtocol)
-        break;
-    }
-
-    // If the protocol has a default type, check it.
-    if (literalProtocol) {
+      // If the protocol has a default type, check it.
       if (auto defaultType = TypeChecker::getDefaultType(literalProtocol, DC)) {
         // Check whether the nominal types match. This makes sure that we
         // properly handle Array vs. Array<T>.
@@ -196,6 +191,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
           increaseScore(SK_NonDefaultLiteral);
         }
       }
+
+      break;
     }
   }
 
