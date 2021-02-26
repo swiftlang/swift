@@ -290,7 +290,7 @@ bool ModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
   // processes are doing the same.
   // FIXME: We should surface the module building step to the build system so
   // we don't need to synchronize here.
-  llvm::LockFileManager Locked(interfacePath);
+  llvm::LockFileManager Locked(OutPath);
   switch (Locked) {
   case llvm::LockFileManager::LFS_Error:{
     // ModuleInterfaceBuilder takes care of correctness and locks are only
