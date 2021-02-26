@@ -234,8 +234,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
 
     CanType depTy = req.getFirstType()->getCanonicalType();
     auto replacement = depTy.subst(subs, lookupConformance);
-    auto protoType = req.getSecondType()->castTo<ProtocolType>();
-    auto proto = protoType->getDecl();
+    auto *proto = req.getProtocolDecl();
     auto conformance = lookupConformance(depTy, replacement, proto);
     conformances.push_back(conformance);
   }
@@ -334,37 +333,26 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   auto genericSig = getGenericSignature();
 
-  // Fast path
-  unsigned index = 0;
-  for (auto reqt : genericSig->getRequirements()) {
-    if (reqt.getKind() == RequirementKind::Conformance) {
-      if (reqt.getFirstType()->isEqual(type) &&
-          reqt.getSecondType()->isEqual(proto->getDeclaredInterfaceType()))
-        return getConformances()[index];
+  auto getSignatureConformance =
+      [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+    unsigned index = 0;
+    for (auto reqt : genericSig->getRequirements()) {
+      if (reqt.getKind() == RequirementKind::Conformance) {
+        if (reqt.getFirstType()->isEqual(type) &&
+            reqt.getProtocolDecl() == proto)
+          return getConformances()[index];
 
-      ++index;
-    }
-  }
-
-  // Retrieve the starting conformance from the conformance map.
-  auto getInitialConformance =
-      [&](Type type, ProtocolDecl *proto) -> ProtocolConformanceRef {
-    unsigned conformanceIndex = 0;
-    for (const auto &req : getGenericSignature()->getRequirements()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
-
-      // Is this the conformance we're looking for?
-      if (req.getFirstType()->isEqual(type) &&
-          req.getSecondType()->castTo<ProtocolType>()->getDecl() == proto) {
-        return getConformances()[conformanceIndex];
+        ++index;
       }
-
-      ++conformanceIndex;
     }
 
-    return ProtocolConformanceRef::forInvalid();
+    return None;
   };
+
+  // Fast path -- check if the generic signature directly states the
+  // conformance.
+  if (auto directConformance = getSignatureConformance(type, proto))
+    return *directConformance;
 
   // Check whether the superclass conforms.
   if (auto superclass = genericSig->getSuperclassBound(type)) {
@@ -388,15 +376,15 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   for (const auto &step : accessPath) {
     // For the first step, grab the initial conformance.
     if (conformance.isInvalid()) {
-      conformance = getInitialConformance(step.first, step.second);
-      if (conformance.isInvalid())
-        return ProtocolConformanceRef::forInvalid();
+      if (auto initialConformance = getSignatureConformance(
+            step.first, step.second)) {
+        conformance = *initialConformance;
+        continue;
+      }
 
-      continue;
+      // We couldn't find the initial conformance, fail.
+      return ProtocolConformanceRef::forInvalid();
     }
-
-    if (conformance.isInvalid())
-      return conformance;
 
     // If we've hit an abstract conformance, everything from here on out is
     // abstract.
@@ -436,6 +424,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // Get the associated conformance.
     conformance = concrete->getAssociatedConformance(step.first, step.second);
+    if (conformance.isInvalid())
+      return conformance;
   }
 
   return conformance;

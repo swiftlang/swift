@@ -2533,8 +2533,7 @@ static bool usesFeatureRethrowsProtocol(
           ->getGenericSignatureOfContext()) {
     for (const auto &req : genericSig->getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance &&
-          usesFeatureRethrowsProtocol(
-            req.getSecondType()->getAs<ProtocolType>()->getDecl(), checked))
+          usesFeatureRethrowsProtocol(req.getProtocolDecl(), checked))
         return true;
     }
   }

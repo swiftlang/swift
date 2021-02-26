@@ -572,8 +572,7 @@ void NormalProtocolConformance::setSignatureConformances(
              "Should have interface types here");
       assert(idx < conformances.size());
       assert(conformances[idx].isInvalid() ||
-             conformances[idx].getRequirement() ==
-               req.getSecondType()->castTo<ProtocolType>()->getDecl());
+             conformances[idx].getRequirement() == req.getProtocolDecl());
       ++idx;
     }
   }
@@ -772,7 +771,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
     if (reqt.getKind() == RequirementKind::Conformance) {
       // Is this the conformance we're looking for?
       if (reqt.getFirstType()->isEqual(assocType) &&
-          reqt.getSecondType()->castTo<ProtocolType>()->getDecl() == protocol)
+          reqt.getProtocolDecl() == protocol)
         return getSignatureConformances()[conformanceIndex];
 
       ++conformanceIndex;
@@ -840,7 +839,7 @@ void NormalProtocolConformance::finishSignatureConformances() {
       auto *depMemTy = origTy->castTo<DependentMemberType>();
       substTy = recursivelySubstituteBaseType(module, this, depMemTy);
     }
-    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto reqProto = req.getProtocolDecl();
 
     // Looking up a conformance for a contextual type and mapping the
     // conformance context produces a more accurate result than looking

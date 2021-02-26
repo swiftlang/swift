@@ -308,9 +308,8 @@ CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
     assert(reqt.getKind() == RequirementKind::Conformance &&
            "Only conformance requirements can have multiples");
 
-    auto prevProto =
-      prevReqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-    auto proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto prevProto = prevReqt.getProtocolDecl();
+    auto proto = reqt.getProtocolDecl();
     assert(TypeDecl::compare(prevProto, proto) < 0 &&
            "Out-of-order conformance requirements");
   }
@@ -545,8 +544,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
 
   switch (requirement.getKind()) {
   case RequirementKind::Conformance: {
-    auto protocolType = requirement.getSecondType()->castTo<ProtocolType>();
-    auto protocol = protocolType->getDecl();
+    auto *protocol = requirement.getProtocolDecl();
 
     if (canFirstType->isTypeParameter())
       return requiresProtocol(canFirstType, protocol);
@@ -746,8 +744,7 @@ static bool hasConformanceInSignature(ArrayRef<Requirement> requirements,
   for (const auto &req: requirements) {
     if (req.getKind() == RequirementKind::Conformance &&
         req.getFirstType()->isEqual(subjectType) &&
-        req.getSecondType()->castTo<ProtocolType>()->getDecl()
-          == proto) {
+        req.getProtocolDecl() == proto) {
       return true;
     }
   }
@@ -1007,7 +1004,6 @@ bool Requirement::isCanonical() const {
   return true;
 }
 
-
 /// Get the canonical form of this requirement.
 Requirement Requirement::getCanonical() const {
   Type firstType = getFirstType();
@@ -1028,4 +1024,9 @@ Requirement Requirement::getCanonical() const {
     return Requirement(getKind(), firstType, getLayoutConstraint());
   }
   llvm_unreachable("Unhandled RequirementKind in switch");
+}
+
+ProtocolDecl *Requirement::getProtocolDecl() const {
+  assert(getKind() == RequirementKind::Conformance);
+  return getSecondType()->castTo<ProtocolType>()->getDecl();
 }

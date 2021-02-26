@@ -88,8 +88,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
 
-    auto protoTy = requirement.getSecondType()->castTo<ProtocolType>();
-    auto protoDecl = protoTy->getDecl();
+    auto *protoDecl = requirement.getProtocolDecl();
     if (!protoDecl->hasPolymorphicEffect(kind))
       continue;
 
@@ -119,9 +118,7 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
   if (auto genericSig = decl->getGenericSignature()) {
     for (auto req : genericSig->getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
-        if (req.getSecondType()->castTo<ProtocolType>()
-                               ->getDecl()
-                               ->hasPolymorphicEffect(kind)) {
+        if (req.getProtocolDecl()->hasPolymorphicEffect(kind)) {
           return PolymorphicEffectKind::ByConformance;
         }
       }

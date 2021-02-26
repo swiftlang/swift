@@ -259,7 +259,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
 
       // The conformance of 'Self' to the protocol is okay.
       if (req.getKind() == RequirementKind::Conformance &&
-          req.getSecondType()->getAs<ProtocolType>()->getDecl() == proto &&
+          req.getProtocolDecl() == proto &&
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
