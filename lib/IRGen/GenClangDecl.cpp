@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenModule.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -20,6 +21,7 @@
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -130,6 +132,15 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
         continue;
     if (isa<clang::FieldDecl>(next)) {
       continue;
+    }
+    // If a method calls another method in a class template specialization, we
+    // need to instantiate that other method. Do that here.
+    if (auto *method = dyn_cast<clang::CXXMethodDecl>(next)) {
+      // Make sure that this method is part of a class template specialization.
+      if (method->getTemplateInstantiationPattern())
+        Context.getClangModuleLoader()
+            ->getClangSema()
+            .InstantiateFunctionDefinition(method->getLocation(), method);
     }
     ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(next));
   }
