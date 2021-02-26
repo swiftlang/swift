@@ -135,6 +135,24 @@ private:
   /// equivalence class changes.
   void reintroduceToInference(Constraint *constraint, bool notifyReferencedVars);
 
+  /// Similar to \c introduceToInference(Constraint *, ...) this method is going
+  /// to notify inference that this type variable has been bound to a concrete
+  /// type.
+  ///
+  /// The reason why this can't simplify be a part of \c bindTypeVariable
+  /// is related to the fact that it's sometimes expensive to re-compute
+  /// bindings (i.e. if `DependentMemberType` is involved, because it requires
+  /// a conformance lookup), so inference has to be delayed until its clear that
+  /// type variable has been bound to a valid type and solver can make progress.
+  void
+  introduceToInference(Type fixedType,
+                       SmallPtrSetImpl<TypeVariableType *> &referencedVars);
+
+  /// Opposite of \c introduceToInference(Type, ...)
+  void
+  retractFromInference(Type fixedType,
+                       SmallPtrSetImpl<TypeVariableType *> &referencedVars);
+
   /// Drop all previously collected bindings and re-infer based on the
   /// current set constraints associated with this equivalence class.
   void resetBindingSet();
@@ -148,6 +166,7 @@ private:
   /// This is useful in situations when type variable gets bound and unbound,
   /// or equivalence class changes.
   void notifyReferencingVars() const;
+
   /// }
 
   /// The constraint graph this node belongs to.
