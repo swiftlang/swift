@@ -15,36 +15,27 @@
 using namespace swift;
 using namespace swift::syntax;
 
-RC<const SyntaxData> SyntaxData::replacingSelf(const RawSyntax *NewRaw) const {
-  if (hasParent()) {
-    auto NewRoot = getParent()->replacingChild(NewRaw, getIndexInParent());
-    auto NewSelf = AbsoluteRaw.replacingSelf(
-        NewRaw, NewRoot->AbsoluteRaw.getNodeId().getRootId());
-    return RC<const SyntaxData>(new SyntaxData(NewSelf, NewRoot));
-  } else {
-    auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
-    return RC<const SyntaxData>(new SyntaxData(NewSelf));
-  }
-}
+// MARK: - SyntaxDataRef
 
-bool SyntaxData::isType() const { return getRaw()->isType(); }
-
-bool SyntaxData::isStmt() const { return getRaw()->isStmt(); }
-
-bool SyntaxData::isDecl() const { return getRaw()->isDecl(); }
-
-bool SyntaxData::isExpr() const { return getRaw()->isExpr(); }
-
-bool SyntaxData::isPattern() const { return getRaw()->isPattern(); }
-
-bool SyntaxData::isUnknown() const { return getRaw()->isUnknown(); }
-
-void SyntaxData::dump(llvm::raw_ostream &OS) const {
+void SyntaxDataRef::dump(llvm::raw_ostream &OS) const {
   getRaw()->dump(OS, 0);
   OS << '\n';
 }
 
-void SyntaxData::dump() const { dump(llvm::errs()); }
+void SyntaxDataRef::dump() const { dump(llvm::errs()); }
+
+// MARK: - SyntaxData
+
+RC<const SyntaxData>
+SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
+  auto AbsoluteRaw = getAbsoluteRaw().getChild(Index);
+  if (AbsoluteRaw) {
+    return RC<SyntaxData>(
+        new SyntaxData(*AbsoluteRaw, /*Parent=*/RC<const SyntaxData>(this)));
+  } else {
+    return nullptr;
+  }
+}
 
 RC<const SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
@@ -77,17 +68,21 @@ RC<const SyntaxData> SyntaxData::getNextNode() const {
 }
 
 RC<const SyntaxData> SyntaxData::getFirstToken() const {
-  if (getRaw()->isToken()) {
+  /// getFirstToken and getLastToken cannot be implemented on SyntaxDataRef
+  /// because we might need to traverse through multiple nodes to reach the
+  /// first token. When returning this token, the parent nodes are being
+  /// discarded and thus its parent pointer would point to invalid memory.
+  if (getRaw()->isToken() && !getRaw()->isMissing()) {
     return RC<const SyntaxData>(this);
   }
 
   for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
     if (auto Child = getChild(I)) {
-      if (Child->getRaw()->isMissing())
+      if (Child->getRaw()->isMissing()) {
         continue;
-      if (Child->getRaw()->isToken()) {
-        return Child;
-      } else if (auto Token = Child->getFirstToken()) {
+      }
+
+      if (auto Token = Child->getFirstToken()) {
         return Token;
       }
     }
@@ -96,6 +91,7 @@ RC<const SyntaxData> SyntaxData::getFirstToken() const {
 }
 
 RC<const SyntaxData> SyntaxData::getLastToken() const {
+  // Also see comment in getFirstToken.
   if (getRaw()->isToken() && !getRaw()->isMissing()) {
     return RC<const SyntaxData>(this);
   }
@@ -108,9 +104,8 @@ RC<const SyntaxData> SyntaxData::getLastToken() const {
       if (Child->getRaw()->isMissing()) {
         continue;
       }
-      if (Child->getRaw()->isToken()) {
-        return Child;
-      } else if (auto Token = Child->getLastToken()) {
+
+      if (auto Token = Child->getLastToken()) {
         return Token;
       }
     }
@@ -118,56 +113,14 @@ RC<const SyntaxData> SyntaxData::getLastToken() const {
   return nullptr;
 }
 
-RC<const SyntaxData>
-SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
-  if (!getRaw()->getChild(Index)) {
-    return nullptr;
-  }
-  /// FIXME: Start from the back (advancedToEndOfChildren) and reverse from
-  /// there if Index is closer to the end as a performance improvement?
-  AbsoluteSyntaxPosition Position =
-      AbsoluteRaw.getInfo().getPosition().advancedToFirstChild();
-  SyntaxIdentifier NodeId =
-      AbsoluteRaw.getInfo().getNodeId().advancedToFirstChild();
-
-  for (size_t I = 0; I < Index; ++I) {
-    Position = Position.advancedBy(getRaw()->getChild(I));
-    NodeId = NodeId.advancedBy(getRaw()->getChild(I));
-  }
-  AbsoluteSyntaxInfo Info(Position, NodeId);
-
-  const RC<const SyntaxData> RefCountedParent = RC<const SyntaxData>(this);
-  return RC<const SyntaxData>(new SyntaxData(
-      AbsoluteRawSyntax(getRaw()->getChild(Index), Info), RefCountedParent));
-}
-
-AbsoluteOffsetPosition
-SyntaxData::getAbsolutePositionBeforeLeadingTrivia() const {
-  return AbsoluteRaw.getPosition();
-}
-
-AbsoluteOffsetPosition
-SyntaxData::getAbsolutePositionAfterLeadingTrivia() const {
-  if (auto FirstToken = getFirstToken()) {
-    return getAbsolutePositionBeforeLeadingTrivia().advancedBy(
-        FirstToken->getRaw()->getLeadingTriviaLength());
+RC<const SyntaxData> SyntaxData::replacingSelf(const RawSyntax *NewRaw) const {
+  if (hasParent()) {
+    auto NewParent = getParent()->replacingChild(NewRaw, getIndexInParent());
+    auto NewSelf = AbsoluteRaw.replacingSelf(
+        NewRaw, NewParent->AbsoluteRaw.getNodeId().getRootId());
+    return RC<const SyntaxData>(new SyntaxData(NewSelf, NewParent));
   } else {
-    return getAbsolutePositionBeforeLeadingTrivia();
+    auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
+    return RC<const SyntaxData>(new SyntaxData(NewSelf));
   }
-}
-
-AbsoluteOffsetPosition
-SyntaxData::getAbsoluteEndPositionBeforeTrailingTrivia() const {
-  if (auto LastToken = getLastToken()) {
-    return getAbsoluteEndPositionAfterTrailingTrivia().advancedBy(
-        -LastToken->getRaw()->getTrailingTriviaLength());
-  } else {
-    return getAbsoluteEndPositionAfterTrailingTrivia();
-  }
-}
-
-AbsoluteOffsetPosition
-SyntaxData::getAbsoluteEndPositionAfterTrailingTrivia() const {
-  return getAbsolutePositionBeforeLeadingTrivia().advancedBy(
-      getRaw()->getTextLength());
 }

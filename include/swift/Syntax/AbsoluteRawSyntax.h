@@ -218,8 +218,26 @@ struct AbsoluteRawSyntax {
   const AbsoluteSyntaxInfo Info;
 
 public:
+  /// Create a null \c AbsoluteRawSyntax to which a real \c AbsoluteRawSyntax
+  /// can be stored later.
+  explicit AbsoluteRawSyntax()
+      : Raw(nullptr), Info(AbsoluteSyntaxPosition(0, 0),
+                           SyntaxIdentifier(0, SyntaxIndexInTree::zero())) {}
+
+  /// Create a new \c AbsoluteRawData backed by \p Raw and with additional \p
+  /// Info. The caller of this constructor is responsible to ensure that the
+  /// Arena of \p Raw (and thus \p Raw itself) outlives this \c
+  /// AbsoluteRawSyntax.
   AbsoluteRawSyntax(const RawSyntax *Raw, AbsoluteSyntaxInfo Info)
-      : Raw(Raw), Info(Info) {}
+      : Raw(Raw), Info(Info) {
+    assert(Raw != nullptr &&
+           "A AbsoluteRawSyntax created through the memberwise constructor "
+           "should always have a RawSyntax");
+  }
+
+  /// Whether this is a null \c AbsoluteRawSyntax created through the default
+  /// constructor.
+  bool isNull() const { return Raw == nullptr; }
 
   /// Construct a \c AbsoluteRawSyntax for a \c RawSyntax node that represents
   /// the syntax tree's root.
@@ -227,17 +245,105 @@ public:
     return AbsoluteRawSyntax(Raw, AbsoluteSyntaxInfo::forRoot());
   }
 
-  const RawSyntax *getRaw() const { return Raw; }
+  const RawSyntax *getRaw() const {
+    assert(!isNull() && "Cannot get Raw of a null AbsoluteRawSyntax");
+    return Raw;
+  }
 
-  AbsoluteSyntaxInfo getInfo() const { return Info; }
+  AbsoluteSyntaxInfo getInfo() const {
+    assert(!isNull() && "Cannot get Raw of a null AbsoluteRawSyntax");
+    return Info;
+  }
 
   /// Get the position at which the leading triva of this node starts.
-  AbsoluteSyntaxPosition getPosition() const { return Info.getPosition(); };
+  AbsoluteSyntaxPosition getPosition() const {
+    return getInfo().getPosition();
+  };
 
-  SyntaxIdentifier getNodeId() const { return Info.getNodeId(); };
+  SyntaxIdentifier getNodeId() const { return getInfo().getNodeId(); };
 
   AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
     return getPosition().getIndexInParent();
+  }
+
+  size_t getNumChildren() const { return getRaw()->getLayout().size(); }
+
+  /// Get the child at \p Index if it exists. If the node does not have a child
+  /// at \p Index, return \c None. Asserts that \p Index < \c NumChildren
+  Optional<AbsoluteRawSyntax>
+  getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
+    assert(Index < getNumChildren() && "Index out of bounds");
+    auto RawChild = getRaw()->getChild(Index);
+    if (RawChild) {
+      return getPresentChild(Index);
+    } else {
+      return None;
+    }
+  }
+
+  /// Get the child at \p Index, asserting that it exists. This is slightly
+  /// more performant than \c getChild in these cases since the \c
+  /// AbsoluteRawSyntax node does not have to be wrapped in an \c Optional.
+  AbsoluteRawSyntax
+  getPresentChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
+    assert(Index < getNumChildren() && "Index out of bounds");
+    auto RawChild = getRaw()->getChild(Index);
+    assert(RawChild &&
+           "Child retrieved using getPresentChild must always exist");
+
+    AbsoluteSyntaxPosition Position = getPosition().advancedToFirstChild();
+    SyntaxIdentifier NodeId = getNodeId().advancedToFirstChild();
+
+    for (size_t I = 0; I < Index; ++I) {
+      Position = Position.advancedBy(getRaw()->getChild(I));
+      NodeId = NodeId.advancedBy(getRaw()->getChild(I));
+    }
+
+    AbsoluteSyntaxInfo Info(Position, NodeId);
+    return AbsoluteRawSyntax(RawChild, Info);
+  }
+
+  /// Get the first non-missing token node in this tree. Return \c None if
+  /// this node does not contain non-missing tokens.
+  Optional<AbsoluteRawSyntax> getFirstToken() const {
+    if (getRaw()->isToken() && !getRaw()->isMissing()) {
+      return *this;
+    }
+
+    size_t NumChildren = getNumChildren();
+    for (size_t I = 0; I < NumChildren; ++I) {
+      if (auto Child = getChild(I)) {
+        if (Child->getRaw()->isMissing()) {
+          continue;
+        }
+
+        if (auto Token = Child->getFirstToken()) {
+          return Token;
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Get the last non-missing token node in this tree. Return \c None if
+  /// this node does not contain non-missing tokens.
+  Optional<AbsoluteRawSyntax> getLastToken() const {
+    if (getRaw()->isToken() && !getRaw()->isMissing()) {
+      return *this;
+    }
+
+    for (int I = getNumChildren() - 1; I >= 0; --I) {
+      if (auto Child = getChild(I)) {
+        if (Child->getRaw()->isMissing()) {
+          continue;
+        }
+
+        if (auto Token = Child->getLastToken()) {
+          return Token;
+        }
+      }
+    }
+    return None;
   }
 
   /// Construct a new \c AbsoluteRawSyntax node that has the same info as the
@@ -247,8 +353,9 @@ public:
   AbsoluteRawSyntax
   replacingSelf(const RawSyntax *NewRaw,
                 SyntaxIdentifier::RootIdType NewRootId) const {
-    SyntaxIdentifier NewNodeId(NewRootId, Info.getNodeId().getIndexInTree());
-    AbsoluteSyntaxInfo NewInfo(Info.getPosition(), NewNodeId);
+    SyntaxIdentifier NewNodeId(NewRootId,
+                               getInfo().getNodeId().getIndexInTree());
+    AbsoluteSyntaxInfo NewInfo(getInfo().getPosition(), NewNodeId);
     return AbsoluteRawSyntax(NewRaw, NewInfo);
   }
 };
