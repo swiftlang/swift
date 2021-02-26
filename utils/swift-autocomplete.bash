@@ -102,6 +102,7 @@ _swift_complete()
       -sil-partial-specialization-with-generic-substitutions \
       -sil-print-all \
       -sil-print-debuginfo \
+      -sil-print-function \
       -sil-print-functions \
       -sil-print-generic-specialization-info \
       -sil-print-generic-specialization-loops \
