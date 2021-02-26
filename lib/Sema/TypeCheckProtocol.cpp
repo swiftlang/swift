@@ -2777,8 +2777,11 @@ bool ConformanceChecker::checkActorIsolation(
     break;
   }
 
-  case ActorIsolation::Independent:
   case ActorIsolation::IndependentUnsafe:
+    // The requirement is explicitly unsafe; allow it.
+    return false;
+
+  case ActorIsolation::Independent:
   case ActorIsolation::Unspecified:
     break;
   }

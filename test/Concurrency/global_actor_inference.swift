@@ -29,6 +29,12 @@ struct GenericGlobalActor<T> {
 @MainActor func iron() {}
 
 // ----------------------------------------------------------------------
+// Check that @MainActor(blah) doesn't work
+// ----------------------------------------------------------------------
+// expected-error@+1{{global actor attribute 'MainActor' argument can only be '(unsafe)'}}
+@MainActor(blah) func brokenMainActorAttr() { }
+
+// ----------------------------------------------------------------------
 // Global actor inference for protocols
 // ----------------------------------------------------------------------
 
@@ -226,4 +232,37 @@ func bar() async {
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func barSync() {
   foo() // expected-error {{global function 'foo()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+}
+
+
+// ----------------------------------------------------------------------
+// Unsafe global actors
+// ----------------------------------------------------------------------
+protocol UGA {
+  @SomeGlobalActor(unsafe) func req()
+}
+
+struct StructUGA1: UGA {
+  @SomeGlobalActor func req() { }
+}
+
+struct StructUGA2: UGA {
+  @actorIndependent func req() { }
+}
+
+@GenericGlobalActor<String>
+func testUGA<T: UGA>(_ value: T) {
+  value.req()
+}
+
+class UGAClass {
+  @SomeGlobalActor(unsafe) func method() { }
+}
+
+class UGASubclass1: UGAClass {
+  @SomeGlobalActor override func method() { }
+}
+
+class UGASubclass2: UGAClass {
+  override func method() { }
 }

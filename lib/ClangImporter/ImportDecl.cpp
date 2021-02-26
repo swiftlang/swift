@@ -8159,10 +8159,16 @@ void ClangImporter::Implementation::importAttributes(
       // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
       if (swiftAttr->getAttribute() == "@MainActor" ||
+          swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
           swiftAttr->getAttribute() == "@UIActor") {
+        bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
+            !C.LangOpts.isSwiftVersionAtLeast(6);
         if (Type mainActorType = getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+          attr->setArgIsUnsafe(isUnsafe);
+          if (isUnsafe)
+            attr->setImplicit();
           MappedDecl->getAttrs().add(attr);
         }
 
