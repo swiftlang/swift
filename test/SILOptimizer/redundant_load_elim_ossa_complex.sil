@@ -23,6 +23,10 @@ struct TripleKlass {
   var val3 : Klass
 }
 
+public enum FakeOptional<T> {
+  case none
+  case some(T)
+}
 sil [ossa] @use_klass : $@convention(thin) (@owned Klass) -> ()
 sil [ossa] @use_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
 
@@ -818,3 +822,28 @@ bb9:
   return %val1 : $Klass
 }
 
+// CHECK-LABEL: @rle_ownershipkindmergetest :
+// CHECK-NOT: load
+// CHECK-LABEL: end sil function 'rle_ownershipkindmergetest'
+sil [ossa] @rle_ownershipkindmergetest : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  %3 = alloc_stack $FakeOptional<Klass>
+  store %0 to [init] %3 : $*FakeOptional<Klass>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  store %4 to [assign] %3 : $*FakeOptional<Klass>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %49 = load [copy] %3 : $*FakeOptional<Klass>
+  destroy_value %49 : $FakeOptional<Klass>
+  destroy_addr %3 : $*FakeOptional<Klass>
+  dealloc_stack %3 : $*FakeOptional<Klass>
+  %res = tuple ()
+  return %res : $()
+}
