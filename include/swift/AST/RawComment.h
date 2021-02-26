@@ -104,6 +104,10 @@ class BasicSourceFileInfo {
 
   StringRef FilePath;
   Fingerprint InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
+  /// Does *not* include the type-body hashes of the top level types.
+  /// Just the `SourceFile` hashes.
+  /// Used for incremental imports.
+  Fingerprint InterfaceHashExcludingTypeMembers = Fingerprint::ZERO();
   llvm::sys::TimePoint<> LastModified = {};
   uint64_t FileSize = 0;
 
@@ -113,14 +117,16 @@ class BasicSourceFileInfo {
 public:
   BasicSourceFileInfo(StringRef FilePath,
                       Fingerprint InterfaceHashIncludingTypeMembers,
+                      Fingerprint InterfaceHashExcludingTypeMembers,
                       llvm::sys::TimePoint<> LastModified, uint64_t FileSize)
       : FilePath(FilePath),
         InterfaceHashIncludingTypeMembers(InterfaceHashIncludingTypeMembers),
+        InterfaceHashExcludingTypeMembers(InterfaceHashExcludingTypeMembers),
         LastModified(LastModified), FileSize(FileSize) {}
 
-  ///  Construct with a 'SourceFile'. 'getInterfaceHashIncludingTypeMembers()',
-  ///  'getLastModified()' and 'getFileSize()' are laizily pupulated when
-  ///  accessed.
+  ///  Construct with a `SourceFile`. `getInterfaceHashIncludingTypeMembers()`,
+  ///  `getInterfaceHashExcludingTypeMembers()`, `getLastModified()` and `getFileSize()` are laizily
+  ///  populated when accessed.
   BasicSourceFileInfo(const SourceFile *SF);
 
   bool isFromSourceFile() const;
@@ -130,6 +136,11 @@ public:
   Fingerprint getInterfaceHashIncludingTypeMembers() const {
     const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
     return InterfaceHashIncludingTypeMembers;
+  }
+
+  Fingerprint getInterfaceHashExcludingTypeMembers() const {
+    const_cast<BasicSourceFileInfo *>(this)->populateWithSourceFileIfNeeded();
+    return InterfaceHashExcludingTypeMembers;
   }
 
   llvm::sys::TimePoint<> getLastModified() const {
