@@ -70,7 +70,7 @@ extension Task {
     handler: @concurrent () -> (),
     operation: () async throws -> T
   ) async rethrows -> T {
-    let task = Builtin.getCurrentAsyncTask()
+    let task = _taskGetCurrent()! // !-safe, task is always available in an async func
 
     guard !_taskIsCancelled(task) else {
       // If the current task is already cancelled, run the handler immediately.

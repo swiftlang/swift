@@ -65,7 +65,7 @@ extension Task {
     returning returnType: BodyResult.Type = BodyResult.self,
     body: @concurrent @escaping (inout Task.Group<TaskResult>) async throws -> BodyResult
   ) async throws -> BodyResult {
-    let parent = Builtin.getCurrentAsyncTask()
+    let parent = _taskGetCurrent()! // !-safe, task is always available in an async func
 
     // Set up the job flags for a new task.
     var groupFlags = JobFlags()
@@ -77,7 +77,7 @@ extension Task {
 
     let (groupTask, _) =
       Builtin.createAsyncTaskFuture(groupFlags.bits, parent) { () async throws -> BodyResult in
-        let task = Builtin.getCurrentAsyncTask()
+        let task = _taskGetCurrent()! // !-safe, task is always available in an async func
         var group = Task.Group<TaskResult>(task: task)
 
         // This defer handles both return/throw cases in the following way:

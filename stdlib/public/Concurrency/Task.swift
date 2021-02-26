@@ -50,7 +50,9 @@ extension Task {
   /// All functions available on the Task
   // TODO: once we can have async properties land make this computed property
   public static func current() async -> Task {
-    Task.unsafeCurrent!.task // !-safe, we are guaranteed to have a task available within an async function
+    let _task = _taskGetCurrent()! // !-safe, we are guaranteed to have a task available within an async function
+    _swiftRetain(_task)
+    return Task(_task)
   }
 
 }
@@ -66,7 +68,16 @@ extension Task {
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.priority`
   public static var currentPriority: Priority {
-    Task.unsafeCurrent?.priority ?? Priority.default
+    // TODO: The ?? expression hits a codegen bug (rdar://74693488) which sometimes
+    //       prevents this function from returning properly. Temporarily use if/else.
+    //
+    //  return Task.unsafeCurrent?.priority ?? Priority.default
+    if let priority = Task.unsafeCurrent?.priority {
+      return priority
+    } else {
+      return Priority.default
+    }
+
   }
 
   /// Returns the `current` task's priority.
@@ -508,7 +519,7 @@ extension Task {
   ///
   /// The returned value must not be accessed from tasks other than the current one.
   public static var unsafeCurrent: UnsafeCurrentTask? {
-    guard let _task = Builtin.getCurrentAsyncTask() else {
+    guard let _task = _taskGetCurrent() else {
       return nil
     }
     _swiftRetain(_task)
@@ -618,7 +629,7 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 public func _runChildTask<T>(
   operation: @concurrent @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
-  let currentTask = Builtin.getCurrentAsyncTask()
+  let currentTask = _taskGetCurrent()! // !-safe, task is always available in an async func
 
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
@@ -649,7 +660,7 @@ public func _runGroupChildTask<T>(
   withLocalValues hasLocalValues: Bool = false,
   operation: @concurrent @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
-  let currentTask = Builtin.getCurrentAsyncTask()
+  let currentTask = _taskGetCurrent()! // !-safe, task is always available in an async func
 
   // Set up the job flags for a new task.
   var flags = Task.JobFlags()
@@ -670,6 +681,9 @@ public func _runGroupChildTask<T>(
 
 @_silgen_name("swift_task_cancel")
 func _taskCancel(_ task: Builtin.NativeObject)
+
+@_silgen_name("swift_task_getCurrent")
+func _taskGetCurrent() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_isCancelled")
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool

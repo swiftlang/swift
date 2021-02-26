@@ -100,7 +100,7 @@ extension Task {
     boundTo value: Key.Value,
     operation: () async throws -> BodyResult
   ) async rethrows -> BodyResult where Key: TaskLocalKey {
-    let task = Builtin.getCurrentAsyncTask()
+    let task = _taskGetCurrent()! // !-safe, task is always available in an async func
 
     _taskLocalValuePush(task, keyType: Key.self, value: value)
     defer { _taskLocalValuePop(task) }
