@@ -263,8 +263,12 @@ enum class MatchKind : uint8_t {
   /// The witness did not match because of __consuming conflicts.
   ConsumingConflict,
 
-  /// The witness is not rethrows, but the requirement is.
+  /// The witness throws unconditionally, but the requirement rethrows.
   RethrowsConflict,
+
+  /// The witness rethrows via conformance, but the requirement rethrows
+  /// via closure and is not in a '@rethrows' protocol.
+  RethrowsByConformanceConflict,
 
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
@@ -498,6 +502,7 @@ struct RequirementMatch {
     case MatchKind::NonMutatingConflict:
     case MatchKind::ConsumingConflict:
     case MatchKind::RethrowsConflict:
+    case MatchKind::RethrowsByConformanceConflict:
     case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
@@ -530,6 +535,7 @@ struct RequirementMatch {
     case MatchKind::NonMutatingConflict:
     case MatchKind::ConsumingConflict:
     case MatchKind::RethrowsConflict:
+    case MatchKind::RethrowsByConformanceConflict:
     case MatchKind::AsyncConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:

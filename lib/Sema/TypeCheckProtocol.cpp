@@ -558,25 +558,39 @@ swift::matchWitness(
     if (!funcReq->isMutating() && funcWitness->isMutating())
       return RequirementMatch(witness, MatchKind::MutatingConflict);
 
-    // If the requirement is rethrows, the witness must either be
-    // rethrows or be non-throwing if the requirement is not by conformance
-    // else the witness can be by conformance, throwing or non throwing
-    if (reqAttrs.hasAttribute<RethrowsAttr>() &&
-        !witnessAttrs.hasAttribute<RethrowsAttr>()) {
+    // If the requirement has an explicit 'rethrows' argument, the witness
+    // must be 'rethrows', too.
+    if (reqAttrs.hasAttribute<RethrowsAttr>()) {
       auto reqRethrowingKind =
           funcReq->getPolymorphicEffectKind(EffectKind::Throws);
       auto witnessRethrowingKind =
           funcWitness->getPolymorphicEffectKind(EffectKind::Throws);
-      if (reqRethrowingKind == PolymorphicEffectKind::ByConformance) {
-        switch (witnessRethrowingKind) {
-        case PolymorphicEffectKind::ByConformance:
-        case PolymorphicEffectKind::Always:
-        case PolymorphicEffectKind::None:
+
+      assert(reqRethrowingKind != PolymorphicEffectKind::Always &&
+             reqRethrowingKind != PolymorphicEffectKind::None);
+
+      switch (witnessRethrowingKind) {
+      case PolymorphicEffectKind::None:
+      case PolymorphicEffectKind::Invalid:
+      case PolymorphicEffectKind::ByClosure:
+        break;
+
+      case PolymorphicEffectKind::ByConformance: {
+        // A by-conformance `rethrows` witness cannot witness a
+        // by-conformance `rethrows` requirement unless the protocol
+        // is @rethrows. Otherwise, we don't have enough information
+        // at the call site to assess if the conformance actually
+        // throws or not.
+        auto *proto = cast<ProtocolDecl>(req->getDeclContext());
+        if (reqRethrowingKind == PolymorphicEffectKind::ByConformance &&
+            proto->hasPolymorphicEffect(EffectKind::Throws))
           break;
-        default:
-          return RequirementMatch(witness, MatchKind::RethrowsConflict);
-        }
-      } else if (cast<AbstractFunctionDecl>(witness)->hasThrows()) {
+
+        return RequirementMatch(witness,
+                                MatchKind::RethrowsByConformanceConflict);
+      }
+
+      case PolymorphicEffectKind::Always:
         return RequirementMatch(witness, MatchKind::RethrowsConflict);
       }
     }
@@ -2522,6 +2536,13 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
         diags.diagnose(witness, diag::protocol_witness_rethrows_conflict);
     auto FD = cast<FuncDecl>(witness);
     diag.fixItReplace(FD->getThrowsLoc(), getTokenText(tok::kw_rethrows));
+    break;
+  }
+  case MatchKind::RethrowsByConformanceConflict: {
+    auto witness = match.Witness;
+    auto diag =
+        diags.diagnose(witness,
+                       diag::protocol_witness_rethrows_by_conformance_conflict);
     break;
   }
   case MatchKind::NonObjC:
