@@ -4396,9 +4396,10 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
       case decls_block::Custom_DECL_ATTR: {
         bool isImplicit;
+        bool isArgUnsafe;
         TypeID typeID;
         serialization::decls_block::CustomDeclAttrLayout::readRecord(
-          scratch, isImplicit, typeID);
+          scratch, isImplicit, typeID, isArgUnsafe);
 
         Expected<Type> deserialized = MF.getTypeChecked(typeID);
         if (!deserialized) {
@@ -4412,7 +4413,9 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
             return deserialized.takeError();
         } else {
           auto *TE = TypeExpr::createImplicit(deserialized.get(), ctx);
-          Attr = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
+          auto custom = CustomAttr::create(ctx, SourceLoc(), TE, isImplicit);
+          custom->setArgIsUnsafe(isArgUnsafe);
+          Attr = custom;
         }
         break;
       }

@@ -2016,6 +2016,20 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     if (!globalActorType || globalActorType->hasError())
       return ActorIsolation::forUnspecified();
 
+    // Handle @<global attribute type>(unsafe).
+    bool isUnsafe = globalActorAttr->first->isArgUnsafe();
+    if (globalActorAttr->first->getArg() && !isUnsafe) {
+      ctx.Diags.diagnose(
+          globalActorAttr->first->getLocation(),
+          diag::global_actor_non_unsafe_init, globalActorType);
+    }
+
+    // TODO: Model as unsafe from the actor-isolation perspective, which
+    // disables all checking. We probably want to model this as a separate kind
+    // of actor isolation to emit warnings.
+    if (isUnsafe)
+      return ActorIsolation::forIndependent(ActorIndependentKind::Unsafe);
+
     return ActorIsolation::forGlobalActor(
         globalActorType->mapTypeOutOfContext());
   }
@@ -2285,6 +2299,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
   // If the isolation matches, we're done.
   if (isolation == overriddenIsolation)
+    return;
+
+  // If the overridden declaration is @actorIndependent(unsafe) and the
+  // overriding declaration has been placed in a global actor, allow it.
+  if (overriddenIsolation.getKind() == ActorIsolation::IndependentUnsafe &&
+      isolation.getKind() == ActorIsolation::GlobalActor)
     return;
 
   // If the overridden declaration is from Objective-C with no actor annotation,
