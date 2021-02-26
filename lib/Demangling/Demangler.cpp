@@ -1614,6 +1614,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
       return false;
     default:
       return true;
@@ -3274,6 +3275,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'P':
       Args = None;
       Kind = Node::Kind::PropertyWrapperBackingInitializer;
+      break;
+    case 'W':
+      Args = None;
+      Kind = Node::Kind::PropertyWrapperInitFromProjectedValue;
       break;
     default: return nullptr;
   }

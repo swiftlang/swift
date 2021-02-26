@@ -2456,6 +2456,28 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
                                  resultType);
 }
+
+static CanAnyFunctionType getPropertyWrapperInitFromProjectedValueInterfaceType(TypeConverter &TC,
+                                                                                VarDecl *VD) {
+  CanType resultType =
+      VD->getPropertyWrapperBackingPropertyType()->getCanonicalType();
+
+  Type interfaceType = VD->getPropertyWrapperProjectionVar()->getInterfaceType();
+  if (interfaceType->hasArchetype())
+    interfaceType = interfaceType->mapTypeOutOfContext();
+
+  CanType inputType = interfaceType->getCanonicalType();
+
+  auto *DC = VD->getInnermostDeclContext();
+  auto sig = DC->getGenericSignatureOfContext();
+
+  AnyFunctionType::Param param(
+      inputType, Identifier(),
+      ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
+                                 resultType);
+}
+
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                                                      bool isDeallocating,
@@ -2610,6 +2632,9 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getPropertyWrapperBackingInitializerInterfaceType(*this,
                                                              cast<VarDecl>(vd));
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+    return getPropertyWrapperInitFromProjectedValueInterfaceType(*this,
+                                                                 cast<VarDecl>(vd));
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, false);
@@ -2649,6 +2674,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return vd->getDeclContext()->getGenericSignatureOfContext();
   }
 
@@ -2731,6 +2757,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   switch (fn.kind) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     return CaptureInfo::empty();
 
   default:

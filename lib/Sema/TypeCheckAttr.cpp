@@ -2987,12 +2987,24 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // through a property.
   if (nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
     // property wrappers can only be applied to variables
-    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
+    if (!isa<VarDecl>(D)) {
       diagnose(attr->getLocation(),
                diag::property_wrapper_attribute_not_on_property,
                nominal->getName());
       attr->setInvalid();
       return;
+    }
+
+    if (isa<ParamDecl>(D)) {
+      // Check for unsupported declarations.
+      auto *context = D->getDeclContext()->getAsDecl();
+      if (context && isa<SubscriptDecl>(context)) {
+        diagnose(attr->getLocation(),
+                 diag::property_wrapper_param_not_supported,
+                 context->getDescriptiveKind());
+        attr->setInvalid();
+        return;
+      }
     }
 
     return;

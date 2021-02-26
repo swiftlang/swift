@@ -289,10 +289,13 @@ static bool matchCallArgumentsImpl(
     assert(argNumber != numArgs && "Must have a valid index to claim");
     assert(!claimedArgs[argNumber] && "Argument already claimed");
 
+    auto argLabel = args[argNumber].getLabel();
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (args[argNumber].getLabel() != expectedName && !ignoreNameClash) {
+    } else if (argLabel != expectedName && !ignoreNameClash &&
+               !(argLabel.str().startswith("$") &&
+                 argLabel.str().drop_front() == expectedName.str())) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
@@ -340,7 +343,9 @@ static bool matchCallArgumentsImpl(
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       auto argLabel = args[i].getLabel();
 
-      if (argLabel != paramLabel) {
+      if (argLabel != paramLabel &&
+          !(argLabel.str().startswith("$") &&
+            argLabel.str().drop_front() == paramLabel.str())) {
         // If this is an attempt to claim additional unlabeled arguments
         // for variadic parameter, we have to stop at first labeled argument.
         if (forVariadic)
@@ -1413,6 +1418,16 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           argIdx == *argInfo->UnlabeledTrailingClosureIndex) {
         cs.recordFix(SpecifyLabelToAssociateTrailingClosure::create(
             cs, cs.getConstraintLocator(loc)));
+      }
+
+      auto *wrappedParam = paramInfo.getPropertyWrapperParam(argIdx);
+      auto argLabel = argument.getLabel();
+      if (wrappedParam || argLabel.hasDollarPrefix()) {
+        if (cs.applyPropertyWrapperToParameter(paramTy, argTy, const_cast<ParamDecl *>(wrappedParam),
+                                               argLabel, subKind, locator).isFailure()) {
+          return cs.getTypeMatchFailure(loc);
+        }
+        continue;
       }
 
       // If argument comes for declaration it should loose
@@ -6686,8 +6701,27 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  DeclNameRef lookupName = memberName;
+  if (memberName.isCompoundName()) {
+    auto &context = getASTContext();
+
+    // Remove any $ prefixes for lookup
+    SmallVector<Identifier, 4> lookupLabels;
+    for (auto label : memberName.getArgumentNames()) {
+      if (label.hasDollarPrefix()) {
+        auto unprefixed = label.str().drop_front();
+        lookupLabels.push_back(context.getIdentifier(unprefixed));
+      } else {
+        lookupLabels.push_back(label);
+      }
+    }
+
+    DeclName unprefixedName(context, memberName.getBaseName(), lookupLabels);
+    lookupName = DeclNameRef(unprefixedName);
+  }
+
   // Look for members within the base.
-  LookupResult &lookup = lookupMember(instanceTy, memberName);
+  LookupResult &lookup = lookupMember(instanceTy, lookupName);
 
   // If this is true, we're using type construction syntax (Foo()) rather
   // than an explicit call to `init` (Foo.init()).
@@ -8155,6 +8189,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   SmallVector<AnyFunctionType::Param, 4> parameters;
   for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
     auto param = inferredClosureType->getParams()[i];
+    auto *paramDecl = paramList->get(i);
 
     // In case of anonymous parameters let's infer flags from context
     // that helps to infer variadic and inout earlier.
@@ -8163,8 +8198,56 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         param = param.withFlags(contextualParam->getParameterFlags());
     }
 
+    if (paramDecl->hasAttachedPropertyWrapper()) {
+      bool hasError = false;
+      Type backingType;
+
+      if (paramDecl->hasImplicitPropertyWrapper()) {
+        backingType = getContextualParamAt(i)->getPlainType();
+
+        // If the contextual type is not a property wrapper, record a fix.
+        auto *nominal = backingType->getAnyNominal();
+        if (!(nominal && nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())) {
+          if (!shouldAttemptFixes())
+            return false;
+
+          paramDecl->visitAuxiliaryDecls([](VarDecl *var) {
+            var->setInvalid();
+          });
+
+          auto *fix = AddPropertyWrapperAttribute::create(*this, backingType,
+                                                          getConstraintLocator(paramDecl));
+          recordFix(fix);
+          hasError = true;
+        }
+      } else {
+        auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
+        auto wrapperType = paramDecl->getAttachedPropertyWrapperType(0);
+        backingType = replaceInferableTypesWithTypeVars(
+            wrapperType, getConstraintLocator(wrapperAttr->getTypeRepr()));
+      }
+
+      if (!hasError) {
+        auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
+                                                      paramDecl, paramDecl->getName(),
+                                                      ConstraintKind::Equal, locator);
+        if (result.isFailure())
+          return false;
+
+        auto *backingVar = paramDecl->getPropertyWrapperBackingProperty();
+        setType(backingVar, backingType);
+
+        auto *localWrappedVar = paramDecl->getPropertyWrapperWrappedValueVar();
+        setType(localWrappedVar, computeWrappedValueType(paramDecl, backingType));
+
+        if (auto *projection = paramDecl->getPropertyWrapperProjectionVar()) {
+          setType(projection, computeProjectedValueType(paramDecl, backingType));
+        }
+      }
+    }
+
     Type internalType;
-    if (paramList->get(i)->getTypeRepr()) {
+    if (paramDecl->getTypeRepr()) {
       // Internal type is the type used in the body of the closure,
       // so "external" type translates to it as follows:
       //  - `Int...` -> `[Int]`,
@@ -8205,7 +8288,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
     }
 
-    setType(paramList->get(i), internalType);
+    setType(paramDecl, internalType);
     parameters.push_back(param);
   }
 
@@ -10630,6 +10713,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipUnhandledConstructInResultBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
+  case FixKind::AddProjectedValue:
+  case FixKind::AddPropertyWrapperAttribute:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
   case FixKind::ExplicitlyConstructRawRepresentable:

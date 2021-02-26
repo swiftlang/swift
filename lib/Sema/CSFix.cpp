@@ -629,6 +629,27 @@ UseWrappedValue *UseWrappedValue::create(ConstraintSystem &cs,
       UseWrappedValue(cs, propertyWrapper, base, wrapper, locator);
 }
 
+bool AddProjectedValue::diagnose(const Solution &solution, bool asNote) const {
+  MissingProjectedValueFailure failure(solution, wrapperType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AddProjectedValue *AddProjectedValue::create(ConstraintSystem &cs, Type wrapperType,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddProjectedValue(cs, wrapperType, locator);
+}
+
+bool AddPropertyWrapperAttribute::diagnose(const Solution &solution, bool asNote) const {
+  MissingPropertyWrapperAttributeFailure failure(solution, wrapperType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AddPropertyWrapperAttribute *AddPropertyWrapperAttribute::create(ConstraintSystem &cs,
+                                                                 Type wrapperType,
+                                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddPropertyWrapperAttribute(cs, wrapperType, locator);
+}
+
 bool UseSubscriptOperator::diagnose(const Solution &solution,
                                     bool asNote) const {
   SubscriptMisuseFailure failure(solution, getLocator());

@@ -1304,10 +1304,13 @@ namespace {
 
     bool canRewriteSetAsPropertyWrapperInit(SILGenFunction &SGF) const {
       if (auto *VD = dyn_cast<VarDecl>(Storage)) {
+        if (VD->isImplicit() || isa<ParamDecl>(VD))
+          return false;
+
         // If this is not a wrapper property that can be initialized from
         // a value of the wrapped type, we can't perform the initialization.
         auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo();
-        if (!wrapperInfo.initializeFromOriginal)
+        if (!wrapperInfo.hasInitFromWrappedValue())
           return false;
 
         bool isAssignmentToSelfParamInInit =
@@ -1322,14 +1325,14 @@ namespace {
         // If this var isn't in a type context, assignment will always use the setter
         // if there is an initial value.
         if (!VD->getDeclContext()->isTypeContext() &&
-            wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue())
+            wrapperInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue())
           return false;
 
         // If this property wrapper uses autoclosure in it's initializer,
         // the argument types of the setter and initializer shall be
         // different, so we don't rewrite an assignment into an
         // initialization.
-        return !wrapperInfo.wrappedValuePlaceholder->isAutoClosure();
+        return !wrapperInfo.getWrappedValuePlaceholder()->isAutoClosure();
       }
 
       return false;

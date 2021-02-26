@@ -132,6 +132,8 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+    return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
     return getMagicFunctionName(cast<ClassDecl>(ref.getDecl()));
   case SILDeclRef::Kind::IVarDestroyer:
@@ -516,6 +518,11 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
              fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   prepareEpilog(true, fd->hasThrows(), CleanupLocation(fd));
+  for (auto *param : *fd->getParameters()) {
+    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+      visit(auxiliaryVar);
+    });
+  }
 
   if (fd->isAsyncHandler() &&
       // If F.isAsync() we are emitting the asyncHandler body and not the
@@ -594,6 +601,12 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
              ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
   prepareEpilog(true, ace->isBodyThrowing(), CleanupLocation(ace));
+  for (auto *param : *ace->getParameters()) {
+    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
+      visit(auxiliaryVar);
+    });
+  }
+
   if (auto *ce = dyn_cast<ClosureExpr>(ace)) {
     emitStmt(ce->getBody());
   } else {
@@ -885,9 +898,10 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   }
 
   // For a property wrapper backing initializer, form a parameter list
-  // containing the wrapped value.
+  // containing the wrapped or projected value.
   ParameterList *params = nullptr;
-  if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+  if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer ||
+      function.kind == SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue) {
     auto &ctx = getASTContext();
     auto param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                      ctx.getIdentifier("$input_value"),
@@ -895,8 +909,18 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                      ctx.getIdentifier("$input_value"),
                                      dc);
     param->setSpecifier(ParamSpecifier::Owned);
+    param->setImplicit();
     auto vd = cast<VarDecl>(function.getDecl());
-    param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
+    if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+      param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
+    } else {
+      auto *placeholder = vd->getPropertyWrapperBackingPropertyInfo().getProjectedValuePlaceholder();
+      auto interfaceType = placeholder->getType();
+      if (interfaceType->hasArchetype())
+        interfaceType = interfaceType->mapTypeOutOfContext();
+
+      param->setInterfaceType(interfaceType);
+    }
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
   }
@@ -918,12 +942,22 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
       auto var = cast<VarDecl>(function.getDecl());
       auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
       auto param = params->get(0);
-      auto *placeholder = wrappedInfo.wrappedValuePlaceholder;
+      auto *placeholder = wrappedInfo.getWrappedValuePlaceholder();
       opaqueValue.emplace(
           *this, placeholder->getOpaqueValuePlaceholder(),
           maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
 
-      assert(value == wrappedInfo.initializeFromOriginal);
+      assert(value == wrappedInfo.getInitFromWrappedValue());
+    } else if (function.kind == SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue) {
+      auto var = cast<VarDecl>(function.getDecl());
+      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto param = params->get(0);
+      auto *placeholder = wrappedInfo.getProjectedValuePlaceholder();
+      opaqueValue.emplace(
+          *this, placeholder->getOpaqueValuePlaceholder(),
+          maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
+
+      assert(value == wrappedInfo.getInitFromProjectedValue());
     }
 
     emitReturnExpr(Loc, value);

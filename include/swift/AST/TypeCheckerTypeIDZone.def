@@ -188,6 +188,9 @@ SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
               PropertyWrapperBackingPropertyInfo(VarDecl *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperWrappedValueVarRequest,
+              VarDecl *(VarDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyTypeRequest,
               Type(VarDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperLValuenessRequest,

@@ -164,6 +164,10 @@ public:
   bool isEditorPlaceholder() const {
     return !empty() && isEditorPlaceholder(str());
   }
+
+  bool hasDollarPrefix() const {
+    return str().startswith("$") && !(getLength() == 1);
+  }
   
   const void *getAsOpaquePointer() const {
       return static_cast<const void *>(Pointer);
@@ -322,6 +326,10 @@ public:
 
   bool isEditorPlaceholder() const {
     return !isSpecial() && getIdentifier().isEditorPlaceholder();
+  }
+
+  bool hasDollarPrefix() const {
+    return getIdentifier().hasDollarPrefix();
   }
 
   /// A representation of the name to be displayed to users. May be ambiguous

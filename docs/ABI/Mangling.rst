@@ -325,6 +325,7 @@ Entities
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fP'                       // property wrapper backing initializer
+  entity-spec ::= 'fW'                       // property wrapper init from projected value
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped

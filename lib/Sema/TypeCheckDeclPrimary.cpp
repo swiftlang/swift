@@ -1401,36 +1401,6 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   diagnoseClassWithoutInitializers(classDecl);
 }
 
-void TypeChecker::checkParameterList(ParameterList *params,
-                                     DeclContext *owner) {
-  for (auto param: *params) {
-    checkDeclAttributes(param);
-
-    // async autoclosures can only occur as parameters to async functions.
-    if (param->isAutoClosure()) {
-      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
-        if (fnType->isAsync() &&
-            !(isa<AbstractFunctionDecl>(owner) &&
-              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
-          param->diagnose(diag::async_autoclosure_nonasync_function);
-          if (auto func = dyn_cast<FuncDecl>(owner))
-            addAsyncNotes(func);
-        }
-      }
-    }
-  }
-
-  // For source compatibilty, allow duplicate internal parameter names
-  // on protocol requirements.
-  //
-  // FIXME: Consider turning this into a warning or error if we do
-  // another -swift-version.
-  if (!isa<ProtocolDecl>(owner->getParent())) {
-    // Check for duplicate parameter names.
-    diagnoseDuplicateDecls(*params);
-  }
-}
-
 void TypeChecker::diagnoseDuplicateBoundVars(Pattern *pattern) {
   SmallVector<VarDecl *, 2> boundVars;
   pattern->collectVariables(boundVars);
@@ -2983,4 +2953,40 @@ public:
 void TypeChecker::typeCheckDecl(Decl *D) {
   auto *SF = D->getDeclContext()->getParentSourceFile();
   DeclChecker(D->getASTContext(), SF).visit(D);
+}
+
+void TypeChecker::checkParameterList(ParameterList *params,
+                                     DeclContext *owner) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+
+    // async autoclosures can only occur as parameters to async functions.
+    if (param->isAutoClosure()) {
+      if (auto fnType = param->getInterfaceType()->getAs<FunctionType>()) {
+        if (fnType->isAsync() &&
+            !(isa<AbstractFunctionDecl>(owner) &&
+              cast<AbstractFunctionDecl>(owner)->isAsyncContext())) {
+          param->diagnose(diag::async_autoclosure_nonasync_function);
+          if (auto func = dyn_cast<FuncDecl>(owner))
+            addAsyncNotes(func);
+        }
+      }
+    }
+
+    auto *SF = param->getDeclContext()->getParentSourceFile();
+    param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
+      if (!isa<ParamDecl>(auxiliaryDecl))
+        DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+    });
+  }
+
+  // For source compatibilty, allow duplicate internal parameter names
+  // on protocol requirements.
+  //
+  // FIXME: Consider turning this into a warning or error if we do
+  // another -swift-version.
+  if (!isa<ProtocolDecl>(owner->getParent())) {
+    // Check for duplicate parameter names.
+    diagnoseDuplicateDecls(*params);
+  }
 }

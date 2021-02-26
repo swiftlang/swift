@@ -2048,7 +2048,7 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
           .fixItRemoveChars(end.getAdvancedLoc(-1), end);
     }
 
-    loc = consumeArgumentLabel(name);
+    loc = consumeArgumentLabel(name, /*diagnoseDollarPrefix=*/false);
     consumeToken(tok::colon);
   }
 }
@@ -2599,7 +2599,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         Identifier name;
         SourceLoc nameLoc;
         if (Tok.is(tok::identifier)) {
-          nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/true);
+          nameLoc = consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
         } else {
           nameLoc = consumeToken(tok::kw__);
         }
@@ -3175,7 +3175,7 @@ Parser::parseTrailingClosures(bool isExprBasic, SourceRange calleeRange,
     SyntaxParsingContext ClosureCtx(SyntaxContext,
                                     SyntaxKind::MultipleTrailingClosureElement);
     Identifier label;
-    auto labelLoc = consumeArgumentLabel(label);
+    auto labelLoc = consumeArgumentLabel(label, /*diagnoseDollarPrefix=*/false);
     consumeToken(tok::colon);
     ParserResult<Expr> closure;
     if (Tok.is(tok::l_brace)) {
