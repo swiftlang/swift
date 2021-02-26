@@ -848,12 +848,6 @@ public:
     /// This is a root requirement source.
     NestedTypeNameMatch,
 
-    /// The requirement is the implicit binding of a type to
-    /// the interface type of the concrete type declaration it represents.
-    ///
-    /// This is a root requirement source.
-    ConcreteTypeBinding,
-
     /// The requirement is a protocol requirement.
     ///
     /// This stores the protocol that introduced the requirement as well as the
@@ -943,7 +937,6 @@ private:
     case Explicit:
     case Inferred:
     case NestedTypeNameMatch:
-    case ConcreteTypeBinding:
     case Superclass:
     case Parent:
     case Concrete:
@@ -984,7 +977,6 @@ private:
     case Inferred:
     case RequirementSignatureSelf:
     case NestedTypeNameMatch:
-    case ConcreteTypeBinding:
       return true;
 
     case ProtocolRequirement:
@@ -1114,12 +1106,6 @@ public:
   static const RequirementSource *forNestedTypeNameMatch(
                                       GenericSignatureBuilder &builder,
                                       Type rootType);
-
-  /// Retrieve a requirement source describing when a concrete type
-  /// declaration is used to define a potential archetype.
-  static const RequirementSource *forConcreteTypeBinding(
-                                     GenericSignatureBuilder &builder,
-                                     Type rootType);
 
 private:
   /// A requirement source that describes that a requirement comes from a
