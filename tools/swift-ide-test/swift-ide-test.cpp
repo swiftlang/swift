@@ -2519,6 +2519,7 @@ static void printModuleMetadata(ModuleDecl *MD) {
   MD->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
     OS << "filepath=" << info.FilePath << "; ";
     OS << "hash=" << info.InterfaceHash.getRawValue() << "; ";
+    OS << "hashWithoutTypeMembers=" << info.InterfaceHashWithoutTypeMembers.getRawValue() << "; ";
     OS << "mtime=" << info.LastModified << "; ";
     OS << "size=" << info.FileSize;
     OS << "\n";

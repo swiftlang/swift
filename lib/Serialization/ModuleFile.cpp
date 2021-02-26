@@ -978,8 +978,12 @@ void ModuleFile::collectBasicSourceFileInfo(
   while (Cursor < End) {
     // FilePath (byte offset in 'SourceLocsTextData').
     auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
-    // InterfaceHash (fixed length string).
-    auto fpStr = StringRef{reinterpret_cast<const char *>(Cursor),
+    // InterfaceHashWithoutTypeMembers (fixed length string).
+    auto fpStrWithoutTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
+                           Fingerprint::DIGEST_LENGTH};
+    Cursor += Fingerprint::DIGEST_LENGTH;
+    // InterfaceHashIncludingTypeMembers (fixed length string).
+    auto fpStrIncludingTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
                            Fingerprint::DIGEST_LENGTH};
     Cursor += Fingerprint::DIGEST_LENGTH;
     // LastModified (nanoseconds since epoch).
@@ -994,10 +998,21 @@ void ModuleFile::collectBasicSourceFileInfo(
 
     BasicSourceFileInfo info;
     info.FilePath = filePath;
-    if (auto fingerprint = Fingerprint::fromString(fpStr))
-      info.InterfaceHash = fingerprint.getValue();
-    else {
-      llvm::errs() << "Unconvertable fingerprint '" << fpStr << "'\n";
+    if (auto fingerprintWithoutTypeMembers = Fingerprint::fromString(fpStrWithoutTypeMembers)) {
+      info.InterfaceHashWithoutTypeMembers =
+        fingerprintWithoutTypeMembers.getValue();
+    } else {
+      llvm::errs() << "Unconvertable fingerprint without type members'" <<
+        fpStrWithoutTypeMembers << "'\n";
+      abort();
+    }
+    if (auto fingerprintIncludingTypeMembers = Fingerprint::fromString(fpStrIncludingTypeMembers)) {
+      // Only the hash without type members is stored in a module file
+      // because that's what's needed for incremental imports.
+      info.InterfaceHash = fingerprintIncludingTypeMembers.getValue();
+    } else {
+      llvm::errs() << "Unconvertable fingerprint including type members'" <<
+        fpStrIncludingTypeMembers << "'\n";
       abort();
     }
     info.LastModified =

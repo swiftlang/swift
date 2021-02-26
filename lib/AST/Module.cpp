@@ -1553,7 +1553,9 @@ Fingerprint ModuleDecl::getFingerprint() const {
   StableHasher hasher = StableHasher::defaultHasher();
   SmallVector<Fingerprint, 16> FPs;
   collectBasicSourceFileInfo([&](const BasicSourceFileInfo &bsfi) {
-    FPs.emplace_back(bsfi.InterfaceHash);
+    // For incremental imports, the hash must be insensitive to type-body
+    // changes, so use the one without type members.
+    FPs.emplace_back(bsfi.InterfaceHashWithoutTypeMembers);
   });
   
   // Sort the fingerprints lexicographically so we have a stable hash despite

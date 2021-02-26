@@ -99,6 +99,10 @@ struct BasicDeclLocs {
 struct BasicSourceFileInfo {
   StringRef FilePath;
   Fingerprint InterfaceHash = Fingerprint::ZERO();
+  /// Does *not* include the type-body hashes of the top level types.
+  /// Just the `SourceFile` hashes.
+  /// Used for incremental imports.
+  Fingerprint InterfaceHashWithoutTypeMembers = Fingerprint::ZERO();
   llvm::sys::TimePoint<> LastModified = {};
   uint64_t FileSize = 0;
 
