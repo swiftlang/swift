@@ -1154,20 +1154,23 @@ func vjpOpaqueResult(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
 // Test instance vs static method mismatch.
 
 struct StaticMismatch<T: Differentiable> {
+  // expected-note @+1 {{original function 'init(_:)' operates on a type}}
   init(_ x: T) {}
+  // expected-note @+1 {{original function 'instanceMethod' operates on an instance type}}
   func instanceMethod(_ x: T) -> T { x }
+  // expected-note @+1 {{original function 'staticMethod' operates on a type}}
   static func staticMethod(_ x: T) -> T { x }
 
   @derivative(of: init)
-  // expected-error @+2 {{derivative function must match usege of static declaration modifier from original function 'init(_:)'}}
-  // expected-note @+1 {{mark the derivative function 'vjpInit' as static}}{{3-3=static }}
+  // expected-error @+2 {{derivative function 'vjpInit' operates on an instance type, not on a type as required}}
+  // expected-note @+1 {{derivative function 'vjpInit' must be 'static'}}{{3-3=static }}
   func vjpInit(_ x: T) -> (value: Self, pullback: (T.TangentVector) -> T.TangentVector) {
     fatalError()
   }
 
   @derivative(of: instanceMethod)
-  // expected-error @+2 {{derivative function must match usege of static declaration modifier from original function 'instanceMethod'}}
-  // expected-note @+1 {{remove static declaration modifier for function 'jvpInstance'}}{{3-10=}}
+  // expected-error @+2 {{derivative function 'jvpInstance' operates on a type, not on an instance type as required}}
+  // expected-note @+1 {{derivative function 'jvpInstance' must not be 'static'}}{{3-10=}}
   static func jvpInstance(_ x: T) -> (
     value: T, differential: (T.TangentVector) -> (T.TangentVector)
   ) {
@@ -1175,8 +1178,8 @@ struct StaticMismatch<T: Differentiable> {
   }
 
   @derivative(of: staticMethod)
-  // expected-error @+2 {{derivative function must match usege of static declaration modifier from original function 'staticMethod'}}
-  // expected-note @+1 {{mark the derivative function 'jvpStatic' as static}}{{3-3=static }}
+  // expected-error @+2 {{derivative function 'jvpStatic' operates on an instance type, not on a type as required}}
+  // expected-note @+1 {{derivative function 'jvpStatic' must be 'static'}}{{3-3=static }}
   func jvpStatic(_ x: T) -> (
     value: T, differential: (T.TangentVector) -> (T.TangentVector)
   ) {

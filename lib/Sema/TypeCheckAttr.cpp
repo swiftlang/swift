@@ -4589,35 +4589,32 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 /// Otherwise the registered derivative should be an instance method.
 /// \returns true if mismatch is found, false otherwise.
 static bool checkStaticDeclMismatch(AbstractFunctionDecl *originalCandidate,
- AbstractFunctionDecl *registred) {
-  return (isa<ConstructorDecl>(originalCandidate) || originalCandidate->isStatic()) !=
-      registred->isStatic();
+                                    AbstractFunctionDecl *registered) {
+  return (isa<ConstructorDecl>(originalCandidate) ||
+          originalCandidate->isStatic()) != registered->isStatic();
 }
 
 /// Produces diagnostics for mismatch in static/instance method declaration
 /// between original candidate and registered derivative.
 static void diagnoseStaticDeclMismatch(AbstractFunctionDecl *originalCandidate,
- FuncDecl *registred) {
+                                       FuncDecl *registered) {
   auto &diags = originalCandidate->getASTContext().Diags;
-  diags.diagnose(registred->getNameLoc(),
-                 diag::autodiff_attr_static_decl_mismatch,
-                 originalCandidate->getName());
-  if (registred->isStatic()) {
-    diags
-        .diagnose(registred->getStartLoc(),
-                  diag::autodiff_attr_remove_static_decl_modifier,
-                  registred->getName())
-        .fixItRemove(registred->getStaticLoc());
+  diags.diagnose(
+      registered->getNameLoc(), diag::autodiff_attr_static_decl_mismatch,
+      registered->getName(), registered->isStatic(), !registered->isStatic());
+  diags.diagnose(
+      originalCandidate->getNameLoc(), diag::autodiff_attr_static_decl_original,
+      originalCandidate->getName(),
+      isa<ConstructorDecl>(originalCandidate) || originalCandidate->isStatic());
+  auto fixItDiag = diags.diagnose(
+      registered->getStartLoc(), diag::autodiff_attr_static_decl_mismatch_fix,
+      registered->getName(), !registered->isStatic());
+  if (registered->isStatic()) {
+    fixItDiag.fixItRemove(registered->getStaticLoc());
   } else {
-    diags
-        .diagnose(registred->getStartLoc(),
-                  diag::autodiff_attr_add_static_decl_modifier,
-                  registred->getName())
-        .fixItInsert(
-            registred->getAttributeInsertionLoc(/*forModifier*/ true),
-            "static ");
+    fixItDiag.fixItInsert(registered->getStartLoc(), "static ");
   }
- }
+}
 
 /// Type-checks the given `@derivative` attribute `attr` on declaration `D`.
 ///
