@@ -35,7 +35,7 @@ namespace swift {
 /// access by a cancelling thread.  In particular, the chain of
 /// status records must not be disturbed.  When the task leaves
 /// the scope that requires the status record, the record can
-/// be unregistered from the task with `swift_task_removeTaskStatusRecord`,
+/// be unregistered from the task with `swift_task_removeStatusRecord`,
 /// at which point the memory can be returned to the system.
 class TaskStatusRecord {
 public:
@@ -124,14 +124,22 @@ public:
 /// A status record which states that a task has one or
 /// more active child tasks.
 class ChildTaskStatusRecord : public TaskStatusRecord {
-  /// FIXME: should this be an array?  How are things like task groups supposed
-  /// to actually manage this?  Should it be atomically modifiable?
   AsyncTask *FirstChild;
 
 public:
   ChildTaskStatusRecord(AsyncTask *child)
     : TaskStatusRecord(TaskStatusRecordKind::ChildTask),
       FirstChild(child) {}
+
+  ChildTaskStatusRecord(AsyncTask *child, TaskStatusRecordKind kind)
+    : TaskStatusRecord(kind),
+      FirstChild(child) {
+    assert(kind == TaskStatusRecordKind::ChildTask);
+    assert(!child->hasGroupChildFragment() &&
+      "Group child tasks must be tracked in their respective "
+      "TaskGroupTaskStatusRecord, and not as independent ChildTaskStatusRecord "
+      "records.");
+  }
 
   /// Return the first child linked by this record.  This may be null;
   /// if not, it (and all of its successors) are guaranteed to satisfy
@@ -154,12 +162,97 @@ public:
   }
 };
 
+/// A status record which states that a task has a task group.
+///
+/// The child tasks are stored as an invasive single-linked list, starting
+/// from `FirstChild` and continuing through the `NextChild` pointers of all
+/// the linked children.
+///
+/// All children of the specific `Group` are stored "by" this record,
+/// so that they may be cancelled when this task becomes cancelled.
+///
+/// When the group exits, it may simply remove this single record from the task
+/// running it. As it has guaranteed that the tasks have already completed.
+///
+/// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
+/// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
+class TaskGroupTaskStatusRecord : public TaskStatusRecord {
+  TaskGroup *Group;
+  AsyncTask *FirstChild;
+public:
+  TaskGroupTaskStatusRecord(TaskGroup *group)
+    : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+      Group(group),
+      FirstChild(nullptr) {}
+
+  TaskGroupTaskStatusRecord(TaskGroup *group, AsyncTask *child)
+    : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
+      Group(group),
+      FirstChild(child) {}
+
+  TaskGroup* getGroup() const {
+    return Group;
+  }
+
+  /// Return the first child linked by this record.  This may be null;
+  /// if not, it (and all of its successors) are guaranteed to satisfy
+  /// `isChildTask()`.
+  AsyncTask *getFirstChild() const {
+    return FirstChild;
+  }
+
+  /// Attach the passed in `child` task to this group.
+  void attachChild(AsyncTask *child) {
+    assert(child->groupChildFragment());
+    assert(child->hasGroupChildFragment());
+    assert(child->groupChildFragment()->getGroup() == Group);
+
+    if (!FirstChild) {
+      // This is the first child we ever attach, so store it as FirstChild.
+      FirstChild = child;
+      return;
+    }
+
+    // We need to traverse the siblings to find the last one and add the child there.
+
+    auto cur = FirstChild;
+    auto i = 0;
+    while (cur) {
+      i++;
+
+      // no need to check hasChildFragment, all tasks we store here have them.
+      auto fragment = cur->childFragment();
+      if (auto next = fragment->getNextChild()) {
+        cur = next;
+      } else {
+        // we're done searching and `cur` is the last
+        break;
+      }
+    }
+
+    cur->childFragment()->setNextChild(child);
+  }
+
+  static AsyncTask *getNextChildTask(AsyncTask *task) {
+    return task->childFragment()->getNextChild();
+  }
+
+  using child_iterator = LinkedListIterator<AsyncTask, getNextChildTask>;
+  llvm::iterator_range<child_iterator> children() const {
+    return child_iterator::rangeBeginning(getFirstChild());
+  }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskGroup;
+  }
+};
+
 /// A cancellation record which states that a task has an arbitrary
 /// function that needs to be called if the task is cancelled.
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeTaskStatusRecord` and freely
+/// code may call `swift_task_removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
@@ -189,7 +282,7 @@ public:
 ///
 /// The end of any call to the function will be ordered before the
 /// end of a call to unregister this record from the task.  That is,
-/// code may call `swift_task_removeTaskStatusRecord` and freely
+/// code may call `swift_task_removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {

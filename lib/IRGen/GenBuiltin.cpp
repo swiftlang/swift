@@ -227,11 +227,18 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) {
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture) {
+
     auto flags = args.claimNext();
     auto parentTask = args.claimNext();
+    auto taskGroup =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture)
+        ? args.claimNext()
+        : nullptr;
     auto futureResultType =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture)
+        ((Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) ||
+         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture))
           ? args.claimNext()
           : nullptr;
     auto taskFunction = args.claimNext();
@@ -243,7 +250,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     IGF.emitNativeStrongRetain(taskContext, IGF.getDefaultAtomicity());
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, parentTask, futureResultType, taskFunction, taskContext,
+        IGF, flags, parentTask, taskGroup, futureResultType, taskFunction, taskContext,
         substitutions);
 
     // Cast back to NativeObject/RawPointer.

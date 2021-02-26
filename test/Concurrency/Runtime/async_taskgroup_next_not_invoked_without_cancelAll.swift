@@ -1,11 +1,16 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
+// REQUIRES: libdispatch
 
-import func Foundation.sleep
+import Dispatch
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 func test_skipCallingNext() async {
   let numbers = [1, 1]

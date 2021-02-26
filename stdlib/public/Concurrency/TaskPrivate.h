@@ -26,6 +26,7 @@
 namespace swift {
 
 class AsyncTask;
+class TaskGroup;
 
 /// Initialize the task-local allocator in the given task.
 void _swift_task_alloc_initialize(AsyncTask *task);
@@ -61,7 +62,6 @@ void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 namespace {
 
 /// An asynchronous context within a task that describes a general "Future".
-/// task.
 ///
 /// This type matches the ABI of a function `<T> () async throws -> T`, which
 /// is the type used by `Task.runDetached` and `Task.group.add` to create
@@ -80,7 +80,9 @@ public:
   // Arguments.
   AsyncTask *task;
 
-  // Only in swift_task_group_next
+  // Only in swift_task_group_wait_next_throwing.
+  TaskGroup *group;
+  // Only in swift_task_group_wait_next_throwing.
   const Metadata *successType;
 
   using AsyncContext::AsyncContext;

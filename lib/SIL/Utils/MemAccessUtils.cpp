@@ -1815,6 +1815,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskFuture:
+    case BuiltinValueKind::CreateAsyncTaskGroupFuture:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:
     case BuiltinValueKind::AutoDiffAllocateSubcontext:
     case BuiltinValueKind::InitializeDefaultActor:

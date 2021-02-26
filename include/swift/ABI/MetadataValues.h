@@ -1936,9 +1936,9 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask    = 24,
-    Task_IsFuture       = 25,
-    Task_IsTaskGroup    = 26
+    Task_IsChildTask      = 24,
+    Task_IsFuture         = 25,
+    Task_IsGroupChildTask = 26,
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
@@ -1965,9 +1965,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsFuture,
                                 task_isFuture,
                                 task_setIsFuture)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskGroup,
-                                task_isTaskGroup,
-                                task_setIsTaskGroup)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsGroupChildTask,
+                                task_isGroupChildTask,
+                                task_setIsGroupChildTask)
 };
 
 /// Kinds of task status record.
@@ -1979,14 +1979,18 @@ enum class TaskStatusRecordKind : uint8_t {
   /// active child tasks.
   ChildTask = 1,
 
+  /// A TaskGroupTaskStatusRecord, which represents a task group
+  /// and child tasks spawned within it.
+  TaskGroup = 2,
+
   /// A CancellationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task is cancelled.
-  CancellationNotification = 2,
+  CancellationNotification = 3,
 
   /// An EscalationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task's priority is
   /// escalated.
-  EscalationNotification = 3,
+  EscalationNotification = 4,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,

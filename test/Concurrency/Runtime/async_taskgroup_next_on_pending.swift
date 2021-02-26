@@ -1,13 +1,16 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
-
-// REQUIRES: rdar73267044
+// REQUIRES: libdispatch
 
 import Dispatch
+
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 func completeSlowly(n: Int) async -> Int {
   sleep(UInt32(n + 1))
@@ -18,7 +21,7 @@ func completeSlowly(n: Int) async -> Int {
 /// Tasks complete AFTER they are next() polled.
 func test_sum_nextOnPending() async {
   let numbers = [1, 2, 3]
-  let expected = numbers.reduce(0, +)
+  let expected = 6 // FIXME: numbers.reduce(0, +) this hangs?
 
   let sum = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
     for n in numbers {
