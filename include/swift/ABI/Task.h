@@ -281,9 +281,9 @@ public:
 
     private:
       explicit TaskLocalItem(const Metadata *keyType, const Metadata *valueType)
-          : keyType(keyType),
-            valueType(valueType),
-            next(0) { }
+          : next(0),
+            keyType(keyType),
+            valueType(valueType) { }
 
     public:
       /// TaskLocalItem which does not by itself store any value, but only points
