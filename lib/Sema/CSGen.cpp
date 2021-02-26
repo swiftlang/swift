@@ -4053,7 +4053,7 @@ bool ConstraintSystem::generateConstraints(
 }
 
 ConstraintSystem::TypeMatchResult
-ConstraintSystem::applyPropertyWrapperParameter(
+ConstraintSystem::applyPropertyWrapperToParameter(
     Type wrapperType, Type paramType, ParamDecl *param, Identifier argLabel,
     ConstraintKind matchKind, ConstraintLocatorBuilder locator) {
   Expr *anchor = getAsExpr(locator.getAnchor());

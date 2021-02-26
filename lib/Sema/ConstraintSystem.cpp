@@ -1203,8 +1203,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
     auto paramType = paramTypes[i].getParameterType();
     auto paramLabel = paramTypes[i].getLabel();
     adjustedParamTypes.push_back(AnyFunctionType::Param(wrappedType, paramLabel));
-    cs.applyPropertyWrapperParameter(paramType, wrappedType, paramDecl, argLabel,
-                                     ConstraintKind::Equal, locator);
+    cs.applyPropertyWrapperToParameter(paramType, wrappedType, paramDecl, argLabel,
+                                       ConstraintKind::Equal, locator);
   }
 
   return FunctionType::get(adjustedParamTypes, functionType->getResult(),

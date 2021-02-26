@@ -1423,8 +1423,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       auto *wrappedParam = paramInfo.getPropertyWrapperParam(argIdx);
       auto argLabel = argument.getLabel();
       if (wrappedParam || argLabel.hasDollarPrefix()) {
-        if (cs.applyPropertyWrapperParameter(paramTy, argTy, const_cast<ParamDecl *>(wrappedParam),
-                                             argLabel, subKind, locator).isFailure()) {
+        if (cs.applyPropertyWrapperToParameter(paramTy, argTy, const_cast<ParamDecl *>(wrappedParam),
+                                               argLabel, subKind, locator).isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }
         continue;
@@ -8228,9 +8228,9 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       }
 
       if (!hasError) {
-        auto result = applyPropertyWrapperParameter(backingType, param.getParameterType(),
-                                                    paramDecl, paramDecl->getName(),
-                                                    ConstraintKind::Equal, locator);
+        auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
+                                                      paramDecl, paramDecl->getName(),
+                                                      ConstraintKind::Equal, locator);
         if (result.isFailure())
           return false;
 
