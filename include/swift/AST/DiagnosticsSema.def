@@ -5524,9 +5524,9 @@ ERROR(property_with_wrapper_conflict_attribute,none,
 ERROR(property_wrapper_not_single_var, none,
       "property wrapper can only apply to a single variable", ())
 ERROR(property_with_wrapper_in_bad_context,none,
-      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{|non-static|non-static}1 %2 %0 declared inside "
       "%select{a protocol|an extension|an enum}1 cannot have a wrapper",
-      (Identifier, int))
+      (Identifier, int, DescriptiveDeclKind))
 ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (Identifier))

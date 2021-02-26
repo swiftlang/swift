@@ -83,3 +83,8 @@ func testInvalidArgLabel() {
   // expected-error@+1 {{cannot use property wrapper projection argument; parameter does not have an attached property wrapper}}
   noWrappers($argLabel: 10)
 }
+
+protocol P {
+  // expected-error@+1 {{parameter 'arg' declared inside a protocol cannot have a wrapper}}
+  func requirement(@Wrapper arg: Int)
+}

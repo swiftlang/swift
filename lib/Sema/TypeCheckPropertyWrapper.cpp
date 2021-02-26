@@ -455,6 +455,10 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
+    if (isa<ParamDecl>(var) && isa<AbstractFunctionDecl>(dc)) {
+      dc = dc->getAsDecl()->getDeclContext();
+    }
+
     // A property with a wrapper cannot be declared in a protocol, enum, or
     // an extension.
     if (isa<ProtocolDecl>(dc) ||
@@ -468,7 +472,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       else
         whichKind = 2;
       var->diagnose(diag::property_with_wrapper_in_bad_context,
-                    var->getName(), whichKind)
+                    var->getName(), whichKind, var->getDescriptiveKind())
         .highlight(attr->getRange());
 
       continue;
