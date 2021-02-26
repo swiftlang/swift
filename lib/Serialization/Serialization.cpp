@@ -2532,7 +2532,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
-                                       S.addTypeRef(theAttr->getType()));
+                                       S.addTypeRef(theAttr->getType()),
+                                       theAttr->isArgUnsafe());
       return;
     }
 

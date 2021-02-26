@@ -4410,7 +4410,9 @@ ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
 ERROR(global_actor_on_struct_property,none,
       "stored property %0 of a struct cannot have a global actor", (DeclName))
-
+ERROR(global_actor_non_unsafe_init,none,
+      "global actor attribute %0 argument can only be '(unsafe)'", (Type))
+      
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))
