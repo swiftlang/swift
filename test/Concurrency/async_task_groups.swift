@@ -4,12 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func asyncFunc() async -> Int { 42 }
 func asyncThrowsFunc() async throws -> Int { 42 }
 func asyncThrowsOnCancel() async throws -> Int {

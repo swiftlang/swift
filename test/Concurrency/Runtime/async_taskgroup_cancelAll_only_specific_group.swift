@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
@@ -23,7 +17,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
 
     for i in 1...5 {
       await group.add {
-        sleep(1)
+        await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("add: \(i) (cancelled: \(c))")
         return i
@@ -48,7 +42,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
   let g2: Int = try! await Task.withGroup(resultType: Int.self) { group in
     for i in 1...3 {
       await group.add {
-        sleep(1)
+        await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("g1 task \(i) (cancelled: \(c))")
         return i

@@ -4,12 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 actor Counter {
   private var value = 0
   private let scratchBuffer: UnsafeMutableBufferPointer<Int>

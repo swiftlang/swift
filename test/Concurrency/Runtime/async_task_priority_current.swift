@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_detach() async {
   let a1 = Task.currentPriority
   print("a1: \(a1)") // CHECK: a1: default

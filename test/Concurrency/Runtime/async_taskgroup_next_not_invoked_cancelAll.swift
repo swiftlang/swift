@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_skipCallingNext_butInvokeCancelAll() async {
   let numbers = [1, 1]
 
