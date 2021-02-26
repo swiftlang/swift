@@ -1,4 +1,8 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
+
+// Rerun with optimizations to check if -O does not make any difference
+// RUN: %target-swift-frontend -O -emit-sil -primary-file %s -o /dev/null -verify
+
 func ifFalse() -> Int {
   if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
@@ -451,3 +455,18 @@ func f(i: Int?) {
     guard i != nil else { Never.theThing }
     guard i != nil else { test(Never.self) }
 }
+
+extension Collection {
+  // Check that the destroy_addr which is inserted by DestroyHoisting does not
+  // trigger a warning here.
+  func f() -> Index {
+    var lo = startIndex
+    var hi = endIndex
+    while true {
+        formIndex(after: &lo)
+        formIndex(after: &hi)
+        if Bool.random() { return hi }
+    }
+  }
+}
+
