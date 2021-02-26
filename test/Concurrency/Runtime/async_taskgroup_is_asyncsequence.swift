@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// XFAIL: linux
 
 #if canImport(Darwin)
 import Darwin
