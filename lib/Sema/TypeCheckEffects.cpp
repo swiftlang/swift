@@ -283,7 +283,7 @@ public:
       return AFD->getInterfaceType();
     }
     case Kind::Closure: return getClosure()->getType();
-    case Kind::Parameter: return getParameter()->getType();
+    case Kind::Parameter: return getParameter()->getInterfaceType();
     }
     llvm_unreachable("bad kind");
   }
@@ -846,7 +846,7 @@ private:
   Classification classifyParameterBody(ParamDecl *param,
                                        PotentialEffectReason reason,
                                        EffectKind kind) {
-    assert(param->getType()
+    assert(param->getInterfaceType()
                ->lookThroughAllOptionalTypes()
                ->castTo<AnyFunctionType>()
                ->hasEffect(kind));
