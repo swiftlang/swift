@@ -768,7 +768,7 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
       }
 
       // If we are the value use, look through it.
-      llvm::copy(mdi->getValue()->getUses(), std::back_inserter(worklist));
+      llvm::copy(mdi->getUses(), std::back_inserter(worklist));
       continue;
     }
 

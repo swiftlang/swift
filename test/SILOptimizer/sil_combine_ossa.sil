@@ -4958,6 +4958,12 @@ class KlassWithTailAllocatedElems {
   init()
 }
 
+// Test conversion from address_to_pointer->pointer_to_address to
+// unchecked_addr_cast when the base is an interior pointer (ref_tail_addr).
+//
+// RAW attempts to clone the ref_tail_addr and its access path to the
+// load, which includes
+//
 // CHECK-LABEL: sil [ossa] @unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast : $@convention(thin) () -> Builtin.Word {
 // CHECK-NOT: pointer_to_address
 // CHECK-NOT: address_to_pointer

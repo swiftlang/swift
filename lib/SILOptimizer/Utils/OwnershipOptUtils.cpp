@@ -788,89 +788,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
 //                     Interior Pointer Operand Rebasing
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// Clone all projections and casts on the access use-def chain until either the
-/// specified predicate is true or the access base is reached.
-///
-/// This will not clone ref_element_addr or ref_tail_addr because those aren't
-/// part of the access chain.
-class InteriorPointerAddressRebaseUseDefChainCloner
-    : public AccessUseDefChainVisitor<
-          InteriorPointerAddressRebaseUseDefChainCloner, SILValue> {
-  SILValue oldAddressValue;
-  SingleValueInstruction *oldIntPtr;
-  SingleValueInstruction *newIntPtr;
-  SILInstruction *insertPt;
-
-public:
-  InteriorPointerAddressRebaseUseDefChainCloner(
-      SILValue oldAddressValue, SingleValueInstruction *oldIntPtr,
-      SingleValueInstruction *newIntPtr, SILInstruction *insertPt)
-      : oldAddressValue(oldAddressValue), oldIntPtr(oldIntPtr),
-        newIntPtr(newIntPtr), insertPt(insertPt) {}
-
-  // Recursive main entry point
-  SILValue cloneUseDefChain(SILValue currentOldAddr) {
-    // If we have finally hit oldIntPtr, we are done.
-    if (currentOldAddr == oldIntPtr)
-      return currentOldAddr;
-    return this->visit(currentOldAddr);
-  }
-
-  // Recursively clone an address on the use-def chain.
-  SingleValueInstruction *cloneProjection(SingleValueInstruction *projectedAddr,
-                                          Operand *sourceOper) {
-    SILValue sourceOperVal = sourceOper->get();
-    SILValue projectedSource = cloneUseDefChain(sourceOperVal);
-    // If we hit the end of our chain, then make newIntPtr the operand so that
-    // we have successfully rebased.
-    if (sourceOperVal == projectedSource)
-      projectedSource = newIntPtr;
-    SILInstruction *clone = projectedAddr->clone(insertPt);
-    clone->setOperand(sourceOper->getOperandNumber(), projectedSource);
-    return cast<SingleValueInstruction>(clone);
-  }
-
-  SILValue visitBase(SILValue base, AccessedStorage::Kind kind) {
-    assert(false && "access base cannot be cloned");
-    return SILValue();
-  }
-
-  SILValue visitNonAccess(SILValue base) {
-    assert(false && "unknown address root cannot be cloned");
-    return SILValue();
-  }
-
-  SILValue visitPhi(SILPhiArgument *phi) {
-    assert(false && "unexpected phi on access path");
-    return SILValue();
-  }
-
-  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
-    // We are ok with cloning storage casts.
-    return cloneProjection(cast, sourceOper);
-  }
-
-  SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
-                                 Operand *sourceOper) {
-    return cloneProjection(projectedAddr, sourceOper);
-  }
-};
-
-} // namespace
-
-/// \p oldAddressValue is an address rooted in \p oldIntPtr. Clone the use-def
-/// chain from \p oldAddressValue to \p oldIntPtr, but starting from \p
-/// newAddressValue.
-static SILValue cloneInteriorProjectionUseDefChain(
-    SILValue oldAddressValue, SingleValueInstruction *oldIntPtr,
-    SingleValueInstruction *newIntPtr, SILInstruction *insertPt) {
-  InteriorPointerAddressRebaseUseDefChainCloner cloner(
-      oldAddressValue, oldIntPtr, newIntPtr, insertPt);
-  return cloner.cloneUseDefChain(oldAddressValue);
-}
-
 SILBasicBlock::iterator
 OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
                                         SILValue newValue) {
@@ -907,19 +824,18 @@ OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
   // the access path from newValue to intPtr but upon newIntPtr. Then we make it
   // use newIntPtr.
   auto *intPtrUser = cast<SingleValueInstruction>(intPtr->getUser());
-  SILValue initialAddr = cloneInteriorProjectionUseDefChain(
-      newValue /*address we originally wanted to replace*/,
-      intPtrUser /*the interior pointer of that value*/,
-      newIntPtrUser /*the interior pointer we need to recreate the chain upon*/,
-      oldValue /*insert point*/);
 
-  // If we got back newValue, then we need to set initialAddr to be int ptr
-  // user.
-  if (initialAddr == newValue)
-    initialAddr = newIntPtrUser;
+  // This cloner invocation must match the canCloneUseDefChain check in the
+  // constructor.
+  auto checkBase = [&](SILValue srcAddr) {
+    return (srcAddr == intPtrUser) ? SILValue(newIntPtrUser) : SILValue();
+  };
+  SILValue clonedAddr =
+      cloneUseDefChain(newValue, /*insetPt*/ oldValue, checkBase);
+  assert(clonedAddr != newValue && "expect at least the base to be replaced");
 
   // Now that we have an addr that is setup appropriately, RAUW!
-  return replaceAllUsesAndErase(oldValue, initialAddr, ctx->callbacks);
+  return replaceAllUsesAndErase(oldValue, clonedAddr, ctx->callbacks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1011,6 +927,17 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   auto borrowedValue = intPtr.getSingleBaseValue();
   if (!borrowedValue) {
     // Invalidate!
+    ctx = nullptr;
+    return;
+  }
+
+  // This cloner check must match the later cloner invocation in
+  // replaceAddressUses()
+  auto *intPtrUser = cast<SingleValueInstruction>(intPtr->getUser());
+  auto checkBase = [&](SILValue srcAddr) {
+    return (srcAddr == intPtrUser) ? SILValue(intPtrUser) : SILValue();
+  };
+  if (!canCloneUseDefChain(newValue, checkBase)) {
     ctx = nullptr;
     return;
   }
