@@ -76,6 +76,7 @@ class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
+enum class EffectKind : uint8_t;
 class EnumDecl;
 class EnumElementDecl;
 class SILFunctionType;
@@ -3158,6 +3159,8 @@ public:
   bool isAsync() const { return getExtInfo().isAsync(); }
 
   bool isThrowing() const { return getExtInfo().isThrowing(); }
+
+  bool hasEffect(EffectKind kind) const;
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
   DifferentiabilityKind getDifferentiabilityKind() const {

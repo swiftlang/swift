@@ -35,12 +35,7 @@ static bool hasFunctionParameterWithEffect(EffectKind kind, Type type) {
 
   // Only consider function types with this effect.
   if (auto fnType = type->getAs<AnyFunctionType>()) {
-    auto extInfo = fnType->getExtInfo();
-    switch (kind) {
-    case EffectKind::Throws: return extInfo.isThrowing();
-    case EffectKind::Async: return extInfo.isAsync();
-    }
-    llvm_unreachable("Bad effect kind");
+    return fnType->hasEffect(kind);
   }
 
   // Look through tuples.
