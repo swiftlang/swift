@@ -717,16 +717,11 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    Classification result;
-
-    if (fnType->isAsync() || E->implicitlyAsync())
-      result = Classification::forUnconditional(
-        EffectKind::Async,
-        PotentialEffectReason::forApply());
-
-    // If the function doesn't throw at all, we're done here.
-    if (!fnType->isThrowing()) {
-      return result;
+    // If the function doesn't have any effects, we're done here.
+    if (!fnType->isThrowing() &&
+        !fnType->isAsync() &&
+        !E->implicitlyAsync()) {
+      return Classification();
     }
 
     // Decompose the application.
@@ -739,58 +734,86 @@ public:
         return Classification::forInvalidCode();
     }
 
-    // Handle rethrowing functions.
-    switch (fnRef.getPolymorphicEffectKind(EffectKind::Throws)) {
-    case PolymorphicEffectKind::ByConformance: {
-      auto substitutions = fnRef.getSubstitutions();
-      for (auto conformanceRef : substitutions.getConformances()) {
-        if (conformanceRef.hasEffect(EffectKind::Throws)) {
-          result.merge(Classification::forConditional(EffectKind::Throws,
-            PotentialEffectReason::forConformance()));
-          return result;
+    Classification result;
+
+    auto classifyApplyEffect = [&](EffectKind kind) {
+      if (!fnType->hasEffect(kind) &&
+          !(kind == EffectKind::Async &&
+            E->implicitlyAsync())) {
+        return;
+      }
+
+      // Handle rethrowing and reasync functions.
+      switch (fnRef.getPolymorphicEffectKind(kind)) {
+      case PolymorphicEffectKind::ByConformance: {
+        auto substitutions = fnRef.getSubstitutions();
+        for (auto conformanceRef : substitutions.getConformances()) {
+          if (conformanceRef.hasEffect(kind)) {
+            result.merge(Classification::forConditional(kind,
+              PotentialEffectReason::forConformance()));
+            return;
+          }
         }
+
+        // 'ByConformance' is a superset of 'ByClosure', so check for
+        // closure arguments too.
+        LLVM_FALLTHROUGH;
       }
 
-      // 'ByConformance' is a superset of 'ByClosure', so check for
-      // closure arguments too.
-      LLVM_FALLTHROUGH;
-    }
+      case PolymorphicEffectKind::ByClosure: {
+        // We need to walk the original parameter types in parallel
+        // because it only counts for rethrows/reasync purposes if it
+        // lines up with a throws/async function parameter in the
+        // original type.
+        auto *origType = fnRef.getType()->getAs<AnyFunctionType>();
+        if (!origType) {
+          result.merge(Classification::forInvalidCode());
+          return;
+        }
 
-    case PolymorphicEffectKind::ByClosure: {
-      // We need to walk the original parameter types in parallel
-      // because it only counts for 'rethrows' purposes if it lines up
-      // with a throwing function parameter in the original type.
-      auto *origType = fnRef.getType()->getAs<AnyFunctionType>();
-      if (!origType)
-        return Classification::forInvalidCode();
+        // Use the most significant result from the arguments.
+        auto params = origType->getParams();
+        if (params.size() != args.size()) {
+          result.merge(Classification::forInvalidCode());
+          return;
+        }
 
-      // Use the most significant result from the arguments.
-      auto params = origType->getParams();
-      if (params.size() != args.size())
-        return Classification::forInvalidCode();
+        for (unsigned i = 0, e = params.size(); i < e; ++i) {
+          result.merge(classifyArgument(args[i],
+                                        params[i].getParameterType(),
+                                        kind));
+        }
 
-      for (unsigned i = 0, e = params.size(); i < e; ++i) {
-        result.merge(classifyArgument(args[i],
-                                      params[i].getParameterType(),
-                                      EffectKind::Throws));
+        return;
       }
 
-      return result;
-    }
+      case PolymorphicEffectKind::None:
+      case PolymorphicEffectKind::Always:
+      case PolymorphicEffectKind::Invalid:
+        break;
+      }
 
-    default:
-      break;
-    }
+      // Try to classify the implementation of functions that we have
+      // local knowledge of.
+      //
+      // An autoclosure callee here only appears in a narrow case where
+      // we're in the initializer of an 'async let'.
+      if (fnRef.isAutoClosure()) {
+        result.merge(Classification::forUnconditional(
+            kind, PotentialEffectReason::forApply()));
+      } else {
+        result.merge(
+          classifyFunctionBody(fnRef,
+                               PotentialEffectReason::forApply(),
+                               kind));
+        assert(result.getConditionalKind(kind)
+               != ConditionalEffectKind::None &&
+               "body classification decided function had no effect?");
+      }
+    };
 
-    // Try to classify the implementation of functions that we have
-    // local knowledge of.
-    result.merge(
-      classifyFunctionBody(fnRef,
-                           PotentialEffectReason::forApply(),
-                           EffectKind::Throws));
-    assert(result.getConditionalKind(EffectKind::Throws)
-           != ConditionalEffectKind::None &&
-           "body classification decided function was no-throw");
+    classifyApplyEffect(EffectKind::Throws);
+    classifyApplyEffect(EffectKind::Async);
 
     return result;
   }
@@ -813,23 +836,12 @@ public:
   }
 
 private:
-  /// Classify a throwing function according to our local knowledge of
-  /// its implementation.
-  ///
-  /// For the most part, this only distinguishes between Throws and
-  /// RethrowingOnly.  But it can return Invalid if a type-checking
-  /// failure prevents it from deciding that, and it can return None
-  /// if the function is an autoclosure that simply doesn't throw at all.
+  /// Classify a throwing or async function according to our local
+  /// knowledge of its implementation.
   Classification
   classifyFunctionBody(const AbstractFunction &fn,
                        PotentialEffectReason reason,
                        EffectKind kind) {
-    // If we're not checking a 'rethrows' context, we don't need to
-    // distinguish between 'throws' and 'rethrows'.  But don't even
-    // trust 'throws' for autoclosures.
-    if (!getPolymorphicEffectDeclContext(kind) && !fn.isAutoClosure())
-      return Classification::forUnconditional(kind, reason);
-
     switch (fn.getKind()) {
     case AbstractFunction::Opaque:
       return Classification::forUnconditional(kind, reason);
