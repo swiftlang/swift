@@ -3267,8 +3267,8 @@ ERROR(autodiff_attr_opaque_result_type_unsupported,none,
 ERROR(autodiff_attr_static_decl_mismatch,none,
       "derivative function %0 operates on %select{an instance|a}1 type, "
       "not on %select{an instance|a}2 type as required",
-      (/*derivative*/ DeclName, /*derivativeOperatesTy*/bool,
-       /*originalOperatesOnInstanceTy*/bool))
+      (/*derivative*/ DeclName, /*derivativeOperatesOnTy*/bool,
+       /*originalOperatesOnTy*/bool))
 NOTE(autodiff_attr_static_decl_original,none,
       "original function %0 operates on %select{an instance|a}1 type",
       (/*original*/ DeclName, /*originalOperatesOnTy*/bool))
