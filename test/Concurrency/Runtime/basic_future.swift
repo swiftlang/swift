@@ -34,7 +34,7 @@ func testSimple(
     // can complete.
     if doSuspend {
       print("- Future sleeping")
-      sleep(1)
+      sleep(1) // TODO: await Task.sleep would be preferable here
     }
 
     if (shouldThrow) {

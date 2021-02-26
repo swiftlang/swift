@@ -1,16 +1,15 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck --dump-input=always %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck --dump-input=always %s
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
+
+import Dispatch
 
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
-#elseif os(Windows)
-import CRT
-import WinSDK
-#else
-#error("Unsupported platform")
 #endif
 
 func test_detach() async {
@@ -33,11 +32,7 @@ func test_multiple_lo_indirectly_escalated() async {
   @concurrent
   func loopUntil(priority: Task.Priority) async {
     while (Task.currentPriority != priority) {
-#if os(Windows)
-      Sleep(1)
-#else
       sleep(1)
-#endif
     }
   }
 

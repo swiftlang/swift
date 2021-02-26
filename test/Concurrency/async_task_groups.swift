@@ -40,36 +40,6 @@ func test_taskGroup_add() async throws -> Int {
   } // implicitly awaits
 }
 
-func test_taskGroup_addHandles() async throws -> Int {
-  try await Task.withGroup(resultType: Int.self) { group in
-    let one = await group.add {
-      await asyncFunc()
-    }
-
-    let two = await group.add {
-      await asyncFunc()
-    }
-
-    _ = try await one.get()
-    _ = try await two.get()
-  } // implicitly awaits
-}
-
-func test_taskGroup_cancel_handles() async throws {
-  try await Task.withGroup(resultType: Int.self) { group in
-    let one = await group.add {
-      try await asyncThrowsOnCancel()
-    }
-
-    let two = await group.add {
-      await asyncFunc()
-    }
-
-    _ = try await one.get()
-    _ = try await two.get()
-  } // implicitly awaits
-}
-
 // ==== ------------------------------------------------------------------------
 // MARK: Example group Usages
 
