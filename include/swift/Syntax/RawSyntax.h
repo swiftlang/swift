@@ -450,6 +450,7 @@ public:
   /// Get a child based on a particular node's "Cursor", indicating
   /// the position of the terms in the production of the Swift grammar.
   const RawSyntax *getChild(CursorIndex Index) const {
+    assert(Index < getNumChildren() && "Index out of bounds");
     return getLayout()[Index];
   }
 
