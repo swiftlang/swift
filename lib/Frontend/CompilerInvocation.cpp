@@ -713,9 +713,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.EnableExperimentalHasAsyncAlternative |=
-      Args.hasArg(OPT_experimental_has_async_alternative_attribute);
-
   return HadError || UnsupportedOS || UnsupportedArch;
 }
 
