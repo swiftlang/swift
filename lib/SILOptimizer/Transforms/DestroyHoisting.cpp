@@ -507,7 +507,7 @@ void DestroyHoisting::insertDestroys(Bits &toInsert, Bits &activeDestroys,
   SILInstruction *insertionPoint =
     (afterInst ? &*std::next(afterInst->getIterator()) : &*inBlock->begin());
   SILBuilder builder(insertionPoint);
-  SILLocation loc = RegularLocation(insertionPoint->getLoc());
+  SILLocation loc = CleanupLocation(insertionPoint->getLoc());
 
   // Insert destroy_addr instructions for all bits in toInsert.
   for (int locIdx = toInsert.find_first(); locIdx >= 0;
