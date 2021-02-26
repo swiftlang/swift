@@ -1,0 +1,83 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-combine-canonicalize=false | %FileCheck %s
+//
+// Run sil-combine without canonicalization to test specific patterns
+// in isolation.
+
+sil_stage canonical
+
+import Builtin
+
+class Klass {}
+
+class KlassWithTailAllocatedElems {
+  var x : Builtin.NativeObject
+  init()
+}
+
+// Test conversion from address_to_pointer->pointer_to_address to
+// unchecked_addr_cast when the base is a borrowed box.
+//
+// The box is not an interior pointer, so RAUW should not try to clone
+// the begin_borrow, which would fail.
+//
+// CHECK-LABEL: sil [ossa] @unchecked_addr_cast_borrowed_box : $@convention(thin) () -> Builtin.Int64 {
+// CHECK: [[BOX:%.*]] = alloc_box ${ var Builtin.Int64 }
+// CHECK: [[BORROW:%.*]] = begin_borrow [[BOX]]
+// CHECK: [[PROJ:%.*]] = project_box [[BORROW]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: [[CAST_RESULT:%.*]] = unchecked_addr_cast [[PROJ]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: load [trivial] [[CAST_RESULT]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[BOX]]
+// CHECK-LABEL: } // end sil function 'unchecked_addr_cast_borrowed_box'
+sil [ossa] @unchecked_addr_cast_borrowed_box : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = alloc_box ${ var Builtin.Int64 }
+  %1a = project_box %1 : ${ var Builtin.Int64 }, 0
+  store %0 to [trivial] %1a : $*Builtin.Int64
+  %borrow = begin_borrow %1 : ${ var Builtin.Int64 }
+  %1b = project_box %borrow : ${ var Builtin.Int64 }, 0
+  %1c = address_to_pointer %1b : $*Builtin.Int64 to $Builtin.RawPointer
+  %2 = pointer_to_address %1c : $Builtin.RawPointer to [strict] $*Builtin.Int64
+  %3 = load [trivial] %2 : $*Builtin.Int64
+  end_borrow %borrow : ${ var Builtin.Int64 }
+  destroy_value %1 : ${ var Builtin.Int64 }
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_addr_cast_mark_dependence : $@convention(thin) () -> Builtin.Word {
+// CHECK: [[BORROW:%.*]] = begin_borrow
+// CHECK: [[TAIL_ADDR:%.*]] = ref_tail_addr
+// CHECK-NOT: unchecked_addr_cast
+// CHECK: [[MD:%.*]] = mark_dependence [[TAIL_ADDR]]
+// CHECK-NOT: unchecked_addr_cast
+// CHECK: [[PTR:%.*]] = address_to_pointer [[MD]]
+// CHECK-NOT: unchecked_addr_cast
+// CHECK: end_borrow [[BORROW]]
+// CHECK-NOT: unchecked_addr_cast
+// CHECK: destroy_value {{.*}} : $Klass
+// CHECK-NOT: unchecked_addr_cast
+// CHECK: [[ADR:%.*]] = pointer_to_address [[PTR]]
+// CHECK: load [trivial] [[ADR]]
+// CHECK: destroy_value {{.*}} : $KlassWithTailAllocatedElems
+// CHECK-LABEL: } // end sil function 'unchecked_addr_cast_mark_dependence'
+sil [ossa] @unchecked_addr_cast_mark_dependence : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %parent = alloc_ref $Klass
+  %one = integer_literal $Builtin.Word, 1
+  %obj = alloc_ref [tail_elems $(Builtin.NativeObject) * %one : $Builtin.Word] $KlassWithTailAllocatedElems
+  %borrow = begin_borrow %obj : $KlassWithTailAllocatedElems
+  %addr = ref_tail_addr %borrow : $KlassWithTailAllocatedElems, $Builtin.NativeObject
+  %md = mark_dependence %addr : $*Builtin.NativeObject on %parent : $Klass
+  %ptr = address_to_pointer %md : $*Builtin.NativeObject to $Builtin.RawPointer
+  end_borrow %borrow : $KlassWithTailAllocatedElems
+  destroy_value %parent : $Klass
+  %adr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %val = load [trivial] %adr : $*Builtin.Word
+  destroy_value %obj : $KlassWithTailAllocatedElems
+  return %val : $Builtin.Word
+}
