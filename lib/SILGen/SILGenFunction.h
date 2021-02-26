@@ -857,12 +857,13 @@ public:
   // Concurrency
   //===--------------------------------------------------------------------===//
 
-  /// Generates code to obtain the callee function's executor, if the function
-  /// is actor-isolated.
+  /// Generates code to obtain the executor for the given actor isolation,
+  /// as-needed, and emits a \c hop_to_executor to that executor.
   ///
-  /// \returns a SILValue representing the executor, if an executor exists.
-  Optional<SILValue> emitLoadActorExecutorForCallee(ValueDecl *calleeVD,
-                                                    ArrayRef<ManagedValue> args);
+  /// \returns a non-null pointer if a \c hop_to_executor was emitted.
+  HopToExecutorInst* emitHopToTargetActor(SILLocation loc,
+                            Optional<ActorIsolation> actorIso,
+                            Optional<ManagedValue> actorSelf);
 
   /// Generates code to obtain the executor given the actor's decl.
   /// \returns a SILValue representing the executor.

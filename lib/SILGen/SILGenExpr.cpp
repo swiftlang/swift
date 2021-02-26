@@ -927,7 +927,6 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 }
 
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
-  assert(!E->isImplicitlyAsync() && "TODO: Implement SILGen lowering");
   return SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(),
                                E->getAccessSemantics(), C);
 }
@@ -2183,7 +2182,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
   assert(!e->getType()->is<LValueType>() &&
          "RValueEmitter shouldn't be called on lvalues");
   assert(isa<VarDecl>(e->getMember().getDecl()));
-  assert(!e->isImplicitlyAsync() && "TODO: Implement SILGen lowering");
 
   // Everything else should use the l-value logic.
 
@@ -2211,7 +2209,6 @@ visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
-  assert(!E->isImplicitlyAsync() && "TODO: Implement SILGen lowering");
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
 
