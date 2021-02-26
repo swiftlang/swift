@@ -50,6 +50,14 @@ actor MyActor: MySuperActor {
 
   let point : Point = Point()
 
+  @MainActor
+  var name : String = "koala"
+
+  // FIXME: if you take the 'async' off of this, you get a very confusing error message.
+  func accessProp() async -> String {
+    return await self.name
+  }
+
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
@@ -57,6 +65,12 @@ actor MyActor: MySuperActor {
   func asynchronous() async -> String {
     super.superState += 4
     return synchronous()
+  }
+}
+
+actor Camera {
+  func accessProp(act : MyActor) async -> String {
+    return await act.name
   }
 }
 

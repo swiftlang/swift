@@ -29,6 +29,11 @@ actor TestActor {
   var value1: Int = 0
   var value2: Int = 1
   var points: [Point] = []
+
+  subscript(x : inout Int) -> Int { // expected-error {{'inout' must not be used on subscript parameters}}
+    x += 1
+    return x
+  }
 }
 
 func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
