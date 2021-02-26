@@ -6926,26 +6926,29 @@ void GenericSignatureBuilder::enumerateRequirements(
                    SmallVectorImpl<Requirement> &requirements) {
   auto recordRequirement = [&](RequirementKind kind,
                                Type depTy,
-                               RequirementRHS type) {
+                               RequirementRHS rhs) {
     depTy = getSugaredDependentType(depTy, genericParams);
 
-    if (auto concreteTy = type.dyn_cast<Type>()) {
-      if (concreteTy->hasError())
+    if (auto type = rhs.dyn_cast<Type>()) {
+      if (type->hasError())
         return;
 
       // Drop requirements involving concrete types containing
       // unresolved associated types.
-      if (concreteTy->findUnresolvedDependentMemberType()) {
+      if (type->findUnresolvedDependentMemberType()) {
         assert(Impl->HadAnyError);
         return;
       }
 
-      if (concreteTy->isTypeParameter())
-        concreteTy = getSugaredDependentType(concreteTy, genericParams);
+      if (type->isTypeParameter())
+        type = getSugaredDependentType(type, genericParams);
 
-      requirements.push_back(Requirement(kind, depTy, concreteTy));
+      requirements.push_back(Requirement(kind, depTy, type));
+    } else if (auto *proto = rhs.dyn_cast<ProtocolDecl *>()) {
+      auto type = proto->getDeclaredInterfaceType();
+      requirements.push_back(Requirement(kind, depTy, type));
     } else {
-      auto layoutConstraint = type.get<LayoutConstraint>();
+      auto layoutConstraint = rhs.get<LayoutConstraint>();
       requirements.push_back(Requirement(kind, depTy, layoutConstraint));
       return;
     }
@@ -7079,8 +7082,7 @@ void GenericSignatureBuilder::enumerateRequirements(
 
     // Enumerate the conformance requirements.
     for (auto proto : protocols) {
-      recordRequirement(RequirementKind::Conformance, subjectType,
-                        proto->getDeclaredInterfaceType());
+      recordRequirement(RequirementKind::Conformance, subjectType, proto);
     }
   }
 
