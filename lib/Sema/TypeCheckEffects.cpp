@@ -1233,22 +1233,10 @@ private:
                                                EffectKind kind) {
     if (!paramType || paramType->hasError())
       return Classification::forInvalidCode();
-    if (auto fnType = paramType->getAs<AnyFunctionType>()) {
-      if (fnType->hasEffect(kind)) {
-        return Classification::forUnconditional(kind, reason);
-      } else {
-        return Classification();
-      }
-    }
-    if (auto tupleType = paramType->getAs<TupleType>()) {
-      Classification result;
-      for (auto eltType : tupleType->getElementTypes()) {
-        result.merge(classifyArgumentByType(eltType, reason, kind));
-      }
-      return result;
-    }
 
-    // No other types include throwing functions for now.
+    if (hasFunctionParameterWithEffect(kind, paramType))
+      return Classification::forUnconditional(kind, reason);
+
     return Classification();
   }
 };
