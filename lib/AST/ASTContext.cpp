@@ -709,8 +709,7 @@ FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
         continue;
       for (auto Req: FD->getGenericRequirements()) {
         if (Req.getKind() == RequirementKind::Conformance &&
-              Req.getSecondType()->getNominalOrBoundGenericNominal() ==
-            getRangeReplaceableCollectionDecl()) {
+              Req.getProtocolDecl() == getRangeReplaceableCollectionDecl()) {
           getImpl().PlusFunctionOnRangeReplaceableCollection = FD;
         }
       }

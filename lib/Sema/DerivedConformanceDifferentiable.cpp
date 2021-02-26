@@ -409,7 +409,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // Note that, for example, this will always find `AdditiveArithmetic` and `Differentiable` because
   // the `Differentiable` protocol itself requires that its `TangentVector` conforms to
   // `AdditiveArithmetic` and `Differentiable`.
-  llvm::SmallPtrSet<ProtocolType *, 4> tvDesiredProtos;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> tvDesiredProtos;
   llvm::SmallPtrSet<ProtocolDecl *, 4> conformanceInheritedProtos;
   getInheritedProtocols(derived.ConformanceDecl, conformanceInheritedProtos);
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
@@ -421,15 +421,13 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       auto *firstType = req.getFirstType()->getAs<DependentMemberType>();
       if (!firstType || firstType->getAssocType() != tvAssocType)
         continue;
-      auto tvRequiredProto = req.getSecondType()->getAs<ProtocolType>();
-      if (!tvRequiredProto)
-        continue;
-      tvDesiredProtos.insert(tvRequiredProto);
+      tvDesiredProtos.insert(req.getProtocolDecl());
     }
   }
   SmallVector<TypeLoc, 4> tvDesiredProtoTypeLocs;
   for (auto *p : tvDesiredProtos)
-    tvDesiredProtoTypeLocs.push_back(TypeLoc::withoutLoc(p));
+    tvDesiredProtoTypeLocs.push_back(
+      TypeLoc::withoutLoc(p->getDeclaredInterfaceType()));
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;

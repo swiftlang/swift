@@ -2232,6 +2232,9 @@ NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
+NOTE(protocol_witness_rethrows_by_conformance_conflict,none,
+     "candidate is 'rethrows' via a conformance, "
+     "but the protocol requirement is not from a '@rethrows' protocol", ())
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
