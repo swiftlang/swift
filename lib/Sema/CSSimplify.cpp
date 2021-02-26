@@ -1420,9 +1420,10 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
             cs, cs.getConstraintLocator(loc)));
       }
 
-      if (auto *param = paramInfo.getPropertyWrapperParam(argIdx)) {
-        auto argLabel = argInfo->Labels[argIdx];
-        if (cs.applyPropertyWrapperParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
+      auto *wrappedParam = paramInfo.getPropertyWrapperParam(argIdx);
+      auto argLabel = argument.getLabel();
+      if (wrappedParam || argLabel.hasDollarPrefix()) {
+        if (cs.applyPropertyWrapperParameter(paramTy, argTy, const_cast<ParamDecl *>(wrappedParam),
                                              argLabel, subKind, locator).isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }

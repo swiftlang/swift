@@ -73,3 +73,13 @@ struct S {
   // expected-error@+1 {{property wrapper attribute on parameter not yet supported on subscript}}
   subscript(@Wrapper position: Int) -> Int { 0 }
 }
+
+func testInvalidArgLabel() {
+  func noWrappers(argLabel: Int) {}
+
+  // expected-error@+1 {{cannot use property wrapper projection argument; parameter does not have an attached property wrapper}}
+  let ref = noWrappers($argLabel:)
+
+  // expected-error@+1 {{cannot use property wrapper projection argument; parameter does not have an attached property wrapper}}
+  noWrappers($argLabel: 10)
+}

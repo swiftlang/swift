@@ -4061,6 +4061,18 @@ ConstraintSystem::applyPropertyWrapperParameter(
     anchor = apply->getFn();
   }
 
+  if (argLabel.hasDollarPrefix() && (!param || !param->hasAttachedPropertyWrapper())) {
+    if (!shouldAttemptFixes())
+      return getTypeMatchFailure(locator);
+
+    addConstraint(matchKind, paramType, wrapperType, locator);
+    auto *fix = AddPropertyWrapperAttribute::create(*this, wrapperType, getConstraintLocator(locator));
+    if (recordFix(fix))
+      return getTypeMatchFailure(locator);
+
+    return getTypeMatchSuccess();
+  }
+
   PropertyWrapperInitKind initKind;
   if (argLabel.hasDollarPrefix()) {
     auto attemptProjectedValueFix = [&](ConstraintFix *fix) -> ConstraintSystem::TypeMatchResult {

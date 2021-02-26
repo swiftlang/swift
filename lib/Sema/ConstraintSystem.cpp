@@ -1162,10 +1162,8 @@ static FunctionType *
 unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *funcDecl,
                                     FunctionRefKind functionRefKind, FunctionType *functionType,
                                     ConstraintLocatorBuilder locator) {
-  // Only apply property wrappers to unapplied references to functions
-  // with wrapped parameters.
-  if (!AnyFunctionRef(funcDecl).hasPropertyWrapperParameters() ||
-      !(functionRefKind == FunctionRefKind::Compound ||
+  // Only apply property wrappers to unapplied references to functions.
+  if (!(functionRefKind == FunctionRefKind::Compound ||
         functionRefKind == FunctionRefKind::Unapplied)) {
     return functionType;
   }
@@ -1187,18 +1185,18 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
   }
 
   for (unsigned i : indices(*paramList)) {
-    auto *paramDecl = paramList->get(i);
-    if (!paramDecl->hasAttachedPropertyWrapper()) {
-      adjustedParamTypes.push_back(paramTypes[i]);
-      continue;
-    }
-
     Identifier argLabel;
     if (functionRefKind == FunctionRefKind::Compound) {
       auto &context = cs.getASTContext();
       auto argLabelLoc = nameLoc.getArgumentLabelLoc(i);
       auto argLabelToken = Lexer::getTokenAtLocation(context.SourceMgr, argLabelLoc);
       argLabel = context.getIdentifier(argLabelToken.getText());
+    }
+
+    auto *paramDecl = paramList->get(i);
+    if (!paramDecl->hasAttachedPropertyWrapper() && !argLabel.hasDollarPrefix()) {
+      adjustedParamTypes.push_back(paramTypes[i]);
+      continue;
     }
 
     auto *wrappedType = cs.createTypeVariable(cs.getConstraintLocator(locator), 0);
@@ -1209,7 +1207,8 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
                                      ConstraintKind::Equal, locator);
   }
 
-  return FunctionType::get(adjustedParamTypes, functionType->getResult());
+  return FunctionType::get(adjustedParamTypes, functionType->getResult(),
+                           functionType->getExtInfo());
 }
 
 std::pair<Type, Type>

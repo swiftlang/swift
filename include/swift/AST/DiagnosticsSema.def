@@ -5490,6 +5490,10 @@ NOTE(property_wrapper_declared_here,none,
 ERROR(property_wrapper_param_no_projection,none,
       "cannot use property wrapper projection parameter; "
       "wrapper %0 does not have a 'projectedValue'", (Type))
+ERROR(property_wrapper_param_no_wrapper,none,
+      "cannot use property wrapper projection argument; "
+      "parameter does not have an attached property wrapper",
+      ())
 ERROR(property_wrapper_param_projection_invalid,none,
       "cannot use property wrapper projection argument; "
       "pass wrapped value type %0 instead", (Type))

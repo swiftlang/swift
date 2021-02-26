@@ -3310,10 +3310,14 @@ bool MissingProjectedValueFailure::diagnoseAsError() {
 }
 
 bool MissingPropertyWrapperAttributeFailure::diagnoseAsError() {
-  emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
+  if (auto *param = getAsDecl<ParamDecl>(getAnchor())) {
+    emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
 
-  // FIXME: emit a note and fix-it to add '@propertyWrapper' if the
-  // type is a nominal and in the same module.
+    // FIXME: emit a note and fix-it to add '@propertyWrapper' if the
+    // type is a nominal and in the same module.
+  } else {
+    emitDiagnostic(diag::property_wrapper_param_no_wrapper);
+  }
 
   return true;
 }
