@@ -177,6 +177,7 @@ where SubSequence: MutableCollection
   /// within an algorithm, but when that fails, invoking the
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -199,6 +200,7 @@ where SubSequence: MutableCollection
 // TODO: swift-3-indexing-model - review the following
 extension MutableCollection {
   @inlinable
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
