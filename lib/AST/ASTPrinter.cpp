@@ -4215,6 +4215,10 @@ public:
   }
 
   void visit(Type T) {
+    #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+      return; // not needed for the parser library.
+    #endif
+
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
 
