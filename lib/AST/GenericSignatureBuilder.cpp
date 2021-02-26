@@ -555,6 +555,7 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
   case NestedTypeNameMatch:
   case ConcreteTypeBinding:
   case EquivalentType:
+  case Layout:
     switch (storageKind) {
     case StorageKind::StoredType:
       return true;
@@ -597,17 +598,6 @@ bool RequirementSource::isAcceptableStorageKind(Kind kind,
     case StorageKind::StoredType:
     case StorageKind::AssociatedTypeDecl:
     case StorageKind::None:
-      return false;
-    }
-
-  case Derived:
-    switch (storageKind) {
-    case StorageKind::None:
-      return true;
-
-    case StorageKind::StoredType:
-    case StorageKind::ProtocolConformance:
-    case StorageKind::AssociatedTypeDecl:
       return false;
     }
   }
@@ -669,7 +659,7 @@ bool RequirementSource::isInferredRequirement() const {
     case ProtocolRequirement:
     case RequirementSignatureSelf:
     case Superclass:
-    case Derived:
+    case Layout:
       break;
     }
   }
@@ -695,7 +685,7 @@ bool RequirementSource::isDerivedRequirement() const {
   case Superclass:
   case Concrete:
   case RequirementSignatureSelf:
-  case Derived:
+  case Layout:
   case EquivalentType:
     return true;
 
@@ -879,7 +869,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
     case Concrete:
     case Superclass:
-    case Derived:
+    case Layout:
     case EquivalentType:
       return false;
 
@@ -1077,11 +1067,13 @@ const RequirementSource *RequirementSource::viaParent(
                         0, WrittenRequirementLoc());
 }
 
-const RequirementSource *RequirementSource::viaDerived(
-                           GenericSignatureBuilder &builder) const {
+const RequirementSource *RequirementSource::viaLayout(
+                           GenericSignatureBuilder &builder,
+                           Type superclass) const {
   REQUIREMENT_SOURCE_FACTORY_BODY(
-                        (nodeID, Derived, this, nullptr, nullptr, nullptr),
-                        (Derived, this),
+                        (nodeID, Layout, this, superclass.getPointer(),
+                         nullptr, nullptr),
+                        (Layout, this, superclass),
                         0, WrittenRequirementLoc());
 }
 
@@ -1142,9 +1134,9 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
     return parent->withoutRedundantSubpath(builder, start, end)
       ->viaConcrete(builder, getProtocolConformance());
 
-  case Derived:
+  case Layout:
     return parent->withoutRedundantSubpath(builder, start, end)
-      ->viaDerived(builder);
+      ->viaLayout(builder, getStoredType());
 
   case EquivalentType:
     return parent->withoutRedundantSubpath(builder, start, end)
@@ -1211,7 +1203,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
 
   case RequirementSource::Concrete:
   case RequirementSource::Superclass:
-  case RequirementSource::Derived:
+  case RequirementSource::Layout:
     return parent->visitPotentialArchetypesAlongPath(visitor);
 
   case RequirementSource::EquivalentType: {
@@ -1392,8 +1384,8 @@ void RequirementSource::print(llvm::raw_ostream &out,
     out << "Superclass";
     break;
 
-  case Derived:
-    out << "Derived";
+  case Layout:
+    out << "Layout";
     break;
 
   case EquivalentType:
@@ -1566,7 +1558,7 @@ bool FloatingRequirementSource::isExplicit() const {
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement:
     case RequirementSource::Superclass:
-    case RequirementSource::Derived:
+    case RequirementSource::Layout:
     case RequirementSource::EquivalentType:
       return false;
     }
@@ -1588,7 +1580,7 @@ bool FloatingRequirementSource::isExplicit() const {
     case RequirementSource::ConcreteTypeBinding:
     case RequirementSource::Parent:
     case RequirementSource::Superclass:
-    case RequirementSource::Derived:
+    case RequirementSource::Layout:
     case RequirementSource::EquivalentType:
       return false;
     }
@@ -4278,14 +4270,15 @@ bool GenericSignatureBuilder::updateSuperclass(
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
     auto layoutReqSource =
-      source.getSource(*this, type)->viaDerived(*this);
-    addLayoutRequirementDirect(type,
-                         LayoutConstraint::getLayoutConstraint(
-                             superclass->getClassOrBoundGenericClass()->isObjC()
-                                 ? LayoutConstraintKind::Class
-                                 : LayoutConstraintKind::NativeClass,
-                             getASTContext()),
-                         layoutReqSource);
+      source.getSource(*this, type)->viaLayout(*this, superclass);
+
+    auto layout =
+      LayoutConstraint::getLayoutConstraint(
+        superclass->getClassOrBoundGenericClass()->isObjC()
+          ? LayoutConstraintKind::Class
+          : LayoutConstraintKind::NativeClass,
+        getASTContext());
+    addLayoutRequirementDirect(type, layout, layoutReqSource);
     return true;
   }
 

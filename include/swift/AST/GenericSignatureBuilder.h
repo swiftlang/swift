@@ -886,9 +886,12 @@ public:
     /// requirement.
     Concrete,
 
-    /// A requirement that was resolved based on structural derivation from
-    /// another requirement.
-    Derived,
+    /// A requirement that was resolved based on a layout requirement
+    /// imposed by a superclass constraint.
+    ///
+    /// This stores the \c LayoutConstraint used to resolve the
+    /// requirement.
+    Layout,
 
     /// A requirement that was provided for another type in the
     /// same equivalence class, but which we want to "re-root" on a new
@@ -944,7 +947,7 @@ private:
     case Superclass:
     case Parent:
     case Concrete:
-    case Derived:
+    case Layout:
     case EquivalentType:
       return 0;
     }
@@ -989,7 +992,7 @@ private:
     case Superclass:
     case Parent:
     case Concrete:
-    case Derived:
+    case Layout:
     case EquivalentType:
       return false;
     }
@@ -1141,16 +1144,17 @@ public:
                                      GenericSignatureBuilder &builder,
                                      ProtocolConformanceRef conformance) const;
 
+  /// A constraint source that describes a layout constraint that was implied
+  /// by a superclass requirement.
+  const RequirementSource *viaLayout(GenericSignatureBuilder &builder,
+                                     Type superclass) const;
+
   /// A constraint source that describes that a constraint that is resolved
   /// for a nested type via a constraint on its parent.
   ///
   /// \param assocType the associated type that
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
-
-  /// A constraint source that describes a constraint that is structurally
-  /// derived from another constraint but does not require further information.
-  const RequirementSource *viaDerived(GenericSignatureBuilder &builder) const;
 
   /// A constraint source that describes a constraint that is structurally
   /// derived from another constraint but does not require further information.
