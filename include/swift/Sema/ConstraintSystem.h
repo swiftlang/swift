@@ -2800,7 +2800,7 @@ private:
   void
   filterSolutions(SmallVectorImpl<Solution> &solutions,
                   bool minimize = false) {
-    if (solutions.size() < 2 || isForCodeCompletion())
+    if (solutions.size() < 2)
       return;
 
     if (auto best = findBestSolution(solutions, minimize)) {
@@ -4827,9 +4827,11 @@ private:
   /// \param diff The differences among the solutions.
   /// \param idx1 The index of the first solution.
   /// \param idx2 The index of the second solution.
+  /// \param isForCodeCompletion Whether solving for code completion.
   static SolutionCompareResult
   compareSolutions(ConstraintSystem &cs, ArrayRef<Solution> solutions,
-                   const SolutionDiff &diff, unsigned idx1, unsigned idx2);
+                   const SolutionDiff &diff, unsigned idx1, unsigned idx2,
+                   bool isForCodeCompletion);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution

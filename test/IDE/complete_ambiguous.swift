@@ -48,6 +48,7 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=REGULAR_MULTICLOSURE_APPLIED | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER2 | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER_GEN | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER_GEN
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MISSINGARG_INLINE | %FileCheck %s --check-prefix=MISSINGARG_INLINE
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MISSINGARG_TRAILING | %FileCheck %s --check-prefix=MISSINGARG_TRAILING
 
@@ -495,7 +496,7 @@ enum Enum123 {
 struct Struct123: Equatable {
     var structMem = Enum123.enumElem
 }
-func testNoBestSolutionFilter() {
+func testBestSolutionFilter() {
   let a = Struct123();
   let b = [Struct123]().first(where: { $0 == a && 1 + 90 * 5 / 8 == 45 * -10 })?.structMem != .#^BEST_SOLUTION_FILTER^#
   let c = min(10.3, 10 / 10.4) < 6 / 7 ? true : Optional(a)?.structMem != .#^BEST_SOLUTION_FILTER2^#
@@ -508,3 +509,16 @@ func testNoBestSolutionFilter() {
 // BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Enum123>#]{{; name=.+$}}
 // BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Enum123#})[#Optional<Enum123>#]{{; name=.+$}}
 // BEST_SOLUTION_FILTER: End completions
+
+func testBestSolutionGeneric() {
+  struct Test1 {}
+  func genAndInt(_ x: Int) -> Int { return 1 }
+  func genAndInt<T>(_ x: T) -> Test1 { return Test1() }
+
+  genAndInt(2).#^BEST_SOLUTION_FILTER_GEN^#
+}
+
+// BEST_SOLUTION_FILTER_GEN: Begin completions
+// BEST_SOLUTION_FILTER_GEN-DAG: Keyword[self]/CurrNominal:     self[#Int#]; name=self
+// BEST_SOLUTION_FILTER_GEN-DAG: Keyword[self]/CurrNominal:     self[#Test1#]; name=self
+// BEST_SOLUTION_FILTER_GEN: End completions
