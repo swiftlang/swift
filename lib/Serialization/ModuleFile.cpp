@@ -992,18 +992,13 @@ void ModuleFile::collectBasicSourceFileInfo(
     size_t terminatorOffset = filePath.find('\0');
     filePath = filePath.slice(0, terminatorOffset);
 
-    BasicSourceFileInfo info;
-    info.FilePath = filePath;
-    if (auto fingerprint = Fingerprint::fromString(fpStr))
-      info.InterfaceHash = fingerprint.getValue();
-    else {
+    auto fingerprint = Fingerprint::fromString(fpStr);
+    if (!fingerprint) {
       llvm::errs() << "Unconvertable fingerprint '" << fpStr << "'\n";
       abort();
     }
-    info.LastModified =
-        llvm::sys::TimePoint<>(std::chrono::nanoseconds(timestamp));
-    info.FileSize = fileSize;
-    callback(info);
+
+    callback(BasicSourceFileInfo(filePath, fingerprint.getValue(), llvm::sys::TimePoint<>(std::chrono::nanoseconds(timestamp)), fileSize));
   }
 }
 
