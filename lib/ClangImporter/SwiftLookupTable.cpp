@@ -2040,7 +2040,12 @@ void importer::finalizeLookupTable(
       auto decl = entry.get<clang::NamedDecl *>();
       auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
 
-      if (swiftName) {
+      if (swiftName
+          // Clang didn't previously attach SwiftNameAttrs to forward
+          // declarations, but this changed and we started diagnosing spurious
+          // warnings on @class declarations. Suppress them.
+          // FIXME: Can we avoid processing these decls in the first place?
+          && !importer::isForwardDeclOfType(decl)) {
         clang::SourceLocation diagLoc = swiftName->getLocation();
         if (!diagLoc.isValid())
           diagLoc = decl->getLocation();
