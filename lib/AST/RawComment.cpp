@@ -278,9 +278,11 @@ void BasicSourceFileInfo::populateWithSourceFileIfNeeded() {
 
   if (SF->hasInterfaceHash()) {
     InterfaceHashIncludingTypeMembers = SF->getInterfaceHashIncludingTypeMembers();
+    InterfaceHashExcludingTypeMembers = SF->getInterfaceHash();
   } else {
     // FIXME: Parse the file with EnableInterfaceHash option.
     InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
+    InterfaceHashExcludingTypeMembers = Fingerprint::ZERO();
   }
 
   return;
