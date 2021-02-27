@@ -150,6 +150,8 @@ void swift::swift_job_run(Job *job, ExecutorRef executor) {
 }
 
 void swift::runJobInExecutorContext(Job *job, ExecutorRef executor) {
+  _swift_tsan_acquire(job);
+
   if (auto task = dyn_cast<AsyncTask>(job)) {
     // Update the active task in the current thread.
     ActiveTask::set(task);
@@ -167,6 +169,8 @@ void swift::runJobInExecutorContext(Job *job, ExecutorRef executor) {
     // There's no extra bookkeeping to do for simple jobs.
     job->runSimpleInFullyEstablishedContext(executor);
   }
+
+  _swift_tsan_release(job);
 }
 
 AsyncTask *swift::swift_task_getCurrent() {
@@ -1427,6 +1431,8 @@ void swift::swift_task_switch(AsyncTask *task, ExecutorRef currentExecutor,
 
 void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
   assert(job && "no job provided");
+
+  _swift_tsan_release(job);
 
   if (executor.isGeneric())
     return swift_task_enqueueGlobal(job);

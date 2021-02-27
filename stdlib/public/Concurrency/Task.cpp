@@ -63,10 +63,12 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
     switch (queueHead.getStatus()) {
     case Status::Error:
     case Status::Success:
+      _swift_tsan_acquire(static_cast<Job *>(this));
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
     case Status::Executing:
+      _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is now complete. We'll need to add ourselves to the queue.
       break;
     }
@@ -89,6 +91,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
 void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
+
+  _swift_tsan_release(static_cast<Job *>(this));
 
   assert(isFuture());
   auto fragment = futureFragment();
@@ -121,6 +125,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
   while (waitingTask) {
+    _swift_tsan_acquire(static_cast<Job *>(waitingTask));
+
     // Find the next waiting task before we invalidate it by resuming
     // the task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
