@@ -249,7 +249,8 @@ ERROR(computed_property_no_accessors, none,
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,
-      "protocol property %0 cannot have a default implementation specified here; use extension instead", (StringRef))
+      "protocol property %0 cannot have a default implementation specified "
+      "here; use extension instead", (StringRef))
 ERROR(computed_property_missing_type,none,
       "computed property must have an explicit type", ())
 ERROR(getset_nontrivial_pattern,none,
