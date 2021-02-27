@@ -6531,7 +6531,7 @@ public:
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
-  
+
   /// Do not call this!
   /// It exists to let the AST walkers get the raw value without forcing a request.
   LiteralExpr *getRawValueUnchecked() const { return RawValueExpr; }

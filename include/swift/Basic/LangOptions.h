@@ -247,6 +247,9 @@ namespace swift {
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
+    /// Enable experimental derivation of `Codable` for enums.
+    bool EnableExperimentalEnumCodableDerivation = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
 

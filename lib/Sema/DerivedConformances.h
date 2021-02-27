@@ -378,10 +378,9 @@ public:
                      EnumDecl *enumDecl, VarDecl *enumVarDecl,
                      AbstractFunctionDecl *funcDecl, const char *indexName);
 
-  static Pattern *
-  enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl, char varPrefix,
-                               DeclContext *varContext,
-                               SmallVectorImpl<VarDecl *> &boundVars);
+  static Pattern *enumElementPayloadSubpattern(
+      EnumElementDecl *enumElementDecl, char varPrefix, DeclContext *varContext,
+      SmallVectorImpl<VarDecl *> &boundVars, bool useLabels = false);
 
   static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
                                  DeclContext *varContext);
