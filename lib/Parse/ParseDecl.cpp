@@ -3479,6 +3479,7 @@ ParserStatus Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
 //      '__consuming'
 //      'convenience'
 //      'actor'
+//      'distributed'
 bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
                                    SourceLoc &StaticLoc,
                                    StaticSpellingKind &StaticSpelling) {
@@ -3559,6 +3560,15 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
           diag.fixItReplace(classLoc, "actor")
               .fixItRemove(actorLoc);
         Attributes.add(new (Context) ActorAttr({}, Tok.getLoc()));
+        consumeToken();
+        continue;
+      }
+
+      if (Kind == DAK_DistributedActor &&
+          !shouldParseExperimentalDistributed()) {
+        // 'distributed' requires the experimental distributed flag to be set
+        SourceLoc distributedLoc = Tok.getLoc();
+        diagnose(distributedLoc, diag::attr_requires_distributed);
         consumeToken();
         continue;
       }

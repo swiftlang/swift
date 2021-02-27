@@ -1801,10 +1801,14 @@ ERROR(pound_available_package_description_not_allowed, none,
 ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
-ERROR(attr_requires_concurrency,none,
+ERROR(attr_requires_concurrency, none,
       "'%0' %select{attribute|modifier}1 is only valid when experimental "
       "concurrency is enabled",
       (StringRef, bool))
+
+ERROR(attr_requires_distributed, none,
+      "'distributed' modifier is only valid when experimental distributed "
+      "is enabled. Enable it with -enable-experimental-distributed", ())
 
 //------------------------------------------------------------------------------
 // MARK: syntax parsing diagnostics

@@ -259,6 +259,9 @@ namespace swift {
     /// Enable experimental derivation of `Codable` for enums.
     bool EnableExperimentalEnumCodableDerivation = false;
 
+    /// Enable experimental 'distributed' actors and functions.
+    bool EnableExperimentalDistributed = false;
+
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
 

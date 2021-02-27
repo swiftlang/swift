@@ -237,6 +237,10 @@ def enable_experimental_enum_codable_derivation :
   Flag<["-"], "enable-experimental-enum-codable-derivation">,
   HelpText<"Enable experimental derivation of Codable for enums">;
 
+def enable_experimental_distributed :
+  Flag<["-"], "enable-experimental-distributed">,
+  HelpText<"Enable experimental 'distributed' actors and functions">;
+
 def enable_resilience : Flag<["-"], "enable-resilience">,
      HelpText<"Deprecated, use -enable-library-evolution instead">;
 }

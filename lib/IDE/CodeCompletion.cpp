@@ -4549,6 +4549,7 @@ public:
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
                                     bool IsConcurrencyEnabled,
+                                    bool IsDistributedEnabled,
                                     Optional<DeclKind> DK) {
     if (DeclAttribute::isUserInaccessible(DAK))
       return false;
@@ -4559,6 +4560,8 @@ public:
     if (!IsInSil && DeclAttribute::isSilOnly(DAK))
       return false;
     if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
+      return false;
+    if (!IsDistributedEnabled && DeclAttribute::isConcurrencyOnly(DAK))
       return false;
     if (!DK.hasValue())
       return true;
@@ -4578,9 +4581,13 @@ public:
       }
     }
     bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
+    bool IsDistributedEnabled = Ctx.LangOpts.EnableExperimentalDistributed;
     std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR(KEYWORD, NAME, ...)                                         \
-    if (canUseAttributeOnDecl(DAK_##NAME, IsInSil, IsConcurrencyEnabled, DK)) \
+    if (canUseAttributeOnDecl(DAK_##NAME, IsInSil,                            \
+                              IsConcurrencyEnabled,                           \
+                              IsDistributedEnabled,                           \
+                              DK))                                            \
       addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/Attr.def"
   }
@@ -5750,7 +5757,8 @@ addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
 }
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink,
-                            bool IsConcurrencyEnabled) {
+                            bool IsConcurrencyEnabled,
+                            bool IsDistributedEnabled) {
   auto AddDeclKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind,
                         Optional<DeclAttrKind> DAK) {
     if (Name == "let" || Name == "var") {
@@ -5766,6 +5774,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink,
     // Remove keywords only available when concurrency is enabled.
     if (DAK.hasValue() && !IsConcurrencyEnabled &&
         DeclAttribute::isConcurrencyOnly(*DAK))
+      return;
+
+    // Remove keywords only available when distributed is enabled.
+    if (DAK.hasValue() && !IsDistributedEnabled &&
+        DeclAttribute::isDistributedOnly(*DAK))
       return;
 
     addKeyword(Sink, Name, Kind);
@@ -5889,7 +5902,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   }
   case CompletionKind::StmtOrExpr:
-    addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
+    addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
     addStmtKeywords(Sink, MaybeFuncBody);
     LLVM_FALLTHROUGH;
   case CompletionKind::ReturnStmtExpr:
@@ -5950,7 +5963,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
         .Default(false);
     }) != ParsedKeywords.end();
     if (!HasDeclIntroducer) {
-      addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
+      addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
       addLetVarKeywords(Sink);
     }
     break;
@@ -6713,7 +6726,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
         if (CurDeclContext->isTypeContext()) {
           // Override completion (CompletionKind::NominalMemberBeginning).
-          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
+          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
           addLetVarKeywords(Sink);
           SmallVector<StringRef, 0> ParsedKeywords;
           CompletionOverrideLookup OverrideLookup(Sink, Context, CurDeclContext,
@@ -6721,7 +6734,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
           OverrideLookup.getOverrideCompletions(SourceLoc());
         } else {
           // Global completion (CompletionKind::PostfixExprBeginning).
-          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency);
+          addDeclKeywords(Sink, Context.LangOpts.EnableExperimentalConcurrency, Context.LangOpts.EnableExperimentalDistributed);
           addStmtKeywords(Sink, MaybeFuncBody);
           addSuperKeyword(Sink);
           addLetVarKeywords(Sink);
