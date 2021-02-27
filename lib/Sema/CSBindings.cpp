@@ -1793,7 +1793,15 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
-  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, srcLocator);
+  ConstraintSystem::TypeMatchOptions options;
+
+  options |= ConstraintSystem::TMF_GenerateConstraints;
+
+  auto result =
+      cs.matchTypes(TypeVar, type, ConstraintKind::Bind, options, srcLocator);
+
+  if (result.isFailure())
+    return false;
 
   auto reportHole = [&]() {
     if (cs.isForCodeCompletion()) {
@@ -1825,5 +1833,5 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       return true;
   }
 
-  return !cs.failedConstraint && !cs.simplify();
+  return !cs.simplify();
 }
