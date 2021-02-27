@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
@@ -112,13 +113,14 @@ evaluator::DependencyCollector::~DependencyCollector() {
 #endif
 }
 
-void evaluator::DependencyCollector::addUsedMember(NominalTypeDecl *subject,
+void evaluator::DependencyCollector::addUsedMember(DeclContext *subject,
                                                    DeclBaseName name) {
+  assert(subject->isTypeContext());
   return parent.recordDependency(Reference::usedMember(subject, name));
 }
 
-void evaluator::DependencyCollector::addPotentialMember(
-    NominalTypeDecl *subject) {
+void evaluator::DependencyCollector::addPotentialMember(DeclContext *subject) {
+  assert(subject->isTypeContext());
   return parent.recordDependency(Reference::potentialMember(subject));
 }
 

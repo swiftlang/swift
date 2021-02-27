@@ -426,14 +426,14 @@ public:
   private:
     const NodeKind kind;
     const DeclAspect aspect;
-    const NominalTypeDecl *context;
+    const DeclContext *context;
     StringRef name;
 
   private:
     // A private copy constructor so our clients are forced to use the
     // move-only builder interface.
     explicit Builder(NodeKind kind, DeclAspect aspect,
-                     const NominalTypeDecl *context, StringRef name)
+                     const DeclContext *context, StringRef name)
         : kind(kind), aspect(aspect), context(context), name(name) {}
 
   public:
@@ -534,11 +534,6 @@ public:
     return getAspect() == DeclAspect::implementation;
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
-
-  /// Create just the interface half of the keys for a provided Decl or Decl
-  /// pair
-  template <NodeKind kind, typename Entity>
-  static DependencyKey createForProvidedEntityInterface(Entity);
 
   DependencyKey correspondingImplementation() const {
     return withAspect(DeclAspect::implementation);
