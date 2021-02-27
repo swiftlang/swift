@@ -298,7 +298,7 @@ void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
                       savedBindings.end());
 }
 
-bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
+bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
   while (!ActiveConstraints.empty()) {
     // Grab the next constraint from the worklist.
@@ -324,7 +324,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
     }
 
     // Check whether a constraint failed. If so, we're done.
-    if (failedConstraint && !ContinueAfterFailures) {
+    if (failedConstraint) {
       return true;
     }
 

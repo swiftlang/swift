@@ -4626,7 +4626,7 @@ public:
   /// no fixed type. Such type variables are left to the solver to bind.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool simplify(bool ContinueAfterFailures = false);
+  bool simplify();
 
   /// Simplify the given constraint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
