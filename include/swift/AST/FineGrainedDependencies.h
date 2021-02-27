@@ -879,8 +879,10 @@ public:
   }
 
   /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
-  /// successful.
-  Optional<SourceFileDepGraph> static loadFromPath(StringRef);
+  /// successful. If \p allowSwiftModule is true, try to load the information
+  /// from a swiftmodule file if appropriate.
+  Optional<SourceFileDepGraph> static loadFromPath(
+      StringRef, bool allowSwiftModule = false);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
