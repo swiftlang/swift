@@ -6071,10 +6071,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                                  existingAccessor);
     }
 
-    // There's should be no body in the limited syntax.
+    // There should be no body in the limited syntax; diagnose unexpected
+    // accessor implementations.
     if (parsingLimitedSyntax) {
-      // If there ~is~ a body in the limited syntax, alert that accessors can not
-      // be implemented.
       if (Tok.is(tok::l_brace))
         diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
                  getAccessorNameForDiagnostic(Kind, /*article*/ false));
