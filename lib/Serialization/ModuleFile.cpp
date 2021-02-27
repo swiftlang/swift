@@ -978,10 +978,17 @@ void ModuleFile::collectBasicSourceFileInfo(
   while (Cursor < End) {
     // FilePath (byte offset in 'SourceLocsTextData').
     auto fileID = endian::readNext<uint32_t, little, unaligned>(Cursor);
-    // InterfaceHash (fixed length string).
-    auto fpStr = StringRef{reinterpret_cast<const char *>(Cursor),
+
+    // InterfaceHashIncludingTypeMembers (fixed length string).
+    auto fpStrIncludingTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
                            Fingerprint::DIGEST_LENGTH};
     Cursor += Fingerprint::DIGEST_LENGTH;
+
+    // InterfaceHashExcludingTypeMembers (fixed length string).
+    auto fpStrExcludingTypeMembers = StringRef{reinterpret_cast<const char *>(Cursor),
+                           Fingerprint::DIGEST_LENGTH};
+    Cursor += Fingerprint::DIGEST_LENGTH;
+
     // LastModified (nanoseconds since epoch).
     auto timestamp = endian::readNext<uint64_t, little, unaligned>(Cursor);
     // FileSize (num of bytes).
@@ -992,13 +999,25 @@ void ModuleFile::collectBasicSourceFileInfo(
     size_t terminatorOffset = filePath.find('\0');
     filePath = filePath.slice(0, terminatorOffset);
 
-    auto fingerprint = Fingerprint::fromString(fpStr);
-    if (!fingerprint) {
-      llvm::errs() << "Unconvertable fingerprint '" << fpStr << "'\n";
+    auto fingerprintIncludingTypeMembers =
+      Fingerprint::fromString(fpStrIncludingTypeMembers);
+    if (!fingerprintIncludingTypeMembers) {
+      llvm::errs() << "Unconvertible fingerprint including type members'"
+                   << fpStrIncludingTypeMembers << "'\n";
       abort();
     }
-
-    callback(BasicSourceFileInfo(filePath, fingerprint.getValue(), llvm::sys::TimePoint<>(std::chrono::nanoseconds(timestamp)), fileSize));
+    auto fingerprintExcludingTypeMembers =
+      Fingerprint::fromString(fpStrExcludingTypeMembers);
+    if (!fingerprintExcludingTypeMembers) {
+      llvm::errs() << "Unconvertible fingerprint excluding type members'"
+                   << fpStrExcludingTypeMembers << "'\n";
+      abort();
+    }
+    callback(BasicSourceFileInfo(filePath,
+                                 fingerprintIncludingTypeMembers.getValue(),
+                                 fingerprintExcludingTypeMembers.getValue(),
+                                 llvm::sys::TimePoint<>(std::chrono::nanoseconds(timestamp)),
+                                 fileSize));
   }
 }
 
