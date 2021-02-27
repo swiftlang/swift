@@ -453,6 +453,8 @@ bool Decl::isInvalid() const {
   llvm_unreachable("Unknown decl kind");
 }
 
+void Decl::setInvalidBit() { Bits.Decl.Invalid = true; }
+
 void Decl::setInvalid() {
   switch (getKind()) {
 #define VALUE_DECL(ID, PARENT)
