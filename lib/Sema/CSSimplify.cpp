@@ -3016,7 +3016,8 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
-  assignFixedType(typeVar, type);
+  assignFixedType(typeVar, type, /*updateState=*/true,
+                  /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
   return getTypeMatchSuccess();
 }

@@ -44,6 +44,7 @@ class Constraint;
 class ConstraintGraph;
 class ConstraintGraphScope;
 class ConstraintSystem;
+class TypeVariableBinding;
 
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
@@ -144,11 +145,9 @@ private:
   /// bindings (i.e. if `DependentMemberType` is involved, because it requires
   /// a conformance lookup), so inference has to be delayed until its clear that
   /// type variable has been bound to a valid type and solver can make progress.
-  void
-  introduceToInference(Type fixedType,
-                       SmallPtrSetImpl<TypeVariableType *> &referencedVars);
+  void introduceToInference(Type fixedType);
 
-  /// Opposite of \c introduceToInference(Type, ...)
+  /// Opposite of \c introduceToInference(Type)
   void
   retractFromInference(Type fixedType,
                        SmallPtrSetImpl<TypeVariableType *> &referencedVars);
@@ -211,6 +210,8 @@ private:
   void verify(ConstraintGraph &cg);
 
   friend class ConstraintGraph;
+  friend class ConstraintSystem;
+  friend class TypeVariableBinding;
 };
 
 /// A graph that describes the relationships among the various type variables

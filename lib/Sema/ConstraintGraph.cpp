@@ -335,8 +335,7 @@ void ConstraintGraphNode::reintroduceToInference(Constraint *constraint,
   introduceToInference(constraint, notifyReferencedVars);
 }
 
-void ConstraintGraphNode::introduceToInference(
-    Type fixedType, SmallPtrSetImpl<TypeVariableType *> &referencedVars) {
+void ConstraintGraphNode::introduceToInference(Type fixedType) {
   // Notify all of the type variables that reference this one.
   //
   // Since this type variable has been replaced with a fixed type
@@ -344,6 +343,12 @@ void ConstraintGraphNode::introduceToInference(
   // which means that all of the not-yet-attempted bindings should
   // change as well.
   notifyReferencingVars();
+
+  if (!fixedType->hasTypeVariable())
+    return;
+
+  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  fixedType->getTypeVariables(referencedVars);
 
   for (auto *referencedVar : referencedVars) {
     auto &node = CG[referencedVar];
@@ -593,8 +598,6 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
     otherNode.addReferencedBy(typeVar);
     node.addReferencedVar(otherTypeVar);
   }
-
-  node.introduceToInference(fixed, referencedVars);
 }
 
 void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed) {

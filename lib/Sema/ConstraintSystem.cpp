@@ -155,7 +155,8 @@ bool ConstraintSystem::typeVarOccursInType(TypeVariableType *typeVar,
 }
 
 void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
-                                       bool updateState) {
+                                       bool updateState,
+                                       bool notifyBindingInference) {
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
@@ -199,6 +200,9 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   // Notify the constraint graph.
   CG.bindTypeVariable(typeVar, type);
   addTypeVariableConstraintsToWorkList(typeVar);
+
+  if (notifyBindingInference)
+    CG[typeVar].introduceToInference(type);
 }
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
