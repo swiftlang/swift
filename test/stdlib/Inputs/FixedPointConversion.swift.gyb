@@ -106,8 +106,11 @@ FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}"
 %     otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
 %     (selfFtoIMin, selfFtoIMax) = getFtoIBounds(other_type.bits, selfBits, selfSigned)
 
-%     if Other == 'Float80':
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+%     if Other == 'Float16':
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+%     elif Other == 'Float80':
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %     end
 
 %     testValues = [
@@ -217,7 +220,10 @@ FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
   expectNil(${Self}(exactly: get${Other}(${Other}.nan)))
 }
 
-%     if Other == 'Float80':
+%     if Other == 'Float16':
+}
+#endif
+%     elif Other == 'Float80':
 #endif
 %     end
 

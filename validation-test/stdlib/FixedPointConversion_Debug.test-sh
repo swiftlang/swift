@@ -6,4 +6,3 @@
 // RUN: %line-directive %t/FixedPointConversion.swift -- %target-run %t/a.out_Debug
 // REQUIRES: executable_test
 // REQUIRES: long_test
-// REQUIRES: rdar49177883
