@@ -131,10 +131,12 @@ void CopyPropagation::run() {
   }
 }
 
-SILTransform *swift::createCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true);
+SILTransform *swift::createMandatoryCopyPropagation() {
+  return new CopyPropagation(/*pruneDebug*/ true, /*unownedRemnant*/ true,
+                             /*canonicalizeAll*/ true);
 }
 
-SILTransform *swift::createMandatoryCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ false);
+SILTransform *swift::createCopyPropagation() {
+  return new CopyPropagation(/*pruneDebug*/ true, /*unownedRemnant*/ false,
+                             /*canonicalizeAll*/ false);
 }
