@@ -233,10 +233,10 @@ A short (non-exhaustive) list of SIL printing options:
   `-sil-print-function` and/or `-sil-print-functions`.
 
 * `-Xllvm -sil-print-before=$PASS_NAME`: Like `-sil-print-around`, but prints
-  the SIL only _before_ the specfied pass runs.
+  the SIL only _before_ the specified pass runs.
 
 * `-Xllvm -sil-print-after=$PASS_NAME`: Like `-sil-print-around`, but prints
-  the SIL only _after_ the specfied pass did run.
+  the SIL only _after_ the specified pass did run.
 
 NOTE: This may emit a lot of text to stderr, so be sure to pipe the
 output to a file.
