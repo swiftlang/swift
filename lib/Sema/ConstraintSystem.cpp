@@ -1021,9 +1021,21 @@ ConstraintSystem::getWrappedPropertyInformation(
 /// \param baseType - the type of the base on which this object
 ///   is being accessed; must be null if and only if this is not
 ///   a type member
-static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
-                                     Type baseType, DeclContext *useDC,
-                                     const DeclRefExpr *base = nullptr) {
+static bool
+doesStorageProduceLValue(AbstractStorageDecl *storage, Type baseType,
+                         DeclContext *useDC,
+                         ConstraintLocator *memberLocator = nullptr) {
+  const DeclRefExpr *base = nullptr;
+  if (memberLocator) {
+    if (auto *const E = getAsExpr(memberLocator->getAnchor())) {
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        base = dyn_cast<DeclRefExpr>(MRE->getBase());
+      } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+        base = dyn_cast<DeclRefExpr>(UDE->getBase());
+      }
+    }
+  }
+
   // Unsettable storage decls always produce rvalues.
   if (!storage->isSettable(useDC, base))
     return false;
@@ -1043,10 +1055,9 @@ static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
           !storage->isSetterMutating());
 }
 
-Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                                  DeclContext *UseDC,
-                                                  const DeclRefExpr *base,
-                                                  bool wantInterfaceType) {
+Type ConstraintSystem::getUnopenedTypeOfReference(
+    VarDecl *value, Type baseType, DeclContext *UseDC,
+    ConstraintLocator *memberLocator, bool wantInterfaceType) {
   return ConstraintSystem::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
@@ -1059,13 +1070,13 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      base, wantInterfaceType);
+      memberLocator, wantInterfaceType);
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
-    llvm::function_ref<Type(VarDecl *)> getType, const DeclRefExpr *base,
-    bool wantInterfaceType) {
+    llvm::function_ref<Type(VarDecl *)> getType,
+    ConstraintLocator *memberLocator, bool wantInterfaceType) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
@@ -1081,7 +1092,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(value, baseType, UseDC, base) &&
+  if (doesStorageProduceLValue(value, baseType, UseDC, memberLocator) &&
       !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
@@ -1566,18 +1577,6 @@ ConstraintSystem::getTypeOfMemberReference(
   unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
       value, /*isCurriedInstanceReference*/ !hasAppliedSelf, functionRefKind);
 
-  const auto getBaseAsDeclRefExpr = [&] {
-    if (auto *E = getAsExpr(locator->getAnchor())) {
-      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-        return dyn_cast<DeclRefExpr>(MRE->getBase());
-      } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
-        return dyn_cast<DeclRefExpr>(UDE->getBase());
-      }
-    }
-
-    return (DeclRefExpr *)nullptr;
-  };
-
   AnyFunctionType *funcType;
 
   if (isa<AbstractFunctionDecl>(value) ||
@@ -1593,8 +1592,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
 
-      if (doesStorageProduceLValue(subscript, baseTy, useDC,
-                                   getBaseAsDeclRefExpr()))
+      if (doesStorageProduceLValue(subscript, baseTy, useDC, locator))
         elementTy = LValueType::get(elementTy);
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1611,7 +1609,7 @@ ConstraintSystem::getTypeOfMemberReference(
       refType = FunctionType::get(indices, elementTy);
     } else {
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
-                                           getBaseAsDeclRefExpr(),
+                                           locator,
                                            /*wantInterfaceType=*/true);
     }
 
