@@ -187,6 +187,7 @@ _ninja_complete()
 
 complete -o default -F _swift_complete swiftc
 complete -o default -F _swift_complete swift
+complete -o default -F _swift_complete swift-frontend
 complete -o default -F _swift_complete sil-opt
 complete -o default -F _swift_complete sil-func-extractor
 complete -o default -F _swift_complete swift-demangle
