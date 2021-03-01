@@ -190,9 +190,22 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind);
 
+/// How the concurrent value check should be performed.
+enum class ConcurrentValueCheck {
+  /// ConcurrentValue conformance was explicitly stated and should be
+  /// fully checked.
+  Explicit,
+
+  /// ConcurrentValue conformance was implied by one of the standard library
+  /// protocols that added ConcurrentValue after-the-fact.
+  ImpliedByStandardProtocol,
+};
+
 /// Check the correctness of the given ConcurrentValue conformance.
-void checkConcurrentValueConformance(
-    ProtocolConformance *conformance, bool asWarning);
+///
+/// \returns true if an error occurred.
+bool checkConcurrentValueConformance(
+    ProtocolConformance *conformance, ConcurrentValueCheck check);
 
 } // end namespace swift
 

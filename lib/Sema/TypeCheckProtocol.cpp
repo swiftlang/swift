@@ -5715,8 +5715,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   // Check constraints of ConcurrentValue.
   if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
-    bool asWarning = errorConformance || codingKeyConformance;
-    checkConcurrentValueConformance(concurrentValueConformance, asWarning);
+    ConcurrentValueCheck check = ConcurrentValueCheck::Explicit;
+    if (errorConformance || codingKeyConformance)
+      check = ConcurrentValueCheck::ImpliedByStandardProtocol;
+    checkConcurrentValueConformance(concurrentValueConformance, check);
   }
 
   // Check all conformances.

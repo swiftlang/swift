@@ -2356,22 +2356,23 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
-void swift::checkConcurrentValueConformance(
-    ProtocolConformance *conformance, bool asWarning) {
+bool swift::checkConcurrentValueConformance(
+    ProtocolConformance *conformance, ConcurrentValueCheck check) {
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
-    return;
+    return false;
 
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl) {
     // Actors implicitly conform to ConcurrentValue and protect their state.
     if (classDecl->isActor())
-      return;
+      return false;
   }
 
   // ConcurrentValue can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
+  bool asWarning = (check == ConcurrentValueCheck::ImpliedByStandardProtocol);
   if (!conformanceDC->getParentSourceFile() ||
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(
@@ -2379,7 +2380,9 @@ void swift::checkConcurrentValueConformance(
           ? diag::concurrent_value_outside_source_file_warn
           : diag::concurrent_value_outside_source_file,
         nominal->getDescriptiveKind(), nominal->getName());
-    return;
+
+    if (!asWarning)
+      return true;
   }
 
   if (classDecl) {
@@ -2389,8 +2392,9 @@ void swift::checkConcurrentValueConformance(
           asWarning ? diag::concurrent_value_open_class_warn
                     : diag::concurrent_value_open_class,
           classDecl->getName());
+
       if (!asWarning)
-        return;
+        return true;
     }
 
     // A 'ConcurrentValue' class cannot inherit from another class, although
@@ -2403,8 +2407,9 @@ void swift::checkConcurrentValueConformance(
                         : diag::concurrent_value_inherit,
               nominal->getASTContext().LangOpts.EnableObjCInterop,
               classDecl->getName());
+
           if (!asWarning)
-            return;
+            return true;
         }
       }
     }
@@ -2412,6 +2417,7 @@ void swift::checkConcurrentValueConformance(
 
   // Stored properties of structs and classes must have
   // ConcurrentValue-conforming types.
+  bool invalid = false;
   if (isa<StructDecl>(nominal) || classDecl) {
     for (auto property : nominal->getStoredProperties()) {
       if (classDecl && property->supportsMutation()) {
@@ -2420,6 +2426,7 @@ void swift::checkConcurrentValueConformance(
                       : diag::concurrent_value_class_mutable_property,
             property->getName(), nominal->getDescriptiveKind(),
             nominal->getName());
+        invalid = true;
         continue;
       }
 
@@ -2431,11 +2438,12 @@ void swift::checkConcurrentValueConformance(
                       : diag::non_concurrent_type_member,
             false, property->getName(),
             nominal->getDescriptiveKind(), nominal->getName(), propertyType);
+        invalid = true;
         continue;
       }
     }
 
-    return;
+    return invalid;
   }
 
   // Associated values of enum cases must have ConcurrentValue-conforming
@@ -2454,9 +2462,12 @@ void swift::checkConcurrentValueConformance(
                         : diag::non_concurrent_type_member,
               true, element->getName(),
               nominal->getDescriptiveKind(), nominal->getName(), elementType);
+          invalid = true;
           continue;
         }
       }
     }
   }
+
+  return invalid;
 }
