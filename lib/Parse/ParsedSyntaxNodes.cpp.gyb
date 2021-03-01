@@ -31,11 +31,11 @@ Parsed${node.name}::getDeferred${child.name}(const SyntaxParsingContext *SyntaxC
   auto RawChild = getRaw().getDeferredChild(${node.name}::Cursor::${child.name}, SyntaxContext);
   if (RawChild.isNull())
     return None;
-  return Parsed${child.type_name} {RawChild.copyDeferred()};
+  return Parsed${child.type_name}(std::move(RawChild));
 }
 %     else:
 Parsed${child.type_name} Parsed${node.name}::getDeferred${child.name}(const SyntaxParsingContext *SyntaxContext) {
-  return Parsed${child.type_name} {getRaw().getDeferredChild(${node.name}::Cursor::${child.name}, SyntaxContext).copyDeferred()};
+  return Parsed${child.type_name} {getRaw().getDeferredChild(${node.name}::Cursor::${child.name}, SyntaxContext)};
 }
 %     end
 

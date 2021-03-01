@@ -187,17 +187,6 @@ public:
     return copy;
   }
 
-  ParsedRawSyntaxNode copyDeferred() const {
-    assert(isDeferredLayout() || isDeferredToken() && "node not deferred");
-    ParsedRawSyntaxNode copy;
-    copy.Data = Data;
-    copy.Range = Range;
-    copy.SynKind = SynKind;
-    copy.TokKind = TokKind;
-    copy.IsMissing = IsMissing;
-    return copy;
-  }
-
 #ifndef NDEBUG
   bool ensureDataIsNotRecorded() {
     if (getDataKind() != DataKind::Recorded)
