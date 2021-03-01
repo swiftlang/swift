@@ -4,9 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// Remove with rdar://problem/72439642
-// UNSUPPORTED: asan
-
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -19,6 +16,7 @@ actor Counter {
 
   init(maxCount: Int) {
     scratchBuffer = .allocate(capacity: maxCount)
+    scratchBuffer.initialize(repeating: 0)
   }
 
   func next() -> Int {
@@ -34,10 +32,7 @@ actor Counter {
 }
 
 
-func worker(
-  identity: Int, counters: [Counter], numIterations: Int,
-  scratchBuffer: UnsafeMutableBufferPointer<Int>
-) async {
+func worker(identity: Int, counters: [Counter], numIterations: Int) async {
   for i in 0..<numIterations {
     let counterIndex = Int.random(in: 0 ..< counters.count)
     let counter = counters[counterIndex]
@@ -47,10 +42,6 @@ func worker(
 }
 
 func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
-  let scratchBuffer = UnsafeMutableBufferPointer<Int>.allocate(
-    capacity: numCounters * numWorkers * numIterations
-  )
-
   // Create counter actors.
   var counters: [Counter] = []
   for i in 0..<numCounters {
@@ -63,10 +54,7 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
     workers.append(
       Task.runDetached { [counters] in
         usleep(UInt32.random(in: 0..<100) * 1000)
-        await worker(
-          identity: i, counters: counters, numIterations: numIterations,
-          scratchBuffer: scratchBuffer
-        )
+        await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
   }
@@ -76,8 +64,6 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
     try! await worker.get()
   }
 
-  // Clear out the scratch buffer.
-  scratchBuffer.deallocate()
   print("DONE!")
 }
 
