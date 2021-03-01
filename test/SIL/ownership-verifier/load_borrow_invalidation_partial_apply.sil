@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline %s -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -inline %s -verify-continue-on-failure=true -dont-abort-on-memory-lifetime-errors -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 // Tests here are patterns we should not consider as broken

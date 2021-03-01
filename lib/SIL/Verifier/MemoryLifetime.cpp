@@ -350,6 +350,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::EndAccessInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
       case SILInstructionKind::BeginApplyInst:
@@ -870,12 +871,13 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::DeallocStackInst:
         state.killBits(I.getOperand(0), locations);
         break;
+      case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst: {
-        FullApplySite FAS(&I);
+        ApplySite AS(&I);
         for (Operand &op : I.getAllOperands()) {
-          if (FAS.isArgumentOperand(op)) {
-            setFuncOperandBits(state, op, FAS.getArgumentConvention(op),
+          if (AS.isArgumentOperand(op)) {
+            setFuncOperandBits(state, op, AS.getArgumentOperandConvention(op),
                               isa<TryApplyInst>(&I));
           }
         }
@@ -1092,12 +1094,13 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           requireBitsSet(bits, orig, &I);
         break;
       }
+      case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst: {
-        FullApplySite FAS(&I);
+        ApplySite AS(&I);
         for (Operand &op : I.getAllOperands()) {
-          if (FAS.isArgumentOperand(op))
-            checkFuncArgument(bits, op, FAS.getArgumentConvention(op), &I);
+          if (AS.isArgumentOperand(op))
+            checkFuncArgument(bits, op, AS.getArgumentOperandConvention(op), &I);
         }
         break;
       }
