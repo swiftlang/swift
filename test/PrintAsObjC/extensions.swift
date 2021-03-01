@@ -7,6 +7,13 @@
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
 
+// This test generates invalid SIL. It will cause a compiler assert in
+// both -Onone and -O builds:
+// Error! Found a leaked owned value that was never consumed.
+// -disable-sil-ownership-verifier is a temporary workaround.
+// rdar://64375208 (Wrong lowering of PrintAsObjC code. Result is
+// unowned instead of autoreleased)
+
 // REQUIRES: objc_interop
 
 import Foundation
