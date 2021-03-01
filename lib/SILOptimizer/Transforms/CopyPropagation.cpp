@@ -131,7 +131,9 @@ void CopyPropagation::run() {
     accessBlockAnalysis->lockInvalidation();
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     accessBlockAnalysis->unlockInvalidation();
-    f->verifyOwnership(deBlocksAnalysis->get(f));
+    if (f->getModule().getOptions().VerifySILOwnership) {
+      f->verifyOwnership(deBlocksAnalysis->get(f));
+    }
   }
 }
 
