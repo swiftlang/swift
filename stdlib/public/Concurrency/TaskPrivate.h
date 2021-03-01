@@ -57,7 +57,6 @@ void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 #endif
 
 // ==== ------------------------------------------------------------------------
-// TODO: this was moved from Task.cpp to share it with TaskGroup.cpp, where else better place to put it?
 
 namespace {
 

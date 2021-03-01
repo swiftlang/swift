@@ -46,11 +46,11 @@ func async_let_nested() async {
     func test() async {
       printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
       async let x31 = printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
-      _ = try! await x31
+      _ = await x31
     }
     async let x3: () = test()
 
-    _ = try! await x2
+    _ = await x2
     await x3
   }
 
@@ -64,8 +64,9 @@ func async_let_nested_skip_optimization() async {
       async let x3: Int? = { () async -> Int? in
         async let x4: Int? = { () async -> Int? in
           async let x5: Int? = { () async -> Int? in
+            assert(Task.local(\.number) == 2)
             async let xx = printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
-            return try! await xx
+            return await xx
           }()
           return await x5
         }()

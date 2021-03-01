@@ -190,6 +190,10 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
   // Set that there's no longer a running task in the current thread.
   _swift_task_clearCurrent();
 
+  // Destroy and deallocate any remaining task local items.
+  // We need to do this before we destroy the task local deallocator.
+  task->Local.destroy(task);
+
   // Tear down the task-local allocator immediately;
   // there's no need to wait for the object to be destroyed.
   _swift_task_alloc_destroy(task);
@@ -288,9 +292,6 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     new(allocation) AsyncTask(&taskHeapMetadata, flags,
                               function, initialContext);
 
-  // Initialize task locals fragment.
-  task->Local.initializeLinkParent(task, parent);
-
   // Initialize the child fragment if applicable.
   if (parent) {
     auto childFragment = task->childFragment();
@@ -342,6 +343,13 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   // Initialize the task-local allocator.
   // TODO: consider providing an initial pre-allocated first slab to the allocator.
   _swift_task_alloc_initialize(task);
+
+  // TODO: if the allocator would be prepared earlier we could do this in some
+  //       other existing if-parent if rather than adding another one here.
+  if (parent) {
+    // Initialize task locals with a link to the parent task.
+    task->Local.initializeLinkParent(task, parent);
+  }
 
   return {task, initialContext};
 }

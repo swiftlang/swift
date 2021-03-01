@@ -201,10 +201,6 @@ public:
 
   // ==== Task Local Values ----------------------------------------------------
 
-  void localValueInitializeLinkParent(AsyncTask *parent) {
-    Local.initializeLinkParent(this, parent);
-  }
-
   void localValuePush(const Metadata *keyType,
                       /* +1 */ OpaqueValue *value, const Metadata *valueType) {
     Local.pushValue(this, keyType, value, valueType);

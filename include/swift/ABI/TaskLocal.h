@@ -93,6 +93,11 @@ public:
     // uninitialized or contain an instance of \c valueType.
 
   private:
+    explicit Item()
+      : next(0),
+        keyType(nullptr),
+        valueType(nullptr) {}
+
     explicit Item(const Metadata *keyType, const Metadata *valueType)
       : next(0),
         keyType(keyType),
@@ -114,11 +119,7 @@ public:
                             const Metadata *keyType,
                             const Metadata *valueType);
 
-    void destroy(AsyncTask *task) {
-      if (valueType) {
-        valueType->vw_destroy(getStoragePtr());
-      }
-    }
+    void destroy(AsyncTask *task);
 
     Item *getNext() {
       return reinterpret_cast<Item *>(next & ~statusMask);
@@ -210,11 +211,12 @@ public:
 
     void popValue(AsyncTask *task);
 
+    /// Destroy and deallocate all items stored by this specific task.
+    ///
+    /// Items owned by a parent task are left untouched, since we do not own them.
     void destroy(AsyncTask *task);
   };
 };
-
-TaskLocal::Storage* swift_task_localValueStorage(AsyncTask *task);
 
 } // end namespace swift
 

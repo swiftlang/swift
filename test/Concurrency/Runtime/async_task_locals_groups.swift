@@ -25,7 +25,7 @@ func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
   _ expected: Key.Value? = nil,
   file: String = #file, line: UInt = #line
-) async throws where Key: TaskLocalKey {
+) where Key: TaskLocalKey {
   let value = Task.local(key)
   print("\(Key.self): \(value) at \(file):\(line)")
   if let expected = expected {
@@ -68,8 +68,8 @@ func groups() async {
       await group.add {
         printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 
-        async let childInsideGroupChild = printTaskLocal(\.number)
-        try! await childInsideGroupChild // CHECK: NumberKey: 2 {{.*}}
+        async let childInsideGroupChild: () = printTaskLocal(\.number)
+        await childInsideGroupChild // CHECK: NumberKey: 2 {{.*}}
 
         return Task.local(\.number)
       }

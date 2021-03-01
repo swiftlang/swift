@@ -17,7 +17,7 @@ func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
   _ expected: Key.Value? = nil,
   file: String = #file, line: UInt = #line
-) async where Key: TaskLocalKey {
+) where Key: TaskLocalKey {
   let value = Task.local(key)
   print("\(Key.self): \(value) at \(file):\(line)")
   if let expected = expected {

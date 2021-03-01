@@ -20,10 +20,6 @@ using namespace swift;
 // =============================================================================
 // ==== ABI --------------------------------------------------------------------
 
-TaskLocal::Storage* swift::swift_task_localValueStorage(AsyncTask *task) {
-  return &task->Local;
-}
-
 void swift::swift_task_localValuePush(AsyncTask *task,
                                       const Metadata *keyType,
                                       /* +1 */ OpaqueValue *value,
@@ -46,25 +42,19 @@ void swift::swift_task_localValuePop(AsyncTask *task) {
 
 void TaskLocal::Storage::initializeLinkParent(AsyncTask* task,
                                               AsyncTask* parent) {
-  assert(!head && "task local storage was already initialized with parent");
-  if (parent) {
-    head = TaskLocal::Item::createParentLink(task, parent);
-  }
+  assert(!head && "initial task local storage was already initialized");
+  assert(parent && "parent must be provided to link to it");
+  head = TaskLocal::Item::createParentLink(task, parent);
 }
 
 TaskLocal::Item*
 TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
-  assert(parent);
   size_t amountToAllocate = Item::itemSize(/*valueType*/nullptr);
   // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-  void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator
+  void *allocation = swift_task_alloc(task, amountToAllocate);
+  Item *item = new(allocation) Item();
 
-  Item *item =
-    new(allocation) Item(nullptr, nullptr);
-
-   auto parentHead = parent->Local.head;
-//  auto parentLocalStorage = swift_task_localValueStorage(parent);
-//  auto parentHead = parentLocalStorage->head;
+  auto parentHead = parent->Local.head;
   if (parentHead) {
     if (parentHead->isEmpty()) {
       switch (parentHead->getNextLinkType()) {
@@ -105,11 +95,9 @@ TaskLocal::Item::createLink(AsyncTask *task,
   assert(task);
   size_t amountToAllocate = Item::itemSize(valueType);
   // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-  void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator rdar://74218679
-  Item *item =
-    new(allocation) Item(keyType, valueType);
+  void *allocation = swift_task_alloc(task, amountToAllocate);
+  Item *item = new(allocation) Item(keyType, valueType);
 
-  auto nextStorage = swift_task_localValueStorage(task);
   auto next = task->Local.head;
   auto nextLinkType = next ? NextLinkType::IsNext
                            : NextLinkType::IsTerminal;
@@ -122,6 +110,14 @@ TaskLocal::Item::createLink(AsyncTask *task,
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
 
+void TaskLocal::Item::destroy(AsyncTask *task) {
+  if (valueType) {
+    valueType->vw_destroy(getStoragePtr());
+  }
+
+  swift_task_dealloc(task, this);
+}
+
 void TaskLocal::Storage::destroy(AsyncTask *task) {
   auto item = head;
   head = nullptr;
@@ -131,13 +127,14 @@ void TaskLocal::Storage::destroy(AsyncTask *task) {
       case TaskLocal::NextLinkType::IsNext:
         next = item->getNext();
         item->destroy(task);
-        free(item);
         item = next;
         break;
 
       case TaskLocal::NextLinkType::IsParent:
       case TaskLocal::NextLinkType::IsTerminal:
-        // we're done here, we must not destroy values owned by the parent task.
+        // we're done here; as we must not proceed into the parent owned values.
+        // we do have to destroy the item pointing at the parent/edge itself though.
+        item->destroy(task);
         return;
     }
   }
@@ -159,8 +156,9 @@ void TaskLocal::Storage::pushValue(AsyncTask *task,
 
 void TaskLocal::Storage::popValue(AsyncTask *task) {
   assert(head && "attempted to pop value off empty task-local stack");
-  head->destroy(task);
+  auto old = head;
   head = head->getNext();
+  old->destroy(task);
 }
 
 OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,

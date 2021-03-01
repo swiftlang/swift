@@ -71,13 +71,12 @@ extension Task {
   ///            bound in the current (or any parent) tasks.
   public static func local<Key>(_ keyPath: KeyPath<TaskLocalValues, Key>)
     -> Key.Value where Key: TaskLocalKey {
-    guard let _task = Task.unsafeCurrent?._task else {
-      fatalError("No async task!")
+    guard let unsafeTask = Task.unsafeCurrent else {
       return Key.defaultValue
     }
 
     let value = _taskLocalValueGet(
-      _task, keyType: Key.self, inheritance: Key.inherit.rawValue)
+      unsafeTask._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
     guard let rawValue = value else {
       return Key.defaultValue
     }
