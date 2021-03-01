@@ -163,19 +163,6 @@ public:
   /// Returns the range of this node including leading and trailing trivia.
   CharSourceRange getRange() const { return Range; }
 
-  // Recorded Data ===========================================================//
-
-  OpaqueSyntaxNode getOpaqueNode() const {
-    assert(isRecorded());
-    return Data.getOpaque();
-  }
-  OpaqueSyntaxNode takeOpaqueNode() {
-    assert(isRecorded());
-    auto opaque = Data.getOpaque();
-    reset();
-    return opaque;
-  }
-
   // Deferred Layout Data ====================================================//
 
   /// If this node is a deferred layout node, return the child at index \p
