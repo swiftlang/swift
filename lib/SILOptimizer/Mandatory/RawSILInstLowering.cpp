@@ -16,6 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 
 STATISTIC(numAssignRewritten, "Number of assigns rewritten");
@@ -177,6 +178,7 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   SILValue dest = inst->getDest();
   SILLocation loc = inst->getLoc();
   SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
+  SingleValueInstruction *closureToDelete = nullptr;
 
   switch (inst->getAssignDestination()) {
     case AssignByWrapperInst::Destination::BackingWrapper: {
@@ -199,8 +201,7 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
           b.createStore(loc, wrappedSrc, dest, StoreOwnershipQualifier::Assign);
         }
       }
-      // TODO: remove the unused setter function, which usually is a dead
-      // partial_apply.
+      closureToDelete = dyn_cast<SingleValueInstruction>(inst->getSetter());
       break;
     }
     case AssignByWrapperInst::Destination::WrappedValue: {
@@ -218,12 +219,13 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       // nested access violation.
       if (auto *BA = dyn_cast<BeginAccessInst>(dest))
         accessMarkers.push_back(BA);
-      // TODO: remove the unused init function, which usually is a dead
-      // partial_apply.
+      closureToDelete = dyn_cast<SingleValueInstruction>(inst->getInitializer());
       break;
     }
   }
   inst->eraseFromParent();
+  if (closureToDelete)
+    tryDeleteDeadClosure(closureToDelete);
 }
 
 static void deleteDeadAccessMarker(BeginAccessInst *BA) {
