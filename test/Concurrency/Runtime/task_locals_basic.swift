@@ -146,6 +146,7 @@ func withLocal_body_mustNotEscape() async {
   await Task.withLocal(\.string, boundTo: "xxx") {
     something = "very nice"
   }
+  _ = something // silence not used warning
 }
 
 @main struct Main {
