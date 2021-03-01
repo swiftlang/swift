@@ -3015,6 +3015,8 @@ ERROR(rethrows_without_throwing_parameter,none,
 ERROR(override_reasync_with_non_reasync,none,
       "override of 'reasync' %select{method|initializer}0 should also "
       "be 'reasync'", (bool))
+ERROR(reasync_without_async_parameter,none,
+      "'reasync' function must take an 'async' function argument", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",

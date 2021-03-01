@@ -14,6 +14,13 @@ func asyncReasyncFunction(_: () async throws -> ()) async reasync {}
 func reasyncParam(_: () reasync -> ()) {}
 // expected-error@-1 {{only function declarations may be marked 'reasync'; did you mean 'async'?}}{{25-32=async}}
 
+//// Invalid cases
+
+func noReasyncParams() reasync {}
+// expected-error@-1 {{'reasync' function must take an 'async' function argument}}
+
+//// Method override attribute checking
+
 class Base {
   func reasyncMethod(_: () async -> ()) reasync {}
   // expected-note@-1 {{overridden declaration is here}}
