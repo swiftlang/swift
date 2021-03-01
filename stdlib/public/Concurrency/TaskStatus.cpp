@@ -460,8 +460,7 @@ static void performCancellationAction(TaskStatusRecord *record) {
 }
 
 /// Perform any cancellation actions required by the given record.
-static void performGroupCancellationAction(TaskStatusRecord *record,
-                                           TaskGroup *group) {
+static void performGroupCancellationAction(TaskStatusRecord *record) {
   switch (record->getKind()) {
   // We only need to cancel specific GroupChildTasks, not arbitrary child tasks.
   // A task may be parent to many tasks which are not part of a group after all.
@@ -470,13 +469,12 @@ static void performGroupCancellationAction(TaskStatusRecord *record,
 
   case TaskStatusRecordKind::TaskGroup: {
     auto groupChildRecord = cast<TaskGroupTaskStatusRecord>(record);
-    // since a task can only be running a single task group at the same time,
-    // we do not need to `group == groupChildRecord->getGroup()` filter here,
-    // however we assert this for good measure.
+    // Since a task can only be running a single task group at the same time,
+    // we can always assume that the group record which we found is the one
+    // we're intended to cancel child tasks for.
     //
     // A group enforces that tasks can not "escape" it, and as such once the group
     // returns, all its task have been completed.
-    assert(group == groupChildRecord->getGroup());
     for (AsyncTask *child: groupChildRecord->children()) {
       swift_task_cancel(child);
     }
@@ -540,7 +538,7 @@ void swift::swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *grou
   // Carry out the cancellation operations associated with all
   // the active records.
   for (auto cur: oldStatus.records()) {
-    performGroupCancellationAction(cur, group);
+    performGroupCancellationAction(cur);
   }
 
   // Release the status record lock, being sure to flag that
