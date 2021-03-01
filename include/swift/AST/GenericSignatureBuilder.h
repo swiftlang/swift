@@ -1118,17 +1118,23 @@ private:
                              WrittenRequirementLoc writtenLoc =
                                WrittenRequirementLoc()) const;
 public:
-  /// A requirement source that describes that a requirement that is resolved
+  /// A requirement source that describes a conformance requirement resolved
   /// via a superclass requirement.
   const RequirementSource *viaSuperclass(
                                     GenericSignatureBuilder &builder,
                                     ProtocolConformanceRef conformance) const;
 
-  /// A requirement source that describes that a requirement that is resolved
-  /// via a same-type-to-concrete requirement.
+  /// A requirement source that describes a conformance requirement resolved
+  /// via a concrete type requirement with a conforming nominal type.
   const RequirementSource *viaConcrete(
                                      GenericSignatureBuilder &builder,
                                      ProtocolConformanceRef conformance) const;
+
+  /// A requirement source that describes that a requirement that is resolved
+  /// via a concrete type requirement with an existential self-conforming type.
+  const RequirementSource *viaConcrete(
+                                     GenericSignatureBuilder &builder,
+                                     Type existentialType) const;
 
   /// A constraint source that describes a layout constraint that was implied
   /// by a superclass requirement.
