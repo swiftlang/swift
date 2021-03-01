@@ -27,7 +27,7 @@ struct NativeObjectPair {
   var obj2 : Builtin.NativeObject
 }
 
-// Test that a value with no copiesis paradoxically optimized at
+// Test that a value with no copies is paradoxically optimized at
 // -Onone but not at -O. -Onone aggressively shortens lifetimes and
 // leaves unowned remnants for debugging. A 'nil' weak dereference
 // should happen at -Onone if at all possible so it isn't surprising
@@ -39,7 +39,7 @@ struct NativeObjectPair {
 // CHECK-DEBUG:   [[COPY:%.*]] = copy_value [[UNOWNED]] : $@sil_unowned B
 // CHECK-DEBUG:   destroy_value %0 : $B
 // CHECK-DEBUG:   apply
-// CHECK-DEBUG:   destroy_value [[UNOWNED]] : $@sil_unowned B
+// CHECK-DEBUG:   destroy_value [[COPY]] : $@sil_unowned B
 // CHECK-DEBUG-LABEL: } // end sil function 'testDestroyAfterCall'
 //
 // CHECK-OPT-LABEL: sil [ossa] @testDestroyAfterCall : $@convention(thin) (@owned B) -> () {
@@ -76,7 +76,8 @@ sil @modifyInt : $@convention(thin) (@inout Int) -> ()
 // CHECK: apply
 // CHECK-NOT: destroy
 // CHECK: end_apply
-// CHECK-NOT: destroy
+// CHECK-NOT: destroy_value %{{.*}} : $WritableKeyPath<Struct, Int>
+// CHECK-DEBUG: destroy_value %{{.*}} : $@sil_unowned WritableKeyPath<Struct, Int>
 // CHECK: destroy_value %{{.*}} : $WritableKeyPath<Struct, Int>
 // CHECK-NOT: destroy
 // CHECK-LABEL: } // end sil function 'testBeginApply'
