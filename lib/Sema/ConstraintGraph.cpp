@@ -275,11 +275,13 @@ inference::PotentialBindings &ConstraintGraphNode::getCurrentBindings() {
 
 static bool isUsefulForReferencedVars(Constraint *constraint) {
   switch (constraint->getKind()) {
-  // Don't attempt to propagate information about `Bind`s to referenced
-  // variables since they are adjacent through that binding already, and
-  // there is no useful information in trying to process that kind of
+  // Don't attempt to propagate information about `Bind`s and
+  // `BindOverload`s to referenced variables since they are
+  // adjacent through that binding already, and there is no
+  // useful information in trying to process that kind of
   // constraint.
   case ConstraintKind::Bind:
+  case ConstraintKind::BindOverload:
     return false;
 
   default:
