@@ -120,6 +120,27 @@ using llvm::StringRef;
 #define syntax_assert_token_is(Tok, Kind, Text)
 #endif
 
+namespace {
+/// If the \p Str is not allocated in \p Arena, copy it to \p Arena and adjust
+/// \p Str to point to the string's copy in \p Arena.
+void copyToArenaIfNecessary(
+    StringRef &Str, const swift::RC<swift::syntax::SyntaxArena> &Arena) {
+  if (Str.empty()) {
+    // Empty strings can live wherever they want. Nothing to do.
+    return;
+  }
+  if (Arena->containsPointer(Str.data())) {
+    // String already in arena. Nothing to do.
+    return;
+  }
+  // Copy string to arena
+  char *Data = (char *)Arena->Allocate(Str.size(), alignof(char *));
+  std::uninitialized_copy(Str.begin(), Str.end(), Data);
+  Str = StringRef(Data, Str.size());
+}
+} // namespace
+// end anonymous namespace
+
 namespace swift {
 namespace syntax {
 
@@ -223,7 +244,39 @@ class RawSyntax final
   /// the caller needs to assure that the node ID has not been used yet.
   RawSyntax(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout,
             size_t TextLength, SourcePresence Presence,
-            const RC<SyntaxArena> &Arena, llvm::Optional<SyntaxNodeId> NodeId);
+            const RC<SyntaxArena> &Arena, llvm::Optional<SyntaxNodeId> NodeId)
+      : Arena(Arena.get()),
+        Bits({{unsigned(TextLength), unsigned(Presence), false}}) {
+    assert(Arena && "RawSyntax nodes must always be allocated in an arena");
+    assert(
+        Kind != SyntaxKind::Token &&
+        "'token' syntax node must be constructed with dedicated constructor");
+
+    size_t TotalSubNodeCount = 0;
+    for (auto Child : Layout) {
+      if (Child) {
+        TotalSubNodeCount += Child->getTotalSubNodeCount() + 1;
+        // If the child is stored in a different arena, it needs to stay alive
+        // as long as this node's arena is alive.
+        Arena->addChildArena(Child->Arena);
+      }
+    }
+
+    if (NodeId.hasValue()) {
+      this->NodeId = NodeId.getValue();
+      NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
+    } else {
+      this->NodeId = NextFreeNodeId++;
+    }
+    Bits.Layout.NumChildren = Layout.size();
+    Bits.Layout.TotalSubNodeCount = TotalSubNodeCount;
+    Bits.Layout.Kind = unsigned(Kind);
+
+    // Initialize layout data.
+    std::uninitialized_copy(Layout.begin(), Layout.end(),
+                            getTrailingObjects<const RawSyntax *>());
+  }
+
   /// Constructor for creating token nodes
   /// \c SyntaxArena, that arena must be passed as \p Arena to retain the node's
   /// underlying storage.
@@ -232,7 +285,35 @@ class RawSyntax final
   RawSyntax(tok TokKind, StringRef Text, size_t TextLength,
             StringRef LeadingTrivia, StringRef TrailingTrivia,
             SourcePresence Presence, const RC<SyntaxArena> &Arena,
-            llvm::Optional<SyntaxNodeId> NodeId);
+            llvm::Optional<SyntaxNodeId> NodeId)
+      : Arena(Arena.get()),
+        Bits({{unsigned(TextLength), unsigned(Presence), true}}) {
+    assert(Arena && "RawSyntax nodes must always be allocated in an arena");
+    copyToArenaIfNecessary(LeadingTrivia, Arena);
+    copyToArenaIfNecessary(Text, Arena);
+    copyToArenaIfNecessary(TrailingTrivia, Arena);
+
+    if (Presence == SourcePresence::Missing) {
+      assert(TextLength == 0);
+    } else {
+      assert(TextLength ==
+             LeadingTrivia.size() + Text.size() + TrailingTrivia.size());
+    }
+
+    if (NodeId.hasValue()) {
+      this->NodeId = NodeId.getValue();
+      NextFreeNodeId = std::max(this->NodeId + 1, NextFreeNodeId);
+    } else {
+      this->NodeId = NextFreeNodeId++;
+    }
+    Bits.Token.LeadingTrivia = LeadingTrivia.data();
+    Bits.Token.TokenText = Text.data();
+    Bits.Token.TrailingTrivia = TrailingTrivia.data();
+    Bits.Token.LeadingTriviaLength = LeadingTrivia.size();
+    Bits.Token.TokenLength = Text.size();
+    Bits.Token.TrailingTriviaLength = TrailingTrivia.size();
+    Bits.Token.TokenKind = unsigned(TokKind);
+  }
 
   /// Compute the node's text length by summing up the length of its childern
   size_t computeTextLength() {
@@ -254,7 +335,13 @@ public:
   static const RawSyntax *
   make(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout, size_t TextLength,
        SourcePresence Presence, const RC<SyntaxArena> &Arena,
-       llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
+       llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+    assert(Arena && "RawSyntax nodes must always be allocated in an arena");
+    auto size = totalSizeToAlloc<const RawSyntax *>(Layout.size());
+    void *data = Arena->Allocate(size, alignof(RawSyntax));
+    return new (data)
+        RawSyntax(Kind, Layout, TextLength, Presence, Arena, NodeId);
+  }
 
   static const RawSyntax *
   makeAndCalcLength(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout,
@@ -274,7 +361,13 @@ public:
   make(tok TokKind, StringRef Text, size_t TextLength, StringRef LeadingTrivia,
        StringRef TrailingTrivia, SourcePresence Presence,
        const RC<SyntaxArena> &Arena,
-       llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
+       llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+    assert(Arena && "RawSyntax nodes must always be allocated in an arena");
+    auto size = totalSizeToAlloc<const RawSyntax *>(0);
+    void *data = Arena->Allocate(size, alignof(RawSyntax));
+    return new (data) RawSyntax(TokKind, Text, TextLength, LeadingTrivia,
+                                TrailingTrivia, Presence, Arena, NodeId);
+  }
 
   /// Make a raw "token" syntax node that was allocated in \p Arena.
   static const RawSyntax *
