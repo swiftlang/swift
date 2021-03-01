@@ -211,30 +211,6 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_oge_${Builtin}(a._storage._value, b._storage._value)
     )
   }
-    
-  /// The sum of two vectors.
-  @_alwaysEmitIntoClient
-  public static func +(a: Self, b: Self) -> Self{
-    Self(Builtin.fadd_${Builtin}(a._storage._value, b._storage._value))
-  }
-    
-  /// The difference of two vectors.
-  @_alwaysEmitIntoClient
-  public static func -(a: Self, b: Self) -> Self{
-    Self(Builtin.fsub_${Builtin}(a._storage._value, b._storage._value))
-  }
-    
-  /// The pointwise product of two vectors.
-  @_alwaysEmitIntoClient
-  public static func *(a: Self, b: Self) -> Self{
-    Self(Builtin.fmul_${Builtin}(a._storage._value, b._storage._value))
-  }
-    
-  /// The pointwise quotient of two vectors.
-  @_alwaysEmitIntoClient
-  public static func /(a: Self, b: Self) -> Self{
-    Self(Builtin.fdiv_${Builtin}(a._storage._value, b._storage._value))
-  }
 }
 %  if bits == 16:
 #endif
