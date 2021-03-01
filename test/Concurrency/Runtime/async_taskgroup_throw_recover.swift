@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: OS=windows-msvc
 
 struct Boom: Error {}
 struct IgnoredBoom: Error {}

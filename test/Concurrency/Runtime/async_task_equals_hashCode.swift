@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: OS=windows-os
 
 #if canImport(Darwin)
 import Darwin
