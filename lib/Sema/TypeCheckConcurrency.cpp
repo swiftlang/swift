@@ -2356,6 +2356,68 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
+/// Check the instance storage of the given nominal type to verify whether
+/// it is comprised only of ConcurrentValue instance storage.
+static bool checkConcurrentValueInstanceStorage(
+    NominalTypeDecl *nominal, DeclContext *dc, ConcurrentValueCheck check) {
+  // Stored properties of structs and classes must have
+  // ConcurrentValue-conforming types.
+  bool asWarning = (check == ConcurrentValueCheck::ImpliedByStandardProtocol);
+  bool invalid = false;
+  if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+    auto classDecl = dyn_cast<ClassDecl>(nominal);
+    for (auto property : nominal->getStoredProperties()) {
+      if (classDecl && property->supportsMutation()) {
+        property->diagnose(
+            asWarning ? diag::concurrent_value_class_mutable_property_warn
+                      : diag::concurrent_value_class_mutable_property,
+            property->getName(), nominal->getDescriptiveKind(),
+            nominal->getName());
+        invalid = true;
+        continue;
+      }
+
+      auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType());
+      if (!isConcurrentValueType(dc, propertyType)) {
+        property->diagnose(
+            asWarning ? diag::non_concurrent_type_member_warn
+                      : diag::non_concurrent_type_member,
+            false, property->getName(),
+            nominal->getDescriptiveKind(), nominal->getName(), propertyType);
+        invalid = true;
+        continue;
+      }
+    }
+
+    return invalid;
+  }
+
+  // Associated values of enum cases must have ConcurrentValue-conforming
+  // types.
+  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    for (auto caseDecl : enumDecl->getAllCases()) {
+      for (auto element : caseDecl->getElements()) {
+        if (!element->hasAssociatedValues())
+          continue;
+
+        auto elementType = dc->mapTypeIntoContext(
+            element->getArgumentInterfaceType());
+        if (!isConcurrentValueType(dc, elementType)) {
+          element->diagnose(
+              asWarning ? diag::non_concurrent_type_member_warn
+                        : diag::non_concurrent_type_member,
+              true, element->getName(),
+              nominal->getDescriptiveKind(), nominal->getName(), elementType);
+          invalid = true;
+          continue;
+        }
+      }
+    }
+  }
+
+  return invalid;
+}
+
 bool swift::checkConcurrentValueConformance(
     ProtocolConformance *conformance, ConcurrentValueCheck check) {
   auto conformanceDC = conformance->getDeclContext();
@@ -2415,59 +2477,5 @@ bool swift::checkConcurrentValueConformance(
     }
   }
 
-  // Stored properties of structs and classes must have
-  // ConcurrentValue-conforming types.
-  bool invalid = false;
-  if (isa<StructDecl>(nominal) || classDecl) {
-    for (auto property : nominal->getStoredProperties()) {
-      if (classDecl && property->supportsMutation()) {
-        property->diagnose(
-            asWarning ? diag::concurrent_value_class_mutable_property_warn
-                      : diag::concurrent_value_class_mutable_property,
-            property->getName(), nominal->getDescriptiveKind(),
-            nominal->getName());
-        invalid = true;
-        continue;
-      }
-
-      auto propertyType =
-          conformanceDC->mapTypeIntoContext(property->getInterfaceType());
-      if (!isConcurrentValueType(conformanceDC, propertyType)) {
-        property->diagnose(
-            asWarning ? diag::non_concurrent_type_member_warn
-                      : diag::non_concurrent_type_member,
-            false, property->getName(),
-            nominal->getDescriptiveKind(), nominal->getName(), propertyType);
-        invalid = true;
-        continue;
-      }
-    }
-
-    return invalid;
-  }
-
-  // Associated values of enum cases must have ConcurrentValue-conforming
-  // types.
-  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-    for (auto caseDecl : enumDecl->getAllCases()) {
-      for (auto element : caseDecl->getElements()) {
-        if (!element->hasAssociatedValues())
-          continue;
-        
-        auto elementType = conformanceDC->mapTypeIntoContext(
-            element->getArgumentInterfaceType());
-        if (!isConcurrentValueType(conformanceDC, elementType)) {
-          element->diagnose(
-              asWarning ? diag::non_concurrent_type_member_warn
-                        : diag::non_concurrent_type_member,
-              true, element->getName(),
-              nominal->getDescriptiveKind(), nominal->getName(), elementType);
-          invalid = true;
-          continue;
-        }
-      }
-    }
-  }
-
-  return invalid;
+  return checkConcurrentValueInstanceStorage(nominal, conformanceDC, check);
 }
