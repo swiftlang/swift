@@ -24,6 +24,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
@@ -247,26 +248,42 @@ CharSourceRange RawComment::getCharSourceRange() {
   return CharSourceRange(Start, Length);
 }
 
-bool BasicSourceFileInfo::populate(const SourceFile *SF) {
+BasicSourceFileInfo::BasicSourceFileInfo(const SourceFile *SF)
+    : SFAndIsFromSF(SF, true) {
+  FilePath = SF->getFilename();
+}
+
+bool BasicSourceFileInfo::isFromSourceFile() const {
+  return SFAndIsFromSF.getInt();
+}
+
+void BasicSourceFileInfo::populateWithSourceFileIfNeeded() {
+  const auto *SF = SFAndIsFromSF.getPointer();
+  if (!SF)
+    return;
+  SWIFT_DEFER {
+    SFAndIsFromSF.setPointer(nullptr);
+  };
+
   SourceManager &SM = SF->getASTContext().SourceMgr;
 
-  auto filename = SF->getFilename();
-  if (filename.empty())
-    return true;
-  auto stat = SM.getFileSystem()->status(filename);
+  if (FilePath.empty())
+    return;
+  auto stat = SM.getFileSystem()->status(FilePath);
   if (!stat)
-    return true;
+    return;
 
-  FilePath = filename;
   LastModified = stat->getLastModificationTime();
   FileSize = stat->getSize();
 
   if (SF->hasInterfaceHash()) {
-    InterfaceHash = SF->getInterfaceHashIncludingTypeMembers();
+    InterfaceHashIncludingTypeMembers = SF->getInterfaceHashIncludingTypeMembers();
+    InterfaceHashExcludingTypeMembers = SF->getInterfaceHash();
   } else {
     // FIXME: Parse the file with EnableInterfaceHash option.
-    InterfaceHash = Fingerprint::ZERO();
+    InterfaceHashIncludingTypeMembers = Fingerprint::ZERO();
+    InterfaceHashExcludingTypeMembers = Fingerprint::ZERO();
   }
 
-  return false;
+  return;
 }

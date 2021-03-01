@@ -31,10 +31,10 @@ SubsetParameterThunkTests.test("InoutParametersDirect") {
   let x: Float = 3
   let y: Double = 4
   let z: Float = 5
-  expectEqual((2, 3, 4), gradient(at: x, y, z, in: inoutDirectCaller))
-  expectEqual((3, 4), gradient(at: y, z, in: { y, z in inoutDirectCaller(x, y, z) }))
-  expectEqual((2, 4), gradient(at: x, z, in: { x, z in inoutDirectCaller(x, y, z) }))
-  expectEqual((2, 3), gradient(at: x, y, in: { x, y in inoutDirectCaller(x, y, z) }))
+  expectEqual((2, 3, 4), gradient(at: x, y, z, of: inoutDirectCaller))
+  expectEqual((3, 4), gradient(at: y, z, of: { y, z in inoutDirectCaller(x, y, z) }))
+  expectEqual((2, 4), gradient(at: x, z, of: { x, z in inoutDirectCaller(x, y, z) }))
+  expectEqual((2, 3), gradient(at: x, y, of: { x, y in inoutDirectCaller(x, y, z) }))
 }
 
 func inoutIndirect<T: Differentiable, U: Differentiable, V: Differentiable>(
@@ -68,10 +68,10 @@ SubsetParameterThunkTests.test("InoutParametersIndirect") {
   let x: Float = 3
   let y: Double = 4
   let z: Float = 5
-  expectEqual((0, 1, 0), gradient(at: x, y, z, in: inoutIndirectCaller))
-  expectEqual((1, 0), gradient(at: y, z, in: { y, z in inoutIndirectCaller(x, y, z) }))
-  expectEqual((0, 0), gradient(at: x, z, in: { x, z in inoutIndirectCaller(x, y, z) }))
-  expectEqual((0, 1), gradient(at: x, y, in: { x, y in inoutIndirectCaller(x, y, z) }))
+  expectEqual((0, 1, 0), gradient(at: x, y, z, of: inoutIndirectCaller))
+  expectEqual((1, 0), gradient(at: y, z, of: { y, z in inoutIndirectCaller(x, y, z) }))
+  expectEqual((0, 0), gradient(at: x, z, of: { x, z in inoutIndirectCaller(x, y, z) }))
+  expectEqual((0, 1), gradient(at: x, y, of: { x, y in inoutIndirectCaller(x, y, z) }))
 }
 
 runAllTests()

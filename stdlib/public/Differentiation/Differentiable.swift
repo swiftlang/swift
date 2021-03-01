@@ -32,15 +32,15 @@ public protocol Differentiable {
   associatedtype TangentVector: Differentiable & AdditiveArithmetic
     where TangentVector.TangentVector == TangentVector
 
-  /// Moves `self` along the given direction. In Riemannian geometry, this is
+  /// Moves `self` by the given offset. In Riemannian geometry, this is
   /// equivalent to exponential map, which moves `self` on the geodesic surface
-  /// along the given tangent vector.
-  mutating func move(along direction: TangentVector)
+  /// by the given tangent vector.
+  mutating func move(by offset: TangentVector)
 }
 
 public extension Differentiable where TangentVector == Self {
   @_alwaysEmitIntoClient
-  mutating func move(along direction: TangentVector) {
-    self += direction
+  mutating func move(by offset: TangentVector) {
+    self += offset
   }
 }

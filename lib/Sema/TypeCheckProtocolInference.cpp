@@ -1510,8 +1510,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       continue;
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {
-      auto *proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-      insertProtocol(proto);
+      insertProtocol(reqt.getProtocolDecl());
       break;
     }
     case RequirementKind::Superclass:
@@ -1543,8 +1542,7 @@ static Comparison compareDeclsForInference(DeclContext *DC, ValueDecl *decl1,
       continue;
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {
-      auto *proto = reqt.getSecondType()->castTo<ProtocolType>()->getDecl();
-      removeProtocol(proto);
+      removeProtocol(reqt.getProtocolDecl());
       break;
     }
     case RequirementKind::Superclass:
@@ -1881,9 +1879,11 @@ bool AssociatedTypeInference::diagnoseAmbiguousSolutions(
           }
 
           // Otherwise, we have a default.
-          diags.diagnose(assocType, diag::associated_type_deduction_default,
-                         type)
-            .highlight(assocType->getDefaultDefinitionTypeRepr()->getSourceRange());
+          auto defaultDiag =
+            diags.diagnose(assocType, diag::associated_type_deduction_default,
+                           type);
+          if (auto defaultTypeRepr = assocType->getDefaultDefinitionTypeRepr())
+            defaultDiag.highlight(defaultTypeRepr->getSourceRange());
         };
 
         diagnoseWitness(firstMatch, firstType);

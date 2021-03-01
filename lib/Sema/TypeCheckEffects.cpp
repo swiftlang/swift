@@ -88,8 +88,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
 
-    auto protoTy = requirement.getSecondType()->castTo<ProtocolType>();
-    auto protoDecl = protoTy->getDecl();
+    auto *protoDecl = requirement.getProtocolDecl();
     if (!protoDecl->hasPolymorphicEffect(kind))
       continue;
 
@@ -119,9 +118,7 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
   if (auto genericSig = decl->getGenericSignature()) {
     for (auto req : genericSig->getRequirements()) {
       if (req.getKind() == RequirementKind::Conformance) {
-        if (req.getSecondType()->castTo<ProtocolType>()
-                               ->getDecl()
-                               ->hasPolymorphicEffect(kind)) {
+        if (req.getProtocolDecl()->hasPolymorphicEffect(kind)) {
           return PolymorphicEffectKind::ByConformance;
         }
       }
@@ -242,22 +239,19 @@ private:
     ParamDecl *TheParameter;
     Expr *TheExpr;
   };
-  unsigned TheKind : 2;
-  unsigned ParamCount : 2;
+  Kind TheKind;
   PolymorphicEffectKind RethrowingKind;
   SubstitutionMap Substitutions;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
     : TheKind(kind),
-      ParamCount(1),
       RethrowingKind(PolymorphicEffectKind::None) {
     TheExpr = fn;
   }
 
   explicit AbstractFunction(AbstractFunctionDecl *fn, SubstitutionMap subs)
     : TheKind(Kind::Function),
-      ParamCount(fn->getNumCurryLevels()),
       RethrowingKind(fn->getPolymorphicEffectKind(EffectKind::Throws)),
       Substitutions(subs) {
     TheFunction = fn;
@@ -265,46 +259,31 @@ public:
 
   explicit AbstractFunction(AbstractClosureExpr *closure)
     : TheKind(Kind::Closure),
-      ParamCount(1),
       RethrowingKind(PolymorphicEffectKind::None) {
     TheClosure = closure;
   }
 
   explicit AbstractFunction(ParamDecl *parameter)
     : TheKind(Kind::Parameter),
-      ParamCount(1),
       RethrowingKind(PolymorphicEffectKind::None) {
     TheParameter = parameter;
   }
 
-  Kind getKind() const { return Kind(TheKind); }
-
-  /// Whether the function is marked 'rethrows'.
-  bool isBodyRethrows() const {
-    switch (RethrowingKind) {
-    case PolymorphicEffectKind::None:
-    case PolymorphicEffectKind::Always:
-      return false;
-
-    case PolymorphicEffectKind::ByClosure:
-    case PolymorphicEffectKind::ByConformance:
-    case PolymorphicEffectKind::Invalid:
-      return true;
-    }
-  }
+  Kind getKind() const { return TheKind; }
 
   PolymorphicEffectKind getRethrowingKind() const {
     return RethrowingKind;
   }
 
-  unsigned getNumArgumentsForFullApply() const {
-    return ParamCount;
-  }
-
   Type getType() const {
     switch (getKind()) {
     case Kind::Opaque: return getOpaqueFunction()->getType();
-    case Kind::Function: return getFunction()->getInterfaceType();
+    case Kind::Function: {
+      auto *AFD = getFunction();
+      if (AFD->hasImplicitSelfDecl())
+        return AFD->getMethodInterfaceType();
+      return AFD->getInterfaceType();
+    }
     case Kind::Closure: return getClosure()->getType();
     case Kind::Parameter: return getParameter()->getType();
     }
@@ -339,23 +318,20 @@ public:
   }
 
   static AbstractFunction decomposeApply(ApplyExpr *apply,
-                           SmallVectorImpl<SmallVector<Expr *, 2>> &argLists) {
-    Expr *fn;
-    do {
-      auto *argExpr = apply->getArg();
-      if (auto *tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
-        auto args = tupleExpr->getElements();
-        argLists.emplace_back(args.begin(), args.end());
-      } else if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
-        argLists.emplace_back();
-        argLists.back().push_back(parenExpr->getSubExpr());
-      } else {
-        argLists.emplace_back();
-        argLists.back().push_back(argExpr);
-      }
+                                         SmallVectorImpl<Expr *> &args) {
+    auto *argExpr = apply->getArg();
+    if (auto *tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
+      auto elts = tupleExpr->getElements();
+      args.append(elts.begin(), elts.end());
+    } else {
+      auto *parenExpr = cast<ParenExpr>(argExpr);
+      args.push_back(parenExpr->getSubExpr());
+    }
 
-      fn = apply->getFn()->getValueProvidingExpr();
-    } while ((apply = dyn_cast<ApplyExpr>(fn)));
+    Expr *fn = apply->getFn()->getValueProvidingExpr();
+
+    if (auto *selfCall = dyn_cast<SelfApplyExpr>(fn))
+      fn = selfCall->getFn()->getValueProvidingExpr();
 
     return decomposeFunction(fn);
   }
@@ -705,6 +681,9 @@ public:
 
   /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
+    if (isa<SelfApplyExpr>(E))
+      return Classification();
+
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
     if (!E->getType() || E->getType()->hasError())
@@ -716,16 +695,15 @@ public:
     if (!fnType) return Classification::forInvalidCode();
 
     bool isAsync = fnType->isAsync() || E->implicitlyAsync();
+
     // Decompose the application.
-    SmallVector<SmallVector<Expr *, 2>, 2> argLists;
-    auto fnRef = AbstractFunction::decomposeApply(E, argLists);
+    SmallVector<Expr *, 2> args;
+    auto fnRef = AbstractFunction::decomposeApply(E, args);
 
     // If any of the arguments didn't type check, fail.
-    for (auto argList : argLists) {
-      for (auto *arg : argList) {
-        if (!arg->getType() || arg->getType()->hasError())
-          return Classification::forInvalidCode();
-      }
+    for (auto *arg : args) {
+      if (!arg->getType() || arg->getType()->hasError())
+        return Classification::forInvalidCode();
     }
 
     // If the function doesn't throw at all, we're done here.
@@ -733,31 +711,9 @@ public:
       return isAsync ? Classification::forAsync() : Classification();
     }
 
-    // If we're applying more arguments than the natural argument
-    // count, then this is a call to the opaque value returned from
-    // the function.
-    if (argLists.size() != fnRef.getNumArgumentsForFullApply()) {
-      // Special case: a reference to an operator within a type might be
-      // missing 'self'.
-      // FIXME: The issue here is that this is an ill-formed expression, but
-      // we don't know it from the structure of the expression.
-      if (argLists.size() == 1 && fnRef.getKind() == AbstractFunction::Function &&
-          isa<FuncDecl>(fnRef.getFunction()) &&
-          cast<FuncDecl>(fnRef.getFunction())->isOperator() &&
-          fnRef.getNumArgumentsForFullApply() == 2 &&
-          fnRef.getFunction()->getDeclContext()->isTypeContext()) {
-        // Can only happen with invalid code.
-        assert(fnRef.getFunction()->getASTContext().Diags.hadAnyError());
-        return Classification::forInvalidCode();
-      }
-
-      assert(argLists.size() > fnRef.getNumArgumentsForFullApply() &&
-             "partial application was throwing?");
-      return Classification::forThrow(PotentialThrowReason::forThrowingApply(),
-                                      isAsync);
-    }
-
-    if (fnRef.getRethrowingKind() == PolymorphicEffectKind::ByConformance) {
+    // Handle rethrowing functions.
+    switch (fnRef.getRethrowingKind()) {
+    case PolymorphicEffectKind::ByConformance: {
       auto substitutions = fnRef.getSubstitutions();
       for (auto conformanceRef : substitutions.getConformances()) {
         if (conformanceRef.hasEffect(EffectKind::Throws)) {
@@ -765,37 +721,38 @@ public:
             PotentialThrowReason::forRethrowsConformance(E), isAsync);
         }
       }
+
+      // 'ByConformance' is a superset of 'ByClosure', so check for
+      // closure arguments too.
+      LLVM_FALLTHROUGH;
     }
 
-    // If the function's body is 'rethrows' for the number of
-    // arguments we gave it, apply the rethrows logic.
-    if (fnRef.isBodyRethrows()) {
+    case PolymorphicEffectKind::ByClosure: {
       // We need to walk the original parameter types in parallel
       // because it only counts for 'rethrows' purposes if it lines up
       // with a throwing function parameter in the original type.
-      Type type = fnRef.getType();
-      if (!type) return Classification::forInvalidCode();
+      auto *origType = fnRef.getType()->getAs<AnyFunctionType>();
+      if (!origType)
+        return Classification::forInvalidCode();
 
       // Use the most significant result from the arguments.
       Classification result = isAsync ? Classification::forAsync() 
                                       : Classification();
-      for (auto argList : llvm::reverse(argLists)) {
-        auto fnType = type->getAs<AnyFunctionType>();
-        if (!fnType)
-          return Classification::forInvalidCode();
 
-        auto params = fnType->getParams();
-        if (params.size() != argList.size())
-          return Classification::forInvalidCode();
+      auto params = origType->getParams();
+      if (params.size() != args.size())
+        return Classification::forInvalidCode();
 
-        for (unsigned i = 0, e = params.size(); i < e; ++i) {
-          result.merge(classifyRethrowsArgument(argList[i],
-                                                params[i].getParameterType()));
-        }
-
-        type = fnType->getResult();
+      for (unsigned i = 0, e = params.size(); i < e; ++i) {
+        result.merge(classifyRethrowsArgument(args[i],
+                                              params[i].getParameterType()));
       }
+
       return result;
+    }
+
+    default:
+      break;
     }
 
     // Try to classify the implementation of functions that we have
@@ -1164,6 +1121,9 @@ public:
     /// A default argument expression.
     DefaultArgument,
 
+    /// A property wrapper initialization expression.
+    PropertyWrapper,
+
     /// The initializer for an instance variable.
     IVarInitializer,
 
@@ -1289,6 +1249,10 @@ public:
   static Context forInitializer(Initializer *init) {
     if (isa<DefaultArgumentInitializer>(init)) {
       return Context(Kind::DefaultArgument);
+    }
+
+    if (isa<PropertyWrapperInitializer>(init)) {
+      return Context(Kind::PropertyWrapper);
     }
 
     auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
@@ -1539,6 +1503,7 @@ public:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
     case Kind::DefaultArgument:
+    case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
@@ -1563,6 +1528,7 @@ public:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
     case Kind::DefaultArgument:
+    case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:
@@ -1680,6 +1646,7 @@ public:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
     case Kind::DefaultArgument:
+    case Kind::PropertyWrapper:
     case Kind::CatchPattern:
     case Kind::CatchGuard:
     case Kind::DeferBody:

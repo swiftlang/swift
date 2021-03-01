@@ -1,6 +1,6 @@
 // REQUIRES: concurrency
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -experimental-has-async-alternative-attribute
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 
 @hasAsyncAlternative
 func func1() {}

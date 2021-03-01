@@ -112,7 +112,7 @@ TEST(TaskStatusTest, basicTasks) {
     createdTask = task;
 
     EXPECT_FALSE(hasRun);
-    createdTask->run(createdExecutor);
+    createdTask->runInFullyEstablishedContext(createdExecutor);
     EXPECT_TRUE(hasRun);
 
     createdTask = nullptr;
@@ -133,7 +133,7 @@ TEST(TaskStatusTest, cancellation_simple) {
     swift_task_cancel(task);
     EXPECT_TRUE(task->isCancelled());
   }, [&](AsyncTask *task) {
-    task->run(createFakeExecutor(1234));
+    task->runInFullyEstablishedContext(createFakeExecutor(1234));
   });
 }
 
@@ -279,6 +279,6 @@ TEST(TaskStatusTest, deadline) {
 
     EXPECT_TRUE(task->isCancelled());
   }, [&](AsyncTask *task) {
-    task->run(createFakeExecutor(1234));
+    task->runInFullyEstablishedContext(createFakeExecutor(1234));
   });
 }

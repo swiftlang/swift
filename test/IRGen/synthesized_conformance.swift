@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -disable-generic-metadata-prespecialization -emit-ir %s -swift-version 4 -enable-experimental-enum-codable-derivation | %FileCheck %s
 
 struct Struct<T> {
     var x: T
@@ -14,6 +14,7 @@ enum Enum<T> {
 
 extension Enum: Equatable where T: Equatable {}
 extension Enum: Hashable where T: Hashable {}
+extension Enum: Codable where T: Codable {}
 
 final class Final<T> {
     var x: T
@@ -46,6 +47,9 @@ public func encodable() {
     // CHECK: [[Struct_Encodable:%.*]] = call i8** @"$s23synthesized_conformance6StructVySiGACyxGSEAASeRzSERzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[Struct_Encodable]])
     doEncodable(Struct(x: 1))
+    // CHECK: [[Enum_Encodable:%.*]] = call i8** @"$s23synthesized_conformance4EnumOySiGACyxGSEAASeRzSERzlWl"()
+    // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[Enum_Encodable]])
+    doEncodable(Enum.a(1))
     // CHECK: [[Final_Encodable:%.*]] = call i8** @"$s23synthesized_conformance5FinalCySiGACyxGSEAASERzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s23synthesized_conformance11doEncodableyyxSERzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[Final_Encodable]])
     doEncodable(Final(x: 1))

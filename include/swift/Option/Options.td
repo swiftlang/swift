@@ -1118,16 +1118,6 @@ def emit_supported_features : Flag<["-"], "emit-supported-features">,
   HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def enable_request_based_incremental_dependencies : Flag<["-"],
-  "enable-request-based-incremental-dependencies">,
-  Flags<[FrontendOption]>,
-  HelpText<"Enable request-based name tracking">;
-
-def disable_request_based_incremental_dependencies : Flag<["-"],
-  "disable-request-based-incremental-dependencies">,
-  Flags<[FrontendOption]>,
-  HelpText<"Disable request-based name tracking">;
-
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

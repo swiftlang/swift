@@ -166,6 +166,14 @@ std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
   return finalize();
 }
 
+std::string ASTMangler::mangleInitFromProjectedValueEntity(const VarDecl *var,
+                                                           SymbolKind SKind) {
+  beginMangling();
+  appendInitFromProjectedValueEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   beginMangling();
   appendAnyGenericType(decl);
@@ -399,13 +407,17 @@ std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
                                                    CanSILFunctionType BlockType,
                                                    CanType ResultType,
                                                    CanGenericSignature Sig,
+                                                   Optional<bool> ErrorOnZero,
                                                    bool predefined) {
   beginMangling();
   appendType(BlockType);
   appendType(ResultType);
   if (Sig)
     appendGenericSignature(Sig);
-  appendOperator(predefined ? "TZ" : "Tz");
+  if (ErrorOnZero)
+    appendOperator(predefined ? "TZ" : "Tz", Index(*ErrorOnZero + 1));
+  else
+    appendOperator(predefined ? "TZ" : "Tz", Index(0));
   return finalize();
 }
 
@@ -998,7 +1010,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
   TypeBase *tybase = type.getPointer();
   switch (type->getKind()) {
     case TypeKind::TypeVariable:
-    case TypeKind::Hole:
+    case TypeKind::Placeholder:
       llvm_unreachable("mangling type variable");
 
     case TypeKind::Module:
@@ -1580,8 +1592,7 @@ static bool containsRetroactiveConformance(
   for (auto requirement : rootConformance->getConditionalRequirements()) {
     if (requirement.getKind() != RequirementKind::Conformance)
       continue;
-    ProtocolDecl *proto =
-        requirement.getSecondType()->castTo<ProtocolType>()->getDecl();
+    ProtocolDecl *proto = requirement.getProtocolDecl();
     auto conformance = subMap.lookupConformance(
         requirement.getFirstType()->getCanonicalType(), proto);
     if (conformance.isInvalid()) {
@@ -2104,6 +2115,19 @@ void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) 
       }
       return;
     }
+
+    case InitializerKind::PropertyWrapper: {
+      auto wrapperInit = cast<PropertyWrapperInitializer>(ctx);
+      switch (wrapperInit->getKind()) {
+      case PropertyWrapperInitializer::Kind::WrappedValue:
+        appendBackingInitializerEntity(wrapperInit->getParam());
+        break;
+      case PropertyWrapperInitializer::Kind::ProjectedValue:
+        appendInitFromProjectedValueEntity(wrapperInit->getParam());
+        break;
+      }
+      return;
+    }
     }
     llvm_unreachable("bad initializer kind");
 
@@ -2594,8 +2618,7 @@ void ASTMangler::appendRequirement(const Requirement &reqt) {
   case RequirementKind::Layout: {
   } break;
   case RequirementKind::Conformance: {
-    Type SecondTy = reqt.getSecondType();
-    appendProtocolName(SecondTy->castTo<ProtocolType>()->getDecl());
+    appendProtocolName(reqt.getProtocolDecl());
   } break;
   case RequirementKind::Superclass:
   case RequirementKind::SameType: {
@@ -2800,6 +2823,11 @@ void ASTMangler::appendInitializerEntity(const VarDecl *var) {
 void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
   appendEntity(var, "vp", var->isStatic());
   appendOperator("fP");
+}
+
+void ASTMangler::appendInitFromProjectedValueEntity(const VarDecl *var) {
+  appendEntity(var, "vp", var->isStatic());
+  appendOperator("fW");
 }
 
 /// Is this declaration a method for mangling purposes? If so, we'll leave the
@@ -3043,7 +3071,7 @@ static unsigned conformanceRequirementIndex(
       continue;
 
     if (req.getFirstType()->isEqual(entry.first) &&
-        req.getSecondType()->castTo<ProtocolType>()->getDecl() == entry.second)
+        req.getProtocolDecl() == entry.second)
       return result;
 
     ++result;
@@ -3171,8 +3199,7 @@ void ASTMangler::appendConcreteProtocolConformance(
       if (type->hasArchetype())
         type = type->mapTypeOutOfContext();
       CanType canType = type->getCanonicalType(CurGenericSignature);
-      auto proto =
-        conditionalReq.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto proto = conditionalReq.getProtocolDecl();
       
       ProtocolConformanceRef conformance;
       

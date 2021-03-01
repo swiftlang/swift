@@ -201,7 +201,7 @@ option(USE_SWIFT_ASYNC_LOWERING
         functions if it is supported for the target. The runtime also checks
         this setting before using async-specific attributes. This only applies
         to the async calling convention and not to the async context attribute."
-	FALSE)
+	TRUE)
 
 #
 # User-configurable Swift Standard Library specific options.

@@ -4,7 +4,7 @@
 // RUN:    --check-prefix=CHECK-%target-cpu
 // REQUIRES: concurrency
 
-// REQUIRES: rdar74588568
+// UNSUPPORTED: CPU=arm64e
 
 // Test that x is described as a direct dbg.declare of the incoming function
 // argument.

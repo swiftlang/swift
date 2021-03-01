@@ -9,4 +9,4 @@ func foo(x: Float?) -> Float {
    _ = withoutDerivative(at: x ?? 0)
    return 0
 }
-gradient(at: 0, in: foo)
+gradient(at: 0, of: foo)

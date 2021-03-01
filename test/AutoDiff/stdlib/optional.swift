@@ -7,35 +7,35 @@ import StdlibUnittest
 var OptionalDifferentiationTests = TestSuite("OptionalDifferentiation")
 
 OptionalDifferentiationTests.test("Optional operations") {
-  // Differentiable.move(along:)
+  // Differentiable.move(by:)
   do {
     var some: Float? = 2
-    some.move(along: .init(3))
+    some.move(by: .init(3))
     expectEqual(5, some)
 
     var none: Float? = nil
-    none.move(along: .init(3))
+    none.move(by: .init(3))
     expectEqual(nil, none)
   }
 }
 
 OptionalDifferentiationTests.test("Optional.TangentVector operations") {
-  // Differentiable.move(along:)
+  // Differentiable.move(by:)
   do {
     var some: Optional<Float>.TangentVector = .init(2)
-    some.move(along: .init(3))
+    some.move(by: .init(3))
     expectEqual(5, some.value)
 
     var none: Optional<Float>.TangentVector = .init(nil)
-    none.move(along: .init(3))
+    none.move(by: .init(3))
     expectEqual(nil, none.value)
 
     var nestedSome: Optional<Optional<Float>>.TangentVector = .init(.init(2))
-    nestedSome.move(along: .init(.init(3)))
+    nestedSome.move(by: .init(.init(3)))
     expectEqual(.init(5), nestedSome.value)
 
     var nestedNone: Optional<Optional<Float>>.TangentVector = .init(.init(nil))
-    nestedNone.move(along: .init(.init(3)))
+    nestedNone.move(by: .init(.init(3)))
     expectEqual(.init(nil), nestedNone.value)
   }
 

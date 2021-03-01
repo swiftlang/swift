@@ -43,9 +43,9 @@ struct Space {
 
 extension Space : Differentiable {
   typealias TangentVector = TangentSpace
-  mutating func move(along direction: TangentSpace) {
-    x.move(along: direction.x)
-    y.move(along: direction.y)
+  mutating func move(by offset: TangentSpace) {
+    x.move(by: offset.x)
+    y.move(by: offset.y)
   }
 }
 
@@ -113,9 +113,9 @@ struct ProductSpaceOtherTangent {
 
 extension ProductSpaceOtherTangent : Differentiable {
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
-  mutating func move(along direction: ProductSpaceOtherTangentTangentSpace) {
-    x.move(along: direction.x)
-    y.move(along: direction.y)
+  mutating func move(by offset: ProductSpaceOtherTangentTangentSpace) {
+    x.move(by: offset.x)
+    y.move(by: offset.y)
   }
 }
 

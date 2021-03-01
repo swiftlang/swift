@@ -490,17 +490,22 @@ bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
 
 bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
+}
+
+bool PropertyWrapperWrappedValueVarRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
 
 bool PropertyWrapperMutabilityRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
 
 bool PropertyWrapperLValuenessRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
 
 void swift::simple_display(
@@ -1005,7 +1010,7 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->hasHole() && "Type hole in interface type");
+    assert(!type->hasPlaceholder() && "Type placeholder in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
   }

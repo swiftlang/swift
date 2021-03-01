@@ -39,7 +39,7 @@ extension Wrapper: AdditiveArithmetic where T: AdditiveArithmetic {
 }
 extension Wrapper: Differentiable where T: Differentiable {
   typealias TangentVector = Wrapper<T.TangentVector>
-  mutating func move(along direction: TangentVector) {
-    value.move(along: direction.value)
+  mutating func move(by offset: TangentVector) {
+    value.move(by: offset.value)
   }
 }

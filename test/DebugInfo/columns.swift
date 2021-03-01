@@ -15,14 +15,12 @@ public func foo(_ a: Int64, _ b: Int64) -> Int64 {      // line 5
 }
 
 // CHECK-DAG: !DISubprogram(name: "foo",{{.*}} line: 5,
-// DWARF-CHECK-DAG: !DILexicalBlock({{.*}}, line: 5, column: 50)
 // DWARF-CHECK-DAG: ![[DIV]] = !DILocation(line: 8, column: 17,
 // DWARF-CHECK-DAG: ![[ADD]] = !DILocation(line: 8, column: 13,
 // DWARF-CHECK-DAG: ![[SLT]] = !DILocation(line: 10, column: 9,
 // DWARF-CHECK-DAG: !DILexicalBlock({{.*}}, line: 10, column: 14)
 // DWARF-CHECK-DAG: ![[SUB]] = !DILocation(line: 12, column: 14,
 
-// CV-CHECK-DAG: !DILexicalBlock({{.*}}, line: 5)
 // CV-CHECK-DAG: ![[DIV]] = !DILocation(line: 8, scope:
 // CV-CHECK-DAG: ![[SLT]] = !DILocation(line: 10, scope:
 // CV-CHECK-DAG: !DILexicalBlock({{.*}}, line: 10)

@@ -402,7 +402,7 @@ struct level1 {
     static func + (_: Self, _: Self) -> Self { Self() }
     static func - (_: Self, _: Self) -> Self { Self() }
     typealias TangentVector = Self
-    mutating func move(along: TangentVector) {}
+    mutating func move(by: TangentVector) {}
     func foo(x: Float) -> Float {
       return x
     }
@@ -483,7 +483,7 @@ where T: Differentiable & AdditiveArithmetic {
   static func + (_: Self, _: Self) -> Self { Self() }
   static func - (_: Self, _: Self) -> Self { Self() }
   typealias TangentVector = Self
-  mutating func move(along: TangentVector) {}
+  mutating func move(by: TangentVector) {}
 }
 
 // Test computed properties.

@@ -655,7 +655,7 @@ CompilerInstance::getRecordedBufferID(const InputFile &input,
 
   // Recover by dummy buffer if requested.
   if (!buffers.hasValue() && shouldRecover &&
-      input.getType() == file_types::TY_Swift && !input.isPrimary()) {
+      input.getType() == file_types::TY_Swift) {
     buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
         "// missing file\n", input.getFileName()));
   }

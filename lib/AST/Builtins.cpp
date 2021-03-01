@@ -1371,6 +1371,22 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder);
+  builder.addParameter(
+      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheNativeObjectType))); // parent
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  builder.addParameter(
+     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+  builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+  return builder.build(id);
+}
+
 static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id,
                             _thin,
@@ -2547,6 +2563,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTaskFuture:
     return getCreateAsyncTaskFuture(Context, Id);
+
+  case BuiltinValueKind::CreateAsyncTaskGroupFuture:
+    return getCreateAsyncTaskGroupFuture(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -prespecialize-generic-metadata -target %module-target-future -emit-ir %s -swift-version 4 | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
+// RUN: %target-swift-frontend -prespecialize-generic-metadata -target %module-target-future -emit-ir %s -swift-version 4 -enable-experimental-enum-codable-derivation | %FileCheck %s -DINT=i%target-ptrsize -DALIGNMENT=%target-alignment
 
 // REQUIRES: VENDOR=apple || OS=linux-gnu
 // UNSUPPORTED: CPU=i386 && OS=ios
@@ -19,6 +19,7 @@ enum Enum<T> {
 
 extension Enum: Equatable where T: Equatable {}
 extension Enum: Hashable where T: Hashable {}
+extension Enum: Codable where T: Codable {}
 
 final class Final<T> {
     var x: T
@@ -111,6 +112,28 @@ public func encodable() {
     // CHECK-SAME:   i8** [[Struct_Encodable]]
     // CHECK-SAME: )
     doEncodable(Struct(x: 1))
+    // CHECK: [[Enum_Encodable:%.*]] = call i8** @"$s30synthesized_conformance_future4EnumOySiGACyxGSEAASeRzSERzlWl"()
+    // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(
+    // CHECK-SAME:   %swift.opaque* noalias nocapture {{[^,]*}},
+    // CHECK-SAME:   %swift.type* getelementptr inbounds (
+    // CHECK-SAME:     %swift.full_type,
+    // CHECK-SAME:     %swift.full_type* bitcast (
+    // CHECK-SAME:       <{
+    // CHECK-SAME:         i8**,
+    // CHECK-SAME:         [[INT]],
+    // CHECK-SAME:         %swift.type_descriptor*,
+    // CHECK-SAME:         %swift.type*,
+    // CHECK-SAME:         [[INT]],
+    // CHECK-SAME:         i64
+    // CHECK-SAME:       }>* @"$s30synthesized_conformance_future4EnumOySiGMf"
+    // CHECK-SAME:       to %swift.full_type*
+    // CHECK-SAME:     ),
+    // CHECK-SAME:     i32 0,
+    // CHECK-SAME:     i32 1
+    // CHECK-SAME:   ),
+    // CHECK-SAME:   i8** [[Enum_Encodable]]
+    // CHECK-SAME: )
+    doEncodable(Enum.a(1))
     // CHECK: [[Final_Encodable:%.*]] = call i8** @"$s30synthesized_conformance_future5FinalCySiGACyxGSEAASERzlWl"()
     // CHECK-NEXT: call swiftcc void @"$s30synthesized_conformance_future11doEncodableyyxSERzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[Final_Encodable]])
     doEncodable(Final(x: 1))

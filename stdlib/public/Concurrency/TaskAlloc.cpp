@@ -17,8 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TaskPrivate.h"
 #include "swift/Runtime/Concurrency.h"
+#include "swift/ABI/Task.h"
+#include "TaskPrivate.h"
 #include "../runtime/StackAllocator.h"
 #include <stdlib.h>
 
@@ -70,5 +71,5 @@ void *swift::swift_task_alloc(AsyncTask *task, size_t size) {
 }
 
 void swift::swift_task_dealloc(AsyncTask *task, void *ptr) {
-  return allocator(task).dealloc(ptr);
+  allocator(task).dealloc(ptr);
 }

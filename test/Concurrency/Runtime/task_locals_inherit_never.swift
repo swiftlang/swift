@@ -18,7 +18,7 @@ func printTaskLocal<Key>(
   _ expected: Key.Value? = nil,
   file: String = #file, line: UInt = #line
 ) async where Key: TaskLocalKey {
-  let value = await Task.local(key)
+  let value = Task.local(key)
   print("\(Key.self): \(value) at \(file):\(line)")
   if let expected = expected {
     assert("\(expected)" == "\(value)",
@@ -39,37 +39,35 @@ extension TaskLocalValues {
 // ==== ------------------------------------------------------------------------
 
 func test_async_let() async {
-  // CHECK: StringKey: <undefined> {{.*}}
-  await printTaskLocal(\.string)
-  await Task.withLocal(\.string, boundTo: "top") {
-    // CHECK: StringKey: top {{.*}}
-    await printTaskLocal(\.string)
+  print(#function) // CHECK: test_async_let
 
-    // CHECK: StringKey: <undefined> {{.*}}
-    async let child: () = printTaskLocal(\.string)
+  await printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
+  await Task.withLocal(\.string, boundTo: "top") {
+    await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
+
+    async let child: () = printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
     await child
 
-    // CHECK: StringKey: top {{.*}}
-    await printTaskLocal(\.string)
+    await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
   }
 }
 
-func pending_async_group() async {
-  print("SKIPPED: \(#function)") // FIXME: unlock once https://github.com/apple/swift/pull/35874 is merged
-  return
-
-  // COM: CHECK: test_async_group
+func test_async_group() async {
+  // CHECK: test_async_group
   print(#function)
 
-  // COM: CHECK: StringKey: <undefined> {{.*}}
-  await printTaskLocal(\.string)
+  await printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "top") {
-    // COM: CHECK: StringKey: top {{.*}}
-    await printTaskLocal(\.string)
+    await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
-    try! await Task.withGroup(resultType: String.self) { group -> Void in
-      // COM: CHECK: StringKey: top {{.*}}
-      await printTaskLocal(\.string)
+    try! await Task.withGroup(resultType: Void.self) { group -> Void? in
+      await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
+
+      await group.add {
+        await printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
+      }
+
+      return try! await group.next()
     }
   }
 }
@@ -77,6 +75,6 @@ func pending_async_group() async {
 @main struct Main {
   static func main() async {
     await test_async_let()
-    await pending_async_group()
+    await test_async_group()
   }
 }

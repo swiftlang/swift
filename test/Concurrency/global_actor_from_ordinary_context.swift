@@ -56,11 +56,9 @@ func referenceAsyncGlobalActor() {
 }
 
 
-// expected-note@+3 {{add '@asyncHandler' to function 'callGlobalActor()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
-// expected-note@+2 {{add 'async' to function 'callGlobalActor()' to make it asynchronous}} {{23-23= async}}
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'callGlobalActor()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func callGlobalActor() {
-  syncGlobActorFn() // expected-error {{'async' in a function that does not support concurrency}}
+  syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
 }
 
 func fromClosure() {
@@ -70,40 +68,36 @@ func fromClosure() {
     x()
   }()
 
-  // expected-error@+2 {{'async' in a function that does not support concurrency}}
   // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
   let _ = { syncGlobActorFn() }()
 }
 
 class Taylor {
-  init() { // expected-note {{add 'async' to function 'init()' to make it asynchronous}} {{9-9= async}}
-    syncGlobActorFn() // expected-error {{'async' in a function that does not support concurrency}}
+  init() {
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
   }
 
   deinit {
-    syncGlobActorFn() // expected-error {{'async' in a function that does not support concurrency}}
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
   }
 
-  // expected-note@+3 2 {{add '@SomeGlobalActor' to make instance method 'method1()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
-  // expected-note@+2 {{add '@asyncHandler' to function 'method1()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
-  // expected-note@+1 {{add 'async' to function 'method1()' to make it asynchronous}} {{17-17= async}}
+  // expected-note@+1 2 {{add '@SomeGlobalActor' to make instance method 'method1()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
   func method1() {
-    syncGlobActorFn() // expected-error {{'async' in a function that does not support concurrency}}
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
   }
 
-  // expected-note@+2 2 {{add '@SomeGlobalActor' to make instance method 'cannotBeHandler()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
-  // expected-note@+1 {{add 'async' to function 'cannotBeHandler()' to make it asynchronous}}
+  // expected-note@+1 2 {{add '@SomeGlobalActor' to make instance method 'cannotBeHandler()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
   func cannotBeHandler() -> Int {
-    syncGlobActorFn() // expected-error {{'async' in a function that does not support concurrency}}
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn

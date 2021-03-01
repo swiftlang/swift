@@ -248,6 +248,9 @@ ERROR(computed_property_no_accessors, none,
       "%select{computed property|subscript}0 must have accessors specified", (bool))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
+ERROR(unexpected_getset_implementation_in_protocol,none,
+      "protocol property %0 cannot have a default implementation specified "
+      "here; use extension instead", (StringRef))
 ERROR(computed_property_missing_type,none,
       "computed property must have an explicit type", ())
 ERROR(getset_nontrivial_pattern,none,
@@ -1673,10 +1676,6 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       (StringRef, StringRef))
 
 // hasAsyncAlternative
-ERROR(requires_has_async_alternative, none,
-      "'%0' support is required to be explicitly enabled using "
-      "-experimental-has-async-alternative-attribute", (StringRef))
-
 ERROR(has_async_alternative_invalid_name, none,
       "argument of '%0' attribute must be an identifier or full function name",
       (StringRef))

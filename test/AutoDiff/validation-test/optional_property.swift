@@ -85,24 +85,24 @@ struct StructGeneric<T: Differentiable>: Differentiable {
 
 OptionalTests.test("Optional struct stored properties") {
   expectEqual(
-    valueWithGradient(at: Struct(stored: 3, optional: 4), in: { $0.method() }),
+    valueWithGradient(at: Struct(stored: 3, optional: 4), of: { $0.method() }),
     (12, .init(stored: 4, optional: .init(3))))
   expectEqual(
-    valueWithGradient(at: Struct(stored: 3, optional: nil), in: { $0.method() }),
+    valueWithGradient(at: Struct(stored: 3, optional: nil), of: { $0.method() }),
     (3, .init(stored: 1, optional: .init(0))))
 
   expectEqual(
-    valueWithGradient(at: StructTracked(stored: 3, optional: 4), in: { $0.method() }),
+    valueWithGradient(at: StructTracked(stored: 3, optional: 4), of: { $0.method() }),
     (12, .init(stored: 4, optional: .init(3))))
   expectEqual(
-    valueWithGradient(at: StructTracked(stored: 3, optional: nil), in: { $0.method() }),
+    valueWithGradient(at: StructTracked(stored: 3, optional: nil), of: { $0.method() }),
     (3, .init(stored: 1, optional: .init(0))))
 
   expectEqual(
-    valueWithGradient(at: StructGeneric<Float>(stored: 3, optional: 4), in: { $0.method() }),
+    valueWithGradient(at: StructGeneric<Float>(stored: 3, optional: 4), of: { $0.method() }),
     (4, .init(stored: 0, optional: .init(1))))
   expectEqual(
-    valueWithGradient(at: StructGeneric<Float>(stored: 3, optional: nil), in: { $0.method() }),
+    valueWithGradient(at: StructGeneric<Float>(stored: 3, optional: nil), of: { $0.method() }),
     (3, .init(stored: 1, optional: .init(0))))
 }
 
@@ -182,24 +182,24 @@ struct ClassGeneric<T: Differentiable>: Differentiable {
 
 OptionalTests.test("Optional class stored properties") {
   expectEqual(
-    valueWithGradient(at: Class(stored: 3, optional: 4), in: { $0.method() }),
+    valueWithGradient(at: Class(stored: 3, optional: 4), of: { $0.method() }),
     (12, .init(stored: 4, optional: .init(3))))
   expectEqual(
-    valueWithGradient(at: Class(stored: 3, optional: nil), in: { $0.method() }),
+    valueWithGradient(at: Class(stored: 3, optional: nil), of: { $0.method() }),
     (3, .init(stored: 1, optional: .init(0))))
 
   expectEqual(
-    valueWithGradient(at: ClassTracked(stored: 3, optional: 4), in: { $0.method() }),
+    valueWithGradient(at: ClassTracked(stored: 3, optional: 4), of: { $0.method() }),
     (12, .init(stored: 4, optional: .init(3))))
   expectEqual(
-    valueWithGradient(at: ClassTracked(stored: 3, optional: nil), in: { $0.method() }),
+    valueWithGradient(at: ClassTracked(stored: 3, optional: nil), of: { $0.method() }),
     (3, .init(stored: 1, optional: .init(0))))
 
   expectEqual(
-    valueWithGradient(at: ClassGeneric<Tracked<Float>>(stored: 3, optional: 4), in: { $0.method() }),
+    valueWithGradient(at: ClassGeneric<Tracked<Float>>(stored: 3, optional: 4), of: { $0.method() }),
     (4, .init(stored: 0, optional: .init(1))))
   expectEqual(
-    valueWithGradient(at: ClassGeneric<Tracked<Float>>(stored: 3, optional: nil), in: { $0.method() }),
+    valueWithGradient(at: ClassGeneric<Tracked<Float>>(stored: 3, optional: nil), of: { $0.method() }),
     (3, .init(stored: 1, optional: .init(0))))
 }
 

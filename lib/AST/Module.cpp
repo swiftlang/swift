@@ -1023,8 +1023,8 @@ LookupConformanceInModuleRequest::evaluate(
 
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
-  // intended type might have.
-  if (type->is<UnresolvedType>())
+  // intended type might have. Same goes for PlaceholderType.
+  if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
     return ProtocolConformanceRef(protocol);
 
   auto nominal = type->getAnyNominal();
@@ -1539,10 +1539,7 @@ void ModuleDecl::collectBasicSourceFileInfo(
     llvm::function_ref<void(const BasicSourceFileInfo &)> callback) const {
   for (const FileUnit *fileUnit : getFiles()) {
     if (const auto *SF = dyn_cast<SourceFile>(fileUnit)) {
-      BasicSourceFileInfo info;
-      if (info.populate(SF))
-        continue;
-      callback(info);
+      callback(BasicSourceFileInfo(SF));
     } else if (auto *serialized = dyn_cast<LoadedFile>(fileUnit)) {
       serialized->collectBasicSourceFileInfo(callback);
     }
@@ -1553,7 +1550,9 @@ Fingerprint ModuleDecl::getFingerprint() const {
   StableHasher hasher = StableHasher::defaultHasher();
   SmallVector<Fingerprint, 16> FPs;
   collectBasicSourceFileInfo([&](const BasicSourceFileInfo &bsfi) {
-    FPs.emplace_back(bsfi.InterfaceHash);
+    // For incremental imports, the hash must be insensitive to type-body
+    // changes, so use the one without type members.
+    FPs.emplace_back(bsfi.getInterfaceHashExcludingTypeMembers());
   });
   
   // Sort the fingerprints lexicographically so we have a stable hash despite

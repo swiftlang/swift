@@ -73,9 +73,11 @@ protected:
     for (const auto &declOrPair : contentsVec) {
       auto fp =
           AbstractSourceFileDepGraphFactory::getFingerprintIfAny(declOrPair);
-      addADefinedDecl(
-          DependencyKey::createForProvidedEntityInterface<kind>(declOrPair),
-          fp);
+      auto key = DependencyKey::Builder{kind, DeclAspect::interface}
+                    .withContext(declOrPair)
+                    .withName(declOrPair)
+                    .build();
+      addADefinedDecl(key, fp);
     }
   }
 

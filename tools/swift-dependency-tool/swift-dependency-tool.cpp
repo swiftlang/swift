@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
   }
 
   case ActionType::BinaryToYAML: {
-    auto fg = SourceFileDepGraph::loadFromPath(options::InputFilename);
+    auto fg = SourceFileDepGraph::loadFromPath(options::InputFilename, true);
     if (!fg) {
       llvm::errs() << "Failed to read dependency file\n";
       return 1;

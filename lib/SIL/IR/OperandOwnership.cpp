@@ -443,9 +443,24 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     ? SILArgumentConvention(apply.getSubstCalleeType()->getCalleeConvention())
     : apply.getArgumentConvention(op);
 
-  return getFunctionArgOwnership(
-      argConv,
-      /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+  auto argOwnership = getFunctionArgOwnership(
+    argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation());
+
+  // OSSA cleanup needs to handle each of these callee ownership cases.
+  //
+  // OperandOwnership::ForwardingConsume is only for thick @callee_owned.
+  //
+  // OperandOwnership::Borrow would only happen for a coroutine closure, which
+  // isn't yet possible.
+  if (apply.isCalleeOperand(op)) {
+    assert((argOwnership == OperandOwnership::TrivialUse
+            || argOwnership == OperandOwnership::UnownedInstantaneousUse
+            || argOwnership == OperandOwnership::InstantaneousUse
+            || argOwnership == OperandOwnership::ForwardingConsume
+            || argOwnership == OperandOwnership::Borrow) &&
+           "unsupported callee ownership");
+  }
+  return argOwnership;
 }
 
 OperandOwnership
@@ -736,6 +751,7 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTaskFuture)
+BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTaskGroupFuture)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 

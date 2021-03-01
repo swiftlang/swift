@@ -399,6 +399,7 @@ public:
       std::pair<unsigned, std::pair<const SILDebugScope *, StringRef>>;
   /// Keeps track of the mapping of source variables to -O0 shadow copy allocas.
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
+  llvm::SmallDenseMap<llvm::Value *, Address, 8> TaskAllocStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   unsigned NumAnonVars = 0;
 
@@ -732,10 +733,118 @@ public:
   }
 #endif
 
+  static bool isCallToSwiftTaskAlloc(llvm::Value *val) {
+    auto *call = dyn_cast<llvm::CallInst>(val);
+    if (!call)
+      return false;
+    auto *callee = call->getCalledFunction();
+    if (!callee)
+      return false;
+    auto isTaskAlloc = callee->getName().equals("swift_task_alloc");
+    return isTaskAlloc;
+  }
+
+  static bool isTaskAlloc(llvm::Value *Storage) {
+    while (Storage) {
+      if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
+        Storage = LdInst->getOperand(0);
+      else if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Storage))
+        Storage = GEPInst->getOperand(0);
+      else if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Storage))
+        Storage = BCInst->getOperand(0);
+      else if (auto *CallInst = dyn_cast<llvm::CallInst>(Storage))
+        return isCallToSwiftTaskAlloc(CallInst);
+      else
+        break;
+    }
+    return false;
+  }
+
+  /// Emit a direct path to an Argument.
+  llvm::Value *getDirectCoroutineArgument(llvm::Value *Addr) {
+    auto getDirect = [&](llvm::Instruction *Orig) {
+      llvm::Value *Buffered = Orig->getOperand(0);
+      llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
+      if (Buffered == Direct)
+        return Orig;
+      llvm::Instruction *Cloned = Orig->clone();
+      Cloned->setOperand(0, Direct);
+      Cloned->insertBefore(Orig);
+      return Cloned;
+    };
+    if (auto *LdInst = dyn_cast<llvm::LoadInst>(Addr))
+      return getDirect(LdInst);
+    if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Addr))
+      return getDirect(GEPInst);
+    if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Addr))
+      return getDirect(BCInst);
+    if (auto *CallInst = dyn_cast<llvm::CallInst>(Addr)) {
+      llvm::Value *Buffered = CallInst->getArgOperand(0);
+      if (CallInst->getCalledFunction() != IGM.getProjectBoxFn()) {
+        assert(false && "unhandled projection");
+        return CallInst;
+      }
+      llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
+      if (Buffered == Direct)
+        return CallInst;
+      auto *Cloned = cast<llvm::CallInst>(CallInst->clone());
+      Cloned->setArgOperand(0, Direct);
+      Cloned->insertBefore(CallInst);
+      return Cloned;
+    }
+    if (auto *AllocaInst = dyn_cast<llvm::AllocaInst>(Addr)) {
+      llvm::Value *Direct = nullptr;
+      unsigned NumStores = 0;
+      for (auto &AIUse : AllocaInst->uses()) {
+        llvm::User *U = AIUse.getUser();
+        if (llvm::StoreInst *StInst = llvm::dyn_cast<llvm::StoreInst>(U)) {
+          ++NumStores;
+          Direct = StInst->getOperand(0);
+        }
+      }
+      if (NumStores == 1)
+        return Direct;
+    }
+    return Addr;
+  }
+
+  llvm::Value *emitTaskAllocShadowCopy(llvm::Value *Storage,
+                                       const SILDebugScope *Scope) {
+    auto getRec = [&](llvm::Instruction *Orig) {
+      llvm::Instruction *Cloned = Orig->clone();
+      Cloned->setOperand(0, emitTaskAllocShadowCopy(Orig->getOperand(0), Scope));
+      Cloned->insertBefore(Orig);
+      return Cloned;
+    };
+    if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
+      return getRec(LdInst);
+    if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Storage))
+      return getRec(GEPInst);
+    if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Storage))
+      return getRec(BCInst);
+    if (auto *CallInst = dyn_cast<llvm::CallInst>(Storage)) {
+      assert(isTaskAlloc(CallInst));
+      auto Align = IGM.getPointerAlignment();
+      auto &Alloca = TaskAllocStackSlots[CallInst];
+      if (!Alloca.isValid())
+        Alloca = createAlloca(Storage->getType(), Align, "taskalloc.debug");
+      zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
+      ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
+      auto *Store =
+          Builder.CreateStore(Storage, Alloca.getAddress(), Align);
+      Store->moveAfter(CallInst);
+      return Alloca.getAddress();
+    }
+    return Storage;
+  }
+
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo,
                               llvm::Optional<Alignment> _Align) {
+    if (CurSILFn->isAsync())
+      if (isTaskAlloc(Storage))
+        return emitTaskAllocShadowCopy(Storage, Scope);
     auto Align = _Align.getValueOr(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
@@ -764,7 +873,8 @@ public:
     // debug info during coroutine splitting. Instead we are relying on LLVM's
     // CoroSplit.cpp to emit shadow copies.
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
-        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous || CurSILFn->isAsync() ||
+        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
+        (CurSILFn->isAsync() && VarInfo.ArgNo) ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
         !needsShadowCopy(Storage))
       return Storage;
@@ -791,7 +901,8 @@ public:
 
     // Only do this at -O0.
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
-        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous || CurSILFn->isAsync()) {
+        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
+        (CurSILFn->isAsync() && VarInfo.ArgNo)) {
       auto vals = e.claimAll();
       copy.append(vals.begin(), vals.end());
       return;
@@ -853,8 +964,6 @@ public:
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
                                              VarInfo, Indirection);
   }
-  /// Emit a direct path to an Argument.
-  llvm::Value *getDirectCoroutineArgument(llvm::Value *Addr);
 
   void emitFailBB() {
     if (!FailBBs.empty()) {
@@ -2280,11 +2389,30 @@ void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
   setLoweredFunctionPointer(i, FunctionPointer(fnType, diffWitness, signature));
 }
 
+static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
+  using SpecialKind = FunctionPointer::SpecialKind;
+
+  // Check for some special cases, which are currently all async:
+  if (fn->isAsync()) {
+    auto name = fn->getName();
+    if (name.equals("swift_task_future_wait"))
+      return SpecialKind::TaskFutureWait;
+    if (name.equals("swift_task_future_wait_throwing"))
+      return SpecialKind::TaskFutureWaitThrowing;
+    if (name.equals("swift_task_group_wait_next_throwing"))
+      return SpecialKind::TaskGroupWaitNext;
+  }
+
+  return fn->getLoweredFunctionType();
+}
+
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
   auto fnType = fn->getLoweredFunctionType();
 
-  auto sig = IGM.getSignature(fnType);
+  auto fpKind = classifyFunctionPointerKind(fn);
+
+  auto sig = IGM.getSignature(fnType, fpKind.suppressGenerics());
 
   // Note that the pointer value returned by getAddrOfSILFunction doesn't
   // necessarily have element type sig.getType(), e.g. if it's imported.
@@ -2292,18 +2420,20 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
       isa<PreviousDynamicFunctionRefInst>(i));
   llvm::Constant *value;
-  auto isSpecialAsyncWithoutCtxtSize =
-      fn->isAsync() && (
-          fn->getName().equals("swift_task_future_wait") ||
-          fn->getName().equals("swift_task_group_wait_next"));
-  if (fn->isAsync() && !isSpecialAsyncWithoutCtxtSize) {
+  if (fpKind.isAsyncFunctionPointer()) {
     value = IGM.getAddrOfAsyncFunctionPointer(fn);
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
   } else {
     value = fnPtr;
+
+    // HACK: the swiftasync argument treatment is currently using
+    // a register that can be clobbered by the linker.  Use nonlazybind
+    // as a workaround.
+    if (fpKind.isSpecial()) {
+      cast<llvm::Function>(value)->addFnAttr(llvm::Attribute::NonLazyBind);
+    }
   }
-  FunctionPointer fp =
-      FunctionPointer(fnType, value, sig, isSpecialAsyncWithoutCtxtSize);
+  FunctionPointer fp = FunctionPointer(fpKind, value, sig);
 
   // Store the function as a FunctionPointer so we can avoid bitcasting
   // or thunking if we don't need to.
@@ -2806,7 +2936,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Pass the generic arguments.
-  if (hasPolymorphicParameters(origCalleeType)) {
+  if (hasPolymorphicParameters(origCalleeType) &&
+      !emission->getCallee().getFunctionPointer().suppressGenerics()) {
     SubstitutionMap subMap = site.getSubstitutionMap();
     emitPolymorphicArguments(*this, origCalleeType,
                              subMap, &witnessMetadata, llArgs);
@@ -4299,53 +4430,6 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
                                          IndirectValue, ArtificialValue);
 }
 
-llvm::Value *IRGenSILFunction::getDirectCoroutineArgument(llvm::Value *Addr) {
-  auto getDirect = [&](llvm::Instruction *Orig) {
-    llvm::Value *Buffered = Orig->getOperand(0);
-    llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
-    if (Buffered == Direct)
-      return Orig;
-    llvm::Instruction *Cloned = Orig->clone();
-    Cloned->setOperand(0, Direct);
-    Cloned->insertBefore(Orig);
-    return Cloned;
-  };
-  if (auto *LdInst = dyn_cast<llvm::LoadInst>(Addr))
-    return getDirect(LdInst);
-  if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Addr))
-    return getDirect(GEPInst);
-  if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Addr))
-    return getDirect(BCInst);
-  if (auto *CallInst = dyn_cast<llvm::CallInst>(Addr)) {
-    llvm::Value *Buffered = CallInst->getArgOperand(0);
-    if (CallInst->getCalledFunction() != IGM.getProjectBoxFn()) {
-      assert(false && "unhandled projection");
-      return CallInst;
-    }
-    llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
-    if (Buffered == Direct)
-      return CallInst;
-    auto *Cloned = cast<llvm::CallInst>(CallInst->clone());
-    Cloned->setArgOperand(0, Direct);
-    Cloned->insertBefore(CallInst);
-    return Cloned;
-  }
-  if (auto *AllocaInst = dyn_cast<llvm::AllocaInst>(Addr)) {
-    llvm::Value *Direct = nullptr;
-    unsigned NumStores = 0;
-    for (auto &AIUse : AllocaInst->uses()) {
-      llvm::User *U = AIUse.getUser();
-      if (llvm::StoreInst *StInst = llvm::dyn_cast<llvm::StoreInst>(U)) {
-        ++NumStores;
-        Direct = StInst->getOperand(0);
-      }
-    }
-    if (NumStores == 1)
-      return Direct;
-  }
-  return Addr;
-}
-
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
@@ -4718,17 +4802,6 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);
-}
-
-static bool isCallToSwiftTaskAlloc(llvm::Value *val) {
-  auto *call = dyn_cast<llvm::CallInst>(val);
-  if (!call)
-    return false;
-  auto *callee = call->getCalledFunction();
-  if (!callee)
-    return false;
-  auto isTaskAlloc = callee->getName().equals("swift_task_alloc");
-  return isTaskAlloc;
 }
 
 void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,

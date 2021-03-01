@@ -139,22 +139,32 @@ func takesEmpty<T : Empty>(_: T) rethrows {}
 
 takesEmpty(EmptyWitness())
 
-// FIXME: Fix this soundness hole
+// Rethrows kinds need to line up when a 'rethrows' function witnesses a
+// 'rethrows' protocol requirement
 
-// Note: SimpleThrowsClosure is not @rethrows
+// Note: the SimpleThrowsClosure protocol is not @rethrows
 protocol SimpleThrowsClosure {
   func doIt(_: () throws -> ()) rethrows
+  // expected-note@-1 {{protocol requires function 'doIt' with type '(() throws -> ()) throws -> ()'; do you want to add a stub?}}
+
+  func doIt2<T : Empty>(_: T) rethrows
+  // expected-note@-1 {{protocol requires function 'doIt2' with type '<T> (T) throws -> ()'; do you want to add a stub?}}
 }
 
 struct ConformsToSimpleThrowsClosure<T : RethrowingProtocol> : SimpleThrowsClosure {
+// expected-error@-1 {{type 'ConformsToSimpleThrowsClosure<T>' does not conform to protocol 'SimpleThrowsClosure'}}
   let t: T
 
   // This cannot witness SimpleThrowsClosure.doIt(), because the
   // T : RethrowingProtocol conformance is a source here, but that
   // is not captured in the protocol's requirement signature.
   func doIt(_: () throws -> ()) rethrows {
+  // expected-note@-1 {{candidate is 'rethrows' via a conformance, but the protocol requirement is not from a '@rethrows' protocol}}
     try t.source()
   }
+
+  func doIt2<T : Empty>(_: T) rethrows {}
+  // expected-note@-1 {{candidate is 'rethrows' via a conformance, but the protocol requirement is not from a '@rethrows' protocol}}
 }
 
 func soundnessHole<T : SimpleThrowsClosure>(_ t: T) {

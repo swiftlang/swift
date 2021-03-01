@@ -26,7 +26,7 @@ func printTaskLocal<Key>(
   _ expected: Key.Value? = nil,
   file: String = #file, line: UInt = #line
 ) async throws -> Key.Value? where Key: TaskLocalKey {
-  let value = await Task.local(key)
+  let value = Task.local(key)
   print("\(Key.self): \(value) at \(file):\(line)")
   if let expected = expected {
     assert("\(expected)" == "\(value)",
@@ -38,14 +38,14 @@ func printTaskLocal<Key>(
 // ==== ------------------------------------------------------------------------
 
 func async_let_nested() async {
-  _ = try! await printTaskLocal(\.number) // COM: NumberKey: 0 {{.*}}
+  _ = try! await printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
   async let x1: () = Task.withLocal(\.number, boundTo: 2) {
-    async let x2 = printTaskLocal(\.number) // COM: NumberKey: 2 {{.*}}
+    async let x2 = printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 
     @concurrent
     func test() async {
-      try! await printTaskLocal(\.number) // COM: NumberKey: 2 {{.*}}
-      async let x31 = printTaskLocal(\.number) // COM: NumberKey: 2 {{.*}}
+      try! await printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
+      async let x31 = printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
       _ = try! await x31
     }
     async let x3: () = test()
@@ -55,7 +55,7 @@ func async_let_nested() async {
   }
 
   _ = await x1
-  try! await printTaskLocal(\.number) // COM: NumberKey: 0 {{.*}}
+  try! await printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
 }
 
 func async_let_nested_skip_optimization() async {

@@ -2120,10 +2120,13 @@ static Type decomposeCompletionHandlerType(
     if (param.isInOut() || param.isVariadic())
       return Type();
 
-    // If there is an error parameter to the completion handler, it is
+    // If there are error-related parameters to the completion handler, they are
     // not part of the result type of the asynchronous function.
     if (info.completionHandlerErrorParamIndex() &&
         paramIdx == *info.completionHandlerErrorParamIndex())
+      continue;
+    if (info.completionHandlerFlagParamIndex() &&
+        paramIdx == *info.completionHandlerFlagParamIndex())
       continue;
 
     resultTypeElts.push_back(param.getPlainType());

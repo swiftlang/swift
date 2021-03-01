@@ -39,7 +39,6 @@ set(swift_runtime_sources
     Enum.cpp
     EnvironmentVariables.cpp
     ErrorObjectCommon.cpp
-    ErrorObjectConstants.cpp
     ErrorObjectNative.cpp
     Errors.cpp
     ErrorDefaultImpls.cpp

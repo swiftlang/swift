@@ -1614,6 +1614,7 @@ bool Demangle::nodeConsumesGenericArgs(Node *node) {
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
       return false;
     default:
       return true;
@@ -2301,13 +2302,14 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case 'z':
     case 'Z': {
+      NodePointer flagMode = demangleIndexAsNode();
       NodePointer sig = popNode(Node::Kind::DependentGenericSignature);
       NodePointer resultType = popNode(Node::Kind::Type);
       NodePointer implType = popNode(Node::Kind::Type);
       auto node = createWithChildren(c == 'z'
                                   ? Node::Kind::ObjCAsyncCompletionHandlerImpl
                                   : Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl,
-                                implType, resultType);
+                                implType, resultType, flagMode);
       if (sig)
         addChild(node, sig);
       return node;
@@ -3273,6 +3275,10 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'P':
       Args = None;
       Kind = Node::Kind::PropertyWrapperBackingInitializer;
+      break;
+    case 'W':
+      Args = None;
+      Kind = Node::Kind::PropertyWrapperInitFromProjectedValue;
       break;
     default: return nullptr;
   }

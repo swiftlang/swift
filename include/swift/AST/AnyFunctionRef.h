@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -101,6 +102,18 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getSingleExpressionBody();
     return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
+  }
+
+  ParameterList *getParameters() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getParameters();
+    return TheFunction.get<AbstractClosureExpr *>()->getParameters();
+  }
+
+  bool hasPropertyWrapperParameters() const {
+    return llvm::any_of(*getParameters(), [](const ParamDecl *param) {
+      return param->hasAttachedPropertyWrapper();
+    });
   }
 
   Type getType() const {

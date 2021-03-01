@@ -266,8 +266,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
     }
     // Check conformance requirements.
     case RequirementKind::Conformance: {
-      auto protocolType = req.getSecondType()->castTo<ProtocolType>();
-      auto protocol = protocolType->getDecl();
+      auto *protocol = req.getProtocolDecl();
       assert(protocol && "Expected protocol in generic signature requirement");
       // If the first type does not conform to the second type in the current
       // module, then record the unsatisfied requirement.

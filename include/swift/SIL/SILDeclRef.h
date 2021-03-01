@@ -140,6 +140,10 @@ struct SILDeclRef {
     /// References the wrapped value injection function used to initialize
     /// the backing storage property from a wrapped value.
     PropertyWrapperBackingInitializer,
+
+    /// References the function used to initialize a property wrapper storage
+    /// instance from a projected value.
+    PropertyWrapperInitFromProjectedValue,
   };
   
   /// The ValueDecl or AbstractClosureExpr represented by this SILDeclRef.
@@ -264,7 +268,8 @@ struct SILDeclRef {
   /// True if the SILDeclRef references the initializer for the backing storage
   /// of a property wrapper.
   bool isPropertyWrapperBackingInitializer() const {
-    return kind == Kind::PropertyWrapperBackingInitializer;
+    return (kind == Kind::PropertyWrapperBackingInitializer ||
+            kind == Kind::PropertyWrapperInitFromProjectedValue);
   }
 
   /// True if the SILDeclRef references the ivar initializer or deinitializer of

@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -4926,3 +4927,67 @@ bb1(%result : @owned $Builtin.NativeObject):
 bb2(%error : @owned $Error):
   unreachable
 }
+
+sil [ossa] @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
+
+// CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: sil shared [ossa] @$s8refcast24main5KlassC_Tg5 : 
+// CHECK_FORWARDING_OWNERSHIP_KIND: unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
+// CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: } // end sil function '$s8refcast24main5KlassC_Tg5'
+sil [ossa] @refcast2 : $@convention(thin) <T> (@in T, @owned Klass) -> () {
+bb0(%0 : $*T, %1 : @owned $Klass):
+  destroy_addr %0 : $*T
+  %2 = unchecked_bitwise_cast %1 : $Klass to $Optional<Klass>
+  %3 = copy_value %2 : $Optional<Klass>
+  destroy_value %1 : $Klass
+  %func = function_ref @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
+  apply %func(%3) : $@convention(thin) (@owned Optional<Klass>) -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @caller : $@convention(thin) (@in Klass, @owned Klass) -> () {
+bb0(%0 :  $*Klass, %1 : @owned $Klass):
+  %f = function_ref @refcast2 : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Klass) -> ()
+  %res = apply %f<Klass>(%0, %1) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+class KlassWithTailAllocatedElems {
+  var x : Builtin.NativeObject
+  init()
+}
+
+// Test conversion from address_to_pointer->pointer_to_address to
+// unchecked_addr_cast when the base is an interior pointer (ref_tail_addr).
+//
+// RAW attempts to clone the ref_tail_addr and its access path to the
+// load, which includes
+//
+// CHECK-LABEL: sil [ossa] @unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast : $@convention(thin) () -> Builtin.Word {
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: [[TAIL_ADDR:%.*]] = ref_tail_addr
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: [[CAST_RESULT:%.*]] = unchecked_addr_cast [[TAIL_ADDR]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: load [trivial] [[CAST_RESULT]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: } // end sil function 'unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast'
+sil [ossa] @unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %7 = integer_literal $Builtin.Word, 1
+  %8 = alloc_ref [tail_elems $(Builtin.NativeObject) * %7 : $Builtin.Word] $KlassWithTailAllocatedElems
+  %borrow = begin_borrow %8 : $KlassWithTailAllocatedElems
+  %addr = ref_tail_addr %borrow : $KlassWithTailAllocatedElems, $Builtin.NativeObject
+  %1 = address_to_pointer %addr : $*Builtin.NativeObject to $Builtin.RawPointer
+  end_borrow %borrow : $KlassWithTailAllocatedElems
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %3 = load [trivial] %2 : $*Builtin.Word
+  destroy_value %8 : $KlassWithTailAllocatedElems
+  return %3 : $Builtin.Word
+}
+

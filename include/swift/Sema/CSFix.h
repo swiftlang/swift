@@ -119,6 +119,13 @@ enum class FixKind : uint8_t {
   /// the storage or property wrapper.
   UseWrappedValue,
 
+  /// Add 'var projectedValue' to the property wrapper type to allow passing
+  /// a projection argument.
+  AddProjectedValue,
+
+  /// Add '@propertyWrapper' to a nominal type declaration.
+  AddPropertyWrapperAttribute,
+
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
 
@@ -307,6 +314,11 @@ enum class FixKind : uint8_t {
   /// convertible, but runtime does not support such convertions. e.g.
   /// function type casts.
   AllowUnsupportedRuntimeCheckedCast,
+
+  /// Allow reference to a static member on a protocol metatype
+  /// even though result type of the reference doesn't conform
+  /// to an expected protocol.
+  AllowInvalidStaticMemberRefOnProtocolMetatype,
 };
 
 class ConstraintFix {
@@ -950,6 +962,42 @@ public:
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
                                  ConstraintLocator *locator);
+};
+
+class AddProjectedValue final : public ConstraintFix {
+  Type wrapperType;
+
+  AddProjectedValue(ConstraintSystem &cs, Type wrapper,
+                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddProjectedValue, locator), wrapperType(wrapper) {}
+
+public:
+  static AddProjectedValue *create(ConstraintSystem &cs, Type wrapper,
+                                   ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "add 'var projectedValue' to pass a projection argument";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+};
+
+class AddPropertyWrapperAttribute final : public ConstraintFix {
+  Type wrapperType;
+
+  AddPropertyWrapperAttribute(ConstraintSystem &cs, Type wrapper,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddPropertyWrapperAttribute, locator), wrapperType(wrapper) {}
+
+public:
+  static AddPropertyWrapperAttribute *create(ConstraintSystem &cs, Type wrapper,
+                                             ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "add '@propertyWrapper'";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 };
 
 class UseSubscriptOperator final : public ConstraintFix {
@@ -2305,6 +2353,29 @@ public:
   static AllowUnsupportedRuntimeCheckedCast *
   attempt(ConstraintSystem &cs, Type fromType, Type toType,
           CheckedCastKind kind, ConstraintLocator *locator);
+};
+
+class AllowInvalidStaticMemberRefOnProtocolMetatype final
+    : public ConstraintFix {
+  AllowInvalidStaticMemberRefOnProtocolMetatype(ConstraintSystem &cs,
+                                                ConstraintLocator *locator)
+      : ConstraintFix(cs,
+                      FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype,
+                      locator) {}
+
+  public:
+  std::string getName() const override {
+    return "allow invalid static member reference on a protocol metatype";
+  }
+
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowInvalidStaticMemberRefOnProtocolMetatype *
+  create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

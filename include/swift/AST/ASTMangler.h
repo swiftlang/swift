@@ -135,6 +135,8 @@ public:
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
                                              SymbolKind SKind = SymbolKind::Default);
+  std::string mangleInitFromProjectedValueEntity(const VarDecl *var,
+                                                 SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -172,6 +174,7 @@ public:
   std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
                                                    CanType ResultType,
                                                    CanGenericSignature Sig,
+                                                   Optional<bool> FlagParamIsZeroOnError,
                                                    bool predefined);
   
   /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
@@ -404,6 +407,7 @@ protected:
 
   void appendInitializerEntity(const VarDecl *var);
   void appendBackingInitializerEntity(const VarDecl *var);
+  void appendInitFromProjectedValueEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
                                  GenericSignature &genericSig,

@@ -563,7 +563,8 @@ public:
     return consumeToken();
   }
 
-  SourceLoc consumeArgumentLabel(Identifier &Result) {
+  SourceLoc consumeArgumentLabel(Identifier &Result,
+                                 bool diagnoseDollarPrefix) {
     assert(Tok.canBeArgumentLabel());
     assert(Result.empty());
     if (!Tok.is(tok::kw__)) {
@@ -571,7 +572,7 @@ public:
       Result = Context.getIdentifier(Tok.getText());
 
       if (Tok.getText()[0] == '$')
-        diagnoseDollarIdentifier(Tok, /*diagnoseDollarPrefix=*/true);
+        diagnoseDollarIdentifier(Tok, diagnoseDollarPrefix);
     }
     return consumeToken();
   }

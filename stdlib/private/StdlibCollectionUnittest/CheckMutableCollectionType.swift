@@ -512,7 +512,7 @@ func checkSortedPredicateThrow(
   }
 }
 
-self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/WhereElementIsComparable") {
+self.test("\(testNamePrefix).sorted/DispatchesThroughDirectStorageAccessors/WhereElementIsComparable") {
   let sequence = [ 5, 4, 3, 2, 1 ]
   let elements: [MinimalComparableValue] =
     zip(sequence, 0..<sequence.count).map {
@@ -525,13 +525,16 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
   let result = lc.sorted()
   let extractedResult = result.map(extractValueFromComparable)
 
+  let actualWUMBPIF = lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)]
+  let actualWCMSIA =  lc.log.withContiguousMutableStorageIfAvailable[type(of: lc)]
+
+  let actualWUMBPIFNonNil = lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)]
+  let actualWCMSIANonNil =  lc.log.withContiguousMutableStorageIfAvailableNonNilReturns[type(of: lc)]
+
   // This sort operation is not in-place.
   // The collection is copied into an array before sorting.
-  expectEqual(
-    0, lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)])
-  expectEqual(
-    0,
-    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)])
+  expectEqual(0, actualWUMBPIF + actualWCMSIA)
+  expectEqual(0, actualWUMBPIFNonNil + actualWCMSIANonNil)
 
   expectEqualSequence([ 1, 2, 3, 4, 5 ], extractedResult.map { $0.value })
 }
@@ -631,7 +634,7 @@ self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElements") {
 }
 
 
-self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/Predicate") {
+self.test("\(testNamePrefix).sorted/DispatchesThroughDirectStorageAccessors/Predicate") {
   let sequence = [ 5, 4, 3, 2, 1 ]
   let elements: [OpaqueValue<Int>] =
     zip(sequence, 0..<sequence.count).map {
@@ -644,13 +647,16 @@ self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPoi
   let result = lc.sorted { extractValue($0).value < extractValue($1).value }
   let extractedResult = result.map(extractValue)
 
+  let actualWUMBPIF = lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)]
+  let actualWCMSIA =  lc.log.withContiguousMutableStorageIfAvailable[type(of: lc)]
+
+  let actualWUMBPIFNonNil = lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)]
+  let actualWCMSIAIFNonNil =  lc.log.withContiguousMutableStorageIfAvailableNonNilReturns[type(of: lc)]
+
   // This sort operation is not in-place.
   // The collection is copied into an array before sorting.
-  expectEqual(
-    0, lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)])
-  expectEqual(
-    0,
-    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)])
+  expectEqual(0, actualWUMBPIF + actualWCMSIA)
+  expectEqual(0, actualWUMBPIFNonNil + actualWCMSIAIFNonNil)
 
   expectEqualSequence([ 1, 2, 3, 4, 5 ], extractedResult.map { $0.value })
 }
@@ -949,7 +955,7 @@ self.test("\(testNamePrefix).reverse()") {
 // partition(by:)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported") {
+self.test("\(testNamePrefix).partition/DispatchesThroughDirectStorageAccessors") {
   let sequence = [ 5, 4, 3, 2, 1 ]
   let elements: [OpaqueValue<Int>] =
     zip(sequence, 0..<sequence.count).map {
@@ -965,11 +971,23 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     return !(extractValue(val).value < extractValue(first!).value)
   })
 
-  expectEqual(
-    1, lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)])
+  let actualWUMBPIF = lc.log._withUnsafeMutableBufferPointerIfSupported[type(of: lc)]
+  let actualWCMSIA =  lc.log.withContiguousMutableStorageIfAvailable[type(of: lc)]
+
+  let actualWUMBPIFNonNil = lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)]
+  let actualWCMSIAIFNonNil =  lc.log.withContiguousMutableStorageIfAvailableNonNilReturns[type(of: lc)]
+
+  expectEqual(1, actualWUMBPIF + actualWCMSIA)
   expectEqual(
     withUnsafeMutableBufferPointerIsSupported ? 1 : 0,
-    lc.log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[type(of: lc)])
+    actualWUMBPIFNonNil + actualWCMSIAIFNonNil)
+
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    // `partition(by:)` is expected to dispatch to the public API in releases
+    // that contain https://github.com/apple/swift/pull/36003.
+    expectEqual(0, actualWUMBPIF)
+    expectEqual(0, actualWUMBPIFNonNil)
+  }
 
   expectEqual(4, lc.distance(from: lc.startIndex, to: pivot))
   expectEqualsUnordered([1, 2, 3, 4], lc.prefix(upTo: pivot).map { extractValue($0).value })
@@ -1279,4 +1297,3 @@ self.test("\(testNamePrefix).sort/ThrowingPredicateWithLargeNumberElements") {
 
   } // addMutableRandomAccessCollectionTests
 }
-

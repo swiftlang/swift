@@ -2517,10 +2517,12 @@ static void printModuleMetadata(ModuleDecl *MD) {
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
   });
   MD->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
-    OS << "filepath=" << info.FilePath << "; ";
-    OS << "hash=" << info.InterfaceHash.getRawValue() << "; ";
-    OS << "mtime=" << info.LastModified << "; ";
-    OS << "size=" << info.FileSize;
+    OS << "filepath=" << info.getFilePath() << "; ";
+    OS << "hash=" << info.getInterfaceHashIncludingTypeMembers().getRawValue() << "; ";
+    OS << "hashExcludingTypeMembers="
+       << info.getInterfaceHashExcludingTypeMembers().getRawValue() << "; ";
+    OS << "mtime=" << info.getLastModified() << "; ";
+    OS << "size=" << info.getFileSize();
     OS << "\n";
   });
 }

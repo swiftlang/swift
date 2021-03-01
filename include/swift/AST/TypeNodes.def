@@ -97,7 +97,7 @@
 
 TYPE(Error, Type)
 UNCHECKED_TYPE(Unresolved, Type)
-UNCHECKED_TYPE(Hole, Type)
+UNCHECKED_TYPE(Placeholder, Type)
 ABSTRACT_TYPE(Builtin, Type)
   ABSTRACT_TYPE(AnyBuiltinInteger, BuiltinType)
     BUILTIN_TYPE(BuiltinInteger, AnyBuiltinIntegerType)

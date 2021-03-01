@@ -794,31 +794,44 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
     llvm::StringSet<> seenFilenames;
 
     void emitSourceFileInfo(const BasicSourceFileInfo &info) {
+      if (info.getFilePath().empty())
+        return;
       // Make 'FilePath' absolute for serialization;
-      SmallString<128> absolutePath = info.FilePath;
+      SmallString<128> absolutePath = info.getFilePath();
       llvm::sys::fs::make_absolute(absolutePath);
 
       // Don't emit duplicated files.
-      if (!seenFilenames.insert(info.FilePath).second)
+      if (!seenFilenames.insert(absolutePath).second)
         return;
 
       auto fileID = FWriter.getTextOffset(absolutePath);
-      auto fingerprintStr = info.InterfaceHash.getRawValue();
+
+      auto fingerprintStrIncludingTypeMembers =
+        info.getInterfaceHashIncludingTypeMembers().getRawValue();
+      auto fingerprintStrExcludingTypeMembers =
+        info.getInterfaceHashExcludingTypeMembers().getRawValue();
+
       auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                           info.LastModified.time_since_epoch())
+                           info.getLastModified().time_since_epoch())
                            .count();
 
       llvm::raw_svector_ostream out(Buffer);
       endian::Writer writer(out, little);
       // FilePath.
       writer.write<uint32_t>(fileID);
-      // InterfaceHash (fixed length string).
-      assert(fingerprintStr.size() == Fingerprint::DIGEST_LENGTH);
-      out << fingerprintStr;
+
+      // InterfaceHashIncludingTypeMembers (fixed length string).
+      assert(fingerprintStrIncludingTypeMembers.size() == Fingerprint::DIGEST_LENGTH);
+      out << fingerprintStrIncludingTypeMembers;
+
+      // InterfaceHashExcludingTypeMembers (fixed length string).
+      assert(fingerprintStrExcludingTypeMembers.size() == Fingerprint::DIGEST_LENGTH);
+      out << fingerprintStrExcludingTypeMembers;
+
       // LastModified (nanoseconds since epoch).
       writer.write<uint64_t>(timestamp);
       // FileSize (num of bytes).
-      writer.write<uint64_t>(info.FileSize);
+      writer.write<uint64_t>(info.getFileSize());
     }
 
     SourceFileListWriter(StringWriter &FWriter) : FWriter(FWriter) {
@@ -827,10 +840,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
   } writer(FWriter);
 
   if (SourceFile *SF = MSF.dyn_cast<SourceFile *>()) {
-    BasicSourceFileInfo info;
-    if (info.populate(SF))
-      return;
-    writer.emitSourceFileInfo(info);
+    writer.emitSourceFileInfo(BasicSourceFileInfo(SF));
   } else {
     auto *M = MSF.get<ModuleDecl *>();
     M->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {

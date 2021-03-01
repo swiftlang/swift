@@ -49,6 +49,12 @@ static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
     llvm::cl::desc("Enable sinking of owened forwarding insts"),
     llvm::cl::init(true), llvm::cl::Hidden);
 
+// Allow disabling general optimization for targetted unit tests.
+static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
+    "sil-combine-canonicalize",
+    llvm::cl::desc("Canonicalization during sil-combine"), llvm::cl::init(true),
+    llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
@@ -141,6 +147,9 @@ public:
   }
 
   bool tryCanonicalize(SILInstruction *inst) {
+    if (!EnableSILCombineCanonicalize)
+      return false;
+
     changed = false;
     canonicalize(inst);
     return changed;

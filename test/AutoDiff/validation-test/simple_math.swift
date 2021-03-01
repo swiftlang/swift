@@ -17,37 +17,37 @@ SimpleMathTests.test("Arithmetics") {
   func foo1(x: Float, y: Float) -> Float {
     return x * y
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: foo1))
+  expectEqual((4, 3), gradient(at: 3, 4, of: foo1))
   func foo2(x: Float, y: Float) -> Float {
     return -x * y
   }
-  expectEqual((-4, -3), gradient(at: 3, 4, in: foo2))
+  expectEqual((-4, -3), gradient(at: 3, 4, of: foo2))
   func foo3(x: Float, y: Float) -> Float {
     return -x + y
   }
-  expectEqual((-1, 1), gradient(at: 3, 4, in: foo3))
+  expectEqual((-1, 1), gradient(at: 3, 4, of: foo3))
 }
 
 SimpleMathTests.test("Fanout") {
   func foo1(x: Float) -> Float {
      x - x
   }
-  expectEqual(0, gradient(at: 100, in: foo1))
+  expectEqual(0, gradient(at: 100, of: foo1))
   func foo2(x: Float) -> Float {
      x + x
   }
-  expectEqual(2, gradient(at: 100, in: foo2))
+  expectEqual(2, gradient(at: 100, of: foo2))
   func foo3(x: Float, y: Float) -> Float {
     x + x + x * y
   }
-  expectEqual((4, 3), gradient(at: 3, 2, in: foo3))
+  expectEqual((4, 3), gradient(at: 3, 2, of: foo3))
 }
 
 SimpleMathTests.test("FunctionCall") {
   func foo(_ x: Float, _ y: Float) -> Float {
     return 3 * x + { $0 * 3 }(3) * y
   }
-  expectEqual((3, 9), gradient(at: 3, 4, in: foo))
+  expectEqual((3, 9), gradient(at: 3, 4, of: foo))
   expectEqual(3, gradient(at: 3) { x in foo(x, 4) })
 }
 
@@ -55,16 +55,16 @@ SimpleMathTests.test("ResultSelection") {
   func tuple(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
   }
-  expectEqual((1, 0), gradient(at: 3, 3, in: { x, y in tuple(x, y).0 }))
-  expectEqual((0, 1), gradient(at: 3, 3, in: { x, y in tuple(x, y).1 }))
+  expectEqual((1, 0), gradient(at: 3, 3, of: { x, y in tuple(x, y).0 }))
+  expectEqual((0, 1), gradient(at: 3, 3, of: { x, y in tuple(x, y).1 }))
 
   func tupleGeneric<T>(_ x: T, _ y: T) -> (T, T) {
     return (x, y)
   }
   func tupleGenericFirst<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).0 }
   func tupleGenericSecond<T>(_ x: T, _ y: T) -> T { tupleGeneric(x, y).1 }
-  expectEqual((1, 0), gradient(at: 3, 3, in: tupleGenericFirst))
-  expectEqual((0, 1), gradient(at: 3, 3, in: tupleGenericSecond))
+  expectEqual((1, 0), gradient(at: 3, 3, of: tupleGenericFirst))
+  expectEqual((0, 1), gradient(at: 3, 3, of: tupleGenericSecond))
 }
 
 SimpleMathTests.test("MultipleResults") {
@@ -77,8 +77,8 @@ SimpleMathTests.test("MultipleResults") {
     // Note: both results (tuple elements) are active.
     return z.0 * z.1
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply))
-  expectEqual((10, 5), gradient(at: 5, 10, in: multiply))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply))
 
   // Test function with multiple `inout` parameters.
   func swap(_ x: inout Float, _ y: inout Float) {
@@ -89,8 +89,8 @@ SimpleMathTests.test("MultipleResults") {
     swap(&tuple.0, &tuple.1)
     return tuple.0 * tuple.1
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swap))
-  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swap))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swap))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swap))
 
   // Test function with multiple `inout` parameters.
   func swapGeneric<T>(_ x: inout T, _ y: inout T) {
@@ -101,8 +101,8 @@ SimpleMathTests.test("MultipleResults") {
     swapGeneric(&tuple.0, &tuple.1)
     return tuple.0 * tuple.1
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapGeneric))
-  expectEqual((10, 5), gradient(at: 5, 10, in: multiply_swapGeneric))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapGeneric))
+  expectEqual((10, 5), gradient(at: 5, 10, of: multiply_swapGeneric))
 
   // Test function with multiple `inout` parameters and a formal result.
   func swapAndReturnProduct(_ x: inout Float, _ y: inout Float) -> Float {
@@ -117,8 +117,8 @@ SimpleMathTests.test("MultipleResults") {
     let result = swapAndReturnProduct(&x2, &y2)
     return result
   }
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
-  expectEqual((4, 3), gradient(at: 3, 4, in: multiply_swapAndReturnProduct))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapAndReturnProduct))
+  expectEqual((4, 3), gradient(at: 3, 4, of: multiply_swapAndReturnProduct))
 }
 
 SimpleMathTests.test("CaptureLocal") {
@@ -126,7 +126,7 @@ SimpleMathTests.test("CaptureLocal") {
   func foo(_ x: Float) -> Float {
     return z * x
   }
-  expectEqual(10, gradient(at: 0, in: foo))
+  expectEqual(10, gradient(at: 0, of: foo))
 }
 
 var globalVar: Float = 10
@@ -135,7 +135,7 @@ SimpleMathTests.test("CaptureGlobal") {
     globalVar += 20
     return globalVar * x
   }
-  expectEqual(30, gradient(at: 0, in: foo))
+  expectEqual(30, gradient(at: 0, of: foo))
 }
 
 SimpleMathTests.test("Mutation") {
@@ -145,7 +145,7 @@ SimpleMathTests.test("Mutation") {
     a = a * x
     return a * x
   }
-  expectEqual(4 * 27, gradient(at: 3, in: fourthPower))
+  expectEqual(4 * 27, gradient(at: 3, of: fourthPower))
 }
 
 SimpleMathTests.test("Tuple") {
@@ -154,7 +154,7 @@ SimpleMathTests.test("Tuple") {
     var tuple = (1, 1, ((x, 1), 1))
     return tuple.2.0.0
   }
-  expectEqual(1, gradient(at: 3, in: nested))
+  expectEqual(1, gradient(at: 3, of: nested))
 }
 
 SimpleMathTests.test("TupleMutation") {
@@ -163,7 +163,7 @@ SimpleMathTests.test("TupleMutation") {
     tuple.0 = tuple.0 * x
     return x * tuple.0
   }
-  expectEqual(27, gradient(at: 3, in: foo))
+  expectEqual(27, gradient(at: 3, of: foo))
 
   func fifthPower(_ x: Float) -> Float {
     var tuple = (x, x)
@@ -171,7 +171,7 @@ SimpleMathTests.test("TupleMutation") {
     tuple.1 = tuple.0 * x
     return tuple.0 * tuple.1
   }
-  expectEqual(405, gradient(at: 3, in: fifthPower))
+  expectEqual(405, gradient(at: 3, of: fifthPower))
 
   func nested(_ x: Float) -> Float {
     var tuple = ((x, x), x)
@@ -179,13 +179,13 @@ SimpleMathTests.test("TupleMutation") {
     tuple.0.1 = tuple.0.0 * x
     return tuple.0.0 * tuple.0.1
   }
-  expectEqual(405, gradient(at: 3, in: nested))
+  expectEqual(405, gradient(at: 3, of: nested))
 
   func generic<T: Differentiable & AdditiveArithmetic>(_ x: T) -> T {
     var tuple = (x, x)
     return tuple.0
   }
-  expectEqual(1, gradient(at: 3.0, in: generic))
+  expectEqual(1, gradient(at: 3.0, of: generic))
 
   // FIXME(TF-1033): Fix forward-mode ownership error for tuple with non-active
   // initial values.
@@ -198,7 +198,7 @@ SimpleMathTests.test("TupleMutation") {
     tuple.1 = x
     return tuple.0
   }
-  expectEqual(1, gradient(at: 3.0, in: genericInitialNonactive))
+  expectEqual(1, gradient(at: 3.0, of: genericInitialNonactive))
   */
 }
 
@@ -209,7 +209,7 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
     let tuple = (2 * x, 1)
     return tuple.0
   }
-  expectEqual((8, 2), valueWithGradient(at: 4, in: tupleLet))
+  expectEqual((8, 2), valueWithGradient(at: 4, of: tupleLet))
 
   func tupleVar(_ x: Tracked<Float>) -> Tracked<Float> {
     var tuple = (x, 1)
@@ -217,7 +217,7 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
     tuple.1 = 1
     return tuple.0
   }
-  expectEqual((3, 1), valueWithGradient(at: 3, in: tupleVar))
+  expectEqual((3, 1), valueWithGradient(at: 3, of: tupleVar))
 
   func nested(_ x: Tracked<Float>) -> Tracked<Float> {
     // Convoluted function computing `x * x`.
@@ -228,7 +228,7 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
     tuple.2 = x
     return tuple.1.1 * tuple.2
   }
-  expectEqual((16, 8), valueWithGradient(at: 4, in: nested))
+  expectEqual((16, 8), valueWithGradient(at: 4, of: nested))
 
   struct Wrapper<T> {
     @differentiable(reverse where T : Differentiable)
@@ -244,7 +244,7 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
     let w = Wrapper<Tracked<Float>>()
     return w.baz(x)
   }
-  expectEqual((3, 1), valueWithGradient(at: 3, in: wrapper))
+  expectEqual((3, 1), valueWithGradient(at: 3, of: wrapper))
 }
 
 // Tests TF-21.
@@ -257,9 +257,9 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
   }
 
   // Test direct `init` reference.
-  expectEqual(10, pullback(at: 4, in: Foo.init)(.init(stored: 10)))
+  expectEqual(10, pullback(at: 4, of: Foo.init)(.init(stored: 10)))
 
-  let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
+  let 𝛁foo = pullback(at: Float(4), of: { input -> Foo in
     let foo = Foo(stored: input)
     let foo2 = foo + foo
     return Foo(stored: foo2.stored)
@@ -288,7 +288,7 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     }
   }
 
-  let 𝛁custom = pullback(at: Float(4), in: { input -> Custom in
+  let 𝛁custom = pullback(at: Float(4), of: { input -> Custom in
     let foo = Custom(x: input)
     return foo + foo
   })(Custom.TangentVector(x: 1))
@@ -316,8 +316,8 @@ SimpleMathTests.test("StructConstantStoredProperty") {
     return model.applied(to: input)
   }
   expectEqual(TF_319.TangentVector(x: 6),
-              gradient(at: TF_319(x: 10), in: { $0.applied(to: 3) }))
-  expectEqual(20, gradient(at: 3, in: testStructInit))
+              gradient(at: TF_319(x: 10), of: { $0.applied(to: 3) }))
+  expectEqual(20, gradient(at: 3, of: testStructInit))
 }
 
 SimpleMathTests.test("StructMutation") {
@@ -331,7 +331,7 @@ SimpleMathTests.test("StructMutation") {
     let point = Point(x: input, y: input, z: input)
     return point + point
   }
-  expectEqual(6, pullback(at: 4, in: double)(Point(x: 1, y: 1, z: 1)))
+  expectEqual(6, pullback(at: 4, of: double)(Point(x: 1, y: 1, z: 1)))
 
   func fifthPower(_ input: Float) -> Float {
     var point = Point(x: input, y: input, z: input)
@@ -339,7 +339,7 @@ SimpleMathTests.test("StructMutation") {
     point.y = point.x * input
     return point.x * point.y
   }
-  expectEqual(405, gradient(at: 3, in: fifthPower))
+  expectEqual(405, gradient(at: 3, of: fifthPower))
 
   func mix(_ input: Float) -> Float {
     var tuple = (point: Point(x: input, y: input, z: input), float: input)
@@ -347,7 +347,7 @@ SimpleMathTests.test("StructMutation") {
     tuple.point.y = tuple.point.x * input
     return tuple.point.x * tuple.point.y
   }
-  expectEqual(405, gradient(at: 3, in: mix))
+  expectEqual(405, gradient(at: 3, of: mix))
 
   // Test TF-282.
   struct Add : Differentiable {
@@ -370,7 +370,7 @@ SimpleMathTests.test("StructGeneric") {
     var z: T
   }
 
-  let 𝛁generic = pullback(at: Float(3), in: { input -> Generic<Float> in
+  let 𝛁generic = pullback(at: Float(3), of: { input -> Generic<Float> in
     var generic = Generic(x: input, y: input, z: input)
     return generic
   })(Generic<Float>.TangentVector(x: 1, y: 1, z: 1))
@@ -382,7 +382,7 @@ SimpleMathTests.test("StructGeneric") {
     generic.y = generic.x * input
     return generic.x * generic.y
   }
-  expectEqual(405, gradient(at: 3, in: fifthPower))
+  expectEqual(405, gradient(at: 3, of: fifthPower))
 }
 
 SimpleMathTests.test("StructWithNoDerivativeProperty") {
@@ -432,7 +432,7 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
   func doubled(_ model: SmallTestModel) -> Float{
     return model() + model.stored
   }
-  let grads = gradient(at: SmallTestModel(), in: doubled)
+  let grads = gradient(at: SmallTestModel(), of: doubled)
   expectEqual(2.0, grads.stored)
 }
 

@@ -49,10 +49,8 @@ extension Task {
   ///
   /// All functions available on the Task
   // TODO: once we can have async properties land make this computed property
-  @available(*, deprecated, message: "Please use Builtin.getCurrentAsyncTask() or Task.__unsafeCurrentAsync() until this function becomes implemented.")
-  public static func current(file: StaticString = #file, line: UInt = #line) async -> Task {
-    fatalError("Task.current() is not implemented yet!", file: file, line: line)
-    Task.unsafeCurrent!.task // !-safe, guaranteed to have a Task available within an async function.
+  public static func current() async -> Task {
+    return Task.unsafeCurrent!.task // !-safe, we are guaranteed to have a task available within an async function
   }
 
 }
@@ -67,7 +65,6 @@ extension Task {
   ///
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.priority`
-  @available(*, deprecated, message: "Not implemented yet, until unsafeCurrent is ready. Please use Task.__unsafeCurrentAsync().priority instead.")
   public static var currentPriority: Priority {
     Task.unsafeCurrent?.priority ?? Priority.default
   }
@@ -140,7 +137,7 @@ extension Task {
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
   public struct Handle<Success, Failure: Error> {
-    private let _task: Builtin.NativeObject
+    internal let _task: Builtin.NativeObject
 
     internal init(_ task: Builtin.NativeObject) {
       self._task = task
@@ -221,7 +218,7 @@ extension Task.Handle where Failure == Never {
   /// value of the `Success` type, or encode that cancellation has occurred in
   /// that type itself.
   public func get() async -> Success {
-    return try! await _taskFutureGetThrowing(_task) // try-! safe, cannot throw
+    return await _taskFutureGet(_task)
   }
   
 }
@@ -324,8 +321,8 @@ extension Task {
       }
     }
 
-    /// Whether this is a task group.
-    var isTaskGroup: Bool {
+    /// Whether this is a group child.
+    var isGroupChildTask: Bool {
       get {
         (bits & (1 << 26)) != 0
       }
@@ -510,22 +507,17 @@ extension Task {
   /// asynchronous function present in this functions call stack.
   ///
   /// The returned value must not be accessed from tasks other than the current one.
-  @available(*, deprecated, message: "Not implemented yet, use Builtin.getCurrentAsyncTask() or Task.___unsafeCurrentAsync() until this function is implemented.")
   public static var unsafeCurrent: UnsafeCurrentTask? {
-    // FIXME: rdar://70546948 implement this once getCurrentAsyncTask can be called from sync funcs
-    //    guard let _task = Builtin.getCurrentAsyncTask() else {
-    //      return nil
-    //    }
-    //    return UnsafeCurrentTask(_task)
-    fatalError("\(#function) is not implemented yet")
+    guard let _task = _getActiveAsyncTask() else {
+      return nil
+    }
+    // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+    //        with "destroying a task that never completed" in the task's destroy.
+    //        How do we solve this properly?
+    _swiftRetain(_task)
+    return UnsafeCurrentTask(_task)
   }
 
-  @available(*, deprecated, message: "This will be removed, and replaced by unsafeCurrent().", renamed: "unsafeCurrent()")
-  public static func __unsafeCurrentAsync() async -> UnsafeCurrentTask {
-    let task = Builtin.getCurrentAsyncTask()
-    _swiftRetain(task)
-    return UnsafeCurrentTask(task)
-  }
 }
 
 /// An *unsafe* 'current' task handle.
@@ -542,7 +534,7 @@ extension Task {
 /// and most certainly will break invariants in other places of the program
 /// actively running on this task.
 public struct UnsafeCurrentTask {
-  private let _task: Builtin.NativeObject
+  internal let _task: Builtin.NativeObject
 
   // May only be created by the standard library.
   internal init(_ task: Builtin.NativeObject) {
@@ -576,7 +568,23 @@ public struct UnsafeCurrentTask {
 
 }
 
+extension UnsafeCurrentTask: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
+  }
+}
+
+extension UnsafeCurrentTask: Equatable {
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
+      UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
+  }
+}
+
 // ==== Internal ---------------------------------------------------------------
+
+@_silgen_name("swift_task_get_active")
+func _getActiveAsyncTask() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
@@ -604,34 +612,14 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
   _asyncMainDrainQueue()
 }
 
+// FIXME: both of these ought to take their arguments _owned so that
+// we can do a move out of the future in the common case where it's
+// unreferenced
 @_silgen_name("swift_task_future_wait")
-func _taskFutureWait(
-  on task: Builtin.NativeObject
-) async -> (hadErrorResult: Bool, storage: UnsafeRawPointer)
+public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 
-public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T {
-  let rawResult = await _taskFutureWait(on: task)
-  assert(!rawResult.hadErrorResult)
-
-  // Take the value.
-  let storagePtr = rawResult.storage.bindMemory(to: T.self, capacity: 1)
-  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
-}
-
-public func _taskFutureGetThrowing<T>(
-    _ task: Builtin.NativeObject
-) async throws -> T {
-  let rawResult = await _taskFutureWait(on: task)
-  if rawResult.hadErrorResult {
-    // Throw the result on error.
-    throw unsafeBitCast(rawResult.storage, to: Error.self)
-  }
-
-  // Take the value on success
-  let storagePtr =
-    rawResult.storage.bindMemory(to: T.self, capacity: 1)
-  return UnsafeMutablePointer<T>(mutating: storagePtr).pointee
-}
+@_silgen_name("swift_task_future_wait_throwing")
+public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 
 public func _runChildTask<T>(
   operation: @concurrent @escaping () async throws -> T
@@ -642,37 +630,6 @@ public func _runChildTask<T>(
   var flags = Task.JobFlags()
   flags.kind = .task
   flags.priority = getJobFlags(currentTask).priority
-  flags.isFuture = true
-  flags.isChildTask = true
-
-  // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(
-      flags.bits, currentTask, operation)
-
-  // Enqueue the resulting job.
-  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-  return task
-}
-class StringLike: CustomStringConvertible {
-  let value: String
-  init(_ value: String) {
-    self.value = value
-  }
-  var description: String { value }
-}
-
-public func _runGroupChildTask<T>(
-  overridingPriority priorityOverride: Task.Priority? = nil,
-  withLocalValues hasLocalValues: Bool = false,
-  operation: @concurrent @escaping () async throws -> T
-) async -> Builtin.NativeObject {
-  let currentTask = Builtin.getCurrentAsyncTask()
-
-  // Set up the job flags for a new task.
-  var flags = Task.JobFlags()
-  flags.kind = .task
-  flags.priority = priorityOverride ?? getJobFlags(currentTask).priority
   flags.isFuture = true
   flags.isChildTask = true
 

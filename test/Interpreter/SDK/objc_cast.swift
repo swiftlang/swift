@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
-// rdar://problem/27616753
-// XFAIL: *
-
 // REQUIRES: objc_interop
 
 import Foundation
@@ -139,14 +136,14 @@ if  (obj as? SwiftSub) != nil       { abort() }
 if  (obj as? SwiftSuper) == nil     { abort() }
 
 // Test optional and non-optional bridged conversions
-var ao: AnyObject = "s"
+var ao: AnyObject = "s" as NSObject
 ao as! String
 ao is String
 
-var auo: AnyObject! = "s"
+var auo: AnyObject! = "s" as NSObject
 var s: String = auo as! String
 
-var auoo: AnyObject? = "s"
+var auoo: AnyObject? = "s" as NSObject
 auoo! as? String
 
 // Test bridged casts.
@@ -438,7 +435,8 @@ if let doubleArr = obj as? [Double] {
   print("Numbers-as-doubles failed")
 }
 
-// CHECK: Numbers-as-floats cast produces [3.9375, 2.71828{{.*}}, 0.0]
+// CHECK-FAIL: Numbers-as-floats cast produces [3.9375, 2.71828{{.*}}, 0.0]
+// TODO: check if this is intention: rdar://33021520
 if let floatArr = obj as? [Float] {
   print(MemoryLayout<Float>.size)
   print("Numbers-as-floats cast produces \(floatArr)")
@@ -446,14 +444,16 @@ if let floatArr = obj as? [Float] {
   print("Numbers-as-floats failed")
 }
 
-// CHECK: Numbers-as-ints cast produces [3, 2, 0]
+// CHECK-FAIL: Numbers-as-ints cast produces [3, 2, 0]
+// TODO: check if this is intention: rdar://33021520
 if let intArr = obj as? [Int] {
   print("Numbers-as-ints cast produces \(intArr)")
 } else {
   print("Numbers-as-ints failed")
 }
 
-// CHECK: Numbers-as-bools cast produces [true, true, false]
+// CHECK-FAIL: Numbers-as-bools cast produces [true, true, false]
+// TODO: check if this is intention: rdar://33021520
 if let boolArr = obj as? [Bool] {
   print("Numbers-as-bools cast produces \(boolArr)")
 } else {
@@ -472,7 +472,7 @@ class Derived : Base {
 }
 
 // CHECK: Array-of-base cast produces [Derived, Derived, Base]
-obj = [Derived(), Derived(), Base()]
+obj = [Derived(), Derived(), Base()] as NSObject
 if let baseArr = obj as? [Base] {
   print("Array-of-base cast produces \(baseArr)")
 } else {
@@ -508,13 +508,13 @@ if let dict = obj as? Dictionary<Derived, Derived> {
   print("Not a dictionary of derived/derived")
 }
 
-let strArray: AnyObject = ["hello", "world"]
-let intArray: AnyObject = [1, 2, 3]
+let strArray: AnyObject = ["hello", "world"] as NSObject
+let intArray: AnyObject = [1, 2, 3] as NSObject
 let dictArray: AnyObject = [["hello" : 1, "world" : 2], 
-                            ["swift" : 1, "speedy" : 2]]
+                            ["swift" : 1, "speedy" : 2]] as NSObject
 
 // CHECK: Dictionary<String, AnyObject> is
-obj = ["a" : strArray, "b" : intArray, "c": dictArray]
+obj = ["a" : strArray, "b" : intArray, "c": dictArray] as NSObject
 if let dict = obj as? Dictionary<String, [AnyObject]> {
   print("Dictionary<String, AnyObject> is \(dict)")
 } else {
@@ -551,7 +551,7 @@ if let array = obj as? [Dictionary<String, String>] {
 }
 
 // CHECK: Dictionary<String, [Dictionary<String, Int>]> is ["a": [
-obj = ["a" : dictArray]
+obj = ["a" : dictArray] as NSObject
 if let dict = obj as? Dictionary<String, [Dictionary<String, Int>]> {
   print("Dictionary<String, [Dictionary<String, Int>]> is \(dict)")
 } else {
@@ -566,7 +566,7 @@ if let dict = obj as? Dictionary<String, [Dictionary<String, String>]> {
 }
 
 // CHECK: [Dictionary<String, [Dictionary<String, Int>]>] is
-obj = [obj, obj, obj]
+obj = [obj, obj, obj] as NSObject
 if let array = obj as? [Dictionary<String, [Dictionary<String, Int>]>] {
   print("[Dictionary<String, [Dictionary<String, Int>]>] is \(array)")
 } else {
@@ -598,15 +598,15 @@ func downcastToStringArrayOptOpt(_ obj: AnyObject???!) {
 }
 
 // CHECK: {{^}}some(some(some(["a", "b", "c"]))){{$}}
-var objOptOpt: AnyObject?? = .some(.some(["a", "b", "c"]))
+var objOptOpt: AnyObject?? = .some(.some(["a", "b", "c"] as NSObject))
 downcastToStringArrayOptOpt(objOptOpt)
 
 // CHECK: {{^}}none{{$}}
-objOptOpt = .some(.some([1 : "hello", 2 : "swift", 3 : "world"]))
+objOptOpt = .some(.some([1 : "hello", 2 : "swift", 3 : "world"] as NSObject))
 downcastToStringArrayOptOpt(objOptOpt)
 
 // CHECK: {{^}}none{{$}}
-objOptOpt = .some(.some([1, 2, 3]))
+objOptOpt = .some(.some([1, 2, 3] as NSObject))
 downcastToStringArrayOptOpt(objOptOpt)
 
 print("ok")  // CHECK: ok

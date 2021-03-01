@@ -76,7 +76,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   builder.addRequirement(newRequirement, source, nullptr);
 
   auto genericSig = std::move(builder).computeGenericSignature(
-      SourceLoc(), /*allowConcreteGenericParams=*/true);
+      /*allowConcreteGenericParams=*/true);
   genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype =

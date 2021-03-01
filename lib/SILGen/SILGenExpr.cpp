@@ -517,6 +517,8 @@ namespace {
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
     RValue visitPropertyWrapperValuePlaceholderExpr(
         PropertyWrapperValuePlaceholderExpr *E, SGFContext C);
+    RValue visitAppliedPropertyWrapperExpr(
+        AppliedPropertyWrapperExpr *E, SGFContext C);
 
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
@@ -1021,13 +1023,13 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
 }
 
-SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
-                                                 SILType ty) {
+SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
+                                                 bool hasDynamicLifetime) {
   ty = ty.getObjectType();
   Optional<SILDebugVariable> DbgVar;
   if (auto *VD = loc.getAsASTNode<VarDecl>())
     DbgVar = SILDebugVariable(VD->isLet(), 0);
-  auto alloc = B.createAllocStack(loc, ty, DbgVar);
+  auto alloc = B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime);
   enterDeallocStackCleanup(alloc);
   return alloc;
 }
@@ -5261,6 +5263,29 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
 RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
     PropertyWrapperValuePlaceholderExpr *E, SGFContext C) {
   return visitOpaqueValueExpr(E->getOpaqueValuePlaceholder(), C);
+}
+
+RValue RValueEmitter::visitAppliedPropertyWrapperExpr(
+    AppliedPropertyWrapperExpr *E, SGFContext C) {
+  auto *param = const_cast<ParamDecl *>(E->getParamDecl());
+  auto argument = visit(E->getValue(), C);
+  SILDeclRef::Kind initKind;
+  switch (E->getValueKind()) {
+  case swift::AppliedPropertyWrapperExpr::ValueKind::WrappedValue:
+    initKind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
+    break;
+  case swift::AppliedPropertyWrapperExpr::ValueKind::ProjectedValue:
+    initKind = SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue;
+    break;
+  }
+
+  SubstitutionMap subs;
+  if (param->getDeclContext()->getAsDecl()) {
+    subs = E->getCallee().getSubstitutions();
+  }
+
+  return SGF.emitApplyOfPropertyWrapperBackingInitializer(
+      SILLocation(E), param, subs, std::move(argument), initKind);
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

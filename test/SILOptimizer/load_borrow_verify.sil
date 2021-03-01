@@ -73,6 +73,7 @@ bb0(%0 : @owned $AnyObject):
   inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
   %5 = load_borrow %1 : $*Optional<AnyObject>
   end_borrow %5 : $Optional<AnyObject>
+  destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   %99 = tuple ()
   return %99 : $()

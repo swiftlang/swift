@@ -1,0 +1,34 @@
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+//
+// These tests case are converted to OSSA form, but aren't yet
+// optimized in OSSA mode. Move them to simplify_cfg_ossa.sil when
+// they are enabled.
+//
+// REQUIRES: disabled
+
+class A {}
+
+//CHECK-LABEL: no_remove_mandatory_dead_args
+//CHECK: checked_cast_br {{%.*}} : $AnyObject to A, bb1
+//CHECK-NOT: bb1
+//CHECK: bb1([[VAR:%[0-9]+]] : $A)
+//CHECK-NOT: [[VAR]]
+//CHECK: return
+sil [ossa] @no_remove_mandatory_dead_args : $@convention(thin) (@owned AnyObject) -> Int32 {
+bb0(%0 : @owned $AnyObject):
+  checked_cast_br %0 : $AnyObject to A, bb1, bb2 // id: %3
+
+bb1(%1 : $A):
+  %2 = integer_literal $Builtin.Int32, 1
+  destroy_value %1 : $A
+  br bb3(%2 : $Builtin.Int32)
+
+bb2(%default : $AnyObject):
+  %3 = integer_literal $Builtin.Int32, 0
+  destroy_value %default : $AnyObject
+  br bb3(%3 : $Builtin.Int32)
+
+bb3(%4 : $Builtin.Int32):
+  %5 = struct $Int32 (%4 : $Builtin.Int32)
+  return %5 : $Int32
+}

@@ -3824,7 +3824,6 @@ void ClangImporter::Implementation::lookupValue(
           clangDecl->getMostRecentDecl();
 
       CurrentVersion.forEachOtherImportNameVersion(
-          SwiftContext.LangOpts.EnableExperimentalConcurrency,
           [&](ImportNameVersion nameVersion) {
         if (anyMatching)
           return;

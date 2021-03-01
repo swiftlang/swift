@@ -278,6 +278,11 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveBridgedNSError(ValueDecl *requirement);
 
+  /// Determine if \c Encodable can be derived for the given type.
+  static bool canDeriveEncodable(NominalTypeDecl *NTD);
+  /// Determine if \c Decodable can be derived for the given type.
+  static bool canDeriveDecodable(NominalTypeDecl *NTD);
+
   /// Derive a CodingKey requirement for an enum type.
   ///
   /// \returns the derived member, which will also be added to the type.
@@ -373,10 +378,9 @@ public:
                      EnumDecl *enumDecl, VarDecl *enumVarDecl,
                      AbstractFunctionDecl *funcDecl, const char *indexName);
 
-  static Pattern *
-  enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl, char varPrefix,
-                               DeclContext *varContext,
-                               SmallVectorImpl<VarDecl *> &boundVars);
+  static Pattern *enumElementPayloadSubpattern(
+      EnumElementDecl *enumElementDecl, char varPrefix, DeclContext *varContext,
+      SmallVectorImpl<VarDecl *> &boundVars, bool useLabels = false);
 
   static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
                                  DeclContext *varContext);

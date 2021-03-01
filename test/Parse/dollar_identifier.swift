@@ -77,7 +77,7 @@ func $declareWithDollar() { // expected-error{{cannot declare entity named '$dec
     $b c: Int) { } // expected-error{{cannot declare entity named '$b'}}
   let _: (Int) -> Int = {
     [$capture = 0] // expected-error{{cannot declare entity named '$capture'}}
-    $a in // expected-error{{cannot declare entity named '$a'}}
+    $a in // expected-error{{inferred projection type 'Int' is not a property wrapper}}
     $capture
   }
   let ($a: _, _) = (0, 0) // expected-error{{cannot declare entity named '$a'}}
