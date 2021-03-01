@@ -62,24 +62,6 @@ func callObjC() {
 // CHECK:         "identifier": "swift.func"
 // CHECK:       },
 // CHECK:       "names": {
-// CHECK:         "navigator": [
-// CHECK:           {
-// CHECK:             "kind": "keyword",
-// CHECK:             "spelling": "func"
-// CHECK:           },
-// CHECK:           {
-// CHECK:             "kind": "text",
-// CHECK:             "spelling": " "
-// CHECK:           },
-// CHECK:           {
-// CHECK:             "kind": "identifier",
-// CHECK:             "spelling": "fooFuncWithComment5"
-// CHECK:           },
-// CHECK:           {
-// CHECK:             "kind": "text",
-// CHECK:             "spelling": "()"
-// CHECK:           }
-// CHECK:         ],
 // CHECK:         "subHeading": [
 // CHECK:           {
 // CHECK:             "kind": "keyword",
