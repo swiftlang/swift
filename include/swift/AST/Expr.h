@@ -335,10 +335,11 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
-    ImplicitlyAsync : 1
+    ImplicitlyAsync : 1,
+    NoAsync : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CallExpr, ApplyExpr, 1+1+16,
@@ -4359,6 +4360,7 @@ protected:
     assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
     Bits.ApplyExpr.ImplicitlyAsync = false;
+    Bits.ApplyExpr.NoAsync = false;
   }
 
 public:
@@ -4395,6 +4397,15 @@ public:
     assert(!Bits.ApplyExpr.ThrowsIsSet);
     Bits.ApplyExpr.ThrowsIsSet = true;
     Bits.ApplyExpr.Throws = throws;
+  }
+
+  /// Is this a 'rethrows' function that is known not to throw?
+  bool isNoThrows() const { return !throws(); }
+
+  /// Is this a 'reasync' function that is known not to 'await'?
+  bool isNoAsync() const { return Bits.ApplyExpr.NoAsync; }
+  void setNoAsync(bool noAsync) {
+    Bits.ApplyExpr.NoAsync = noAsync;
   }
 
   /// Is this application _implicitly_ required to be an async call?
