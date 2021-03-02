@@ -115,3 +115,17 @@ func callReasyncWithAutoclosure2() async {
   await reasyncWithAutoclosure(computeValueAsync())
   // expected-error@-1 {{call is 'async' in an autoclosure argument that is not marked with 'await'}}
 }
+
+//// Reasync body checking
+
+// FIXME: Need tailored diagnostics to handle 'reasync' vs 'sync'.
+
+func invalidReasyncBody(_: () async -> ()) reasync {
+// expected-note@-1 {{add 'async' to function 'invalidReasyncBody' to make it asynchronous}}
+  _ = await computeValueAsync()
+  // expected-error@-1 {{'async' in a function that does not support concurrency}}
+}
+
+func validReasyncBody(_ fn: () async -> ()) reasync {
+  await fn()
+}
