@@ -199,6 +199,9 @@ enum class ConcurrentValueCheck {
   /// ConcurrentValue conformance was implied by one of the standard library
   /// protocols that added ConcurrentValue after-the-fact.
   ImpliedByStandardProtocol,
+
+  /// Implicit conformance to ConcurrentValue for structs and enums.
+  Implicit,
 };
 
 /// Check the correctness of the given ConcurrentValue conformance.

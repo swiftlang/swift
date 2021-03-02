@@ -206,5 +206,5 @@ extension PublicType: SPIProto where T: PrivateConstraint {}
 @_spi(S) public protocol SPIProtocol {}
 internal protocol InternalProtocol: SPIProtocol {}
 public struct PublicStruct2: InternalProtocol {}
-// CHECK-PRIVATE: @_spi(S) extension {{.*}}.PublicStruct2 : {{.*}}.SPIProtocol
+// CHECK-PRIVATE: @_spi(S) extension {{.*}}PublicStruct2 : {{.*}}.SPIProtocol
 // CHECK-PUBLIC-NOT: SPIProtocol

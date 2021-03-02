@@ -152,6 +152,12 @@
         },
         {
           "kind": "Conformance",
+          "name": "ConcurrentValue",
+          "printedName": "ConcurrentValue",
+          "usr": "s:s15ConcurrentValueP"
+        },
+        {
+          "kind": "Conformance",
           "name": "P2",
           "printedName": "P2",
           "usr": "s:4cake2P2P"
@@ -669,6 +675,12 @@
             }
           ],
           "usr": "s:SY"
+        },
+        {
+          "kind": "Conformance",
+          "name": "ConcurrentValue",
+          "printedName": "ConcurrentValue",
+          "usr": "s:s15ConcurrentValueP"
         }
       ]
     },
@@ -789,6 +801,14 @@
       "moduleName": "cake",
       "declAttributes": [
         "Frozen"
+      ],
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "ConcurrentValue",
+          "printedName": "ConcurrentValue",
+          "usr": "s:s15ConcurrentValueP"
+        }
       ]
     },
     {

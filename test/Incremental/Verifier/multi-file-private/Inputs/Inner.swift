@@ -12,3 +12,4 @@ public func blah(foo: Foo) {}
 public var defaultFoo: Foo = {
   return Inner()
 }
+// expected-superclass{{main.Inner}}
