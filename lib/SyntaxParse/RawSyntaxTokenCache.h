@@ -34,17 +34,17 @@ class RawSyntaxCacheNode : public llvm::FoldingSetNode {
   friend llvm::FoldingSetTrait<RawSyntaxCacheNode>;
 
   /// Associated RawSyntax.
-  RC<syntax::RawSyntax> Obj;
+  const syntax::RawSyntax *Obj;
   /// FoldingSet node identifier of the associated RawSyntax.
   llvm::FoldingSetNodeIDRef IDRef;
 
 public:
-  RawSyntaxCacheNode(RC<syntax::RawSyntax> &Obj,
+  RawSyntaxCacheNode(const syntax::RawSyntax *Obj,
                      const llvm::FoldingSetNodeIDRef IDRef)
       : Obj(Obj), IDRef(IDRef) {}
 
   /// Retrieve assciated RawSyntax.
-  const RC<syntax::RawSyntax> &get() { return Obj; }
+  const syntax::RawSyntax *get() { return Obj; }
 
   // Only allow allocation of Node using the allocator in SyntaxArena.
   void *operator new(size_t Bytes, RC<syntax::SyntaxArena> &Arena,
@@ -61,10 +61,10 @@ class RawSyntaxTokenCache {
   std::vector<RawSyntaxCacheNode *> CacheNodes;
 
 public:
-  RC<syntax::RawSyntax> getToken(RC<syntax::SyntaxArena> &Arena, tok TokKind,
-                                 size_t TextLength, StringRef Text,
-                                 StringRef LeadingTrivia,
-                                 StringRef TrailingTrivia);
+  const syntax::RawSyntax *getToken(RC<syntax::SyntaxArena> &Arena, tok TokKind,
+                                    size_t TextLength, StringRef Text,
+                                    StringRef LeadingTrivia,
+                                    StringRef TrailingTrivia);
 
   ~RawSyntaxTokenCache();
 };

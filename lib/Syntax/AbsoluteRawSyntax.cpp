@@ -17,8 +17,7 @@ using namespace swift::syntax;
 
 std::atomic<SyntaxIdentifier::RootIdType> SyntaxIdentifier::NextUnusedRootId(0);
 
-SyntaxIndexInTree
-SyntaxIndexInTree::advancedBy(const RC<RawSyntax> &Raw) const {
+SyntaxIndexInTree SyntaxIndexInTree::advancedBy(const RawSyntax *Raw) const {
   auto NewIndexInTree = IndexInTree;
   if (Raw) {
     NewIndexInTree += Raw->getTotalNodes();
@@ -26,8 +25,7 @@ SyntaxIndexInTree::advancedBy(const RC<RawSyntax> &Raw) const {
   return SyntaxIndexInTree(NewIndexInTree);
 }
 
-SyntaxIndexInTree
-SyntaxIndexInTree::reversedBy(const RC<RawSyntax> &Raw) const {
+SyntaxIndexInTree SyntaxIndexInTree::reversedBy(const RawSyntax *Raw) const {
   auto NewIndexInTree = IndexInTree;
   if (Raw) {
     NewIndexInTree -= Raw->getTotalNodes();
@@ -41,7 +39,7 @@ SyntaxIndexInTree SyntaxIndexInTree::advancedToFirstChild() const {
 }
 
 AbsoluteSyntaxPosition
-AbsoluteSyntaxPosition::advancedBy(const RC<RawSyntax> &Raw) const {
+AbsoluteSyntaxPosition::advancedBy(const RawSyntax *Raw) const {
   OffsetType NewOffset = Offset;
   if (Raw) {
     NewOffset += Raw->getTextLength();
@@ -51,7 +49,7 @@ AbsoluteSyntaxPosition::advancedBy(const RC<RawSyntax> &Raw) const {
 }
 
 AbsoluteSyntaxPosition
-AbsoluteSyntaxPosition::reversedBy(const RC<RawSyntax> &Raw) const {
+AbsoluteSyntaxPosition::reversedBy(const RawSyntax *Raw) const {
   OffsetType NewOffset = Offset;
   if (Raw) {
     NewOffset -= Raw->getTextLength();
