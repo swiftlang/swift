@@ -53,8 +53,6 @@ const auto NoParent = llvm::None;
 /// Essentially, this is a wrapper around \c SyntaxData that provides
 /// convenience methods based on the node's kind.
 class Syntax {
-  friend struct SyntaxFactory;
-
 protected:
   SyntaxData Data;
 
