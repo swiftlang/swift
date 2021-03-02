@@ -178,9 +178,7 @@ bool IsAsyncHandlerRequest::evaluate(
   // implies @asyncHandler.
   {
     auto idc = cast<IterableDeclContext>(dc->getAsDecl());
-    auto conformances = evaluateOrDefault(
-        dc->getASTContext().evaluator,
-        LookupAllConformancesInContextRequest{idc}, { });
+    auto conformances = idc->getLocalConformances();
 
     for (auto conformance : conformances) {
       auto protocol = conformance->getProtocol();
@@ -2050,9 +2048,7 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
 
   // Walk through each of the conformances in this context, collecting any
   // requirements that have actor isolation.
-  auto conformances = evaluateOrDefault(
-      dc->getASTContext().evaluator,
-      LookupAllConformancesInContextRequest{idc}, { });
+  auto conformances = idc->getLocalConformances();
   using IsolatedRequirement =
       std::tuple<ProtocolConformance *, ActorIsolation, ValueDecl *>;
   SmallVector<IsolatedRequirement, 2> isolatedRequirements;

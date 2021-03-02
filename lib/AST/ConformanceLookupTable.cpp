@@ -955,9 +955,7 @@ bool ConformanceLookupTable::lookupConformance(
 void ConformanceLookupTable::lookupConformances(
        NominalTypeDecl *nominal,
        DeclContext *dc,
-       ConformanceLookupKind lookupKind,
-       SmallVectorImpl<ProtocolDecl *> *protocols,
-       SmallVectorImpl<ProtocolConformance *> *conformances,
+       std::vector<ProtocolConformance *> *conformances,
        SmallVectorImpl<ConformanceDiagnostic> *diagnostics) {
   // We need to expand all implied conformances before we can find
   // those conformances that pertain to this declaration context.
@@ -979,36 +977,6 @@ void ConformanceLookupTable::lookupConformances(
                    [&](ConformanceEntry *entry) {
                      if (entry->isSuperseded())
                        return true;
-
-                     // If we are to filter out this result, do so now.
-                     switch (lookupKind) {
-                     case ConformanceLookupKind::OnlyExplicit:
-                       switch (entry->getKind()) {
-                       case ConformanceEntryKind::Explicit:
-                       case ConformanceEntryKind::Synthesized:
-                         break;
-                       case ConformanceEntryKind::Implied:
-                       case ConformanceEntryKind::Inherited:
-                         return false;
-                       }
-                       break;
-                     case ConformanceLookupKind::NonInherited:
-                       switch (entry->getKind()) {
-                       case ConformanceEntryKind::Explicit:
-                       case ConformanceEntryKind::Synthesized:
-                       case ConformanceEntryKind::Implied:
-                         break;
-                       case ConformanceEntryKind::Inherited:
-                         return false;
-                       }
-                       break;
-                     case ConformanceLookupKind::All:
-                       break;
-                     }
-
-                     // Record the protocol.
-                     if (protocols)
-                       protocols->push_back(entry->getProtocol());
 
                      // Record the conformance.
                      if (conformances) {
