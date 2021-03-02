@@ -16,6 +16,7 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
+#include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/HeapObject.h"
@@ -32,8 +33,7 @@
 using namespace swift;
 using FutureFragment = AsyncTask::FutureFragment;
 using TaskGroup = swift::TaskGroup;
-using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
-using TaskLocalInheritance = AsyncTask::TaskLocalValuesFragment::TaskLocalInheritance;
+using TaskLocalInheritance = TaskLocal::TaskLocalInheritance;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -146,13 +146,14 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
+
   // For a future, destroy the result.
   if (task->isFuture()) {
     task->futureFragment()->destroy();
   }
 
   // Release any objects potentially held as task local values.
-  task->localValuesFragment()->destroy();
+  task->Local.destroy(task);
 
   // The task execution itself should always hold a reference to it, so
   // if we get here, we know the task has finished running, which means
@@ -188,6 +189,10 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
                          SWIFT_ASYNC_CONTEXT AsyncContext *context) {
   // Set that there's no longer a running task in the current thread.
   _swift_task_clearCurrent();
+
+  // Destroy and deallocate any remaining task local items.
+  // We need to do this before we destroy the task local deallocator.
+  task->Local.destroy(task);
 
   // Tear down the task-local allocator immediately;
   // there's no need to wait for the object to be destroyed.
@@ -255,9 +260,6 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
 
-  /// Every task is able to store task local values.
-  headerSize += sizeof(AsyncTask::TaskLocalValuesFragment);
-
   if (parent) {
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
@@ -289,11 +291,6 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   AsyncTask *task =
     new(allocation) AsyncTask(&taskHeapMetadata, flags,
                               function, initialContext);
-
-  // Initialize task locals fragment.
-  auto taskLocalsFragment = task->localValuesFragment();
-  new (taskLocalsFragment) AsyncTask::TaskLocalValuesFragment();
-  taskLocalsFragment->initializeLinkParent(task, parent);
 
   // Initialize the child fragment if applicable.
   if (parent) {
@@ -346,6 +343,13 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   // Initialize the task-local allocator.
   // TODO: consider providing an initial pre-allocated first slab to the allocator.
   _swift_task_alloc_initialize(task);
+
+  // TODO: if the allocator would be prepared earlier we could do this in some
+  //       other existing if-parent if rather than adding another one here.
+  if (parent) {
+    // Initialize task locals with a link to the parent task.
+    task->Local.initializeLinkParent(task, parent);
+  }
 
   return {task, initialContext};
 }
@@ -550,23 +554,6 @@ void swift::swift_task_runAndBlockThread(const void *function,
 
 size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
-}
-
-void swift::swift_task_localValuePush(AsyncTask *task,
-                                        const Metadata *keyType,
-                                        /* +1 */ OpaqueValue *value,
-                                        const Metadata *valueType) {
-  task->localValuesFragment()->pushValue(task, keyType, value, valueType);
-}
-
-void swift::swift_task_localValuePop(AsyncTask *task) {
-  task->localValuesFragment()->popValue(task);
-}
-
-OpaqueValue* swift::swift_task_localValueGet(AsyncTask *task,
-                                             const Metadata *keyType,
-                                             TaskLocalInheritance inheritance) {
-  return task->localValueGet(keyType, inheritance);
 }
 
 namespace {

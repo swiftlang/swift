@@ -20,8 +20,8 @@
 #ifndef SWIFT_ABI_TASKSTATUS_H
 #define SWIFT_ABI_TASKSTATUS_H
 
-#include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/Task.h"
+#include "swift/ABI/MetadataValues.h"
 
 namespace swift {
 

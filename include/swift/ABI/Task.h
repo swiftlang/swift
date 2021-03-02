@@ -17,6 +17,7 @@
 #ifndef SWIFT_ABI_TASK_H
 #define SWIFT_ABI_TASK_H
 
+#include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
@@ -24,8 +25,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
 #include "bitset"
-#include "string"
-#include "queue"
+#include "queue" // TODO: remove and replace with our own mpsc
 
 namespace swift {
 class AsyncTask;
@@ -147,7 +147,6 @@ public:
 /// An AsyncTask may have the following fragments:
 ///
 ///    +--------------------------+
-///    | taskLocalValuesFragment  |
 ///    | childFragment?           |
 ///    | groupChildFragment?      |
 ///    | futureFragment?          |*
@@ -173,12 +172,16 @@ public:
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
 
+  /// Task local values storage container.
+  TaskLocal::Storage Local;
+
   AsyncTask(const HeapMetadata *metadata, JobFlags flags,
             TaskContinuationFunction *run,
             AsyncContext *initialContext)
     : HeapObject(metadata), Job(flags, run),
       ResumeContext(initialContext),
-      Status(ActiveTaskStatus()) {
+      Status(ActiveTaskStatus()),
+      Local(TaskLocal::Storage()) {
     assert(flags.isAsyncTask());
   }
 
@@ -196,237 +199,20 @@ public:
     return Status.load(std::memory_order_relaxed).isCancelled();
   }
 
-  // ==== Task Locals Values ---------------------------------------------------
+  // ==== Task Local Values ----------------------------------------------------
 
-  /// Storage fragment for task local values.
-  class TaskLocalValuesFragment {
-  public:
-    /// Type of the pointed at `next` task local item.
-    enum class NextLinkType : uintptr_t {
-      /// This task is known to be a "terminal" node in the lookup of task locals.
-      /// In other words, even if it had a parent, the parent (and its parents)
-      /// are known to not contain any any more task locals, and thus any further
-      /// search beyond this task.
-      IsTerminal = 0b00,
-      /// The storage pointer points at the next TaskLocalChainItem in this task.
-      IsNext     = 0b01,
-      /// The storage pointer points at a parent AsyncTask, in which we should
-      /// continue the lookup.
-      ///
-      /// Note that this may not necessarily be the same as the task's parent
-      /// task -- we may point to a super-parent if we know / that the parent
-      /// does not "contribute" any task local values. This is to speed up
-      /// lookups by skipping empty parent tasks during get(), and explained
-      /// in depth in `createParentLink`.
-      IsParent   = 0b11
-    };
-
-    /// Values must match `TaskLocalInheritance` declared in `TaskLocal.swift`.
-    enum class TaskLocalInheritance : uint8_t {
-      Default = 0,
-      Never   = 1
-    };
-
-    class TaskLocalItem {
-    private:
-      /// Mask used for the low status bits in a task local chain item.
-      static const uintptr_t statusMask = 0x03;
-
-      /// Pointer to the next task local item; be it in this task or in a parent.
-      /// Low bits encode `NextLinkType`.
-      /// TaskLocalItem *next = nullptr;
-      uintptr_t next;
-
-    public:
-      /// The type of the key with which this value is associated.
-      const Metadata *keyType;
-      /// The type of the value stored by this item.
-      const Metadata *valueType;
-
-      // Trailing storage for the value itself. The storage will be
-      // uninitialized or contain an instance of \c valueType.
-
-    private:
-      explicit TaskLocalItem(const Metadata *keyType, const Metadata *valueType)
-        : next(0),
-          keyType(keyType),
-          valueType(valueType) { }
-
-    public:
-      /// TaskLocalItem which does not by itself store any value, but only points
-      /// to the nearest task-local-value containing parent's first task item.
-      ///
-      /// This item type is used to link to the appropriate parent task's item,
-      /// when the current task itself does not have any task local values itself.
-      ///
-      /// When a task actually has its own task locals, it should rather point
-      /// to the parent's *first* task-local item in its *last* item, extending
-      /// the TaskLocalItem linked list into the appropriate parent.
-      static TaskLocalItem* createParentLink(AsyncTask *task, AsyncTask *parent) {
-        assert(parent);
-        size_t amountToAllocate = TaskLocalItem::itemSize(/*valueType*/nullptr);
-        // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-        void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator
-
-        TaskLocalItem *item =
-            new(allocation) TaskLocalItem(nullptr, nullptr);
-
-        auto parentHead = parent->localValuesFragment()->head;
-        if (parentHead) {
-          if (parentHead->isEmpty()) {
-            switch (parentHead->getNextLinkType()) {
-              case NextLinkType::IsParent:
-                // it has no values, and just points to its parent,
-                // therefore skip also skip pointing to that parent and point
-                // to whichever parent it was pointing to as well, it may be its
-                // immediate parent, or some super-parent.
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) |
-                                  static_cast<uintptr_t>(NextLinkType::IsParent);
-                break;
-              case NextLinkType::IsNext:
-                assert(false && "empty taskValue head in parent task, yet parent's 'head' is `IsNext`, "
-                                "this should not happen, as it implies the parent must have stored some value.");
-                break;
-              case NextLinkType::IsTerminal:
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) | 
-                                  static_cast<uintptr_t>(NextLinkType::IsTerminal);
-                break;
-            }
-          } else {
-            item->next = reinterpret_cast<uintptr_t>(parentHead) |
-                         static_cast<uintptr_t>(NextLinkType::IsParent);
-          }
-        } else {
-          item->next = reinterpret_cast<uintptr_t>(parentHead) |
-                       static_cast<uintptr_t>(NextLinkType::IsTerminal);
-        }
-
-        return item;
-      }
-
-      static TaskLocalItem* createLink(AsyncTask *task,
-                                       const Metadata *keyType,
-                                       const Metadata *valueType) {
-        assert(task);
-        size_t amountToAllocate = TaskLocalItem::itemSize(valueType);
-        // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-        void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator rdar://74218679
-        TaskLocalItem *item =
-            new(allocation) TaskLocalItem(keyType, valueType);
-
-        auto next = task->localValuesFragment()->head;
-        auto nextLinkType = next ? NextLinkType::IsNext : NextLinkType::IsTerminal;
-        item->next = reinterpret_cast<uintptr_t>(next) |
-                     static_cast<uintptr_t>(nextLinkType);
-
-        return item;
-      }
-
-      void destroy() {
-        if (valueType) {
-          valueType->vw_destroy(getStoragePtr());
-        }
-      }
-
-      TaskLocalItem *getNext() {
-        return reinterpret_cast<TaskLocalItem *>(next & ~statusMask);
-      }
-
-      NextLinkType getNextLinkType() {
-        return static_cast<NextLinkType>(next & statusMask);
-      }
-
-      /// Item does not contain any actual value, and is only used to point at
-      /// a specific parent item.
-      bool isEmpty() {
-        return !valueType;
-      }
-
-      /// Retrieve a pointer to the storage of the value.
-      OpaqueValue *getStoragePtr() {
-        return reinterpret_cast<OpaqueValue *>(
-            reinterpret_cast<char *>(this) + storageOffset(valueType));
-      }
-
-      /// Compute the offset of the storage from the base of the item.
-      static size_t storageOffset(const Metadata *valueType) {
-        size_t offset = sizeof(TaskLocalItem);
-        if (valueType) {
-          size_t alignment = valueType->vw_alignment();
-          return (offset + alignment - 1) & ~(alignment - 1);
-        } else {
-          return offset;
-        }
-      }
-
-      /// Determine the size of the item given a particular value type.
-      static size_t itemSize(const Metadata *valueType) {
-        size_t offset = storageOffset(valueType);
-        if (valueType) {
-          offset += valueType->vw_size();
-        }
-        return offset;
-      }
-    };
-
-  private:
-    /// A stack (single-linked list) of task local values.
-    ///
-    /// Once task local values within this task are traversed, the list continues
-    /// to the "next parent that contributes task local values," or if no such
-    /// parent exists it terminates with null.
-    ///
-    /// If the TaskLocalValuesFragment was allocated, it is expected that this
-    /// value should be NOT null; it either has own values, or at least one
-    /// parent that has values. If this task does not have any values, the head
-    /// pointer MAY immediately point at this task's parent task which has values.
-    ///
-    /// ### Concurrency
-    /// Access to the head is only performed from the task itself, when it
-    /// creates child tasks, the child during creation will inspect its parent's
-    /// task local value stack head, and point to it. This is done on the calling
-    /// task, and thus needs not to be synchronized. Subsequent traversal is
-    /// performed by child tasks concurrently, however they use their own
-    /// pointers/stack and can never mutate the parent's stack.
-    ///
-    /// The stack is only pushed/popped by the owning task, at the beginning and
-    /// end a `body` block of `withLocal(_:boundTo:body:)` respectively.
-    ///
-    /// Correctness of the stack strongly relies on the guarantee that tasks
-    /// never outline a scope in which they are created. Thanks to this, if
-    /// tasks are created inside the `body` of `withLocal(_:,boundTo:body:)`
-    /// all tasks created inside the `withLocal` body must complete before it
-    /// returns, as such, any child tasks potentially accessing the value stack
-    /// are guaranteed to be completed by the time we pop values off the stack
-    /// (after the body has completed).
-    TaskLocalItem *head = nullptr;
-
-  public:
-    TaskLocalValuesFragment() {}
-
-    void destroy();
-
-    /// If the parent task has task local values defined, point to in
-    /// the task local values chain.
-    void initializeLinkParent(AsyncTask* task, AsyncTask* parent);
-
-    void pushValue(AsyncTask *task, const Metadata *keyType,
-        /* +1 */ OpaqueValue *value, const Metadata *valueType);
-
-    void popValue(AsyncTask *task);
-
-    OpaqueValue* get(const Metadata *keType, TaskLocalInheritance inheritance);
-  };
-
-  TaskLocalValuesFragment *localValuesFragment() {
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    return reinterpret_cast<TaskLocalValuesFragment*>(offset);
+  void localValuePush(const Metadata *keyType,
+                      /* +1 */ OpaqueValue *value, const Metadata *valueType) {
+    Local.pushValue(this, keyType, value, valueType);
   }
 
   OpaqueValue* localValueGet(const Metadata *keyType,
-                             TaskLocalValuesFragment::TaskLocalInheritance inheritance) {
-    return localValuesFragment()->get(keyType, inheritance);
+                             TaskLocal::TaskLocalInheritance inherit) {
+    return Local.getValue(this, keyType, inherit);
+  }
+
+  void localValuePop() {
+    Local.popValue(this);
   }
 
   // ==== Child Fragment -------------------------------------------------------
@@ -476,7 +262,6 @@ public:
 
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
-    offset += sizeof(TaskLocalValuesFragment);
 
     return reinterpret_cast<ChildFragment*>(offset);
   }
@@ -516,7 +301,6 @@ public:
 
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
-    offset += sizeof(TaskLocalValuesFragment);
     if (hasChildFragment())
       offset += sizeof(ChildFragment);
 
@@ -625,7 +409,6 @@ public:
     assert(isFuture());
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
-    offset += sizeof(TaskLocalValuesFragment);
     if (hasChildFragment())
       offset += sizeof(ChildFragment);
     if (hasGroupChildFragment())
@@ -665,7 +448,7 @@ private:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == 12 * sizeof(void*),
+static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
