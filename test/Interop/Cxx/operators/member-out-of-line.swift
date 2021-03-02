@@ -15,8 +15,8 @@ import StdlibUnittest
 var OperatorsTestSuite = TestSuite("Operators")
 
 OperatorsTestSuite.test("plus") {
-  var lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
+  var lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs + rhs
 
