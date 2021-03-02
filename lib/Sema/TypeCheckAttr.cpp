@@ -34,8 +34,10 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
@@ -4583,39 +4585,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   (void)attr->getParameterIndices();
 }
 
-/// Checks if original candidate and registered derivative match in terms
-/// of static declaration. If the original candidate is a constructor or is
-/// defined as static method then the registered derivative is expected to be static.
-/// Otherwise the registered derivative should be an instance method.
-/// \returns true if mismatch is found, false otherwise.
-static bool checkStaticDeclMismatch(AbstractFunctionDecl *originalCandidate,
-                                    AbstractFunctionDecl *registered) {
-  return (isa<ConstructorDecl>(originalCandidate) ||
-          originalCandidate->isStatic()) != registered->isStatic();
-}
-
-/// Produces diagnostics for mismatch in static/instance method declaration
-/// between original candidate and registered derivative.
-static void diagnoseStaticDeclMismatch(AbstractFunctionDecl *originalCandidate,
-                                       FuncDecl *registered) {
-  auto &diags = originalCandidate->getASTContext().Diags;
-  diags.diagnose(
-      registered->getNameLoc(), diag::autodiff_attr_static_decl_mismatch,
-      registered->getName(), registered->isStatic(), !registered->isStatic());
-  diags.diagnose(
-      originalCandidate->getNameLoc(), diag::autodiff_attr_static_decl_original,
-      originalCandidate->getName(),
-      isa<ConstructorDecl>(originalCandidate) || originalCandidate->isStatic());
-  auto fixItDiag = diags.diagnose(
-      registered->getStartLoc(), diag::autodiff_attr_static_decl_mismatch_fix,
-      registered->getName(), !registered->isStatic());
-  if (registered->isStatic()) {
-    fixItDiag.fixItRemove(registered->getStaticLoc());
-  } else {
-    fixItDiag.fixItInsert(registered->getStartLoc(), "static ");
-  }
-}
-
 /// Type-checks the given `@derivative` attribute `attr` on declaration `D`.
 ///
 /// Effects are:
@@ -4842,12 +4811,39 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     }
   }
 
+  attr->setOriginalFunction(originalAFD);
+
+  // Returns true if:
+  // - Original function and derivative function are static methods.
+  // - Original function and derivative function are non-static methods.
+  // - Original function is a Constructor declaration and derivative function is
+  // a static method.
+  auto compatibleStaticDecls = [&]() {
+    return (isa<ConstructorDecl>(originalAFD) || originalAFD->isStatic()) ==
+           derivative->isStatic();
+  };
+
   // Diagnose if original function and derivative differ in terms of static declaration.
-  if (checkStaticDeclMismatch(originalAFD, derivative)) {
-    diagnoseStaticDeclMismatch(originalAFD, derivative);
+  if (!compatibleStaticDecls()) {
+    bool derivativeMustBeStatic = !derivative->isStatic();
+    diags.diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
+                   diag::derivative_attr_static_method_mismatch_original,
+                   originalAFD->getName(), derivative->getName(),
+                   derivativeMustBeStatic);
+    diags.diagnose(originalAFD->getNameLoc(),
+                   diag::derivative_attr_static_method_mismatch_original_note,
+                   originalAFD->getName(), derivativeMustBeStatic);
+    auto fixItDiag =
+        diags.diagnose(derivative->getStartLoc(),
+                       diag::derivative_attr_static_method_mismatch_fix,
+                       derivative->getName(), derivativeMustBeStatic);
+    if (derivativeMustBeStatic) {
+      fixItDiag.fixItInsert(derivative->getStartLoc(), "static ");
+    } else {
+      fixItDiag.fixItRemove(derivative->getStaticLoc());
+    }
     return true;
   }
-  attr->setOriginalFunction(originalAFD);
 
   // Returns true if:
   // - Original function and derivative function have the same access level.
@@ -5364,11 +5360,35 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     return;
   }
 
+  // Returns true if:
+  // - Original function and transpose function are static methods.
+  // - Original function and transpose function are non-static methods.
+  // - Original function is a Constructor declaration and transpose function is
+  // a static method.
+  auto compatibleStaticDecls = [&]() {
+    return (isa<ConstructorDecl>(originalAFD) || originalAFD->isStatic()) ==
+           transpose->isStatic();
+  };
+
   // Diagnose if original function and transpose differ in terms of static declaration.
-  if (!doSelfTypesMatch && checkStaticDeclMismatch(originalAFD, transpose)) {
-      diagnoseStaticDeclMismatch(originalAFD, transpose);
-      attr->setInvalid();
-      return;
+  if (!doSelfTypesMatch && !compatibleStaticDecls()) {
+    bool transposeMustBeStatic = !transpose->isStatic();
+    diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
+             diag::transpose_attr_static_method_mismatch_original,
+             originalAFD->getName(), transpose->getName(),
+             transposeMustBeStatic);
+    diagnose(originalAFD->getNameLoc(),
+             diag::transpose_attr_static_method_mismatch_original_note,
+             originalAFD->getName(), transposeMustBeStatic);
+    auto fixItDiag = diagnose(transpose->getStartLoc(),
+                              diag::transpose_attr_static_method_mismatch_fix,
+                              transpose->getName(), transposeMustBeStatic);
+    if (transposeMustBeStatic) {
+      fixItDiag.fixItInsert(transpose->getStartLoc(), "static ");
+    } else {
+      fixItDiag.fixItRemove(transpose->getStaticLoc());
+    }
+    return;
   }
 
   // Set the resolved linearity parameter indices in the attribute.

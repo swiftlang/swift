@@ -498,7 +498,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
 
 // Test initializers.
 extension Struct {
-  // expected-note @+1 {{original function 'init(_:)' operates on a type}}
+  // expected-note @+1 {{original function 'init(_:)' is a 'static' method}}
   init(_ x: Float) {}
   init(_ x: T, y: Float) {}
 }
@@ -515,9 +515,9 @@ extension Struct where T: Differentiable, T == T.TangentVector {
   }
 
   // Test instance transpose for static original initializer.
+  // expected-error @+1 {{unexpected transpose function declaration; 'init(_:)' requires the transpose function 'vjpInitStaticMismatch' to be a 'static' method}}
   @transpose(of: init, wrt: 0)
-  // expected-error @+2 {{derivative function 'vjpInitStaticMismatch' operates on an instance type, not on a type as required}}
-  // expected-note @+1 {{derivative function 'vjpInitStaticMismatch' must be 'static'}}{{3-3=static }}
+  // expected-note @+1 {{make transpose function 'vjpInitStaticMismatch' a 'static' method}}{{3-3=static }}
   func vjpInitStaticMismatch(_ x: Self) -> Float {
     fatalError()
   }

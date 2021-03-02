@@ -3216,6 +3216,17 @@ NOTE(derivative_attr_fix_access,none,
      "mark the derivative function as "
      "'%select{private|fileprivate|internal|@usableFromInline|@usableFromInline}0' "
      "to match the original function", (AccessLevel))
+ERROR(derivative_attr_static_method_mismatch_original,none,
+      "unexpected derivative function declaration; "
+      "%0 requires the derivative function %1 to be %select{an instance|a 'static'}2 method",
+      (/*original*/DeclName, /*derivative*/ DeclName,
+       /*originalIsStatic*/bool))
+NOTE(derivative_attr_static_method_mismatch_original_note,none,
+      "original function %0 is %select{an instance|a 'static'}1 method",
+      (/*original*/ DeclName, /*originalIsStatic*/bool))
+NOTE(derivative_attr_static_method_mismatch_fix,none,
+      "make derivative function %0 %select{an instance|a 'static'}1 method",
+      (/*derivative*/ DeclName, /*mustBeStatic*/bool))
 
 // @transpose
 ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
@@ -3233,6 +3244,17 @@ ERROR(transpose_attr_wrt_self_must_be_static,none,
 NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "the transpose is declared in %0 but the original function is declared in "
      "%1", (Type, Type))
+ERROR(transpose_attr_static_method_mismatch_original,none,
+      "unexpected transpose function declaration; "
+      "%0 requires the transpose function %1 to be %select{an instance|a 'static'}2 method",
+      (/*original*/DeclName, /*transpose*/ DeclName,
+       /*originalIsStatic*/bool))
+NOTE(transpose_attr_static_method_mismatch_original_note,none,
+      "original function %0 is %select{an instance|a 'static'}1 method",
+      (/*original*/ DeclName, /*originalIsStatic*/bool))
+NOTE(transpose_attr_static_method_mismatch_fix,none,
+      "make transpose function %0 %select{an instance|a 'static'}1 method",
+      (/*transpose*/ DeclName, /*mustBeStatic*/bool))
 
 // Automatic differentiation attributes
 ERROR(autodiff_attr_original_decl_ambiguous,none,
@@ -3264,18 +3286,6 @@ ERROR(autodiff_attr_result_not_differentiable,none,
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 ERROR(autodiff_attr_opaque_result_type_unsupported,none,
       "cannot differentiate functions returning opaque result types", ())
-ERROR(autodiff_attr_static_decl_mismatch,none,
-      "derivative function %0 operates on %select{an instance|a}1 type, "
-      "not on %select{an instance|a}2 type as required",
-      (/*derivative*/ DeclName, /*derivativeOperatesOnTy*/bool,
-       /*originalOperatesOnTy*/bool))
-NOTE(autodiff_attr_static_decl_original,none,
-      "original function %0 operates on %select{an instance|a}1 type",
-      (/*original*/ DeclName, /*originalOperatesOnTy*/bool))
-NOTE(autodiff_attr_static_decl_mismatch_fix,none,
-      "derivative function %0 must %select{not be|be}1 'static'",
-      (/*derivative*/ DeclName, /*mustBeStatic*/bool))
-
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
