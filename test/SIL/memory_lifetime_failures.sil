@@ -400,3 +400,48 @@ bb3:
   return %res : $()
 }
 
+// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_1: memory is initialized, but shouldn't
+sil [ossa] @test_unconditional_checked_cast_1 : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unconditional_checked_cast_addr U in %0 : $*U to V in %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_2: memory is not initialized, but should
+sil [ossa] @test_unconditional_checked_cast_2 : $@convention(thin) <U, V> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %u = alloc_stack $U
+  %s = alloc_stack $V
+  unconditional_checked_cast_addr U in %u : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  dealloc_stack %u : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_1: memory is initialized, but shouldn't
+sil [ossa] @test_unchecked_ref_cast_1 : $@convention(thin) <U : AnyObject, V : AnyObject> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unchecked_ref_cast_addr U in %0 : $*U to V in %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_2: memory is not initialized, but should
+sil [ossa] @test_unchecked_ref_cast_2 : $@convention(thin) <U : AnyObject, V : AnyObject> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %u = alloc_stack $U
+  %s = alloc_stack $V
+  unchecked_ref_cast_addr U in %u : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  dealloc_stack %u : $*U
+  %5 = tuple ()
+  return %5 : $()
+}

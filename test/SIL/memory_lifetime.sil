@@ -541,3 +541,22 @@ bb3:
   return %res : $()
 }
 
+sil [ossa] @test_unconditional_checked_cast : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unconditional_checked_cast_addr U in %0 : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_unchecked_ref_cast : $@convention(thin) <U : AnyObject, V : AnyObject> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unchecked_ref_cast_addr U in %0 : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}

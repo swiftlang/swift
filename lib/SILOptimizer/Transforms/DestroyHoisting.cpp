@@ -353,6 +353,8 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
     case SILInstructionKind::StoreBorrowInst:
     case SILInstructionKind::CopyAddrInst:
     case SILInstructionKind::InjectEnumAddrInst:
+    case SILInstructionKind::UncheckedRefCastAddrInst:
+    case SILInstructionKind::UnconditionalCheckedCastAddrInst:
     case SILInstructionKind::CheckedCastAddrBranchInst:
     case SILInstructionKind::PartialApplyInst:
     case SILInstructionKind::ApplyInst:

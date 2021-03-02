@@ -357,6 +357,8 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::CheckedCastAddrBranchInst:
+      case SILInstructionKind::UncheckedRefCastAddrInst:
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst:
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
@@ -914,6 +916,14 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::DeallocStackInst:
         state.killBits(I.getOperand(0), locations);
         break;
+      case SILInstructionKind::UncheckedRefCastAddrInst:
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+        SILValue src = I.getOperand(CopyLikeInstruction::Src);
+        SILValue dest = I.getOperand(CopyLikeInstruction::Dest);
+        state.killBits(src, locations);
+        state.genBits(dest, locations);
+        break;
+      }
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst: {
@@ -1169,6 +1179,17 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::EndBorrowInst: {
         if (SILValue orig = cast<EndBorrowInst>(&I)->getSingleOriginalValue())
           requireBitsSet(bits, orig, &I);
+        break;
+      }
+      case SILInstructionKind::UncheckedRefCastAddrInst:
+      case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+        SILValue src = I.getOperand(CopyLikeInstruction::Src);
+        SILValue dest = I.getOperand(CopyLikeInstruction::Dest);
+        requireBitsSet(bits, src, &I);
+        locations.clearBits(bits, src);
+        requireBitsClear(bits & nonTrivialLocations, dest, &I);
+        locations.setBits(bits, dest);
+        requireNoStoreBorrowLocation(dest, &I);
         break;
       }
       case SILInstructionKind::CheckedCastAddrBranchInst: {
