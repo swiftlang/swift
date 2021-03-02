@@ -514,8 +514,8 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     return false;
   }
   Optional<std::vector<std::string>> outputFilenames =
-      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
-                                                                       Diags);
+      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
+        Args, Diags, options::OPT_o, options::OPT_output_filelist);
 
   std::string nameToStem =
       outputFilenames && outputFilenames->size() == 1 &&
@@ -531,14 +531,17 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
 bool ArgsToFrontendOptionsConverter::
     computeMainAndSupplementaryOutputFilenames() {
   std::vector<std::string> mainOutputs;
+  std::vector<std::string> mainOutputForIndexUnits;
   std::vector<SupplementaryOutputPaths> supplementaryOutputs;
   const bool hadError = ArgsToFrontendOutputsConverter(
                             Args, Opts.ModuleName, Opts.InputsAndOutputs, Diags)
-                            .convert(mainOutputs, supplementaryOutputs);
+                            .convert(mainOutputs, mainOutputForIndexUnits,
+                                     supplementaryOutputs);
   if (hadError)
     return true;
   Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,
-                                                       supplementaryOutputs);
+                                                       supplementaryOutputs,
+                                                       mainOutputForIndexUnits);
   return false;
 }
 
