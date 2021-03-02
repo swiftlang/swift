@@ -238,3 +238,115 @@ bb0(%0 : @owned $T):
   return %r : $()
 }
 
+sil [ossa] @closure : $@convention(thin) (@in_guaranteed T) -> () 
+
+// CHECK: SIL memory lifetime failure in @test_non_escaping_closure: memory is initialized at function return but shouldn't
+sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in T) -> () {
+bb0(%0 :  $*T):
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_escaping_closure: indirect argument is not alive at function return
+sil [ossa] @test_escaping_closure : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 :  $*T):
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  destroy_value %pa : $@callee_owned () -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy: memory is not initialized, but should
+sil [ossa] @test_store_borrow_destroy : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  destroy_addr %s : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @func_with_inout_param : $@convention(thin) (@inout T) -> ()
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_inout: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_inout : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  %f = function_ref @func_with_inout_param : $@convention(thin) (@inout T) -> ()
+  %a = apply %f(%s) : $@convention(thin) (@inout T) -> ()
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_store: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_store : $@convention(thin) (@guaranteed T, @owned T) -> () {
+bb0(%0 :  @guaranteed $T, %1 : @owned $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  store %1 to [assign] %s : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_load: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_load : $@convention(thin) (@guaranteed T) -> @owned T {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  %res = load [take] %s : $*T
+  dealloc_stack %s : $*T
+  return %res : $T
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_copy_src: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_copy_src : $@convention(thin) (@guaranteed T) -> @out T {
+bb0(%0 :  $*T, %1 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %1 to %s : $*T
+  copy_addr [take] %s to [initialization] %0 : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_copy_dst: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_copy_dst : $@convention(thin) (@in_guaranteed T, @guaranteed T) -> () {
+bb0(%0 :  $*T, %1 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %1 to %s : $*T
+  copy_addr %0 to %s : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_init_enum: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_init_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
+bb0(%0 :  @guaranteed $Optional<T>):
+  %s = alloc_stack $Optional<T>
+  store_borrow %0 to %s : $*Optional<T>
+  %ie = init_enum_data_addr %s : $*Optional<T>, #Optional.some!enumelt
+  dealloc_stack %s : $*Optional<T>
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_take_enum: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_take_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
+bb0(%0 :  @guaranteed $Optional<T>):
+  %s = alloc_stack $Optional<T>
+  store_borrow %0 to %s : $*Optional<T>
+  %ue = unchecked_take_enum_data_addr %s : $*Optional<T>, #Optional.some!enumelt
+  dealloc_stack %s : $*Optional<T>
+  %res = tuple ()
+  return %res : $()
+}
+
