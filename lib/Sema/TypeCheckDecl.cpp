@@ -1107,7 +1107,8 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
     ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
-    return TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext());
+    return proto &&
+        TypeChecker::conformsToProtocol(rawTy, proto, ED->getDeclContext());
   };
 
   static auto otherLiteralProtocolKinds = {
