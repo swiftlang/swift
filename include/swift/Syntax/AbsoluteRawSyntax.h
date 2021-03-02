@@ -32,11 +32,11 @@ public:
 
   /// Assuming that this index points to the start of \p Raw, advance it so that
   /// it points to the next sibling of \p Raw.
-  SyntaxIndexInTree advancedBy(const RC<RawSyntax> &Raw) const;
+  SyntaxIndexInTree advancedBy(const RawSyntax *Raw) const;
 
   /// Assuming that this index points to the next sibling of \p Raw, reverse it
   /// so that it points to the start of \p Raw.
-  SyntaxIndexInTree reversedBy(const RC<RawSyntax> &Raw) const;
+  SyntaxIndexInTree reversedBy(const RawSyntax *Raw) const;
 
   /// Advance this index to point to its first immediate child.
   SyntaxIndexInTree advancedToFirstChild() const;
@@ -84,14 +84,14 @@ public:
 
   /// Assuming that this identifier points to the start of \p Raw, advance it so
   /// that it points to the next sibling of \p Raw.
-  SyntaxIdentifier advancedBy(const RC<RawSyntax> &Raw) const {
+  SyntaxIdentifier advancedBy(const RawSyntax *Raw) const {
     auto NewIndexInTree = IndexInTree.advancedBy(Raw);
     return SyntaxIdentifier(RootId, NewIndexInTree);
   }
 
   /// Assuming that this identifier points to the next sibling of \p Raw,
   /// reverse it so that it points to the start of \p Raw.
-  SyntaxIdentifier reversedBy(const RC<RawSyntax> &Raw) const {
+  SyntaxIdentifier reversedBy(const RawSyntax *Raw) const {
     auto NewIndexInTree = IndexInTree.reversedBy(Raw);
     return SyntaxIdentifier(RootId, NewIndexInTree);
   }
@@ -138,11 +138,11 @@ public:
 
   /// Assuming that this position points to the start of \p Raw, advance it so
   /// that it points to the next sibling of \p Raw.
-  AbsoluteSyntaxPosition advancedBy(const RC<RawSyntax> &Raw) const;
+  AbsoluteSyntaxPosition advancedBy(const RawSyntax *Raw) const;
 
   /// Assuming that this position points to the next sibling of \p Raw, reverse
   /// it so that it points to the start of \p Raw.
-  AbsoluteSyntaxPosition reversedBy(const RC<RawSyntax> &Raw) const;
+  AbsoluteSyntaxPosition reversedBy(const RawSyntax *Raw) const;
 
   /// Get the position of the node's first immediate child.
   AbsoluteSyntaxPosition advancedToFirstChild() const {
@@ -189,7 +189,7 @@ public:
 
   /// Assuming that this info points to the start of \p Raw, advance it so
   /// that it points to the next sibling of \p Raw.
-  AbsoluteSyntaxInfo advancedBy(const RC<RawSyntax> &Raw) const {
+  AbsoluteSyntaxInfo advancedBy(const RawSyntax *Raw) const {
     auto NewNodeId = NodeId.advancedBy(Raw);
     auto NewPosition = Position.advancedBy(Raw);
     return AbsoluteSyntaxInfo(NewPosition, NewNodeId);
@@ -197,7 +197,7 @@ public:
 
   /// Assuming that this info points to the next sibling of \p Raw, reverse
   /// it so that it points to the start of \p Raw.
-  AbsoluteSyntaxInfo reversedBy(const RC<RawSyntax> &Raw) const {
+  AbsoluteSyntaxInfo reversedBy(const RawSyntax *Raw) const {
     auto NewNodeId = NodeId.reversedBy(Raw);
     auto NewPosition = Position.reversedBy(Raw);
     return AbsoluteSyntaxInfo(NewPosition, NewNodeId);
@@ -214,20 +214,20 @@ public:
 /// A \c RawSyntax node that is enrichted with information of its position
 /// within the syntax tree it lives in.
 struct AbsoluteRawSyntax {
-  const RC<RawSyntax> Raw;
+  const RawSyntax *Raw;
   const AbsoluteSyntaxInfo Info;
 
 public:
-  AbsoluteRawSyntax(const RC<RawSyntax> &Raw, AbsoluteSyntaxInfo Info)
+  AbsoluteRawSyntax(const RawSyntax *Raw, AbsoluteSyntaxInfo Info)
       : Raw(Raw), Info(Info) {}
 
   /// Construct a \c AbsoluteRawSyntax for a \c RawSyntax node that represents
   /// the syntax tree's root.
-  static AbsoluteRawSyntax forRoot(const RC<RawSyntax> &Raw) {
+  static AbsoluteRawSyntax forRoot(const RawSyntax *Raw) {
     return AbsoluteRawSyntax(Raw, AbsoluteSyntaxInfo::forRoot());
   }
 
-  const RC<RawSyntax> &getRaw() const { return Raw; }
+  const RawSyntax *getRaw() const { return Raw; }
 
   AbsoluteSyntaxInfo getInfo() const { return Info; }
 
@@ -245,7 +245,7 @@ public:
   ///  - the \p NewRaw as the backing storage
   ///  - the \p NewRootId as the RootId
   AbsoluteRawSyntax
-  replacingSelf(const RC<RawSyntax> &NewRaw,
+  replacingSelf(const RawSyntax *NewRaw,
                 SyntaxIdentifier::RootIdType NewRootId) const {
     SyntaxIdentifier NewNodeId(NewRootId, Info.getNodeId().getIndexInTree());
     AbsoluteSyntaxInfo NewInfo(Info.getPosition(), NewNodeId);

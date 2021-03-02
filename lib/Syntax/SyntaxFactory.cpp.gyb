@@ -50,7 +50,7 @@ TokenSyntax SyntaxFactory::makeToken(tok Kind, StringRef Text,
 UnknownSyntax
 SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
                                  const RC<SyntaxArena> &Arena) {
-  std::vector<RC<RawSyntax>> Layout;
+  std::vector<const RawSyntax *> Layout;
   Layout.reserve(Tokens.size());
   for (auto &Token : Tokens) {
     Layout.push_back(Token.getRaw());
@@ -60,11 +60,13 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
   return makeRoot<UnknownSyntax>(Raw);
 }
 
-Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
+Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind,
+                                                const RC<SyntaxArena> &Arena) {
   switch(Kind) {
 % for node in SYNTAX_NODES:
 %   if node.is_syntax_collection():
-  case SyntaxKind::${node.syntax_kind}: return makeBlank${node.syntax_kind}();
+  case SyntaxKind::${node.syntax_kind}:
+    return makeBlank${node.syntax_kind}(Arena);
 %   end
 % end
   default: break;
@@ -111,7 +113,7 @@ bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
 }
 
 bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
-                                                  const RC<RawSyntax> &Member) {
+                                                  const RawSyntax *Member) {
   return canServeAsCollectionMemberRaw(CollectionKind, Member->getKind());
 }
 
@@ -120,15 +122,17 @@ canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
   return canServeAsCollectionMemberRaw(CollectionKind, Member.getRaw());
 }
 
-RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
-                                       llvm::ArrayRef<RC<RawSyntax>> Elements,
-                                       const RC<SyntaxArena> &Arena) {
+const RawSyntax *SyntaxFactory::createRaw(
+  SyntaxKind Kind,
+  llvm::ArrayRef<const RawSyntax *> Elements,
+  const RC<SyntaxArena> &Arena
+) {
   switch (Kind) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
 %   child_count = len(node.children)
-    RC<RawSyntax> Layout[${child_count}];
+    const RawSyntax *Layout[${child_count}];
     unsigned I = 0;
 %   for (child_idx, child) in enumerate(node.children):
     // child[${child_idx}] ${child.name}
@@ -168,7 +172,7 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
 Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
                                              llvm::ArrayRef<Syntax> Elements,
                                              const RC<SyntaxArena> &Arena) {
-  std::vector<RC<RawSyntax>> Layout;
+  std::vector<const RawSyntax *> Layout;
   Layout.reserve(Elements.size());
   for (auto &E : Elements)
     Layout.emplace_back(E.getRaw());
@@ -207,7 +211,7 @@ ${node.name}
 SyntaxFactory::make${node.syntax_kind}(
     const std::vector<${node.collection_element_type}> &elements,
     const RC<SyntaxArena> &Arena) {
-  std::vector<RC<RawSyntax>> layout;
+  std::vector<const RawSyntax *> layout;
   layout.reserve(elements.size());
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
