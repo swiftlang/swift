@@ -3004,6 +3004,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DeclContext;
   friend class IterableDeclContext;
   friend class DirectLookupRequest;
+  friend class LookupAllConformancesInContextRequest;
   friend ArrayRef<ValueDecl *>
   ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
