@@ -508,7 +508,7 @@ extension Task {
   ///
   /// The returned value must not be accessed from tasks other than the current one.
   public static var unsafeCurrent: UnsafeCurrentTask? {
-    guard let _task = _getActiveAsyncTask() else {
+    guard let _task = _getCurrentAsyncTask() else {
       return nil
     }
     // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
@@ -583,8 +583,8 @@ extension UnsafeCurrentTask: Equatable {
 
 // ==== Internal ---------------------------------------------------------------
 
-@_silgen_name("swift_task_get_active")
-func _getActiveAsyncTask() -> Builtin.NativeObject?
+@_silgen_name("swift_task_getCurrent")
+func _getCurrentAsyncTask() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags

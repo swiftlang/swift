@@ -122,10 +122,6 @@ void swift_task_cancel(AsyncTask *task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *group);
 
-/// Get 'active' AsyncTask, depending on platform this may use thread local storage.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTask* swift_task_get_active();
-
 /// Escalate the priority of a task and all of its child tasks.
 ///
 /// This can be called from any thread.
@@ -343,8 +339,6 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(
     AsyncTask *task, CancellationNotificationStatusRecord *record);
 
-using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
-
 /// Get a task local value from the passed in task. Its Swift signature is
 ///
 /// \code
@@ -358,7 +352,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_task_localValueGet(AsyncTask* task,
                          const Metadata *keyType,
-                         TaskLocalValuesFragment::TaskLocalInheritance inheritance);
+                         TaskLocal::TaskLocalInheritance inheritance);
 
 /// Add a task local value to the passed in task.
 ///

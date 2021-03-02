@@ -18,10 +18,10 @@
 #define SWIFT_ABI_TASK_GROUP_H
 
 #include "swift/ABI/Task.h"
-#include "swift/Runtime/Concurrency.h"
-#include "swift/Basic/RelativePointer.h"
 #include "swift/ABI/HeapObject.h"
+#include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Config.h"
+#include "swift/Basic/RelativePointer.h"
 #include "swift/Basic/STLExtras.h"
 #include "bitset"
 #include "string"
