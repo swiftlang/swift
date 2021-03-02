@@ -970,18 +970,18 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   // If we are recursively checking for implicit conformance of a nominal
   // type to ConcurrentValue, fail without evaluating this request. This
   // squashes cycles.
+  LookupConformanceInModuleRequest request{{this, type, protocol}};
   if (protocol->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
     if (auto nominal = type->getAnyNominal()) {
-      GetImplicitConcurrentValueRequest request{nominal};
-      if (getASTContext().evaluator.hasActiveRequest(request))
+      GetImplicitConcurrentValueRequest icvRequest{nominal};
+      if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
+          getASTContext().evaluator.hasActiveRequest(request))
         return ProtocolConformanceRef::forInvalid();
     }
   }
 
   return evaluateOrDefault(
-      getASTContext().evaluator,
-      LookupConformanceInModuleRequest{{this, type, protocol}},
-      ProtocolConformanceRef::forInvalid());
+      getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
 }
 
 ProtocolConformanceRef
