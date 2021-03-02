@@ -1298,24 +1298,23 @@ ConstraintGraph::computeConnectedComponents(
   return cc.getComponents();
 }
 
-
-/// For a given constraint kind, decide if we should attempt to eliminate its
-/// edge in the graph.
-static bool shouldContractEdge(ConstraintKind kind) {
-  switch (kind) {
-  case ConstraintKind::BindParam:
-    return true;
-
-  default:
-    return false;
-  }
-}
-
 bool ConstraintGraph::contractEdges() {
   // Current constraint system doesn't have any closure expressions
   // associated with it so there is nothing to here.
   if (CS.ClosureTypes.empty())
     return false;
+
+  // For a given constraint kind, decide if we should attempt to eliminate its
+  // edge in the graph.
+  auto shouldContractEdge = [](ConstraintKind kind) {
+    switch (kind) {
+    case ConstraintKind::BindParam:
+      return true;
+
+    default:
+      return false;
+    }
+  };
 
   SmallVector<Constraint *, 16> constraints;
   for (const auto &closure : CS.ClosureTypes) {
