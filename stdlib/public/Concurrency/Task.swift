@@ -601,6 +601,7 @@ public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 public func _asyncMainDrainQueue() -> Never
 
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+#if os(Windows)
   Task.runDetached {
     do {
       try await asyncFun()
@@ -609,6 +610,21 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
       _errorInMain(error)
     }
   }
+#else
+  @MainActor @concurrent
+  func _doMain(_ asyncFun: @escaping () async throws -> ()) async {
+    do {
+      try await asyncFun()
+    } catch {
+      _errorInMain(error)
+    }
+  }
+
+  Task.runDetached {
+    await _doMain(asyncFun)
+    exit(0)
+  }
+#endif
   _asyncMainDrainQueue()
 }
 
