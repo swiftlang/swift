@@ -8,8 +8,8 @@ import StdlibUnittest
 var OperatorsTestSuite = TestSuite("Operators")
 
 OperatorsTestSuite.test("plus (+)") {
-  let lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs + rhs
 
@@ -17,8 +17,8 @@ OperatorsTestSuite.test("plus (+)") {
 }
 
 OperatorsTestSuite.test("minus (-)") {
-  let lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs - rhs
 
@@ -26,8 +26,8 @@ OperatorsTestSuite.test("minus (-)") {
 }
 
 OperatorsTestSuite.test("star (*)") {
-  let lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs * rhs
 
@@ -35,8 +35,8 @@ OperatorsTestSuite.test("star (*)") {
 }
 
 OperatorsTestSuite.test("slash (/)") {
-  let lhs = IntBox(value: 42)
-  let rhs = IntBox(value: 23)
+  let lhs = LoadableIntWrapper(value: 42)
+  let rhs = LoadableIntWrapper(value: 23)
 
   let result = lhs / rhs
 
@@ -44,8 +44,8 @@ OperatorsTestSuite.test("slash (/)") {
 }
 
 OperatorsTestSuite.test("percent (%)") {
-  let lhs = IntBox(value: 11)
-  let rhs = IntBox(value: 2)
+  let lhs = LoadableIntWrapper(value: 11)
+  let rhs = LoadableIntWrapper(value: 2)
 
   let result = lhs % rhs
 
@@ -53,8 +53,8 @@ OperatorsTestSuite.test("percent (%)") {
 }
 
 OperatorsTestSuite.test("amp (&)") {
-  let lhs = IntBox(value: 6)
-  let rhs = IntBox(value: 5)
+  let lhs = LoadableIntWrapper(value: 6)
+  let rhs = LoadableIntWrapper(value: 5)
 
   let result = lhs & rhs
 
@@ -62,8 +62,8 @@ OperatorsTestSuite.test("amp (&)") {
 }
 
 OperatorsTestSuite.test("pipe (|)") {
-  let lhs = IntBox(value: 6)
-  let rhs = IntBox(value: 5)
+  let lhs = LoadableIntWrapper(value: 6)
+  let rhs = LoadableIntWrapper(value: 5)
 
   let result = lhs | rhs
 
@@ -71,8 +71,8 @@ OperatorsTestSuite.test("pipe (|)") {
 }
 
 OperatorsTestSuite.test("less (<)") {
-  let lhs = IntBox(value: 5)
-  let rhs = IntBox(value: 6)
+  let lhs = LoadableIntWrapper(value: 5)
+  let rhs = LoadableIntWrapper(value: 6)
 
   let result = lhs < rhs
 
@@ -80,8 +80,8 @@ OperatorsTestSuite.test("less (<)") {
 }
 
 OperatorsTestSuite.test("greater (>)") {
-  let lhs = IntBox(value: 5)
-  let rhs = IntBox(value: 6)
+  let lhs = LoadableIntWrapper(value: 5)
+  let rhs = LoadableIntWrapper(value: 6)
 
   let result = lhs > rhs
 
@@ -89,8 +89,8 @@ OperatorsTestSuite.test("greater (>)") {
 }
 
 OperatorsTestSuite.test("less less (<<)") {
-  let lhs = IntBox(value: 2)
-  let rhs = IntBox(value: 4)
+  let lhs = LoadableIntWrapper(value: 2)
+  let rhs = LoadableIntWrapper(value: 4)
 
   let result = lhs << rhs
 
@@ -98,8 +98,8 @@ OperatorsTestSuite.test("less less (<<)") {
 }
 
 OperatorsTestSuite.test("greater greater (>>)") {
-  let lhs = IntBox(value: 512)
-  let rhs = IntBox(value: 8)
+  let lhs = LoadableIntWrapper(value: 512)
+  let rhs = LoadableIntWrapper(value: 8)
 
   let result = lhs >> rhs
 
@@ -107,8 +107,8 @@ OperatorsTestSuite.test("greater greater (>>)") {
 }
 
 OperatorsTestSuite.test("equal equal (==)") {
-  let lhs = IntBox(value: 5)
-  let rhs = IntBox(value: 5)
+  let lhs = LoadableIntWrapper(value: 5)
+  let rhs = LoadableIntWrapper(value: 5)
 
   let result = lhs == rhs
 
@@ -116,8 +116,8 @@ OperatorsTestSuite.test("equal equal (==)") {
 }
 
 OperatorsTestSuite.test("exclaim equal (!=)") {
-  let lhs = IntBox(value: 5)
-  let rhs = IntBox(value: 5)
+  let lhs = LoadableIntWrapper(value: 5)
+  let rhs = LoadableIntWrapper(value: 5)
 
   let result = lhs != rhs
 
@@ -125,8 +125,8 @@ OperatorsTestSuite.test("exclaim equal (!=)") {
 }
 
 OperatorsTestSuite.test("less equal (<=)") {
-  let lhs = IntBox(value: 5)
-  let rhs = IntBox(value: 5)
+  let lhs = LoadableIntWrapper(value: 5)
+  let rhs = LoadableIntWrapper(value: 5)
 
   let result = lhs <= rhs
 
@@ -134,8 +134,8 @@ OperatorsTestSuite.test("less equal (<=)") {
 }
 
 OperatorsTestSuite.test("greater equal (>=)") {
-  let lhs = IntBox(value: 6)
-  let rhs = IntBox(value: 5)
+  let lhs = LoadableIntWrapper(value: 6)
+  let rhs = LoadableIntWrapper(value: 5)
 
   let result = lhs >= rhs
 
@@ -143,8 +143,8 @@ OperatorsTestSuite.test("greater equal (>=)") {
 }
 
 OperatorsTestSuite.test("amp amp (&&)") {
-  let lhs = BoolBox(value: true)
-  let rhs = BoolBox(value: false)
+  let lhs = LoadableBoolWrapper(value: true)
+  let rhs = LoadableBoolWrapper(value: false)
 
   let result = lhs && rhs
 
@@ -152,8 +152,8 @@ OperatorsTestSuite.test("amp amp (&&)") {
 }
 
 OperatorsTestSuite.test("pipe pipe (||)") {
-  let lhs = BoolBox(value: true)
-  let rhs = BoolBox(value: false)
+  let lhs = LoadableBoolWrapper(value: true)
+  let rhs = LoadableBoolWrapper(value: false)
 
   let result = lhs || rhs
 
