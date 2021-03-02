@@ -1321,24 +1321,8 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 SmallVector<ProtocolDecl *, 2>
 IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   SmallVector<ProtocolDecl *, 2> result;
-
-  // Dig out the nominal type.
-  const auto dc = getAsGenericContext();
-  const auto nominal = dc->getSelfNominalTypeDecl();
-  if (!nominal) {
-    return result;
-  }
-
-  // Update to record all potential conformances.
-  nominal->prepareConformanceTable();
-  nominal->ConformanceTable->lookupConformances(
-    nominal,
-    const_cast<GenericContext *>(dc),
-    lookupKind,
-    &result,
-    nullptr,
-    nullptr);
-
+  for (auto conformance : getLocalConformances(lookupKind))
+    result.push_back(conformance->getProtocol());
   return result;
 }
 
@@ -1361,19 +1345,16 @@ LookupAllConformancesInContextRequest::evaluate(
     return { };
   }
 
-  // Update to record all potential conformances.
+  // Record all potential conformances.
   nominal->prepareConformanceTable();
-  SmallVector<ProtocolConformance *, 4> conformances;
+  std::vector<ProtocolConformance *> conformances;
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<GenericContext *>(dc),
-    ConformanceLookupKind::All,
-    nullptr,
     &conformances,
     nullptr);
 
-  return std::vector<ProtocolConformance *>(
-      conformances.begin(), conformances.end());
+  return conformances;
 }
 
 SmallVector<ProtocolConformance *, 2>
@@ -1442,8 +1423,6 @@ IterableDeclContext::takeConformanceDiagnostics() const {
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<GenericContext *>(dc),
-    ConformanceLookupKind::All,
-    nullptr,
     nullptr,
     &result);
 
