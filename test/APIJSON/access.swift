@@ -5,7 +5,7 @@
 // REQUIRES: objc_interop, OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/MyModule.swiftinterface
-// RUN: %target-swift-api-extract -target x86_64-apple-macos11.0 -o - -pretty-print %t/MyModule.swiftinterface -module-name MyModule | %FileCheck %s
+// RUN: %target-swift-api-extract -target x86_64-apple-macos11.0 -o - -pretty-print %t/MyModule.swiftinterface -module-name MyModule -module-cache-path %t | %FileCheck %s
 
 public func publicFunction()
 internal func internalFunction()
