@@ -612,8 +612,7 @@ class SuperSub : SuperBase {
     // CHECK:   [[REABSTRACT_CVF:%.*]] = convert_function [[REABSTRACT_PA]]
     // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_CVF]]
     // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$ss2qqoiyxxSg_xyKXKtKlF :
-    // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : {{.*}}, normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
-    // CHECK: [[NORMAL_BB]]{{.*}}
+    // CHECK:   apply [nothrow] [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : {{.*}})
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     let f1 = {
       // CHECK: sil private [transparent] [ossa] @[[INNER_FUNC_2]]
@@ -644,8 +643,7 @@ class SuperSub : SuperBase {
     // CHECK:   [[REABSTRACT_CVF:%.*]] = convert_function [[REABSTRACT_PA]]
     // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_CVF]]
     // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$ss2qqoiyxxSg_xyKXKtKlF :
-    // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : {{.*}}, normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
-    // CHECK: [[NORMAL_BB]]{{.*}}
+    // CHECK:   apply [nothrow] [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : {{.*}})
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     func g1() {
       // CHECK: sil private [transparent] [ossa] @[[INNER_FUNC_2]] : $@convention(thin) (@guaranteed SuperSub) -> @error Error {

@@ -81,9 +81,7 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 // CHECK:   [[NEXT_RESULT:%.*]] = alloc_stack $Optional<Int>
 // CHECK:   [[MUTATION:%.*]] = begin_access
 // CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $AsyncLazySequence<Array<Int>>.Iterator, #AsyncIteratorProtocol.next : <Self where Self : AsyncIteratorProtocol> (inout Self) -> () async throws -> Self.Element? : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error)
-// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[MUTATION]]) : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
-
-// CHECK: [[NORMAL_BB]]([[VAR:%.*]] : $()):
+// CHECK:   [[VAR:%.*]] = apply [nothrow] [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[MUTATION]]) : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error)
 // CHECK:   end_access [[MUTATION]]
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
@@ -94,9 +92,6 @@ struct AsyncLazySequence<S: Sequence>: AsyncSequence {
 // CHECK: [[NONE_BB]]:
 // CHECK:   funcEnd
 // CHECK    return
-
-// CHECK: [[ERROR_BB]]([[VAR:%.*]] : @owned $Error):
-// CHECK:    unreachable
 // CHECK: } // end sil function '$s13foreach_async13trivialStructyyAA17AsyncLazySequenceVySaySiGGYF'
 func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
   for await x in xx {
@@ -115,9 +110,7 @@ func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
 // CHECK:   [[NEXT_RESULT:%.*]] = alloc_stack $Optional<Int>
 // CHECK:   [[MUTATION:%.*]] = begin_access
 // CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $AsyncLazySequence<Array<Int>>.Iterator, #AsyncIteratorProtocol.next : <Self where Self : AsyncIteratorProtocol> (inout Self) -> () async throws -> Self.Element? : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error)
-// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[MUTATION]]) : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
-
-// CHECK: [[NORMAL_BB]]([[VAR:%.*]] : $()):
+// CHECK:   [[VAR:%.*]] = apply [nothrow] [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[MUTATION]]) : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error)
 // CHECK:   end_access [[MUTATION]]
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
@@ -136,9 +129,6 @@ func trivialStruct(_ xx: AsyncLazySequence<[Int]>) async {
 // CHECK: [[NONE_BB]]:
 // CHECK:   funcEnd
 // CHECK    return
-
-// CHECK: [[ERROR_BB]]([[VAR:%.*]] : @owned $Error):
-// CHECK:    unreachable
 // CHECK: } // end sil function '$s13foreach_async21trivialStructContinueyyAA17AsyncLazySequenceVySaySiGGYF'
 
 func trivialStructContinue(_ xx: AsyncLazySequence<[Int]>) async {
@@ -176,9 +166,7 @@ func trivialStructBreak(_ xx: AsyncLazySequence<[Int]>) async {
 // CHECK:   [[NEXT_RESULT:%.*]] = alloc_stack $Optional<Int>
 // CHECK:   [[MUTATION:%.*]] = begin_access
 // CHECK:   [[WITNESS_METHOD:%.*]] = witness_method $AsyncLazySequence<Array<Int>>.Iterator, #AsyncIteratorProtocol.next : <Self where Self : AsyncIteratorProtocol> (inout Self) -> () async throws -> Self.Element? : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error)
-// CHECK:   try_apply [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[MUTATION]]) : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error), normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
-
-// CHECK: [[NORMAL_BB]]([[VAR:%.*]] : $()):
+// CHECK:   [[VAR:%.*]] = apply [nothrow] [[WITNESS_METHOD]]<AsyncLazySequence<[Int]>.Iterator>([[NEXT_RESULT]], [[MUTATION]]) : $@convention(witness_method: AsyncIteratorProtocol) @async <τ_0_0 where τ_0_0 : AsyncIteratorProtocol> (@inout τ_0_0) -> (@out Optional<τ_0_0.Element>, @error Error)
 // CHECK:   end_access [[MUTATION]]
 // CHECK:   switch_enum [[IND_VAR:%.*]] : $Optional<Int>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 

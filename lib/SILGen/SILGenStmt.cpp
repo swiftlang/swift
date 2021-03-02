@@ -1455,8 +1455,7 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
-                                     SILResultInfo exnResult,
-                                     bool suppressErrorPath) {
+                                     SILResultInfo exnResult) {
   assert(exnResult.getConvention() == ResultConvention::Owned);
 
   // For now, don't try to re-use destination blocks for multiple
@@ -1470,13 +1469,6 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
 
   if (fnTy->isAsync())
     emitHopToCurrentExecutor(loc);
-
-  // If we're suppressing error paths, just wrap it up as unreachable
-  // and return.
-  if (suppressErrorPath) {
-    B.createUnreachable(loc);
-    return destBB;
-  }
 
   // We don't want to exit here with a dead cleanup on the stack,
   // so push the scope first.

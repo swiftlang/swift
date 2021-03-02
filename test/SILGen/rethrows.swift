@@ -59,14 +59,10 @@ func test1() throws {
 // CHECK:       [[T1:%.*]] = convert_function [[T0]] : $@callee_guaranteed () -> Int to $@callee_guaranteed () -> (Int, @error Error)
 // CHECK:       [[T2:%.*]] = convert_escape_to_noescape [[T1]]
 // CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
-// CHECK:       try_apply [[RETHROWER]]([[T2]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
-// CHECK:     [[NORMAL]]([[T0:%.*]] : $Int):
+// CHECK:       [[T0:%.*]] = apply [nothrow] [[RETHROWER]]([[T2]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
 // CHECK-NEXT:  strong_release [[T1]]
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]]
-// CHECK:     [[ERROR]]([[T0:%.*]] : $Error):
-// CHECK-NEXT:  strong_release [[T1]]
-// CHECK-NEXT:  unreachable
 func test2() {
   rethrower(nonthrower)
 }
@@ -77,12 +73,9 @@ func test2() {
 // CHECK:       [[T0:%.*]] = thin_to_thick_function [[CVT]]
 // CHECK:       [[T1:%.*]] = convert_function [[T0]] : $@noescape @callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> (Int, @error Error)
 // CHECK:       [[RETHROWER:%.*]] = function_ref @$s8rethrows9rethroweryS2iyKXEKF : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error)
-// CHECK:       try_apply [[RETHROWER]]([[T1]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error), normal [[NORMAL:bb1]], error [[ERROR:bb2]]
-// CHECK:     [[NORMAL]]({{%.*}} : $Int):
+// CHECK:       {{%.*}} = apply [nothrow] [[RETHROWER]]([[T1]]) : $@convention(thin) (@noescape @callee_guaranteed () -> (Int, @error Error)) -> (Int, @error Error
 // CHECK-NEXT:  [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT:  return [[RESULT]]
-// CHECK:     [[ERROR]]([[ERROR:%.*]] : $Error):
-// CHECK-NEXT:  unreachable
 // CHECK-LABEL: // end sil function '$s8rethrows5test3yyF'
 func test3() {
   rethrower { rethrower(nonthrower) }

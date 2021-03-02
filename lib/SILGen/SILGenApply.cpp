@@ -1783,8 +1783,11 @@ static void emitRawApply(SILGenFunction &SGF,
   }
 
   // If we don't have an error result, we can make a simple 'apply'.
-  if (!substFnType->hasErrorResult()) {
-    auto result = SGF.B.createApply(loc, fnValue, subs, argValues);
+  if (!substFnType->hasErrorResult() ||
+      (options & ApplyOptions::DoesNotThrow)) {
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues,
+                                    substFnType->hasErrorResult() &&
+                                    (options & ApplyOptions::DoesNotThrow));
     rawResults.push_back(result);
 
   // Otherwise, we need to create a try_apply.
@@ -1795,8 +1798,7 @@ static void emitRawApply(SILGenFunction &SGF,
 
     SILBasicBlock *errorBB =
       SGF.getTryApplyErrorDest(loc, substFnType,
-                               substFnType->getErrorResult(),
-                               options & ApplyOptions::DoesNotThrow);
+                               substFnType->getErrorResult());
 
     SGF.B.createTryApply(loc, fnValue, subs, argValues,
                          normalBB, errorBB);

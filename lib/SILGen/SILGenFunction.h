@@ -1655,8 +1655,7 @@ public:
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
-                                      SILResultInfo exnResult,
-                                      bool isSuppressed);
+                                      SILResultInfo exnResult);
 
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
