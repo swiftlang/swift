@@ -356,6 +356,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::EndAccessInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::DestroyAddrInst:
+      case SILInstructionKind::CheckedCastAddrBranchInst:
       case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
@@ -665,7 +666,7 @@ class MemoryLifetimeVerifier {
   /// in \p block.
   /// Example: @out results of try_apply. They are only valid in the
   /// normal-block, but not in the throw-block.
-  void setBitsOfPredecessor(Bits &bits, SILBasicBlock *block);
+  void setBitsOfPredecessor(Bits &genSet, Bits &killSet, SILBasicBlock *block);
 
   /// Initializes the data flow bits sets in the block states for all blocks.
   void initDataflow(MemoryDataflow &dataFlow);
@@ -867,7 +868,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
                                                  BlockState &state) {
   // Initialize the genSet with special cases, like the @out results of an
   // try_apply in the predecessor block.
-  setBitsOfPredecessor(state.genSet, block);
+  setBitsOfPredecessor(state.genSet, state.killSet, block);
 
   for (SILInstruction &I : *block) {
     switch (I.getKind()) {
@@ -939,25 +940,42 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
   }
 }
 
-void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &bits,
+void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
                                                   SILBasicBlock *block) {
   SILBasicBlock *pred = block->getSinglePredecessorBlock();
   if (!pred)
     return;
 
-  auto *TAI = dyn_cast<TryApplyInst>(pred->getTerminator());
+  TermInst *term = pred->getTerminator();
+  if (auto *tai = dyn_cast<TryApplyInst>(term)) {
+    // @out results of try_apply are only valid in the normal-block, but not in
+    // the throw-block.
+    if (tai->getNormalBB() != block)
+      return;
 
-  // @out results of try_apply are only valid in the normal-block, but not in
-  // the throw-block.
-  if (!TAI || TAI->getNormalBB() != block)
-    return;
-
-  FullApplySite FAS(TAI);
-  for (Operand &op : TAI->getAllOperands()) {
-    if (FAS.isArgumentOperand(op) &&
-        FAS.getArgumentConvention(op) == SILArgumentConvention::Indirect_Out) {
-      locations.setBits(bits, op.get());
+    FullApplySite FAS(tai);
+    for (Operand &op : tai->getAllOperands()) {
+      if (FAS.isArgumentOperand(op) &&
+          FAS.getArgumentConvention(op) == SILArgumentConvention::Indirect_Out) {
+        locations.genBits(getSet, killSet, op.get());
+      }
     }
+  } else if (auto *castInst = dyn_cast<CheckedCastAddrBranchInst>(term)) {
+    switch (castInst->getConsumptionKind()) {
+    case CastConsumptionKind::TakeAlways:
+      locations.killBits(getSet, killSet, castInst->getSrc());
+      break;
+    case CastConsumptionKind::TakeOnSuccess:
+      if (castInst->getSuccessBB() == block)
+        locations.killBits(getSet, killSet, castInst->getSrc());
+      break;
+    case CastConsumptionKind::CopyOnSuccess:
+      break;
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
+    }
+    if (castInst->getSuccessBB() == block)
+      locations.genBits(getSet, killSet, castInst->getDest());
   }
 }
 
@@ -1050,7 +1068,7 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
 }
 
 void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
-  setBitsOfPredecessor(bits, block);
+  setBitsOfPredecessor(bits, bits, block);
   const Bits &nonTrivialLocations = locations.getNonTrivialLocations();
 
   for (SILInstruction &I : *block) {
@@ -1151,6 +1169,12 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::EndBorrowInst: {
         if (SILValue orig = cast<EndBorrowInst>(&I)->getSingleOriginalValue())
           requireBitsSet(bits, orig, &I);
+        break;
+      }
+      case SILInstructionKind::CheckedCastAddrBranchInst: {
+        auto *castInst = cast<CheckedCastAddrBranchInst>(&I);
+        requireBitsSet(bits, castInst->getSrc(), &I);
+        requireBitsClear(bits & nonTrivialLocations, castInst->getDest(), &I);
         break;
       }
       case SILInstructionKind::PartialApplyInst:

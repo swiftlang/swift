@@ -115,6 +115,7 @@ bb1:
 
 bb2:
   dealloc_stack %5 : $*Int
+  destroy_addr %3 : $*Optional<CustomStringConvertible>
   dealloc_stack %3 : $*Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
@@ -171,6 +172,7 @@ bb1:
 
 bb2:
   dealloc_stack %5 : $*A
+  destroy_addr %3 : $*Optional<CustomStringConvertible>
   dealloc_stack %3 : $*Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0
@@ -257,6 +259,7 @@ bb1:
 
 bb2:
   dealloc_stack %5 : $*D
+  destroy_addr %3 : $*Optional<CustomStringConvertible>
   dealloc_stack %3 : $*Optional<CustomStringConvertible>
   %12 = integer_literal $Builtin.Int1, -1
   %13 = integer_literal $Builtin.Int1, 0

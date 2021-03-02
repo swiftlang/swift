@@ -493,3 +493,51 @@ bb0(%0 :  @guaranteed $T):
   return %res : $()
 }
 
+sil [ossa] @test_cast_br_take_always : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br take_always U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_cast_br_take_on_success : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br take_on_success U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  destroy_addr %0 : $*U
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_cast_br_copy_on_success : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br copy_on_success U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %0 : $*U
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  destroy_addr %0 : $*U
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+

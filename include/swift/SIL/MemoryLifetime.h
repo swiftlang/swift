@@ -236,16 +236,30 @@ public:
 
   /// Sets the location bits os \p addr in \p bits, if \p addr is associated
   /// with a location.
-  void setBits(Bits &bits, SILValue addr) {
+  void setBits(Bits &bits, SILValue addr) const {
     if (auto *loc = getLocation(addr))
       bits |= loc->subLocations;
   }
 
   /// Clears the location bits os \p addr in \p bits, if \p addr is associated
   /// with a location.
-  void clearBits(Bits &bits, SILValue addr) {
+  void clearBits(Bits &bits, SILValue addr) const {
     if (auto *loc = getLocation(addr))
       bits.reset(loc->subLocations);
+  }
+  
+  void genBits(Bits &genSet, Bits &killSet, SILValue addr) const {
+    if (auto *loc = getLocation(addr)) {
+      killSet.reset(loc->subLocations);
+      genSet |= loc->subLocations;
+    }
+  }
+
+  void killBits(Bits &genSet, Bits &killSet, SILValue addr) const {
+    if (auto *loc = getLocation(addr)) {
+      killSet |= loc->subLocations;
+      genSet.reset(loc->subLocations);
+    }
   }
 
   /// Analyzes all locations in a function.
@@ -368,17 +382,11 @@ public:
     // Utility functions for setting and clearing gen- and kill-bits.
 
     void genBits(SILValue addr, const MemoryLocations &locs) {
-      if (auto *loc = locs.getLocation(addr)) {
-        killSet.reset(loc->subLocations);
-        genSet |= loc->subLocations;
-      }
+      locs.genBits(genSet, killSet, addr);
     }
 
     void killBits(SILValue addr, const MemoryLocations &locs) {
-      if (auto *loc = locs.getLocation(addr)) {
-        genSet.reset(loc->subLocations);
-        killSet |= loc->subLocations;
-      }
+      locs.killBits(genSet, killSet, addr);
     }
 
     bool exitReachable() const {
