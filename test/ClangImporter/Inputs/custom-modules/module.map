@@ -113,6 +113,16 @@ module ImportAsMember {
   }
 }
 
+// FIXME: This probably ought to be in a module_private.map, but that causes
+// hundreds of clang warnings.
+module ImportAsMember_Private {
+  export *
+
+  module A {
+    header "ImportAsMember_Private.h"
+  }
+}
+
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *
