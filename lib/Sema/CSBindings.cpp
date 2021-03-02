@@ -1793,7 +1793,16 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
-  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, srcLocator);
+  ConstraintSystem::TypeMatchOptions options;
+
+  options |= ConstraintSystem::TMF_GenerateConstraints;
+  options |= ConstraintSystem::TMF_BindingTypeVariable;
+
+  auto result =
+      cs.matchTypes(TypeVar, type, ConstraintKind::Bind, options, srcLocator);
+
+  if (result.isFailure())
+    return false;
 
   auto reportHole = [&]() {
     if (cs.isForCodeCompletion()) {
@@ -1825,5 +1834,16 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
       return true;
   }
 
-  return !cs.failedConstraint && !cs.simplify();
+  if (cs.simplify())
+    return false;
+
+  // If all of the re-activated constraints where simplified,
+  // let's notify binding inference about the fact that type
+  // variable has been bound successfully.
+  {
+    auto &CG = cs.getConstraintGraph();
+    CG[TypeVar].introduceToInference(type);
+  }
+
+  return true;
 }

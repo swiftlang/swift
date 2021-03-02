@@ -3631,6 +3631,10 @@ public:
 
     /// Indicates that we are applying a fix.
     TMF_ApplyingFix = 0x02,
+
+    /// Indicates that we are attempting a possible type for
+    /// a type variable.
+    TMF_BindingTypeVariable = 0x04,
   };
 
   /// Options that govern how type matching should proceed.
@@ -3702,10 +3706,14 @@ public:
   /// \param type The fixed type to which the type variable will be bound.
   ///
   /// \param updateState Whether to update the state based on this binding.
-  /// False when we're only assigning a type as part of reconstructing 
+  /// False when we're only assigning a type as part of reconstructing
   /// a complete solution from partial solutions.
+  ///
+  /// \param notifyBindingInference Whether to notify binding inference about
+  /// the change to this type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type,
-                       bool updateState = true);
+                       bool updateState = true,
+                       bool notifyBindingInference = true);
 
   /// Determine if the type in question is an Array<T> and, if so, provide the
   /// element type of the array.
