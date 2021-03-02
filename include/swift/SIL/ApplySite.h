@@ -443,19 +443,28 @@ public:
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
 
-  /// Return whether the given apply is of a formally-throwing function
-  /// which is statically known not to throw.
-  bool isNonThrowing() const {
+  ApplyOptions getApplyOptions() const {
     switch (ApplySiteKind(getInstruction()->getKind())) {
     case ApplySiteKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->isNonThrowing();
+      return cast<ApplyInst>(Inst)->getApplyOptions();
     case ApplySiteKind::BeginApplyInst:
-      return cast<BeginApplyInst>(Inst)->isNonThrowing();
+      return cast<BeginApplyInst>(Inst)->getApplyOptions();
     case ApplySiteKind::TryApplyInst:
-      return false;
+      return cast<TryApplyInst>(Inst)->getApplyOptions();
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
     }
+  }
+  /// Return whether the given apply is of a formally-throwing function
+  /// which is statically known not to throw.
+  bool isNonThrowing() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotThrow);
+  }
+
+  /// Return whether the given apply is of a formally-async function
+  /// which is statically known not to await.
+  bool isNonAsync() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
   }
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }

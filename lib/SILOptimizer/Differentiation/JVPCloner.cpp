@@ -639,7 +639,7 @@ public:
     // Apply the JVP.
     // The JVP should be specialized, so no substitution map is necessary.
     auto *jvpCall = getBuilder().createApply(loc, jvpValue, SubstitutionMap(),
-                                             jvpArgs, ai->isNonThrowing());
+                                             jvpArgs, ai->getApplyOptions());
     LLVM_DEBUG(getADDebugStream() << "Applied jvp function\n" << *jvpCall);
 
     // Release the differentiable function.
@@ -1292,8 +1292,7 @@ public:
 
     // Call the differential.
     auto *differentialCall =
-        diffBuilder.createApply(loc, differential, SubstitutionMap(), diffArgs,
-                                /*isNonThrowing*/ false);
+        diffBuilder.createApply(loc, differential, SubstitutionMap(), diffArgs);
     diffBuilder.emitDestroyValueOperation(loc, differential);
 
     // Get the original `apply` results.

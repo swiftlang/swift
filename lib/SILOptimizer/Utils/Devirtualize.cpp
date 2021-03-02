@@ -453,7 +453,8 @@ replaceApplyInst(SILBuilder &builder, SILLocation loc, ApplyInst *oldAI,
                  SILValue newFn, SubstitutionMap newSubs,
                  ArrayRef<SILValue> newArgs, ArrayRef<SILValue> newArgBorrows) {
   auto *newAI =
-      builder.createApply(loc, newFn, newSubs, newArgs, oldAI->isNonThrowing());
+      builder.createApply(loc, newFn, newSubs, newArgs,
+                          oldAI->getApplyOptions());
 
   if (!newArgBorrows.empty()) {
     for (SILValue arg : newArgBorrows) {
@@ -504,7 +505,8 @@ replaceTryApplyInst(SILBuilder &builder, SILLocation loc, TryApplyInst *oldTAI,
   // Note that this makes this block temporarily double-terminated!
   // We won't fix that until deleteDevirtualizedApply.
   auto newTAI =
-      builder.createTryApply(loc, newFn, newSubs, newArgs, resultBB, errorBB);
+      builder.createTryApply(loc, newFn, newSubs, newArgs, resultBB, errorBB,
+                             oldTAI->getApplyOptions());
 
   if (!newArgBorrows.empty()) {
     builder.setInsertionPoint(normalBB->begin());
@@ -541,7 +543,7 @@ replaceBeginApplyInst(SILBuilder &builder, SILLocation loc,
                       ArrayRef<SILValue> newArgBorrows) {
   bool changedCFG = false;
   auto *newBAI = builder.createBeginApply(loc, newFn, newSubs, newArgs,
-                                          oldBAI->isNonThrowing());
+                                          oldBAI->getApplyOptions());
 
   // Forward the token.
   oldBAI->getTokenResult()->replaceAllUsesWith(newBAI->getTokenResult());

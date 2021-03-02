@@ -1782,9 +1782,14 @@ static void emitRawApply(SILGenFunction &SGF,
     return;
   }
 
+  if (!substFnType->isAsync())
+    options -= ApplyFlags::DoesNotAwait;
+  if (!substFnType->hasErrorResult())
+    options -= ApplyFlags::DoesNotThrow;
+
   // If we don't have an error result, we can make a simple 'apply'.
   if (!substFnType->hasErrorResult()) {
-    auto result = SGF.B.createApply(loc, fnValue, subs, argValues);
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues, options);
     rawResults.push_back(result);
 
   // Otherwise, we need to create a try_apply.
@@ -1796,10 +1801,11 @@ static void emitRawApply(SILGenFunction &SGF,
     SILBasicBlock *errorBB =
       SGF.getTryApplyErrorDest(loc, substFnType,
                                substFnType->getErrorResult(),
-                               options & ApplyOptions::DoesNotThrow);
+                               options.contains(ApplyFlags::DoesNotThrow));
 
+    options -= ApplyFlags::DoesNotThrow;
     SGF.B.createTryApply(loc, fnValue, subs, argValues,
-                         normalBB, errorBB);
+                         normalBB, errorBB, options);
     SGF.B.emitBlock(normalBB);
   }
 }
@@ -3590,19 +3596,25 @@ public:
 
 private:
   PreparedArguments Args;
-  bool Throws;
+  /// Is this a 'rethrows' function that is known not to throw?
+  bool NoThrows;
+  /// Is this a 'reasync' function that is known not to 'await'?
+  bool NoAsync;
 
 public:
-  CallSite(SILLocation loc, PreparedArguments &&args, bool throws)
+  CallSite(SILLocation loc, PreparedArguments &&args,
+           bool isNoThrows=false, bool isNoAsync=false)
       : Loc(loc), Args(std::move(args)),
-        Throws(throws) {
+        NoThrows(isNoThrows), NoAsync(isNoAsync) {
     assert(Args.isValid());
   }
 
   /// Return the substituted, unlowered AST parameter types of the argument.
   ArrayRef<AnyFunctionType::Param> getParams() const { return Args.getParams(); }
 
-  bool throws() const { return Throws; }
+  bool isNoThrows() const { return NoThrows; }
+
+  bool isNoAsync() const { return NoAsync; }
 
   /// Evaluate arguments and begin any inout formal accesses.
   void emit(SILGenFunction &SGF, AbstractionPattern origFormalType,
@@ -3687,7 +3699,7 @@ public:
     PreparedArguments preparedSelf(llvm::ArrayRef<AnyFunctionType::Param>{selfParam});
     preparedSelf.addArbitrary(std::move(selfArg));
 
-    addCallSite(loc, std::move(preparedSelf), /*throws*/ false);
+    addCallSite(loc, std::move(preparedSelf));
   }
 
   /// Is this a fully-applied enum element constructor call?
@@ -4131,7 +4143,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     const CalleeTypeInfo::ForeignInfo &foreign,
     SmallVectorImpl<ManagedValue> &uncurriedArgs,
     Optional<SILLocation> &uncurriedLoc) {
-  ApplyOptions options = ApplyOptions::None;
+  ApplyOptions options;
 
   SmallVector<SmallVector<ManagedValue, 4>, 2> args;
   SmallVector<DelayedArgument, 2> delayedArgs;
@@ -4144,8 +4156,11 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
            || uncurriedSites.size() == 1
            || (uncurriedSites.size() == 2 && substFnType->hasSelfParam()));
 
-    if (!uncurriedSites.back().throws()) {
-      options |= ApplyOptions::DoesNotThrow;
+    if (uncurriedSites.back().isNoThrows()) {
+      options |= ApplyFlags::DoesNotThrow;
+    }
+    if (uncurriedSites.back().isNoAsync()) {
+      options |= ApplyFlags::DoesNotAwait;
     }
 
     // Collect the captures, if any.
@@ -4239,7 +4254,8 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
     PreparedArguments preparedArgs(params, arg);
 
     emission.addCallSite(apply.callSite, std::move(preparedArgs),
-                         apply.callSite->throws());
+                         apply.callSite->isNoThrows(),
+                         apply.callSite->isNoAsync());
 
     emission.setImplicitlyAsync(apply.callSite->implicitlyAsync());
   }
@@ -4508,7 +4524,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   // TODO: maybe this should happen after managing the result if it's
   // not a result-checking convention?
   if (auto foreignError = calleeTypeInfo.foreign.error) {
-    bool doesNotThrow = (options & ApplyOptions::DoesNotThrow);
+    bool doesNotThrow = options.contains(ApplyFlags::DoesNotThrow);
     emitForeignErrorCheck(loc, directResults, errorTemp, doesNotThrow,
                           *foreignError);
   }
@@ -4829,7 +4845,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, mv, subMap,
-                   finalArgs, calleeTypeInfo, ApplyOptions::None, ctx, None);
+                   finalArgs, calleeTypeInfo, ApplyOptions(), ctx, None);
 }
 
 StringRef SILGenFunction::getMagicFunctionString() {
@@ -4935,7 +4951,7 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
                         substFormalType.getParams()[0]);
 
   // Arguments.
-  emission.addCallSite(loc, std::move(args), /*throws*/ false);
+  emission.addCallSite(loc, std::move(args));
 
   // For an inheritable initializer, determine whether we'll need to adjust the
   // result type.
@@ -5019,7 +5035,7 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   // Form the call emission.
   CallEmission emission(*this, std::move(*callee), std::move(writebackScope));
   emission.addSelfParam(loc, std::move(self), substFormalType.getParams()[0]);
-  emission.addCallSite(loc, std::move(args), throws);
+  emission.addCallSite(loc, std::move(args), !throws);
 
   return emission.apply(C);
 }
@@ -5045,7 +5061,7 @@ RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
 
   PreparedArguments args(substFnType->getAs<AnyFunctionType>()->getParams());
   args.add(loc, std::move(originalValue));
-  emission.addCallSite(loc, std::move(args), /*throws=*/false);
+  emission.addCallSite(loc, std::move(args));
   
   return emission.apply(C);
 }
@@ -5605,8 +5621,7 @@ RValue SILGenFunction::emitGetAccessor(SILLocation loc, SILDeclRef get,
   if (subscriptIndices.isNull())
     subscriptIndices.emplace({});
 
-  emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->isThrowing());
+  emission.addCallSite(loc, std::move(subscriptIndices));
 
   // T
   return emission.apply(c);
@@ -5648,7 +5663,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     }
   }
   assert(values.isValid());
-  emission.addCallSite(loc, std::move(values), accessType->isThrowing());
+  emission.addCallSite(loc, std::move(values));
   // ()
   emission.apply();
 }
@@ -5681,8 +5696,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
   if (subscriptIndices.isNull())
     subscriptIndices.emplace({});
 
-  emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->isThrowing());
+  emission.addCallSite(loc, std::move(subscriptIndices));
 
   // Unsafe{Mutable}Pointer<T> or
   // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
@@ -5743,8 +5757,7 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   if (subscriptIndices.isNull())
     subscriptIndices.emplace({});
 
-  emission.addCallSite(loc, std::move(subscriptIndices),
-                       accessType->isThrowing());
+  emission.addCallSite(loc, std::move(subscriptIndices));
 
   auto endApplyHandle = emission.applyCoroutine(yields);
 
@@ -5933,8 +5946,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     if (isa<VarDecl>(e->getMember().getDecl())) {
       resultRV = emitMonomorphicApply(e, result, {},
                                       foreignMethodTy.getResult(), valueTy,
-                                      ApplyOptions::DoesNotThrow,
-                                      None, None);
+                                      ApplyOptions(), None, None);
     } else {
       resultRV = RValue(*this, e, valueTy, result);
     }
@@ -6029,8 +6041,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     
     auto resultRV = emitMonomorphicApply(e, result, indexArgs,
                                          foreignMethodTy.getResult(), valueTy,
-                                         ApplyOptions::DoesNotThrow,
-                                         None, None);
+                                         ApplyOptions(), None, None);
 
     // Package up the result in an optional.
     emitInjectOptionalValueInto(e, {e, std::move(resultRV)}, optTemp, optTL);

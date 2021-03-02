@@ -1908,21 +1908,25 @@ swift::cloneFullApplySiteReplacingCallee(FullApplySite applySite,
     auto *tai = cast<TryApplyInst>(applySite.getInstruction());
     return builder.createTryApply(tai->getLoc(), newCallee,
                                   tai->getSubstitutionMap(), arguments,
-                                  tai->getNormalBB(), tai->getErrorBB());
+                                  tai->getNormalBB(), tai->getErrorBB(),
+                                  tai->getApplyOptions());
   }
   case FullApplySiteKind::ApplyInst: {
     auto *ai = cast<ApplyInst>(applySite);
     auto fTy = newCallee->getType().getAs<SILFunctionType>();
 
+    auto options = ai->getApplyOptions();
     // The optimizer can generate a thin_to_thick_function from a throwing thin
     // to a non-throwing thick function (in case it can prove that the function
     // is not throwing).
     // Therefore we have to check if the new callee (= the argument of the
     // thin_to_thick_function) is a throwing function and set the not-throwing
     // flag in this case.
+    if (fTy->hasErrorResult())
+      options |= ApplyFlags::DoesNotThrow;
     return builder.createApply(applySite.getLoc(), newCallee,
                                applySite.getSubstitutionMap(), arguments,
-                               ai->isNonThrowing() || fTy->hasErrorResult());
+                               options);
   }
   case FullApplySiteKind::BeginApplyInst: {
     llvm_unreachable("begin_apply support not implemented?!");

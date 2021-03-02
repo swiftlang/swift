@@ -400,17 +400,17 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
                      SubstitutionMap Subs,
                      ArrayRef<SILValue> Args,
                      ArrayRef<SILValue> TypeDependentOperands,
-                     bool isNonThrowing,
+                     ApplyOptions options,
                      const GenericSpecializationInformation *SpecializationInfo)
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
                       TypeDependentOperands, SpecializationInfo, Result) {
-  setNonThrowing(isNonThrowing);
+  setApplyOptions(options);
   assert(!SubstCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
 
 ApplyInst *
 ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
-                  ArrayRef<SILValue> Args, bool isNonThrowing,
+                  ArrayRef<SILValue> Args, ApplyOptions Options,
                   Optional<SILModuleConventions> ModuleConventions,
                   SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
                   const GenericSpecializationInformation *SpecializationInfo) {
@@ -432,7 +432,8 @@ ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
       F, getNumAllOperands(Args, TypeDependentOperands));
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeSILTy,
                                  Result, Subs, Args,
-                                 TypeDependentOperands, isNonThrowing,
+                                 TypeDependentOperands,
+                                 Options,
                                  SpecializationInfo);
 }
 
@@ -443,20 +444,20 @@ BeginApplyInst::BeginApplyInst(SILDebugLocation loc, SILValue callee,
                                SubstitutionMap subs,
                                ArrayRef<SILValue> args,
                                ArrayRef<SILValue> typeDependentOperands,
-                               bool isNonThrowing,
+                               ApplyOptions options,
                      const GenericSpecializationInformation *specializationInfo)
     : InstructionBase(loc, callee, substCalleeTy, subs, args,
                       typeDependentOperands, specializationInfo),
       MultipleValueInstructionTrailingObjects(this, allResultTypes,
                                               allResultOwnerships) {
-  setNonThrowing(isNonThrowing);
+  setApplyOptions(options);
   assert(substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
 
 BeginApplyInst *
 BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
                        SubstitutionMap subs, ArrayRef<SILValue> args,
-                       bool isNonThrowing,
+                       ApplyOptions options,
                        Optional<SILModuleConventions> moduleConventions,
                        SILFunction &F,
                        SILOpenedArchetypesState &openedArchetypes,
@@ -499,7 +500,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
   return ::new(buffer) BeginApplyInst(loc, callee, substCalleeSILType,
                                       resultTypes, resultOwnerships, subs,
                                       args, typeDependentOperands,
-                                      isNonThrowing, specializationInfo);
+                                      options, specializationInfo);
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
@@ -586,14 +587,18 @@ TryApplyInst::TryApplyInst(
     SubstitutionMap subs, ArrayRef<SILValue> args,
     ArrayRef<SILValue> TypeDependentOperands, SILBasicBlock *normalBB,
     SILBasicBlock *errorBB,
+    ApplyOptions options,
     const GenericSpecializationInformation *SpecializationInfo)
     : InstructionBase(Loc, callee, substCalleeTy, subs, args,
                       TypeDependentOperands, SpecializationInfo, normalBB,
-                      errorBB) {}
+                      errorBB) {
+  setApplyOptions(options);
+}
 
 TryApplyInst *TryApplyInst::create(
     SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
     ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+    ApplyOptions options,
     SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
     const GenericSpecializationInformation *specializationInfo) {
   SILType substCalleeTy = callee->getType().substGenericArgs(
@@ -608,7 +613,8 @@ TryApplyInst *TryApplyInst::create(
       F, getNumAllOperands(args, typeDependentOperands));
   return ::new (buffer) TryApplyInst(loc, callee, substCalleeTy, subs, args,
                                      typeDependentOperands,
-                                     normalBB, errorBB, specializationInfo);
+                                     normalBB, errorBB, options,
+                                     specializationInfo);
 }
 
 SILType DifferentiableFunctionInst::getDifferentiableFunctionType(

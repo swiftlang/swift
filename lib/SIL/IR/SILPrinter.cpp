@@ -1226,6 +1226,8 @@ public:
   void visitApplyInst(ApplyInst *AI) {
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
+    if (AI->isNonAsync())
+      *this << "[noasync] ";
     visitApplyInstBase(AI);
   }
 
@@ -1236,6 +1238,8 @@ public:
   }
 
   void visitTryApplyInst(TryApplyInst *AI) {
+    if (AI->isNonAsync())
+      *this << "[noasync] ";
     visitApplyInstBase(AI);
     *this << ", normal " << Ctx.getID(AI->getNormalBB());
     *this << ", error " << Ctx.getID(AI->getErrorBB());

@@ -351,7 +351,7 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
       /*Loc=*/instruction->getDebugLocation().getLocation(), /*Fn=*/callee,
       /*Subs=*/partialApply->getSubstitutionMap(),
       /*Args*/ argsVec,
-      /*isNonThrowing=*/instruction->isNonThrowing(),
+      /*isNonThrowing=*/instruction->getApplyOptions(),
       /*SpecializationInfo=*/partialApply->getSpecializationInfo());
 
   worklist.replaceInstructionWithInstruction(instruction, replacement

@@ -425,7 +425,7 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     }
     builder.createTryApply( tai->getLoc(), tai->getCallee(),
                 tai->getSubstitutionMap(), args, normalBB, errorBB,
-                tai->getSpecializationInfo());
+                tai->getApplyOptions(), tai->getSpecializationInfo());
     tai->eraseFromParent();
     return;
   }

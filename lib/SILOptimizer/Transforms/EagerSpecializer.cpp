@@ -267,8 +267,11 @@ static SILValue emitInvocation(SILBuilder &Builder,
   // or de-facto?
   if (!CanSILFuncTy->hasErrorResult() ||
       CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    ApplyOptions Options;
+    if (isNonThrowing)
+      Options |= ApplyFlags::DoesNotThrow;
     auto *AI = Builder.createApply(CalleeFunc->getLocation(), FuncRefInst, Subs,
-                                   CallArgs, isNonThrowing);
+                                   CallArgs, Options);
     cleanupCallArguments(Builder, Loc, CallArgs, ArgsNeedEndBorrow);
     return AI;
   }

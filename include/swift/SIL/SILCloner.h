@@ -900,7 +900,7 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
       Inst, getBuilder().createApply(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
-                Inst->isNonThrowing(),
+                Inst->getApplyOptions(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 
@@ -915,6 +915,7 @@ SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
                 getOpBasicBlock(Inst->getNormalBB()),
                 getOpBasicBlock(Inst->getErrorBB()),
+                Inst->getApplyOptions(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 
@@ -941,7 +942,7 @@ SILCloner<ImplClass>::visitBeginApplyInst(BeginApplyInst *Inst) {
       Inst, getBuilder().createBeginApply(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
-                Inst->isNonThrowing(),
+                Inst->getApplyOptions(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 

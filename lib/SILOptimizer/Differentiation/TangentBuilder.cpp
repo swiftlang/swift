@@ -54,7 +54,7 @@ void TangentBuilder::emitZeroIntoBuffer(SILLocation loc, SILValue buffer,
       loc, SILType::getPrimitiveObjectType(metatypeType));
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
       additiveArithmeticProto, astType, confRef);
-  createApply(loc, getter, subMap, {buffer, metatype}, /*isNonThrowing*/ false);
+  createApply(loc, getter, subMap, {buffer, metatype});
   emitDestroyValueOperation(loc, getter);
 }
 
@@ -115,7 +115,7 @@ void TangentBuilder::emitInPlaceAdd(
   auto metatype = createMetatype(loc, metatypeSILType);
   // %2 = apply $0(%lhs, %rhs, %1)
   createApply(loc, witnessMethod, subMap,
-              {destinationBuffer, operand, metatype}, /*isNonThrowing*/ false);
+              {destinationBuffer, operand, metatype});
   emitDestroyValueOperation(loc, witnessMethod);
 }
 
@@ -162,8 +162,7 @@ void TangentBuilder::emitAddIntoBuffer(SILLocation loc,
   auto metatype = createMetatype(loc, metatypeSILType);
   // %2 = apply %0(%result, %new, %old, %1)
   createApply(loc, witnessMethod, subMap,
-              {destinationBuffer, rhsAddress, lhsAddress, metatype},
-              /*isNonThrowing*/ false);
+              {destinationBuffer, rhsAddress, lhsAddress, metatype});
   emitDestroyValueOperation(loc, witnessMethod);
 }
 

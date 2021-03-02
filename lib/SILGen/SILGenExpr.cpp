@@ -2269,7 +2269,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                captures);
 
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, captures, calleeTypeInfo, ApplyOptions::None, C, None);
+                   subs, captures, calleeTypeInfo, ApplyOptions(), C, None);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2292,7 +2292,7 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C, None);
+                   subs, {}, calleeTypeInfo, ApplyOptions(), C, None);
 }
 
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
@@ -3199,7 +3199,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                      loc, ManagedValue::forUnmanaged(equalsWitness),
                      equatableSub,
                      {lhsArg, rhsArg, metatyValue},
-                     equalsInfo, ApplyOptions::None, SGFContext(), None)
+                     equalsInfo, ApplyOptions(), SGFContext(), None)
           .getUnmanagedSingleValue(subSGF, loc);
       }
       
