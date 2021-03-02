@@ -2697,8 +2697,8 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                 getOpLocation(Inst->getLoc()), Inst->isExact(),
                 getOpValue(Inst->getOperand()),
                 getOpType(Inst->getTargetLoweredType()),
-                getOpASTType(Inst->getTargetFormalType()),
-                OpSuccBB, OpFailBB, TrueCount, FalseCount));
+                getOpASTType(Inst->getTargetFormalType()), OpSuccBB, OpFailBB,
+                Inst->getForwardingOwnershipKind(), TrueCount, FalseCount));
 }
 
 template <typename ImplClass>

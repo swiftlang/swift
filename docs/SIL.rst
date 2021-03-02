@@ -2036,7 +2036,15 @@ and as a result:
 
 * Textual SIL does not represent the ownership of forwarding instructions
   explicitly. Instead, the instruction's ownership is inferred normally from the
-  parsed operand. Since the SILVerifier runs on Textual SIL after parsing, you
+  parsed operand.
+  In some cases the forwarding ownership kind is different from the ownership kind
+  of its operand. In such cases, textual SIL represents the forwarding ownership kind
+  explicity.
+  Eg: ::
+
+    %cast = unchecked_ref_cast %val : $Klass to $Optional<Klass>, forwarding: @unowned
+
+  Since the SILVerifier runs on Textual SIL after parsing, you
   can feel confident that ownership constraints were inferred correctly.
 
 Forwarding has slightly different ownership semantics depending on the value
