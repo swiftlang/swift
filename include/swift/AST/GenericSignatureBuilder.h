@@ -638,7 +638,13 @@ public:
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
 
+  class ExplicitRequirement;
+
+  bool isRedundantExplicitRequirement(ExplicitRequirement req) const;
+
 private:
+  void computeRedundantRequirements();
+
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
@@ -669,6 +675,7 @@ private:
   Constraint<T> checkConstraintList(
                            TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
+                           RequirementKind kind,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
                            llvm::function_ref<
@@ -694,6 +701,7 @@ private:
   Constraint<T> checkConstraintList(
                            TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
+                           RequirementKind kind,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
                            llvm::function_ref<
@@ -1205,6 +1213,10 @@ public:
   /// signature, because the information can be re-derived by following the
   /// path.
   bool isDerivedRequirement() const;
+
+  /// Same as above, but we consider RequirementSignatureSelf to not be
+  /// derived.
+  bool isDerivedNonRootRequirement() const;
 
   /// Whether we should diagnose a redundant constraint based on this
   /// requirement source.
