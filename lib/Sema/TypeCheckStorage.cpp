@@ -2502,30 +2502,26 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   return property;
 }
 
-static void typeCheckSynthesizedWrapperInitializer(
-    PatternBindingDecl *pbd, VarDecl *backingVar, PatternBindingDecl *parentPBD,
-    Expr *&initializer) {
+static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
+                                                   Expr *&initializer) {
   // Figure out the context in which the initializer was written.
+  auto *parentPBD = wrappedVar->getParentPatternBinding();
+  auto i = parentPBD->getPatternEntryIndexForVarDecl(wrappedVar);
   DeclContext *originalDC = parentPBD->getDeclContext();
   if (!originalDC->isLocalContext()) {
     auto initContext =
-        cast_or_null<PatternBindingInitializer>(parentPBD->getInitContext(0));
+        cast_or_null<PatternBindingInitializer>(parentPBD->getInitContext(i));
     if (initContext)
       originalDC = initContext;
   }
 
   // Type-check the initialization.
-  {
-    auto *wrappedVar = backingVar->getOriginalWrappedProperty();
-    auto i = parentPBD->getPatternEntryIndexForVarDecl(wrappedVar);
-    auto *pattern = parentPBD->getPattern(i);
-    TypeChecker::typeCheckBinding(pattern, initializer, originalDC,
-                                  wrappedVar->getType(), parentPBD, i);
-  }
+  auto *pattern = parentPBD->getPattern(i);
+  TypeChecker::typeCheckBinding(pattern, initializer, originalDC,
+                                wrappedVar->getType(), parentPBD, i);
 
-  const auto i = pbd->getPatternEntryIndexForVarDecl(backingVar);
   if (auto initializerContext =
-          dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
+          dyn_cast_or_null<Initializer>(parentPBD->getInitContext(i))) {
     TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
 }
@@ -2807,8 +2803,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
         // FIXME: Record this expression somewhere so that DI can perform the
         // initialization itself.
         Expr *initializer = nullptr;
-        typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
-                                               initializer);
+        typeCheckSynthesizedWrapperInitializer(var, initializer);
         pbd->setInit(0, initializer);
         pbd->setInitializerChecked(0);
       } else if (var->hasObservers() && !dc->isTypeContext()) {
@@ -2846,28 +2841,20 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // If no initial wrapped value was provided via '=' and either:
-  //   1. Not all of the attached property wrappers have init(wrappedValue:), or
-  //   2. An initializer has already been synthesized from arguments in the
-  //      property wrapper attribute,
-  // then this property wrapper cannot be initialized out-of-line with a wrapped
-  // value.
-  if (!wrappedValue && (!var->allAttachedPropertyWrappersHaveWrappedValueInit() ||
-                        initializer)) {
-    return PropertyWrapperBackingPropertyInfo(backingVar, projectionVar, nullptr,
-                                              projectedValueInit);
-  }
-
   // Form the initialization of the backing property from a value of the
   // original property's type.
-  Expr *wrappedValueInit = initializer;
-  if (!wrappedValueInit) {
+  Expr *wrappedValueInit = nullptr;
+  if (wrappedValue) {
+    wrappedValueInit = initializer;
+  } else if (!initializer &&
+             var->allAttachedPropertyWrappersHaveWrappedValueInit()) {
     wrappedValueInit = PropertyWrapperValuePlaceholderExpr::create(
         ctx, var->getSourceRange(), var->getType(), /*wrappedValue=*/nullptr);
 
     if (auto *param = dyn_cast<ParamDecl>(var)) {
-      wrappedValueInit = buildPropertyWrapperInitCall(var, backingVar->getType(), wrappedValueInit,
-                                                      PropertyWrapperInitKind::WrappedValue);
+      wrappedValueInit = buildPropertyWrapperInitCall(
+          var, backingVar->getType(), wrappedValueInit,
+          PropertyWrapperInitKind::WrappedValue);
       TypeChecker::typeCheckExpression(wrappedValueInit, dc);
 
       // Check initializer effects.
@@ -2877,8 +2864,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       checkInitializerActorIsolation(initContext, wrappedValueInit);
       TypeChecker::checkInitializerEffects(initContext, wrappedValueInit);
     } else {
-      typeCheckSynthesizedWrapperInitializer(
-          pbd, backingVar, var->getParentPatternBinding(), wrappedValueInit);
+      typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit);
     }
   }
 
