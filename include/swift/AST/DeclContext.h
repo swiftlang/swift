@@ -734,6 +734,8 @@ class IterableDeclContext {
 
   static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
 
+  friend class LookupAllConformancesInContextRequest;
+
   /// Retrieve the \c ASTContext in which this iterable context occurs.
   ASTContext &getASTContext() const;
 

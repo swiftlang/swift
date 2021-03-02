@@ -1321,58 +1321,82 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 SmallVector<ProtocolDecl *, 2>
 IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   SmallVector<ProtocolDecl *, 2> result;
-
-  // Dig out the nominal type.
-  const auto dc = getAsGenericContext();
-  const auto nominal = dc->getSelfNominalTypeDecl();
-  if (!nominal) {
-    return result;
-  }
-
-  // Update to record all potential conformances.
-  nominal->prepareConformanceTable();
-  nominal->ConformanceTable->lookupConformances(
-    nominal,
-    const_cast<GenericContext *>(dc),
-    lookupKind,
-    &result,
-    nullptr,
-    nullptr);
-
+  for (auto conformance : getLocalConformances(lookupKind))
+    result.push_back(conformance->getProtocol());
   return result;
 }
 
-SmallVector<ProtocolConformance *, 2>
-IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
-    const {
-  SmallVector<ProtocolConformance *, 2> result;
-
+std::vector<ProtocolConformance *>
+LookupAllConformancesInContextRequest::evaluate(
+    Evaluator &eval, const IterableDeclContext *IDC) const {
   // Dig out the nominal type.
-  const auto dc = getAsGenericContext();
+  const auto dc = IDC->getAsGenericContext();
   const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
-    return result;
+    return { };
   }
 
   // Protocols only have self-conformances.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     if (protocol->requiresSelfConformanceWitnessTable()) {
-      return SmallVector<ProtocolConformance *, 2>{
-        protocol->getASTContext().getSelfConformance(protocol)
-      };
+      return { protocol->getASTContext().getSelfConformance(protocol) };
     }
-    return SmallVector<ProtocolConformance *, 2>();
+
+    return { };
   }
 
-  // Update to record all potential conformances.
+  // Record all potential conformances.
   nominal->prepareConformanceTable();
+  std::vector<ProtocolConformance *> conformances;
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<GenericContext *>(dc),
-    lookupKind,
-    nullptr,
-    &result,
+    &conformances,
     nullptr);
+
+  return conformances;
+}
+
+SmallVector<ProtocolConformance *, 2>
+IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
+    const {
+  // Look up the cached set of all of the conformances.
+  std::vector<ProtocolConformance *> conformances =
+      evaluateOrDefault(
+        getASTContext().evaluator, LookupAllConformancesInContextRequest{this},
+        { });
+
+  // Copy all of the conformances we want.
+  SmallVector<ProtocolConformance *, 2> result;
+  std::copy_if(
+      conformances.begin(), conformances.end(), std::back_inserter(result),
+      [&](ProtocolConformance *conformance) {
+         // If we are to filter out this result, do so now.
+         switch (lookupKind) {
+         case ConformanceLookupKind::OnlyExplicit:
+           switch (conformance->getSourceKind()) {
+           case ConformanceEntryKind::Explicit:
+           case ConformanceEntryKind::Synthesized:
+             return true;
+           case ConformanceEntryKind::Implied:
+           case ConformanceEntryKind::Inherited:
+             return false;
+           }
+
+         case ConformanceLookupKind::NonInherited:
+           switch (conformance->getSourceKind()) {
+           case ConformanceEntryKind::Explicit:
+           case ConformanceEntryKind::Synthesized:
+           case ConformanceEntryKind::Implied:
+             return true;
+           case ConformanceEntryKind::Inherited:
+             return false;
+           }
+
+         case ConformanceLookupKind::All:
+           return true;
+         }
+      });
 
   return result;
 }
@@ -1399,8 +1423,6 @@ IterableDeclContext::takeConformanceDiagnostics() const {
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<GenericContext *>(dc),
-    ConformanceLookupKind::All,
-    nullptr,
     nullptr,
     &result);
 
