@@ -768,7 +768,20 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
 
     bool visitFunctionType(FunctionType *type) {
       // Concurrent function types meet the requirements.
-      return type->isConcurrent();
+      if (type->isConcurrent())
+        return true;
+
+      // C and thin function types meeting the requirements because they
+      // cannot have captures.
+      switch (type->getExtInfo().getRepresentation()) {
+      case FunctionTypeRepresentation::Block:
+      case FunctionTypeRepresentation::Swift:
+        return false;
+
+      case FunctionTypeRepresentation::CFunctionPointer:
+      case FunctionTypeRepresentation::Thin:
+        return true;
+      }
     }
 
     bool visitProtocolCompositionType(ProtocolCompositionType *type) {

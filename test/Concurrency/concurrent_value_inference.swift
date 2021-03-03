@@ -80,10 +80,16 @@ public enum PublicEnum {
   case some
 }
 
+struct HasFunctions {
+  var tfp: @convention(thin) () -> Void
+  var cfp: @convention(c) () -> Void
+}
+
 func testCV(
   c1: C1, c2: C2, s1: S1, e1: E1, e2: E2, gs1: GS1<Int>, gs2: GS2<Int>,
   bc: Bitcode, ps: PublicStruct, pe: PublicEnum,
-  fps: FrozenPublicStruct, fpe: FrozenPublicEnum
+  fps: FrozenPublicStruct, fpe: FrozenPublicEnum,
+  hf: HasFunctions
 ) {
   acceptCV(c1) // expected-error{{'C1' conform to 'ConcurrentValue'}}
   acceptCV(c2)
@@ -103,4 +109,7 @@ func testCV(
   // Public is okay when also @frozen.
   acceptCV(fps)
   acceptCV(fpe)
+
+  // Thin and C function types are ConcurrentValue.
+  acceptCV(hf)
 }
