@@ -1050,9 +1050,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
-  context.Args.AddLastArg(
-      Arguments,
-      options::OPT_enable_experimental_cross_module_incremental_build);
+  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));

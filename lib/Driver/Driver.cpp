@@ -1008,8 +1008,9 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
-    const bool EnableCrossModuleDependencies = ArgList->hasArg(
-        options::OPT_enable_experimental_cross_module_incremental_build);
+    const bool EnableCrossModuleDependencies
+        = ArgList->hasArg(options::OPT_enable_incremental_imports,
+                          options::OPT_disable_incremental_imports, true);
 
     // clang-format off
     C = std::make_unique<Compilation>(

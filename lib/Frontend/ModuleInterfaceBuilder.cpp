@@ -79,10 +79,13 @@ bool ModuleInterfaceBuilder::collectDepsForSerialization(
   path::native(ResourcePath);
 
   auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
-  SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
-  InitialDepNames.push_back(interfacePath);
-  InitialDepNames.insert(InitialDepNames.end(),
-                         extraDependencies.begin(), extraDependencies.end());
+  SmallVector<std::string, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
+  auto IncDeps = SubInstance.getDependencyTracker()->getIncrementalDependencyPaths();
+  InitialDepNames.append(IncDeps.begin(), IncDeps.end());
+  InitialDepNames.push_back(interfacePath.str());
+  for (const auto &extra : extraDependencies) {
+    InitialDepNames.push_back(extra.str());
+  }
   SmallString<128> Scratch;
 
   for (const auto &InitialDepName : InitialDepNames) {
