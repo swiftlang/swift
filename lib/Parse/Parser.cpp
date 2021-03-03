@@ -479,7 +479,8 @@ public:
     TokenKindChangeMap[Loc.getOpaquePointerValue()] = NewKind;
   }
 
-  void receive(Token Tok) override {
+  void receive(const Token &TokParam) override {
+    Token Tok = TokParam;
     // We filter out all tokens without valid location
     if(Tok.getLoc().isInvalid())
       return;

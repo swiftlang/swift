@@ -1326,6 +1326,41 @@ IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   return result;
 }
 
+/// Find a synthesized ConcurrentValue conformance in this declaration context,
+/// if there is one.
+static ProtocolConformance *findSynthesizedConcurrentValueConformance(
+    const DeclContext *dc) {
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return nullptr;
+
+  if (isa<ProtocolDecl>(nominal))
+    return nullptr;
+
+  if (dc->getParentModule() != nominal->getParentModule())
+    return nullptr;
+
+  auto cvProto = nominal->getASTContext().getProtocol(
+      KnownProtocolKind::ConcurrentValue);
+  if (!cvProto)
+    return nullptr;
+
+  auto conformance = dc->getParentModule()->lookupConformance(
+      nominal->getDeclaredInterfaceType(), cvProto);
+  if (!conformance || !conformance.isConcrete())
+    return nullptr;
+
+  auto concrete = conformance.getConcrete();
+  if (concrete->getDeclContext() != dc)
+    return nullptr;
+
+  auto normal = concrete->getRootNormalConformance();
+  if (!normal || normal->getSourceKind() != ConformanceEntryKind::Synthesized)
+    return nullptr;
+
+  return normal;
+}
+
 std::vector<ProtocolConformance *>
 LookupAllConformancesInContextRequest::evaluate(
     Evaluator &eval, const IterableDeclContext *IDC) const {
@@ -1394,9 +1429,27 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
            }
 
          case ConformanceLookupKind::All:
+         case ConformanceLookupKind::NonStructural:
            return true;
          }
       });
+
+  // If we want to add structural conformances, do so now.
+  switch (lookupKind) {
+    case ConformanceLookupKind::All:
+    case ConformanceLookupKind::NonInherited: {
+      // Look for a ConcurrentValue conformance globally. If it is synthesized
+      // and matches this declaration context, use it.
+      auto dc = getAsGenericContext();
+      if (auto conformance = findSynthesizedConcurrentValueConformance(dc))
+        result.push_back(conformance);
+      break;
+    }
+
+    case ConformanceLookupKind::NonStructural:
+    case ConformanceLookupKind::OnlyExplicit:
+      break;
+  }
 
   return result;
 }

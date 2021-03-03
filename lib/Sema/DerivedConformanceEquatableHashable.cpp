@@ -942,7 +942,8 @@ getHashableConformance(const Decl *parentDecl) {
   ASTContext &C = parentDecl->getASTContext();
   const auto IDC = cast<IterableDeclContext>(parentDecl);
   auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: IDC->getLocalConformances()) {
+  for (auto conformance: IDC->getLocalConformances(
+           ConformanceLookupKind::NonStructural)) {
     if (conformance->getProtocol() == hashableProto) {
       return conformance;
     }

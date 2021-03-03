@@ -274,7 +274,8 @@ static Type inferResultBuilderType(ValueDecl *decl)  {
   auto addConformanceMatches = [&matches](ValueDecl *lookupDecl) {
     DeclContext *dc = lookupDecl->getDeclContext();
     auto idc = cast<IterableDeclContext>(dc->getAsDecl());
-    auto conformances = idc->getLocalConformances();
+    auto conformances = idc->getLocalConformances(
+        ConformanceLookupKind::NonStructural);
 
     for (auto conformance : conformances) {
       auto protocol = conformance->getProtocol();

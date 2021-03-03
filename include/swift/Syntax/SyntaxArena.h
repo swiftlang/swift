@@ -21,6 +21,8 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/ADT/STLExtras.h"
+#include <set>
 
 namespace swift {
 namespace syntax {
@@ -68,8 +70,25 @@ public:
     auto DidInsert = ChildArenas.insert(Arena);
     if (DidInsert.second) {
       Arena->Retain();
+      assert(!Arena->containsReferenceCycle({this}));
     }
   }
+
+#ifndef NDEBUG
+  /// Check if there are any reference cycles in the child arenas. This is done
+  /// by walking all child nodes from a root node, collecting all visited nodes
+  /// in \p VisitedArenas. If we find a node twice, there's a reference cycle.
+  bool
+  containsReferenceCycle(std::set<const SyntaxArena *> VisitedArenas = {}) const {
+    if (!VisitedArenas.insert(this).second) {
+      // this was already in VisitedArenas -> we have a reference cycle
+      return true;
+    }
+    return llvm::any_of(ChildArenas, [&](const SyntaxArena *Child) {
+      return Child->containsReferenceCycle(VisitedArenas);
+    });
+  }
+#endif
 
   void setHotUseMemoryRegion(const void *Start, const void *End) {
     assert(containsPointer(Start) &&

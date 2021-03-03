@@ -110,9 +110,9 @@ public func runSomethingConcurrently(body: @concurrent () -> Void) { }
 // CHECK-NEXT: #endif
 public func stage(with actor: MyActor) { }
 
-// CHECK-NOT: extension FeatureTest.MyActor : Swift.ConcurrentValue
+// CHECK-NOT: extension MyActor : Swift.ConcurrentValue
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension FeatureTest.OldSchool : FeatureTest.MP {
+// CHECK-NEXT: extension OldSchool : FeatureTest.MP {
 // CHECK-NEXT: #endif
 

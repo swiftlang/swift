@@ -12,8 +12,7 @@ using namespace swift::syntax;
 
 #pragma mark - declaration-modifier
 
-DeclModifierSyntax getCannedDeclModifier() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+DeclModifierSyntax getCannedDeclModifier(const RC<SyntaxArena> &Arena) {
   auto Private = SyntaxFactory::makeIdentifier("private", "", "", Arena);
   auto LParen = SyntaxFactory::makeLeftParenToken("", "", Arena);
   auto Set = SyntaxFactory::makeIdentifier("set", "", "", Arena);
@@ -22,8 +21,8 @@ DeclModifierSyntax getCannedDeclModifier() {
 }
 
 TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
+  RC<SyntaxArena> Arena = SyntaxArena::make();
   {
-    RC<SyntaxArena> Arena = SyntaxArena::make();
     SmallString<1> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     SyntaxFactory::makeBlankDeclModifier(Arena).print(OS);
@@ -32,7 +31,7 @@ TEST(DeclSyntaxTests, DeclModifierMakeAPIs) {
   {
     SmallString<24> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    getCannedDeclModifier().print(OS);
+    getCannedDeclModifier(Arena).print(OS);
     ASSERT_EQ(OS.str().str(), "private(set)");
   }
 }
@@ -220,8 +219,7 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
 
 #pragma mark - parameter
 
-FunctionParameterSyntax getCannedFunctionParameter() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+FunctionParameterSyntax getCannedFunctionParameter(const RC<SyntaxArena> &Arena) {
   auto ExternalName = SyntaxFactory::makeIdentifier("with", "", " ", Arena);
   auto LocalName = SyntaxFactory::makeIdentifier("radius", "", "", Arena);
   auto Colon = SyntaxFactory::makeColonToken("", " ", Arena);
@@ -246,7 +244,7 @@ TEST(DeclSyntaxTests, FunctionParameterMakeAPIs) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    getCannedFunctionParameter().print(OS);
+    getCannedFunctionParameter(Arena).print(OS);
     ASSERT_EQ(OS.str().str(), "with radius: Int = -1, ");
   }
   {
@@ -319,7 +317,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    getCannedFunctionParameter()
+    getCannedFunctionParameter(Arena)
       .withFirstName(ExternalName)
       .withSecondName(LocalName)
       .withColon(Colon)
@@ -332,7 +330,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithAPIs) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    getCannedFunctionParameter()
+    getCannedFunctionParameter(Arena)
       .withType(llvm::None)
       .withDefaultArgument(llvm::None)
       .print(OS);
@@ -352,7 +350,7 @@ TEST(DeclSyntaxTests, FunctionParameterWithEllipsis) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    getCannedFunctionParameter()
+    getCannedFunctionParameter(Arena)
         .withFirstName(ExternalName)
         .withSecondName(LocalName)
         .withColon(Colon)
@@ -378,7 +376,7 @@ TEST(DeclSyntaxTests, FunctionParameterListMakeAPIs) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto Param = getCannedFunctionParameter();
+    auto Param = getCannedFunctionParameter(Arena);
     std::vector<FunctionParameterSyntax> Params { Param, Param, Param };
     SyntaxFactory::makeFunctionParameterList(Params, Arena).print(OS);
     ASSERT_EQ(OS.str().str(),
@@ -388,10 +386,9 @@ TEST(DeclSyntaxTests, FunctionParameterListMakeAPIs) {
 
 #pragma mark - function-signature
 
-FunctionSignatureSyntax getCannedFunctionSignature() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+FunctionSignatureSyntax getCannedFunctionSignature(const RC<SyntaxArena> &Arena) {
   auto LParen = SyntaxFactory::makeLeftParenToken("", "", Arena);
-  auto Param = getCannedFunctionParameter();
+  auto Param = getCannedFunctionParameter(Arena);
   auto List = SyntaxFactory::makeBlankFunctionParameterList(Arena)
                   .appending(Param)
                   .appending(Param)
@@ -420,7 +417,7 @@ TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    getCannedFunctionSignature().print(OS);
+    getCannedFunctionSignature(Arena).print(OS);
     ASSERT_EQ(OS.str().str(),
       "(with radius: Int = -1, "
       "with radius: Int = -1, "
@@ -431,7 +428,7 @@ TEST(DeclSyntaxTests, FunctionSignatureMakeAPIs) {
 TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
   auto LParen = SyntaxFactory::makeLeftParenToken("", "", Arena);
-  auto Param = getCannedFunctionParameter();
+  auto Param = getCannedFunctionParameter(Arena);
   auto List = SyntaxFactory::makeBlankFunctionParameterList(Arena)
                   .appending(Param)
                   .appending(Param)
@@ -481,7 +478,7 @@ TEST(DeclSyntaxTests, FunctionSignatureGetAPIs) {
 TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
   auto LParen = SyntaxFactory::makeLeftParenToken("", "", Arena);
-  auto Param = getCannedFunctionParameter();
+  auto Param = getCannedFunctionParameter(Arena);
   auto List = SyntaxFactory::makeBlankFunctionParameterList(Arena)
                   .appending(Param)
                   .appending(Param)
@@ -510,8 +507,7 @@ TEST(DeclSyntaxTests, FunctionSignatureWithAPIs) {
 
 #pragma mark - function-declaration
 
-ModifierListSyntax getCannedModifiers() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+ModifierListSyntax getCannedModifiers(const RC<SyntaxArena> &Arena) {
   auto PublicID = SyntaxFactory::makePublicKeyword("", " ", Arena);
   auto NoLParen = TokenSyntax::missingToken(tok::l_paren, "(", Arena);
   auto NoArgument = TokenSyntax::missingToken(tok::identifier, "", Arena);
@@ -528,8 +524,7 @@ ModifierListSyntax getCannedModifiers() {
       .appending(Static);
 }
 
-GenericParameterClauseSyntax getCannedGenericParams() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+GenericParameterClauseSyntax getCannedGenericParams(const RC<SyntaxArena> &Arena) {
   GenericParameterClauseSyntaxBuilder GB(Arena);
 
   auto LAngle = SyntaxFactory::makeLeftAngleToken("", "", Arena);
@@ -549,8 +544,7 @@ GenericParameterClauseSyntax getCannedGenericParams() {
   return GB.build();
 }
 
-CodeBlockSyntax getCannedBody() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+CodeBlockSyntax getCannedBody(const RC<SyntaxArena> &Arena) {
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "-", Arena);
   auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", "", "", Arena);
   auto One = SyntaxFactory::makeIntegerLiteralExpr(OneDigits, Arena);
@@ -566,8 +560,7 @@ CodeBlockSyntax getCannedBody() {
   return SyntaxFactory::makeCodeBlock(LBrace, Stmts, RBrace, Arena);
 }
 
-GenericWhereClauseSyntax getCannedWhereClause() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+GenericWhereClauseSyntax getCannedWhereClause(const RC<SyntaxArena> &Arena) {
   auto WhereKW = SyntaxFactory::makeWhereKeyword("", " ", Arena);
   auto T = SyntaxFactory::makeTypeIdentifier("T", "", " ", Arena);
   auto EqualEqual = SyntaxFactory::makeEqualityOperator("", " ", Arena);
@@ -584,16 +577,15 @@ GenericWhereClauseSyntax getCannedWhereClause() {
       .withRequirementList(Requirements);
 }
 
-FunctionDeclSyntax getCannedFunctionDecl() {
-  RC<SyntaxArena> Arena = SyntaxArena::make();
+FunctionDeclSyntax getCannedFunctionDecl(const RC<SyntaxArena> &Arena) {
   auto NoAttributes = SyntaxFactory::makeBlankAttributeList(Arena);
   auto Foo = SyntaxFactory::makeIdentifier("foo", "", "", Arena);
   auto FuncKW = SyntaxFactory::makeFuncKeyword("", " ", Arena);
-  auto Modifiers = getCannedModifiers();
-  auto GenericParams = getCannedGenericParams();
-  auto GenericWhere = getCannedWhereClause();
-  auto Signature = getCannedFunctionSignature();
-  auto Body = getCannedBody();
+  auto Modifiers = getCannedModifiers(Arena);
+  auto GenericParams = getCannedGenericParams(Arena);
+  auto GenericWhere = getCannedWhereClause(Arena);
+  auto Signature = getCannedFunctionSignature(Arena);
+  auto Body = getCannedBody(Arena);
 
   return SyntaxFactory::makeFunctionDecl(NoAttributes, Modifiers, FuncKW, Foo,
                                          GenericParams, Signature, GenericWhere,
@@ -611,7 +603,7 @@ TEST(DeclSyntaxTests, FunctionDeclMakeAPIs) {
   {
     SmallString<64> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    getCannedFunctionDecl().print(OS);
+    getCannedFunctionDecl(Arena).print(OS);
     ASSERT_EQ(OS.str().str(),
               "public static func foo<T, U>"
               "(with radius: Int = -1, "
