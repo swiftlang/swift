@@ -1111,6 +1111,18 @@ def emit_supported_features : Flag<["-"], "emit-supported-features">,
   HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
+def enable_incremental_imports :
+  Flag<["-"], "enable-incremental-imports">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable cross-module incremental build metadata and "
+           "driver scheduling for Swift modules">;
+
+def disable_incremental_imports :
+  Flag<["-"], "disable-incremental-imports">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable cross-module incremental build metadata and "
+           "driver scheduling for Swift modules">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

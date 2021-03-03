@@ -178,8 +178,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.getValueOr(
           !isModuleExternallyConsumed(module));
 
-  serializationOpts.ExperimentalCrossModuleIncrementalInfo =
-      opts.EnableExperimentalCrossModuleIncrementalBuild;
+  serializationOpts.DisableCrossModuleIncrementalInfo =
+      opts.DisableCrossModuleIncrementalBuild;
 
   return serializationOpts;
 }
