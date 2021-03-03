@@ -1983,6 +1983,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
     }
+
+    increaseScore(SK_SyncInAsync);
   }
 
   // A @concurrent function can be a subtype of a non-@concurrent function.

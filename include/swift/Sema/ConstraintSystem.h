@@ -775,9 +775,11 @@ enum ScoreKind {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
-  /// A reference to an async function in a synchronous context, or
-  /// vice versa.
-  SK_AsyncSyncMismatch,
+  /// A reference to an async function in a synchronous context.
+  SK_AsyncInSyncMismatch,
+  /// Synchronous function in an asynchronous context or a conversion of
+  /// a synchronous function to an asynchronous one.
+  SK_SyncInAsync,
   /// A use of the "forward" scan for trailing closures.
   SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.

@@ -711,7 +711,7 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   auto delta = LastSolvedChoice->second - getCurrentScore();
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
-  bool hasAsyncMismatch = delta.Data[SK_AsyncSyncMismatch] > 0;
+  bool hasAsyncMismatch = delta.Data[SK_AsyncInSyncMismatch] > 0;
   auto isBeginningOfPartition = choice.isBeginningOfPartition();
 
   // Attempt to short-circuit evaluation of this disjunction only
