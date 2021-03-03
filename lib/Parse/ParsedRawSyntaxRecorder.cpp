@@ -112,10 +112,6 @@ ParsedRawSyntaxRecorder::recordEmptyRawSyntaxCollection(SyntaxKind kind,
   return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
 }
 
-void ParsedRawSyntaxRecorder::discardRecordedNode(ParsedRawSyntaxNode &node) {
-  SPActions->discardRecordedNode(node.takeOpaqueNode());
-}
-
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::lookupNode(size_t lexerOffset, SourceLoc loc,
                                     SyntaxKind kind) {

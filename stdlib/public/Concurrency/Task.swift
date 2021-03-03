@@ -392,12 +392,9 @@ extension Task {
   @discardableResult
   public static func runDetached<T>(
     priority: Priority = .default,
-    startingOn executor: ExecutorRef? = nil,
     operation: @concurrent @escaping () async -> T
     // TODO: Allow inheriting task-locals?
   ) -> Handle<T, Never> {
-    assert(executor == nil, "Custom executor support is not implemented yet.") // FIXME
-
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -448,11 +445,8 @@ extension Task {
   @discardableResult
   public static func runDetached<T, Failure>(
     priority: Priority = .default,
-    startingOn executor: ExecutorRef? = nil,
     operation: @concurrent @escaping () async throws -> T
   ) -> Handle<T, Failure> {
-    assert(executor == nil, "Custom executor support is not implemented yet.") // FIXME
-
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -478,22 +472,6 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
   )
 }
 
-// ==== Voluntary Suspension -----------------------------------------------------
-
-extension Task {
-
-  /// Explicitly suspend the current task, potentially giving up execution actor
-  /// of current actor/task, allowing other tasks to execute.
-  ///
-  /// This is not a perfect cure for starvation;
-  /// if the task is the highest-priority task in the system, it might go
-  /// immediately back to executing.
-  @available(*, deprecated, message: "Not implemented yet.")
-  public static func yield() async {
-    fatalError("\(#function) not implemented yet.")
-  }
-}
-
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
 extension Task {
@@ -508,7 +486,7 @@ extension Task {
   ///
   /// The returned value must not be accessed from tasks other than the current one.
   public static var unsafeCurrent: UnsafeCurrentTask? {
-    guard let _task = _getActiveAsyncTask() else {
+    guard let _task = _getCurrentAsyncTask() else {
       return nil
     }
     // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
@@ -583,8 +561,8 @@ extension UnsafeCurrentTask: Equatable {
 
 // ==== Internal ---------------------------------------------------------------
 
-@_silgen_name("swift_task_get_active")
-func _getActiveAsyncTask() -> Builtin.NativeObject?
+@_silgen_name("swift_task_getCurrent")
+func _getCurrentAsyncTask() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags

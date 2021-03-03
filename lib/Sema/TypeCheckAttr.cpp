@@ -1835,7 +1835,17 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     // Resulting $main looks like:
     // $main() { _runAsyncMain(main) }
     auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);
-    assert(concurrencyModule != nullptr && "Failed to find Concurrency module");
+    if (!concurrencyModule) {
+      context.Diags.diagnose(mainFunction->getAsyncLoc(),
+                             diag::async_main_no_concurrency);
+      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
+      SmallVector<ASTNode, 1> stmts;
+      stmts.push_back(result);
+      auto body = BraceStmt::create(context, SourceLoc(), stmts,
+                                    SourceLoc(), /*Implicit*/true);
+
+      return std::make_pair(body, /*typechecked*/true);
+    }
 
     SmallVector<ValueDecl *, 1> decls;
     concurrencyModule->lookupQualified(
@@ -4018,7 +4028,9 @@ static bool checkFunctionSignature(
   if (!std::equal(required->getParams().begin(), required->getParams().end(),
                   candidateFnTy->getParams().begin(),
                   [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
-                    return x.getOldType()->isEqual(mapType(y.getOldType()));
+                    auto xInstanceTy = x.getOldType()->getMetatypeInstanceType();
+                    auto yInstanceTy = y.getOldType()->getMetatypeInstanceType();
+                    return xInstanceTy->isEqual(mapType(yInstanceTy));
                   }))
     return false;
 
@@ -4817,7 +4829,40 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       }
     }
   }
+
   attr->setOriginalFunction(originalAFD);
+
+  // Returns true if:
+  // - Original function and derivative function are static methods.
+  // - Original function and derivative function are non-static methods.
+  // - Original function is a Constructor declaration and derivative function is
+  // a static method.
+  auto compatibleStaticDecls = [&]() {
+    return (isa<ConstructorDecl>(originalAFD) || originalAFD->isStatic()) ==
+           derivative->isStatic();
+  };
+
+  // Diagnose if original function and derivative differ in terms of static declaration.
+  if (!compatibleStaticDecls()) {
+    bool derivativeMustBeStatic = !derivative->isStatic();
+    diags.diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
+                   diag::derivative_attr_static_method_mismatch_original,
+                   originalAFD->getName(), derivative->getName(),
+                   derivativeMustBeStatic);
+    diags.diagnose(originalAFD->getNameLoc(),
+                   diag::derivative_attr_static_method_mismatch_original_note,
+                   originalAFD->getName(), derivativeMustBeStatic);
+    auto fixItDiag =
+        diags.diagnose(derivative->getStartLoc(),
+                       diag::derivative_attr_static_method_mismatch_fix,
+                       derivative->getName(), derivativeMustBeStatic);
+    if (derivativeMustBeStatic) {
+      fixItDiag.fixItInsert(derivative->getStartLoc(), "static ");
+    } else {
+      fixItDiag.fixItRemove(derivative->getStaticLoc());
+    }
+    return true;
+  }
 
   // Returns true if:
   // - Original function and derivative function have the same access level.
@@ -5221,8 +5266,9 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   // If the transpose function is curried and `self` is a linearity parameter,
   // check that the instance and static `Self` types are equal.
   Type staticSelfType, instanceSelfType;
+  bool doSelfTypesMatch = false;
   if (isCurried && wrtSelf) {
-    bool doSelfTypesMatch = doTransposeStaticAndInstanceSelfTypesMatch(
+    doSelfTypesMatch = doTransposeStaticAndInstanceSelfTypesMatch(
         transposeInterfaceType, staticSelfType, instanceSelfType);
     if (!doSelfTypesMatch) {
       diagnose(attr->getLocation(),
@@ -5330,6 +5376,37 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
                                parsedLinearParams, attr->getLocation())) {
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
+    return;
+  }
+
+  // Returns true if:
+  // - Original function and transpose function are static methods.
+  // - Original function and transpose function are non-static methods.
+  // - Original function is a Constructor declaration and transpose function is
+  // a static method.
+  auto compatibleStaticDecls = [&]() {
+    return (isa<ConstructorDecl>(originalAFD) || originalAFD->isStatic()) ==
+           transpose->isStatic();
+  };
+
+  // Diagnose if original function and transpose differ in terms of static declaration.
+  if (!doSelfTypesMatch && !compatibleStaticDecls()) {
+    bool transposeMustBeStatic = !transpose->isStatic();
+    diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
+             diag::transpose_attr_static_method_mismatch_original,
+             originalAFD->getName(), transpose->getName(),
+             transposeMustBeStatic);
+    diagnose(originalAFD->getNameLoc(),
+             diag::transpose_attr_static_method_mismatch_original_note,
+             originalAFD->getName(), transposeMustBeStatic);
+    auto fixItDiag = diagnose(transpose->getStartLoc(),
+                              diag::transpose_attr_static_method_mismatch_fix,
+                              transpose->getName(), transposeMustBeStatic);
+    if (transposeMustBeStatic) {
+      fixItDiag.fixItInsert(transpose->getStartLoc(), "static ");
+    } else {
+      fixItDiag.fixItRemove(transpose->getStaticLoc());
+    }
     return;
   }
 

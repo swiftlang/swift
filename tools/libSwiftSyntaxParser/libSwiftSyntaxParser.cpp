@@ -183,7 +183,8 @@ private:
     auto numValue = serialization::getNumericValue(kind);
     node.kind = numValue;
     assert(node.kind == numValue && "syntax kind value is too large");
-    node.layout_data.nodes = elements.data();
+    node.layout_data.nodes =
+        const_cast<const swiftparse_client_node_t *>(elements.data());
     node.layout_data.nodes_count = elements.size();
     makeCRange(node.range, range);
     node.present = true;
@@ -194,10 +195,6 @@ private:
                                                const SourceFile &SF) override {
     // We don't support realizing syntax nodes from the C layout.
     return None;
-  }
-
-  void discardRecordedNode(OpaqueSyntaxNode node) override {
-    // FIXME: This method should not be called at all.
   }
 
   std::pair<size_t, OpaqueSyntaxNode>
@@ -302,7 +299,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
     pConsumer = std::make_unique<SynParserDiagConsumer>(*this, bufID);
     PU.getDiagnosticEngine().addConsumer(*pConsumer);
   }
-  return PU.parse();
+  return const_cast<swiftparse_client_node_t>(PU.parse());
 }
 }
 //===--- C API ------------------------------------------------------------===//

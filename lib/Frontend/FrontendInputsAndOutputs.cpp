@@ -322,7 +322,14 @@ bool FrontendInputsAndOutputs::forEachInputProducingAMainOutputFile(
 
 void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     ArrayRef<std::string> outputFiles,
-    ArrayRef<SupplementaryOutputPaths> supplementaryOutputs) {
+    ArrayRef<SupplementaryOutputPaths> supplementaryOutputs,
+    ArrayRef<std::string> outputFilesForIndexUnits) {
+  if (outputFilesForIndexUnits.empty())
+    outputFilesForIndexUnits = outputFiles;
+
+  assert(outputFiles.size() == outputFilesForIndexUnits.size() &&
+         "Must have one index unit output path per main output");
+
   if (AllInputs.empty()) {
     assert(outputFiles.empty() && "Cannot have outputs without inputs");
     assert(supplementaryOutputs.empty() &&
@@ -340,7 +347,8 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
     for (auto &input : AllInputs) {
       if (input.isPrimary()) {
         input.setPrimarySpecificPaths(PrimarySpecificPaths(
-            outputFiles[i], input.getFileName(), supplementaryOutputs[i]));
+            outputFiles[i], outputFilesForIndexUnits[i], input.getFileName(),
+            supplementaryOutputs[i]));
         ++i;
       }
     }
@@ -350,7 +358,8 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
          "WMO only ever produces one set of supplementary outputs");
   if (outputFiles.size() == 1) {
     AllInputs.front().setPrimarySpecificPaths(PrimarySpecificPaths(
-        outputFiles.front(), firstInputProducingOutput().getFileName(),
+        outputFiles.front(), outputFilesForIndexUnits.front(),
+        firstInputProducingOutput().getFileName(),
         supplementaryOutputs.front()));
     return;
   }
@@ -358,7 +367,7 @@ void FrontendInputsAndOutputs::setMainAndSupplementaryOutputs(
          "Multi-threaded WMO requires one main output per input");
   for (auto i : indices(AllInputs))
     AllInputs[i].setPrimarySpecificPaths(PrimarySpecificPaths(
-        outputFiles[i], outputFiles[i],
+        outputFiles[i], outputFilesForIndexUnits[i], outputFiles[i],
         i == 0 ? supplementaryOutputs.front() : SupplementaryOutputPaths()));
 }
 
@@ -367,6 +376,17 @@ std::vector<std::string> FrontendInputsAndOutputs::copyOutputFilenames() const {
   (void)forEachInputProducingAMainOutputFile(
       [&](const InputFile &input) -> bool {
         outputs.push_back(input.outputFilename());
+        return false;
+      });
+  return outputs;
+}
+
+std::vector<std::string>
+FrontendInputsAndOutputs::copyIndexUnitOutputFilenames() const {
+  std::vector<std::string> outputs;
+  (void)forEachInputProducingAMainOutputFile(
+      [&](const InputFile &input) -> bool {
+        outputs.push_back(input.indexUnitOutputFilename());
         return false;
       });
   return outputs;
@@ -384,6 +404,12 @@ void FrontendInputsAndOutputs::forEachOutputFilename(
 std::string FrontendInputsAndOutputs::getSingleOutputFilename() const {
   assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeChecksHaveBeenBypassed();
   return hasInputs() ? lastInputProducingOutput().outputFilename()
+                     : std::string();
+}
+
+std::string FrontendInputsAndOutputs::getSingleIndexUnitOutputFilename() const {
+  assertMustNotBeMoreThanOnePrimaryInputUnlessBatchModeChecksHaveBeenBypassed();
+  return hasInputs() ? lastInputProducingOutput().indexUnitOutputFilename()
                      : std::string();
 }
 

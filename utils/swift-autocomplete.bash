@@ -161,8 +161,8 @@ _swift_complete()
     if [[ ${prevWord} == "-Xfrontend" ]] || echo ${COMP_WORDS[@]} | grep --quiet -e '-frontend' ; then
       frontendOption="-frontend"
     fi
-    options=`${tool} ${frontendOption} -help-hidden 2>/dev/null | grep '^  *-[a-zA-Z-]' | sed -E 's/^  *(-[a-zA-Z=-]+).*/\1/'`
-    COMPREPLY=( $(compgen -W "${options}" -- ${currentWord}) )
+    toolOptions=`${tool} ${frontendOption} -help-hidden 2>/dev/null | grep '^  *-[a-zA-Z-]' | sed -E 's/^  *(-[a-zA-Z=-]+).*/\1/'`
+    COMPREPLY=( $(compgen -W "${toolOptions}" -- ${currentWord}) )
   fi
   return 0
 }
@@ -187,6 +187,7 @@ _ninja_complete()
 
 complete -o default -F _swift_complete swiftc
 complete -o default -F _swift_complete swift
+complete -o default -F _swift_complete swift-frontend
 complete -o default -F _swift_complete sil-opt
 complete -o default -F _swift_complete sil-func-extractor
 complete -o default -F _swift_complete swift-demangle

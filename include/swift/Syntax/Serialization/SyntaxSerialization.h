@@ -89,14 +89,14 @@ struct ArrayTraits<ArrayRef<syntax::TriviaPiece>> {
 };
 
 /// Serialization traits for RawSyntax list.
-template<>
-struct ArrayTraits<ArrayRef<RC<syntax::RawSyntax>>> {
-  static size_t size(Output &out, ArrayRef<RC<syntax::RawSyntax>> &seq) {
+template <>
+struct ArrayTraits<ArrayRef<const syntax::RawSyntax *>> {
+  static size_t size(Output &out, ArrayRef<const syntax::RawSyntax *> &seq) {
     return seq.size();
   }
-  static RC<syntax::RawSyntax> &
-  element(Output &out, ArrayRef<RC<syntax::RawSyntax>> &seq, size_t index) {
-    return const_cast<RC<syntax::RawSyntax> &>(seq[index]);
+  static const syntax::RawSyntax *&
+  element(Output &out, ArrayRef<const syntax::RawSyntax *> &seq, size_t index) {
+    return const_cast<const syntax::RawSyntax *&>(seq[index]);
   }
 };
 
@@ -128,7 +128,7 @@ struct ObjectTraits<TokenDescription> {
   }
 };
 
-/// Serialization traits for RC<RawSyntax>.
+/// Serialization traits for RawSyntax *.
 /// This will be different depending if the raw syntax node is a Token or not.
 /// Token nodes will always have this structure:
 /// ```
@@ -147,9 +147,9 @@ struct ObjectTraits<TokenDescription> {
 ///   "presence": <"Present" or "Missing">
 /// }
 /// ```
-template<>
-struct ObjectTraits<syntax::RawSyntax> {
-  static void mapping(Output &out, syntax::RawSyntax &value) {
+template <>
+struct ObjectTraits<const syntax::RawSyntax> {
+  static void mapping(Output &out, const syntax::RawSyntax &value) {
     bool dontSerializeIds =
         (bool)out.getUserInfo()[DontSerializeNodeIdsUserInfoKey];
     if (!dontSerializeIds) {
@@ -189,13 +189,13 @@ struct ObjectTraits<syntax::RawSyntax> {
   }
 };
 
-template<>
-struct NullableTraits<RC<syntax::RawSyntax>> {
+template <>
+struct NullableTraits<const syntax::RawSyntax *> {
   using value_type = syntax::RawSyntax;
-  static bool isNull(RC<syntax::RawSyntax> &value) {
+  static bool isNull(const syntax::RawSyntax *&value) {
     return value == nullptr;
   }
-  static syntax::RawSyntax &get(RC<syntax::RawSyntax> &value) {
+  static const syntax::RawSyntax &get(const syntax::RawSyntax *&value) {
     return *value;
   }
 };

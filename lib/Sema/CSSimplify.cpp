@@ -2013,6 +2013,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
+  // To contextual type increase the score to avoid ambiguity when solver can
+  // find more than one viable binding different only in representation e.g.
+  //   let _: (@convention(block) () -> Void)? = Bool.random() ? nil : {}
+  // so same representation should be always favored.
+  auto loc = getConstraintLocator(locator);
+  if (loc->findLast<LocatorPathElt::ContextualType>() &&
+      func1->getRepresentation() != func2->getRepresentation()) {
+    increaseScore(SK_FunctionConversion);
+  }
+
   if (!matchFunctionRepresentations(func1->getExtInfo(), func2->getExtInfo(),
                                     kind, Options)) {
     return getTypeMatchFailure(locator);
@@ -3016,7 +3026,8 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
-  assignFixedType(typeVar, type);
+  assignFixedType(typeVar, type, /*updateState=*/true,
+                  /*notifyInference=*/!flags.contains(TMF_BindingTypeVariable));
 
   return getTypeMatchSuccess();
 }

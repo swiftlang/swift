@@ -15,12 +15,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-SyntaxData SyntaxData::make(AbsoluteRawSyntax AbsoluteRaw,
-                            const RC<RefCountedBox<SyntaxData>> &Parent) {
-  return SyntaxData(AbsoluteRaw, Parent);
-}
-
-SyntaxData SyntaxData::replacingSelf(const RC<RawSyntax> &NewRaw) const {
+SyntaxData SyntaxData::replacingSelf(const RawSyntax *NewRaw) const {
   if (hasParent()) {
     auto NewRoot = getParent()->replacingChild(NewRaw, getIndexInParent());
     auto NewRootBox = RefCountedBox<SyntaxData>::make(NewRoot);
@@ -29,7 +24,7 @@ SyntaxData SyntaxData::replacingSelf(const RC<RawSyntax> &NewRaw) const {
     return SyntaxData(NewSelf, NewRootBox);
   } else {
     auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
-    return SyntaxData(NewSelf, /*Parent=*/nullptr);
+    return SyntaxData(NewSelf);
   }
 }
 

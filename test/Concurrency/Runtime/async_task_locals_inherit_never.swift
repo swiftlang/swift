@@ -17,7 +17,7 @@ func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
   _ expected: Key.Value? = nil,
   file: String = #file, line: UInt = #line
-) async where Key: TaskLocalKey {
+) where Key: TaskLocalKey {
   let value = Task.local(key)
   print("\(Key.self): \(value) at \(file):\(line)")
   if let expected = expected {
@@ -41,14 +41,14 @@ extension TaskLocalValues {
 func test_async_let() async {
   print(#function) // CHECK: test_async_let
 
-  await printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
+  printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "top") {
-    await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
+    printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
     async let child: () = printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
     await child
 
-    await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
+    printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
   }
 }
 
@@ -56,15 +56,15 @@ func test_async_group() async {
   // CHECK: test_async_group
   print(#function)
 
-  await printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
+  printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "top") {
-    await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
+    printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
     try! await Task.withGroup(resultType: Void.self) { group -> Void? in
-      await printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
+      printTaskLocal(\.string) // CHECK: StringKey: top {{.*}}
 
       await group.add {
-        await printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
+        printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
       }
 
       return try! await group.next()

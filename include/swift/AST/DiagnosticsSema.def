@@ -3232,6 +3232,17 @@ NOTE(derivative_attr_fix_access,none,
      "mark the derivative function as "
      "'%select{private|fileprivate|internal|@usableFromInline|@usableFromInline}0' "
      "to match the original function", (AccessLevel))
+ERROR(derivative_attr_static_method_mismatch_original,none,
+      "unexpected derivative function declaration; "
+      "%0 requires the derivative function %1 to be %select{an instance|a 'static'}2 method",
+      (/*original*/DeclName, /*derivative*/ DeclName,
+       /*originalIsStatic*/bool))
+NOTE(derivative_attr_static_method_mismatch_original_note,none,
+      "original function %0 is %select{an instance|a 'static'}1 method",
+      (/*original*/ DeclName, /*originalIsStatic*/bool))
+NOTE(derivative_attr_static_method_mismatch_fix,none,
+      "make derivative function %0 %select{an instance|a 'static'}1 method",
+      (/*derivative*/ DeclName, /*mustBeStatic*/bool))
 
 // @transpose
 ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
@@ -3249,6 +3260,17 @@ ERROR(transpose_attr_wrt_self_must_be_static,none,
 NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "the transpose is declared in %0 but the original function is declared in "
      "%1", (Type, Type))
+ERROR(transpose_attr_static_method_mismatch_original,none,
+      "unexpected transpose function declaration; "
+      "%0 requires the transpose function %1 to be %select{an instance|a 'static'}2 method",
+      (/*original*/DeclName, /*transpose*/ DeclName,
+       /*originalIsStatic*/bool))
+NOTE(transpose_attr_static_method_mismatch_original_note,none,
+      "original function %0 is %select{an instance|a 'static'}1 method",
+      (/*original*/ DeclName, /*originalIsStatic*/bool))
+NOTE(transpose_attr_static_method_mismatch_fix,none,
+      "make transpose function %0 %select{an instance|a 'static'}1 method",
+      (/*transpose*/ DeclName, /*mustBeStatic*/bool))
 
 // Automatic differentiation attributes
 ERROR(autodiff_attr_original_decl_ambiguous,none,
@@ -4093,7 +4115,7 @@ NOTE(because_rethrows_argument_throws,none,
 NOTE(because_rethrows_default_argument_throws,none,
      "call is to 'rethrows' function, but a defaulted argument function"
      " can throw", ())
-NOTE(because_rethrows_default_conformance_throws,none,
+NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
@@ -4389,6 +4411,9 @@ ERROR(actorindependent_local_var,none,
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
+ERROR(async_main_no_concurrency,none,
+      "'_Concurrency' module not imported, required for async main", ())
+
 ERROR(enqueue_partial_task_not_in_context,none,
       "'enqueue(partialTask:)' can only be implemented in the definition of "
       "actor class %0", (Type))

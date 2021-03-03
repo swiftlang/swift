@@ -39,8 +39,9 @@ namespace syntax {
 struct SyntaxVisitor;
 class SourceFileSyntax;
 
-template <typename SyntaxNode> SyntaxNode makeRoot(RC<RawSyntax> Raw) {
-  auto Data = SyntaxData::make(AbsoluteRawSyntax::forRoot(Raw));
+template <typename SyntaxNode>
+SyntaxNode makeRoot(const RawSyntax *Raw) {
+  auto Data = SyntaxData::makeRoot(AbsoluteRawSyntax::forRoot(Raw));
   return SyntaxNode(Data);
 }
 
@@ -66,7 +67,7 @@ public:
   SyntaxKind getKind() const;
 
   /// Get the shared raw syntax.
-  const RC<RawSyntax> &getRaw() const;
+  const RawSyntax *getRaw() const;
 
   /// Get an ID for this node that is stable across incremental parses
   SyntaxNodeId getId() const { return getRaw()->getId(); }

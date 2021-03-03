@@ -76,19 +76,30 @@ class SyntaxData {
   const AbsoluteRawSyntax AbsoluteRaw;
   RC<RefCountedBox<SyntaxData>> Parent;
 
+  /// If this node is the root of a Syntax tree (i.e. \c Parent is \c nullptr ),
+  /// the arena in which this node's \c RawSyntax node has been allocated.
+  /// This keeps this \c RawSyntax nodes referenced by this tree alive.
+  RC<SyntaxArena> Arena;
+
+  /// Create a intermediate node with a parent.
   SyntaxData(AbsoluteRawSyntax AbsoluteRaw,
              const RC<RefCountedBox<SyntaxData>> &Parent)
-      : AbsoluteRaw(AbsoluteRaw), Parent(Parent) {}
+      : AbsoluteRaw(AbsoluteRaw), Parent(Parent), Arena(nullptr) {}
+
+  /// Create a new root node
+  SyntaxData(AbsoluteRawSyntax AbsoluteRaw)
+      : AbsoluteRaw(AbsoluteRaw), Parent(nullptr),
+        Arena(AbsoluteRaw.getRaw()->getArena()) {}
 
 public:
   /// With a new \c RawSyntax node, create a new node from this one and
   /// recursively rebuild the parental chain up to the root.
-  SyntaxData replacingSelf(const RC<RawSyntax> &NewRaw) const;
+  SyntaxData replacingSelf(const RawSyntax *NewRaw) const;
 
   /// Replace a child in the raw syntax and recursively rebuild the
   /// parental chain up to the root.
   template <typename CursorType>
-  SyntaxData replacingChild(const RC<RawSyntax> &RawChild,
+  SyntaxData replacingChild(const RawSyntax *RawChild,
                             CursorType ChildCursor) const {
     auto NewRaw = AbsoluteRaw.getRaw()->replacingChild(ChildCursor, RawChild);
     return replacingSelf(NewRaw);
@@ -111,16 +122,14 @@ public:
   Optional<SyntaxData> getLastToken() const;
 
   /// Make a new \c SyntaxData node for the tree's root.
-  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw) {
-    return make(AbsoluteRaw, nullptr);
+  static SyntaxData makeRoot(AbsoluteRawSyntax AbsoluteRaw) {
+    return SyntaxData(AbsoluteRaw);
   }
-  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw,
-                         const RC<RefCountedBox<SyntaxData>> &Parent);
 
   const AbsoluteRawSyntax &getAbsoluteRaw() const { return AbsoluteRaw; }
 
   /// Returns the raw syntax node for this syntax node.
-  const RC<RawSyntax> &getRaw() const { return AbsoluteRaw.getRaw(); }
+  const RawSyntax *getRaw() const { return AbsoluteRaw.getRaw(); }
 
   /// Returns the kind of syntax node this is.
   SyntaxKind getKind() const { return AbsoluteRaw.getRaw()->getKind(); }

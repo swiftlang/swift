@@ -2193,6 +2193,23 @@ public:
     }
   }
 
+  void checkStoreBorrowInst(StoreBorrowInst *SI) {
+    require(SI->getSrc()->getType().isObject(),
+            "Can't store from an address source");
+    require(!fnConv.useLoweredAddresses()
+                || SI->getSrc()->getType().isLoadable(*SI->getFunction()),
+            "Can't store a non loadable type");
+    require(SI->getDest()->getType().isAddress(),
+            "Must store to an address dest");
+    requireSameType(SI->getDest()->getType().getObjectType(),
+                    SI->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
+
+    // Note: This is the current implementation and the design is not final.
+    require(isa<AllocStackInst>(SI->getDest()),
+            "store_borrow destination can only be an alloc_stack");
+  }
+
   void checkAssignInst(AssignInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,

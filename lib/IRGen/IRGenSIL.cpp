@@ -2399,7 +2399,7 @@ static FunctionPointer::Kind classifyFunctionPointerKind(SILFunction *fn) {
       return SpecialKind::TaskFutureWait;
     if (name.equals("swift_task_future_wait_throwing"))
       return SpecialKind::TaskFutureWaitThrowing;
-    if (name.equals("swift_task_group_wait_next_throwing"))
+    if (name.equals("swift_taskGroup_wait_next_throwing"))
       return SpecialKind::TaskGroupWaitNext;
   }
 
@@ -2425,13 +2425,6 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
     value = llvm::ConstantExpr::getBitCast(value, fnPtr->getType());
   } else {
     value = fnPtr;
-
-    // HACK: the swiftasync argument treatment is currently using
-    // a register that can be clobbered by the linker.  Use nonlazybind
-    // as a workaround.
-    if (fpKind.isSpecial()) {
-      cast<llvm::Function>(value)->addFnAttr(llvm::Attribute::NonLazyBind);
-    }
   }
   FunctionPointer fp = FunctionPointer(fpKind, value, sig);
 

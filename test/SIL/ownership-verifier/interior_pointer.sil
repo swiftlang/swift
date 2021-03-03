@@ -125,19 +125,18 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'recursive_interior_pointer_error'
 // CHECK-NEXT: Found outside of lifetime use?!
-// CHECK-NEXT: Value:   %2 = begin_borrow %0 : $KlassUser               // users: %5, %3
-// CHECK-NEXT: Consuming User:   end_borrow %2 : $KlassUser                      // id: %5
-// CHECK-NEXT: Non Consuming User:   %7 = load [copy] %4 : $*Klass                   // user: %8
+// CHECK-NEXT: Value:   %2 = begin_borrow %0 : $KlassUser
+// CHECK-NEXT: Consuming User:   end_borrow %2 : $KlassUser
+// CHECK-NEXT: Non Consuming User:   %6 = load [copy] %3 : $*Klass
 // CHECK-NEXT: Block: bb0
 // CHECK: Error#: 0. End Error in Function: 'recursive_interior_pointer_error'
 sil [ossa] @recursive_interior_pointer_error : $@convention(thin) (@owned KlassUser, @guaranteed Klass) -> @owned Klass {
 bb0(%0 : @owned $KlassUser, %0a : @guaranteed $Klass):
   %1 = begin_borrow %0 : $KlassUser
   %2 = ref_tail_addr %1 : $KlassUser, $Klass
-  %result = store_borrow %0a to %2 : $*Klass
   end_borrow %1 : $KlassUser
   destroy_value %0 : $KlassUser
-  %3 = load [copy] %result : $*Klass
+  %3 = load [copy] %2 : $*Klass
   return %3 : $Klass
 }
 

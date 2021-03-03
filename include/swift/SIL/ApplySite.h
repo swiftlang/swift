@@ -348,6 +348,37 @@ public:
     return getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
   }
 
+  /// Return the SILArgumentConvention for the given applied argument operand at
+  /// the apply instruction.
+  ///
+  /// For full applies, this is equivalent to `getArgumentConvention`. But for
+  /// a partial_apply, the argument ownership convention at the partial_apply
+  /// instruction itself is different from the argument convention of the callee.
+  /// For details see the partial_apply documentation in SIL.rst.
+  SILArgumentConvention getArgumentOperandConvention(const Operand &oper) const {
+    SILArgumentConvention conv = getArgumentConvention(oper);
+    auto *pai = dyn_cast<PartialApplyInst>(Inst);
+    if (!pai)
+      return conv;
+    switch (conv) {
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return conv;
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Guaranteed:
+      return pai->isOnStack() ? SILArgumentConvention::Direct_Guaranteed
+                              : SILArgumentConvention::Direct_Owned;
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
+                              : SILArgumentConvention::Indirect_In;
+    case SILArgumentConvention::Indirect_Out:
+      llvm_unreachable("partial_apply cannot have an @out operand");
+    }
+  }
+
   /// Return true if 'self' is an applied argument.
   bool hasSelfArgument() const {
     switch (ApplySiteKind(Inst->getKind())) {

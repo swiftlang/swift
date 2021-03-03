@@ -3547,6 +3547,27 @@ by an `end_borrow`_ instruction. All `load_borrow`_ instructions must be
 paired with exactly one `end_borrow`_ instruction along any path through the
 program. Until `end_borrow`_, it is illegal to invalidate or store to ``%0``.
 
+store_borrow
+````````````
+
+::
+
+  sil-instruction ::= 'store_borrow' sil-value 'to' sil-operand
+
+  store_borrow %0 to %1 : $*T
+  // $T must be a loadable type
+  // %1 must be an alloc_stack $T
+
+Stores the value ``%0`` to a stack location ``%1``, which must be an
+``alloc_stack $T``.
+The stored value is alive until the ``dealloc_stack`` or until another
+``store_borrow`` overwrites the value. During the its lifetime, the stored
+value must not be modified or destroyed.
+The source value ``%0`` is borrowed (i.e. not copied) and it's borrow scope
+must outlive the lifetime of the stored value.
+
+Note: This is the current implementation and the design is not final.
+
 begin_borrow
 ````````````
 

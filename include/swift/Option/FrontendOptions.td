@@ -193,6 +193,12 @@ def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
 def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
   HelpText<"Don't run SIL copy propagation to preserve object lifetime.">;
 
+def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-concurrent-value">,
+    HelpText<"Enable inference of ConcurrentValue conformances for public structs and enums">;
+
+def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-concurrent-value">,
+    HelpText<"Disable inference of ConcurrentValue conformances for public structs and enums">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -634,6 +640,9 @@ def index_system_modules : Flag<["-"], "index-system-modules">,
 def index_ignore_stdlib :
   Flag<["-"], "index-ignore-stdlib">,
   HelpText<"Avoid emitting index data for the standard library.">;
+
+def index_unit_output_path_filelist : Separate<["-"], "index-unit-output-path-filelist">,
+  HelpText<"Specify index unit output paths in a file rather than on the command line">;
 
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,

@@ -178,9 +178,8 @@ bool IsAsyncHandlerRequest::evaluate(
   // implies @asyncHandler.
   {
     auto idc = cast<IterableDeclContext>(dc->getAsDecl());
-    auto conformances = evaluateOrDefault(
-        dc->getASTContext().evaluator,
-        LookupAllConformancesInContextRequest{idc}, { });
+    auto conformances = idc->getLocalConformances(
+        ConformanceLookupKind::NonStructural);
 
     for (auto conformance : conformances) {
       auto protocol = conformance->getProtocol();
@@ -2050,9 +2049,8 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
 
   // Walk through each of the conformances in this context, collecting any
   // requirements that have actor isolation.
-  auto conformances = evaluateOrDefault(
-      dc->getASTContext().evaluator,
-      LookupAllConformancesInContextRequest{idc}, { });
+  auto conformances = idc->getLocalConformances(
+      ConformanceLookupKind::NonStructural);
   using IsolatedRequirement =
       std::tuple<ProtocolConformance *, ActorIsolation, ValueDecl *>;
   SmallVector<IsolatedRequirement, 2> isolatedRequirements;
@@ -2360,22 +2358,105 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
-void swift::checkConcurrentValueConformance(
-    ProtocolConformance *conformance, bool asWarning) {
+static bool shouldDiagnoseConcurrentValue(ConcurrentValueCheck check) {
+  switch (check) {
+  case ConcurrentValueCheck::ImpliedByStandardProtocol:
+  case ConcurrentValueCheck::Explicit:
+    return true;
+
+  case ConcurrentValueCheck::Implicit:
+    return false;
+  }
+}
+
+/// Check the instance storage of the given nominal type to verify whether
+/// it is comprised only of ConcurrentValue instance storage.
+static bool checkConcurrentValueInstanceStorage(
+    NominalTypeDecl *nominal, DeclContext *dc, ConcurrentValueCheck check) {
+  // Stored properties of structs and classes must have
+  // ConcurrentValue-conforming types.
+  bool asWarning = (check == ConcurrentValueCheck::ImpliedByStandardProtocol);
+  bool invalid = false;
+  if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
+    auto classDecl = dyn_cast<ClassDecl>(nominal);
+    for (auto property : nominal->getStoredProperties()) {
+      if (classDecl && property->supportsMutation()) {
+        if (!shouldDiagnoseConcurrentValue(check))
+          return true;
+
+        property->diagnose(
+            asWarning ? diag::concurrent_value_class_mutable_property_warn
+                      : diag::concurrent_value_class_mutable_property,
+            property->getName(), nominal->getDescriptiveKind(),
+            nominal->getName());
+        invalid = true;
+        continue;
+      }
+
+      auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType());
+      if (!isConcurrentValueType(dc, propertyType)) {
+        if (!shouldDiagnoseConcurrentValue(check))
+          return true;
+
+        property->diagnose(
+            asWarning ? diag::non_concurrent_type_member_warn
+                      : diag::non_concurrent_type_member,
+            false, property->getName(),
+            nominal->getDescriptiveKind(), nominal->getName(), propertyType);
+        invalid = true;
+        continue;
+      }
+    }
+
+    return invalid;
+  }
+
+  // Associated values of enum cases must have ConcurrentValue-conforming
+  // types.
+  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    for (auto caseDecl : enumDecl->getAllCases()) {
+      for (auto element : caseDecl->getElements()) {
+        if (!element->hasAssociatedValues())
+          continue;
+
+        auto elementType = dc->mapTypeIntoContext(
+            element->getArgumentInterfaceType());
+        if (!isConcurrentValueType(dc, elementType)) {
+          if (!shouldDiagnoseConcurrentValue(check))
+            return true;
+
+          element->diagnose(
+              asWarning ? diag::non_concurrent_type_member_warn
+                        : diag::non_concurrent_type_member,
+              true, element->getName(),
+              nominal->getDescriptiveKind(), nominal->getName(), elementType);
+          invalid = true;
+          continue;
+        }
+      }
+    }
+  }
+
+  return invalid;
+}
+
+bool swift::checkConcurrentValueConformance(
+    ProtocolConformance *conformance, ConcurrentValueCheck check) {
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
-    return;
+    return false;
 
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl) {
     // Actors implicitly conform to ConcurrentValue and protect their state.
     if (classDecl->isActor())
-      return;
+      return false;
   }
 
   // ConcurrentValue can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
+  bool asWarning = (check == ConcurrentValueCheck::ImpliedByStandardProtocol);
   if (!conformanceDC->getParentSourceFile() ||
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(
@@ -2383,7 +2464,9 @@ void swift::checkConcurrentValueConformance(
           ? diag::concurrent_value_outside_source_file_warn
           : diag::concurrent_value_outside_source_file,
         nominal->getDescriptiveKind(), nominal->getName());
-    return;
+
+    if (!asWarning)
+      return true;
   }
 
   if (classDecl) {
@@ -2393,8 +2476,9 @@ void swift::checkConcurrentValueConformance(
           asWarning ? diag::concurrent_value_open_class_warn
                     : diag::concurrent_value_open_class,
           classDecl->getName());
+
       if (!asWarning)
-        return;
+        return true;
     }
 
     // A 'ConcurrentValue' class cannot inherit from another class, although
@@ -2407,60 +2491,84 @@ void swift::checkConcurrentValueConformance(
                         : diag::concurrent_value_inherit,
               nominal->getASTContext().LangOpts.EnableObjCInterop,
               classDecl->getName());
+
           if (!asWarning)
-            return;
+            return true;
         }
       }
     }
   }
 
-  // Stored properties of structs and classes must have
-  // ConcurrentValue-conforming types.
-  if (isa<StructDecl>(nominal) || classDecl) {
-    for (auto property : nominal->getStoredProperties()) {
-      if (classDecl && property->supportsMutation()) {
-        property->diagnose(
-            asWarning ? diag::concurrent_value_class_mutable_property_warn
-                      : diag::concurrent_value_class_mutable_property,
-            property->getName(), nominal->getDescriptiveKind(),
-            nominal->getName());
-        continue;
-      }
+  return checkConcurrentValueInstanceStorage(nominal, conformanceDC, check);
+}
 
-      auto propertyType =
-          conformanceDC->mapTypeIntoContext(property->getInterfaceType());
-      if (!isConcurrentValueType(conformanceDC, propertyType)) {
-        property->diagnose(
-            asWarning ? diag::non_concurrent_type_member_warn
-                      : diag::non_concurrent_type_member,
-            false, property->getName(),
-            nominal->getDescriptiveKind(), nominal->getName(), propertyType);
-        continue;
-      }
-    }
+NormalProtocolConformance *GetImplicitConcurrentValueRequest::evaluate(
+    Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  // Only structs and enums can get implicit ConcurrentValue conformances.
+  if (!isa<StructDecl>(nominal) && !isa<EnumDecl>(nominal))
+    return nullptr;
 
-    return;
+  // Public, non-frozen structs and enums defined in Swift don't get implicit
+  // ConcurrentValue conformances.
+  if (!nominal->getASTContext().LangOpts.EnableInferPublicConcurrentValue &&
+      nominal->getFormalAccessScope(
+          /*useDC=*/nullptr,
+          /*treatUsableFromInlineAsPublic=*/true).isPublic() &&
+      !(nominal->hasClangNode() ||
+        nominal->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+        nominal->getAttrs().hasAttribute<FrozenAttr>())) {
+    return nullptr;
   }
 
-  // Associated values of enum cases must have ConcurrentValue-conforming
-  // types.
-  if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-    for (auto caseDecl : enumDecl->getAllCases()) {
-      for (auto element : caseDecl->getElements()) {
-        if (!element->hasAssociatedValues())
-          continue;
-        
-        auto elementType = conformanceDC->mapTypeIntoContext(
-            element->getArgumentInterfaceType());
-        if (!isConcurrentValueType(conformanceDC, elementType)) {
-          element->diagnose(
-              asWarning ? diag::non_concurrent_type_member_warn
-                        : diag::non_concurrent_type_member,
-              true, element->getName(),
-              nominal->getDescriptiveKind(), nominal->getName(), elementType);
-          continue;
+  // Check the context in which the conformance occurs.
+  if (auto *file = dyn_cast<FileUnit>(nominal->getModuleScopeContext())) {
+    switch (file->getKind()) {
+    case FileUnitKind::Source:
+      // Check what kind of source file we have.
+      if (auto sourceFile = nominal->getParentSourceFile()) {
+        switch (sourceFile->Kind) {
+        case SourceFileKind::Interface:
+          // Interfaces have explicitly called-out ConcurrentValue conformances.
+          return nullptr;
+
+        case SourceFileKind::Library:
+        case SourceFileKind::Main:
+        case SourceFileKind::SIL:
+          break;
         }
       }
+      break;
+
+    case FileUnitKind::Builtin:
+    case FileUnitKind::SerializedAST:
+    case FileUnitKind::Synthesized:
+      // Explicitly-handled modules don't infer ConcurrentValue conformances.
+      return nullptr;
+
+    case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
+      // Infer conformances for imported modules.
+      break;
     }
+  } else {
+    return nullptr;
   }
+
+  // Check the instance storage for ConcurrentValue conformance.
+  if (checkConcurrentValueInstanceStorage(
+          nominal, nominal, ConcurrentValueCheck::Implicit))
+    return nullptr;
+
+  ASTContext &ctx = nominal->getASTContext();
+  auto proto = ctx.getProtocol(KnownProtocolKind::ConcurrentValue);
+  if (!proto)
+    return nullptr;
+
+  auto conformance = ctx.getConformance(
+      nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
+      nominal, ProtocolConformanceState::Complete);
+  conformance->setSourceKindAndImplyingConformance(
+      ConformanceEntryKind::Synthesized, nullptr);
+
+  return conformance;
 }

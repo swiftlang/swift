@@ -5650,13 +5650,6 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-std::vector<ProtocolConformance *>
-LookupAllConformancesInContextRequest::evaluate(
-    Evaluator &eval, const IterableDeclContext *IDC) const {
-  auto result = IDC->getLocalConformances(ConformanceLookupKind::All);
-  return std::vector<ProtocolConformance *>(result.begin(), result.end());
-}
-
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto *const dc = idc->getAsGenericContext();
 
@@ -5672,9 +5665,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   const auto defaultAccess = nominal->getFormalAccess();
 
   // Check each of the conformances associated with this context.
-  auto conformances =
-      evaluateOrDefault(dc->getASTContext().evaluator,
-                        LookupAllConformancesInContextRequest{idc}, {});
+  auto conformances = idc->getLocalConformances();
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();
@@ -5724,8 +5715,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   // Check constraints of ConcurrentValue.
   if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
-    bool asWarning = errorConformance || codingKeyConformance;
-    checkConcurrentValueConformance(concurrentValueConformance, asWarning);
+    ConcurrentValueCheck check = ConcurrentValueCheck::Explicit;
+    if (errorConformance || codingKeyConformance)
+      check = ConcurrentValueCheck::ImpliedByStandardProtocol;
+    checkConcurrentValueConformance(concurrentValueConformance, check);
   }
 
   // Check all conformances.

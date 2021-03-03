@@ -2895,6 +2895,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Retrieve the implicit conformance for the given nominal type to
+/// the ConcurrentValue protocol.
+class GetImplicitConcurrentValueRequest :
+    public SimpleRequest<GetImplicitConcurrentValueRequest,
+                         NormalProtocolConformance *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NormalProtocolConformance *evaluate(
+      Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);

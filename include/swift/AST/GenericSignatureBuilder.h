@@ -95,7 +95,7 @@ public:
       llvm::PointerUnion<Type, PotentialArchetype *, LayoutConstraint>;
 
   using RequirementRHS =
-    llvm::PointerUnion<Type, LayoutConstraint>;
+    llvm::PointerUnion<Type, ProtocolDecl *, LayoutConstraint>;
 
   /// The location of a requirement as written somewhere in the source.
   typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>
@@ -638,7 +638,13 @@ public:
   /// Process any delayed requirements that can be handled now.
   void processDelayedRequirements();
 
+  class ExplicitRequirement;
+
+  bool isRedundantExplicitRequirement(ExplicitRequirement req) const;
+
 private:
+  void computeRedundantRequirements();
+
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
@@ -669,6 +675,7 @@ private:
   Constraint<T> checkConstraintList(
                            TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
+                           RequirementKind kind,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
                            llvm::function_ref<
@@ -694,6 +701,7 @@ private:
   Constraint<T> checkConstraintList(
                            TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
+                           RequirementKind kind,
                            llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
                            llvm::function_ref<
@@ -848,12 +856,6 @@ public:
     /// This is a root requirement source.
     NestedTypeNameMatch,
 
-    /// The requirement is the implicit binding of a type to
-    /// the interface type of the concrete type declaration it represents.
-    ///
-    /// This is a root requirement source.
-    ConcreteTypeBinding,
-
     /// The requirement is a protocol requirement.
     ///
     /// This stores the protocol that introduced the requirement as well as the
@@ -886,9 +888,12 @@ public:
     /// requirement.
     Concrete,
 
-    /// A requirement that was resolved based on structural derivation from
-    /// another requirement.
-    Derived,
+    /// A requirement that was resolved based on a layout requirement
+    /// imposed by a superclass constraint.
+    ///
+    /// This stores the \c LayoutConstraint used to resolve the
+    /// requirement.
+    Layout,
 
     /// A requirement that was provided for another type in the
     /// same equivalence class, but which we want to "re-root" on a new
@@ -940,11 +945,10 @@ private:
     case Explicit:
     case Inferred:
     case NestedTypeNameMatch:
-    case ConcreteTypeBinding:
     case Superclass:
     case Parent:
     case Concrete:
-    case Derived:
+    case Layout:
     case EquivalentType:
       return 0;
     }
@@ -981,7 +985,6 @@ private:
     case Inferred:
     case RequirementSignatureSelf:
     case NestedTypeNameMatch:
-    case ConcreteTypeBinding:
       return true;
 
     case ProtocolRequirement:
@@ -989,7 +992,7 @@ private:
     case Superclass:
     case Parent:
     case Concrete:
-    case Derived:
+    case Layout:
     case EquivalentType:
       return false;
     }
@@ -1112,12 +1115,6 @@ public:
                                       GenericSignatureBuilder &builder,
                                       Type rootType);
 
-  /// Retrieve a requirement source describing when a concrete type
-  /// declaration is used to define a potential archetype.
-  static const RequirementSource *forConcreteTypeBinding(
-                                     GenericSignatureBuilder &builder,
-                                     Type rootType);
-
 private:
   /// A requirement source that describes that a requirement comes from a
   /// requirement of the given protocol described by the parent.
@@ -1129,17 +1126,28 @@ private:
                              WrittenRequirementLoc writtenLoc =
                                WrittenRequirementLoc()) const;
 public:
-  /// A requirement source that describes that a requirement that is resolved
+  /// A requirement source that describes a conformance requirement resolved
   /// via a superclass requirement.
   const RequirementSource *viaSuperclass(
                                     GenericSignatureBuilder &builder,
                                     ProtocolConformanceRef conformance) const;
 
-  /// A requirement source that describes that a requirement that is resolved
-  /// via a same-type-to-concrete requirement.
+  /// A requirement source that describes a conformance requirement resolved
+  /// via a concrete type requirement with a conforming nominal type.
   const RequirementSource *viaConcrete(
                                      GenericSignatureBuilder &builder,
                                      ProtocolConformanceRef conformance) const;
+
+  /// A requirement source that describes that a requirement that is resolved
+  /// via a concrete type requirement with an existential self-conforming type.
+  const RequirementSource *viaConcrete(
+                                     GenericSignatureBuilder &builder,
+                                     Type existentialType) const;
+
+  /// A constraint source that describes a layout constraint that was implied
+  /// by a superclass requirement.
+  const RequirementSource *viaLayout(GenericSignatureBuilder &builder,
+                                     Type superclass) const;
 
   /// A constraint source that describes that a constraint that is resolved
   /// for a nested type via a constraint on its parent.
@@ -1147,10 +1155,6 @@ public:
   /// \param assocType the associated type that
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
-
-  /// A constraint source that describes a constraint that is structurally
-  /// derived from another constraint but does not require further information.
-  const RequirementSource *viaDerived(GenericSignatureBuilder &builder) const;
 
   /// A constraint source that describes a constraint that is structurally
   /// derived from another constraint but does not require further information.
@@ -1209,6 +1213,10 @@ public:
   /// signature, because the information can be re-derived by following the
   /// path.
   bool isDerivedRequirement() const;
+
+  /// Same as above, but we consider RequirementSignatureSelf to not be
+  /// derived.
+  bool isDerivedNonRootRequirement() const;
 
   /// Whether we should diagnose a redundant constraint based on this
   /// requirement source.
