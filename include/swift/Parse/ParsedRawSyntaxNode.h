@@ -22,7 +22,7 @@
 
 namespace swift {
 
-typedef void *OpaqueSyntaxNode;
+typedef const void *OpaqueSyntaxNode;
 class SyntaxParsingContext;
 
 /// Represents a raw syntax node formed by the parser.

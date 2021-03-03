@@ -53,7 +53,7 @@ namespace swift {
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
-  typedef void *OpaqueSyntaxNode;
+  typedef const void *OpaqueSyntaxNode;
   class Parser;
   class SerializationOptions;
   class SILOptions;
