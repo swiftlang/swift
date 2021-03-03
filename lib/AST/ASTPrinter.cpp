@@ -4474,6 +4474,10 @@ public:
   }
 
   void printFunctionExtInfo(AnyFunctionType *fnType) {
+    if (!fnType->hasExtInfo()) {
+      Printer << "@_NO_EXTINFO ";
+      return;
+    }
     auto &ctx = fnType->getASTContext();
     auto info = fnType->getExtInfo();
     if (Options.SkipAttributes)
@@ -4693,13 +4697,15 @@ public:
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
-    if (T->isAsync()) {
-      Printer << " ";
-      Printer.printKeyword("async", Options);
-    }
+    if (T->hasExtInfo()) {
+      if (T->isAsync()) {
+        Printer << " ";
+        Printer.printKeyword("async", Options);
+      }
 
-    if (T->isThrowing())
-      Printer << " " << tok::kw_throws;
+      if (T->isThrowing())
+        Printer << " " << tok::kw_throws;
+    }
 
     Printer << " -> ";
 
@@ -4738,13 +4744,15 @@ public:
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
 
-    if (T->isAsync()) {
-      Printer << " ";
-      Printer.printKeyword("async", Options);
-    }
+   if (T->hasExtInfo()) {
+     if (T->isAsync()) {
+       Printer << " ";
+       Printer.printKeyword("async", Options);
+     }
 
-    if (T->isThrowing())
-      Printer << " " << tok::kw_throws;
+     if (T->isThrowing())
+       Printer << " " << tok::kw_throws;
+   }
 
     Printer << " -> ";
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);

@@ -2433,7 +2433,11 @@ namespace {
           Type outputType = CS.createTypeVariable(
               CS.getConstraintLocator(locator),
               TVO_CanBindToNoEscape);
-          Type functionType = FunctionType::get(params, outputType);
+          // Equal constraints require ExtInfo comparison.
+          // FIXME: Verify ExtInfo state is correct, not working by accident.
+          FunctionType::ExtInfo info;
+          Type functionType = FunctionType::get(params, outputType, info);
+          // TODO: Convert to FunctionInput/FunctionResult constraints.
           CS.addConstraint(
               ConstraintKind::Equal, functionType, memberType,
               locator.withPathElement(LocatorPathElt::PatternMatch(pattern)));

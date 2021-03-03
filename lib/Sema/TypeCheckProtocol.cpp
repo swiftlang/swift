@@ -744,22 +744,24 @@ swift::matchWitness(
       }
     }
 
-    // If the witness is 'async', the requirement must be.
-    if (witnessFnType->getExtInfo().isAsync() &&
-          !reqFnType->getExtInfo().isAsync()) {
-      return RequirementMatch(witness, MatchKind::AsyncConflict);
-    }
+    if (witnessFnType->hasExtInfo()) {
+      // If the witness is 'async', the requirement must be.
+      if (witnessFnType->getExtInfo().isAsync() &&
+            !reqFnType->getExtInfo().isAsync()) {
+        return RequirementMatch(witness, MatchKind::AsyncConflict);
+      }
 
-    // If witness is sync, the requirement cannot be @objc and 'async'
-    if (!witnessFnType->getExtInfo().isAsync() &&
-          (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
-      return RequirementMatch(witness, MatchKind::AsyncConflict);
-    }
+      // If witness is sync, the requirement cannot be @objc and 'async'
+      if (!witnessFnType->getExtInfo().isAsync() &&
+            (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
+        return RequirementMatch(witness, MatchKind::AsyncConflict);
+      }
 
-    // If the witness is 'throws', the requirement must be.
-    if (witnessFnType->getExtInfo().isThrowing() &&
-        !reqFnType->getExtInfo().isThrowing()) {
-      return RequirementMatch(witness, MatchKind::ThrowsConflict);
+      // If the witness is 'throws', the requirement must be.
+      if (witnessFnType->getExtInfo().isThrowing() &&
+          !reqFnType->getExtInfo().isThrowing()) {
+        return RequirementMatch(witness, MatchKind::ThrowsConflict);
+      }
     }
   } else {
     auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();

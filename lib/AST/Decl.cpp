@@ -7799,11 +7799,16 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   // Constructors have an initializer type that takes an instance
   // instead of a metatype.
   auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
+
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
   Type initFuncTy;
-  if (auto sig = getGenericSignature())
-    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy);
-  else
-    initFuncTy = FunctionType::get({initSelfParam}, funcTy);
+  if (auto sig = getGenericSignature()) {
+    GenericFunctionType::ExtInfo info;
+    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy, info);
+  } else {
+    FunctionType::ExtInfo info;
+    initFuncTy = FunctionType::get({initSelfParam}, funcTy, info);
+  }
   InitializerInterfaceType = initFuncTy;
 
   return InitializerInterfaceType;

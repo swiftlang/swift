@@ -442,9 +442,13 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 
   auto selfTy = dc->getSelfInterfaceType();
   auto selfParam = AnyFunctionType::Param(selfTy);
-  if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type);
-  return FunctionType::get({selfParam}, type);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  if (sig) {
+    GenericFunctionType::ExtInfo info;
+    return GenericFunctionType::get(sig, {selfParam}, type, info);
+  }
+  FunctionType::ExtInfo info;
+  return FunctionType::get({selfParam}, type, info);
 }
 
 void TypeBase::getTypeVariables(
@@ -1264,7 +1268,9 @@ CanType TypeBase::computeCanonicalType() {
     getCanonicalParams(funcTy, genericSig, canParams);
     auto resultTy = funcTy->getResult()->getCanonicalType(genericSig);
 
-    auto extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
+    Optional<ASTExtInfo> extInfo = None;
+    if (funcTy->hasExtInfo())
+      extInfo = funcTy->getCanonicalExtInfo(useClangTypes(resultTy));
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
                                         extInfo);
@@ -4755,12 +4761,16 @@ case TypeKind::Id:
       if (isUnchanged) return *this;
 
       auto genericSig = genericFnType->getGenericSignature();
+      if (!function->hasExtInfo())
+        return GenericFunctionType::get(genericSig, substParams, resultTy);
       return GenericFunctionType::get(genericSig, substParams, resultTy,
                                       function->getExtInfo());
     }
 
     if (isUnchanged) return *this;
 
+    if (!function->hasExtInfo())
+      return FunctionType::get(substParams, resultTy);
     return FunctionType::get(substParams, resultTy,
                              function->getExtInfo());
   }
@@ -5350,7 +5360,10 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     }
     auto differentialResult =
         hasInoutDiffParameter ? Type(ctx.TheEmptyTupleType) : resultTanType;
-    linearMapType = FunctionType::get(differentialParams, differentialResult);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    linearMapType =
+        FunctionType::get(differentialParams, differentialResult, info);
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -5399,7 +5412,9 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     auto flags = ParameterTypeFlags().withInOut(hasInoutDiffParameter);
     auto pullbackParam =
         AnyFunctionType::Param(resultTanType, Identifier(), flags);
-    linearMapType = FunctionType::get({pullbackParam}, pullbackResult);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    linearMapType = FunctionType::get({pullbackParam}, pullbackResult, info);
     break;
   }
   }

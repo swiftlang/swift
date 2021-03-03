@@ -1207,9 +1207,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
           params.push_back(FunctionType::Param(paramGen.build(builder)));
-        auto innerFunction =
-            FunctionType::get(params, fnResultGen.build(builder));
-        return innerFunction->withExtInfo(extInfo);
+        return FunctionType::get(params, fnResultGen.build(builder), extInfo);
       }};
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
@@ -1274,8 +1272,10 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      auto innerFunction = FunctionType::get(params,
-                                             linearFnResultGen.build(builder));
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      auto innerFunction =
+          FunctionType::get(params, linearFnResultGen.build(builder), info);
       return innerFunction->withExtInfo(extInfo);
     }
   };

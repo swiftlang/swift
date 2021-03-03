@@ -1070,7 +1070,10 @@ namespace {
         args.push_back(paramRef);
       }
 
-      fnRef->setType(FunctionType::get(innerParamTypes, fnType->getResult()));
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo fnInfo;
+      fnRef->setType(
+          FunctionType::get(innerParamTypes, fnType->getResult(), fnInfo));
       cs.cacheType(fnRef);
 
       auto *fnCall = CallExpr::createImplicit(context, fnRef, args, argLabels);
@@ -1079,7 +1082,11 @@ namespace {
       cs.cacheType(fnCall->getArg());
 
       auto discriminator = AutoClosureExpr::InvalidDiscriminator;
-      auto *autoClosureType = FunctionType::get(outerParamTypes, fnType->getResult());
+
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo closureInfo;
+      auto *autoClosureType =
+          FunctionType::get(outerParamTypes, fnType->getResult(), closureInfo);
       auto *autoClosure = new (context) AutoClosureExpr(fnCall, autoClosureType,
                                                         discriminator, cs.DC);
       autoClosure->setParameterList(outerParams);
@@ -1179,7 +1186,10 @@ namespace {
         auto *closure = buildPropertyWrapperFnThunk(selfCall, calleeFnType,
                                                     fnDecl, callee, appliedWrappers);
 
-        ref->setType(FunctionType::get(refTy->getParams(), selfCall->getType()));
+        // FIXME: Verify ExtInfo state is correct, not working by accident.
+        FunctionType::ExtInfo info;
+        ref->setType(
+            FunctionType::get(refTy->getParams(), selfCall->getType(), info));
         cs.cacheType(ref);
 
         // FIXME: There's more work to do.
@@ -4916,8 +4926,11 @@ namespace {
       // The inner closure.
       //
       //     let closure = "{ $0[keyPath: $kp$] }"
+      //
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo closureInfo;
       auto closureTy =
-          FunctionType::get({ FunctionType::Param(baseTy) }, leafTy);
+          FunctionType::get({FunctionType::Param(baseTy)}, leafTy, closureInfo);
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, leafTy,
                           discriminator, cs.DC);
@@ -4932,8 +4945,11 @@ namespace {
       // The outer closure.
       //
       //    let outerClosure = "{ $kp$ in \(closure) }"
-      auto outerClosureTy =
-          FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy);
+      //
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo outerClosureInfo;
+      auto outerClosureTy = FunctionType::get({FunctionType::Param(keyPathTy)},
+                                              closureTy, outerClosureInfo);
       auto outerClosure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, closureTy,
                           discriminator, cs.DC);
@@ -6761,9 +6777,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             fromEI.intoBuilder()
                 .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
                 .build();
-        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult())
-            ->withExtInfo(newEI)
-            ->castTo<FunctionType>();
+        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult(),
+                                     newEI);
         switch (toEI.getDifferentiabilityKind()) {
         // TODO: Ban `Normal` and `Forward` cases.
         case DifferentiabilityKind::Normal:

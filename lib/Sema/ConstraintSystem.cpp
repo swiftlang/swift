@@ -1597,7 +1597,9 @@ ConstraintSystem::getTypeOfMemberReference(
 
       auto indices = subscript->getInterfaceType()
                               ->castTo<AnyFunctionType>()->getParams();
-      refType = FunctionType::get(indices, elementTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      refType = FunctionType::get(indices, elementTy, info);
     } else {
       refType =
           getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC, base,
@@ -1618,10 +1620,13 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // If the storage is generic, add a generic signature.
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
     if (auto sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType);
+      GenericFunctionType::ExtInfo info;
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType, info);
     } else {
-      funcType = FunctionType::get({selfParam}, refType);
+      FunctionType::ExtInfo info;
+      funcType = FunctionType::get({selfParam}, refType, info);
     }
   }
 
@@ -1697,7 +1702,10 @@ ConstraintSystem::getTypeOfMemberReference(
     auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
     functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                        functionType, locator);
-    openedType = FunctionType::get(fullFunctionType->getParams(), functionType);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    openedType =
+        FunctionType::get(fullFunctionType->getParams(), functionType, info);
   }
 
   // Compute the type of the reference.
@@ -1864,7 +1872,9 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       auto indices = subscript->getInterfaceType()
                        ->castTo<AnyFunctionType>()->getParams();
-      type = FunctionType::get(indices, elementTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      type = FunctionType::get(indices, elementTy, info);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
       if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
@@ -1975,7 +1985,9 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     CS.addConstraint(
         ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::DynamicType));
-    auto refType = FunctionType::get({inputArg}, output);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    auto refType = FunctionType::get({inputArg}, output, info);
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
@@ -2644,8 +2656,10 @@ void ConstraintSystem::bindOverloadType(
                                ConstraintLocator::FunctionResult),
           TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
       auto adjustedFnTy =
-          FunctionType::get(fnType->getParams(), subscriptResultTy);
+          FunctionType::get(fnType->getParams(), subscriptResultTy, info);
 
       ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
       addConstraint(
@@ -2802,10 +2816,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     FunctionType::Param indices[] = {
       FunctionType::Param(keyPathIndexTy, getASTContext().Id_keyPath),
     };
-    auto subscriptTy = FunctionType::get(indices, elementTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo subscriptInfo;
+    auto subscriptTy = FunctionType::get(indices, elementTy, subscriptInfo);
 
     FunctionType::Param baseParam(choice.getBaseType());
-    auto fullTy = FunctionType::get({baseParam}, subscriptTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo fullInfo;
+    auto fullTy = FunctionType::get({baseParam}, subscriptTy, fullInfo);
     openedFullType = fullTy;
     refType = subscriptTy;
 
