@@ -148,6 +148,8 @@ module WinSDK [system] {
     module CommCtrl {
       header "CommCtrl.h"
       export *
+
+      link "ComCtl32.Lib"
     }
 
     module CommDlg {
