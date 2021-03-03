@@ -12,5 +12,5 @@
 
 import Swift
 
-// TODO: just a placeholder; proposal and complete types soon
-public protocol ExecutorRef {}
+// TODO: Custom Executors proposal will define these types
+//       https://forums.swift.org/t/support-custom-executors-in-swift-concurrency/44425/38
