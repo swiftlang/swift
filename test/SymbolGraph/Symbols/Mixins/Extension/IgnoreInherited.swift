@@ -23,12 +23,12 @@ extension S: P where T: Sequence, T.Element == Int {
 // CHECK-NEXT:     "kind": "conformance",
 // CHECK-NEXT:     "lhs": "T",
 // CHECK-NEXT:     "rhs": "Sequence",
-// CHECK-NEXT:     "rhsPrecise": "$sST_pD"
+// CHECK-NEXT:     "rhsPrecise": "s:ST"
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "kind": "sameType",
 // CHECK-NEXT:     "lhs": "T.Element",
 // CHECK-NEXT:     "rhs": "Int",
-// CHECK-NEXT:     "rhsPrecise": "$sSiD"
+// CHECK-NEXT:     "rhsPrecise": "s:Si"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]

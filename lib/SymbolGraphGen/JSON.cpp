@@ -108,11 +108,11 @@ void swift::symbolgraphgen::serialize(const Requirement &Req,
     OS.attribute("rhs", Req.getSecondType()->getString());
     
     // If the RHS type has a USR we can link to, add it to the output
-    if (!Req.getSecondType()->isTypeParameter() && !Req.getSecondType()->hasArchetype()) {
+    if (auto *TyDecl = Req.getSecondType()->getAnyNominal()) {
       SmallString<256> USR;
       {
         llvm::raw_svector_ostream SOS(USR);
-        ide::printTypeUSR(Req.getSecondType(), SOS);
+        ide::printDeclUSR(TyDecl, SOS);
       }
       OS.attribute("rhsPrecise", USR.str());
     }

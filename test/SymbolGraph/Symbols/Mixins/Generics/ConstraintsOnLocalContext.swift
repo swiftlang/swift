@@ -18,6 +18,6 @@ public func foo<T: Sequence>(x: T) {}
 // CHECK:          "kind": "conformance"
 // CHECK-NEXT:     "lhs": "T"
 // CHECK-NEXT:     "rhs": "Sequence",
-// CHECK-NEXT:     "rhsPrecise": "$sST_pD"
+// CHECK-NEXT:     "rhsPrecise": "s:ST"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
