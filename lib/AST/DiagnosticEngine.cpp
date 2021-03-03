@@ -804,6 +804,21 @@ static DiagnosticKind toDiagnosticKind(DiagnosticBehavior behavior) {
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
+static
+DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
+  switch (kind) {
+  case DiagnosticKind::Note:
+    return DiagnosticBehavior::Note;
+  case DiagnosticKind::Error:
+    return isFatal ? DiagnosticBehavior::Fatal : DiagnosticBehavior::Error;
+  case DiagnosticKind::Warning:
+    return DiagnosticBehavior::Warning;
+  case DiagnosticKind::Remark:
+    return DiagnosticBehavior::Remark;
+  }
+  llvm_unreachable("Unhandled DiagnosticKind in switch.");
+}
+
 // A special option only for compiler writers that causes Diagnostics to assert
 // when a failure diagnostic is emitted. Intended for use in the debugger.
 llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
@@ -814,77 +829,62 @@ llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
 DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
-  auto set = [this](DiagnosticBehavior lvl) {
-    if (lvl == DiagnosticBehavior::Fatal) {
-      fatalErrorOccurred = true;
-      anyErrorOccurred = true;
-    } else if (lvl == DiagnosticBehavior::Error) {
-      anyErrorOccurred = true;
-    }
-
-    assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-    assert((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
-           "We emitted a warning?!");
-    previousBehavior = lvl;
-    return lvl;
-  };
-
   // We determine how to handle a diagnostic based on the following rules
-  //   1) If current state dictates a certain behavior, follow that
-  //   2) If the user ignored this specific diagnostic, follow that
-  //   3) If the user provided a behavior for this diagnostic's kind, follow
-  //      that
-  //   4) Otherwise remap the diagnostic kind, applying the behaviorLimit
+  //   1) Map the diagnostic to its "intended" behavior, applying the behavior
+  //      limit for this particular emission
+  //   2) If current state dictates a certain behavior, follow that
+  //   3) If the user ignored this specific diagnostic, follow that
+  //   4) If the user substituted a different behavior for this behavior, apply
+  //      that change
+  //   5) Update current state for use during the next diagnostic
 
+  //   1) Map the diagnostic to its "intended" behavior, applying the behavior
+  //      limit for this particular emission
   auto diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
-  bool isNote = diagInfo.kind == DiagnosticKind::Note
-                  || diag.getBehaviorLimit() == DiagnosticBehavior::Note;
+  DiagnosticBehavior lvl =
+      std::max(toDiagnosticBehavior(diagInfo.kind, diagInfo.isFatal),
+               diag.getBehaviorLimit());
+  assert(lvl != DiagnosticBehavior::Unspecified);
 
-  //   1) If current state dictates a certain behavior, follow that
+  //   2) If current state dictates a certain behavior, follow that
 
   // Notes relating to ignored diagnostics should also be ignored
-  if (previousBehavior == DiagnosticBehavior::Ignore && isNote)
-    return set(DiagnosticBehavior::Ignore);
+  if (previousBehavior == DiagnosticBehavior::Ignore
+      && lvl == DiagnosticBehavior::Note)
+    lvl = DiagnosticBehavior::Ignore;
 
   // Suppress diagnostics when in a fatal state, except for follow-on notes
   if (fatalErrorOccurred)
-    if (!showDiagnosticsAfterFatalError && !isNote)
-      return set(DiagnosticBehavior::Ignore);
+    if (!showDiagnosticsAfterFatalError && lvl != DiagnosticBehavior::Note)
+      lvl = DiagnosticBehavior::Ignore;
 
-  //   2) If the user ignored this specific diagnostic, follow that
+  //   3) If the user ignored this specific diagnostic, follow that
   if (ignoredDiagnostics[(unsigned)diag.getID()])
-    return set(DiagnosticBehavior::Ignore);
+    lvl = DiagnosticBehavior::Ignore;
 
-  //   3) If the user provided a behavior for this diagnostic's kind, follow
-  //      that
-  if (diagInfo.kind == DiagnosticKind::Warning
-      || (diag.getBehaviorLimit() == DiagnosticBehavior::Warning && !isNote)) {
-    if (suppressWarnings)
-      return set(DiagnosticBehavior::Ignore);
+  //   4) If the user substituted a different behavior for this behavior, apply
+  //      that change
+  if (lvl == DiagnosticBehavior::Warning) {
     if (warningsAsErrors)
-      return set(DiagnosticBehavior::Error);
+      lvl = DiagnosticBehavior::Error;
+    if (suppressWarnings)
+      lvl = DiagnosticBehavior::Ignore;
   }
 
-  //   4) Otherwise remap the diagnostic kind, applying the behaviorLimit
-  DiagnosticBehavior lvl = DiagnosticBehavior::Unspecified;
-  switch (diagInfo.kind) {
-  case DiagnosticKind::Note:
-    lvl = DiagnosticBehavior::Note;
-    break;
-  case DiagnosticKind::Error:
-    lvl = diagInfo.isFatal ? DiagnosticBehavior::Fatal
-                           : DiagnosticBehavior::Error;
-    break;
-  case DiagnosticKind::Warning:
-    lvl = DiagnosticBehavior::Warning;
-    break;
-  case DiagnosticKind::Remark:
-    lvl = DiagnosticBehavior::Remark;
-    break;
+  //   5) Update current state for use during the next diagnostic
+  if (lvl == DiagnosticBehavior::Fatal) {
+    fatalErrorOccurred = true;
+    anyErrorOccurred = true;
+  } else if (lvl == DiagnosticBehavior::Error) {
+    anyErrorOccurred = true;
   }
-  assert(lvl != DiagnosticBehavior::Unspecified);
 
-  return set(std::max(lvl, diag.getBehaviorLimit()));
+  assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
+  assert((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
+         "We emitted a warning?!");
+
+  previousBehavior = lvl;
+  return lvl;
 }
 
 void DiagnosticEngine::flushActiveDiagnostic() {
