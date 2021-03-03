@@ -10,10 +10,6 @@ public struct MyStruct: P {
   public func foo() {}
 }
 
-// CHECK-DAG: "kind": "conformsTo",
-// CHECK-DAG: "source": "s:9Something8MyStructV",
-// CHECK-DAG: "target": "s:s15ConcurrentValueP",
-
-// CHECK-DAG: "kind": "conformsTo",
-// CHECK-DAG: "source": "s:9Something8MyStructV",
-// CHECK-DAG: "target": "s:12SomeProtocol1PP",
+// CHECK: "kind": "conformsTo",
+// CHECK-NEXT: "source": "s:9Something8MyStructV",
+// CHECK-NEXT: "target": "s:12SomeProtocol1PP",

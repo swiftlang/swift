@@ -11,6 +11,6 @@ public struct S: P {
   public var x: Int
 }
 
-// CHECK-DAG: "kind": "conformsTo"
-// CHECK-DAG: "source": "s:5Basic1SV"
-// CHECK-DAG: "target": "s:5Basic1PP"
+// CHECK: "kind": "conformsTo"
+// CHECK-NEXT: "source": "s:5Basic1SV"
+// CHECK-NEXT: "target": "s:5Basic1PP"

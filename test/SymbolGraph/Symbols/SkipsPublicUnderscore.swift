@@ -60,7 +60,4 @@ extension _ShouldntAppear.InnerShouldntAppear {
 
 extension _ShouldntAppear.InnerShouldntAppear: Equatable {}
 
-// CHECK: "relationships": [
-// CHECK: "kind": "conformsTo",
-// CHECK: "source": "s:21SkipsPublicUnderscore0B5OuterV",
-// CHECK-NEXT: "target": "s:s15ConcurrentValueP",
+// CHECK: "relationships": []

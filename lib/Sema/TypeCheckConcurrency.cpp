@@ -2504,9 +2504,20 @@ bool swift::checkConcurrentValueConformance(
 
 NormalProtocolConformance *GetImplicitConcurrentValueRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  // Only structs and enums get implicit ConcurrentValue conformances.
+  // Only structs and enums can get implicit ConcurrentValue conformances.
   if (!isa<StructDecl>(nominal) && !isa<EnumDecl>(nominal))
     return nullptr;
+
+  // Public, non-frozen structs and enums defined in Swift don't get implicit
+  // ConcurrentValue conformances.
+  if (nominal->getFormalAccessScope(
+          /*useDC=*/nullptr,
+          /*treatUsableFromInlineAsPublic=*/true).isPublic() &&
+      !(nominal->hasClangNode() ||
+        nominal->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+        nominal->getAttrs().hasAttribute<FrozenAttr>())) {
+    return nullptr;
+  }
 
   // Check the context in which the conformance occurs.
   if (auto *file = dyn_cast<FileUnit>(nominal->getModuleScopeContext())) {

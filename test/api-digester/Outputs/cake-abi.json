@@ -655,12 +655,6 @@
             }
           ],
           "usr": "s:SY"
-        },
-        {
-          "kind": "Conformance",
-          "name": "ConcurrentValue",
-          "printedName": "ConcurrentValue",
-          "usr": "s:s15ConcurrentValueP"
         }
       ]
     },

@@ -10,12 +10,7 @@ public struct S: CustomStringConvertible {
   }
 }
 
-// CHECK-DAG:      "kind": "conformsTo",
-// CHECK-DAG: "source": "s:14TargetFallback1SV",
-// CHECK-DAG: "target": "s:s15ConcurrentValueP",
-// CHECK-DAG: "targetFallback": "Swift.ConcurrentValue"
-
-// CHECK-DAG:      "kind": "conformsTo",
-// CHECK-DAG: "source": "s:14TargetFallback1SV",
-// CHECK-DAG: "target": "s:s23CustomStringConvertibleP",
-// CHECK-DAG: "targetFallback": "Swift.CustomStringConvertible"
+// CHECK:      "kind": "conformsTo",
+// CHECK-NEXT: "source": "s:14TargetFallback1SV",
+// CHECK-NEXT: "target": "s:s23CustomStringConvertibleP",
+// CHECK-NEXT: "targetFallback": "Swift.CustomStringConvertible"

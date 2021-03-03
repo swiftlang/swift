@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-library-evolution
 
 class C1 { }
 final class C2: ConcurrentValue { }
@@ -26,7 +26,7 @@ struct GS2<T> {
 }
 
 func acceptCV<T: ConcurrentValue>(_: T) { }
-// expected-note@-1 4{{where 'T' =}}
+// expected-note@-1 6{{where 'T' =}}
 
 // Example that was triggering circular dependencies.
 struct Signature { }
@@ -62,10 +62,28 @@ enum BitcodeElement {
   case record(Record)
 }
 
+// Public structs and enums do not get implicit ConcurrentValue unless they
+// are frozen.
+public struct PublicStruct {
+  var i: Int
+}
+
+public enum PublicEnum {
+  case some
+}
+
+@frozen public struct FrozenPublicStruct {
+  var i: Int
+}
+
+@frozen public enum FrozenPublicEnum {
+  case some
+}
 
 func testCV(
   c1: C1, c2: C2, s1: S1, e1: E1, e2: E2, gs1: GS1<Int>, gs2: GS2<Int>,
-  bc: Bitcode
+  bc: Bitcode, ps: PublicStruct, pe: PublicEnum,
+  fps: FrozenPublicStruct, fpe: FrozenPublicEnum
 ) {
   acceptCV(c1) // expected-error{{'C1' conform to 'ConcurrentValue'}}
   acceptCV(c2)
@@ -75,6 +93,14 @@ func testCV(
   acceptCV(gs1)
   acceptCV(gs2) // expected-error{{'GS2<Int>' conform to 'ConcurrentValue'}}
 
-  // Note available due to recursive conformance dependencies.
+  // Not available due to recursive conformance dependencies.
   acceptCV(bc) // expected-error{{global function 'acceptCV' requires that 'Bitcode' conform to 'ConcurrentValue'}}
+
+  // Not available due to "public".
+  acceptCV(ps) // expected-error{{global function 'acceptCV' requires that 'PublicStruct' conform to 'ConcurrentValue'}}
+  acceptCV(pe) // expected-error{{global function 'acceptCV' requires that 'PublicEnum' conform to 'ConcurrentValue'}}
+
+  // Public is okay when also @frozen.
+  acceptCV(fps)
+  acceptCV(fpe)
 }

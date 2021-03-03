@@ -8,7 +8,7 @@
 // Ensure we don't crash during merge-modules - no matter the order of inputs.
 
 // CHECK: Statistics
-// CHECK: 3 Serialization - # of normal protocol conformances completed
+// CHECK: 2 Serialization - # of normal protocol conformances completed
 
 public struct AnyWindows : Vista {
   public init<V: Vista>(erasing vista: V) {

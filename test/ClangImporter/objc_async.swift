@@ -93,3 +93,9 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
 
   func uiActorMethod() { }
 }
+
+// ConcurrentValue conformance inference for imported types.
+func acceptCV<T: ConcurrentValue>(_: T) { }
+func testCV(r: NSRange) {
+  acceptCV(r)
+}
