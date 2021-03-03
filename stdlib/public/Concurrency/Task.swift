@@ -478,7 +478,6 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
   ///
   /// This function does _not_ block the underlying thread.
   public static func sleep(_ duration: UInt64) async {
-
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -486,12 +485,14 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, {})
+    // FIXME: This should be an empty closure instead. Returning `0` here is
+    //        a workaround for rdar://74957357
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, { return 0 })
 
     // Enqueue the resulting job.
     _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
 
-    let _ = await Handle<Void, Never>(task).get()
+    let _ = await Handle<Int, Never>(task).get()
   }
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
