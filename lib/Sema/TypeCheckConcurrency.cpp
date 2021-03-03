@@ -2510,7 +2510,8 @@ NormalProtocolConformance *GetImplicitConcurrentValueRequest::evaluate(
 
   // Public, non-frozen structs and enums defined in Swift don't get implicit
   // ConcurrentValue conformances.
-  if (nominal->getFormalAccessScope(
+  if (!nominal->getASTContext().LangOpts.EnableInferPublicConcurrentValue &&
+      nominal->getFormalAccessScope(
           /*useDC=*/nullptr,
           /*treatUsableFromInlineAsPublic=*/true).isPublic() &&
       !(nominal->hasClangNode() ||
