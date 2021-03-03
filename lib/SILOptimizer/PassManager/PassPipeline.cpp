@@ -350,7 +350,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   if (P.getOptions().EnableOSSAModules) {
     // We earlier eliminated ownership if we are not compiling the stdlib. Now
     // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
-    P.addCopyPropagation();
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
     P.addSemanticARCOpts();
   }
 
@@ -372,7 +374,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Clean up Semantic ARC before we perform additional post-inliner opts.
   if (P.getOptions().EnableOSSAModules) {
-    P.addCopyPropagation();
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
     P.addSemanticARCOpts();
   }
 
@@ -437,7 +441,9 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Run a final round of ARC opts when ownership is enabled.
   if (P.getOptions().EnableOSSAModules) {
-    P.addCopyPropagation();
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
     P.addSemanticARCOpts();
   }
 }
@@ -471,7 +477,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
-  P.addCopyPropagation();
+  if (!P.getOptions().DisableCopyPropagation) {
+    P.addCopyPropagation();
+  }
   P.addSemanticARCOpts();
 
   // Devirtualizes differentiability witnesses into functions that reference them.
@@ -785,7 +793,9 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // Run one last copy propagation/semantic arc opts run before serialization/us
   // lowering ownership.
   if (P.getOptions().EnableOSSAModules) {
-    P.addCopyPropagation();
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
     P.addSemanticARCOpts();
   }
 
@@ -835,7 +845,13 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  P.addGuaranteedARCOpts();
+  if (P.getOptions().EnableCopyPropagation) {
+    // MandatoryCopyPropagation should only be run at -Onone, not -O.
+    P.addMandatoryCopyPropagation();
+  }
+  // TODO: MandatoryARCOpts should be subsumed by CopyPropagation. There should
+  // be no need to run another analysis of copies at -Onone.
+  P.addMandatoryARCOpts();
 
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
