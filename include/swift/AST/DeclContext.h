@@ -159,6 +159,9 @@ enum class ConformanceLookupKind : unsigned {
   OnlyExplicit,
   /// All conformances except for inherited ones.
   NonInherited,
+  /// All conformances except structurally-derived conformances, of which
+  /// ConcurrentValue is the only one.
+  NonStructural,
 };
 
 /// Describes a diagnostic for a conflict between two protocol

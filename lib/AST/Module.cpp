@@ -967,10 +967,21 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol) {
+  // If we are recursively checking for implicit conformance of a nominal
+  // type to ConcurrentValue, fail without evaluating this request. This
+  // squashes cycles.
+  LookupConformanceInModuleRequest request{{this, type, protocol}};
+  if (protocol->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
+    if (auto nominal = type->getAnyNominal()) {
+      GetImplicitConcurrentValueRequest icvRequest{nominal};
+      if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
+          getASTContext().evaluator.hasActiveRequest(request))
+        return ProtocolConformanceRef::forInvalid();
+    }
+  }
+
   return evaluateOrDefault(
-      getASTContext().evaluator,
-      LookupConformanceInModuleRequest{{this, type, protocol}},
-      ProtocolConformanceRef::forInvalid());
+      getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
 }
 
 ProtocolConformanceRef
@@ -1035,8 +1046,20 @@ LookupConformanceInModuleRequest::evaluate(
 
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
-  if (!nominal->lookupConformance(mod, protocol, conformances))
-    return ProtocolConformanceRef::forInvalid();
+  if (!nominal->lookupConformance(mod, protocol, conformances)) {
+    if (!protocol->isSpecificProtocol(KnownProtocolKind::ConcurrentValue))
+      return ProtocolConformanceRef::forInvalid();
+
+    // Try to infer ConcurrentValue conformance.
+    GetImplicitConcurrentValueRequest cvRequest{nominal};
+    if (auto conformance = evaluateOrDefault(
+            ctx.evaluator, cvRequest, nullptr)) {
+      conformances.clear();
+      conformances.push_back(conformance);
+    } else {
+      return ProtocolConformanceRef::forInvalid();
+    }
+  }
 
   // FIXME: Ambiguity resolution.
   auto conformance = conformances.front();
