@@ -66,6 +66,8 @@ actor A {
 
 // CHECK: starting
 // CHECK-NOT: ERROR
+// CHECK: Hello from the main function
+// CHECK-NOT: ERROR
 // CHECK: hello from main actor!
 // CHECK-NOT: ERROR
 // CHECK: on actor instance's queue
@@ -77,6 +79,11 @@ actor A {
 @main struct RunIt {
   static func main() async {
     print("starting")
+    if checkIfMainQueue(expectedAnswer: true) {
+      print("Hello from the main function")
+    } else {
+      print("ERROR: not on the main queue")
+    }
     let result = await someFunc()
     print("finished with return counter = \(result)")
   }
