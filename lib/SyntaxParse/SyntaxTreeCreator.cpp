@@ -130,13 +130,13 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
   auto raw =
       TokenCache->getToken(Arena, tokenKind, range.getByteLength(), tokenText,
                            leadingTriviaText, trailingTriviaText);
-  return static_cast<OpaqueSyntaxNode>(const_cast<RawSyntax *>(raw));
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
   auto raw = RawSyntax::missing(kind, getTokenText(kind), Arena);
-  return static_cast<OpaqueSyntaxNode>(const_cast<RawSyntax *>(raw));
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 OpaqueSyntaxNode
@@ -151,7 +151,7 @@ SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
   size_t TextLength = range.isValid() ? range.getByteLength() : 0;
   auto raw =
       RawSyntax::make(kind, parts, TextLength, SourcePresence::Present, Arena);
-  return static_cast<OpaqueSyntaxNode>(const_cast<RawSyntax *>(raw));
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 std::pair<size_t, OpaqueSyntaxNode>
@@ -163,8 +163,5 @@ SyntaxTreeCreator::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
     return {0, nullptr};
   const RawSyntax *raw = cacheLookup->getRaw();
   size_t length = raw->getTextLength();
-  return {length, static_cast<OpaqueSyntaxNode>(const_cast<RawSyntax *>(raw))};
-}
-
-void SyntaxTreeCreator::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
+  return {length, static_cast<OpaqueSyntaxNode>(raw)};
 }

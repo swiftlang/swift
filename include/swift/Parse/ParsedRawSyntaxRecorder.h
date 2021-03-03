@@ -67,8 +67,6 @@ public:
   ParsedRawSyntaxNode recordEmptyRawSyntaxCollection(syntax::SyntaxKind kind,
                                                      SourceLoc loc);
 
-  void discardRecordedNode(ParsedRawSyntaxNode &node);
-
   /// Used for incremental re-parsing.
   ParsedRawSyntaxNode lookupNode(size_t lexerOffset, SourceLoc loc,
                                  syntax::SyntaxKind kind);
