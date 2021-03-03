@@ -33,7 +33,7 @@ actor A7 {
 }
 
 // A non-actor can conform to the Actor protocol, if it does it properly.
-class C1: Actor {
+class C1: Actor { // expected-error{{non-final class 'C1' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
   func enqueue(partialTask: PartialAsyncTask) { }
 }
 
@@ -55,8 +55,9 @@ extension BA2 {
   @actorIndependent func enqueue(partialTask: PartialAsyncTask) { }
 }
 
-// No synthesis for non-actores.
+// No synthesis for non-actors.
 class C2: Actor { // expected-error{{type 'C2' does not conform to protocol 'Actor'}}
+  // expected-error@-1{{non-final class 'C2' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 }
 
 // Make sure the conformances actually happen.

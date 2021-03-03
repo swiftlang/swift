@@ -3029,13 +3029,6 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
 
-#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
-  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
-  static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void *_Nullable))
-    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
-#endif
-
   // Temporary workaround until objc_loadClassref is in the SDK.
   static auto objc_loadClassref =
     (Class (*)(void *))
@@ -3078,7 +3071,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // be safe to ignore the stub in this case.
     if (stub != nullptr &&
         objc_loadClassref != nullptr &&
-        _objc_realizeClassFromSwift != nullptr) {
+        &_objc_realizeClassFromSwift != nullptr) {
       _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
     } else {
       swift_instantiateObjCClass(self);
@@ -3129,14 +3122,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets,
                                bool allowDependency) {
-#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
-  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
-  static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void *_Nullable))
-    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
-#endif
-
-  bool requiresUpdate = (_objc_realizeClassFromSwift != nullptr);
+  bool requiresUpdate = (&_objc_realizeClassFromSwift != nullptr);
 
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even

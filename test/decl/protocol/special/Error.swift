@@ -34,13 +34,13 @@ enum EmptyErrorDomain: Error {}
 struct ErrorStruct : Error {
 }
 
-class ErrorClass : Error {
+class ErrorClass : Error { // expected-warning{{non-final class 'ErrorClass' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 }
 
 struct ErrorStruct2 { }
 
 extension ErrorStruct2 : Error { }
 
-class ErrorClass2 { }
+class ErrorClass2 { } // expected-warning{{non-final class 'ErrorClass2' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 
 extension ErrorClass2 : Error { }
