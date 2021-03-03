@@ -45,6 +45,7 @@ struct StructKey : CodingKey { // expected-error {{type 'StructKey' does not con
 
 // Classes conforming to CodingKey should not get implict derived conformance.
 class ClassKey : CodingKey { //expected-error {{type 'ClassKey' does not conform to protocol 'CodingKey'}}
+  // expected-warning@-1{{non-final class 'ClassKey' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 }
 
 // Types which are valid for CodingKey derived conformance should not get that

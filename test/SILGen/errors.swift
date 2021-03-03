@@ -1013,14 +1013,14 @@ func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
   var copy = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
-class SomeErrorClass : Error { }
+class SomeErrorClass : Error { } // expected-warning{{non-final class 'SomeErrorClass' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 
 // CHECK-LABEL: sil_vtable SomeErrorClass
 // CHECK-NEXT:   #SomeErrorClass.init!allocator: {{.*}} : @$s6errors14SomeErrorClassCACycfC
 // CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: @$s6errors14SomeErrorClassCfD
 // CHECK-NEXT: }
 
-class OtherErrorSub : OtherError { }
+class OtherErrorSub : OtherError { } // expected-warning{{non-final class 'OtherErrorSub' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 
 // CHECK-LABEL: sil_vtable OtherErrorSub {
 // CHECK-NEXT:  #OtherError.init!allocator: {{.*}} : @$s6errors13OtherErrorSubCACycfC [override]
