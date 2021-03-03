@@ -344,15 +344,16 @@ namespace swift {
     }
   };
 
-  /// Describes the current behavior to take with a diagnostic
+  /// Describes the current behavior to take with a diagnostic.
+  /// Ordered from most severe to least.
   enum class DiagnosticBehavior : uint8_t {
-    Unspecified,
-    Ignore,
-    Note,
-    Remark,
-    Warning,
-    Error,
+    Unspecified = 0,
     Fatal,
+    Error,
+    Warning,
+    Remark,
+    Note,
+    Ignore,
   };
 
   struct DiagnosticFormatOptions {
@@ -405,6 +406,7 @@ namespace swift {
     SourceLoc Loc;
     bool IsChildNote = false;
     const swift::Decl *Decl = nullptr;
+    DiagnosticBehavior BehaviorLimit = DiagnosticBehavior::Unspecified;
 
     friend DiagnosticEngine;
 
@@ -432,10 +434,12 @@ namespace swift {
     bool isChildNote() const { return IsChildNote; }
     SourceLoc getLoc() const { return Loc; }
     const class Decl *getDecl() const { return Decl; }
+    DiagnosticBehavior getBehaviorLimit() const { return BehaviorLimit; }
 
     void setLoc(SourceLoc loc) { Loc = loc; }
     void setIsChildNote(bool isChildNote) { IsChildNote = isChildNote; }
     void setDecl(const class Decl *decl) { Decl = decl; }
+    void setBehaviorLimit(DiagnosticBehavior limit){ BehaviorLimit = limit; }
 
     /// Returns true if this object represents a particular diagnostic.
     ///
@@ -504,6 +508,11 @@ namespace swift {
     
     /// Flush the active diagnostic to the diagnostic output engine.
     void flush();
+
+    /// Prevent the diagnostic from behaving more severely than \p limit. For
+    /// instance, if \c DiagnosticBehavior::Warning is passed, an error will be
+    /// emitted as a warning, but a note will still be emitted as a note.
+    InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
 
     /// Add a token-based range to the currently-active diagnostic.
     InFlightDiagnostic &highlight(SourceRange R);

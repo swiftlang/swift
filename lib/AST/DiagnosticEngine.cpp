@@ -289,6 +289,12 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   return *this;
 }
 
+InFlightDiagnostic &
+InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
+  Engine->getActiveDiagnostic().setBehaviorLimit(limit);
+  return *this;
+}
+
 void InFlightDiagnostic::flush() {
   if (!IsActive)
     return;
@@ -828,10 +834,11 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
   //   2) If the user ignored this specific diagnostic, follow that
   //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
-  //   4) Otherwise remap the diagnostic kind
+  //   4) Otherwise remap the diagnostic kind, applying the behaviorLimit
 
   auto diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
-  bool isNote = diagInfo.kind == DiagnosticKind::Note;
+  bool isNote = diagInfo.kind == DiagnosticKind::Note
+                  || diag.getBehaviorLimit() == DiagnosticBehavior::Note;
 
   //   1) If current state dictates a certain behavior, follow that
 
@@ -850,27 +857,34 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
 
   //   3) If the user provided a behavior for this diagnostic's kind, follow
   //      that
-  if (diagInfo.kind == DiagnosticKind::Warning) {
+  if (diagInfo.kind == DiagnosticKind::Warning
+      || (diag.getBehaviorLimit() == DiagnosticBehavior::Warning && !isNote)) {
     if (suppressWarnings)
       return set(DiagnosticBehavior::Ignore);
     if (warningsAsErrors)
       return set(DiagnosticBehavior::Error);
   }
 
-  //   4) Otherwise remap the diagnostic kind
+  //   4) Otherwise remap the diagnostic kind, applying the behaviorLimit
+  DiagnosticBehavior lvl = DiagnosticBehavior::Unspecified;
   switch (diagInfo.kind) {
   case DiagnosticKind::Note:
-    return set(DiagnosticBehavior::Note);
+    lvl = DiagnosticBehavior::Note;
+    break;
   case DiagnosticKind::Error:
-    return set(diagInfo.isFatal ? DiagnosticBehavior::Fatal
-                                : DiagnosticBehavior::Error);
+    lvl = diagInfo.isFatal ? DiagnosticBehavior::Fatal
+                           : DiagnosticBehavior::Error;
+    break;
   case DiagnosticKind::Warning:
-    return set(DiagnosticBehavior::Warning);
+    lvl = DiagnosticBehavior::Warning;
+    break;
   case DiagnosticKind::Remark:
-    return set(DiagnosticBehavior::Remark);
+    lvl = DiagnosticBehavior::Remark;
+    break;
   }
+  assert(lvl != DiagnosticBehavior::Unspecified);
 
-  llvm_unreachable("Unhandled DiagnosticKind in switch.");
+  return set(std::max(lvl, diag.getBehaviorLimit()));
 }
 
 void DiagnosticEngine::flushActiveDiagnostic() {

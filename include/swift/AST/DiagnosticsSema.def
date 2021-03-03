@@ -4364,38 +4364,20 @@ ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
       "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
-WARNING(non_concurrent_type_member_warn,none,
-      "%select{stored property %1|associated value %1}0 of "
-      "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
-      (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
-      "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
-      (DeclName, DescriptiveDeclKind, DeclName))
-WARNING(concurrent_value_class_mutable_property_warn,none,
       "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_outside_source_file,none,
       "conformance to 'ConcurrentValue' must occur in the same source file as "
       "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
-WARNING(concurrent_value_outside_source_file_warn,none,
-      "conformance to 'ConcurrentValue' must occur in the same source file as "
-      "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
-      (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to `ConcurrentValue`; "
-      "use `UnsafeConcurrentValue`", (DeclName))
-WARNING(concurrent_value_nonfinal_class_warn,none,
       "non-final class %0 cannot conform to `ConcurrentValue`; "
       "use `UnsafeConcurrentValue`", (DeclName))
 ERROR(concurrent_value_inherit,none,
       "`ConcurrentValue` class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
-WARNING(concurrent_value_inherit_warn,none,
-        "`ConcurrentValue` class %1 cannot inherit from another class"
-        "%select{| other than 'NSObject'}0",
-        (bool, DeclName))
 
 ERROR(actorindependent_let,none,
       "'@actorIndependent' is meaningless on 'let' declarations because "

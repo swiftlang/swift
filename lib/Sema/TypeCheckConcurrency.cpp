@@ -2371,14 +2371,16 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
-static bool shouldDiagnoseConcurrentValue(ConcurrentValueCheck check) {
+static DiagnosticBehavior toDiagnosticBehavior(ConcurrentValueCheck check,
+                                               bool diagnoseImplicit = false) {
   switch (check) {
   case ConcurrentValueCheck::ImpliedByStandardProtocol:
+    return DiagnosticBehavior::Warning;
   case ConcurrentValueCheck::Explicit:
-    return true;
-
+    return DiagnosticBehavior::Unspecified;
   case ConcurrentValueCheck::Implicit:
-    return false;
+    return diagnoseImplicit ? DiagnosticBehavior::Unspecified
+                            : DiagnosticBehavior::Ignore;
   }
 }
 
@@ -2388,34 +2390,31 @@ static bool checkConcurrentValueInstanceStorage(
     NominalTypeDecl *nominal, DeclContext *dc, ConcurrentValueCheck check) {
   // Stored properties of structs and classes must have
   // ConcurrentValue-conforming types.
-  bool asWarning = (check == ConcurrentValueCheck::ImpliedByStandardProtocol);
+  auto behavior = toDiagnosticBehavior(check);
   bool invalid = false;
   if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
     auto classDecl = dyn_cast<ClassDecl>(nominal);
     for (auto property : nominal->getStoredProperties()) {
       if (classDecl && property->supportsMutation()) {
-        if (!shouldDiagnoseConcurrentValue(check))
+        if (behavior == DiagnosticBehavior::Ignore)
           return true;
-
-        property->diagnose(
-            asWarning ? diag::concurrent_value_class_mutable_property_warn
-                      : diag::concurrent_value_class_mutable_property,
-            property->getName(), nominal->getDescriptiveKind(),
-            nominal->getName());
+        property->diagnose(diag::concurrent_value_class_mutable_property,
+                           property->getName(), nominal->getDescriptiveKind(),
+                           nominal->getName())
+            .limitBehavior(behavior);
         invalid = true;
         continue;
       }
 
       auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType());
       if (!isConcurrentValueType(dc, propertyType)) {
-        if (!shouldDiagnoseConcurrentValue(check))
+        if (behavior == DiagnosticBehavior::Ignore)
           return true;
-
-        property->diagnose(
-            asWarning ? diag::non_concurrent_type_member_warn
-                      : diag::non_concurrent_type_member,
-            false, property->getName(),
-            nominal->getDescriptiveKind(), nominal->getName(), propertyType);
+        property->diagnose(diag::non_concurrent_type_member,
+                           false, property->getName(),
+                           nominal->getDescriptiveKind(), nominal->getName(),
+                           propertyType)
+            .limitBehavior(behavior);
         invalid = true;
         continue;
       }
@@ -2435,14 +2434,13 @@ static bool checkConcurrentValueInstanceStorage(
         auto elementType = dc->mapTypeIntoContext(
             element->getArgumentInterfaceType());
         if (!isConcurrentValueType(dc, elementType)) {
-          if (!shouldDiagnoseConcurrentValue(check))
+          if (behavior == DiagnosticBehavior::Ignore)
             return true;
-
-          element->diagnose(
-              asWarning ? diag::non_concurrent_type_member_warn
-                        : diag::non_concurrent_type_member,
-              true, element->getName(),
-              nominal->getDescriptiveKind(), nominal->getName(), elementType);
+          element->diagnose(diag::non_concurrent_type_member,
+                            true, element->getName(),
+                            nominal->getDescriptiveKind(), nominal->getName(),
+                            elementType)
+              .limitBehavior(behavior);
           invalid = true;
           continue;
         }
@@ -2469,28 +2467,26 @@ bool swift::checkConcurrentValueConformance(
 
   // ConcurrentValue can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  bool asWarning = (check == ConcurrentValueCheck::ImpliedByStandardProtocol);
+  auto behavior = toDiagnosticBehavior(check, /*diagnoseImplicit=*/true);
   if (!conformanceDC->getParentSourceFile() ||
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
-    conformanceDecl->diagnose(
-        asWarning
-          ? diag::concurrent_value_outside_source_file_warn
-          : diag::concurrent_value_outside_source_file,
-        nominal->getDescriptiveKind(), nominal->getName());
+    conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,
+                              nominal->getDescriptiveKind(),
+                              nominal->getName())
+        .limitBehavior(behavior);
 
-    if (!asWarning)
+    if (behavior != DiagnosticBehavior::Warning)
       return true;
   }
 
   if (classDecl) {
     // An non-final class cannot conform to `ConcurrentValue`.
     if (!classDecl->isFinal()) {
-      classDecl->diagnose(
-          asWarning ? diag::concurrent_value_nonfinal_class_warn
-                    : diag::concurrent_value_nonfinal_class,
-          classDecl->getName());
+      classDecl->diagnose(diag::concurrent_value_nonfinal_class,
+                          classDecl->getName())
+          .limitBehavior(behavior);
 
-      if (!asWarning)
+      if (behavior != DiagnosticBehavior::Warning)
         return true;
     }
 
@@ -2500,12 +2496,12 @@ bool swift::checkConcurrentValueConformance(
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         if (!superclassDecl->isNSObject()) {
           classDecl->diagnose(
-              asWarning ? diag::concurrent_value_inherit_warn
-                        : diag::concurrent_value_inherit,
+              diag::concurrent_value_inherit,
               nominal->getASTContext().LangOpts.EnableObjCInterop,
-              classDecl->getName());
+              classDecl->getName())
+              .limitBehavior(behavior);
 
-          if (!asWarning)
+          if (behavior != DiagnosticBehavior::Warning)
             return true;
         }
       }
