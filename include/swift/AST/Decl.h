@@ -678,6 +678,7 @@ protected:
   friend class DeclIterator;
   friend class IterableDeclContext;
   friend class MemberLookupTable;
+  friend class DeclDeserializer;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -694,6 +695,10 @@ private:
   };
   mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
   const CachedExternalSourceLocs *getSerializedLocs() const;
+
+  /// Directly set the invalid bit
+  void setInvalidBit();
+
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)

@@ -776,9 +776,18 @@ NOTE(serialization_compatibility_version_mismatch,none,
      "(this is supported but may expose additional compiler issues)",
      (StringRef, StringRef, StringRef))
 
+ERROR(serialization_invalid_decl,Fatal,
+      "deserialized invalid declaration %0 (%1) in module '%2'",
+      (DeclName, DescriptiveDeclKind, StringRef))
 ERROR(serialization_allowing_invalid_decl,none,
-      "allowing deserialization of invalid declaration %0 from module '%1'",
-      (DeclName, StringRef))
+      "allowing deserialization of invalid declaration %0 (%1) in module '%2'",
+      (DeclName, DescriptiveDeclKind, StringRef))
+ERROR(serialization_error_type,Fatal,
+      "deserialized error type '%0' in module '%1'",
+      (StringRef, StringRef))
+ERROR(serialization_allowing_error_type,none,
+      "allowing deserialization of error type '%0' in module '%1'",
+      (StringRef, StringRef))
 
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
