@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
 // RUN:    -module-name a -enable-experimental-concurrency \
-// RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK \
-// RUN:    --check-prefix=CHECK-%target-cpu
+// RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 
 // UNSUPPORTED: CPU=arm64e
@@ -10,6 +9,8 @@
 // argument.
 
 // CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYF.resume.0"
+// CHECK: call void @llvm.dbg.declare
+// CHECK: call void @llvm.dbg.declare
 // CHECK: call void @llvm.dbg.declare(metadata {{.*}}%2, metadata ![[X0:[0-9]+]], {{.*}}!DIExpression(DW_OP
 // CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYF.resume.1"
 // FIXME: call void @llvm.dbg.declare(metadata {{.*}}%2, metadata ![[X1:[0-9]+]], {{.*}}!DIExpression(DW_OP
