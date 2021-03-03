@@ -291,6 +291,10 @@ struct ConformanceState {
     auto uintPtr = reinterpret_cast<uintptr_t>(ptr);
     return dyldSharedCacheStart <= uintPtr && uintPtr < dyldSharedCacheEnd;
   }
+
+  bool sharedCacheOptimizationsActive() { return dyldSharedCacheStart != 0; }
+#else
+  bool sharedCacheOptimizationsActive() { return false; }
 #endif
 
   ConformanceState() {
@@ -298,22 +302,28 @@ struct ConformanceState {
         runtime::bincompat::workaroundProtocolConformanceReverseIteration();
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
-    if (_dyld_swift_optimizations_version() ==
-        DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION) {
-      size_t length;
-      dyldSharedCacheStart = (uintptr_t)_dyld_get_shared_cache_range(&length);
-      dyldSharedCacheEnd =
-          dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
-      validateSharedCacheResults = runtime::environment::
-          SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES();
-      SHARED_CACHE_LOG("Shared cache range is %#lx-%#lx", dyldSharedCacheStart,
-                       dyldSharedCacheEnd);
-    } else {
-      SHARED_CACHE_LOG("Disabling shared cache optimizations due to unknown "
-                       "optimizations version %u",
-                       _dyld_swift_optimizations_version());
-      dyldSharedCacheStart = 0;
-      dyldSharedCacheEnd = 0;
+    if (__builtin_available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)) {
+      if (&_dyld_swift_optimizations_version) {
+        if (_dyld_swift_optimizations_version() ==
+            DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION) {
+          size_t length;
+          dyldSharedCacheStart =
+              (uintptr_t)_dyld_get_shared_cache_range(&length);
+          dyldSharedCacheEnd =
+              dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
+          validateSharedCacheResults = runtime::environment::
+              SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES();
+          SHARED_CACHE_LOG("Shared cache range is %#lx-%#lx",
+                           dyldSharedCacheStart, dyldSharedCacheEnd);
+        } else {
+          SHARED_CACHE_LOG(
+              "Disabling shared cache optimizations due to unknown "
+              "optimizations version %u",
+              _dyld_swift_optimizations_version());
+          dyldSharedCacheStart = 0;
+          dyldSharedCacheEnd = 0;
+        }
+      }
     }
 #endif
 
@@ -570,7 +580,7 @@ static void validateSharedCacheResults(
     const WitnessTable *dyldCachedWitnessTable,
     const ProtocolConformanceDescriptor *dyldCachedConformanceDescriptor) {
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
-  if (!C.validateSharedCacheResults)
+  if (!C.sharedCacheOptimizationsActive() || !C.validateSharedCacheResults)
     return;
 
   llvm::SmallVector<const ProtocolConformanceDescriptor *, 8> conformances;
@@ -726,29 +736,30 @@ swift_conformsToProtocolImpl(const Metadata *const type,
 
   // Search the shared cache tables for a conformance for this type, and for
   // superclasses (if it's a class).
-  const Metadata *dyldSearchType = type;
-  do {
-    bool definitiveFailure;
-    std::tie(dyldCachedWitnessTable, dyldCachedConformanceDescriptor,
-             definitiveFailure) =
-        findSharedCacheConformance(C, dyldSearchType, protocol);
+  if (C.sharedCacheOptimizationsActive()) {
+    const Metadata *dyldSearchType = type;
+    do {
+      bool definitiveFailure;
+      std::tie(dyldCachedWitnessTable, dyldCachedConformanceDescriptor,
+               definitiveFailure) =
+          findSharedCacheConformance(C, dyldSearchType, protocol);
 
-    if (definitiveFailure)
-      return nullptr;
+      if (definitiveFailure)
+        return nullptr;
 
-    dyldSearchType = _swift_class_getSuperclass(dyldSearchType);
-  } while (dyldSearchType && !dyldCachedWitnessTable &&
-           !dyldCachedConformanceDescriptor);
+      dyldSearchType = _swift_class_getSuperclass(dyldSearchType);
+    } while (dyldSearchType && !dyldCachedWitnessTable &&
+             !dyldCachedConformanceDescriptor);
 
-  validateSharedCacheResults(C, type, protocol, dyldCachedWitnessTable,
-                             dyldCachedConformanceDescriptor);
-
-  // Return a cached result if we got a witness table. We can't do this if
-  // scanSectionsBackwards is set, since a scanned conformance can override a
-  // cached result in that case.
-  if (!C.scanSectionsBackwards)
-    if (dyldCachedWitnessTable)
-      return dyldCachedWitnessTable;
+    validateSharedCacheResults(C, type, protocol, dyldCachedWitnessTable,
+                               dyldCachedConformanceDescriptor);
+    // Return a cached result if we got a witness table. We can't do this if
+    // scanSectionsBackwards is set, since a scanned conformance can override a
+    // cached result in that case.
+    if (!C.scanSectionsBackwards)
+      if (dyldCachedWitnessTable)
+        return dyldCachedWitnessTable;
+  }
 
   // See if we have an authoritative cached conformance. The
   // ConcurrentReadableHashMap data structure allows us to search the map
