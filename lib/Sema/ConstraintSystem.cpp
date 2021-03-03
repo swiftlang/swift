@@ -1514,6 +1514,36 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
+Type constraints::getDynamicSelfReplacementType(
+    Type baseObjTy, const ValueDecl *member, ConstraintLocator *memberLocator) {
+  // Constructions must always have their dynamic 'Self' result type replaced
+  // with the base object type, 'super' or not.
+  if (isa<ConstructorDecl>(member))
+    return baseObjTy;
+
+  const SuperRefExpr *SuperExpr = nullptr;
+  if (auto *E = getAsExpr(memberLocator->getAnchor())) {
+    if (auto *LE = dyn_cast<LookupExpr>(E)) {
+      SuperExpr = dyn_cast<SuperRefExpr>(LE->getBase());
+    } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+      SuperExpr = dyn_cast<SuperRefExpr>(UDE->getBase());
+    }
+  }
+
+  // For anything else that isn't 'super', we want it to be the base
+  // object type.
+  if (!SuperExpr)
+    return baseObjTy;
+
+  // 'super' is special in that we actually want dynamic 'Self' to behave
+  // as if the base were 'self'.
+  const auto *selfDecl = SuperExpr->getSelf();
+  return selfDecl->getDeclContext()
+      ->getInnermostTypeContext()
+      ->mapTypeIntoContext(selfDecl->getInterfaceType())
+      ->getMetatypeInstanceType();
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
@@ -1712,21 +1742,23 @@ ConstraintSystem::getTypeOfMemberReference(
   // Compute the type of the reference.
   Type type = openedType;
 
+  // Cope with dynamic 'Self'.
   if (!outerDC->getSelfProtocolDecl()) {
-    // Class methods returning Self as well as constructors get the
-    // result replaced with the base object type.
+    const auto replacementTy =
+        getDynamicSelfReplacementType(baseObjTy, value, locator);
+
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if (func->hasDynamicSelfResult() &&
           !baseObjTy->getOptionalObjectType()) {
-        type = type->replaceCovariantResultType(baseObjTy, 2);
+        type = type->replaceCovariantResultType(replacementTy, 2);
       }
     } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
       if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
-        type = type->replaceCovariantResultType(baseObjTy, 2);
+        type = type->replaceCovariantResultType(replacementTy, 2);
       }
     } else if (auto *decl = dyn_cast<VarDecl>(value)) {
       if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
-        type = type->replaceCovariantResultType(baseObjTy, 1);
+        type = type->replaceCovariantResultType(replacementTy, 1);
       }
     }
   }
@@ -1795,7 +1827,8 @@ ConstraintSystem::getTypeOfMemberReference(
   return { openedType, type };
 }
 
-Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
+Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
+                                                const OverloadChoice &overload,
                                                 bool allowMembers,
                                                 DeclContext *useDC) {
   switch (overload.getKind()) {
@@ -1854,15 +1887,26 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
     if (!allowMembers)
       return Type();
 
+    const auto withDynamicSelfResultReplaced = [&](Type type,
+                                                   unsigned uncurryLevel) {
+      const Type baseObjTy = overload.getBaseType()
+                                 ->getRValueType()
+                                 ->getMetatypeInstanceType()
+                                 ->lookThroughAllOptionalTypes();
+
+      return type->replaceCovariantResultType(
+          getDynamicSelfReplacementType(baseObjTy, decl, locator),
+          uncurryLevel);
+    };
+
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
       auto elementTy = subscript->getElementInterfaceType();
 
       if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
         elementTy = LValueType::get(elementTy);
       else if (elementTy->hasDynamicSelfType()) {
-        Type selfType = overload.getBaseType()->getRValueType()
-            ->getMetatypeInstanceType()->lookThroughAllOptionalTypes();
-        elementTy = elementTy->replaceCovariantResultType(selfType, 0);
+        elementTy = withDynamicSelfResultReplaced(elementTy,
+                                                  /*uncurryLevel=*/0);
       }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1876,8 +1920,11 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
       type = FunctionType::get(indices, elementTy);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
-      if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
+      if (doesStorageProduceLValue(var, overload.getBaseType(), useDC)) {
         type = LValueType::get(type);
+      } else if (type->hasDynamicSelfType()) {
+        type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
+      }
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
@@ -1892,18 +1939,16 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
             return Type();
 
           if (!overload.getBaseType()->getOptionalObjectType()) {
-            Type selfType = overload.getBaseType()
-                                ->getRValueType()
-                                ->getMetatypeInstanceType();
-
             // `Int??(0)` if we look through all optional types for `Self`
             // we'll end up with incorrect type `Int?` for result because
             // the actual result type is `Int??`.
-            if (isa<ConstructorDecl>(decl) && selfType->getOptionalObjectType())
+            if (isa<ConstructorDecl>(decl) && overload.getBaseType()
+                                                  ->getRValueType()
+                                                  ->getMetatypeInstanceType()
+                                                  ->getOptionalObjectType())
               return Type();
 
-            type = type->replaceCovariantResultType(
-                selfType->lookThroughAllOptionalTypes(), 2);
+            type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/2);
           }
         }
       }

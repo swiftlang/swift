@@ -5283,6 +5283,14 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type);
 Type isRawRepresentable(ConstraintSystem &cs, Type type,
                         KnownProtocolKind rawRepresentableProtocol);
 
+/// Compute the type that shall stand in for dynamic 'Self' in a member
+/// reference with a base of the given object type.
+///
+/// \param memberLocator The locator of the member constraint; used to retrieve
+/// the expression that the locator is anchored to.
+Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
+                                   ConstraintLocator *memberLocator);
+
 class DisjunctionChoice {
   ConstraintSystem &CS;
   unsigned Index;
