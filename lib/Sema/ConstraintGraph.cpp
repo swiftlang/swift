@@ -1314,26 +1314,49 @@ ConstraintGraph::computeConnectedComponents(
   return cc.getComponents();
 }
 
-
-/// For a given constraint kind, decide if we should attempt to eliminate its
-/// edge in the graph.
-static bool shouldContractEdge(ConstraintKind kind) {
-  switch (kind) {
-  case ConstraintKind::BindParam:
-    return true;
-
-  default:
-    return false;
-  }
-}
-
 bool ConstraintGraph::contractEdges() {
+  // Current constraint system doesn't have any closure expressions
+  // associated with it so there is nothing to here.
+  if (CS.ClosureTypes.empty())
+    return false;
+
+  // For a given constraint kind, decide if we should attempt to eliminate its
+  // edge in the graph.
+  auto shouldContractEdge = [](ConstraintKind kind) {
+    switch (kind) {
+    case ConstraintKind::BindParam:
+      return true;
+
+    default:
+      return false;
+    }
+  };
+
   SmallVector<Constraint *, 16> constraints;
-  CS.findConstraints(constraints, [&](const Constraint &constraint) {
-    // Track how many constraints did contraction algorithm iterated over.
-    incrementConstraintsPerContractionCounter();
-    return shouldContractEdge(constraint.getKind());
-  });
+  for (const auto &closure : CS.ClosureTypes) {
+    for (const auto &param : closure.second->getParams()) {
+      auto paramTy = param.getPlainType()->getAs<TypeVariableType>();
+      if (!paramTy)
+        continue;
+
+      // This closure is not currently in scope.
+      if (!CS.TypeVariables.count(paramTy))
+        break;
+
+      // Nothing to contract here since outside parameter
+      // is already bound to a concrete type.
+      if (CS.getFixedType(paramTy))
+        continue;
+
+      for (auto *constraint : (*this)[paramTy].getConstraints()) {
+        // Track how many constraints did contraction algorithm iterated over.
+        incrementConstraintsPerContractionCounter();
+
+        if (shouldContractEdge(constraint->getKind()))
+          constraints.push_back(constraint);
+      }
+    }
+  }
 
   bool didContractEdges = false;
   for (auto *constraint : constraints) {
