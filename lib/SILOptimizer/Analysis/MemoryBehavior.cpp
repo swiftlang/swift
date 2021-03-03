@@ -183,6 +183,7 @@ public:
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
   MemBehavior visitDestroyValueInst(DestroyValueInst *DVI);
+  MemBehavior visitEndBorrowInst(EndBorrowInst *EBI);
   MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
   MemBehavior visitBeginCOWMutationInst(BeginCOWMutationInst *BCMI);
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -497,6 +498,12 @@ MemoryBehaviorVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
   if (!EA->canEscapeTo(V, DVI))
     return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitEndBorrowInst(EndBorrowInst *EBI) {
+  if (!EA->canEscapeTo(V, EBI))
+    return MemBehavior::None;
+  return MemBehavior::MayRead;
 }
 
 MemBehavior MemoryBehaviorVisitor::visitSetDeallocatingInst(SetDeallocatingInst *SDI) {
