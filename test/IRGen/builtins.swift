@@ -158,6 +158,14 @@ func cast_test(_ ptr: inout Builtin.RawPointer, i8: inout Builtin.Int8,
   d = Builtin.bitcast_Int64_FPIEEE64(i64)   // CHECK: bitcast
 }
 
+func vector_bitcast_test(_ src: Builtin.Vec16xInt8) -> Builtin.Int16 {
+  // CHECK: vector_bitcast_test
+  // This is the idiom for pmovmskb on x86 targets:
+  let zero: Builtin.Vec16xInt8 = Builtin.zeroInitializer()
+  let mask = Builtin.cmp_slt_Vec16xInt8(src, zero)
+  return Builtin.bitcast_Vec16xInt1_Int16(mask) // CHECK: bitcast
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test
