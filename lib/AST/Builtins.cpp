@@ -1864,7 +1864,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
-  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
   case IITDescriptor::VecOfBitcastsToInt:
   case IITDescriptor::Subdivide2Argument:
@@ -1891,6 +1890,15 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
     return makeVector(eltType, D.Vector_Width.getKnownMinValue());
+  }
+  
+  // The element type of a vector type.
+  case IITDescriptor::VecElementArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    auto vecType = argType->getAs<BuiltinVectorType>();
+    if (!vecType) return Type();
+    return vecType->getElementType();
   }
 
   // A pointer to an immediate type.
