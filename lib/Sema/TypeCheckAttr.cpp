@@ -1835,7 +1835,17 @@ synthesizeMainBody(AbstractFunctionDecl *fn, void *arg) {
     // Resulting $main looks like:
     // $main() { _runAsyncMain(main) }
     auto *concurrencyModule = context.getLoadedModule(context.Id_Concurrency);
-    assert(concurrencyModule != nullptr && "Failed to find Concurrency module");
+    if (!concurrencyModule) {
+      context.Diags.diagnose(mainFunction->getAsyncLoc(),
+                             diag::async_main_no_concurrency);
+      auto result = new (context) ErrorExpr(mainFunction->getSourceRange());
+      SmallVector<ASTNode, 1> stmts;
+      stmts.push_back(result);
+      auto body = BraceStmt::create(context, SourceLoc(), stmts,
+                                    SourceLoc(), /*Implicit*/true);
+
+      return std::make_pair(body, /*typechecked*/true);
+    }
 
     SmallVector<ValueDecl *, 1> decls;
     concurrencyModule->lookupQualified(
