@@ -188,6 +188,11 @@ def batch_scan_input_file
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
 
+def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
+  HelpText<"Run SIL copy propagation to shorten object lifetime.">;
+def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
+  HelpText<"Don't run SIL copy propagation to preserve object lifetime.">;
+
 def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-concurrent-value">,
     HelpText<"Enable inference of ConcurrentValue conformances for public structs and enums">;
 

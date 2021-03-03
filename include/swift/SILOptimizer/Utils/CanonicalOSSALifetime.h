@@ -187,7 +187,7 @@ public:
 private:
   /// If true, then debug_value instructions outside of non-debug
   /// liveness may be pruned during canonicalization.
-  bool pruneDebug;
+  bool pruneDebugMode;
 
   NonLocalAccessBlockAnalysis *accessBlockAnalysis;
   // Lazily initialize accessBlocks only when
@@ -237,12 +237,13 @@ private:
   CanonicalOSSAConsumeInfo consumes;
 
 public:
-  CanonicalizeOSSALifetime(bool pruneDebug,
+  CanonicalizeOSSALifetime(bool pruneDebugMode,
                            NonLocalAccessBlockAnalysis *accessBlockAnalysis,
                            DominanceAnalysis *dominanceAnalysis,
                            DeadEndBlocks *deBlocks)
-    : pruneDebug(pruneDebug), accessBlockAnalysis(accessBlockAnalysis),
-      dominanceAnalysis(dominanceAnalysis), deBlocks(deBlocks) {}
+      : pruneDebugMode(pruneDebugMode),
+        accessBlockAnalysis(accessBlockAnalysis),
+        dominanceAnalysis(dominanceAnalysis), deBlocks(deBlocks) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 

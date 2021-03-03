@@ -44,6 +44,16 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
+  /// Force-run SIL copy propagation to shorten object lifetime in whatever
+  /// optimization pipeline is currently used.
+  /// When this is 'false' the pipeline has default behavior.
+  bool EnableCopyPropagation = false;
+
+  /// Disable SIL copy propagation to preserve object lifetime in whatever
+  /// optimization pipeline is currently used.
+  /// When this is 'false' the pipeline has default behavior.
+  bool DisableCopyPropagation = false;
+
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
