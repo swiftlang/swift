@@ -472,7 +472,9 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
   )
 }
 
+// ==== Async Sleep ------------------------------------------------------------
 
+extension Task {
   /// Suspends the current task for _at least_ the given duration
   /// in nanoseconds.
   ///
@@ -494,6 +496,8 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
 
     let _ = await Handle<Int, Never>(task).get()
   }
+}
+
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
 extension Task {

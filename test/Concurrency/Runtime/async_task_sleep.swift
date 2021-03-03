@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input always
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
@@ -35,6 +35,8 @@ import Dispatch
 
     print("Run second")
 
+    // CHECK: Run first
+    // CHECK: Run second
     await task.get()
   }
 }
