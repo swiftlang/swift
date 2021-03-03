@@ -4845,10 +4845,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   // Diagnose if original function and derivative differ in terms of static declaration.
   if (!compatibleStaticDecls()) {
     bool derivativeMustBeStatic = !derivative->isStatic();
-    diags.diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
-                   diag::derivative_attr_static_method_mismatch_original,
-                   originalAFD->getName(), derivative->getName(),
-                   derivativeMustBeStatic);
+    diags
+        .diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
+                  diag::derivative_attr_static_method_mismatch_original,
+                  originalAFD->getName(), derivative->getName(),
+                  derivativeMustBeStatic)
+        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diags.diagnose(originalAFD->getNameLoc(),
                    diag::derivative_attr_static_method_mismatch_original_note,
                    originalAFD->getName(), derivativeMustBeStatic);
@@ -5395,7 +5397,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
              diag::transpose_attr_static_method_mismatch_original,
              originalAFD->getName(), transpose->getName(),
-             transposeMustBeStatic);
+             transposeMustBeStatic)
+        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diagnose(originalAFD->getNameLoc(),
              diag::transpose_attr_static_method_mismatch_original_note,
              originalAFD->getName(), transposeMustBeStatic);
