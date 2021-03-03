@@ -4360,11 +4360,11 @@ WARNING(concurrent_value_outside_source_file_warn,none,
       "conformance to 'ConcurrentValue' must occur in the same source file as "
       "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
-ERROR(concurrent_value_open_class,none,
-      "open class %0 cannot conform to `ConcurrentValue`; "
+ERROR(concurrent_value_nonfinal_class,none,
+      "non-final class %0 cannot conform to `ConcurrentValue`; "
       "use `UnsafeConcurrentValue`", (DeclName))
-WARNING(concurrent_value_open_class_warn,none,
-      "open class %0 cannot conform to `ConcurrentValue`; "
+WARNING(concurrent_value_nonfinal_class_warn,none,
+      "non-final class %0 cannot conform to `ConcurrentValue`; "
       "use `UnsafeConcurrentValue`", (DeclName))
 ERROR(concurrent_value_inherit,none,
       "`ConcurrentValue` class %1 cannot inherit from another class"

@@ -2483,11 +2483,11 @@ bool swift::checkConcurrentValueConformance(
   }
 
   if (classDecl) {
-    // An open class cannot conform to `ConcurrentValue`.
-    if (classDecl->getFormalAccess() == AccessLevel::Open) {
+    // An non-final class cannot conform to `ConcurrentValue`.
+    if (!classDecl->isFinal()) {
       classDecl->diagnose(
-          asWarning ? diag::concurrent_value_open_class_warn
-                    : diag::concurrent_value_open_class,
+          asWarning ? diag::concurrent_value_nonfinal_class_warn
+                    : diag::concurrent_value_nonfinal_class,
           classDecl->getName());
 
       if (!asWarning)
