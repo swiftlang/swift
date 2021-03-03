@@ -145,7 +145,7 @@ B(foo: 0) // expected-warning{{unused}}
 
 // rdar://problem/33040113 - Provide fix-it for missing "try" when calling throwing Swift function
 
-class E_33040113 : Error {}
+class E_33040113 : Error {} // expected-warning{{non-final class 'E_33040113' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 func rdar33040113() throws -> Int {
     throw E_33040113()
 }

@@ -768,7 +768,20 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
 
     bool visitFunctionType(FunctionType *type) {
       // Concurrent function types meet the requirements.
-      return type->isConcurrent();
+      if (type->isConcurrent())
+        return true;
+
+      // C and thin function types meeting the requirements because they
+      // cannot have captures.
+      switch (type->getExtInfo().getRepresentation()) {
+      case FunctionTypeRepresentation::Block:
+      case FunctionTypeRepresentation::Swift:
+        return false;
+
+      case FunctionTypeRepresentation::CFunctionPointer:
+      case FunctionTypeRepresentation::Thin:
+        return true;
+      }
     }
 
     bool visitProtocolCompositionType(ProtocolCompositionType *type) {
@@ -2470,11 +2483,11 @@ bool swift::checkConcurrentValueConformance(
   }
 
   if (classDecl) {
-    // An open class cannot conform to `ConcurrentValue`.
-    if (classDecl->getFormalAccess() == AccessLevel::Open) {
+    // An non-final class cannot conform to `ConcurrentValue`.
+    if (!classDecl->isFinal()) {
       classDecl->diagnose(
-          asWarning ? diag::concurrent_value_open_class_warn
-                    : diag::concurrent_value_open_class,
+          asWarning ? diag::concurrent_value_nonfinal_class_warn
+                    : diag::concurrent_value_nonfinal_class,
           classDecl->getName());
 
       if (!asWarning)
