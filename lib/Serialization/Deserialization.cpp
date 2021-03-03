@@ -2369,6 +2369,8 @@ class DeclDeserializer {
   ASTContext &ctx;
   Serialized<Decl *> &declOrOffset;
 
+  bool IsInvalid = false;
+
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
 
@@ -2421,6 +2423,22 @@ public:
     if (!decl)
       return;
 
+    if (IsInvalid) {
+      decl->setInvalidBit();
+
+      DeclName name;
+      if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+        name = VD->getName();
+      }
+
+      auto diagId = ctx.LangOpts.AllowModuleWithCompilerErrors
+                        ? diag::serialization_allowing_invalid_decl
+                        : diag::serialization_invalid_decl;
+      ctx.Diags.diagnose(SourceLoc(), diagId, name,
+                         decl->getDescriptiveKind(),
+                         MF.getAssociatedModule()->getNameStr());
+    }
+
     if (DAttrs)
       decl->getAttrs().setRawAttributeChain(DAttrs);
 
@@ -2436,10 +2454,9 @@ public:
     }
   }
 
-  /// Deserializes decl attribute and attribute-like records from
-  /// \c MF.DeclTypesCursor until a non-attribute record is found,
-  /// passing each one to AddAttribute.
-  llvm::Error deserializeDeclAttributes();
+  /// Deserializes records common to all decls from \c MF.DeclTypesCursor (ie.
+  /// the invalid flag, attributes, and discriminators)
+  llvm::Error deserializeDeclCommon();
 
   Expected<Decl *> getDeclCheckedImpl(
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
@@ -4083,19 +4100,6 @@ ModuleFile::getDeclChecked(
         matchAttributes);
     if (!deserialized)
       return deserialized;
-
-    auto *decl = declOrOffset.get();
-    if (isAllowModuleWithCompilerErrorsEnabled() && decl->isInvalid()) {
-      if (!isa<ParamDecl>(decl) && !decl->isImplicit()) {
-        // The parent function will be invalid if the parameter is invalid,
-        // implicits should have an invalid explicit as well
-        if (auto *VD = dyn_cast<ValueDecl>(decl)) {
-          getContext().Diags.diagnose(
-              VD->getLoc(), diag::serialization_allowing_invalid_decl,
-              VD->getName(), VD->getModuleContext()->getNameStr());
-        }
-      }
-    }
   } else if (matchAttributes) {
     // Decl was cached but we may need to filter it
     if (!matchAttributes(declOrOffset.get()->getAttrs()))
@@ -4115,7 +4119,7 @@ ModuleFile::getDeclChecked(
   return declOrOffset;
 }
 
-llvm::Error DeclDeserializer::deserializeDeclAttributes() {
+llvm::Error DeclDeserializer::deserializeDeclCommon() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 64> scratch;
@@ -4132,7 +4136,10 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
     unsigned recordID = MF.fatalIfUnexpected(
         MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
-    if (isDeclAttrRecord(recordID)) {
+    if (recordID == ERROR_FLAG) {
+      assert(!IsInvalid && "Error flag written multiple times");
+      IsInvalid = true;
+    } else if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
@@ -4459,7 +4466,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         // because it requires `DifferentiableAttr::setOriginalDeclaration` to
         // be called first. `DifferentiableAttr::setOriginalDeclaration` cannot
         // be called here because the original declaration is not accessible in
-        // this function (`DeclDeserializer::deserializeDeclAttributes`).
+        // this function (`DeclDeserializer::deserializeDeclCommon`).
         diffAttrParamIndicesMap[diffAttr] = indices;
         diffAttr->setDerivativeGenericSignature(derivativeGenSig);
         Attr = diffAttr;
@@ -4616,9 +4623,9 @@ Expected<Decl *>
 DeclDeserializer::getDeclCheckedImpl(
   llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
 
-  auto attrError = deserializeDeclAttributes();
-  if (attrError)
-    return std::move(attrError);
+  auto commonError = deserializeDeclCommon();
+  if (commonError)
+    return std::move(commonError);
 
   if (matchAttributes) {
     // Deserialize the full decl only if matchAttributes finds a match.
@@ -5764,19 +5771,28 @@ public:
 
   Expected<Type> deserializeErrorType(ArrayRef<uint64_t> scratch,
                                       StringRef blobData) {
-    if (!MF.isAllowModuleWithCompilerErrorsEnabled())
-      MF.fatal();
-
     TypeID origID;
     decls_block::ErrorTypeLayout::readRecord(scratch, origID);
 
-    auto origTy = MF.getTypeChecked(origID);
-    if (!origTy)
-      return origTy.takeError();
+    auto origTyOrError = MF.getTypeChecked(origID);
+    if (!origTyOrError)
+      return origTyOrError.takeError();
 
-    if (!origTy.get())
+    auto origTy = *origTyOrError;
+    auto diagId = ctx.LangOpts.AllowModuleWithCompilerErrors
+                      ? diag::serialization_allowing_error_type
+                      : diag::serialization_error_type;
+    // Generally not a super useful diagnostic, so only output once if there
+    // hasn't been any other diagnostic yet to ensure nothing slips by and
+    // causes SILGen to crash.
+    if (!ctx.hadError()) {
+      ctx.Diags.diagnose(SourceLoc(), diagId, StringRef(origTy.getString()),
+                         MF.getAssociatedModule()->getNameStr());
+    }
+
+    if (!origTy)
       return ErrorType::get(ctx);
-    return ErrorType::get(origTy.get());
+    return ErrorType::get(origTy);
   }
 };
 }
