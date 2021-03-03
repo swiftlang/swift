@@ -1473,6 +1473,10 @@ bool shouldSuppressDeclImport(const clang::Decl *decl);
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
 
+/// \returns true if this operator should be made a static function
+/// even if imported as a non-static member function.
+bool isImportedAsStatic(clang::OverloadedOperatorKind op);
+
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx);
