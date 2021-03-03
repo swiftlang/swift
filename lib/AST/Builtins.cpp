@@ -30,7 +30,6 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ManagedStatic.h"
 #include <tuple>
-#include <cstdio>
 
 using namespace swift;
 
