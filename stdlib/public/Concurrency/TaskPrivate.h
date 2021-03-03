@@ -79,9 +79,9 @@ public:
   // Arguments.
   AsyncTask *task;
 
-  // Only in swift_task_group_wait_next_throwing.
+  // Only in swift_taskGroup_wait_next_throwing.
   TaskGroup *group;
-  // Only in swift_task_group_wait_next_throwing.
+  // Only in swift_taskGroup_wait_next_throwing.
   const Metadata *successType;
 
   using AsyncContext::AsyncContext;
