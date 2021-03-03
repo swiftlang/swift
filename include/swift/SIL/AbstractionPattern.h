@@ -509,6 +509,12 @@ class AbstractionPattern {
     case Kind::CFunctionAsMethodType:
     case Kind::CurriedCFunctionAsMethodType:
     case Kind::PartialCurriedCFunctionAsMethodType:
+    case Kind::CXXMethodType:
+    case Kind::CurriedCXXMethodType:
+    case Kind::PartialCurriedCXXMethodType:
+    case Kind::CXXOperatorMethodType:
+    case Kind::CurriedCXXOperatorMethodType:
+    case Kind::PartialCurriedCXXOperatorMethodType:
       return true;
 
     default:
@@ -552,9 +558,11 @@ class AbstractionPattern {
   }
 
   void initCXXMethod(CanGenericSignature signature, CanType origType,
-                     const clang::CXXMethodDecl *method, Kind kind) {
+                     const clang::CXXMethodDecl *method, Kind kind,
+                     ImportAsMemberStatus memberStatus) {
     initSwiftType(signature, origType, kind);
     CXXMethod = method;
+    OtherData = memberStatus.getRawValue();
   }
 
   AbstractionPattern() {}
@@ -715,19 +723,22 @@ public:
   /// then the uncurried type is:
   ///   ((RefrigeratorCompartment, Temperature), Refrigerator) -> ()
   static AbstractionPattern getCXXMethod(CanType origType,
-                                         const clang::CXXMethodDecl *method) {
+                                         const clang::CXXMethodDecl *method,
+                                         ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initCXXMethod(nullptr, origType, method, Kind::CXXMethodType);
+    pattern.initCXXMethod(nullptr, origType, method,
+                          Kind::CXXMethodType, memberStatus);
     return pattern;
   }
 
   static AbstractionPattern
-  getCXXOperatorMethod(CanType origType, const clang::CXXMethodDecl *method) {
+  getCXXOperatorMethod(CanType origType, const clang::CXXMethodDecl *method,
+                       ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,
-                          Kind::CXXOperatorMethodType);
+                          Kind::CXXOperatorMethodType, memberStatus);
     return pattern;
   }
 
@@ -739,21 +750,23 @@ public:
   /// then the curried type:
   ///   (Refrigerator) -> (Compartment, Temperature) -> ()
   static AbstractionPattern
-  getCurriedCXXMethod(CanType origType, const clang::CXXMethodDecl *method) {
+  getCurriedCXXMethod(CanType origType, const clang::CXXMethodDecl *method,
+                      ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,
-                          Kind::CurriedCXXMethodType);
+                          Kind::CurriedCXXMethodType, memberStatus);
     return pattern;
   }
 
   static AbstractionPattern
   getCurriedCXXOperatorMethod(CanType origType,
-                              const clang::CXXMethodDecl *method) {
+                              const clang::CXXMethodDecl *method,
+                              ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(nullptr, origType, method,
-                          Kind::CurriedCXXOperatorMethodType);
+                          Kind::CurriedCXXOperatorMethodType, memberStatus);
     return pattern;
   }
 
@@ -855,22 +868,24 @@ private:
   ///   (Compartment, Temperature) -> ()
   static AbstractionPattern
   getPartialCurriedCXXMethod(CanGenericSignature signature, CanType origType,
-                             const clang::CXXMethodDecl *method) {
+                             const clang::CXXMethodDecl *method,
+                             ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(signature, origType, method,
-                          Kind::PartialCurriedCXXMethodType);
+                          Kind::PartialCurriedCXXMethodType, memberStatus);
     return pattern;
   }
 
   static AbstractionPattern
   getPartialCurriedCXXOperatorMethod(CanGenericSignature signature,
                                      CanType origType,
-                                     const clang::CXXMethodDecl *method) {
+                                     const clang::CXXMethodDecl *method,
+                                     ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
     pattern.initCXXMethod(signature, origType, method,
-                          Kind::PartialCurriedCXXOperatorMethodType);
+                          Kind::PartialCurriedCXXOperatorMethodType, memberStatus);
     return pattern;
   }
 

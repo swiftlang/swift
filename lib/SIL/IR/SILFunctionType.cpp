@@ -2903,8 +2903,8 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
     AbstractionPattern origPattern = method->isOverloadedOperator() ?
-        AbstractionPattern::getCXXOperatorMethod(origType, method):
-        AbstractionPattern::getCXXMethod(origType, method);
+        AbstractionPattern::getCXXOperatorMethod(origType, method, foreignInfo.Self):
+        AbstractionPattern::getCXXMethod(origType, method, foreignInfo.Self);
     auto conventions = CXXMethodConventions(method);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder, conventions,
