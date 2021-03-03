@@ -30,6 +30,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ManagedStatic.h"
 #include <tuple>
+#include <cstdio>
 
 using namespace swift;
 
@@ -577,6 +578,15 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
         if (BIT->isFixedWidth() && BIT->getFixedWidth() == BFT->getBitWidth())
           break;
+      
+    // Support VecNxInt1 -> IntN bitcast for SIMD comparison results.
+    if (auto *Vec = CheckInput->getAs<BuiltinVectorType>())
+      if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
+        if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
+          if (Element->getFixedWidth() == 1 &&
+              BIT->isFixedWidth() &&
+              BIT->getFixedWidth() == Vec->getNumElements())
+            break;
 
     // FIXME: Implement bitcast typechecking.
     llvm_unreachable("Bitcast not supported yet!");
