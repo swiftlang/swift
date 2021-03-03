@@ -75,7 +75,7 @@ func throwErrorCode() throws {
   throw FictionalServerError.meltedDown // expected-error{{thrown error code type 'FictionalServerError.Code' does not conform to 'Error'; construct an 'FictionalServerError' instance}}{{29-29=(}}{{40-40=)}}
 }
 
-class MyErrorClass { }
+class MyErrorClass { } // expected-warning{{non-final class 'MyErrorClass' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 extension MyErrorClass: Error { }
 
 class MyClass { }
