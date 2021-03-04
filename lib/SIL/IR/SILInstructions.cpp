@@ -1080,11 +1080,10 @@ AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
                                            SILValue Src, SILValue Dest,
                                            SILValue Initializer,
                                            SILValue Setter,
-                                          AssignOwnershipQualifier Qualifier) :
+                                           AssignByWrapperInst::Mode mode) :
     AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
   assert(Initializer->getType().is<SILFunctionType>());
-  SILNode::Bits.AssignByWrapperInst.OwnershipQualifier =
-      unsigned(Qualifier);
+  SILNode::Bits.AssignByWrapperInst.Mode = unsigned(mode);
 }
 
 MarkFunctionEscapeInst *

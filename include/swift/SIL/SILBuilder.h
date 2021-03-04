@@ -877,10 +877,10 @@ public:
                                                SILValue Src, SILValue Dest,
                                                SILValue Initializer,
                                                SILValue Setter,
-                                          AssignOwnershipQualifier Qualifier) {
+                                               AssignByWrapperInst::Mode mode) {
     return insert(new (getModule())
                   AssignByWrapperInst(getSILDebugLocation(Loc), Src, Dest,
-                                       Initializer, Setter, Qualifier));
+                                       Initializer, Setter, mode));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,

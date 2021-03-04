@@ -1243,7 +1243,7 @@ void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
                                       getOpValue(Inst->getDest()),
                                       getOpValue(Inst->getInitializer()),
                                       getOpValue(Inst->getSetter()),
-                                      Inst->getOwnershipQualifier()));
+                                      Inst->getMode()));
 }
 
 template<typename ImplClass>
