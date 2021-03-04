@@ -3612,6 +3612,20 @@ We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
 
 This instruction is only valid in functions in Ownership SSA form.
 
+end_lifetime
+``````````
+
+::
+
+   sil-instruction ::= 'end_lifetime' sil-operand
+
+This instruction signifies the end of it's operand's lifetime to the ownership
+verifier. It is inserted by the compiler in instances where it could be illegal
+to insert a destroy operation. Ex: if the sil-operand had an undef value.
+
+This instruction is valid only in OSSA and is lowered to a no-op when lowering
+to non-OSSA.
+
 assign
 ``````
 ::
