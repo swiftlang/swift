@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.14 -module-name main -emit-ir %s | %FileCheck --check-prefix=CHECK --check-prefix=NO_OPT_SELF %s
 
 // REQUIRES: objc_interop
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx && CPU=x86_64
 
 class C {
   var x: Int = 0
