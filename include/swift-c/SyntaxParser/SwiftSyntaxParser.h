@@ -218,8 +218,10 @@ swiftparse_parser_set_node_lookup(swiftparse_parser_t,
 /// via the return value of \c swiftparse_parse_string.
 ///
 /// \param source a null-terminated UTF8 string buffer.
+/// \param len The length of the source string. This allows \p source to contain
+///            intermediate null characters.
 SWIFTPARSE_PUBLIC swiftparse_client_node_t
-swiftparse_parse_string(swiftparse_parser_t, const char *source);
+swiftparse_parse_string(swiftparse_parser_t, const char *source, size_t len);
 
 /// Returns a constant string pointer for verification purposes.
 ///
