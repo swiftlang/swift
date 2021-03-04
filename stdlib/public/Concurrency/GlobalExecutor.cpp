@@ -123,6 +123,40 @@ static void __swift_run_job_main_executor(void *_job) {
   swift_job_run(job, ExecutorRef::mainExecutor());
 }
 
+static constexpr size_t globalQueueCacheCount =
+    static_cast<size_t>(JobPriority::UserInteractive) + 1;
+static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
+
+static constexpr size_t dispatchQueueCooperativeFlag = 4;
+
+static dispatch_queue_t getGlobalQueue(JobPriority priority) {
+  size_t numericPriority = static_cast<size_t>(priority);
+  if (numericPriority >= globalQueueCacheCount)
+    fatalError(0, "invalid job priority %#zx");
+
+  auto *ptr = &globalQueueCache[numericPriority];
+  auto queue = ptr->load(std::memory_order_relaxed);
+  if (SWIFT_LIKELY(queue))
+    return queue;
+
+  // If we don't have a queue cached for this priority, cache it now. This may
+  // race with other threads doing this at the same time for this priority, but
+  // that's OK, they'll all end up writing the same value.
+  queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
+                                    dispatchQueueCooperativeFlag);
+  // If dispatch doesn't support dispatchQueueCooperativeFlag, it will return
+  // NULL. Fall back to a standard global queue.
+  if (!queue)
+    queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
+                                      /*flags*/ 0);
+
+  // Unconditionally store it back in the cache. If we raced with another
+  // thread, we'll just overwrite the entry with the same value.
+  ptr->store(queue, std::memory_order_relaxed);
+
+  return queue;
+}
+
 #endif
 
 void swift::swift_task_enqueueGlobal(Job *job) {
@@ -169,9 +203,7 @@ void swift::swift_task_enqueueGlobal(Job *job) {
 
   JobPriority priority = job->getPriority();
 
-  // TODO: cache this to avoid the extra call
-  auto queue = dispatch_get_global_queue((dispatch_qos_class_t) priority,
-                                         /*flags*/ 0);
+  auto queue = getGlobalQueue(priority);
 
   dispatch_async_f(queue, dispatchContext, dispatchFunction);
 #endif
@@ -190,7 +222,7 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
   dispatch_function_t dispatchFunction = &__swift_run_job_main_executor;
   void *dispatchContext = job;
 
-  // TODO: cache this to avoid the extra call
+  // This is an inline function that compiles down to a pointer to a global.
   auto mainQueue = dispatch_get_main_queue();
 
   dispatch_async_f(mainQueue, dispatchContext, dispatchFunction);
