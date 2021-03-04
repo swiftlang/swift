@@ -2344,7 +2344,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Function used when returning an inferred isolation.
-  auto inferredIsolation = [&](ActorIsolation inferred) {
+  auto inferredIsolation = [&](
+      ActorIsolation inferred, bool propagateUnsafe = false) {
     // Add an implicit attribute to capture the actor isolation that was
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
@@ -2357,13 +2358,19 @@ ActorIsolation ActorIsolationRequest::evaluate(
       break;
 
     case ActorIsolation::GlobalActorUnsafe:
-      // Don't infer unsafe global actor isolation.
-      return ActorIsolation::forUnspecified();
+      if (!propagateUnsafe) {
+        // Don't infer unsafe global actor isolation.
+        return ActorIsolation::forUnspecified();
+      }
+
+      LLVM_FALLTHROUGH;
 
     case ActorIsolation::GlobalActor: {
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(
           ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+      if (inferred == ActorIsolation::GlobalActorUnsafe)
+        attr->setArgIsUnsafe(true);
       value->getAttrs().add(attr);
       break;
     }
@@ -2401,6 +2408,46 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   if (shouldInferAttributeInContext(value->getDeclContext())) {
+    if (auto var = dyn_cast<VarDecl>(value)) {
+      // If this is a variable with a property wrapper, infer from the property
+      // wrapper's wrappedValue.
+      if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
+        if (auto wrappedValue = wrapperInfo.valueVar) {
+          if (auto isolation = getActorIsolation(wrappedValue))
+            return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+        }
+      }
+
+      // If this is the backing storage for a property wrapper, infer from the
+      // type of the outermost property wrapper.
+      if (auto originalVar = var->getOriginalWrappedProperty(
+              PropertyWrapperSynthesizedPropertyKind::Backing)) {
+        if (auto backingType =
+                originalVar->getPropertyWrapperBackingPropertyType()) {
+          if (auto backingNominal = backingType->getAnyNominal()) {
+            if (!isa<ClassDecl>(backingNominal) ||
+                !cast<ClassDecl>(backingNominal)->isActor()) {
+              if (auto isolation = getActorIsolation(backingNominal))
+                return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+            }
+          }
+        }
+      }
+
+      // If this is the projected property for a property wrapper, infer from
+      // the property wrapper's projectedValue.
+      if (auto originalVar = var->getOriginalWrappedProperty(
+              PropertyWrapperSynthesizedPropertyKind::Projection)) {
+        if (auto wrapperInfo =
+                originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
+          if (auto projectedValue = wrapperInfo.projectedValueVar) {
+            if (auto isolation = getActorIsolation(projectedValue))
+              return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+          }
+        }
+      }
+    }
+
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
     if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {

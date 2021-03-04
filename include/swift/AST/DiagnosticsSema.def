@@ -4406,6 +4406,11 @@ ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
 
+ERROR(actor_instance_property_wrapper,none,
+      "%0 property in property wrapper type %1 cannot be isolated to "
+      "the actor instance; consider @actorIndependent",
+      (Identifier, Identifier))
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
