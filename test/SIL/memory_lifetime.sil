@@ -560,3 +560,35 @@ bb0(%0 : $*U):
   %5 = tuple ()
   return %5 : $()
 }
+
+protocol P {}
+
+sil [ossa] @test_existentials : $@convention(thin) <U: P> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $P
+  %i = init_existential_addr %s : $*P, $U
+  copy_addr %0 to [initialization] %i : $*U
+  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  copy_addr %o to [initialization] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  destroy_addr %s : $*P
+  dealloc_stack %s : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_init_two_existentials : $@convention(thin) <U: P, V: P> (@in_guaranteed U, @in_guaranteed V) -> () {
+bb0(%0 : $*U, %1 : $*V):
+  %s = alloc_stack $P
+  %t = init_existential_addr %s : $*P, $U
+  copy_addr %0 to [initialization] %t : $*U
+  destroy_addr %s : $*P
+  %v = init_existential_addr %s : $*P, $V
+  copy_addr %1 to [initialization] %v : $*V
+  destroy_addr %s : $*P
+  dealloc_stack %s : $*P
+  %5 = tuple ()
+  return %5 : $()
+}

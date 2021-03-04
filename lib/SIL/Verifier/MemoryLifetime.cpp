@@ -100,7 +100,8 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
       parentIdx(parentIdx) {
   assert(((parentIdx >= 0) ==
     (isa<StructElementAddrInst>(val) || isa<TupleElementAddrInst>(val) ||
-     isa<InitEnumDataAddrInst>(val) || isa<UncheckedTakeEnumDataAddrInst>(val)))
+     isa<InitEnumDataAddrInst>(val) || isa<UncheckedTakeEnumDataAddrInst>(val) ||
+     isa<InitExistentialAddrInst>(val) || isa<OpenExistentialAddrInst>(val)))
     && "sub-locations can only be introduced with struct/tuple/enum projections");
   setBitAndResize(subLocations, index);
   setBitAndResize(selfAndParents, index);
@@ -280,35 +281,17 @@ void MemoryLocations::clear() {
   nonTrivialLocations.clear();
 }
 
-static EnumElementDecl *computeSinglePayloadEnumCase(SILType enumTy) {
-  EnumDecl *enumDecl = enumTy.getEnumOrBoundGenericEnum();
-  if (!enumDecl)
-    return nullptr;
-  EnumElementDecl *payloadCase = nullptr;
-  for (EnumElementDecl *elem : enumDecl->getAllElements()) {
-    if (elem->hasAssociatedValues()) {
-      if (payloadCase)
-        return nullptr;
-      payloadCase = elem;
-    }
-  }
-  return payloadCase;
-}
-
-EnumElementDecl *MemoryLocations::getSinglePayloadEnumCase(SILType enumTy) {
-  auto iter = singlePayloadEnums.find(enumTy);
-  if (iter != singlePayloadEnums.end())
-    return iter->second;
-  
-  EnumElementDecl *&payloadCase = singlePayloadEnums[enumTy];
-  payloadCase = computeSinglePayloadEnumCase(enumTy);
-  return payloadCase;
-}
-
 bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx,
                                     SmallVectorImpl<SILValue> &collectedVals,
                                     SubLocationMap &subLocationMap) {
   for (Operand *use : V->getUses()) {
+    // We can safely ignore type dependent operands, because the lifetime of a
+    // type is decoupled from the lifetime of its value. For example, even if
+    // the result of an open_existential_addr is destroyed its type is still
+    // valid.
+    if (use->isTypeDependent())
+      continue;
+  
     SILInstruction *user = use->getUser();
 
     // We only handle addr-instructions which are planned to be used with
@@ -335,11 +318,11 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
                                             collectedVals, subLocationMap))
           return false;
         break;
+      case SILInstructionKind::InitExistentialAddrInst:
+      case SILInstructionKind::OpenExistentialAddrInst:
       case SILInstructionKind::InitEnumDataAddrInst:
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-        if (!handleEnumDataProjections)
-          return false;
-        if (!getSinglePayloadEnumCase(user->getOperand(0)->getType()))
+        if (!handleNonTrivialProjections)
           return false;
         // The payload is represented as a single sub-location of the enum.
         if (!analyzeAddrProjection(cast<SingleValueInstruction>(user), locIdx,
@@ -347,9 +330,6 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
           return false;
         break;
       case SILInstructionKind::InjectEnumAddrInst:
-        if (!getSinglePayloadEnumCase(user->getOperand(0)->getType()))
-          return false;
-        break;
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::StoreInst:
       case SILInstructionKind::StoreBorrowInst:
@@ -368,6 +348,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::YieldInst:
       case SILInstructionKind::DeallocStackInst:
       case SILInstructionKind::SwitchEnumAddrInst:
+      case SILInstructionKind::WitnessMethodInst:
         break;
       default:
         return false;
@@ -411,6 +392,24 @@ bool MemoryLocations::analyzeAddrProjection(
         idx = loc.parentIdx;
       } while (idx >= 0);
     }
+  } else if (!isa<OpenExistentialAddrInst>(projection)) {
+    Location *loc = &locations[subLocIdx];
+    if (loc->representativeValue->getType() != projection->getType()) {
+      assert(isa<InitEnumDataAddrInst>(projection) ||
+             isa<UncheckedTakeEnumDataAddrInst>(projection) ||
+             isa<InitExistentialAddrInst>(projection));
+             
+      // We can only handle a single enum payload type for a location or or a
+      // single concrete existential type. Mismatching types can have a differnt
+      // number of (non-trivial) sub-locations and we cannot handle this.
+      // But we ignore opened existential types, because those cannot have
+      // sub-locations (there cannot be an address projection on an
+      // open_existential_addr).
+      if (!isa<OpenExistentialAddrInst>(loc->representativeValue))
+        return false;
+      assert(loc->representativeValue->getType().isOpenedExistential());
+      loc->representativeValue = projection;
+    }
   }
 
   if (!analyzeLocationUsesRecursively(projection, subLocIdx, collectedVals,
@@ -449,11 +448,6 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
     for (unsigned idx = 0, end = tupleTy->getNumElements(); idx < end; ++idx) {
       loc.updateFieldCounters(ty.getTupleElementType(idx), +1);
     }
-    return;
-  }
-  if (EnumElementDecl *elem = getSinglePayloadEnumCase(ty)) {
-    // The payload is represented as a single sub-location of the enum.
-    loc.updateFieldCounters(ty.getEnumElementType(elem, function), +1);
     return;
   }
   loc.updateFieldCounters(ty, +1);
@@ -695,7 +689,7 @@ class MemoryLifetimeVerifier {
 
 public:
   MemoryLifetimeVerifier(SILFunction *function) :
-    function(function), locations(/*handleEnumDataProjections*/ true) {}
+    function(function), locations(/*handleNonTrivialProjections*/ true) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.
@@ -1152,12 +1146,16 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         requireNoStoreBorrowLocation(IEAI->getOperand(), &I);
         break;
       }
+      case SILInstructionKind::InitExistentialAddrInst:
       case SILInstructionKind::InitEnumDataAddrInst: {
-        SILValue enumAddr = cast<InitEnumDataAddrInst>(&I)->getOperand();
-        requireBitsClear(bits, enumAddr, &I);
-        requireNoStoreBorrowLocation(enumAddr, &I);
+        SILValue addr = I.getOperand(0);
+        requireBitsClear(bits, addr, &I);
+        requireNoStoreBorrowLocation(addr, &I);
         break;
       }
+      case SILInstructionKind::OpenExistentialAddrInst:
+        requireBitsSet(bits, cast<OpenExistentialAddrInst>(&I)->getOperand(), &I);
+        break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
         // Note that despite the name, unchecked_take_enum_data_addr does _not_
         // "take" the payload of the Swift.Optional enum. This is a terrible

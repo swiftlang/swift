@@ -189,18 +189,16 @@ private:
   /// small. They can be handled separately with handleSingleBlockLocations().
   llvm::SmallVector<SingleValueInstruction *, 16> singleBlockLocations;
 
-  /// A Cache for single-payload enums.
-  llvm::DenseMap<SILType, EnumElementDecl *> singlePayloadEnums;
-
   /// The bit-set of locations for which numNonTrivialFieldsNotCovered is > 0.
   Bits nonTrivialLocations;
 
-  /// If true, support init_enum_data_addr and unchecked_take_enum_data_addr
-  bool handleEnumDataProjections;
+  /// If true, support init_enum_data_addr, unchecked_take_enum_data_addr,
+  /// init_existential_addr and open_existential_addr.
+  bool handleNonTrivialProjections;
 
 public:
-  MemoryLocations(bool handleEnumDataProjections) :
-    handleEnumDataProjections(handleEnumDataProjections) {}
+  MemoryLocations(bool handleNonTrivialProjections) :
+    handleNonTrivialProjections(handleNonTrivialProjections) {}
 
   MemoryLocations(const MemoryLocations &) = delete;
   MemoryLocations &operator=(const MemoryLocations &) = delete;
@@ -296,15 +294,6 @@ private:
 
   // (locationIdx, fieldNr) -> subLocationIdx
   using SubLocationMap = llvm::DenseMap<std::pair<unsigned, unsigned>, unsigned>;
-
-  /// Returns the payload case of a single-payload enum.
-  ///
-  /// Returns null if \p enumTy is not a single-payload enum.
-  /// We are currently only handling enum data projections for single-payload
-  /// enums, because it's much simpler to represent them with Locations. We
-  /// could also support multi-payload enums, but that gets complicated. Most
-  /// importantly, we can handle Swift.Optional.
-  EnumElementDecl *getSinglePayloadEnumCase(SILType enumTy);
 
   /// Helper function called by analyzeLocation to check all uses of the
   /// location recursively.

@@ -124,9 +124,9 @@ class DestroyHoisting {
 public:
   DestroyHoisting(SILFunction *function, DominanceAnalysis *DA) :
     function(function),
-    // We currently don't handle enum data projections, because they cannot
-    // re-created easily. We could support this in future.
-    locations(/*handleEnumDataProjections*/ false), DA(DA) {}
+    // We currently don't handle enum and existential projections, because they
+    // cannot be re-created easily. We could support this in future.
+    locations(/*handleNonTrivialProjections*/ false), DA(DA) {}
 
   bool hoistDestroys();
 };
