@@ -2024,6 +2024,14 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
   }
 
+  void checkEndLifetimeInst(EndLifetimeInst *I) {
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial");
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
+            "end_lifetime is only valid in functions with qualified "
+            "ownership");
+  }
+
   void checkUncheckedValueCastInst(UncheckedValueCastInst *) {
     require(
         F.hasOwnership(),
