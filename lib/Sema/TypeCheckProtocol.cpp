@@ -2725,6 +2725,7 @@ bool ConformanceChecker::checkActorIsolation(
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
   bool isCrossActor = false;
+  bool witnessIsUnsafe = false;
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
@@ -2761,6 +2762,10 @@ bool ConformanceChecker::checkActorIsolation(
   case ActorIsolationRestriction::CrossActorSelf:
     return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
+
+  case ActorIsolationRestriction::GlobalActorUnsafe:
+    witnessIsUnsafe = true;
+    LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
     // Hang on to the global actor that's used for the witness. It will need
@@ -2837,6 +2842,10 @@ bool ConformanceChecker::checkActorIsolation(
     // If the requirement was imported from Objective-C, it may not have been
     // annotated appropriately. Allow the mismatch.
     if (requirement->hasClangNode())
+      return false;
+
+    // If the witness is "unsafe", allow the mismatch.
+    if (witnessIsUnsafe)
       return false;
 
     witness->diagnose(

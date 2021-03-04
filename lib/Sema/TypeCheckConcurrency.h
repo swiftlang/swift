@@ -90,6 +90,12 @@ public:
     /// permitted from other declarations with that same global actor or
     /// are permitted from elsewhere as a cross-actor reference.
     GlobalActor,
+
+    /// References to a declaration that is part of a global actor are
+    /// permitted from other declarations with that same global actor or
+    /// are permitted from elsewhere as a cross-actor reference, but
+    /// contexts with unspecified isolation won't diagnose anything.
+    GlobalActorUnsafe,
   };
 
 private:
@@ -125,7 +131,7 @@ public:
 
   /// Retrieve the actor class that the declaration is within.
   Type getGlobalActor() const {
-    assert(kind == GlobalActor);
+    assert(kind == GlobalActor || kind == GlobalActorUnsafe);
     return Type(data.globalActor);
   }
 
@@ -152,8 +158,9 @@ public:
   /// Accesses to the given declaration can only be made via this particular
   /// global actor or is a cross-actor access.
   static ActorIsolationRestriction forGlobalActor(
-      Type globalActor, bool isCrossActor) {
-    ActorIsolationRestriction result(GlobalActor, isCrossActor);
+      Type globalActor, bool isCrossActor, bool isUnsafe) {
+    ActorIsolationRestriction result(
+        isUnsafe ? GlobalActorUnsafe : GlobalActor, isCrossActor);
     result.data.globalActor = globalActor.getPointer();
     return result;
   }
