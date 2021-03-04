@@ -11,42 +11,43 @@ using namespace swift::syntax;
 
 
 SymbolicReferenceExprSyntax getCannedSymbolicRef(const RC<SyntaxArena> &Arena) {
+  SyntaxFactory Factory(Arena);
   // First, make a symbolic reference to an 'Array<Int>'
-  auto Array = SyntaxFactory::makeIdentifier("Array", {}, {}, Arena);
-  auto Int = SyntaxFactory::makeIdentifier("Int", {}, {}, Arena);
-  auto IntType = SyntaxFactory::makeSimpleTypeIdentifier(Int, None, Arena);
-  auto IntArg = SyntaxFactory::makeGenericArgument(IntType, None, Arena);
+  auto Array = Factory.makeIdentifier("Array", {}, {});
+  auto Int = Factory.makeIdentifier("Int", {}, {});
+  auto IntType = Factory.makeSimpleTypeIdentifier(Int, None);
+  auto IntArg = Factory.makeGenericArgument(IntType, None);
   GenericArgumentClauseSyntaxBuilder ArgBuilder(Arena);
-  ArgBuilder
-    .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}, Arena))
-    .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}, Arena))
-    .addArgument(IntArg);
+  ArgBuilder.useLeftAngleBracket(Factory.makeLeftAngleToken({}, {}))
+      .useRightAngleBracket(Factory.makeRightAngleToken({}, {}))
+      .addArgument(IntArg);
 
-  return SyntaxFactory::makeSymbolicReferenceExpr(Array, ArgBuilder.build(), Arena);
+  return Factory.makeSymbolicReferenceExpr(Array, ArgBuilder.build());
 }
 
 FunctionCallExprSyntax getCannedFunctionCall(const RC<SyntaxArena> &Arena) {
-  auto LParen = SyntaxFactory::makeLeftParenToken({}, {}, Arena);
-  auto RParen = SyntaxFactory::makeRightParenToken({}, {}, Arena);
+  SyntaxFactory Factory(Arena);
+  auto LParen = Factory.makeLeftParenToken({}, {});
+  auto RParen = Factory.makeRightParenToken({}, {});
 
-  auto Label = SyntaxFactory::makeIdentifier("elements", {}, {}, Arena);
-  auto Colon = SyntaxFactory::makeColonToken({}, " ", Arena);
-  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", {}, {}, Arena);
+  auto Label = Factory.makeIdentifier("elements", {}, {});
+  auto Colon = Factory.makeColonToken({}, " ");
+  auto OneDigits = Factory.makeIntegerLiteral("1", {}, {});
   auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "", Arena);
-  auto One = SyntaxFactory::makePrefixOperatorExpr(NoSign,
-    SyntaxFactory::makeIntegerLiteralExpr(OneDigits, Arena), Arena);
+  auto One = Factory.makePrefixOperatorExpr(
+      NoSign, Factory.makeIntegerLiteralExpr(OneDigits));
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
 
-  auto Arg = SyntaxFactory::makeTupleExprElement(Label, Colon, One,
-                                                     NoComma, Arena);
-  auto Args = SyntaxFactory::makeTupleExprElementList({ Arg }, Arena);
+  auto Arg = Factory.makeTupleExprElement(Label, Colon, One, NoComma);
+  auto Args = Factory.makeTupleExprElementList({Arg});
 
-  return SyntaxFactory::makeFunctionCallExpr(getCannedSymbolicRef(Arena), LParen,
-                                             Args, RParen, None, None, Arena);
+  return Factory.makeFunctionCallExpr(getCannedSymbolicRef(Arena), LParen, Args,
+                                      RParen, None, None);
 }
 
 TEST(UnknownSyntaxTests, UnknownSyntaxMakeAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   {
     auto SymbolicRef = getCannedSymbolicRef(Arena);
 
@@ -71,6 +72,7 @@ TEST(UnknownSyntaxTests, UnknownSyntaxMakeAPIs) {
 
 TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto Call = getCannedFunctionCall(Arena);
 
   // Function call child 0 -> layout child 0 -> called expression
@@ -136,17 +138,16 @@ TEST(UnknownSyntaxTests, UnknownSyntaxGetAPIs) {
 
 TEST(UnknownSyntaxTests, EmbedUnknownExpr) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto SymbolicRef = getCannedSymbolicRef(Arena);
-  auto LParen = SyntaxFactory::makeLeftParenToken({}, {}, Arena);
-  auto RParen = SyntaxFactory::makeRightParenToken({}, {}, Arena);
-  auto EmptyArgs = SyntaxFactory::makeBlankTupleExprElementList(Arena);
+  auto LParen = Factory.makeLeftParenToken({}, {});
+  auto RParen = Factory.makeRightParenToken({}, {});
+  auto EmptyArgs = Factory.makeBlankTupleExprElementList();
 
   SmallString<48> KnownScratch;
   llvm::raw_svector_ostream KnownOS(KnownScratch);
-  auto CallWithKnownExpr = SyntaxFactory::makeFunctionCallExpr(SymbolicRef,
-                                                               LParen,
-                                                               EmptyArgs,
-                                                               RParen, None, None, Arena);
+  auto CallWithKnownExpr = Factory.makeFunctionCallExpr(
+      SymbolicRef, LParen, EmptyArgs, RParen, None, None);
   CallWithKnownExpr.print(KnownOS);
 
   // Let's make a function call expression where the called expression is

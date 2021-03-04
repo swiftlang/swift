@@ -9,34 +9,36 @@ using namespace swift;
 using namespace swift::syntax;
 
 TupleExprElementSyntax getCannedArgument(const RC<SyntaxArena> &Arena) {
-  auto X = SyntaxFactory::makeIdentifier("x", "", "", Arena);
-  auto Foo = SyntaxFactory::makeIdentifier("foo", "", "", Arena);
-  auto Colon = SyntaxFactory::makeColonToken("", " ", Arena);
-  auto SymbolicRef =
-      SyntaxFactory::makeSymbolicReferenceExpr(Foo, llvm::None, Arena);
-  auto Comma = SyntaxFactory::makeCommaToken("", " ", Arena);
+  SyntaxFactory Factory(Arena);
+  auto X = Factory.makeIdentifier("x", "", "");
+  auto Foo = Factory.makeIdentifier("foo", "", "");
+  auto Colon = Factory.makeColonToken("", " ");
+  auto SymbolicRef = Factory.makeSymbolicReferenceExpr(Foo, llvm::None);
+  auto Comma = Factory.makeCommaToken("", " ");
 
-  return SyntaxFactory::makeTupleExprElement(X, Colon, SymbolicRef, Comma,
-                                             Arena);
+  return Factory.makeTupleExprElement(X, Colon, SymbolicRef, Comma);
 }
 
 TEST(SyntaxCollectionTests, empty) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto Empty = SyntaxFactory::makeBlankTupleExprElementList(Arena);
+  SyntaxFactory Factory(Arena);
+  auto Empty = Factory.makeBlankTupleExprElementList();
   ASSERT_TRUE(Empty.empty());
   ASSERT_FALSE(Empty.appending(getCannedArgument(Arena)).empty());
 }
 
 TEST(SyntaxCollectionTests, size) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto Empty = SyntaxFactory::makeBlankTupleExprElementList(Arena);
+  SyntaxFactory Factory(Arena);
+  auto Empty = Factory.makeBlankTupleExprElementList();
   ASSERT_EQ(Empty.size(), size_t(0));
   ASSERT_EQ(Empty.appending(getCannedArgument(Arena)).size(), size_t(1));
 }
 
 TEST(SyntaxCollectionTests, subscript) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto Empty = SyntaxFactory::makeBlankTupleExprElementList(Arena);
+  SyntaxFactory Factory(Arena);
+  auto Empty = Factory.makeBlankTupleExprElementList();
 #ifndef NDEBUG
   ASSERT_DEATH({ Empty[0]; }, "");
 #endif
@@ -61,9 +63,10 @@ TEST(SyntaxCollectionTests, subscript) {
 
 TEST(SyntaxCollectionTests, appending) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto Arg = getCannedArgument(Arena);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
-  auto List = SyntaxFactory::makeBlankTupleExprElementList(Arena)
+  auto List = Factory.makeBlankTupleExprElementList()
                   .appending(Arg)
                   .appending(Arg)
                   .appending(Arg.withTrailingComma(NoComma));
@@ -91,12 +94,11 @@ TEST(SyntaxCollectionTests, appending) {
 
 TEST(SyntaxCollectionTests, removingLast) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  ASSERT_DEATH(
-      { SyntaxFactory::makeBlankTupleExprElementList(Arena).removingLast(); },
-      "");
+  SyntaxFactory Factory(Arena);
+  ASSERT_DEATH({ Factory.makeBlankTupleExprElementList().removingLast(); }, "");
   auto Arg = getCannedArgument(Arena);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
-  auto List = SyntaxFactory::makeBlankTupleExprElementList(Arena)
+  auto List = Factory.makeBlankTupleExprElementList()
                   .appending(Arg)
                   .appending(Arg)
                   .appending(Arg.withTrailingComma(NoComma))
@@ -109,13 +111,14 @@ TEST(SyntaxCollectionTests, removingLast) {
 
 TEST(SyntaxCollectionTests, prepending) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto Arg = getCannedArgument(Arena);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
-  auto List = SyntaxFactory::makeBlankTupleExprElementList(Arena)
-                  .prepending(Arg.withTrailingComma(NoComma))
-                  .prepending(Arg.withLabel(
-                      SyntaxFactory::makeIdentifier("schwifty", "", "", Arena)))
-                  .prepending(Arg);
+  auto List =
+      Factory.makeBlankTupleExprElementList()
+          .prepending(Arg.withTrailingComma(NoComma))
+          .prepending(Arg.withLabel(Factory.makeIdentifier("schwifty", "", "")))
+          .prepending(Arg);
 
   ASSERT_EQ(List.size(), size_t(3));
 
@@ -140,17 +143,17 @@ TEST(SyntaxCollectionTests, prepending) {
 
 TEST(SyntaxCollectionTests, removingFirst) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  ASSERT_DEATH(
-      { SyntaxFactory::makeBlankTupleExprElementList(Arena).removingFirst(); },
-      "");
+  SyntaxFactory Factory(Arena);
+  ASSERT_DEATH({ Factory.makeBlankTupleExprElementList().removingFirst(); },
+               "");
   auto Arg = getCannedArgument(Arena);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
-  auto List = SyntaxFactory::makeBlankTupleExprElementList(Arena)
-                  .appending(Arg.withLabel(
-                      SyntaxFactory::makeIdentifier("schwifty", "", "", Arena)))
-                  .appending(Arg)
-                  .appending(Arg.withTrailingComma(NoComma))
-                  .removingFirst();
+  auto List =
+      Factory.makeBlankTupleExprElementList()
+          .appending(Arg.withLabel(Factory.makeIdentifier("schwifty", "", "")))
+          .appending(Arg)
+          .appending(Arg.withTrailingComma(NoComma))
+          .removingFirst();
   SmallString<48> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
   List.print(OS);
@@ -159,20 +162,18 @@ TEST(SyntaxCollectionTests, removingFirst) {
 
 TEST(SyntaxCollectionTests, inserting) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto Arg = getCannedArgument(Arena);
   auto NoComma = TokenSyntax::missingToken(tok::comma, ",", Arena);
 #ifndef NDEBUG
-  ASSERT_DEATH(
-      {
-        SyntaxFactory::makeBlankTupleExprElementList(Arena).inserting(1, Arg);
-      },
-      "");
+  ASSERT_DEATH({ Factory.makeBlankTupleExprElementList().inserting(1, Arg); },
+               "");
 #endif
 
   {
     SmallString<48> InsertedScratch;
     llvm::raw_svector_ostream InsertedOS(InsertedScratch);
-    SyntaxFactory::makeBlankTupleExprElementList(Arena)
+    Factory.makeBlankTupleExprElementList()
         .inserting(0, Arg)
         .inserting(0, Arg)
         .inserting(0, Arg)
@@ -180,7 +181,7 @@ TEST(SyntaxCollectionTests, inserting) {
 
     SmallString<48> PrependedScratch;
     llvm::raw_svector_ostream PrependedOS(PrependedScratch);
-    SyntaxFactory::makeBlankTupleExprElementList(Arena)
+    Factory.makeBlankTupleExprElementList()
         .prepending(Arg)
         .prepending(Arg)
         .prepending(Arg)
@@ -191,7 +192,7 @@ TEST(SyntaxCollectionTests, inserting) {
   {
     SmallString<48> InsertedScratch;
     llvm::raw_svector_ostream InsertedOS(InsertedScratch);
-    SyntaxFactory::makeBlankTupleExprElementList(Arena)
+    Factory.makeBlankTupleExprElementList()
         .inserting(0, Arg)
         .inserting(1, Arg)
         .inserting(2, Arg)
@@ -199,7 +200,7 @@ TEST(SyntaxCollectionTests, inserting) {
 
     SmallString<48> AppendedScratch;
     llvm::raw_svector_ostream AppendedOS(AppendedScratch);
-    SyntaxFactory::makeBlankTupleExprElementList(Arena)
+    Factory.makeBlankTupleExprElementList()
         .appending(Arg)
         .appending(Arg)
         .appending(Arg)
@@ -210,11 +211,10 @@ TEST(SyntaxCollectionTests, inserting) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankTupleExprElementList(Arena)
+    Factory.makeBlankTupleExprElementList()
         .appending(Arg)
         .appending(Arg)
-        .inserting(1, Arg.withLabel(SyntaxFactory::makeIdentifier(
-                          "schwifty", "", "", Arena)))
+        .inserting(1, Arg.withLabel(Factory.makeIdentifier("schwifty", "", "")))
         .print(OS);
     ASSERT_EQ(OS.str().str(), "x: foo, schwifty: foo, x: foo, ");
   }
@@ -222,10 +222,11 @@ TEST(SyntaxCollectionTests, inserting) {
 
 TEST(SyntaxCollectionTests, cleared) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto Arg = getCannedArgument(Arena);
   SmallString<1> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
-  auto List = SyntaxFactory::makeBlankTupleExprElementList(Arena)
+  auto List = Factory.makeBlankTupleExprElementList()
                   .appending(Arg)
                   .appending(Arg)
                   .appending(Arg)
@@ -239,8 +240,9 @@ TEST(SyntaxCollectionTests, cleared) {
 
 TEST(SyntaxCollectionTests, Iteration) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto Arg = getCannedArgument(Arena);
-  auto List = SyntaxFactory::makeBlankTupleExprElementList(Arena)
+  auto List = Factory.makeBlankTupleExprElementList()
                   .appending(Arg)
                   .appending(Arg)
                   .appending(Arg);
@@ -272,13 +274,14 @@ TEST(SyntaxCollectionTests, Iteration) {
 
 TEST(SyntaxCollectionTests, Removing) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   auto Arg = getCannedArgument(Arena);
-  auto List = SyntaxFactory::makeBlankTupleExprElementList(Arena)
-                  .appending(Arg)
-                  .appending(Arg.withLabel(
-                      SyntaxFactory::makeIdentifier("first", "", "", Arena)))
-                  .appending(Arg)
-                  .removing(1);
+  auto List =
+      Factory.makeBlankTupleExprElementList()
+          .appending(Arg)
+          .appending(Arg.withLabel(Factory.makeIdentifier("first", "", "")))
+          .appending(Arg)
+          .removing(1);
 
   ASSERT_EQ(List.size(), static_cast<size_t>(2));
 
