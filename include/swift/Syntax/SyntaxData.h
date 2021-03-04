@@ -84,12 +84,6 @@ protected:
   /// and released when \c this is destroyed.
   const SyntaxDataRef *Parent;
 
-#ifndef NDEBUG
-  /// In debug builds, a flag that specifies if this instance is a \c
-  /// SyntaxDataRef or a \c SyntaxData object.
-  bool IsRef = true;
-#endif
-
   /// Creates an empty \c SyntaxDataRef variable to which values can later be
   /// stored.
   SyntaxDataRef() : AbsoluteRaw() {}
@@ -103,6 +97,11 @@ protected:
            "SyntaxDataRef must always have a value. Use default constructor to "
            "create a SyntaxDataRef to be populated later.");
   }
+
+#ifndef NDEBUG
+  virtual bool isRef() const { return true; }
+  virtual ~SyntaxDataRef() {}
+#endif
 
 public:
   SyntaxDataRef(const SyntaxDataRef &DataRef) = default;
@@ -224,29 +223,26 @@ class SyntaxData final : public SyntaxDataRef {
     assert(
         Parent != nullptr &&
         "Use SyntaxData(AbsoluteRawSyntax) or makeRoot to create a root node.");
-    assert(!Parent->IsRef &&
+    assert(!Parent->isRef() &&
            "Cannot create a SyntaxData as a child of a SyntaxDataRef");
     Parent->Retain();
-#ifndef NDEBUG
-    IsRef = false;
-#endif
   }
 
   /// Create a new root node.
   SyntaxData(const AbsoluteRawSyntax &AbsoluteRaw)
       : SyntaxDataRef(AbsoluteRaw, nullptr),
-        Arena(AbsoluteRaw.getRaw()->getArena()) {
+        Arena(AbsoluteRaw.getRaw()->getArena()) {}
+
 #ifndef NDEBUG
-    IsRef = false;
+  virtual bool isRef() const override { return false; }
 #endif
-  }
 
 public:
   SyntaxData(const SyntaxData &DataRef)
       : SyntaxDataRef(DataRef.AbsoluteRaw, DataRef.Parent),
         Arena(DataRef.Arena) {
     if (auto Parent = getParent()) {
-      assert(!Parent->IsRef &&
+      assert(!Parent->isRef() &&
              "Parent of a SyntaxData node should always be a SyntaxData node");
       Parent->Retain();
     }
@@ -280,7 +276,7 @@ public:
   /// Return the parent syntax if there is one, otherwise return \c nullptr.
   RC<const SyntaxData> getParent() const {
     if (auto ParentRef = getParentRef()) {
-      assert(!ParentRef->IsRef &&
+      assert(!ParentRef->isRef() &&
              "Parent of a SyntaxData node should always be a SyntaxData node");
       return RC<const SyntaxData>(static_cast<const SyntaxData *>(ParentRef));
     } else {
