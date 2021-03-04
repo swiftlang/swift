@@ -29,6 +29,7 @@ class ParsedRawSyntaxNode;
 struct ParsedTrivia;
 class ParsedTriviaPiece;
 class SyntaxParseActions;
+class SyntaxParsingContext;
 class SourceLoc;
 class Token;
 enum class tok;
@@ -66,6 +67,19 @@ public:
   /// if not missing.
   ParsedRawSyntaxNode recordEmptyRawSyntaxCollection(syntax::SyntaxKind kind,
                                                      SourceLoc loc);
+
+  /// Form a deferred syntax layout node.
+  ParsedRawSyntaxNode
+  makeDeferred(syntax::SyntaxKind k,
+               MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
+               SyntaxParsingContext &ctx);
+
+  /// Form a deferred token node.
+  ParsedRawSyntaxNode makeDeferred(Token tok, StringRef leadingTrivia,
+                                   StringRef trailingTrivia);
+
+  /// Form a deferred missing token node.
+  ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc);
 
   /// Used for incremental re-parsing.
   ParsedRawSyntaxNode lookupNode(size_t lexerOffset, SourceLoc loc,

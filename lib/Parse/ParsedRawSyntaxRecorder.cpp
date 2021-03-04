@@ -20,6 +20,7 @@
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Parse/Token.h"
 #include "swift/Syntax/SyntaxKind.h"
 
@@ -110,6 +111,59 @@ ParsedRawSyntaxRecorder::recordEmptyRawSyntaxCollection(SyntaxKind kind,
   CharSourceRange range{loc, 0};
   OpaqueSyntaxNode n = SPActions->recordRawSyntax(kind, {}, range);
   return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
+}
+
+/// Create a deferred layout node.
+ParsedRawSyntaxNode ParsedRawSyntaxRecorder::makeDeferred(
+    syntax::SyntaxKind k, MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
+    SyntaxParsingContext &ctx) {
+  CharSourceRange range;
+  if (deferredNodes.empty()) {
+    return ParsedRawSyntaxNode(k, range, {});
+  }
+  ParsedRawSyntaxNode *newPtr =
+      ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
+
+#ifndef NDEBUG
+  ParsedRawSyntaxRecorder::verifyElementRanges(deferredNodes);
+#endif
+  auto ptr = newPtr;
+  for (auto &node : deferredNodes) {
+    // Cached range.
+    if (!node.isNull() && !node.isMissing()) {
+      auto nodeRange = node.getDeferredRange();
+      if (nodeRange.isValid()) {
+        if (range.isInvalid())
+          range = nodeRange;
+        else
+          range.widen(nodeRange);
+      }
+    }
+
+    // uninitialized move;
+    ::new (static_cast<void *>(ptr++)) ParsedRawSyntaxNode(std::move(node));
+  }
+  return ParsedRawSyntaxNode(
+      k, range, llvm::makeMutableArrayRef(newPtr, deferredNodes.size()));
+}
+
+/// Create a deferred token node.
+ParsedRawSyntaxNode
+ParsedRawSyntaxRecorder::makeDeferred(Token tok, StringRef leadingTrivia,
+                                      StringRef trailingTrivia) {
+  CharSourceRange tokRange = tok.getRange();
+  return ParsedRawSyntaxNode(tok.getKind(), tokRange.getStart(),
+                             tokRange.getByteLength(), leadingTrivia,
+                             trailingTrivia);
+}
+
+ParsedRawSyntaxNode
+ParsedRawSyntaxRecorder::makeDeferredMissing(tok tokKind, SourceLoc loc) {
+  auto raw = ParsedRawSyntaxNode(tokKind, loc, /*tokLength=*/0,
+                                 /*leadingTrivia=*/StringRef(),
+                                 /*trailingTrivia=*/StringRef());
+  raw.IsMissing = true;
+  return raw;
 }
 
 ParsedRawSyntaxNode
