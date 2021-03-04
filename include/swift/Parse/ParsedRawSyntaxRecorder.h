@@ -98,6 +98,9 @@ public:
   ParsedRawSyntaxNode getDeferredChild(const ParsedRawSyntaxNode &parent,
                                        size_t ChildIndex) const;
 
+  /// For a deferred layout node \p node, retrieve the number of children.
+  size_t getDeferredNumChildren(const ParsedRawSyntaxNode &node) const;
+
 #ifndef NDEBUG
   static void verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements);
 #endif

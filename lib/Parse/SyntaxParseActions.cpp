@@ -165,3 +165,8 @@ DeferredNodeInfo SyntaxParseActions::getDeferredChild(OpaqueSyntaxNode node,
   }
   }
 }
+
+size_t SyntaxParseActions::getDeferredNumChildren(OpaqueSyntaxNode node) {
+  auto Data = static_cast<const DeferredLayoutNode *>(node);
+  return Data->Children.size();
+}

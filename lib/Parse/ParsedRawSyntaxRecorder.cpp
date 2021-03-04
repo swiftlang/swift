@@ -223,6 +223,12 @@ ParsedRawSyntaxRecorder::getDeferredChild(const ParsedRawSyntaxNode &parent,
                              childInfo.IsMissing);
 }
 
+size_t ParsedRawSyntaxRecorder::getDeferredNumChildren(
+    const ParsedRawSyntaxNode &node) const {
+  assert(node.isDeferredLayout());
+  return SPActions->getDeferredNumChildren(node.getData());
+}
+
 #ifndef NDEBUG
 void ParsedRawSyntaxRecorder::verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements) {
   SourceLoc prevEndLoc;

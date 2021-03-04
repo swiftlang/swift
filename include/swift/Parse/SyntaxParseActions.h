@@ -142,6 +142,10 @@ public:
                                             size_t childIndex,
                                             SourceLoc startLoc);
 
+  /// Return the number of children, \p node has. These can be retrieved using
+  /// \c getDeferredChild.
+  virtual size_t getDeferredNumChildren(OpaqueSyntaxNode node);
+
   /// Attempt to realize an opaque raw syntax node for a source file into a
   /// SourceFileSyntax node. This will return \c None if the parsing action
   /// doesn't support the realization of syntax nodes.

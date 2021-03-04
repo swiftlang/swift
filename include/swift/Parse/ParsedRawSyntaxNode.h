@@ -187,6 +187,9 @@ public:
   getDeferredChild(size_t ChildIndex,
                    const SyntaxParsingContext *SyntaxContext) const;
 
+  size_t
+  getDeferredNumChildren(const SyntaxParsingContext *SyntaxContext) const;
+
   ParsedRawSyntaxNode copyDeferred() const {
     assert(isDeferredLayout() || isDeferredToken() && "node not deferred");
     ParsedRawSyntaxNode copy;
@@ -203,8 +206,10 @@ public:
   /// Dump this piece of syntax recursively for debugging or testing.
   SWIFT_DEBUG_DUMP;
 
-  /// Dump this piece of syntax recursively.
-  void dump(raw_ostream &OS, unsigned Indent = 0) const;
+  /// Dump this piece of syntax recursively. If \p Context is passed, this
+  /// method is also able to traverse its children and dump them.
+  void dump(raw_ostream &OS, const SyntaxParsingContext *Context = nullptr,
+            unsigned Indent = 0) const;
 
   static ParsedRawSyntaxNode null() {
     return ParsedRawSyntaxNode{};
