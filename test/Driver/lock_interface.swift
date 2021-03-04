@@ -10,10 +10,10 @@
 // RUN: echo 'import Foo' > %t/file-01.swift
 // RUN: echo 'import Foo' > %t/file-02.swift
 // RUN: echo 'import Foo' > %t/file-03.swift
-// RUN: %target-swiftc_driver -j20 %t/main.swift %t/file-01.swift %t/file-02.swift %t/file-03.swift -I %t/sdk -Xfrontend -Rmodule-interface-rebuild -module-cache-path %t/module-cache &> %t/result.txt
+// RUN: %target-swiftc_driver -disable-batch-mode -j20 %t/main.swift %t/file-01.swift %t/file-02.swift %t/file-03.swift -I %t/sdk -Xfrontend -Rmodule-interface-rebuild -module-cache-path %t/module-cache &> %t/result.txt
 // RUN: %FileCheck %s  -check-prefix=CHECK-REBUILD < %t/result.txt
 
-// RUN: %target-swiftc_driver -j20 %t/main.swift %t/file-01.swift %t/file-02.swift %t/file-03.swift -I %t/sdk -Xfrontend -Rmodule-interface-rebuild -Xfrontend -disable-interface-lock -module-cache-path %t/module-cache-no-lock &> %t/result.txt
+// RUN: %target-swiftc_driver -disable-batch-mode -j20 %t/main.swift %t/file-01.swift %t/file-02.swift %t/file-03.swift -I %t/sdk -Xfrontend -Rmodule-interface-rebuild -Xfrontend -disable-interface-lock -module-cache-path %t/module-cache-no-lock &> %t/result.txt
 
 // RUN: %FileCheck %s  -check-prefix=CHECK-REBUILD-NO-LOCK < %t/result.txt
 
