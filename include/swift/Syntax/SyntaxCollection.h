@@ -53,7 +53,6 @@ struct SyntaxCollectionIterator {
 /// A generic unbounded collection of syntax nodes
 template <SyntaxKind CollectionKind, typename Element>
 class SyntaxCollection : public Syntax {
-  friend struct SyntaxFactory;
   friend class Syntax;
 
 private:

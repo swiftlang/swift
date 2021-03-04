@@ -9,14 +9,14 @@ using namespace swift::syntax;
 
 TEST(StmtSyntaxTests, FallthroughStmtGetAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   llvm::SmallString<48> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
 
-  auto FallthroughKW = SyntaxFactory::makeFallthroughKeyword("", "", Arena);
+  auto FallthroughKW = Factory.makeFallthroughKeyword("", "");
 
   auto Fallthrough =
-      SyntaxFactory::makeBlankFallthroughStmt(Arena).withFallthroughKeyword(
-          FallthroughKW);
+      Factory.makeBlankFallthroughStmt().withFallthroughKeyword(FallthroughKW);
 
   /// This should be directly shared through reference-counting.
   ASSERT_EQ(FallthroughKW.getRaw(), Fallthrough.getFallthroughKeyword()
@@ -25,12 +25,13 @@ TEST(StmtSyntaxTests, FallthroughStmtGetAPIs) {
 
 TEST(StmtSyntaxTests, FallthroughStmtWithAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   llvm::SmallString<48> Scratch;
   llvm::raw_svector_ostream OS(Scratch);
 
-  auto FallthroughKW = SyntaxFactory::makeFallthroughKeyword("", "", Arena);
+  auto FallthroughKW = Factory.makeFallthroughKeyword("", "");
 
-  SyntaxFactory::makeBlankFallthroughStmt(Arena)
+  Factory.makeBlankFallthroughStmt()
       .withFallthroughKeyword(FallthroughKW)
       .print(OS);
 
@@ -39,13 +40,14 @@ TEST(StmtSyntaxTests, FallthroughStmtWithAPIs) {
 
 TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto FallthroughKW = SyntaxFactory::makeFallthroughKeyword("", "", Arena);
+  SyntaxFactory Factory(Arena);
+  auto FallthroughKW = Factory.makeFallthroughKeyword("", "");
 
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
 
-    SyntaxFactory::makeFallthroughStmt(FallthroughKW, Arena).print(OS);
+    Factory.makeFallthroughStmt(FallthroughKW).print(OS);
     ASSERT_EQ(OS.str().str(), "fallthrough");
   }
 
@@ -55,7 +57,7 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
 
     auto NewFallthroughKW = FallthroughKW.withLeadingTrivia("  ");
 
-    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW, Arena).print(OS);
+    Factory.makeFallthroughStmt(NewFallthroughKW).print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough");
   }
 
@@ -66,7 +68,7 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     auto NewFallthroughKW =
         FallthroughKW.withLeadingTrivia("  ").withTrailingTrivia("  ");
 
-    SyntaxFactory::makeFallthroughStmt(NewFallthroughKW, Arena).print(OS);
+    Factory.makeFallthroughStmt(NewFallthroughKW).print(OS);
     ASSERT_EQ(OS.str().str(), "  fallthrough  ");
   }
 
@@ -74,7 +76,7 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
     llvm::SmallString<1> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
 
-    SyntaxFactory::makeBlankFallthroughStmt(Arena).print(OS);
+    Factory.makeBlankFallthroughStmt().print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }
 }
@@ -83,10 +85,10 @@ TEST(StmtSyntaxTests, FallthroughStmtMakeAPIs) {
 
 TEST(StmtSyntaxTests, BreakStmtGetAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto BreakKW = SyntaxFactory::makeBreakKeyword("", " ", Arena);
-  auto Label =
-      SyntaxFactory::makeIdentifier("sometimesYouNeedTo", "", "", Arena);
-  auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label, Arena);
+  SyntaxFactory Factory(Arena);
+  auto BreakKW = Factory.makeBreakKeyword("", " ");
+  auto Label = Factory.makeIdentifier("sometimesYouNeedTo", "", "");
+  auto Break = Factory.makeBreakStmt(BreakKW, Label);
 
   /// These should be directly shared through reference-counting.
   ASSERT_EQ(BreakKW.getRaw(), Break.getBreakKeyword().getRaw());
@@ -95,10 +97,11 @@ TEST(StmtSyntaxTests, BreakStmtGetAPIs) {
 
 TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto BreakKW = SyntaxFactory::makeBreakKeyword("", "", Arena);
-  auto Label = SyntaxFactory::makeIdentifier("theRules", "", "", Arena);
+  SyntaxFactory Factory(Arena);
+  auto BreakKW = Factory.makeBreakKeyword("", "");
+  auto Label = Factory.makeIdentifier("theRules", "", "");
 
-  auto Break = SyntaxFactory::makeBlankBreakStmt(Arena);
+  auto Break = Factory.makeBlankBreakStmt();
 
   {
     llvm::SmallString<48> Scratch;
@@ -131,19 +134,20 @@ TEST(StmtSyntaxTests, BreakStmtWithAPIs) {
 
 TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto BreakKW = SyntaxFactory::makeBreakKeyword("", " ", Arena);
-    auto Label = SyntaxFactory::makeIdentifier("theBuild", "", "", Arena);
-    auto Break = SyntaxFactory::makeBreakStmt(BreakKW, Label, Arena);
+    auto BreakKW = Factory.makeBreakKeyword("", " ");
+    auto Label = Factory.makeIdentifier("theBuild", "", "");
+    auto Break = Factory.makeBreakStmt(BreakKW, Label);
     Break.print(OS);
     ASSERT_EQ(OS.str().str(), "break theBuild"); // don't you dare
   }
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankBreakStmt(Arena).print(OS);
+    Factory.makeBlankBreakStmt().print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }
 }
@@ -152,9 +156,10 @@ TEST(StmtSyntaxTests, BreakStmtMakeAPIs) {
 
 TEST(StmtSyntaxTests, ContinueStmtGetAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto ContinueKW = SyntaxFactory::makeContinueKeyword("", " ", Arena);
-  auto Label = SyntaxFactory::makeIdentifier("always", "", "", Arena);
-  auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label, Arena);
+  SyntaxFactory Factory(Arena);
+  auto ContinueKW = Factory.makeContinueKeyword("", " ");
+  auto Label = Factory.makeIdentifier("always", "", "");
+  auto Continue = Factory.makeContinueStmt(ContinueKW, Label);
 
   /// These should be directly shared through reference-counting.
   ASSERT_EQ(ContinueKW.getRaw(), Continue.getContinueKeyword().getRaw());
@@ -163,9 +168,10 @@ TEST(StmtSyntaxTests, ContinueStmtGetAPIs) {
 
 TEST(StmtSyntaxTests, ContinueStmtWithAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto ContinueKW = SyntaxFactory::makeContinueKeyword("", "", Arena);
-  auto Label = SyntaxFactory::makeIdentifier("toCare", "", "", Arena);
-  auto Continue = SyntaxFactory::makeBlankContinueStmt(Arena);
+  SyntaxFactory Factory(Arena);
+  auto ContinueKW = Factory.makeContinueKeyword("", "");
+  auto Label = Factory.makeIdentifier("toCare", "", "");
+  auto Continue = Factory.makeBlankContinueStmt();
 
   {
     llvm::SmallString<48> Scratch;
@@ -198,19 +204,20 @@ TEST(StmtSyntaxTests, ContinueStmtWithAPIs) {
 
 TEST(StmtSyntaxTests, ContinueStmtMakeAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
+  SyntaxFactory Factory(Arena);
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto ContinueKW = SyntaxFactory::makeContinueKeyword("", " ", Arena);
-    auto Label = SyntaxFactory::makeIdentifier("toLead", "", "", Arena);
-    auto Continue = SyntaxFactory::makeContinueStmt(ContinueKW, Label, Arena);
+    auto ContinueKW = Factory.makeContinueKeyword("", " ");
+    auto Label = Factory.makeIdentifier("toLead", "", "");
+    auto Continue = Factory.makeContinueStmt(ContinueKW, Label);
     Continue.print(OS);
     ASSERT_EQ(OS.str().str(), "continue toLead"); // by example
   }
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankContinueStmt(Arena).print(OS);
+    Factory.makeBlankContinueStmt().print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }
 }
@@ -219,35 +226,37 @@ TEST(StmtSyntaxTests, ContinueStmtMakeAPIs) {
 
 TEST(StmtSyntaxTests, ReturnStmtMakeAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto ReturnKW = SyntaxFactory::makeReturnKeyword("", " ", Arena);
-  auto Minus = SyntaxFactory::makePrefixOperator("-", "", "", Arena);
-  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", "", "", Arena);
-  auto MinusOne = SyntaxFactory::makePrefixOperatorExpr(
-      Minus, SyntaxFactory::makeIntegerLiteralExpr(OneDigits, Arena), Arena);
+  SyntaxFactory Factory(Arena);
+  auto ReturnKW = Factory.makeReturnKeyword("", " ");
+  auto Minus = Factory.makePrefixOperator("-", "", "");
+  auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
+  auto MinusOne = Factory.makePrefixOperatorExpr(
+      Minus, Factory.makeIntegerLiteralExpr(OneDigits));
 
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankReturnStmt(Arena).print(OS);
+    Factory.makeBlankReturnStmt().print(OS);
     ASSERT_EQ(OS.str().str(), "");
   }
 
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne, Arena).print(OS);
+    Factory.makeReturnStmt(ReturnKW, MinusOne).print(OS);
     ASSERT_EQ(OS.str().str(), "return -1");
   }
 }
 
 TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto ReturnKW = SyntaxFactory::makeReturnKeyword("", " ", Arena);
-  auto Minus = SyntaxFactory::makePrefixOperator("-", "", "", Arena);
-  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", "", "", Arena);
-  auto MinusOne = SyntaxFactory::makePrefixOperatorExpr(
-      Minus, SyntaxFactory::makeIntegerLiteralExpr(OneDigits, Arena), Arena);
-  auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, MinusOne, Arena);
+  SyntaxFactory Factory(Arena);
+  auto ReturnKW = Factory.makeReturnKeyword("", " ");
+  auto Minus = Factory.makePrefixOperator("-", "", "");
+  auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
+  auto MinusOne = Factory.makePrefixOperatorExpr(
+      Minus, Factory.makeIntegerLiteralExpr(OneDigits));
+  auto Return = Factory.makeReturnStmt(ReturnKW, MinusOne);
 
   ASSERT_EQ(ReturnKW.getRaw(), Return.getReturnKeyword().getRaw());
   auto GottenExpression = Return.getExpression().getValue();
@@ -257,32 +266,31 @@ TEST(StmtSyntaxTests, ReturnStmtGetAPIs) {
 
 TEST(StmtSyntaxTests, ReturnStmtWithAPIs) {
   RC<SyntaxArena> Arena = SyntaxArena::make();
-  auto ReturnKW = SyntaxFactory::makeReturnKeyword("", " ", Arena);
-  auto Minus = SyntaxFactory::makePrefixOperator("-", "", "", Arena);
-  auto OneDigits = SyntaxFactory::makeIntegerLiteral("1", "", "", Arena);
-  auto MinusOne = SyntaxFactory::makePrefixOperatorExpr(
-      Minus, SyntaxFactory::makeIntegerLiteralExpr(OneDigits, Arena), Arena);
+  SyntaxFactory Factory(Arena);
+  auto ReturnKW = Factory.makeReturnKeyword("", " ");
+  auto Minus = Factory.makePrefixOperator("-", "", "");
+  auto OneDigits = Factory.makeIntegerLiteral("1", "", "");
+  auto MinusOne = Factory.makePrefixOperatorExpr(
+      Minus, Factory.makeIntegerLiteralExpr(OneDigits));
 
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankReturnStmt(Arena).withReturnKeyword(ReturnKW).print(
-        OS);
+    Factory.makeBlankReturnStmt().withReturnKeyword(ReturnKW).print(OS);
     ASSERT_EQ(OS.str().str(), "return ");
   }
 
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankReturnStmt(Arena).withExpression(MinusOne).print(
-        OS);
+    Factory.makeBlankReturnStmt().withExpression(MinusOne).print(OS);
     ASSERT_EQ(OS.str().str(), "-1");
   }
 
   {
     llvm::SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    SyntaxFactory::makeBlankReturnStmt(Arena)
+    Factory.makeBlankReturnStmt()
         .withReturnKeyword(ReturnKW)
         .withExpression(MinusOne)
         .print(OS);
