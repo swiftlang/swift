@@ -91,7 +91,7 @@ extension DistributedActor {
 /***************************** Actor Transport ********************************/
 /******************************************************************************/
 
-public protocol ActorTransport {
+public protocol ActorTransport: ConcurrentValue {
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
   /// The returned value is either a local actor or proxy to a remote actor.
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
@@ -129,8 +129,7 @@ public enum ActorResolved<Act: DistributedActor> {
 /***************************** Actor Address **********************************/
 /******************************************************************************/
 
-// TODO: make into a protocol
-public struct ActorAddress: Equatable, Codable {
+public struct ActorAddress: Codable, ConcurrentValue, Equatable {
   /// Uniquely specifies the actor transport and the protocol used by it.
   ///
   /// E.g. "xpc", "specific-clustering-protocol" etc.

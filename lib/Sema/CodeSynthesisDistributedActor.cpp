@@ -322,9 +322,6 @@ createDistributedActorInit(ClassDecl *classDecl,
       if (argumentNames[0] == C.Id_from) {
         // TODO: do we need to check types of the params here too?
         // TODO: implement synthesis
-        requirement->dump();
-        fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__,
-                "init(from:) requirement for DistributedActor");
         return nullptr;
       }
       break;
@@ -336,8 +333,8 @@ createDistributedActorInit(ClassDecl *classDecl,
       break;
   }
 
-  requirement->dump();
-  fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__, "unrecognized constructor requirement for DistributedActor");
+//  requirement->dump();
+//  fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__, "unrecognized constructor requirement for DistributedActor");
   return nullptr; // TODO: make it assert(false); after we're done with all
 }
 
@@ -392,9 +389,6 @@ static void addImplicitDistributedActorConstructors(ClassDecl *decl) {
   if (!decl->isDistributedActor())
     return;
 
-  fprintf(stderr, "[%s:%d] >> (%s) %s  \n", __FILE__, __LINE__, __FUNCTION__, "GENERATE DA INITS");
-
-  //
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       if (ctor->isRecursiveValidation())
