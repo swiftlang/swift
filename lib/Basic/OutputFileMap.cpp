@@ -88,7 +88,10 @@ void OutputFileMap::dump(llvm::raw_ostream &os, bool Sort) const {
       const TypeToPathMap &Map = InputPair.second;
       std::vector<TypePathPair> Pairs;
       Pairs.insert(Pairs.end(), Map.begin(), Map.end());
-      std::sort(Pairs.begin(), Pairs.end());
+      std::sort(Pairs.begin(), Pairs.end(), [](const TypePathPair &LHS,
+                                               const TypePathPair &RHS) -> bool {
+        return LHS < RHS;
+      });
       for (auto &OutputPair : Pairs) {
         printOutputPair(InputPair.first, OutputPair);
       }
