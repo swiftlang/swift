@@ -56,6 +56,10 @@ public:
     /// The declaration is isolated to a global actor. It can refer to other
     /// entities with the same global actor.
     GlobalActor,
+    /// The declaration is isolated to a global actor but with the "unsafe"
+    /// annotation, which means that we only enforce the isolation if we're
+    /// coming from something with specific isolation.
+    GlobalActorUnsafe,
   };
 
 private:
@@ -93,8 +97,9 @@ public:
     return ActorIsolation(ActorInstance, actor);
   }
 
-  static ActorIsolation forGlobalActor(Type globalActor) {
-    return ActorIsolation(GlobalActor, globalActor);
+  static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
+    return ActorIsolation(
+        unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
   }
 
   Kind getKind() const { return kind; }
@@ -108,8 +113,12 @@ public:
     return actor;
   }
 
+  bool isGlobalActor() const {
+    return getKind() == GlobalActor || getKind() == GlobalActorUnsafe;
+  }
+
   Type getGlobalActor() const {
-    assert(getKind() == GlobalActor);
+    assert(isGlobalActor());
     return globalActor;
   }
 
@@ -135,6 +144,7 @@ public:
       return lhs.actor == rhs.actor;
 
     case GlobalActor:
+    case GlobalActorUnsafe:
       return areTypesEqual(lhs.globalActor, rhs.globalActor);
     }
   }
