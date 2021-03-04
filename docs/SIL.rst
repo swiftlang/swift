@@ -3650,7 +3650,9 @@ assign_by_wrapper
 ``````````````````
 ::
 
-  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+
+  mode ::= '[initialization]' | '[assign]' | '[assign_wrapped_value]'
 
   assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
@@ -3661,13 +3663,22 @@ assign_by_wrapper
 Similar to the `assign`_ instruction, but the assignment is done via a
 delegate.
 
-In case of an initialization, the function ``%2`` is called with ``%0`` as
-argument. The result is stored to ``%1``. In case ``%2`` is an address type,
-it is simply passed as a first out-argument to ``%2``.
+Initially the instruction is created with no mode. Once the mode is decided
+(by the definitive initialization pass), the instruction is lowered as follows:
 
-In case of a re-assignment, the function ``%3`` is called with ``%0`` as
-argument. As ``%3`` is a setter (e.g. for the property in the containing
-nominal type), the destination address ``%1`` is not used in this case.
+If the mode is ``initialization``, the function ``%2`` is called with ``%0`` as
+argument. The result is stored to ``%1``. In case of an address type, ``%1`` is
+simply passed as a first out-argument to ``%2``.
+
+The ``assign`` mode works similar to ``initialization``, except that the
+destination is "assigned" rather than "initialized". This means that the
+existing value in the destination is destroyed before the new value is
+stored.
+
+If the mode is ``assign_wrapped_value``, the function ``%3`` is called with
+``%0`` as argument. As ``%3`` is a setter (e.g. for the property in the
+containing nominal type), the destination address ``%1`` is not used in this
+case.
 
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.

@@ -1981,6 +1981,32 @@ static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
   return false;
 }
 
+static bool parseAssignByWrapperMode(AssignByWrapperInst::Mode &Result,
+                                          SILParser &P) {
+  StringRef Str;
+  // If we do not parse '[' ... ']', we have unknown. Set value and return.
+  if (!parseSILOptional(Str, P)) {
+    Result = AssignByWrapperInst::Unknown;
+    return false;
+  }
+
+  // Then try to parse one of our other initialization kinds. We do not support
+  // parsing unknown here so we use that as our fail value.
+  auto Tmp = llvm::StringSwitch<AssignByWrapperInst::Mode>(Str)
+        .Case("initialization", AssignByWrapperInst::Initialization)
+        .Case("assign", AssignByWrapperInst::Assign)
+        .Case("assign_wrapped_value", AssignByWrapperInst::AssignWrappedValue)
+        .Default(AssignByWrapperInst::Unknown);
+
+  // Thus return true (following the conventions in this file) if we fail.
+  if (Tmp == AssignByWrapperInst::Unknown)
+    return true;
+
+  // Otherwise, assign Result and return false.
+  Result = Tmp;
+  return false;
+}
+
 // Parse a list of integer indices, prefaced with the given string label.
 // Returns true on error.
 static bool parseIndexList(Parser &P, StringRef label,
@@ -3725,9 +3751,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::AssignByWrapperInst: {
     SILValue Src, DestAddr, InitFn, SetFn;
     SourceLoc DestLoc;
-    AssignOwnershipQualifier AssignQualifier;
+    AssignByWrapperInst::Mode mode;
     if (parseTypedValueRef(Src, B) || parseVerbatim("to") ||
-        parseAssignOwnershipQualifier(AssignQualifier, *this) ||
+        parseAssignByWrapperMode(mode, *this) ||
         parseTypedValueRef(DestAddr, DestLoc, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("init") || parseTypedValueRef(InitFn, B) ||
@@ -3743,7 +3769,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     ResultVal = B.createAssignByWrapper(InstLoc, Src, DestAddr, InitFn, SetFn,
-                                        AssignQualifier);
+                                        mode);
     break;
   }
 

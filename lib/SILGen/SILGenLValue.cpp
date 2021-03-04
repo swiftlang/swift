@@ -1549,7 +1549,7 @@ namespace {
 
         SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
                                      initFn.getValue(), setterFn.getValue(),
-                                     AssignOwnershipQualifier::Unknown);
+                                     AssignByWrapperInst::Unknown);
 
         return;
       }

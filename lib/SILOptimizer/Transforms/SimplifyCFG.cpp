@@ -3372,7 +3372,9 @@ bool SimplifyCFG::run() {
     if (simplifyBlocks())
       removeUnreachableBlocks(Fn);
   }
-  Fn.verifyCriticalEdges();
+
+  if (Fn.getModule().getOptions().VerifyAll)
+    Fn.verifyCriticalEdges();
 
   // Canonicalize switch_enum instructions.
   Changed |= canonicalizeSwitchEnums();
@@ -4139,7 +4141,7 @@ public:
   void run() override {
     auto &Fn = *getFunction();
 
-    if (OnlyNonCondBrEdges)
+    if (OnlyNonCondBrEdges && Fn.getModule().getOptions().VerifyAll)
       Fn.verifyCriticalEdges();
 
     // Split all critical edges from all or non only cond_br terminators.

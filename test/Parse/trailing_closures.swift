@@ -123,3 +123,13 @@ func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{d
 // TODO: The diagnostics here are perhaps a little overboard.
 _ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'default' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}} expected-error {{top-level statement cannot begin with a closure expression}} expected-error {{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}}
 _ = produce { 2 } `default`: { 3 }
+
+func f() -> Int { 42 }
+
+// This should be interpreted as a trailing closure, instead of being 
+// interpreted as a computed property with undesired initial value.
+struct TrickyTest {
+    var x : Int = f () { // expected-error {{argument passed to call that takes no arguments}}
+        3
+    }
+}

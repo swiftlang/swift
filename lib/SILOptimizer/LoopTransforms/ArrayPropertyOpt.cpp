@@ -797,7 +797,8 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
         ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
 
       // Verify that no illegal critical edges were created.
-      getFunction()->verifyCriticalEdges();
+      if (getFunction()->getModule().getOptions().VerifyAll)
+        getFunction()->verifyCriticalEdges();
 
       // We preserve the dominator tree. Let's invalidate everything
       // else.

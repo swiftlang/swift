@@ -4370,39 +4370,38 @@ class AssignByWrapperInst
   friend SILBuilder;
 
 public:
-  /// The assignment destination for the property wrapper
-  enum class Destination {
-    BackingWrapper,
-    WrappedValue,
+  enum Mode {
+    /// The mode is not decided yet (by DefiniteInitialization).
+    Unknown,
+    
+    /// The initializer is called with Src as argument. The result is stored to
+    /// Dest.
+    Initialization,
+    
+    // Like ``Initialization``, except that the destination is "assigned" rather
+    // than "initialized". This means that the existing value in the destination
+    // is destroyed before the new value is stored.
+    Assign,
+    
+    /// The setter is called with Src as argument. The Dest is not used in this
+    /// case.
+    AssignWrappedValue
   };
 
 private:
-  Destination AssignDest = Destination::WrappedValue;
-
   AssignByWrapperInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
-                       SILValue Initializer, SILValue Setter,
-                       AssignOwnershipQualifier Qualifier =
-                         AssignOwnershipQualifier::Unknown);
+                       SILValue Initializer, SILValue Setter, Mode mode);
 
 public:
-
   SILValue getInitializer() { return Operands[2].get(); }
   SILValue getSetter() { return  Operands[3].get(); }
 
-  AssignOwnershipQualifier getOwnershipQualifier() const {
-    return AssignOwnershipQualifier(
-      SILNode::Bits.AssignByWrapperInst.OwnershipQualifier);
+  Mode getMode() const {
+    return Mode(SILNode::Bits.AssignByWrapperInst.Mode);
   }
 
-  Destination getAssignDestination() const { return AssignDest; }
-
-  void setAssignInfo(AssignOwnershipQualifier qualifier, Destination dest) {
-    assert(qualifier == AssignOwnershipQualifier::Init && dest == Destination::BackingWrapper ||
-           qualifier == AssignOwnershipQualifier::Reassign && dest == Destination::BackingWrapper ||
-           qualifier == AssignOwnershipQualifier::Reassign && dest == Destination::WrappedValue);
-
-    SILNode::Bits.AssignByWrapperInst.OwnershipQualifier = unsigned(qualifier);
-    AssignDest = dest;
+  void setMode(Mode mode) {
+    SILNode::Bits.AssignByWrapperInst.Mode = unsigned(mode);
   }
 };
 
