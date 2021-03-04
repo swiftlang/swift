@@ -1250,16 +1250,19 @@ namespace {
         llvm_unreachable("OpenCL type in ABI lowering");
 
       // We should never see ARM SVE types at all.
-#define SVE_TYPE(Name, Id, ...) \
-      case clang::BuiltinType::Id:
+#define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
         llvm_unreachable("ARM SVE type in ABI lowering");
 
       // We should never see PPC MMA types at all.
-#define PPC_VECTOR_TYPE(Name, Id, Size) \
-      case clang::BuiltinType::Id:
+#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
         llvm_unreachable("PPC MMA type in ABI lowering");
+
+      // We should never see RISC-V V types at all.
+#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
+        llvm_unreachable("RISC-V V type in ABI lowering");
 
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
