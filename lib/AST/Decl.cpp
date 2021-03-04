@@ -8085,7 +8085,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
 
     case ClosureActorIsolation::GlobalActor: {
-      return ActorIsolation::forGlobalActor(isolation.getGlobalActor());
+      return ActorIsolation::forGlobalActor(
+          isolation.getGlobalActor(), /*unsafe=*/false);
     }
 
     case ClosureActorIsolation::ActorInstance: {

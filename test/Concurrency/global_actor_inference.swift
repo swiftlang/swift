@@ -239,7 +239,7 @@ func barSync() {
 // Unsafe global actors
 // ----------------------------------------------------------------------
 protocol UGA {
-  @SomeGlobalActor(unsafe) func req()
+  @SomeGlobalActor(unsafe) func req() // expected-note{{calls to instance method 'req()' from outside of its actor context are implicitly asynchronous}}
 }
 
 struct StructUGA1: UGA {
@@ -252,7 +252,7 @@ struct StructUGA2: UGA {
 
 @GenericGlobalActor<String>
 func testUGA<T: UGA>(_ value: T) {
-  value.req()
+  value.req() // expected-error{{instance method 'req()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
 }
 
 class UGAClass {

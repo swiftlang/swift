@@ -2725,6 +2725,7 @@ bool ConformanceChecker::checkActorIsolation(
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
   bool isCrossActor = false;
+  bool witnessIsUnsafe = false;
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
@@ -2762,13 +2763,14 @@ bool ConformanceChecker::checkActorIsolation(
     return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
 
-  case ActorIsolationRestriction::CrossGlobalActor:
-    isCrossActor = true;
+  case ActorIsolationRestriction::GlobalActorUnsafe:
+    witnessIsUnsafe = true;
     LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
     // Hang on to the global actor that's used for the witness. It will need
     // to match that of the requirement.
+    isCrossActor = witnessRestriction.isCrossActor;
     witnessGlobalActor = witness->getDeclContext()->mapTypeIntoContext(
         witnessRestriction.getGlobalActor());
     break;
@@ -2785,9 +2787,14 @@ bool ConformanceChecker::checkActorIsolation(
 
   // Check whether the requirement requires some particular actor isolation.
   Type requirementGlobalActor;
+  bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
     llvm_unreachable("There are not actor protocols");
+
+  case ActorIsolation::GlobalActorUnsafe:
+    requirementIsUnsafe = true;
+    LLVM_FALLTHROUGH;
 
   case ActorIsolation::GlobalActor: {
     auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
@@ -2837,6 +2844,10 @@ bool ConformanceChecker::checkActorIsolation(
     if (requirement->hasClangNode())
       return false;
 
+    // If the witness is "unsafe", allow the mismatch.
+    if (witnessIsUnsafe)
+      return false;
+
     witness->diagnose(
         diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
         witness->getName(), witnessGlobalActor, Proto->getName());
@@ -2846,9 +2857,11 @@ bool ConformanceChecker::checkActorIsolation(
 
   // If the requirement has a global actor but the witness does not, we have
   // an isolation error.
-  //
-  // FIXME: Within a module, this will be an inference rule.
   if (requirementGlobalActor && !witnessGlobalActor) {
+    // If the requirement's global actor was "unsafe", we allow this.
+    if (requirementIsUnsafe)
+      return false;
+
     if (isCrossActor) {
       return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);

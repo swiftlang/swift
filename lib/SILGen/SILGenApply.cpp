@@ -4303,6 +4303,7 @@ Optional<SILValue> SILGenFunction::emitLoadActorExecutorForCallee(
       }
 
       case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
         return emitLoadGlobalActorExecutor(actorIso.getGlobalActor());
     }
   }

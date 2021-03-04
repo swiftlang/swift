@@ -554,12 +554,14 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
       return forActorSelf(isolation.getActor(),
           isAccessibleAcrossActors || isa<ConstructorDecl>(decl));
 
+    case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
       Type actorType = isolation.getGlobalActor();
       if (auto subs = declRef.getSubstitutions())
         actorType = actorType.subst(subs);
 
-      return forGlobalActor(actorType, isAccessibleAcrossActors);
+      return forGlobalActor(actorType, isAccessibleAcrossActors,
+                            isolation == ActorIsolation::GlobalActorUnsafe);
     }
 
     case ActorIsolation::Independent:
@@ -1293,7 +1295,14 @@ namespace {
         case ActorIsolationRestriction::Unrestricted:
         case ActorIsolationRestriction::Unsafe:
           break;
-        case ActorIsolationRestriction::CrossGlobalActor:
+        case ActorIsolationRestriction::GlobalActorUnsafe:
+          // If we're not supposed to diagnose existing data races here,
+          // we're done.
+          if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
+            break;
+
+          LLVM_FALLTHROUGH;
+
         case ActorIsolationRestriction::GlobalActor: {
           ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
                              decl->getDescriptiveKind(), decl->getName(),
@@ -1361,8 +1370,10 @@ namespace {
           return isolation;
 
         case ActorIsolation::GlobalActor:
+        case ActorIsolation::GlobalActorUnsafe:
           return ActorIsolation::forGlobalActor(
-              constDC->mapTypeIntoContext(isolation.getGlobalActor()));
+              constDC->mapTypeIntoContext(isolation.getGlobalActor()),
+              isolation == ActorIsolation::GlobalActorUnsafe);
         }
       };
 
@@ -1467,7 +1478,8 @@ namespace {
       // Check whether we are within the same isolation context, in which
       // case there is nothing further to check,
       auto contextIsolation = getInnermostIsolatedContext(declContext);
-      if (contextIsolation == ActorIsolation::forGlobalActor(globalActor)) {
+      if (contextIsolation.isGlobalActor() &&
+          contextIsolation.getGlobalActor()->isEqual(globalActor)) {
         return false;
       }
 
@@ -1490,7 +1502,8 @@ namespace {
         noteIsolatedActorMember(value);
         return true;
 
-      case ActorIsolation::GlobalActor: {
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe: {
         // Check if this decl reference is the callee of the enclosing Apply,
         // making it OK as an implicitly async call.
         if (inspectForImplicitlyAsync())
@@ -1675,11 +1688,16 @@ namespace {
       case ActorIsolationRestriction::ActorSelf:
         llvm_unreachable("non-member reference into an actor");
 
-      case ActorIsolationRestriction::CrossGlobalActor:
+      case ActorIsolationRestriction::GlobalActorUnsafe:
+        // Only complain if we're in code that's adopted concurrency features.
+        if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
+          return false;
+
+        LLVM_FALLTHROUGH;
+
       case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
-            valueRef, loc, isolation.getGlobalActor(),
-            isolation == ActorIsolationRestriction::CrossGlobalActor);
+            valueRef, loc, isolation.getGlobalActor(), isolation.isCrossActor);
 
       case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafeGlobal(value, loc);
@@ -1829,6 +1847,7 @@ namespace {
           }
 
           case ActorIsolation::GlobalActor:
+          case ActorIsolation::GlobalActorUnsafe:
             // Check for implicit async.
             if (auto result = checkImplicitlyAsync())
               return *result;
@@ -1846,11 +1865,17 @@ namespace {
         llvm_unreachable("Unhandled actor isolation");
       }
 
-      case ActorIsolationRestriction::CrossGlobalActor:
+      case ActorIsolationRestriction::GlobalActorUnsafe:
+        // Only complain if we're in code that's adopted concurrency features.
+        if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
+          return false;
+
+        LLVM_FALLTHROUGH;
+
       case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
-            isolation == ActorIsolationRestriction::CrossGlobalActor);
+            isolation.isCrossActor);
 
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
@@ -1880,7 +1905,8 @@ namespace {
       case ActorIsolation::Unspecified:
         return ClosureActorIsolation::forIndependent();
 
-      case ActorIsolation::GlobalActor: {
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe: {
         Type globalActorType = closure->mapTypeIntoContext(
             parentIsolation.getGlobalActor()->mapTypeOutOfContext());
         return ClosureActorIsolation::forGlobalActor(globalActorType);
@@ -2036,14 +2062,8 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
           diag::global_actor_non_unsafe_init, globalActorType);
     }
 
-    // TODO: Model as unsafe from the actor-isolation perspective, which
-    // disables all checking. We probably want to model this as a separate kind
-    // of actor isolation to emit warnings.
-    if (isUnsafe)
-      return ActorIsolation::forIndependent(ActorIndependentKind::Unsafe);
-
     return ActorIsolation::forGlobalActor(
-        globalActorType->mapTypeOutOfContext());
+        globalActorType->mapTypeOutOfContext(), isUnsafe);
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -2113,7 +2133,8 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
       case ActorIsolation::Unspecified:
         return true;
 
-      case ActorIsolation::GlobalActor: {
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe: {
         // Substitute into the global actor type.
         auto conformance = std::get<0>(isolated);
         auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
@@ -2124,7 +2145,8 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
           return true;
 
         // Update the global actor type, now that we've done this substitution.
-        std::get<1>(isolated) = ActorIsolation::forGlobalActor(globalActor);
+        std::get<1>(isolated) = ActorIsolation::forGlobalActor(
+            globalActor, isolation == ActorIsolation::GlobalActorUnsafe);
         return false;
       }
       }
@@ -2187,6 +2209,10 @@ ActorIsolation ActorIsolationRequest::evaluate(
       value->getAttrs().add(new (ctx) ActorIndependentAttr(
                               ActorIndependentKind::Safe, /*IsImplicit=*/true));
       break;
+
+    case ActorIsolation::GlobalActorUnsafe:
+      // Don't infer unsafe global actor isolation.
+      return ActorIsolation::forUnspecified();
 
     case ActorIsolation::GlobalActor: {
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
@@ -2315,14 +2341,64 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   // If the overridden declaration is @actorIndependent(unsafe) and the
   // overriding declaration has been placed in a global actor, allow it.
   if (overriddenIsolation.getKind() == ActorIsolation::IndependentUnsafe &&
-      isolation.getKind() == ActorIsolation::GlobalActor)
+      isolation.isGlobalActor())
     return;
 
   // If the overridden declaration is from Objective-C with no actor annotation,
   // and the overriding declaration has been placed in a global actor, allow it.
   if (overridden->hasClangNode() && !overriddenIsolation &&
-      isolation.getKind() == ActorIsolation::GlobalActor)
+      isolation.isGlobalActor())
     return;
+
+  // If the overridden declaration uses an unsafe global actor, we can do
+  // anything except be actor-isolated or have a different global actor.
+  if (overriddenIsolation == ActorIsolation::GlobalActorUnsafe) {
+    switch (isolation) {
+    case ActorIsolation::Independent:
+    case ActorIsolation::IndependentUnsafe:
+    case ActorIsolation::Unspecified:
+      return;
+
+    case ActorIsolation::ActorInstance:
+      // Diagnose below.
+      break;
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      // The global actors don't match; diagnose it.
+      if (overriddenIsolation.getGlobalActor()->isEqual(
+              isolation.getGlobalActor()))
+        return;
+
+      // Diagnose below.
+      break;
+    }
+  }
+
+  // If the overriding declaration uses an unsafe global actor, we can do
+  // anything that doesn't actively conflict with the overridden isolation.
+  if (isolation == ActorIsolation::GlobalActorUnsafe) {
+    switch (overriddenIsolation) {
+    case ActorIsolation::Unspecified:
+      return;
+
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Independent:
+    case ActorIsolation::IndependentUnsafe:
+      // Diagnose below.
+      break;
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      // The global actors don't match; diagnose it.
+      if (overriddenIsolation.getGlobalActor()->isEqual(
+              isolation.getGlobalActor()))
+        return;
+
+      // Diagnose below.
+      break;
+    }
+  }
 
   // Isolation mismatch. Diagnose it.
   value->diagnose(
