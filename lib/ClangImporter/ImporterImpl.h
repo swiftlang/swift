@@ -1524,7 +1524,9 @@ public:
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
                            const PlatformAvailability &avail, bool inferIAM)
-      : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
+      : // An unfortunate workaround until D97702 lands.
+        clang::ModuleFileExtension(static_cast<ModuleFileExtensionKind>(42)),
+        pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
         buffersForDiagnostics(buffersForDiagnostics), availability(avail),
         inferImportAsMember(inferIAM) {}
 
