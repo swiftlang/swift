@@ -74,6 +74,7 @@ The following build options are available:
 The following build targets are available:
 
 * `swift-benchmark-macosx-x86_64`
+* `swift-benchmark-macosx-arm64`
 * `swift-benchmark-iphoneos-arm64e`
 * `swift-benchmark-iphoneos-arm64`
 * `swift-benchmark-iphoneos-armv7`
@@ -84,7 +85,7 @@ Build steps (with example options):
 
 1. `$ mkdir build; cd build`
 2. `$ cmake [path to swift src]/benchmark -G Ninja -DSWIFT_EXEC=[path to built swiftc]`
-3. `$ ninja swift-benchmark-macosx-x86_64`
+3. `$ ninja swift-benchmark-macosx-$(uname -m)`
 
 Benchmark binaries are placed in `bin`.
 
@@ -98,7 +99,7 @@ relative to the benchmark binary at the time it was executed
 For example, to benchmark against a locally built `swiftc`, including
 any standard library changes in that build, you might configure using:
 
-    cmake <src>/benchmark -G Ninja -DSWIFT_EXEC=<build>/swift-macosx-x86_64/bin/swiftc
+    cmake <src>/benchmark -G Ninja -DSWIFT_EXEC=<build>/swift-macosx-$(uname -m)/bin/swiftc
     ninja swift-benchmark-iphoneos-arm64
 
 To build against the installed Xcode, simply omit SWIFT_EXEC:
@@ -319,12 +320,12 @@ swift-source$ ./swift/utils/build-script -R -B
 ````
 you can rebuild just the benchmarks:
 ````
-swift-source$ export SWIFT_BUILD_DIR=`pwd`/build/Ninja-ReleaseAssert/swift-macosx-x86_64
-swift-source$ ninja -C ${SWIFT_BUILD_DIR} swift-benchmark-macosx-x86_64
+swift-source$ export SWIFT_BUILD_DIR=`pwd`/build/Ninja-ReleaseAssert/swift-macosx-$(uname -m)
+swift-source$ ninja -C ${SWIFT_BUILD_DIR} swift-benchmark-macosx-$(uname -m)
 ````
 
 When modifying the testing infrastructure, you should verify that your changes
 pass all the tests:
 ````
-swift-source$ ./llvm/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-macosx-x86_64/benchmark
+swift-source$ ./llvm/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-macosx-$(uname -m)/benchmark
 ````

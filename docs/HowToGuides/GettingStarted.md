@@ -245,13 +245,13 @@ Phew, that's a lot to digest! Now let's proceed to the actual build itself!
    - Via Ninja:
      ```sh
      utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
+       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
        --sccache --release-debuginfo --test
      ```
    - Via Xcode:
      ```sh
      utils/build-script --skip-build-benchmarks \
-       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "x86_64" \
+       --skip-ios --skip-watchos --skip-tvos --swift-darwin-supported-archs "$(uname -m)" \
        --sccache --release-debuginfo --test \
        --xcode
      ```
@@ -350,7 +350,8 @@ git push --set-upstream my-remote my-branch
 ### First time Xcode setup
 
 If you used `--xcode` earlier, you will see an Xcode project generated under
-`../build/Xcode-RelWithDebInfoAssert/swift-macosx-x86_64`. When you open the
+`../build/Xcode-RelWithDebInfoAssert/swift-macosx-x86_64` (or
+`../build/Xcode-RelWithDebInfoAssert/swift-macosx-arm64` on Apple Silicon Macs). When you open the
 project, Xcode might helpfully suggest "Automatically Create Schemes". Most of
 those schemes are not required in day-to-day work, so you can instead manually
 select the following schemes:
@@ -375,12 +376,12 @@ Now that you have made some changes, you will need to rebuild...
 
 To rebuild the compiler:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64 swift-frontend
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m) swift-frontend
 ```
 
 To rebuild everything, including the standard library:
 ```sh
-ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64
+ninja -C ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)
 ```
 
 ### Incremental builds with Xcode
@@ -396,7 +397,7 @@ build should be much faster than the from-scratch build at the beginning.
 Now check if the version string has been updated:
 
 ```sh
-../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/bin/swift-frontend --version
+../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/bin/swift-frontend --version
 ```
 
 This should print your updated version string.
@@ -439,22 +440,22 @@ There are two main ways to run tests:
    ```sh
    # Rebuild all test dependencies and run all tests under test/.
    utils/run-test --lit ../llvm-project/llvm/utils/lit/lit.py \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m)
 
    # Rebuild all test dependencies and run tests containing "MyTest".
    utils/run-test --lit ../llvm-project/llvm/utils/lit/lit.py \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64 \
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m) \
      --filter="MyTest"
    ```
 2. `lit.py`: lit doesn't know anything about dependencies. It just runs tests.
    ```sh
    # Run all tests under test/.
    ../llvm-project/llvm/utils/lit/lit.py -s -vv \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m)
 
    # Run tests containing "MyTest"
    ../llvm-project/llvm/utils/lit/lit.py -s -vv \
-     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-x86_64/test-macosx-x86_64 \
+     ../build/Ninja-RelWithDebInfoAssert/swift-macosx-$(uname -m)/test-macosx-$(uname -m) \
      --filter="MyTest"
    ```
    The `-s` and `-vv` flags print a progress bar and the executed commands
