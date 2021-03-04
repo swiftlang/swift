@@ -346,39 +346,26 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
   if (Line == 0) {
     return None;
   }
-  const bool LineEnd = Col == ~0u;
-  auto InputBuf = getLLVMSourceMgr().getMemoryBuffer(BufferId);
-  const char *Ptr = InputBuf->getBufferStart();
-  const char *End = InputBuf->getBufferEnd();
-  const char *LineStart = Ptr;
-  --Line;
-  for (; Line && (Ptr < End); ++Ptr) {
-    if (*Ptr == '\n') {
-      --Line;
-      LineStart = Ptr+1;
-    }
-  }
-  if (Line != 0) {
+  const bool LineEnd = (Col == ~0u);
+  if (LineEnd)
+    Col = 0;
+
+  auto loc = const_cast<SourceManager *>(this)
+                 ->getLLVMSourceMgr()
+                 .FindLocForLineAndColumn(BufferId, Line, Col);
+  if (!loc.isValid())
     return None;
-  }
-  Ptr = LineStart;
-  if (Col == 0)   {
-      return Ptr - InputBuf->getBufferStart();
-  }
-  // The <= here is to allow for non-inclusive range end positions at EOF
-  for (; ; ++Ptr) {
-    --Col;
-    if (Col == 0)
-      return Ptr - InputBuf->getBufferStart();
-    if (*Ptr == '\n' || Ptr == End) {
-      if (LineEnd) {
-        return Ptr - InputBuf->getBufferStart();
-      } else {
+
+  auto InputBuf = getLLVMSourceMgr().getMemoryBuffer(BufferId);
+  const char *Ptr = loc.getPointer();
+  if (LineEnd) {
+    const char *End = InputBuf->getBufferEnd();
+    for (;; ++Ptr) {
+      if (Ptr == End || *Ptr == '\n')
         break;
-      }
     }
   }
-  return None;
+  return Ptr - InputBuf->getBufferStart();
 }
 
 unsigned SourceManager::getExternalSourceBufferId(StringRef Path) {
