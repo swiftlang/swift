@@ -13,8 +13,10 @@
 // RUN: %target-swiftc_driver -j20 %t/main.swift %t/file-01.swift %t/file-02.swift %t/file-03.swift -I %t/sdk -Xfrontend -Rmodule-interface-rebuild -module-cache-path %t/module-cache &> %t/result.txt
 // RUN: %FileCheck %s  -check-prefix=CHECK-REBUILD < %t/result.txt
 
+/// Checking that the compiler rebuilds the same module more than once can
+/// fail depending on how fast the jobs are executed. Just make sure the
+/// compiler accepts the -disable-interface-lock flag.
 // RUN: %target-swiftc_driver -j20 %t/main.swift %t/file-01.swift %t/file-02.swift %t/file-03.swift -I %t/sdk -Xfrontend -Rmodule-interface-rebuild -Xfrontend -disable-interface-lock -module-cache-path %t/module-cache-no-lock &> %t/result.txt
-
 // RUN: %FileCheck %s  -check-prefix=CHECK-REBUILD-NO-LOCK < %t/result.txt
 
 // Reset the permissions
@@ -25,6 +27,4 @@
 // CHECK-REBUILD-NOT: rebuilding module 'Foo' from interface
 // CHECK-REBUILD-NOT: building module interface without lock file
 
-// CHECK-REBUILD-NO-LOCK: rebuilding module 'Foo' from interface
-// CHECK-REBUILD-NO-LOCK: rebuilding module 'Foo' from interface
 // CHECK-REBUILD-NO-LOCK: rebuilding module 'Foo' from interface
