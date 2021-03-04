@@ -498,15 +498,30 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != file_types::TY_Nothing) {
+    auto IndexUnitOutputs = context.Output.getIndexUnitOutputFilenames();
+
     if (context.shouldUseMainOutputFileListInFrontendInvocation()) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
       II.FilelistInfos.push_back({Arguments.back(),
                                   context.Output.getPrimaryOutputType(),
                                   FilelistInfo::WhichFiles::Output});
+      if (!IndexUnitOutputs.empty()) {
+        Arguments.push_back("-index-unit-output-path-filelist");
+        Arguments.push_back(context.getTemporaryFilePath("index-unit-outputs",
+                                                         ""));
+        II.FilelistInfos.push_back({
+          Arguments.back(), file_types::TY_IndexUnitOutputPath,
+          FilelistInfo::WhichFiles::IndexUnitOutputPaths});
+      }
     } else {
       for (auto FileName : context.Output.getPrimaryOutputFilenames()) {
         Arguments.push_back("-o");
+        Arguments.push_back(context.Args.MakeArgString(FileName));
+      }
+
+      for (auto FileName : IndexUnitOutputs) {
+        Arguments.push_back("-index-unit-output-path");
         Arguments.push_back(context.Args.MakeArgString(FileName));
       }
     }
@@ -639,6 +654,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
+  case file_types::TY_IndexUnitOutputPath:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -896,6 +912,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftOverlayFile:
+    case file_types::TY_IndexUnitOutputPath:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");

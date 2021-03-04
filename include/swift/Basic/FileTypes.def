@@ -79,6 +79,7 @@ TYPE("json-features",       JSONFeatures,              "features.json",   "")
 
 
 TYPE("index-data",          IndexData,                 "",                "")
+TYPE("index-unit-output-path", IndexUnitOutputPath,    "",                "")
 TYPE("yaml-opt-record",     YAMLOptRecord,             "opt.yaml",        "")
 TYPE("bitstream-opt-record",BitstreamOptRecord,        "opt.bitstream",   "")
 
