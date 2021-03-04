@@ -1297,7 +1297,6 @@ namespace {
         case ActorIsolationRestriction::Unrestricted:
         case ActorIsolationRestriction::Unsafe:
           break;
-        case ActorIsolationRestriction::CrossGlobalActor:
         case ActorIsolationRestriction::GlobalActor: {
           ctx.Diags.diagnose(argLoc, diag::actor_isolated_inout_state,
                              decl->getDescriptiveKind(), decl->getName(),
@@ -1683,11 +1682,9 @@ namespace {
       case ActorIsolationRestriction::ActorSelf:
         llvm_unreachable("non-member reference into an actor");
 
-      case ActorIsolationRestriction::CrossGlobalActor:
       case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
-            valueRef, loc, isolation.getGlobalActor(),
-            isolation == ActorIsolationRestriction::CrossGlobalActor);
+            valueRef, loc, isolation.getGlobalActor(), isolation.isCrossActor);
 
       case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafeGlobal(value, loc);
@@ -1855,11 +1852,10 @@ namespace {
         llvm_unreachable("Unhandled actor isolation");
       }
 
-      case ActorIsolationRestriction::CrossGlobalActor:
       case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
-            isolation == ActorIsolationRestriction::CrossGlobalActor);
+            isolation.isCrossActor);
 
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some

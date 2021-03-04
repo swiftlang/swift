@@ -2762,13 +2762,10 @@ bool ConformanceChecker::checkActorIsolation(
     return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
 
-  case ActorIsolationRestriction::CrossGlobalActor:
-    isCrossActor = true;
-    LLVM_FALLTHROUGH;
-
   case ActorIsolationRestriction::GlobalActor: {
     // Hang on to the global actor that's used for the witness. It will need
     // to match that of the requirement.
+    isCrossActor = witnessRestriction.isCrossActor;
     witnessGlobalActor = witness->getDeclContext()->mapTypeIntoContext(
         witnessRestriction.getGlobalActor());
     break;

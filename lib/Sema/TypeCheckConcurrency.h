@@ -86,19 +86,13 @@ public:
     /// the actor's isolation domain.
     ActorSelf,
 
-    /// References to a declaration that is part of a global actor are only
-    /// permitted from other declarations with that same global actor.
+    /// References to a declaration that is part of a global actor are
+    /// permitted from other declarations with that same global actor or
+    /// are permitted from elsewhere as a cross-actor reference.
     GlobalActor,
-
-    /// References to this entity are allowed from anywhere, but doing so may
-    /// cross an actor boundary if it is not from the same global actor.
-    CrossGlobalActor,
   };
 
 private:
-  /// The kind of restriction.
-  Kind kind;
-
   union {
     /// The local context that an entity is tied to.
     DeclContext *localContext;
@@ -110,9 +104,17 @@ private:
     TypeBase *globalActor;
   } data;
 
-  explicit ActorIsolationRestriction(Kind kind) : kind(kind) { }
+  explicit ActorIsolationRestriction(Kind kind, bool isCrossActor)
+      : kind(kind), isCrossActor(isCrossActor) { }
 
 public:
+  /// The kind of restriction.
+  const Kind kind;
+
+  /// Whether referencing this from another actor constitutes a cross-acter
+  /// reference.
+  const bool isCrossActor;
+
   Kind getKind() const { return kind; }
 
   /// Retrieve the actor class that the declaration is within.
@@ -123,25 +125,26 @@ public:
 
   /// Retrieve the actor class that the declaration is within.
   Type getGlobalActor() const {
-    assert(kind == GlobalActor || kind == CrossGlobalActor);
+    assert(kind == GlobalActor);
     return Type(data.globalActor);
   }
 
   /// There are no restrictions on the use of the entity.
   static ActorIsolationRestriction forUnrestricted() {
-    return ActorIsolationRestriction(Unrestricted);
+    return ActorIsolationRestriction(Unrestricted, /*isCrossActor=*/false);
   }
 
   /// Accesses to the given declaration are unsafe.
   static ActorIsolationRestriction forUnsafe() {
-    return ActorIsolationRestriction(Unsafe);
+    return ActorIsolationRestriction(Unsafe, /*isCrossActor=*/false);
   }
 
   /// Accesses to the given declaration can only be made via the 'self' of
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
       ClassDecl *actorClass, bool isCrossActor) {
-    ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf);
+    ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
+                                     isCrossActor);
     result.data.actorClass = actorClass;
     return result;
   }
@@ -150,8 +153,7 @@ public:
   /// global actor or is a cross-actor access.
   static ActorIsolationRestriction forGlobalActor(
       Type globalActor, bool isCrossActor) {
-    ActorIsolationRestriction result(
-        isCrossActor ? CrossGlobalActor : GlobalActor);
+    ActorIsolationRestriction result(GlobalActor, isCrossActor);
     result.data.globalActor = globalActor.getPointer();
     return result;
   }
