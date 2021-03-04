@@ -59,6 +59,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
   auto fragment = futureFragment();
 
   auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
+  _taskHooks.cb_waitFuture(waitingTask, this, queueHead.getStatus());
+
   while (true) {
     switch (queueHead.getStatus()) {
     case Status::Error:
@@ -101,6 +103,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     hadErrorResult = true;
   }
 
+  _taskHooks.cb_completeFuture(this);
+
   // Update the status to signal completion.
   auto newQueueHead = WaitQueueItem::get(
     hadErrorResult ? Status::Error : Status::Success,
@@ -133,6 +137,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     } else {
       waitingContext->fillWithSuccess(fragment);
     }
+
+    _taskHooks.cb_completeFutureWaiter(waitingTask, this);
 
     // Enqueue the waiter on the global executor.
     // TODO: allow waiters to fill in a suggested executor

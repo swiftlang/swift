@@ -540,6 +540,34 @@ void swift_job_run(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTask *swift_task_getCurrent(void);
 
+/// Callbacks to observe events and hooks to customize the Swift Task runtime.
+struct TaskHooks {
+  /// Hook to customize global job enqueuing.  Return \c true if the job has
+  /// been handled.
+  bool (*hook_enqueueGlobal)(Job *job);
+
+  /// Callback to observe when a job gets enqueued.
+  void (*cb_enqueue)(Job *job, ExecutorRef executor);
+  /// Callback to observe when a job starts running.
+  void (*cb_runJobBegin)(Job *job, ExecutorRef executor);
+  /// Callback to observe when a job stops running.
+  void (*cb_runJobEnd)(Job *job, ExecutorRef executor);
+
+  /// Callback to observe when a task future completes.
+  void (*cb_completeFuture)(AsyncTask *task);
+  /// Callback to observe when a waiting task is enqueued as a result of the
+  /// waited-on task completing.
+  void (*cb_completeFutureWaiter)(AsyncTask *waitingTask,
+                                  AsyncTask *waitedOnTask);
+
+  /// Callback to observe when a tasks waits on another task future.
+  void (*cb_waitFuture)(AsyncTask *waitingTask, AsyncTask *waitedOnTask,
+                        AsyncTask::FutureFragment::Status status);
+};
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(c)
+void swift_task_set_hooks(const TaskHooks *hooks, size_t structSize);
+
 }
 
 #endif

@@ -61,6 +61,8 @@ void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 void _swift_tsan_acquire(void *addr);
 void _swift_tsan_release(void *addr);
 
+extern const TaskHooks _taskHooks;
+
 // ==== ------------------------------------------------------------------------
 // TODO: this was moved from Task.cpp to share it with TaskGroup.cpp, where else better place to put it?
 
