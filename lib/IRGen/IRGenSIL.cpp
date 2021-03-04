@@ -401,6 +401,10 @@ public:
   llvm::SmallDenseMap<StackSlotKey, Address, 8> ShadowStackSlots;
   llvm::SmallDenseMap<llvm::Value *, Address, 8> TaskAllocStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
+  /// To avoid inserting elements into ValueDomPoints twice.
+  llvm::SmallDenseSet<llvm::Instruction *, 8> ValueVariables;
+  /// Holds the DominancePoint of values that are storage for a source variable.
+  SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
@@ -691,6 +695,83 @@ public:
         Size, llvm::MaybeAlign(AI->getAlignment()));
   }
 
+  /// Try to emit an inline assembly gadget which extends the lifetime of
+  /// \p Var. Returns whether or not this was successful.
+  bool emitLifetimeExtendingUse(llvm::Value *Var) {
+    llvm::Type *ArgTys;
+    auto *Ty = Var->getType();
+    // Vectors, Pointers and Floats are expected to fit into a register.
+    if (Ty->isPointerTy() || Ty->isFloatingPointTy() || Ty->isVectorTy())
+      ArgTys = {Ty};
+    else {
+      // If this is not a scalar or vector type, we can't handle it.
+      if (isa<llvm::StructType>(Ty))
+        return false;
+      // The storage is guaranteed to be no larger than the register width.
+      // Extend the storage so it would fit into a register.
+      llvm::Type *IntTy;
+      switch (IGM.getClangASTContext().getTargetInfo().getRegisterWidth()) {
+      case 64:
+        IntTy = IGM.Int64Ty;
+        break;
+      case 32:
+        IntTy = IGM.Int32Ty;
+        break;
+      default:
+        llvm_unreachable("unsupported register width");
+      }
+      ArgTys = {IntTy};
+      Var = Var->getType()->getIntegerBitWidth() < IntTy->getIntegerBitWidth()
+                ? Builder.CreateZExtOrBitCast(Var, IntTy)
+                : Builder.CreateTruncOrBitCast(Var, IntTy);
+    }
+    // Emit an empty inline assembler expression depending on the register.
+    auto *AsmFnTy = llvm::FunctionType::get(IGM.VoidTy, ArgTys, false);
+    auto *InlineAsm = llvm::InlineAsm::get(AsmFnTy, "", "r", true);
+    Builder.CreateAsmCall(InlineAsm, Var);
+    return true;
+  }
+
+  /// At -Onone, forcibly keep all LLVM values that are tracked by
+  /// debug variables alive by inserting an empty inline assembler
+  /// expression depending on the value in the blocks dominated by the
+  /// value.
+  ///
+  /// This is used only in async functions.
+  void emitDebugVariableRangeExtension(const SILBasicBlock *CurBB) {
+    if (IGM.IRGen.Opts.shouldOptimize())
+      return;
+    for (auto &Variable : ValueDomPoints) {
+      llvm::Instruction *Var = Variable.first;
+      DominancePoint VarDominancePoint = Variable.second;
+      if (getActiveDominancePoint() == VarDominancePoint ||
+          isActiveDominancePointDominatedBy(VarDominancePoint)) {
+        bool ExtendedLifetime = emitLifetimeExtendingUse(Var);
+        if (!ExtendedLifetime)
+          continue;
+
+        // Propagate dbg.values for Var into the current basic block. Note
+        // that this shouldn't be necessary. LiveDebugValues should be doing
+        // this but can't in general because it currently only tracks register
+        // locations.
+        llvm::BasicBlock *BB = Var->getParent();
+        llvm::BasicBlock *CurBB = Builder.GetInsertBlock();
+        if (BB == CurBB)
+          // The current basic block must be a successor of the dbg.value().
+          continue;
+
+        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
+        llvm::findDbgValues(DbgValues, Var);
+        for (auto *DVI : DbgValues)
+          if (DVI->getParent() == BB)
+            IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
+                DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
+                DVI->getDebugLoc(), &*CurBB->getFirstInsertionPt());
+      }
+    }
+  }
+
+  
   /// Account for bugs in LLVM.
   ///
   /// - When a variable is spilled into a stack slot, LiveDebugValues fails to
@@ -872,6 +953,14 @@ public:
     // turned off for async functions, because they make it impossible to track
     // debug info during coroutine splitting. Instead we are relying on LLVM's
     // CoroSplit.cpp to emit shadow copies.
+
+    // Mark variables in async functions for lifetime extension, so they get
+    // spilled into the async context.
+    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+      if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
+        if (emitLifetimeExtendingUse(Value))
+          if (ValueVariables.insert(Value).second)
+            ValueDomPoints.push_back({Value, getActiveDominancePoint()});
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
         IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
         (CurSILFn->isAsync() && VarInfo.ArgNo) ||
@@ -905,6 +994,15 @@ public:
         (CurSILFn->isAsync() && VarInfo.ArgNo)) {
       auto vals = e.claimAll();
       copy.append(vals.begin(), vals.end());
+
+      // Mark variables in async functions for lifetime extension, so they get
+      // spilled into the async context.
+      if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
+        if (vals.begin() != vals.end())
+          if (auto *Value = dyn_cast<llvm::Instruction>(vals.front()))
+            if (emitLifetimeExtendingUse(Value))
+              if (ValueVariables.insert(Value).second)
+                ValueDomPoints.push_back({Value, getActiveDominancePoint()});
       return;
     }
 
@@ -2271,6 +2369,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         IGM.DebugInfo->setCurrentLoc(
             Builder, DS, RegularLocation::getAutoGeneratedLocation());
       }
+      if (isa<TermInst>(&I))
+        emitDebugVariableRangeExtension(BB);
     }
     visit(&I);
   }
@@ -4867,7 +4967,6 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   const TypeInfo &type = getTypeInfo(i->getElementType());
-
   // Derive name from SIL location.
   StringRef dbgname;
   VarDecl *Decl = i->getDecl();
