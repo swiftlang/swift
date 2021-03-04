@@ -60,9 +60,6 @@
 
 using namespace swift;
 
-SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobal_hook)(Job *job) = nullptr;
-
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 static Job *JobQueue = nullptr;
 
@@ -128,9 +125,9 @@ static void __swift_run_job_main_executor(void *_job) {
 void swift::swift_task_enqueueGlobal(Job *job) {
   assert(job && "no job provided");
 
-  // If the hook is defined, use it.
-  if (swift_task_enqueueGlobal_hook)
-    return swift_task_enqueueGlobal_hook(job);
+  if (_taskHooks.hook_enqueueGlobal(job)) {
+    return;
+  }
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   insertIntoJobQueue(job);

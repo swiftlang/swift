@@ -34,8 +34,7 @@ static void finishTest() {
 }
 
 static std::vector<Job*> globalQueue;
-SWIFT_CC(swift)
-static void enqueueGlobal(Job *job) {
+static bool enqueueGlobal(Job *job) {
   assert(job);
 
   // Check that the job isn't already on the queue.
@@ -49,17 +48,21 @@ static void enqueueGlobal(Job *job) {
   for (auto i = globalQueue.begin(), e = globalQueue.end(); i != e; ++i) {
     if (job->getPriority() <= (*i)->getPriority()) {
       globalQueue.insert(i, job);
-      return;
+      return true;
     }
   }
 
   // If the job's priority is higher than everything in the existing
   // queue, set it as the new front of the queue.
   globalQueue.push_back(job);
+  return true;
 }
 
 static void run(llvm::function_ref<void()> fn) {
-  swift_task_enqueueGlobal_hook = &enqueueGlobal;
+  TaskHooks hooks = {
+    .hook_enqueueGlobal = enqueueGlobal
+  };
+  swift_task_set_hooks(&hooks, sizeof(TaskHooks));
 
   progressIndex = 0;
 
@@ -79,8 +82,6 @@ static void run(llvm::function_ref<void()> fn) {
   }
 
   EXPECT_EQ(FinishedIndex, progressIndex);
-
-  swift_task_enqueueGlobal_hook = nullptr;
 }
 
 namespace {

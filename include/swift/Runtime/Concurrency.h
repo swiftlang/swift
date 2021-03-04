@@ -475,11 +475,6 @@ void swift_task_enqueueMainExecutor(Job *job);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_MainActor_register(HeapObject *actor);
 
-/// A hook to take over global enqueuing.
-/// TODO: figure out a better abstraction plan than this.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void (*swift_task_enqueueGlobal_hook)(Job *job);
-
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_initialize(DefaultActor *actor);
