@@ -488,7 +488,12 @@ bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
-bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
+bool PropertyWrapperAuxiliaryVariablesRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
+}
+
+bool PropertyWrapperInitializerInfoRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
@@ -520,10 +525,21 @@ void swift::simple_display(
 
 void swift::simple_display(
     llvm::raw_ostream &out,
-    const PropertyWrapperBackingPropertyInfo &backingInfo) {
+    const PropertyWrapperInitializerInfo &initInfo) {
+  out << "{";
+  if (initInfo.hasInitFromWrappedValue())
+    initInfo.getInitFromWrappedValue()->dump(out);
+  if (initInfo.hasInitFromProjectedValue())
+    initInfo.getInitFromProjectedValue()->dump(out);
+  out << " }";
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const PropertyWrapperAuxiliaryVariables &auxiliaryVars) {
   out << "{ ";
-  if (backingInfo.backingVar)
-    backingInfo.backingVar->dumpRef(out);
+  if (auxiliaryVars.backingVar)
+    auxiliaryVars.backingVar->dumpRef(out);
   out << " }";
 }
 

@@ -44,7 +44,7 @@ class DefaultArgumentExpr;
 class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
-struct PropertyWrapperBackingPropertyInfo;
+class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
@@ -712,11 +712,10 @@ public:
   bool isCached() const;
 };
 
-/// Request information about the backing property for properties that have
-/// attached property wrappers.
-class PropertyWrapperBackingPropertyInfoRequest :
-    public SimpleRequest<PropertyWrapperBackingPropertyInfoRequest,
-                         PropertyWrapperBackingPropertyInfo(VarDecl *),
+/// Request the synthesized auxiliary declarations for a wrapped property.
+class PropertyWrapperAuxiliaryVariablesRequest :
+    public SimpleRequest<PropertyWrapperAuxiliaryVariablesRequest,
+                         PropertyWrapperAuxiliaryVariables(VarDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -725,7 +724,28 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  PropertyWrapperBackingPropertyInfo
+  PropertyWrapperAuxiliaryVariables
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
+/// Request information about initialization of the backing property
+/// for properties that have attached property wrappers.
+class PropertyWrapperInitializerInfoRequest :
+    public SimpleRequest<PropertyWrapperInitializerInfoRequest,
+                         PropertyWrapperInitializerInfo(VarDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  PropertyWrapperInitializerInfo
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:

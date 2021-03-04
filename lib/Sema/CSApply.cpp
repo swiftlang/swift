@@ -1022,7 +1022,7 @@ namespace {
                           ? LValueType::get(outerParamType) : outerParamType);
         cs.cacheType(paramRef);
 
-        if (auto wrapperInfo = innerParam->getPropertyWrapperBackingPropertyInfo()) {
+        if (innerParam->hasAttachedPropertyWrapper()) {
           // Rewrite the parameter ref to the backing wrapper initialization
           // expression.
           auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];

@@ -186,8 +186,11 @@ SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
               ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
-              PropertyWrapperBackingPropertyInfo(VarDecl *), Cached,
+SWIFT_REQUEST(TypeChecker, PropertyWrapperAuxiliaryVariablesRequest,
+              PropertyWrapperAuxiliaryVariables(VarDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperInitializerInfoRequest,
+              PropertyWrapperInitializerInfo(VarDecl *), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperWrappedValueVarRequest,
               VarDecl *(VarDecl *), Cached,

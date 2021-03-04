@@ -5931,14 +5931,24 @@ Type VarDecl::getPropertyWrapperBackingPropertyType() const {
       Type());
 }
 
-PropertyWrapperBackingPropertyInfo
-VarDecl::getPropertyWrapperBackingPropertyInfo() const {
+PropertyWrapperAuxiliaryVariables
+VarDecl::getPropertyWrapperAuxiliaryVariables() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator,
-      PropertyWrapperBackingPropertyInfoRequest{mutableThis},
-      PropertyWrapperBackingPropertyInfo());
+      PropertyWrapperAuxiliaryVariablesRequest{mutableThis},
+      PropertyWrapperAuxiliaryVariables());
+}
+
+PropertyWrapperInitializerInfo
+VarDecl::getPropertyWrapperInitializerInfo() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyWrapperInitializerInfoRequest{mutableThis},
+      PropertyWrapperInitializerInfo());
 }
 
 Optional<PropertyWrapperMutability>
@@ -5963,11 +5973,11 @@ VarDecl::getPropertyWrapperSynthesizedPropertyKind() const {
 }
 
 VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
-  return getPropertyWrapperBackingPropertyInfo().backingVar;
+  return getPropertyWrapperAuxiliaryVariables().backingVar;
 }
 
 VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
-  return getPropertyWrapperBackingPropertyInfo().projectionVar;
+  return getPropertyWrapperAuxiliaryVariables().projectionVar;
 }
 
 VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
@@ -6038,11 +6048,11 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 }
 
 Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
-  auto wrapperInfo = getPropertyWrapperBackingPropertyInfo();
-  if (!wrapperInfo || !wrapperInfo.getWrappedValuePlaceholder())
+  auto initInfo = getPropertyWrapperInitializerInfo();
+  if (!initInfo.getWrappedValuePlaceholder())
     return Type();
 
-  Type valueInterfaceTy = wrapperInfo.getWrappedValuePlaceholder()->getType();
+  Type valueInterfaceTy = initInfo.getWrappedValuePlaceholder()->getType();
   if (valueInterfaceTy->hasArchetype())
     valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
 

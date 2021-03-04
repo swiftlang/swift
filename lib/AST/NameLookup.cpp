@@ -28,6 +28,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
@@ -1673,8 +1674,10 @@ static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
     if (auto var = dyn_cast<VarDecl>(member)) {
       if (var->hasAttachedPropertyWrapper()) {
         auto sourceFile = var->getDeclContext()->getParentSourceFile();
-        if (sourceFile && sourceFile->Kind != SourceFileKind::Interface)
-          (void)var->getPropertyWrapperBackingProperty();
+        if (sourceFile && sourceFile->Kind != SourceFileKind::Interface) {
+          (void)var->getPropertyWrapperAuxiliaryVariables();
+          (void)var->getPropertyWrapperInitializerInfo();
+        }
       }
     }
   }

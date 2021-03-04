@@ -243,12 +243,13 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
-    if (auto wrapperInfo = PD->getPropertyWrapperBackingPropertyInfo()) {
-      if (wrapperInfo.hasSynthesizedInitializers()) {
+    if (auto *backingVar = PD->getPropertyWrapperBackingProperty()) {
+      auto initInfo = PD->getPropertyWrapperInitializerInfo();
+      if (initInfo.hasSynthesizedInitializers()) {
         SGF.SGM.emitPropertyWrapperBackingInitializer(PD);
       }
 
-      PD = cast<ParamDecl>(wrapperInfo.backingVar);
+      PD = cast<ParamDecl>(backingVar);
     }
 
     auto type = PD->getType();
