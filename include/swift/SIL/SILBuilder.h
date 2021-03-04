@@ -1845,10 +1845,20 @@ public:
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances) {
+    return createInitExistentialRef(Loc, ExistentialType, FormalConcreteType,
+                                    Concrete, Conformances,
+                                    Concrete.getOwnershipKind());
+  }
+
+  InitExistentialRefInst *
+  createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
+                           CanType FormalConcreteType, SILValue Concrete,
+                           ArrayRef<ProtocolConformanceRef> Conformances,
+                           ValueOwnershipKind forwardingOwnershipKind) {
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), C.OpenedArchetypes,
-        Concrete.getOwnershipKind()));
+        forwardingOwnershipKind));
   }
 
   DeinitExistentialAddrInst *createDeinitExistentialAddr(SILLocation Loc,
@@ -2295,6 +2305,14 @@ public:
                           SILType destLoweredTy, CanType destFormalTy,
                           SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
+                          ProfileCounter Target1Count = ProfileCounter(),
+                          ProfileCounter Target2Count = ProfileCounter());
+
+  CheckedCastBranchInst *
+  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op,
+                          SILType destLoweredTy, CanType destFormalTy,
+                          SILBasicBlock *successBB, SILBasicBlock *failureBB,
+                          ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
 
