@@ -335,22 +335,6 @@ extension Task {
         }
       }
     }
-
-    /// Whether this (or its parents) have task local values.
-    var hasLocalValues: Bool {
-      get {
-        (bits & (1 << 27)) != 0
-      }
-
-      set {
-        if newValue {
-          bits = bits | 1 << 27
-        } else {
-          bits = (bits & ~(1 << 27))
-        }
-      }
-    }
-
   }
 }
 
@@ -633,7 +617,7 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 /// which was called through its ObjC-exported completion-handler-based API.
 @_alwaysEmitIntoClient
 @usableFromInline
-internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
+internal func _runTaskForBridgedAsyncMethod(_ body: @concurrent @escaping () async -> Void) {
   // TODO: We can probably do better than Task.runDetached
   // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other

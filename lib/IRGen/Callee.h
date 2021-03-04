@@ -133,6 +133,7 @@ namespace irgen {
     enum class SpecialKind {
       TaskFutureWait,
       TaskFutureWaitThrowing,
+      TaskGroupAdd,
       TaskGroupWaitNext,
     };
 
@@ -181,6 +182,7 @@ namespace irgen {
           // future.
           return true;
         case SpecialKind::TaskGroupWaitNext:
+        case SpecialKind::TaskGroupAdd: // TODO: no idea if this too can be supressed?
           return false;
         }
       }

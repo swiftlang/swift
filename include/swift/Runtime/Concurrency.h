@@ -162,6 +162,87 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskFutureWaitThrowingSignature::FunctionType
 swift_task_future_wait_throwing;
 
+/// Create a new `TaskGroup`.
+/// The caller is responsible for retaining and managing the group's lifecycle.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_create(
+///     _ task: Builtin.NativeObject
+/// ) -> Builtin.RawPointer
+/// \endcode
+// FIXME: NOT ABI and should be removed; Instead, make a Builtin.taskGroupCreate that calls swift_taskGroup_initialize
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskGroup* swift_taskGroup_create(AsyncTask *task);
+
+/// Initialize a `TaskGroup` in the passed `group` memory location.
+/// The caller is responsible for retaining and managing the group's lifecycle.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_initialize(
+///     _ task: Builtin.NativeObject,
+///     group: Builtin.RawPointer,
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group);
+
+///// Attach a child task to the parent task's task group record.
+/////
+///// This function MUST be called from the AsyncTask running the task group.
+/////
+///// Since the group (or rather, its record) is inserted in the parent task at
+///// creation we do not need the parent task here, the group already is attached
+///// to it.
+///// Its Swift signature is
+/////
+///// \code
+///// func swift_taskGroup_attachChild(
+/////     group: Builtin.RawPointer,
+/////     parent: Builtin.NativeObject,
+/////     child: Builtin.NativeObject
+///// )
+///// \endcode
+//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+//void swift_taskGroup_attachChild(TaskGroup *group, AsyncTask *child);
+
+/// Its Swift signature is
+///
+/// This function MUST be called from the AsyncTask running the task group.
+///
+/// \code
+/// func swift_taskGroup_destroy(
+///     _ task: Builtin.NativeObject,
+///     _ group: UnsafeRawPointer
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_destroy(AsyncTask *task, TaskGroup *group);
+
+using TaskGroupAddSignature =
+  AsyncSignature<bool(TaskGroup *, JobPriority, ThickNullaryAsyncSignature::FunctionPointer *), // FIXME: signature?
+                 /*throws*/ false>;
+
+/// Create a task group child task, add it to the group, and schedule it.
+///
+/// This function MUST be called from the AsyncTask running the task group.
+///
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_addPending(
+///     group: Builtin.RawPointer
+///     priorityOverride: Int,
+///     operation: @concurrent @escaping () async throws -> TaskResult // FIXME: signature?
+/// ) -> Bool
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+TaskGroupAddSignature::FunctionType
+swift_taskGroup_add;
+
 using TaskGroupFutureWaitThrowingSignature =
   AsyncSignature<void(AsyncTask *, TaskGroup *, Metadata *), /*throws*/ true>;
 
@@ -179,80 +260,22 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskGroupFutureWaitThrowingSignature::FunctionType
 swift_taskGroup_wait_next_throwing;
 
-/// Create a new `TaskGroup`.
-/// The caller is responsible for retaining and managing the group's lifecycle.
-///
-/// Its Swift signature is
-///
-/// \code
-/// func swift_taskGroup_create(
-///     _ task: Builtin.NativeObject
-/// ) -> Builtin.RawPointer
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-TaskGroup* swift_taskGroup_create(AsyncTask *task); // TODO: probably remove this call, and just use the initialize always
-
-/// Initialize a `TaskGroup` in the passed `group` memory location.
-/// The caller is responsible for retaining and managing the group's lifecycle.
-///
-/// Its Swift signature is
-///
-/// \code
-/// func swift_taskGroup_initialize(
-///     _ task: Builtin.NativeObject,
-///     group: Builtin.RawPointer,
-/// )
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group);
-
-/// Attach a child task to the parent task's task group record.
-///
-/// This function MUST be called from the AsyncTask running the task group.
-///
-/// Since the group (or rather, its record) is inserted in the parent task at
-/// creation we do not need the parent task here, the group already is attached
-/// to it.
-/// Its Swift signature is
-///
-/// \code
-/// func swift_taskGroup_attachChild(
-///     group: Builtin.RawPointer,
-///     parent: Builtin.NativeObject,
-///     child: Builtin.NativeObject
-/// )
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_taskGroup_attachChild(TaskGroup *group, AsyncTask *child);
-
-/// Its Swift signature is
-///
-/// This function MUST be called from the AsyncTask running the task group.
-///
-/// \code
-/// func swift_taskGroup_destroy(
-///     _ task: Builtin.NativeObject,
-///     _ group: UnsafeRawPointer
-/// )
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_taskGroup_destroy(AsyncTask *task, TaskGroup *group);
-
-/// Before starting a task group child task, inform the group that there is one
-/// more 'pending' child to account for.
-///
-/// This function SHOULD be called from the AsyncTask running the task group,
-/// however is generally thread-safe as it only only works with the group status.
-///
-/// Its Swift signature is
-///
-/// \code
-/// func swift_taskGroup_addPending(
-///     group: Builtin.RawPointer
-/// ) -> Bool
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_taskGroup_addPending(TaskGroup *group);
+///// Before starting a task group child task, inform the group that there is one
+///// more 'pending' child to account for.
+/////
+///// This function SHOULD be called from the AsyncTask running the task group,
+///// however is generally thread-safe as it only only works with the group status.
+/////
+///// Its Swift signature is
+/////
+///// \code
+///// func swift_taskGroup_addPending(
+/////     group: Builtin.RawPointer
+///// ) -> Bool
+///// \endcode
+//// FIXME: should not be ABI, instead the entire add() should be ABI
+//SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+//bool swift_taskGroup_addPending(TaskGroup *group);
 
 /// Cancel all tasks in the group.
 /// This also prevents new tasks from being added.

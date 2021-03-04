@@ -201,6 +201,10 @@ public:
   }
 
   /// Attach the passed in `child` task to this group.
+  ///
+  /// ### Concurrency
+  /// MUST be called from the task which owns the group, because it involves
+  /// modifying the tasks task group record without additional synchronization.
   void attachChild(AsyncTask *child) {
     assert(child->groupChildFragment());
     assert(child->hasGroupChildFragment());
@@ -215,19 +219,23 @@ public:
     // We need to traverse the siblings to find the last one and add the child there.
     // FIXME: just set prepend to the current head, no need to traverse.
 
-    auto cur = FirstChild;
-    while (cur) {
-      // no need to check hasChildFragment, all tasks we store here have them.
-      auto fragment = cur->childFragment();
-      if (auto next = fragment->getNextChild()) {
-        cur = next;
-      } else {
-        // we're done searching and `cur` is the last
-        break;
-      }
-    }
+    AsyncTask* previousFirstChild = FirstChild;
+    FirstChild = child;
+    child->childFragment()->setNextChild(previousFirstChild);
 
-    cur->childFragment()->setNextChild(child);
+//    auto cur = FirstChild;
+//    while (cur) {
+//      // no need to check hasChildFragment, all tasks we store here have them.
+//      auto fragment = cur->childFragment();
+//      if (auto next = fragment->getNextChild()) {
+//        cur = next;
+//      } else {
+//        // we're done searching and `cur` is the last
+//        break;
+//      }
+//    }
+//
+//    cur->childFragment()->setNextChild(child);
   }
 
   static AsyncTask *getNextChildTask(AsyncTask *task) {

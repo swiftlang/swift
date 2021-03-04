@@ -443,22 +443,8 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
 
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 void swift::swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group) {
-//  // nasty trick, but we want to keep the record inside the group as we'll need
-//  // to remove it from the task as the group is destroyed, as well as interact
-//  // with it every time we add child tasks; so it is useful to pre-create it here
-//  // and store it in the group.
-//  //
-//  // The record won't be used by anyone until we're done constructing and setting
-//  // up the group anyway.
-//  void *recordAllocation = swift_task_alloc(task, sizeof(TaskGroupTaskStatusRecord));
-//  auto record = new (recordAllocation)
-//    TaskGroupTaskStatusRecord(reinterpret_cast<TaskGroupImpl*>(_group));
-
-  // TODO: this becomes less weird once we make the fragment BE the group
-
   TaskGroupImpl *impl = new (group) TaskGroupImpl();
   auto record = impl->getTaskRecord();
-  assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
   swift_task_addStatusRecord(task, record);
@@ -467,20 +453,14 @@ void swift::swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group) {
 // =============================================================================
 // ==== create -----------------------------------------------------------------
 
+// FIXME: NOT ABI! This must be replaced with a builtin.
+// TODO: John suggested we should rather create from a builtin, which would allow us to optimize allocations even more?
 TaskGroup* swift::swift_taskGroup_create(AsyncTask *task) {
-  // TODO: John suggested we should rather create from a builtin, which would allow us to optimize allocations even more?
   void *allocation = swift_task_alloc(task, sizeof(TaskGroup));
   auto group = reinterpret_cast<TaskGroup *>(allocation);
   swift_taskGroup_initialize(task, group);
+  fprintf(stderr, "[%s:%d] (%s) group %d\n", __FILE__, __LINE__, __FUNCTION__, group);
   return group;
-}
-
-// =============================================================================
-// ==== add / attachChild ------------------------------------------------------
-
-void swift::swift_taskGroup_attachChild(TaskGroup *group, AsyncTask *child) {
-  auto groupRecord = asImpl(group)->getTaskRecord();
-  return groupRecord->attachChild(child);
 }
 
 // =============================================================================
@@ -507,6 +487,79 @@ void TaskGroupImpl::destroy(AsyncTask *task) {
 
   // TODO: get the parent task, do we need to store it?
   swift_task_dealloc(task, this);
+}
+
+// =============================================================================
+// ==== add --------------------------------------------------------------------
+
+SWIFT_CC(swiftasync)
+void swift::swift_taskGroup_add(
+    AsyncTask *addingTask,
+    ExecutorRef executor,
+    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
+  addingTask->ResumeTask = rawContext->ResumeParent;
+  addingTask->ResumeContext = rawContext;
+
+  auto context = static_cast<TaskGroupAddAsyncContext *>(rawContext);
+  auto group = context->group;
+  auto _group = asImpl(group);
+  auto operation = context->operation;
+  // to get the effective priority of this task, we check if an override was specified,
+  // and if not we re-use the parent task's priority.
+  auto priority = context->priorityOverride == JobPriority::Unspecified ?
+                  addingTask->Flags.getPriority() : context->priorityOverride;
+  auto childTaskResultType = context->childTaskResultType;
+  fprintf(stderr, "[%s:%d] (%s) params --------------\n", __FILE__, __LINE__, __FUNCTION__);
+  fprintf(stderr, "[%s:%d] (%s) addingTask  %d\n", __FILE__, __LINE__, __FUNCTION__, addingTask);
+  fprintf(stderr, "[%s:%d] (%s) group       %d\n", __FILE__, __LINE__, __FUNCTION__, group);
+  fprintf(stderr, "[%s:%d] (%s) override    %d\n", __FILE__, __LINE__, __FUNCTION__, context->priorityOverride);
+  fprintf(stderr, "[%s:%d] (%s) priority    %d\n", __FILE__, __LINE__, __FUNCTION__, priority);
+  fprintf(stderr, "[%s:%d] (%s) operation   %d\n", __FILE__, __LINE__, __FUNCTION__, operation);
+  assert(group && "swift_taskGroup_wait_next_throwing was passed context without group!");
+
+  // If the task is cancelled, the group is as well,
+  // and we can avoid even trying to add into it
+  auto cancelled = addingTask->isCancelled();
+
+  // Unless already cancelled, attempt to +1 pending task count in the group.
+  // This will also inform us if the group itself already is cancelled.
+  if (!cancelled) {
+    auto assumedStatus = _group->statusAddPendingTaskRelaxed();
+    // if the group was cancelled already,
+    cancelled = cancelled && assumedStatus.isCancelled();
+  }
+
+  // If the group or task were cancelled, we cannot add tasks and must bail out
+  if (cancelled) {
+    // initialize the result as `false` (unable to add to the group).
+    *reinterpret_cast<bool*>(context->successResultPointer) = false;
+    addingTask->runInFullyEstablishedContext(executor);
+    return;
+  }
+
+  // We added `pending` and can create the group child task now
+  auto flags = JobFlags(JobKind::Task, priority);
+  flags.task_setIsFuture(true);
+  flags.task_setIsChildTask(true);
+  flags.task_setIsGroupChildTask(true);
+
+  auto pair = swift_task_create_group_future_f(
+    flags, /*parent*/ addingTask, group,
+    /*futureResultType*/ childTaskResultType,
+    operation->Function.get(),
+    operation->ExpectedContextSize);
+
+  fprintf(stderr, "[%s:%d] (%s) created child %d\n", __FILE__, __LINE__, __FUNCTION__, pair.Task);
+  // Attach this child task to the group (which
+  _group->attachChild(pair.Task);
+
+  // Schedule the resulting job.
+  // TODO: it should be possible to customize this executor via add(startingOn: executor)
+  swift_task_enqueueGlobal(pair.Task);
+
+  // We're done here, return true to signal we successfully added to the group.
+  *reinterpret_cast<bool*>(context->successResultPointer) = true;
+  addingTask->runInFullyEstablishedContext(executor);
 }
 
 // =============================================================================
@@ -800,10 +853,10 @@ bool TaskGroupImpl::cancelAll(AsyncTask *task) {
   return true;
 }
 
-// =============================================================================
-// ==== addPending -------------------------------------------------------------
-
-bool swift::swift_taskGroup_addPending(TaskGroup *group) {
-  auto assumedStatus = asImpl(group)->statusAddPendingTaskRelaxed();
-  return !assumedStatus.isCancelled();
-}
+//// =============================================================================
+//// ==== addPending -------------------------------------------------------------
+//
+//bool swift::swift_taskGroup_addPending(TaskGroup *group) {
+//  auto assumedStatus = asImpl(group)->statusAddPendingTaskRelaxed();
+//  return !assumedStatus.isCancelled();
+//}

@@ -345,6 +345,8 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   // TODO: consider providing an initial pre-allocated first slab to the allocator.
   _swift_task_alloc_initialize(task);
 
+  fprintf(stderr, "[%s:%d] (%s) task %d\n", __FILE__, __LINE__, __FUNCTION__, task);
+
   // TODO: if the allocator would be prepared earlier we could do this in some
   //       other existing if-parent if rather than adding another one here.
   if (parent) {

@@ -26,6 +26,9 @@
 
 namespace swift {
 
+using FutureAsyncSignature =
+  AsyncSignature<void(void*), /*throws*/ true>;
+
 /// The task group is responsible for maintaining dynamically created child tasks.
 class alignas(Alignment_TaskGroup) TaskGroup {
 public:
@@ -37,8 +40,22 @@ public:
 
   void *PrivateData[NumWords_TaskGroup];
 
-  /// Upon a future task's completion, offer it to the task group it belongs to.
+  /// Implements TaskGroup.add
+  void add(JobPriority priorityOverride,
+           FutureAsyncSignature::FunctionType *function);
+
+  /// Implements a task group completion reporting back to its owning group.
+  ///
+  /// Upon a future task's completion, that task group child task will offer
+  /// itself as `completed` to its parent group. This way the group can either
+  /// immediately resume the (if present) on `next()` waiting task, or record
+  /// the future result for later consumption whenever `next()` is awaited on.
+  ///
+  /// If other tasks have been offered but not yet next() consumed, this enqueues
+  /// this completed result in an internal queue that will feed future next()
+  /// invocations.
   void offer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
+
 };
 
 } // end namespace swift

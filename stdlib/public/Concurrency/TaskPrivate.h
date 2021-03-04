@@ -63,8 +63,7 @@ namespace {
 /// An asynchronous context within a task that describes a general "Future".
 ///
 /// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
-/// futures.
+/// is the type used by `Task.runDetached` to create futures.
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   // Error result is always present.
@@ -72,8 +71,7 @@ public:
 
   OpaqueValue *successResultPointer;
 
-  // FIXME: Currently, this is always here, but it isn't technically
-  // necessary.
+  // FIXME: Currently, this is always here, but it isn't technically necessary.
   void* Self;
 
   // Arguments.
@@ -83,6 +81,49 @@ public:
   TaskGroup *group;
   // Only in swift_taskGroup_wait_next_throwing.
   const Metadata *successType;
+
+  using AsyncContext::AsyncContext;
+
+  void fillWithSuccess(AsyncTask::FutureFragment *future) {
+    fillWithSuccess(future->getStoragePtr(), future->getResultType());
+  }
+  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
+    successType->vw_initializeWithCopy(successResultPointer, src);
+  }
+
+  void fillWithError(AsyncTask::FutureFragment *future) {
+    fillWithError(future->getError());
+  }
+  void fillWithError(SwiftError *error) {
+    *errorResult = error;
+    swift_errorRetain(error);
+  }
+};
+
+/// An asynchronous context within a task that describes a general "Future".
+///
+/// This type matches the ABI of a function `<T> () async throws -> T`, which
+/// is the type used by `Task.group.add` to create futures.
+///
+/// the result will always be true or false.
+class TaskGroupAddAsyncContext : public AsyncContext {
+public:
+  // Error result is always present.
+  SwiftError **errorResult = nullptr;
+
+  OpaqueValue *successResultPointer;
+
+  // FIXME: Currently, this is always here, but it isn't technically necessary.
+  void* Self;
+
+  // Arguments.
+  TaskGroup *group;
+
+  JobPriority priorityOverride;
+
+  ThickNullaryAsyncSignature::FunctionPointer *operation;
+
+  const Metadata *childTaskResultType;
 
   using AsyncContext::AsyncContext;
 

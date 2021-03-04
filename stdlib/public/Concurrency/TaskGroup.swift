@@ -12,6 +12,7 @@
 
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
+import Foundation
 
 // ==== Task Group -------------------------------------------------------------
 
@@ -32,21 +33,30 @@ extension Task {
   ///       // some accumulation logic (e.g. sum += result)
   ///     }
   ///
+  ///     // or, using an async for loop:
+  ///
+  ///     for await try result in group.next() {
+  ///       // some logic (e.g. sum += result)
+  ///     }
+  ///
   /// ### Thrown errors
   /// When tasks are added to the group using the `group.add` function, they may
-  /// immediately begin executing. Even if their results are not collected explicitly
-  /// and such task throws, and was not yet cancelled, it may result in the `withGroup`
-  /// throwing.
+  /// immediately begin executing. Even if their results are not collected
+  /// explicitly and such task throws, and was not yet cancelled, it may result
+  /// in the `withGroup` throwing.
   ///
   /// ### Cancellation
-  /// If an error is thrown out of the task group, all of its remaining tasks
-  /// will be cancelled and the `withGroup` call will rethrow that error.
+  /// If an error is thrown out of the task group's `body`, all of its remaining
+  /// tasks will be cancelled and the `withGroup` call will rethrow that error.
   ///
   /// Individual tasks throwing results in their corresponding `try group.next()`
   /// call throwing, giving a chance to handle individual errors or letting the
   /// error be rethrown by the group.
   ///
-  /// Postcondition:
+  /// If the task which is running this task group is cancelled, the group becomes
+  /// cancelled as well, i.e. it will stop accepting new tasks being added to it.
+  ///
+  /// ### Postcondition
   /// Once `withGroup` returns it is guaranteed that the `group` is *empty*.
   ///
   /// This is achieved in the following way:
@@ -56,10 +66,6 @@ extension Task {
   ///   - once the `withGroup` returns the group is guaranteed to be empty.
   /// - if the body throws:
   ///   - all tasks remaining in the group will be automatically cancelled.
-  // TODO: Do we have to add a different group type to accommodate throwing
-  //       tasks without forcing users to use Result?  I can't think of how that
-  //       could be propagated out of the callback body reasonably, unless we
-  //       commit to doing multi-statement closure typechecking.
   public static func withGroup<TaskResult, BodyResult>(
     resultType: TaskResult.Type,
     returning returnType: BodyResult.Type = BodyResult.self,
@@ -99,7 +105,6 @@ extension Task {
 
     /// No public initializers
     init(task: Builtin.NativeObject, group: Builtin.RawPointer) {
-      // TODO: this feels slightly off, any other way to avoid the task being too eagerly released?
       _swiftRetain(task) // to avoid the task being destroyed when the group is destroyed
 
       self._task = task
@@ -126,32 +131,39 @@ extension Task {
       overridingPriority priorityOverride: Priority? = nil,
       operation: @concurrent @escaping () async throws -> TaskResult
     ) async -> Bool {
-      let canAdd = _taskGroupAddPendingTask(group: _group)
-
-      guard canAdd else {
-        // the group is cancelled and is not accepting any new work
-        return false
-      }
-
-      // Set up the job flags for a new task.
-      var flags = Task.JobFlags()
-      flags.kind = .task
-      flags.priority = priorityOverride ?? getJobFlags(_task).priority
-      flags.isFuture = true
-      flags.isChildTask = true
-      flags.isGroupChildTask = true
-
-      // Create the asynchronous task future.
-      let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-        flags.bits, _task, _group, operation)
-
-      // Attach it to the group's task record in the current task.
-      _taskGroupAttachChild(group: _group, child: childTask)
-
-      // Enqueue the resulting job.
-      _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
-
-      return true
+//      let canAdd = _taskGroupAddPendingTask(group: _group)
+//
+//      guard canAdd else {
+//        // the group is cancelled and is not accepting any new work
+//        return false
+//      }
+//
+//      // Set up the job flags for a new task.
+//      var flags = Task.JobFlags()
+//      flags.kind = .task
+//      flags.priority = priorityOverride ?? getJobFlags(_task).priority
+//      flags.isFuture = true
+//      flags.isChildTask = true
+//      flags.isGroupChildTask = true
+//
+//      // Create the asynchronous task future.
+//      let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
+//        flags.bits, _task, _group, operation)
+//
+//      // Attach it to the group's task record in the current task.
+//      _taskGroupAttachChild(group: _group, child: childTask)
+//
+//      // Enqueue the resulting job.
+//      _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+//
+//      return true
+      fputs("[\(#file):\(#line)] (\(#function)) ADD\n", stderr)
+      return await _taskGroupAdd(
+        group: _group,
+        priorityOverride: (priorityOverride ?? Priority.unspecified).rawValue,
+        operation: operation,
+        childTaskResultType: TaskResult.self
+      )
     }
 
     /// Wait for the a child task that was added to the group to complete,
@@ -183,7 +195,8 @@ extension Task {
     ///     }
     ///
     /// ### Thread-safety
-    /// Please note that the `group` object MUST NOT escape into another task.
+    /// The `group` value MUST NOT escape into another task.
+    ///
     /// The `group.next()` MUST be awaited from the task that had originally
     /// created the group. It is not allowed to escape the group reference.
     ///
@@ -209,9 +222,7 @@ extension Task {
     /// function's body, causing all remaining tasks to be implicitly cancelled.
     public mutating func next() async throws -> TaskResult? {
       #if NDEBUG
-      let callingTask = Builtin.getCurrentAsyncTask() // can't inline into the assert sadly
-      assert(unsafeBitCast(callingTask, to: size_t.self) ==
-             unsafeBitCast(_task, to: size_t.self),
+      assert(Task.currentUnsafe?.task == Task(_task),
         """
         group.next() invoked from task other than the task which created the group! \
         This means the group must have illegally escaped the withGroup{} scope.
@@ -346,12 +357,12 @@ func _taskGroupCreate(
   task: Builtin.NativeObject
 ) -> Builtin.RawPointer
 
-/// Attach task group child to the group group to the task.
-@_silgen_name("swift_taskGroup_attachChild")
-func _taskGroupAttachChild(
-  group: Builtin.RawPointer,
-  child: Builtin.NativeObject
-) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
+///// Attach task group child to the group group to the task.
+//@_silgen_name("swift_taskGroup_attachChild")
+//func _taskGroupAttachChild(
+//  group: Builtin.RawPointer,
+//  child: Builtin.NativeObject
+//) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
 
 @_silgen_name("swift_taskGroup_destroy")
 func _taskGroupDestroy(
@@ -359,10 +370,18 @@ func _taskGroupDestroy(
   group: __owned Builtin.RawPointer
 )
 
-@_silgen_name("swift_taskGroup_addPending")
-func _taskGroupAddPendingTask(
-  group: Builtin.RawPointer
-) -> Bool
+@_silgen_name("swift_taskGroup_add")
+func _taskGroupAdd(
+  group: Builtin.RawPointer,
+  priorityOverride: Int, // JobPriority
+  operation: @concurrent @escaping () async throws -> Any, // FIXME: is the signature right?
+  childTaskResultType: Any
+) async -> Bool
+
+//@_silgen_name("swift_taskGroup_addPending")
+//func _taskGroupAddPendingTask(
+//  group: Builtin.RawPointer
+//) -> Bool
 
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(
