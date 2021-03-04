@@ -668,6 +668,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
       contAwaitSyncAddr->getType()->getPointerElementType(), 1);
   auto results = Builder.CreateAtomicCmpXchg(
       contAwaitSyncAddr, null, one,
+      llvm::MaybeAlign(),
       llvm::AtomicOrdering::Release /*success ordering*/,
       llvm::AtomicOrdering::Acquire /* failure ordering */,
       llvm::SyncScope::System);
@@ -710,6 +711,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
 
     auto results = Builder.CreateAtomicCmpXchg(
         contAwaitSyncAddr, null, one,
+        llvm::MaybeAlign(),
         llvm::AtomicOrdering::Release /*success ordering*/,
         llvm::AtomicOrdering::Acquire /* failure ordering */,
         llvm::SyncScope::System);
