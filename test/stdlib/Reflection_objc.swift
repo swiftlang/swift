@@ -9,6 +9,9 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// rdar://problem/75006694
+// XFAIL: OS=macosx && CPU=arm64
+
 //
 // DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
 //
