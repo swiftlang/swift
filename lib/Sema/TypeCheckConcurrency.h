@@ -74,22 +74,24 @@ public:
     /// There is no restriction on references to the given declaration.
     Unrestricted,
 
-    /// Access to the declaration is unsafe in a concurrent context.
+    /// Access to the declaration is unsafe in any concurrent context.
     Unsafe,
 
     /// References to this entity are allowed from anywhere, but doing so
-    /// may cross an actor boundary if it is not on \c self.
+    /// may cross an actor boundary if it is not from within the same actor's
+    /// isolation domain.
     CrossActorSelf,
 
-    /// References to this member of an actor are only permitted on 'self'.
+    /// References to this member of an actor are only permitted from within
+    /// the actor's isolation domain.
     ActorSelf,
 
     /// References to a declaration that is part of a global actor are only
     /// permitted from other declarations with that same global actor.
     GlobalActor,
 
-    /// Referneces to this entity are allowed from anywhere, but doing so may
-    /// cross an actor bounder if it is not from the same global actor.
+    /// References to this entity are allowed from anywhere, but doing so may
+    /// cross an actor boundary if it is not from the same global actor.
     CrossGlobalActor,
   };
 

@@ -472,6 +472,7 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       case ActorIsolation::Unspecified:
       case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::GlobalActorUnsafe:
         break;
 
       case ActorIsolation::ActorInstance: {

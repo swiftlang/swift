@@ -690,6 +690,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
       break;
 
     case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       Out << "global actor " << FormatOpts.OpeningQuotationMark
         << isolation.getGlobalActor().getString()
         << FormatOpts.ClosingQuotationMark << "-isolated";
