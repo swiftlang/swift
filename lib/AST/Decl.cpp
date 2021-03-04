@@ -600,6 +600,9 @@ const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
     return CachedSerializedLocs;
   }
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  assert(File->getKind() == FileUnitKind::SerializedAST &&
+         "getSerializedLocs() should only be called on decls in "
+         "a 'SerializedASTFile'");
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
     static const Decl::CachedExternalSourceLocs NullLocs{};

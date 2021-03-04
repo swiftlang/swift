@@ -147,9 +147,14 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
     return Result;
   }
 
-  // Ask the parent module.
-  if (auto *Unit =
-          dyn_cast<FileUnit>(this->getDeclContext()->getModuleScopeContext())) {
+  if (!getDeclContext())
+    return RawComment();
+  auto *Unit = dyn_cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  if (!Unit)
+    return RawComment();
+
+  switch (Unit->getKind()) {
+  case FileUnitKind::SerializedAST: {
     if (SerializedOK) {
       if (const auto *CachedLocs = getSerializedLocs()) {
         if (!CachedLocs->DocRanges.empty()) {
@@ -158,8 +163,8 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
             if (Range.isValid()) {
               SRCs.push_back({ Range, Context.SourceMgr });
             } else {
-              // if we've run into an invalid range, don't bother trying to load any of
-              // the other comments
+              // if we've run into an invalid range, don't bother trying to load
+              // any of the other comments
               SRCs.clear();
               break;
             }
@@ -178,10 +183,17 @@ RawComment Decl::getRawComment(bool SerializedOK) const {
       Context.setRawComment(this, C->Raw);
       return C->Raw;
     }
-  }
 
-  // Give up.
-  return RawComment();
+    return RawComment();
+  }
+  case FileUnitKind::Source:
+  case FileUnitKind::Builtin:
+  case FileUnitKind::Synthesized:
+  case FileUnitKind::ClangModule:
+  case FileUnitKind::DWARFModule:
+    return RawComment();
+  }
+  llvm_unreachable("invalid file kind");
 }
 
 static const Decl* getGroupDecl(const Decl *D) {
