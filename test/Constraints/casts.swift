@@ -346,7 +346,7 @@ extension Int: JSONLeaf { }
 extension Array: JSON where Element: JSON { }
 
 protocol SR13035Error: Error {}
-class ChildError: SR13035Error {} // expected-warning{{non-final class 'ChildError' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
+class ChildError: SR13035Error {}
 
 protocol AnyC {
   func foo()

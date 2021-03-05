@@ -238,6 +238,12 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
+    /// Provide additional warnings about code that is unsafe in the
+    /// eventual Swift concurrency model, and will eventually become errors
+    /// in a future Swift language version, but are too noisy for existing
+    /// language modes.
+    bool WarnConcurrency = false;
+
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
