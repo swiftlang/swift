@@ -64,6 +64,11 @@ namespace syntax {
 class SyntaxDataRef {
   friend class SyntaxData;
 
+  /// OptionalStorage is a friend so it can call the memberwise initialiser
+  /// to construct a null \c SyntaxDataRef.
+  template <typename, bool>
+  friend class llvm::optional_detail::OptionalStorage;
+
 protected:
   /// The \c AbsoluteRawSyntaxNode that provides the majority of this node's
   /// data. The underlying \c RawSyntax node is *not* retained by the \c
@@ -73,7 +78,7 @@ protected:
   /// In \c SyntaxData, the backing \c SyntaxArena is retained via the \c Arena
   /// property, lifiting the responsibility to guarantee the \c RawSyntax node
   /// stays alive from the user.
-  const AbsoluteRawSyntax AbsoluteRaw;
+  AbsoluteRawSyntax AbsoluteRaw;
 
   /// The parent of this node. The parent is *not* retained by the \c
   /// SyntaxDataRef. It is the user's responsibility to ensure that the parent
@@ -84,18 +89,14 @@ protected:
   /// and released when \c this is destroyed.
   const SyntaxDataRef *Parent;
 
-  /// Creates an empty \c SyntaxDataRef variable to which values can later be
-  /// stored.
-  SyntaxDataRef() : AbsoluteRaw() {}
+  /// Creates an *uninitialized* \c SyntaxDataRef.
+  SyntaxDataRef() {}
 
   /// Creates a \c SyntaxDataRef. \p AbsoluteRaw must not be null. If \p Parent
   /// is a \c nullptr, this node represents the root of a tree.
   SyntaxDataRef(const AbsoluteRawSyntax &AbsoluteRaw,
                 const SyntaxDataRef *Parent)
       : AbsoluteRaw(AbsoluteRaw), Parent(Parent) {
-    assert(!AbsoluteRaw.isNull() &&
-           "SyntaxDataRef must always have a value. Use default constructor to "
-           "create a SyntaxDataRef to be populated later.");
   }
 
 #ifndef NDEBUG
@@ -107,14 +108,12 @@ public:
   SyntaxDataRef(const SyntaxDataRef &DataRef) = default;
   SyntaxDataRef(SyntaxDataRef &&DataRef) = default;
 
+  SyntaxDataRef &operator=(SyntaxDataRef const &other) = default;
+  SyntaxDataRef &operator=(SyntaxDataRef &&other) = default;
+
   // MARK: - Retrieving underlying data
 
-  /// Whether this is a null node created by the default constructor, and will
-  /// be populated later.
-  bool isNull() const { return AbsoluteRaw.isNull(); }
-
   const AbsoluteRawSyntax &getAbsoluteRaw() const {
-    assert(!isNull() && "Cannot get AbsoluteRaw of a null SyntaxDataRef");
     return AbsoluteRaw;
   }
 
@@ -124,7 +123,6 @@ public:
   // MARK: - Retrieving related nodes
 
   const SyntaxDataRef *getParentRef() const {
-    assert(!isNull() && "Cannot get Parent of a null SyntaxDataRef");
     return Parent;
   }
 
@@ -331,5 +329,80 @@ public:
 
 } // end namespace syntax
 } // end namespace swift
+
+namespace llvm {
+namespace optional_detail {
+
+using swift::syntax::SyntaxDataRef;
+
+/// A custom \c OptionalStorage implementation for \c SyntaxDataRef.
+/// This makes \c Optional<SyntaxDataRef> a zero-cost wrapper around \c
+/// SyntaxDataRef that uses an internal null type to denote a missing value.
+/// This way, we can guarantee that \c SyntaxDataRef values are always non-null.
+/// Additionally, it allows writing a value into the \c Optional's storage
+/// pointer, which automatically flips the \c Optional's \c hasValue property
+/// to \c true. E.g.
+/// \code
+/// Optional<SyntaxDataRef> optRef;
+/// optRef.hasValue(); // false
+/// new (optRef.getPointer()) SyntaxDataRef(...);
+/// optRef.hasValue(); // true
+/// \endcode
+/// This behaviour is important so we can stack-allocate an optional \c
+/// SyntaxDataRef and later populate its value using the \c SyntaxDataRef's
+/// \c getChild method.
+template <>
+class OptionalStorage<SyntaxDataRef> {
+  SyntaxDataRef Storage;
+
+public:
+  OptionalStorage() : Storage(AbsoluteRawSyntax(nullptr), nullptr) {}
+  OptionalStorage(OptionalStorage const &other) = default;
+  OptionalStorage(OptionalStorage &&other) = default;
+
+  template <class... ArgTypes>
+  explicit OptionalStorage(llvm::optional_detail::in_place_t,
+                           ArgTypes &&...Args)
+      : Storage(std::forward<ArgTypes>(Args)...) {}
+
+  void reset() { Storage = SyntaxDataRef(AbsoluteRawSyntax(nullptr), nullptr); }
+
+  bool hasValue() const { return !Storage.getAbsoluteRaw().isNull(); }
+
+  SyntaxDataRef &getValue() LLVM_LVALUE_FUNCTION {
+    assert(hasValue());
+    return Storage;
+  }
+  SyntaxDataRef const &getValue() const LLVM_LVALUE_FUNCTION {
+    assert(hasValue());
+    return Storage;
+  }
+#if LLVM_HAS_RVALUE_REFERENCE_THIS
+  SyntaxDataRef &&getValue() &&noexcept {
+    assert(hasValue());
+    return std::move(Storage);
+  }
+#endif
+
+  template <class... Args>
+  void emplace(Args &&...args) {
+    Storage = SyntaxDataRef(std::forward<Args>(args)...);
+  }
+
+  OptionalStorage &operator=(const SyntaxDataRef &AbsoluteRaw) {
+    Storage = AbsoluteRaw;
+    return *this;
+  }
+
+  OptionalStorage &operator=(SyntaxDataRef &&AbsoluteRaw) {
+    Storage = std::move(AbsoluteRaw);
+    return *this;
+  }
+
+  OptionalStorage &operator=(OptionalStorage const &other) = default;
+  OptionalStorage &operator=(OptionalStorage &&other) = default;
+};
+} // namespace optional_detail
+} // end namespace llvm
 
 #endif // SWIFT_SYNTAX_SYNTAXDATA_H

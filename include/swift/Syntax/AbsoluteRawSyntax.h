@@ -28,6 +28,8 @@ class SyntaxIndexInTree {
   explicit SyntaxIndexInTree(size_t IndexInTree) : IndexInTree(IndexInTree) {}
 
 public:
+  /// Create an *uninitialized* \c SyntaxIndexInTree.
+  SyntaxIndexInTree() {}
   static SyntaxIndexInTree zero() { return SyntaxIndexInTree(0); }
 
   /// Assuming that this index points to the start of \p Raw, advance it so that
@@ -68,6 +70,9 @@ private:
   SyntaxIndexInTree IndexInTree;
 
 public:
+  /// Create an *uninitialized* \c SyntaxIdentifier.
+  SyntaxIdentifier() {}
+
   SyntaxIdentifier(RootIdType RootId, SyntaxIndexInTree IndexInTree)
       : RootId(RootId), IndexInTree(IndexInTree) {
     assert(RootId < NextUnusedRootId && "New RootIds should only be created "
@@ -124,6 +129,9 @@ private:
   IndexInParentType IndexInParent;
 
 public:
+  /// Create an *uninitialized* \c AbsoluteSyntaxPosition.
+  AbsoluteSyntaxPosition() {}
+
   AbsoluteSyntaxPosition(OffsetType Offset, IndexInParentType IndexInParent)
       : Offset(Offset), IndexInParent(IndexInParent) {}
 
@@ -156,6 +164,8 @@ class AbsoluteOffsetPosition {
   AbsoluteSyntaxPosition::OffsetType Offset;
 
 public:
+  /// Create an *uninitialized* \c AbsoluteOffsetPosition.
+  AbsoluteOffsetPosition() {}
   explicit AbsoluteOffsetPosition(AbsoluteSyntaxPosition::OffsetType Offset)
       : Offset(Offset) {}
   AbsoluteOffsetPosition(AbsoluteSyntaxPosition Position)
@@ -176,6 +186,8 @@ class AbsoluteSyntaxInfo {
   SyntaxIdentifier NodeId;
 
 public:
+  /// Create an *uninitialized* \c AbsoluteSyntaxInfo.
+  AbsoluteSyntaxInfo() {}
   AbsoluteSyntaxInfo(AbsoluteSyntaxPosition Position, SyntaxIdentifier NodeId)
       : Position(Position), NodeId(NodeId) {}
 
@@ -213,16 +225,25 @@ public:
 
 /// A \c RawSyntax node that is enrichted with information of its position
 /// within the syntax tree it lives in.
-struct AbsoluteRawSyntax {
+class AbsoluteRawSyntax {
+  /// OptionalStorage is a friend so it can access the \c nullptr initializer
+  /// and \c isNull.
+  template <typename, bool>
+  friend class llvm::optional_detail::OptionalStorage;
+
   const RawSyntax *Raw;
-  const AbsoluteSyntaxInfo Info;
+  AbsoluteSyntaxInfo Info;
+
+  /// Whether this is a null \c AbsoluteRawSyntax.
+  bool isNull() const { return Raw == nullptr; }
+
+  /// Create a null \c AbsoluteRawSyntax. This should only be used in \c
+  /// AbsoluteRawSyntax's \c OptionalStorage.
+  explicit AbsoluteRawSyntax(std::nullptr_t) : Raw(nullptr) {}
 
 public:
-  /// Create a null \c AbsoluteRawSyntax to which a real \c AbsoluteRawSyntax
-  /// can be stored later.
-  explicit AbsoluteRawSyntax()
-      : Raw(nullptr), Info(AbsoluteSyntaxPosition(0, 0),
-                           SyntaxIdentifier(0, SyntaxIndexInTree::zero())) {}
+  /// Create an *uninitialized* \c AbsoluteRawSyntax.
+  explicit AbsoluteRawSyntax() {}
 
   /// Create a new \c AbsoluteRawData backed by \p Raw and with additional \p
   /// Info. The caller of this constructor is responsible to ensure that the
@@ -234,10 +255,6 @@ public:
            "A AbsoluteRawSyntax created through the memberwise constructor "
            "should always have a RawSyntax");
   }
-
-  /// Whether this is a null \c AbsoluteRawSyntax created through the default
-  /// constructor.
-  bool isNull() const { return Raw == nullptr; }
 
   /// Construct a \c AbsoluteRawSyntax for a \c RawSyntax node that represents
   /// the syntax tree's root.
@@ -270,16 +287,8 @@ public:
 
   /// Get the child at \p Index if it exists. If the node does not have a child
   /// at \p Index, return \c None. Asserts that \p Index < \c NumChildren
-  Optional<AbsoluteRawSyntax>
-  getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
-    assert(Index < getNumChildren() && "Index out of bounds");
-    auto RawChild = getRaw()->getChild(Index);
-    if (RawChild) {
-      return getPresentChild(Index);
-    } else {
-      return None;
-    }
-  }
+  inline Optional<AbsoluteRawSyntax>
+  getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const;
 
   /// Get the child at \p Index, asserting that it exists. This is slightly
   /// more performant than \c getChild in these cases since the \c
@@ -305,46 +314,11 @@ public:
 
   /// Get the first non-missing token node in this tree. Return \c None if
   /// this node does not contain non-missing tokens.
-  Optional<AbsoluteRawSyntax> getFirstToken() const {
-    if (getRaw()->isToken() && !getRaw()->isMissing()) {
-      return *this;
-    }
-
-    size_t NumChildren = getNumChildren();
-    for (size_t I = 0; I < NumChildren; ++I) {
-      if (auto Child = getChild(I)) {
-        if (Child->getRaw()->isMissing()) {
-          continue;
-        }
-
-        if (auto Token = Child->getFirstToken()) {
-          return Token;
-        }
-      }
-    }
-    return None;
-  }
+  inline Optional<AbsoluteRawSyntax> getFirstToken() const;
 
   /// Get the last non-missing token node in this tree. Return \c None if
   /// this node does not contain non-missing tokens.
-  Optional<AbsoluteRawSyntax> getLastToken() const {
-    if (getRaw()->isToken() && !getRaw()->isMissing()) {
-      return *this;
-    }
-
-    for (int I = getNumChildren() - 1; I >= 0; --I) {
-      if (auto Child = getChild(I)) {
-        if (Child->getRaw()->isMissing()) {
-          continue;
-        }
-
-        if (auto Token = Child->getLastToken()) {
-          return Token;
-        }
-      }
-    }
-    return None;
-  }
+  inline Optional<AbsoluteRawSyntax> getLastToken() const;
 
   /// Construct a new \c AbsoluteRawSyntax node that has the same info as the
   /// current one, but
@@ -366,6 +340,122 @@ public:
 namespace llvm {
 raw_ostream &operator<<(raw_ostream &OS,
                         swift::syntax::AbsoluteOffsetPosition Pos);
+
+namespace optional_detail {
+
+using swift::syntax::AbsoluteRawSyntax;
+
+/// A custom \c OptionalStorage implementation for \c AbsoluteRawSyntax that
+/// makes \c Optional<AbsoluteRawSyntax> a zero-cost wrapper around \c
+/// AbsoluteRawSyntax by using a special (externally not accessible) null \c
+/// AbsoluteRawSyntax to represent a missing value.
+template <>
+class OptionalStorage<AbsoluteRawSyntax> {
+  AbsoluteRawSyntax Storage;
+
+public:
+  OptionalStorage() : Storage(nullptr) {}
+  OptionalStorage(OptionalStorage const &other) = default;
+  OptionalStorage(OptionalStorage &&other) = default;
+
+  template <class... ArgTypes>
+  explicit OptionalStorage(llvm::optional_detail::in_place_t,
+                           ArgTypes &&...Args)
+      : Storage(std::forward<ArgTypes>(Args)...) {}
+
+  void reset() { Storage = AbsoluteRawSyntax(nullptr); }
+
+  bool hasValue() const { return !Storage.isNull(); }
+
+  AbsoluteRawSyntax &getValue() LLVM_LVALUE_FUNCTION {
+    assert(hasValue());
+    return Storage;
+  }
+  AbsoluteRawSyntax const &getValue() const LLVM_LVALUE_FUNCTION {
+    assert(hasValue());
+    return Storage;
+  }
+#if LLVM_HAS_RVALUE_REFERENCE_THIS
+  AbsoluteRawSyntax &&getValue() &&noexcept {
+    assert(hasValue());
+    return std::move(Storage);
+  }
+#endif
+
+  template <class... Args>
+  void emplace(Args &&...args) {
+    Storage = AbsoluteRawSyntax(std::forward<Args>(args)...);
+  }
+
+  OptionalStorage &operator=(const AbsoluteRawSyntax &AbsoluteRaw) {
+    Storage = AbsoluteRaw;
+    return *this;
+  }
+
+  OptionalStorage &operator=(AbsoluteRawSyntax &&AbsoluteRaw) {
+    Storage = std::move(AbsoluteRaw);
+    return *this;
+  }
+
+  OptionalStorage &operator=(OptionalStorage const &other) = default;
+  OptionalStorage &operator=(OptionalStorage &&other) = default;
+};
+} // namespace optional_detail
 } // end namespace llvm
+
+namespace swift {
+namespace syntax {
+
+Optional<AbsoluteRawSyntax> AbsoluteRawSyntax::getChild(
+    AbsoluteSyntaxPosition::IndexInParentType Index) const {
+  assert(Index < getNumChildren() && "Index out of bounds");
+  if (getRaw()->getChild(Index)) {
+    return getPresentChild(Index);
+  } else {
+    return None;
+  }
+}
+
+Optional<AbsoluteRawSyntax> AbsoluteRawSyntax::getFirstToken() const {
+  if (getRaw()->isToken() && !getRaw()->isMissing()) {
+    return *this;
+  }
+
+  size_t NumChildren = getNumChildren();
+  for (size_t I = 0; I < NumChildren; ++I) {
+    if (auto Child = getChild(I)) {
+      if (Child->getRaw()->isMissing()) {
+        continue;
+      }
+
+      if (auto Token = Child->getFirstToken()) {
+        return Token;
+      }
+    }
+  }
+  return None;
+}
+
+Optional<AbsoluteRawSyntax> AbsoluteRawSyntax::getLastToken() const {
+  if (getRaw()->isToken() && !getRaw()->isMissing()) {
+    return *this;
+  }
+
+  for (int I = getNumChildren() - 1; I >= 0; --I) {
+    if (auto Child = getChild(I)) {
+      if (Child->getRaw()->isMissing()) {
+        continue;
+      }
+
+      if (auto Token = Child->getLastToken()) {
+        return Token;
+      }
+    }
+  }
+  return None;
+}
+
+} // end namespace syntax
+} // end namespace swift
 
 #endif // SWIFT_SYNTAX_ABSOLUTERAWSYNTAX_H
