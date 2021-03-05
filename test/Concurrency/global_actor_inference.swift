@@ -279,7 +279,7 @@ actor WrapperActor<Wrapped> {
 
 struct HasWrapperOnActor {
   @WrapperOnActor var synced: Int = 0
-  // expected-note@-1 3{{mutable state is only available within the actor instance}}
+  // expected-note@-1 3{{property declared here}}
 
   // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
@@ -338,7 +338,7 @@ actor WrapperActorBad2<Wrapped> {
 
 actor ActorWithWrapper {
   @WrapperOnActor var synced: Int = 0
-  // expected-note@-1 3{{mutable state is only available within the actor instance}}
+  // expected-note@-1 3{{property declared here}}
   func f() {
     _ = synced // expected-error{{'synced' isolated to global actor}}
     _ = $synced // expected-error{{'$synced' isolated to global actor}}
@@ -400,7 +400,7 @@ struct WrapperOnUnsafeActor<Wrapped> {
 
 struct HasWrapperOnUnsafeActor {
   @WrapperOnUnsafeActor var synced: Int = 0
-  // expected-note@-1 3{{mutable state is only available within the actor instance}}
+  // expected-note@-1 3{{property declared here}}
 
   func testUnsafeOkay() {
     _ = synced
