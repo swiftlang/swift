@@ -29,19 +29,36 @@ using namespace swift;
 /// Determine whether it makes sense to infer an attribute in the given
 /// context.
 static bool shouldInferAttributeInContext(const DeclContext *dc) {
-  auto sourceFile = dc->getParentSourceFile();
-  if (!sourceFile)
-    return false;
+  if (auto *file = dyn_cast<FileUnit>(dc->getModuleScopeContext())) {
+    switch (file->getKind()) {
+    case FileUnitKind::Source:
+      // Check what kind of source file we have.
+      if (auto sourceFile = dc->getParentSourceFile()) {
+        switch (sourceFile->Kind) {
+        case SourceFileKind::Interface:
+          // Interfaces have explicitly called-out ConcurrentValue conformances.
+          return false;
 
-  switch (sourceFile->Kind) {
-  case SourceFileKind::Interface:
-  case SourceFileKind::SIL:
-    return false;
+        case SourceFileKind::Library:
+        case SourceFileKind::Main:
+        case SourceFileKind::SIL:
+          return true;
+        }
+      }
+      break;
 
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-    return true;
+    case FileUnitKind::Builtin:
+    case FileUnitKind::SerializedAST:
+    case FileUnitKind::Synthesized:
+      return false;
+
+    case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
+      return true;
+    }
   }
+
+  return false;
 }
 
 /// Check whether the @asyncHandler attribute can be applied to the given
@@ -2349,7 +2366,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
       break;
 
     case ActorIsolation::GlobalActorUnsafe:
-      if (!propagateUnsafe) {
+      if (!propagateUnsafe && !value->hasClangNode()) {
         // Don't infer unsafe global actor isolation.
         return ActorIsolation::forUnspecified();
       }
