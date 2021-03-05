@@ -213,27 +213,11 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 }
 
 AsyncTaskAndContext
-swift::swift_task_create(JobFlags flags, AsyncTask *parent,
-        const ThinNullaryAsyncSignature::FunctionPointer *function) {
-  return swift_task_create_f(flags, parent, function->Function.get(),
-                             function->ExpectedContextSize);
-}
-
-AsyncTaskAndContext
 swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
                 ThinNullaryAsyncSignature::FunctionType *function,
                            size_t initialContextSize) {
   return swift_task_create_future_f(
       flags, parent, nullptr, function, initialContextSize);
-}
-
-AsyncTaskAndContext swift::swift_task_create_future(
-    JobFlags flags, AsyncTask *parent,
-    const Metadata *futureResultType,
-    const FutureAsyncSignature::FunctionPointer *function) {
-  return swift_task_create_future_f(
-      flags, parent, futureResultType, function->Function.get(),
-      function->ExpectedContextSize);
 }
 
 AsyncTaskAndContext swift::swift_task_create_future_f(

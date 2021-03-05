@@ -1502,7 +1502,7 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
-// AsyncTaskAndContext swift_task_create(
+// AsyncTaskAndContext swift_task_create_f(
 //     size_t flags, AsyncTask *task,
 //     TaskContinuationFunction* function,
 //     size_t contextSize);

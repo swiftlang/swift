@@ -32,21 +32,6 @@ struct AsyncTaskAndContext {
 
 /// Create a task object with no future which will run the given
 /// function.
-///
-/// The task is not yet scheduled.
-///
-/// If a parent task is provided, flags.task_hasChildFragment() must
-/// be true, and this must be called synchronously with the parent.
-/// The parent is responsible for creating a ChildTaskStatusRecord.
-/// TODO: should we have a single runtime function for creating a task
-///       and doing this child task status record management?
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create(JobFlags flags,
-                                      AsyncTask *parent,
-                const ThinNullaryAsyncSignature::FunctionPointer *function);
-
-/// Create a task object with no future which will run the given
-/// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_f(JobFlags flags,
                                         AsyncTask *parent,
@@ -57,24 +42,6 @@ AsyncTaskAndContext swift_task_create_f(JobFlags flags,
 /// this signature may be incorrect.
 using FutureAsyncSignature =
   AsyncSignature<void(void*), /*throws*/ true>;
-
-/// Create a task object with a future which will run the given
-/// function.
-///
-/// The task is not yet scheduled.
-///
-/// If a parent task is provided, flags.task_hasChildFragment() must
-/// be true, and this must be called synchronously with the parent.
-/// The parent is responsible for creating a ChildTaskStatusRecord.
-/// TODO: should we have a single runtime function for creating a task
-///       and doing this child task status record management?
-///
-/// flags.task_isFuture must be set. \c futureResultType is the type
-///
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTaskAndContext swift_task_create_future(
-    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
-    const FutureAsyncSignature::FunctionPointer *function);
 
 /// Create a task object with a future which will run the given
 /// function.
