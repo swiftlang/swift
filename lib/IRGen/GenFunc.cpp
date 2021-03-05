@@ -1607,6 +1607,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
               AddressToDeallocate{fieldTy, fieldTI, stackAddr});
         };
 
+        assert(!outType->isAsync());
         if (outType->isNoEscape()) {
           // If the closure is [onstack] it only captured the address of the
           // value. Load that address from the context.
@@ -1837,6 +1838,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime) {
     assert(!outType->isNoEscape() && "Trivial context must not be released");
+    assert(!outType->isAsync());
     subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
   }
 

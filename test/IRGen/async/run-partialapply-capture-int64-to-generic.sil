@@ -6,6 +6,7 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
+// REQUIRES: DNM
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
