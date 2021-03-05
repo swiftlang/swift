@@ -298,14 +298,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
-  /// Whether we can derive the given Actor requirement in the given context.
-  static bool canDeriveActor(NominalTypeDecl *nominal, DeclContext *dc);
-
-  /// Derive an Actor requirement for an actor class.
-  ///
-  /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveActor(ValueDecl *requirement);
-
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,
