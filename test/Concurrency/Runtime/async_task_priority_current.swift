@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_detach() async {
   let a1 = Task.currentPriority
   print("a1: \(a1)") // CHECK: a1: default
@@ -32,7 +26,7 @@ func test_multiple_lo_indirectly_escalated() async {
   @concurrent
   func loopUntil(priority: Task.Priority) async {
     while (Task.currentPriority != priority) {
-      sleep(1)
+      await Task.sleep(1_000_000_000)
     }
   }
 

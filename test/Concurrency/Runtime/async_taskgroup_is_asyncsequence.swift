@@ -5,12 +5,6 @@
 // XFAIL: linux
 // XFAIL: windows
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_taskGroup_is_asyncSequence() async {
   let sum: Int = try! await Task.withGroup(resultType: Int.self) { group in
     for n in 1...10 {

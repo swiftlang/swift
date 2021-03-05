@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_taskGroup_cancel_from_inside_child() async {
   let result: Int = try! await Task.withGroup(resultType: Int.self) { group in
     let firstAdded = await group.add { [group] in // must explicitly capture, as the task executes concurrently
