@@ -309,7 +309,6 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
 class ClassWithUnavailableProperties {
     // expected-note@-1 4{{add @available attribute to enclosing class}}
 
-  @available(OSX, introduced: 10.9) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   var nonLazyAvailableOn10_9Stored: Int = 9
 
   @available(OSX, introduced: 10.51) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}

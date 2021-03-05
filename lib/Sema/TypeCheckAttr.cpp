@@ -1471,12 +1471,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   SourceLoc attrLoc = attr->getLocation();
 
-  Optional<Diag<>> MaybeNotAllowed =
-      TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
-  if (MaybeNotAllowed.hasValue()) {
-    diagnose(attrLoc, MaybeNotAllowed.getValue());
-  }
-
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
@@ -1494,16 +1488,27 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     EnclosingDecl = getEnclosingDeclForDecl(EnclosingDecl);
   }
 
-  if (!EnclosingDecl)
-    return;
-
   AvailabilityContext AttrRange{
       VersionRange::allGTE(attr->Introduced.getValue())};
 
-  if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
-    diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
-    diagnose(EnclosingDecl->getLoc(),
-             diag::availability_decl_more_than_enclosing_enclosing_here);
+  if (EnclosingDecl) {
+    if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
+      diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
+      diagnose(EnclosingDecl->getLoc(),
+               diag::availability_decl_more_than_enclosing_enclosing_here);
+    }
+  }
+
+  Optional<Diag<>> MaybeNotAllowed =
+      TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
+  if (MaybeNotAllowed.hasValue()) {
+    AvailabilityContext DeploymentRange
+        = AvailabilityContext::forDeploymentTarget(Ctx);
+    if (EnclosingAnnotatedRange.hasValue())
+      DeploymentRange.intersectWith(*EnclosingAnnotatedRange);
+
+    if (!DeploymentRange.isContainedIn(AttrRange))
+      diagnose(attrLoc, MaybeNotAllowed.getValue());
   }
 }
 
