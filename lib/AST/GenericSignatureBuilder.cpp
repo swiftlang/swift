@@ -2808,7 +2808,7 @@ static void concretizeNestedTypeFromConcreteParent(
          SameTypeConflictCheckedLater());
 }
 
-PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
+PotentialArchetype *PotentialArchetype::getOrCreateNestedType(
     GenericSignatureBuilder &builder, AssociatedTypeDecl *assocType,
     ArchetypeResolutionKind kind) {
   if (!assocType)
@@ -2819,57 +2819,45 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
   Identifier name = assocType->getName();
 
+  SWIFT_DEFER {
+    // If we were asked for a complete, well-formed archetype, make sure we
+    // process delayed requirements if anything changed.
+    if (kind == ArchetypeResolutionKind::CompleteWellFormed)
+      builder.processDelayedRequirements();
+  };
+
   // Look for a potential archetype with the appropriate associated type.
-  PotentialArchetype *resultPA = nullptr;
   auto knownNestedTypes = NestedTypes.find(name);
-  bool shouldUpdatePA = false;
   if (knownNestedTypes != NestedTypes.end()) {
     for (auto existingPA : knownNestedTypes->second) {
       // Do we have an associated-type match?
       if (assocType && existingPA->getResolvedType() == assocType) {
-        resultPA = existingPA;
-        break;
+        return existingPA;
       }
     }
   }
 
-  // If we don't have a result potential archetype yet, we may need to add one.
-  if (!resultPA) {
-    switch (kind) {
-    case ArchetypeResolutionKind::CompleteWellFormed:
-    case ArchetypeResolutionKind::WellFormed: {
-      // Creating a new potential archetype in an equivalence class is a
-      // modification.
-      getOrCreateEquivalenceClass(builder)->modified(builder);
+  if (kind == ArchetypeResolutionKind::AlreadyKnown)
+    return nullptr;
 
-      void *mem = builder.Impl->Allocator.Allocate<PotentialArchetype>();
-      resultPA = new (mem) PotentialArchetype(this, assocType);
+  // We don't have a result potential archetype, so we need to add one.
 
-      NestedTypes[name].push_back(resultPA);
-      builder.addedNestedType(resultPA);
-      shouldUpdatePA = true;
-      break;
-    }
+  // Creating a new potential archetype in an equivalence class is a
+  // modification.
+  getOrCreateEquivalenceClass(builder)->modified(builder);
 
-    case ArchetypeResolutionKind::AlreadyKnown:
-      return nullptr;
-    }
+  void *mem = builder.Impl->Allocator.Allocate<PotentialArchetype>();
+  auto *resultPA = new (mem) PotentialArchetype(this, assocType);
+
+  NestedTypes[name].push_back(resultPA);
+  builder.addedNestedType(resultPA);
+
+  // If we know something concrete about the parent PA, we need to propagate
+  // that information to this new archetype.
+  if (auto equivClass = getEquivalenceClassIfPresent()) {
+    if (equivClass->concreteType || equivClass->superclass)
+      concretizeNestedTypeFromConcreteParent(this, resultPA, builder);
   }
-
-  // If we have a potential archetype that requires more processing, do so now.
-  if (shouldUpdatePA) {
-    // We know something concrete about the parent PA, so we need to propagate
-    // that information to this new archetype.
-    if (auto equivClass = getEquivalenceClassIfPresent()) {
-      if (equivClass->concreteType || equivClass->superclass)
-        concretizeNestedTypeFromConcreteParent(this, resultPA, builder);
-    }
-  }
-
-  // If we were asked for a complete, well-formed archetype, make sure we
-  // process delayed requirements if anything changed.
-  if (kind == ArchetypeResolutionKind::CompleteWellFormed)
-    builder.processDelayedRequirements();
 
   return resultPA;
 }
@@ -3889,8 +3877,7 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       }
 
       auto nestedPA =
-        basePA->updateNestedTypeForConformance(*this, assocType,
-                                               resolutionKind);
+        basePA->getOrCreateNestedType(*this, assocType, resolutionKind);
       if (!nestedPA)
         return ResolvedType::forUnresolved(baseEquivClass);
 
@@ -4726,10 +4713,9 @@ void GenericSignatureBuilder::addedNestedType(PotentialArchetype *nestedPA) {
   if (parentPA == parentRepPA) return;
 
   PotentialArchetype *existingPA =
-    parentRepPA->updateNestedTypeForConformance(
-                                        *this,
-                                        nestedPA->getResolvedType(),
-                                        ArchetypeResolutionKind::WellFormed);
+    parentRepPA->getOrCreateNestedType(*this,
+                                       nestedPA->getResolvedType(),
+                                       ArchetypeResolutionKind::WellFormed);
 
   auto sameNamedSource =
     FloatingRequirementSource::forNestedTypeNameMatch(
