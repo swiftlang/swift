@@ -864,11 +864,19 @@ static bool diagnoseNonConcurrentProperty(
   return false;
 }
 
+/// Whether we should diagnose cases where ConcurrentValue conformances are
+/// missing.
+static bool shouldDiagnoseNonConcurrentValueViolations(
+    const LangOptions &langOpts) {
+  return langOpts.EnableExperimentalConcurrency ||
+      langOpts.WarnConcurrency;
+}
+
 bool swift::diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind) {
   // Bail out immediately if we aren't supposed to do this checking.
-  if (!dc->getASTContext().LangOpts.EnableExperimentalConcurrency)
+  if (!shouldDiagnoseNonConcurrentValueViolations(dc->getASTContext().LangOpts))
     return false;
 
   // For functions, check the parameter and result types.
@@ -1241,7 +1249,7 @@ namespace {
           if (!indexExpr || !indexExpr->getType())
             continue;
 
-          if (ctx.LangOpts.EnableExperimentalConcurrency &&
+          if (shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts) &&
               !isConcurrentValueType(getDeclContext(), indexExpr->getType())) {
             ctx.Diags.diagnose(
                 component.getLoc(), diag::non_concurrent_keypath_capture,
@@ -2671,6 +2679,9 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 }
 
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
+  if (dc->getASTContext().LangOpts.WarnConcurrency)
+    return true;
+
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
       // Async and concurrent closures use concurrency features.
@@ -2717,16 +2728,21 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   return false;
 }
 
-static DiagnosticBehavior toDiagnosticBehavior(ConcurrentValueCheck check,
+static DiagnosticBehavior toDiagnosticBehavior(const LangOptions &langOpts,
+                                               ConcurrentValueCheck check,
                                                bool diagnoseImplicit = false) {
   switch (check) {
   case ConcurrentValueCheck::ImpliedByStandardProtocol:
-    return DiagnosticBehavior::Warning;
+    return shouldDiagnoseNonConcurrentValueViolations(langOpts)
+        ? DiagnosticBehavior::Warning
+        : DiagnosticBehavior::Ignore;
   case ConcurrentValueCheck::Explicit:
     return DiagnosticBehavior::Unspecified;
   case ConcurrentValueCheck::Implicit:
-    return diagnoseImplicit ? DiagnosticBehavior::Unspecified
-                            : DiagnosticBehavior::Ignore;
+    return (diagnoseImplicit &&
+            shouldDiagnoseNonConcurrentValueViolations(langOpts))
+      ? DiagnosticBehavior::Unspecified
+      : DiagnosticBehavior::Ignore;
   }
 }
 
@@ -2736,7 +2752,8 @@ static bool checkConcurrentValueInstanceStorage(
     NominalTypeDecl *nominal, DeclContext *dc, ConcurrentValueCheck check) {
   // Stored properties of structs and classes must have
   // ConcurrentValue-conforming types.
-  auto behavior = toDiagnosticBehavior(check);
+  const auto &langOpts = dc->getASTContext().LangOpts;
+  auto behavior = toDiagnosticBehavior(langOpts, check);
   bool invalid = false;
   if (isa<StructDecl>(nominal) || isa<ClassDecl>(nominal)) {
     auto classDecl = dyn_cast<ClassDecl>(nominal);
@@ -2813,7 +2830,8 @@ bool swift::checkConcurrentValueConformance(
 
   // ConcurrentValue can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
-  auto behavior = toDiagnosticBehavior(check, /*diagnoseImplicit=*/true);
+  auto behavior = toDiagnosticBehavior(
+      nominal->getASTContext().LangOpts, check, /*diagnoseImplicit=*/true);
   if (!conformanceDC->getParentSourceFile() ||
       conformanceDC->getParentSourceFile() != nominal->getParentSourceFile()) {
     conformanceDecl->diagnose(diag::concurrent_value_outside_source_file,

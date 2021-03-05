@@ -212,7 +212,7 @@ func sr_6400_3(error: Error) {
 }
 
 class SR_6400_A {}
-class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {} // expected-warning{{non-final class 'SR_6400_B' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
+class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {}
 
 func sr_6400_4() {
   do {
