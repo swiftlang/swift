@@ -10,7 +10,7 @@ func acceptConcurrentClosure<T>(_: @concurrent () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping (String) -> ()) async -> T? { nil }
 
-func acceptAsyncClosure<T>(_: () async -> T) { }
+@discardableResult func acceptAsyncClosure<T>(_: () async -> T) -> T { }
 func acceptEscapingAsyncClosure<T>(_: @escaping () async -> T) { }
 func acceptInout<T>(_: inout T) {}
 
@@ -360,6 +360,17 @@ actor Crystal {
   goo2()
 }
 @asyncHandler @SomeOtherGlobalActor func goo2() { await goo1() }
+
+func testGlobalActorClosures() {
+  let _: Int = acceptAsyncClosure { @SomeGlobalActor in
+    syncGlobalActorFunc()
+    syncOtherGlobalActorFunc() // expected-error{{call is 'async' but is not marked with 'await'}}
+    await syncOtherGlobalActorFunc()
+    return 17
+  }
+
+  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{closure isolated to global actor 'SomeGlobalActor' must be 'async'}}
+}
 
 extension MyActor {
   @SomeGlobalActor func onGlobalActor(otherActor: MyActor) async {
