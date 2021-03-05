@@ -553,6 +553,7 @@ bool swift::isRepresentableInObjC(
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
   ASTContext &ctx = AFD->getASTContext();
+  DiagnosticStateRAII diagState(ctx.Diags);
 
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
@@ -985,6 +986,8 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     T = RST->getReferentType();
   }
   ASTContext &ctx = VD->getASTContext();
+  DiagnosticStateRAII diagState(ctx.Diags);
+
   bool Result = T->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                      VD->getDeclContext());
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
@@ -1018,6 +1021,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
   ASTContext &ctx = SD->getASTContext();
+  DiagnosticStateRAII diagState(ctx.Diags);
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(SD, Reason))
@@ -1219,6 +1223,7 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
+static
 Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
@@ -1472,6 +1477,8 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
 
 
 bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+  DiagnosticStateRAII diagState(VD->getASTContext().Diags);
+
   // Access notes may add attributes that affect this calculus.
   (void)evaluateOrDefault(evaluator, ApplyAccessNoteRequest{VD}, {});
 
@@ -2180,6 +2187,7 @@ lookupOverridenObjCMethod(ClassDecl *classDecl, AbstractFunctionDecl *method,
 
 bool swift::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
   auto &Ctx = sf.getASTContext();
+  DiagnosticStateRAII diagState(Ctx.Diags);
   auto &methods = sf.ObjCMethodList;
 
   // If no Objective-C methods were defined in this file, we're done.
@@ -2284,6 +2292,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
     return false;
 
   auto &Ctx = sf.getASTContext();
+  DiagnosticStateRAII diagState(Ctx.Diags);
   OrderDeclarations ordering;
 
   // Sort the set of conflicts so we get a deterministic order for
@@ -2389,6 +2398,7 @@ bool swift::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
     return false;
 
   auto &Ctx = sf.getASTContext();
+  DiagnosticStateRAII diagState(Ctx.Diags);
 
   // Sort the set of local unsatisfied requirements, so we get a
   // deterministic order for diagnostics.
