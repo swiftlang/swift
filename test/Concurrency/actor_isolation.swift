@@ -51,11 +51,10 @@ actor MyActor: MySuperActor {
   let point : Point = Point()
 
   @MainActor
-  var name : String = "koala"
+  var name : String = "koala" // expected-note{{property declared here}}
 
-  // FIXME: if you take the 'async' off of this, you get a very confusing error message.
-  func accessProp() async -> String {
-    return await self.name
+  func accessProp() -> String {
+    return self.name // expected-error{{property 'name' isolated to global actor 'MainActor' can not be referenced from actor 'MyActor' in a synchronous context}}
   }
 
   class func synchronousClass() { }
@@ -124,7 +123,7 @@ extension MyActor {
     _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
 
     // Global actors
-    syncGlobalActorFunc() /// expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' context}}
+    syncGlobalActorFunc() /// expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' synchronous context}}
     _ = syncGlobalActorFunc // expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' context}}
 
     // Global data is okay if it is immutable.
@@ -315,6 +314,10 @@ struct GenericGlobalActor<T> {
   static var shared: SomeActor { SomeActor() }
 }
 
+@SomeGlobalActor func onions() {} // expected-note{{calls to global function 'onions()' from outside of its actor context are implicitly asynchronous}}
+
+@MainActor func beets() { onions() } // expected-error{{global function 'onions()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'MainActor' in a synchronous context}}
+
 actor Crystal {
   // expected-note@+2 {{property declared here}}
   // expected-note@+1 2 {{mutation of this property is only permitted within the actor}}
@@ -449,7 +452,7 @@ var number: Int = 42 // expected-note {{var declared here}}
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'badNumberUser()' part of global actor 'SomeGlobalActor'}}
 func badNumberUser() {
-  //expected-error@+1{{var 'number' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  //expected-error@+1{{var 'number' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
   print("The protected number is: \(number)")
 }
 
@@ -618,7 +621,7 @@ class SomeClassInActor {
 
 extension SomeClassInActor.ID {
   func f(_ object: SomeClassInActor) { // expected-note{{add '@MainActor' to make instance method 'f' part of global actor 'MainActor'}}
-    object.inActor() // expected-error{{instance method 'inActor()' isolated to global actor 'MainActor' can not be referenced from this context}}
+    object.inActor() // expected-error{{instance method 'inActor()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
   }
 }
 

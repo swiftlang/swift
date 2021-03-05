@@ -1570,10 +1570,6 @@ namespace {
     AsyncMarkingResult tryMarkImplicitlyAsync(SourceLoc declLoc,
                                               ConcreteDeclRef concDeclRef,
                                               Expr* context) {
-      // If our current context isn't an asynchronous one, don't
-      if (!isInAsynchronousContext())
-        return AsyncMarkingResult::NotFound;
-
       ValueDecl *decl = concDeclRef.getDecl();
       AsyncMarkingResult result = AsyncMarkingResult::NotFound;
 
@@ -1581,11 +1577,19 @@ namespace {
       if (isPropOrSubscript(decl)) {
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
+
+            if (!isInAsynchronousContext())
+              return AsyncMarkingResult::SyncContext;
+
             declRef->setImplicitlyAsync(true);
             result = AsyncMarkingResult::FoundAsync;
           }
         } else if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
           if (usageEnv(lookupExpr) == VarRefUseEnv::Read) {
+
+            if (!isInAsynchronousContext())
+              return AsyncMarkingResult::SyncContext;
+
             lookupExpr->setImplicitlyAsync(true);
             result = AsyncMarkingResult::FoundAsync;
           }
@@ -1595,6 +1599,10 @@ namespace {
           isa<AbstractFunctionDecl>(decl)) {
         // actor-isolated non-isolated-self calls are implicitly async
         // and thus OK.
+
+        if (!isInAsynchronousContext())
+          return AsyncMarkingResult::SyncContext;
+
         markNearestCallAsImplicitlyAsync();
         result = AsyncMarkingResult::FoundAsync;
 
@@ -1609,6 +1617,10 @@ namespace {
         if (auto memberRef = findMemberReference(fn)) {
           auto concDecl = memberRef->first;
           if (decl == concDecl.getDecl() && !apply->implicitlyAsync()) {
+
+            if (!isInAsynchronousContext())
+              return AsyncMarkingResult::SyncContext;
+
             // then this ValueDecl appears as the called value of the ApplyExpr.
             markNearestCallAsImplicitlyAsync();
             result = AsyncMarkingResult::FoundAsync;
@@ -1664,7 +1676,7 @@ namespace {
         ctx.Diags.diagnose(loc, diag::global_actor_from_instance_actor_context,
                            value->getDescriptiveKind(), value->getName(),
                            globalActor, contextIsolation.getActor()->getName(),
-                           useKind);
+                           useKind, result == AsyncMarkingResult::SyncContext);
         noteIsolatedActorMember(value, context);
         return true;
       }
@@ -1684,7 +1696,8 @@ namespace {
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_other_global_actor_context,
             value->getDescriptiveKind(), value->getName(), globalActor,
-            contextIsolation.getGlobalActor(), useKind);
+            contextIsolation.getGlobalActor(), useKind,
+            result == AsyncMarkingResult::SyncContext);
         noteIsolatedActorMember(value, context);
         return true;
       }
@@ -1704,7 +1717,8 @@ namespace {
         ctx.Diags.diagnose(loc, diag::global_actor_from_nonactor_context,
                            value->getDescriptiveKind(), value->getName(),
                            globalActor,
-                           /*actorIndependent=*/true, useKind);
+                           /*actorIndependent=*/true, useKind,
+                           result == AsyncMarkingResult::SyncContext);
         noteIsolatedActorMember(value, context);
         return true;
       }
@@ -1723,7 +1737,8 @@ namespace {
             ctx.Diags.diagnose(
               loc, diag::global_actor_from_nonactor_context,
               value->getDescriptiveKind(), value->getName(), globalActor,
-              /*actorIndependent=*/false, useKind);
+              /*actorIndependent=*/false, useKind,
+              result == AsyncMarkingResult::SyncContext);
           }
           noteIsolatedActorMember(value, context);
         };
@@ -2029,10 +2044,14 @@ namespace {
 
             // The 'self' is for a member that's part of a global actor, which
             // means we cannot refer to actor-isolated state.
+            auto useKind = static_cast<unsigned>(
+                kindOfUsage(member, context).getValueOr(VarRefUseEnv::Read));
             ctx.Diags.diagnose(memberLoc,
                                diag::actor_isolated_global_actor_context,
                                member->getDescriptiveKind(), member->getName(),
-                               contextIsolation.getGlobalActor());
+                               contextIsolation.getGlobalActor(), useKind,
+                               result == AsyncMarkingResult::SyncContext
+                               );
             noteIsolatedActorMember(member, context);
             return true;
           }
