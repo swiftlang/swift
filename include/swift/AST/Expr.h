@@ -166,8 +166,9 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
   SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
-  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1,
-    IsSuper : 1
+  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1,
+    IsSuper : 1,
+    IsImplicitlyAsync : 1
   );
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicLookupExpr, LookupExpr);
 
@@ -193,9 +194,10 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1,
     Semantics : 2, // an AccessSemantics
-    FunctionRefKind : 2
+    FunctionRefKind : 2,
+    IsImplicitlyAsync : 1
   );
 
   SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+2,
@@ -1190,6 +1192,7 @@ public:
     Bits.DeclRefExpr.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
+    Bits.DeclRefExpr.IsImplicitlyAsync = false;
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -1201,6 +1204,16 @@ public:
   /// getter or setter.
   AccessSemantics getAccessSemantics() const {
     return (AccessSemantics) Bits.DeclRefExpr.Semantics;
+  }
+
+  /// Determine whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  bool isImplicitlyAsync() const { return Bits.DeclRefExpr.IsImplicitlyAsync; }
+
+  /// Set whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  void setImplicitlyAsync(bool isImplicitlyAsync) {
+    Bits.DeclRefExpr.IsImplicitlyAsync = isImplicitlyAsync;
   }
 
   /// Retrieve the concrete declaration reference.
@@ -1518,6 +1531,7 @@ protected:
                           bool Implicit)
       : Expr(Kind, Implicit), Base(base), Member(member) {
     Bits.LookupExpr.IsSuper = false;
+    Bits.LookupExpr.IsImplicitlyAsync = false;
     assert(Base);
   }
 
@@ -1546,6 +1560,16 @@ public:
 
   /// Set whether this reference refers to the superclass's property.
   void setIsSuper(bool isSuper) { Bits.LookupExpr.IsSuper = isSuper; }
+
+  /// Determine whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  bool isImplicitlyAsync() const { return Bits.LookupExpr.IsImplicitlyAsync; }
+
+  /// Set whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  void setImplicitlyAsync(bool isImplicitlyAsync) {
+    Bits.LookupExpr.IsImplicitlyAsync = isImplicitlyAsync;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_LookupExpr &&
@@ -3118,7 +3142,7 @@ public:
 class LoadExpr : public ImplicitConversionExpr {
 public:
   LoadExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::Load, subExpr, type) {}
+    : ImplicitConversionExpr(ExprKind::Load, subExpr, type) { }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
 };
@@ -4398,6 +4422,7 @@ public:
   }
 
   /// Is this application _implicitly_ required to be an async call?
+  /// That is, does it need to be guarded by hop_to_executor.
   /// Note that this is _not_ a check for whether the callee is async!
   /// Only meaningful after complete type-checking.
   ///
