@@ -330,6 +330,11 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
           return false;
         break;
       case SILInstructionKind::InjectEnumAddrInst:
+      case SILInstructionKind::SelectEnumAddrInst:
+      case SILInstructionKind::ExistentialMetatypeInst:
+      case SILInstructionKind::ValueMetatypeInst:
+      case SILInstructionKind::IsUniqueInst:
+      case SILInstructionKind::FixLifetimeInst:
       case SILInstructionKind::LoadInst:
       case SILInstructionKind::StoreInst:
       case SILInstructionKind::StoreBorrowInst:
@@ -1154,7 +1159,13 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         break;
       }
       case SILInstructionKind::OpenExistentialAddrInst:
-        requireBitsSet(bits, cast<OpenExistentialAddrInst>(&I)->getOperand(), &I);
+      case SILInstructionKind::SelectEnumAddrInst:
+      case SILInstructionKind::ExistentialMetatypeInst:
+      case SILInstructionKind::ValueMetatypeInst:
+      case SILInstructionKind::IsUniqueInst:
+      case SILInstructionKind::FixLifetimeInst:
+      case SILInstructionKind::DebugValueAddrInst:
+        requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
         // Note that despite the name, unchecked_take_enum_data_addr does _not_
@@ -1214,9 +1225,6 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         }
         break;
       }
-      case SILInstructionKind::DebugValueAddrInst:
-        requireBitsSet(bits, cast<DebugValueAddrInst>(&I)->getOperand(), &I);
-        break;
       case SILInstructionKind::DeallocStackInst: {
         SILValue opVal = cast<DeallocStackInst>(&I)->getOperand();
         if (isStoreBorrowLocation(opVal)) {

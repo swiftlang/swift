@@ -238,6 +238,17 @@ bb0(%0 : @owned $T):
   return %r : $()
 }
 
+// CHECK: SIL memory lifetime failure in @test_select_enum_addr: memory is not initialized, but should
+sil [ossa] @test_select_enum_addr : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = select_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: %1, case #Optional.none!enumelt: %2 : $Builtin.Int1
+  dealloc_stack %0 : $*Optional<T>
+  return %3 : $Builtin.Int1
+}
+
 sil [ossa] @closure : $@convention(thin) (@in_guaranteed T) -> () 
 
 // CHECK: SIL memory lifetime failure in @test_non_escaping_closure: memory is initialized at function return but shouldn't
@@ -470,6 +481,46 @@ bb0(%0 : $*U):
   dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
   destroy_addr %s : $*P
   dealloc_stack %s : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_existential_metatype: memory is not initialized, but should
+sil [ossa] @test_existential_metatype : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $P
+  %714 = existential_metatype $@thick P.Type, %0 : $*P
+  dealloc_stack %0 : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_value_metatype: memory is not initialized, but should
+sil [ossa] @test_value_metatype : $@convention(thin) <U> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %1 = alloc_stack $U
+  %2 = value_metatype $@thick U.Type, %1 : $*U
+  dealloc_stack %1 : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_is_unique: memory is not initialized, but should
+sil [ossa] @test_is_unique : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $T
+  %1 = is_unique %0 : $*T
+  dealloc_stack %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_fix_lifetime: memory is not initialized, but should
+sil [ossa] @test_fix_lifetime : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $T
+  fix_lifetime %0 : $*T
+  dealloc_stack %0 : $*T
   %5 = tuple ()
   return %5 : $()
 }

@@ -348,6 +348,11 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
       // ... or abort_apply.
       getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
       break;
+    case SILInstructionKind::SelectEnumAddrInst:
+    case SILInstructionKind::ExistentialMetatypeInst:
+    case SILInstructionKind::ValueMetatypeInst:
+    case SILInstructionKind::IsUniqueInst:
+    case SILInstructionKind::FixLifetimeInst:
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::StoreBorrowInst:

@@ -130,7 +130,7 @@ enum G<T> {
 // CHECK-LABEL: sil [ossa] @canonicalize_select_enum_addr :
 // CHECK: select_enum_addr {{.*}} case #G.E2!enumelt:
 // CHECK: } // end sil function 'canonicalize_select_enum_addr'
-sil [ossa] @canonicalize_select_enum_addr : $@convention(thin) <T> (@in G<T>) -> Int32 {
+sil [ossa] @canonicalize_select_enum_addr : $@convention(thin) <T> (@in_guaranteed G<T>) -> Int32 {
 bb0(%0 : $*G<T>):
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int32, 1

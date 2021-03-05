@@ -464,6 +464,14 @@ bb0(%0 : @owned $T):
   return %r : $()
 }
 
+sil [ossa] @test_select_enum_addr : $@convention(thin) (@in_guaranteed Optional<T>) -> Builtin.Int1 {
+bb0(%0 : $*Optional<T>):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = select_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: %1, case #Optional.none!enumelt: %2 : $Builtin.Int1
+  return %3 : $Builtin.Int1
+}
+
 sil [ossa] @closure : $@convention(thin) (@in_guaranteed T) -> () 
 
 sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in_guaranteed T) -> () {
@@ -592,3 +600,33 @@ bb0(%0 : $*U, %1 : $*V):
   %5 = tuple ()
   return %5 : $()
 }
+
+sil [ossa] @test_existential_metatype : $@convention(thin) (@in_guaranteed P) -> () {
+bb0(%0 : $*P):
+  %714 = existential_metatype $@thick P.Type, %0 : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_value_metatype : $@convention(thin) <U> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %1 = value_metatype $@thick U.Type, %0 : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_is_unique : $@convention(thin) (@in T) -> () {
+bb0(%0 : $*T):
+  %1 = is_unique %0 : $*T
+  destroy_addr %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_fix_lifetime : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  fix_lifetime %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+
