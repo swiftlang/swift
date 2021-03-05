@@ -73,6 +73,17 @@ public class OldSchool: MP {
   func f() throws
 }
 
+// CHECK: public struct UsesRP {
+public struct UsesRP {
+  // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
+  // CHECK-NEXT:  public var value: FeatureTest.RP? {
+  // CHECK-NOT: #if compiler(>=5.3) && $RethrowsProtocol
+  // CHECK: get
+  public var value: RP? {
+    nil
+  }
+}
+
 // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
 // CHECK-NEXT: public func acceptsRP
 public func acceptsRP<T: RP>(_: T) { }

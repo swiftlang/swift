@@ -2629,14 +2629,14 @@ static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
   if (features.empty())
     return features;
 
-  auto enclosingDecl = decl->getDeclContext()->getAsDecl();
+  Decl *enclosingDecl;
+  if (auto accessor = dyn_cast<AccessorDecl>(decl))
+    enclosingDecl = accessor->getStorage();
+  else
+    enclosingDecl = decl->getDeclContext()->getAsDecl();
   if (!enclosingDecl)
     return features;
 
-  if (!isa<NominalTypeDecl>(enclosingDecl) &&
-      !isa<ExtensionDecl>(enclosingDecl))
-    return features;
-  
   auto enclosingFeatures = getFeaturesUsed(enclosingDecl);
   if (enclosingFeatures.empty())
     return features;
