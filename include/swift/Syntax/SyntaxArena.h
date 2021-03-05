@@ -108,6 +108,23 @@ public:
     }
     return getAllocator().identifyObject(Ptr) != llvm::None;
   }
+
+  /// If the \p Data is not allocated in this arena, copy it to this and adjust
+  /// \p Data to point to the string's copy in this arena.
+  void copyStringToArenaIfNecessary(const char *&Data, size_t Length) {
+    if (Length == 0) {
+      // Empty strings can live wherever they want. Nothing to do.
+      return;
+    }
+    if (containsPointer(Data)) {
+      // String already in arena. Nothing to do.
+      return;
+    }
+    // Copy string to arena
+    char *ArenaData = (char *)getAllocator().Allocate<char>(Length);
+    std::memcpy(ArenaData, Data, Length);
+    Data = ArenaData;
+  }
 };
 
 } // namespace syntax

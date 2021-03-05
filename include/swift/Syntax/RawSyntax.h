@@ -120,27 +120,6 @@ using llvm::StringRef;
 #define syntax_assert_token_is(Tok, Kind, Text)
 #endif
 
-namespace {
-/// If the \p Str is not allocated in \p Arena, copy it to \p Arena and adjust
-/// \p Str to point to the string's copy in \p Arena.
-void copyToArenaIfNecessary(
-    StringRef &Str, const swift::RC<swift::syntax::SyntaxArena> &Arena) {
-  if (Str.empty()) {
-    // Empty strings can live wherever they want. Nothing to do.
-    return;
-  }
-  if (Arena->containsPointer(Str.data())) {
-    // String already in arena. Nothing to do.
-    return;
-  }
-  // Copy string to arena
-  char *Data = (char *)Arena->Allocate(Str.size(), alignof(char *));
-  std::uninitialized_copy(Str.begin(), Str.end(), Data);
-  Str = StringRef(Data, Str.size());
-}
-} // namespace
-// end anonymous namespace
-
 namespace swift {
 namespace syntax {
 
@@ -289,9 +268,6 @@ class RawSyntax final
       : Arena(Arena.get()),
         Bits({{unsigned(TextLength), unsigned(Presence), true}}) {
     assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-    copyToArenaIfNecessary(LeadingTrivia, Arena);
-    copyToArenaIfNecessary(Text, Arena);
-    copyToArenaIfNecessary(TrailingTrivia, Arena);
 
     if (Presence == SourcePresence::Missing) {
       assert(TextLength == 0);
@@ -313,6 +289,13 @@ class RawSyntax final
     Bits.Token.TokenLength = Text.size();
     Bits.Token.TrailingTriviaLength = TrailingTrivia.size();
     Bits.Token.TokenKind = unsigned(TokKind);
+
+    Arena->copyStringToArenaIfNecessary(Bits.Token.LeadingTrivia,
+                                        Bits.Token.LeadingTriviaLength);
+    Arena->copyStringToArenaIfNecessary(Bits.Token.TokenText,
+                                        Bits.Token.TokenLength);
+    Arena->copyStringToArenaIfNecessary(Bits.Token.TrailingTrivia,
+                                        Bits.Token.TrailingTriviaLength);
   }
 
   /// Compute the node's text length by summing up the length of its childern
