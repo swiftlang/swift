@@ -542,6 +542,11 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
 
     // A function that provides an asynchronous context has no restrictions
     // on its access.
+    //
+    // FIXME: technically, synchronous functions are allowed to be cross-actor.
+    // The call-sites are just conditionally async based on where they appear
+    // (outside or inside the actor). This suggests that the implicitly-async
+    // concept could be merged into the CrossActorSelf concept.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
       if (func->isAsyncContext())
         isAccessibleAcrossActors = true;
@@ -904,13 +909,74 @@ namespace {
     llvm::SmallDenseMap<VarDecl *, TinyPtrVector<const DeclContext *>>
       captureContexts;
 
-    using MutableVarSource = llvm::PointerUnion<DeclRefExpr *, InOutExpr *>;
-    using MutableVarParent = llvm::PointerUnion<InOutExpr *, LoadExpr *>;
+    using MutableVarSource
+        = llvm::PointerUnion<DeclRefExpr *, InOutExpr *, LookupExpr *>;
 
-    /// Mapping from mutable local variables or inout expressions to the
-    /// parent expression, when that parent is either a load or a inout expression.
+    using MutableVarParent
+        = llvm::PointerUnion<InOutExpr *, LoadExpr *, AssignExpr *>;
+
+    /// Mapping from mutable variable reference exprs, or inout expressions,
+    /// to the parent expression, when that parent is either a load or
+    /// an inout expr.
     llvm::SmallDenseMap<MutableVarSource, MutableVarParent, 4>
       mutableLocalVarParent;
+
+    /// The values for each case in this enum correspond to %select numbers
+    /// in a diagnostic, so be sure to update it if you add new cases.
+    enum class VarRefUseEnv {
+      Read = 0,
+      Mutating = 1,
+      Inout = 2 // means Mutating; having a separate kind helps diagnostics
+    };
+
+    static bool isPropOrSubscript(ValueDecl const* decl) {
+      return isa<VarDecl>(decl) || isa<SubscriptDecl>(decl);
+    }
+
+    /// In the given expression \c use that refers to the decl, this
+    /// function finds the kind of environment tracked by
+    /// \c mutableLocalVarParent that corresponds to that \c use.
+    ///
+    /// Note that an InoutExpr is not considered a use of the decl!
+    ///
+    /// @returns None if the context expression is either an InOutExpr,
+    ///               not tracked, or if the decl is not a property or subscript
+    Optional<VarRefUseEnv> kindOfUsage(ValueDecl *decl, Expr *use) const {
+      // we need a use for lookup.
+      if (!use)
+        return None;
+
+      // must be a property or subscript
+      if (!isPropOrSubscript(decl))
+        return None;
+
+      if (auto lookup = dyn_cast<DeclRefExpr>(use))
+        return usageEnv(lookup);
+      else if (auto lookup = dyn_cast<LookupExpr>(use))
+        return usageEnv(lookup);
+
+      return None;
+    }
+
+    /// @returns the kind of environment in which this expression appears, as
+    ///          tracked by \c mutableLocalVarParent
+    VarRefUseEnv usageEnv(MutableVarSource src) const {
+      auto result = mutableLocalVarParent.find(src);
+      if (result != mutableLocalVarParent.end()) {
+        MutableVarParent parent = result->second;
+        assert(!parent.isNull());
+        if (parent.is<LoadExpr*>())
+          return VarRefUseEnv::Read;
+        else if (parent.is<AssignExpr*>())
+          return VarRefUseEnv::Mutating;
+        else if (auto inout = parent.dyn_cast<InOutExpr*>())
+          return inout->isImplicit() ? VarRefUseEnv::Mutating
+                                     : VarRefUseEnv::Inout;
+        else
+          llvm_unreachable("non-exhaustive case match");
+      }
+      return VarRefUseEnv::Read; // assume if it's not tracked, it's only read.
+    }
 
     const DeclContext *getDeclContext() const {
       return contextStack.back();
@@ -939,9 +1005,9 @@ namespace {
           return false;
 
         // Only mutable variables outside of the current context. This is an
-        // optimization, because the parent map won't be queried in this case, and
-        // it is the most common case for variables to be referenced in their
-        // own context.
+        // optimization, because the parent map won't be queried in this case,
+        // and it is the most common case for variables to be referenced in
+        // their own context.
         if (var->getDeclContext() == getDeclContext())
           return false;
 
@@ -950,14 +1016,17 @@ namespace {
         return true;
       }
 
-      // For a member reference, try to record a parent for the base
-      // expression.
+      // For a member reference, try to record a parent for the base expression.
       if (auto memberRef = dyn_cast<MemberRefExpr>(subExpr)) {
+        // Record the parent of this LookupExpr too.
+        mutableLocalVarParent[memberRef] = parent;
         return recordMutableVarParent(parent, memberRef->getBase());
       }
 
       // For a subscript, try to record a parent for the base expression.
       if (auto subscript = dyn_cast<SubscriptExpr>(subExpr)) {
+        // Record the parent of this LookupExpr too.
+        mutableLocalVarParent[subscript] = parent;
         return recordMutableVarParent(parent, subscript->getBase());
       }
 
@@ -1059,13 +1128,22 @@ namespace {
           recordMutableVarParent(inout, inout->getSubExpr());
       }
 
-      if (auto load = dyn_cast<LoadExpr>(expr)) {
-        recordMutableVarParent(load, load->getSubExpr());
+      if (auto assign = dyn_cast<AssignExpr>(expr)) {
+        // mark vars in the destination expr as being part of the Assign.
+        if (auto destExpr = assign->getDest())
+          recordMutableVarParent(assign, destExpr);
+
+        return {true, expr };
       }
+
+      if (auto load = dyn_cast<LoadExpr>(expr))
+        recordMutableVarParent(load, load->getSubExpr());
 
       if (auto lookup = dyn_cast<LookupExpr>(expr)) {
         checkMemberReference(lookup->getBase(), lookup->getMember(),
-                             lookup->getLoc());
+                             lookup->getLoc(),
+                             /*isEscapingPartialApply*/false,
+                             lookup);
         return { true, expr };
       }
 
@@ -1087,7 +1165,7 @@ namespace {
             // implicitly async, regardless of whether they are escaping.
             checkMemberReference(
                 partialApply->base, memberRef->first, memberRef->second,
-                partialApply->isEscaping, /*maybeImplicitAsync=*/false);
+                partialApply->isEscaping);
 
             partialApply->base->walk(*this);
 
@@ -1106,7 +1184,7 @@ namespace {
         if (auto memberRef = findMemberReference(fn)) {
           checkMemberReference(
               call->getArg(), memberRef->first, memberRef->second,
-              /*isEscapingPartialApply=*/false, /*maybeImplicitAsync=*/true);
+              /*isEscapingPartialApply=*/false, call);
 
           call->getArg()->walk(*this);
 
@@ -1174,12 +1252,12 @@ namespace {
       }
 
       // Clear out the mutable local variable parent map on the way out.
-      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr)) {
+      if (auto *declRefExpr = dyn_cast<DeclRefExpr>(expr))
         mutableLocalVarParent.erase(declRefExpr);
-      }
-      if (auto *inoutExpr = dyn_cast<InOutExpr>(expr)) {
+      else if (auto *lookupExpr = dyn_cast<LookupExpr>(expr))
+        mutableLocalVarParent.erase(lookupExpr);
+      else if (auto *inoutExpr = dyn_cast<InOutExpr>(expr))
         mutableLocalVarParent.erase(inoutExpr);
-      }
 
       // Remove the tracked capture contexts.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
@@ -1226,15 +1304,23 @@ namespace {
     }
 
     /// Note that the given actor member is isolated.
-    static void noteIsolatedActorMember(ValueDecl *decl) {
+    /// @param context is allowed to be null if no context is appropriate.
+    void noteIsolatedActorMember(ValueDecl *decl, Expr *context) {
       // FIXME: Make this diagnostic more sensitive to the isolation context
       // of the declaration.
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         func->diagnose(diag::actor_isolated_sync_func, 
           decl->getDescriptiveKind(),
           decl->getName());
-      } else if (isa<VarDecl>(decl)) {
-        decl->diagnose(diag::actor_mutable_state);
+
+        // was it an attempt to mutate an actor instance's isolated state?
+      } else if (auto environment = kindOfUsage(decl, context)) {
+
+        if (environment.getValue() == VarRefUseEnv::Read)
+          decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
+        else
+          decl->diagnose(diag::actor_mutable_state, decl->getDescriptiveKind());
+
       } else {
         decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
       }
@@ -1435,39 +1521,62 @@ namespace {
     /// Check a reference to an entity within a global actor.
     bool checkGlobalActorReference(
         ConcreteDeclRef valueRef, SourceLoc loc, Type globalActor,
-        bool isCrossActor) {
+        bool isCrossActor,
+        Expr *context) {
       ValueDecl *value = valueRef.getDecl();
 
-      /// Returns true if this global actor reference is the callee of an Apply.
-      /// NOTE: This check mutates the identified ApplyExpr if it returns true!
+      /// Returns true if this global-actor reference is acceptable because
+      /// it is part of an implicitly async operation, such as a call or
+      /// property access.
+      /// NOTE: This check will mutate the AST if it returns true!
       auto inspectForImplicitlyAsync = [&] () -> bool {
         // If our current context isn't an asynchronous one, don't
         if (!isInAsynchronousContext())
           return false;
 
-        // Is this global actor reference outside of an ApplyExpr?
-        if (applyStack.size() == 0)
-          return false;
+        bool asyncAccess = false;
 
-        // Check our applyStack metadata from the traversal.
-        // Our goal is to identify whether this global actor reference appears
-        // as the called value of the enclosing ApplyExpr. We cannot simply
-        // inspect Parent here because of expressions like (callee)()
-        ApplyExpr *apply = applyStack.back();
-        Expr *fn = apply->getFn()->getValueProvidingExpr();
-        if (auto memberRef = findMemberReference(fn)) {
-          auto concDecl = memberRef->first;
-          if (value == concDecl.getDecl() && !apply->implicitlyAsync()) {
-            // then this ValueDecl appears as the called value of the ApplyExpr.
-            markNearestCallAsImplicitlyAsync();
-
-            // Check for non-concurrent types.
-            (void)diagnoseNonConcurrentTypesInReference(
-                valueRef, getDeclContext(), loc,
-                ConcurrentReferenceKind::SynchronousAsAsyncCall);
-
-            return true;
+        // Is this global-actor reference part of a LookupExpr or DeclRefExpr?
+        if (isPropOrSubscript(valueRef.getDecl())) {
+          if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
+            if (usageEnv(declRef) == VarRefUseEnv::Read) {
+              declRef->setImplicitlyAsync(true);
+              asyncAccess = true;
+            }
+          } else if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
+            if (usageEnv(lookupExpr) == VarRefUseEnv::Read) {
+              lookupExpr->setImplicitlyAsync(true);
+              asyncAccess = true;
+            }
           }
+        }
+
+        // Is this global-actor reference within an apply?
+        if (!applyStack.empty()) {
+          // Check our applyStack metadata from the traversal.
+          // Our goal is to identify whether this global actor reference appears
+          // as the called value of the enclosing ApplyExpr. We cannot simply
+          // inspect Parent here because of expressions like (callee)()
+          // and the fact that the reference may be just an argument to an apply
+          ApplyExpr *apply = applyStack.back();
+          Expr *fn = apply->getFn()->getValueProvidingExpr();
+          if (auto memberRef = findMemberReference(fn)) {
+            auto concDecl = memberRef->first;
+            if (value == concDecl.getDecl() && !apply->implicitlyAsync()) {
+              // then this ValueDecl appears as the called value of the ApplyExpr.
+              markNearestCallAsImplicitlyAsync();
+              asyncAccess = true;
+            }
+          }
+        }
+
+        if (asyncAccess) {
+          // Check for non-concurrent types.
+          (void)diagnoseNonConcurrentTypesInReference(
+              valueRef, getDeclContext(), loc,
+              ConcurrentReferenceKind::SynchronousAsAsyncCall);
+
+          return true;
         }
 
         return false;
@@ -1491,16 +1600,20 @@ namespace {
       }
 
       switch (contextIsolation) {
-      case ActorIsolation::ActorInstance:
+      case ActorIsolation::ActorInstance: {
         if (inspectForImplicitlyAsync())
           return false;
 
-        ctx.Diags.diagnose(
-            loc, diag::global_actor_from_instance_actor_context,
-            value->getDescriptiveKind(), value->getName(), globalActor,
-            contextIsolation.getActor()->getName());
-        noteIsolatedActorMember(value);
+        auto useKind = static_cast<unsigned>(
+            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
+
+        ctx.Diags.diagnose(loc, diag::global_actor_from_instance_actor_context,
+                           value->getDescriptiveKind(), value->getName(),
+                           globalActor, contextIsolation.getActor()->getName(),
+                           useKind);
+        noteIsolatedActorMember(value, context);
         return true;
+      }
 
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe: {
@@ -1509,12 +1622,15 @@ namespace {
         if (inspectForImplicitlyAsync())
           return false;
 
+        auto useKind = static_cast<unsigned>(
+            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
+
         // Otherwise, this is a problematic global actor decl reference.
         ctx.Diags.diagnose(
             loc, diag::global_actor_from_other_global_actor_context,
             value->getDescriptiveKind(), value->getName(), globalActor,
-            contextIsolation.getGlobalActor());
-        noteIsolatedActorMember(value);
+            contextIsolation.getGlobalActor(), useKind);
+        noteIsolatedActorMember(value, context);
         return true;
       }
 
@@ -1522,38 +1638,44 @@ namespace {
         // Allow unrestricted use of something in a global actor.
         return false;
 
-      case ActorIsolation::Independent:
+      case ActorIsolation::Independent: {
         if (inspectForImplicitlyAsync())
           return false;
 
-        ctx.Diags.diagnose(
-            loc, diag::global_actor_from_nonactor_context,
-            value->getDescriptiveKind(), value->getName(), globalActor,
-            /*actorIndependent=*/true);
-        noteIsolatedActorMember(value);
+        auto useKind = static_cast<unsigned>(
+            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
+
+        ctx.Diags.diagnose(loc, diag::global_actor_from_nonactor_context,
+                           value->getDescriptiveKind(), value->getName(),
+                           globalActor,
+                           /*actorIndependent=*/true, useKind);
+        noteIsolatedActorMember(value, context);
         return true;
+      }
 
       case ActorIsolation::Unspecified: {
         // NOTE: we must always inspect for implicitlyAsync
-        bool implicitlyAsyncCall = inspectForImplicitlyAsync();
+        bool implicitlyAsyncExpr = inspectForImplicitlyAsync();
         bool didEmitDiagnostic = false;
 
         auto emitError = [&](bool justNote = false) {
           didEmitDiagnostic = true;
           if (!justNote) {
+            auto useKind = static_cast<unsigned>(
+                kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
             ctx.Diags.diagnose(
               loc, diag::global_actor_from_nonactor_context,
               value->getDescriptiveKind(), value->getName(), globalActor,
-              /*actorIndependent=*/false);
+              /*actorIndependent=*/false, useKind);
           }
-          noteIsolatedActorMember(value);
+          noteIsolatedActorMember(value, context);
         };
 
         if (AbstractFunctionDecl const* fn =
             dyn_cast_or_null<AbstractFunctionDecl>(declContext->getAsDecl())) {
           bool isAsyncContext = fn->isAsyncContext();
 
-          if (implicitlyAsyncCall && isAsyncContext)
+          if (implicitlyAsyncExpr && isAsyncContext)
             return didEmitDiagnostic; // definitely an OK reference.
 
           // otherwise, there's something wrong.
@@ -1562,7 +1684,7 @@ namespace {
           // then we know later type-checking will raise an error,
           // so we just emit a note pointing out that callee of the call is
           // implicitly async.
-          emitError(/*justNote=*/implicitlyAsyncCall);
+          emitError(/*justNote=*/implicitlyAsyncExpr);
 
           // otherwise, if it's any kind of global-actor reference within
           // this synchronous function, we'll additionally suggest becoming
@@ -1697,7 +1819,8 @@ namespace {
 
       case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
-            valueRef, loc, isolation.getGlobalActor(), isolation.isCrossActor);
+            valueRef, loc, isolation.getGlobalActor(), isolation.isCrossActor,
+            declRefExpr);
 
       case ActorIsolationRestriction::Unsafe:
         return diagnoseReferenceToUnsafeGlobal(value, loc);
@@ -1707,7 +1830,7 @@ namespace {
 
     /// Determine the reason for the given declaration context to be
     /// actor-independent.
-    static Diag<DescriptiveDeclKind, DeclName>
+    static Diag<DescriptiveDeclKind, DeclName, unsigned>
     findActorIndependentReason(DeclContext *dc) {
       if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
         switch (autoclosure->getThunkKind()) {
@@ -1749,7 +1872,7 @@ namespace {
     bool checkMemberReference(
         Expr *base, ConcreteDeclRef memberRef, SourceLoc memberLoc,
         bool isEscapingPartialApply = false, 
-        bool maybeImplicitAsync = false) {
+        Expr *context = nullptr) {
       if (!base || !memberRef)
         return false;
 
@@ -1775,16 +1898,32 @@ namespace {
       }
 
       case ActorIsolationRestriction::ActorSelf: {
-        // Local function to check for implicit async promotion.
+        /// Local function to check for implicit async promotion.
+        /// returns None if it is not applicable; true if there is an error.
         auto checkImplicitlyAsync = [&]() -> Optional<bool> {
           if (!isInAsynchronousContext())
             return None;
 
+          bool validAccess = false;
+
           // actor-isolated non-isolated-self calls are implicitly async
           // and thus OK.
-          if (maybeImplicitAsync && isa<AbstractFunctionDecl>(member)) {
+          if (llvm::isa_and_nonnull<SelfApplyExpr>(context) &&
+              isa<AbstractFunctionDecl>(member)) {
             markNearestCallAsImplicitlyAsync();
+            validAccess = true;
 
+          } else if (llvm::isa_and_nonnull<LookupExpr>(context) &&
+                    isPropOrSubscript(member) &&
+                    usageEnv(cast<LookupExpr>(context)) == VarRefUseEnv::Read) {
+            cast<LookupExpr>(context)->setImplicitlyAsync(true);
+            validAccess = true;
+          } else {
+            // It's not wrong to have declref context here; simply unimplemented
+            assert(context == nullptr || !isa<DeclRefExpr>(context));
+          }
+
+          if (validAccess) {
             // Check for non-concurrent types.
             return diagnoseNonConcurrentTypesInReference(
                 memberRef, getDeclContext(), memberLoc,
@@ -1801,13 +1940,18 @@ namespace {
           if (auto result = checkImplicitlyAsync())
             return *result;
 
+          auto useKind = static_cast<unsigned>(
+              kindOfUsage(member, context).getValueOr(VarRefUseEnv::Read));
+
           ctx.Diags.diagnose(
               memberLoc, diag::actor_isolated_non_self_reference,
               member->getDescriptiveKind(),
               member->getName(),
               isolation.getActorClass() ==
-                getNearestEnclosingActorContext(getDeclContext()));
-          noteIsolatedActorMember(member);
+                getNearestEnclosingActorContext(getDeclContext()),
+              useKind
+              );
+          noteIsolatedActorMember(member, context);
           return true;
         }
 
@@ -1822,7 +1966,7 @@ namespace {
                   memberLoc, diag::actor_isolated_partial_apply,
                   member->getDescriptiveKind(),
                   member->getName());
-              noteIsolatedActorMember(member);
+              noteIsolatedActorMember(member, context);
               return true;
             }
 
@@ -1839,10 +1983,12 @@ namespace {
 
             // The 'self' is for an actor-independent member, which means
             // we cannot refer to actor-isolated state.
+            auto useKind = static_cast<unsigned>(
+                kindOfUsage(member, context).getValueOr(VarRefUseEnv::Read));
             auto diag = findActorIndependentReason(curDC);
             ctx.Diags.diagnose(memberLoc, diag, member->getDescriptiveKind(),
-                               member->getName());
-            noteIsolatedActorMember(member);
+                               member->getName(), useKind);
+            noteIsolatedActorMember(member, context);
             return true;
           }
 
@@ -1859,7 +2005,7 @@ namespace {
                 member->getDescriptiveKind(),
                 member->getName(),
                 contextIsolation.getGlobalActor());
-            noteIsolatedActorMember(member);
+            noteIsolatedActorMember(member, context);
             return true;
         }
         llvm_unreachable("Unhandled actor isolation");
@@ -1875,7 +2021,7 @@ namespace {
       case ActorIsolationRestriction::GlobalActor:
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
-            isolation.isCrossActor);
+            isolation.isCrossActor, context);
 
       case ActorIsolationRestriction::Unsafe:
         // This case is hit when passing actor state inout to functions in some
