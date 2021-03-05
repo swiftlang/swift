@@ -29,19 +29,36 @@ using namespace swift;
 /// Determine whether it makes sense to infer an attribute in the given
 /// context.
 static bool shouldInferAttributeInContext(const DeclContext *dc) {
-  auto sourceFile = dc->getParentSourceFile();
-  if (!sourceFile)
-    return false;
+  if (auto *file = dyn_cast<FileUnit>(dc->getModuleScopeContext())) {
+    switch (file->getKind()) {
+    case FileUnitKind::Source:
+      // Check what kind of source file we have.
+      if (auto sourceFile = dc->getParentSourceFile()) {
+        switch (sourceFile->Kind) {
+        case SourceFileKind::Interface:
+          // Interfaces have explicitly called-out ConcurrentValue conformances.
+          return false;
 
-  switch (sourceFile->Kind) {
-  case SourceFileKind::Interface:
-  case SourceFileKind::SIL:
-    return false;
+        case SourceFileKind::Library:
+        case SourceFileKind::Main:
+        case SourceFileKind::SIL:
+          return true;
+        }
+      }
+      break;
 
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-    return true;
+    case FileUnitKind::Builtin:
+    case FileUnitKind::SerializedAST:
+    case FileUnitKind::Synthesized:
+      return false;
+
+    case FileUnitKind::ClangModule:
+    case FileUnitKind::DWARFModule:
+      return true;
+    }
   }
+
+  return false;
 }
 
 /// Check whether the @asyncHandler attribute can be applied to the given
@@ -458,15 +475,6 @@ GlobalActorAttributeRequest::evaluate(
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
       }
-
-      // Global actors don't make sense on a stored property of a struct.
-      if (var->hasStorage() && var->getDeclContext()->getSelfStructDecl() &&
-          var->isInstanceMember()) {
-        var->diagnose(diag::global_actor_on_struct_property, var->getName())
-          .highlight(globalActorAttr->getRangeWithAt());
-        return None;
-      }
-
     }
   } else if (isa<ExtensionDecl>(decl)) {
     // Extensions are okay.
@@ -2344,7 +2352,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Function used when returning an inferred isolation.
-  auto inferredIsolation = [&](ActorIsolation inferred) {
+  auto inferredIsolation = [&](
+      ActorIsolation inferred, bool propagateUnsafe = false) {
     // Add an implicit attribute to capture the actor isolation that was
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
@@ -2357,13 +2366,19 @@ ActorIsolation ActorIsolationRequest::evaluate(
       break;
 
     case ActorIsolation::GlobalActorUnsafe:
-      // Don't infer unsafe global actor isolation.
-      return ActorIsolation::forUnspecified();
+      if (!propagateUnsafe && !value->hasClangNode()) {
+        // Don't infer unsafe global actor isolation.
+        return ActorIsolation::forUnspecified();
+      }
+
+      LLVM_FALLTHROUGH;
 
     case ActorIsolation::GlobalActor: {
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(
           ctx, SourceLoc(), typeExpr, /*implicit=*/true);
+      if (inferred == ActorIsolation::GlobalActorUnsafe)
+        attr->setArgIsUnsafe(true);
       value->getAttrs().add(attr);
       break;
     }
@@ -2398,6 +2413,46 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // declaration.
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
     return getActorIsolation(accessor->getStorage());
+  }
+
+  if (auto var = dyn_cast<VarDecl>(value)) {
+    // If this is a variable with a property wrapper, infer from the property
+    // wrapper's wrappedValue.
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
+      if (auto wrappedValue = wrapperInfo.valueVar) {
+        if (auto isolation = getActorIsolation(wrappedValue))
+          return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+      }
+    }
+
+    // If this is the backing storage for a property wrapper, infer from the
+    // type of the outermost property wrapper.
+    if (auto originalVar = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::Backing)) {
+      if (auto backingType =
+              originalVar->getPropertyWrapperBackingPropertyType()) {
+        if (auto backingNominal = backingType->getAnyNominal()) {
+          if (!isa<ClassDecl>(backingNominal) ||
+              !cast<ClassDecl>(backingNominal)->isActor()) {
+            if (auto isolation = getActorIsolation(backingNominal))
+              return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+          }
+        }
+      }
+    }
+
+    // If this is the projected property for a property wrapper, infer from
+    // the property wrapper's projectedValue.
+    if (auto originalVar = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::Projection)) {
+      if (auto wrapperInfo =
+              originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
+        if (auto projectedValue = wrapperInfo.projectedValueVar) {
+          if (auto isolation = getActorIsolation(projectedValue))
+            return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+        }
+      }
+    }
   }
 
   if (shouldInferAttributeInContext(value->getDeclContext())) {
@@ -2577,6 +2632,13 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
         // features.
         if (func->getAttrs().hasAttribute<AsyncHandlerAttr>())
           return true;
+
+        // If we're in an accessor declaration, also check the storage
+        // declaration.
+        if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+          if (getIsolationFromAttributes(accessor->getStorage()))
+            return true;
+        }
       }
     }
 

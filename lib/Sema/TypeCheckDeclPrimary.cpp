@@ -1766,6 +1766,29 @@ public:
     });
   }
 
+  /// If the given pattern binding has a property wrapper, check the
+  /// isolation and effects of the backing storage initializer.
+  void checkPropertyWrapperBackingInitializer(PatternBindingDecl *PBD) {
+    auto singleVar = PBD->getSingleVar();
+    if (!singleVar)
+      return;
+
+    if (!singleVar->hasAttachedPropertyWrapper())
+      return;
+
+    auto backingInfo = singleVar->getPropertyWrapperBackingPropertyInfo();
+    if (!backingInfo)
+      return;
+
+    auto backingPBD = backingInfo.backingVar->getParentPatternBinding();
+    if (!backingPBD)
+      return;
+
+    if (auto initializer = backingInfo.getInitFromWrappedValue()) {
+      checkPropertyWrapperActorIsolation(backingPBD, initializer);
+      TypeChecker::checkPropertyWrapperEffects(backingPBD, initializer);
+    }
+  }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     DeclContext *DC = PBD->getDeclContext();
@@ -1913,6 +1936,8 @@ public:
         }
       }
     }
+
+    checkPropertyWrapperBackingInitializer(PBD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {

@@ -129,4 +129,14 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
 
 #define MAGIC_NUMBER 42
 
+
+__attribute__((__swift_attr__("@MainActor(unsafe)")))
+@interface NXView : NSObject
+-(void)onDisplay;
+@end
+
+@interface NXButton: NXView
+-(void)onButtonPress;
+@end
+
 #pragma clang assume_nonnull end
