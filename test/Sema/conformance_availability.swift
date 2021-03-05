@@ -322,3 +322,32 @@ func usesUnavailableHashable(_ c: UnavailableHashable) {
   // expected-error@-1 2 {{conformance of 'UnavailableHashable' to 'Hashable' is only available in macOS 100 or newer}}
   // expected-note@-2 2 {{add 'if #available' version check}}
 }
+
+// Actually make sure we check witness availability correctly.
+protocol Vehicle {
+  func move() // expected-note {{protocol requirement here}}
+}
+
+@available(macOS 100, *)
+struct Pony : Vehicle {
+  func move() {}
+}
+
+struct Bike {}
+
+@available(macOS 100, *)
+extension Bike : Vehicle {
+  func move() {}
+}
+
+class Car {}
+class ClownCar : Car {}
+
+@available(macOS 200, *)
+extension Car {
+  func move() {} // expected-note {{'move()' declared here}}
+}
+
+@available(macOS 100, *)
+extension ClownCar : Vehicle {}
+// expected-error@-1 {{protocol 'Vehicle' requires 'move()' to be available in macOS 100 and newer}}

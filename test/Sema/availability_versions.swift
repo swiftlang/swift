@@ -1388,7 +1388,7 @@ protocol ProtocolWithRequirementMentioningUnavailable {
 
 protocol HasMethodF {
   associatedtype T
-  func f(_ p: T) // expected-note 5{{protocol requirement here}}
+  func f(_ p: T) // expected-note 4{{protocol requirement here}}
 }
 
 class TriesToConformWithFunctionIntroducedOn10_51 : HasMethodF {
@@ -1439,7 +1439,8 @@ extension HasNoMethodF1 : HasMethodF {
 class HasNoMethodF2 { }
 @available(OSX, introduced: 10.51)
 extension HasNoMethodF2 : HasMethodF {
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodF' requires 'f' to be available in macOS 10.50.0 and newer}}
+  // This is OK, because the conformance was introduced by an extension.
+  func f(_ p: Int) { }
 }
 
 @available(OSX, introduced: 10.51)
@@ -1453,7 +1454,7 @@ extension HasNoMethodF3 : HasMethodF {
 
 @available(OSX, introduced: 10.51)
 protocol HasMethodFOn10_51 {
-  func f(_ p: Int) // expected-note {{protocol requirement here}}
+  func f(_ p: Int)
 }
 
 class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_51 {
@@ -1465,7 +1466,8 @@ class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_51 {
 class HasNoMethodF4 { }
 @available(OSX, introduced: 10.52)
 extension HasNoMethodF4 : HasMethodFOn10_51 {
-  func f(_ p: Int) { } // expected-error {{protocol 'HasMethodFOn10_51' requires 'f' to be available in macOS 10.51 and newer}}
+  // This is OK, because the conformance was introduced by an extension.
+  func f(_ p: Int) { }
 }
 
 @available(OSX, introduced: 10.51)
