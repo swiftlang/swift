@@ -702,6 +702,18 @@ public:
     }
   }
 
+  Classification classifyConformance(ProtocolConformanceRef conformanceRef,
+                                     EffectKind kind) {
+    if (conformanceRef.hasEffect(kind)) {
+      // FIXME: Should be ::Always if its not one of our
+      // input conformances
+      return Classification::forConditional(kind,
+        PotentialEffectReason::forConformance());
+    }
+
+    return Classification();
+  }
+
   /// Check to see if the given function application throws or is async.
   Classification classifyApply(ApplyExpr *E) {
     if (isa<SelfApplyExpr>(E))
@@ -717,16 +729,11 @@ public:
     auto fnType = type->getAs<AnyFunctionType>();
     if (!fnType) return Classification::forInvalidCode();
 
-    Classification result;
-
-    if (fnType->isAsync() || E->implicitlyAsync())
-      result = Classification::forUnconditional(
-        EffectKind::Async,
-        PotentialEffectReason::forApply());
-
-    // If the function doesn't throw at all, we're done here.
-    if (!fnType->isThrowing()) {
-      return result;
+    // If the function doesn't have any effects, we're done here.
+    if (!fnType->isThrowing() &&
+        !fnType->isAsync() &&
+        !E->implicitlyAsync()) {
+      return Classification();
     }
 
     // Decompose the application.
@@ -739,58 +746,81 @@ public:
         return Classification::forInvalidCode();
     }
 
-    // Handle rethrowing functions.
-    switch (fnRef.getPolymorphicEffectKind(EffectKind::Throws)) {
-    case PolymorphicEffectKind::ByConformance: {
-      auto substitutions = fnRef.getSubstitutions();
-      for (auto conformanceRef : substitutions.getConformances()) {
-        if (conformanceRef.hasEffect(EffectKind::Throws)) {
-          result.merge(Classification::forConditional(EffectKind::Throws,
-            PotentialEffectReason::forConformance()));
-          return result;
+    Classification result;
+
+    auto classifyApplyEffect = [&](EffectKind kind) {
+      if (!fnType->hasEffect(kind) &&
+          !(kind == EffectKind::Async &&
+            E->implicitlyAsync())) {
+        return;
+      }
+
+      // Handle rethrowing and reasync functions.
+      switch (fnRef.getPolymorphicEffectKind(kind)) {
+      case PolymorphicEffectKind::ByConformance: {
+        auto substitutions = fnRef.getSubstitutions();
+        for (auto conformanceRef : substitutions.getConformances())
+          result.merge(classifyConformance(conformanceRef, kind));
+
+        // 'ByConformance' is a superset of 'ByClosure', so check for
+        // closure arguments too.
+        LLVM_FALLTHROUGH;
+      }
+
+      case PolymorphicEffectKind::ByClosure: {
+        // We need to walk the original parameter types in parallel
+        // because it only counts for rethrows/reasync purposes if it
+        // lines up with a throws/async function parameter in the
+        // original type.
+        auto *origType = fnRef.getType()->getAs<AnyFunctionType>();
+        if (!origType) {
+          result.merge(Classification::forInvalidCode());
+          return;
         }
+
+        // Use the most significant result from the arguments.
+        auto params = origType->getParams();
+        if (params.size() != args.size()) {
+          result.merge(Classification::forInvalidCode());
+          return;
+        }
+
+        for (unsigned i = 0, e = params.size(); i < e; ++i) {
+          result.merge(classifyArgument(args[i],
+                                        params[i].getParameterType(),
+                                        kind));
+        }
+
+        return;
       }
 
-      // 'ByConformance' is a superset of 'ByClosure', so check for
-      // closure arguments too.
-      LLVM_FALLTHROUGH;
-    }
-
-    case PolymorphicEffectKind::ByClosure: {
-      // We need to walk the original parameter types in parallel
-      // because it only counts for 'rethrows' purposes if it lines up
-      // with a throwing function parameter in the original type.
-      auto *origType = fnRef.getType()->getAs<AnyFunctionType>();
-      if (!origType)
-        return Classification::forInvalidCode();
-
-      // Use the most significant result from the arguments.
-      auto params = origType->getParams();
-      if (params.size() != args.size())
-        return Classification::forInvalidCode();
-
-      for (unsigned i = 0, e = params.size(); i < e; ++i) {
-        result.merge(classifyArgument(args[i],
-                                      params[i].getParameterType(),
-                                      EffectKind::Throws));
+      case PolymorphicEffectKind::None:
+      case PolymorphicEffectKind::Always:
+      case PolymorphicEffectKind::Invalid:
+        break;
       }
 
-      return result;
-    }
+      // Try to classify the implementation of functions that we have
+      // local knowledge of.
+      //
+      // An autoclosure callee here only appears in a narrow case where
+      // we're in the initializer of an 'async let'.
+      if (fnRef.isAutoClosure()) {
+        result.merge(Classification::forUnconditional(
+            kind, PotentialEffectReason::forApply()));
+      } else {
+        result.merge(
+          classifyFunctionBody(fnRef,
+                               PotentialEffectReason::forApply(),
+                               kind));
+        assert(result.getConditionalKind(kind)
+               != ConditionalEffectKind::None &&
+               "body classification decided function had no effect?");
+      }
+    };
 
-    default:
-      break;
-    }
-
-    // Try to classify the implementation of functions that we have
-    // local knowledge of.
-    result.merge(
-      classifyFunctionBody(fnRef,
-                           PotentialEffectReason::forApply(),
-                           EffectKind::Throws));
-    assert(result.getConditionalKind(EffectKind::Throws)
-           != ConditionalEffectKind::None &&
-           "body classification decided function was no-throw");
+    classifyApplyEffect(EffectKind::Throws);
+    classifyApplyEffect(EffectKind::Async);
 
     return result;
   }
@@ -813,23 +843,12 @@ public:
   }
 
 private:
-  /// Classify a throwing function according to our local knowledge of
-  /// its implementation.
-  ///
-  /// For the most part, this only distinguishes between Throws and
-  /// RethrowingOnly.  But it can return Invalid if a type-checking
-  /// failure prevents it from deciding that, and it can return None
-  /// if the function is an autoclosure that simply doesn't throw at all.
+  /// Classify a throwing or async function according to our local
+  /// knowledge of its implementation.
   Classification
   classifyFunctionBody(const AbstractFunction &fn,
                        PotentialEffectReason reason,
                        EffectKind kind) {
-    // If we're not checking a 'rethrows' context, we don't need to
-    // distinguish between 'throws' and 'rethrows'.  But don't even
-    // trust 'throws' for autoclosures.
-    if (!getPolymorphicEffectDeclContext(kind) && !fn.isAutoClosure())
-      return Classification::forUnconditional(kind, reason);
-
     switch (fn.getKind()) {
     case AbstractFunction::Opaque:
       return Classification::forUnconditional(kind, reason);
@@ -853,8 +872,8 @@ private:
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
-    if (kind == EffectKind::Throws &&
-        param->getDeclContext() == RethrowsDC)
+    auto *ParentDC = getPolymorphicEffectDeclContext(kind);
+    if (ParentDC == param->getDeclContext())
       return Classification::forConditional(kind, reason);
 
     // Otherwise, it throws unconditionally.
@@ -979,6 +998,18 @@ private:
       return ShouldRecurse;
     }
 
+    ShouldRecurse_t checkForEach(ForEachStmt *S) {
+      if (S->getTryLoc().isValid()) {
+        auto classification = Self.classifyConformance(
+            S->getSequenceConformance(), EffectKind::Throws);
+        IsInvalid |= classification.isInvalid();
+        ThrowKind = std::max(ThrowKind,
+                             classification.getConditionalKind(EffectKind::Throws));
+      }
+
+      return ShouldRecurse;
+    }
+
     ConditionalEffectKind checkExhaustiveDoBody(DoCatchStmt *S) {
       // All errors thrown by the do body are caught, but any errors thrown
       // by the catch bodies are bounded by the throwing kind of the do body.
@@ -1072,6 +1103,19 @@ private:
     }
 
     ShouldRecurse_t checkDoCatch(DoCatchStmt *S) {
+      return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkForEach(ForEachStmt *S) {
+      if (S->getAwaitLoc().isValid()) {
+        auto classification = Self.classifyConformance(
+            S->getSequenceConformance(),
+            EffectKind::Async);
+        IsInvalid |= classification.isInvalid();
+        AsyncKind = std::max(AsyncKind,
+                             classification.getConditionalKind(EffectKind::Async));
+      }
+
       return ShouldRecurse;
     }
   };
@@ -1313,13 +1357,7 @@ public:
   }
 
   /// Whether this is a function that rethrows.
-  bool isRethrows() const {
-    if (!HandlesErrors)
-      return false;
-
-    if (ErrorHandlingIgnoresFunction)
-      return false;
-
+  bool hasPolymorphicEffect(EffectKind kind) const {
     if (!Function)
       return false;
 
@@ -1327,8 +1365,35 @@ public:
     if (!fn)
       return false;
 
-    return fn->getPolymorphicEffectKind(EffectKind::Throws)
-        == PolymorphicEffectKind::ByClosure;
+    switch (kind) {
+    case EffectKind::Throws:
+      if (!HandlesErrors)
+        return false;
+
+      if (ErrorHandlingIgnoresFunction)
+        return false;
+
+      break;
+
+    case EffectKind::Async:
+      if (!HandlesAsync)
+        return false;
+
+      break;
+    }
+
+    switch (fn->getPolymorphicEffectKind(kind)) {
+    case PolymorphicEffectKind::ByClosure:
+    case PolymorphicEffectKind::ByConformance:
+      return true;
+
+    case PolymorphicEffectKind::None:
+    case PolymorphicEffectKind::Always:
+    case PolymorphicEffectKind::Invalid:
+      return false;
+    }
+
+    llvm_unreachable("Bad polymorphic effect kind");
   }
 
   /// Whether this is an autoclosure.
@@ -1438,9 +1503,6 @@ public:
 
   Kind getKind() const { return TheKind; }
 
-  bool handlesNothing() const {
-    return !HandlesErrors;
-  }
   bool handlesThrows(ConditionalEffectKind errorKind) const {
     switch (errorKind) {
     case ConditionalEffectKind::None:
@@ -1453,17 +1515,30 @@ public:
     // An operation that always throws can only be handled by an
     // all-handling context.
     case ConditionalEffectKind::Always:
-      return HandlesErrors && !isRethrows();
+      return HandlesErrors && !hasPolymorphicEffect(EffectKind::Throws);
     }
     llvm_unreachable("bad error kind");
   }
 
-  bool handlesAsync() const {
-    return HandlesAsync;
+  bool handlesAsync(ConditionalEffectKind errorKind) const {
+    switch (errorKind) {
+    case ConditionalEffectKind::None:
+      return true;
+
+    // A call that's rethrowing-only can be handled by 'rethrows'.
+    case ConditionalEffectKind::Conditional:
+      return HandlesAsync;
+
+    // An operation that always throws can only be handled by an
+    // all-handling context.
+    case ConditionalEffectKind::Always:
+      return HandlesAsync && !hasPolymorphicEffect(EffectKind::Async);
+    }
+    llvm_unreachable("bad error kind");
   }
 
-  DeclContext *getRethrowsDC() const {
-    if (!isRethrows())
+  DeclContext *getPolymorphicEffectDeclContext(EffectKind kind) const {
+    if (!hasPolymorphicEffect(kind))
       return nullptr;
 
     return Function->getAbstractFunctionDecl();
@@ -1573,8 +1648,10 @@ public:
 
     // Allow the diagnostic to fire on the 'try' if we don't have
     // anything else to say.
-    if (isTryCovered && !reason.hasPolymorphicEffect() &&
-        !isRethrows() && !isAutoClosure()) {
+    if (isTryCovered &&
+        !reason.hasPolymorphicEffect() &&
+        !hasPolymorphicEffect(EffectKind::Throws) &&
+        !isAutoClosure()) {
       DiagnoseErrorOnTry = true;
       return;
     }
@@ -1606,7 +1683,7 @@ public:
         return;
       }
 
-      if (isRethrows()) {
+      if (hasPolymorphicEffect(EffectKind::Throws)) {
         diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                     diag::throwing_call_in_rethrows_function,
                             diag::tryless_throwing_call_in_rethrows_function);
@@ -1645,7 +1722,7 @@ public:
         return;
       }
 
-      if (isRethrows()) {
+      if (hasPolymorphicEffect(EffectKind::Throws)) {
         Diags.diagnose(S->getStartLoc(), diag::throw_in_rethrows_function);
         return;
       }
@@ -1819,6 +1896,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   ASTContext &Ctx;
 
   DeclContext *RethrowsDC = nullptr;
+  DeclContext *ReasyncDC = nullptr;
   Context CurContext;
 
   class ContextFlags {
@@ -1905,6 +1983,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   CheckEffectsCoverage &Self;
     Context OldContext;
     DeclContext *OldRethrowsDC;
+    DeclContext *OldReasyncDC;
     ContextFlags OldFlags;
     ConditionalEffectKind OldMaxThrowingKind;
 
@@ -1912,6 +1991,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     ContextScope(CheckEffectsCoverage &self, Optional<Context> newContext)
       : Self(self), OldContext(self.CurContext),
         OldRethrowsDC(self.RethrowsDC),
+        OldReasyncDC(self.ReasyncDC),
         OldFlags(self.Flags),
         OldMaxThrowingKind(self.MaxThrowingKind) {
       if (newContext) self.CurContext = *newContext;
@@ -1922,6 +2002,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
     void enterSubFunction() {
       Self.RethrowsDC = nullptr;
+      Self.ReasyncDC = nullptr;
     }
 
     void enterTry() {
@@ -2026,6 +2107,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     ~ContextScope() {
       Self.CurContext = OldContext;
       Self.RethrowsDC = OldRethrowsDC;
+      Self.ReasyncDC = OldReasyncDC;
       Self.Flags = OldFlags;
       Self.MaxThrowingKind = OldMaxThrowingKind;
     }
@@ -2036,8 +2118,13 @@ public:
     : Ctx(ctx), CurContext(initialContext),
       MaxThrowingKind(ConditionalEffectKind::None) {
 
-    if (auto rethrowsDC = initialContext.getRethrowsDC()) {
+    if (auto rethrowsDC = initialContext.getPolymorphicEffectDeclContext(
+          EffectKind::Throws)) {
       RethrowsDC = rethrowsDC;
+    }
+    if (auto reasyncDC = initialContext.getPolymorphicEffectDeclContext(
+          EffectKind::Async)) {
+      ReasyncDC = reasyncDC;
     }
   }
 
@@ -2119,7 +2206,7 @@ private:
 
     // If the enclosing context doesn't handle anything, use a
     // specialized diagnostic about non-exhaustive catches.
-    if (CurContext.handlesNothing()) {
+    if (!CurContext.handlesThrows(ConditionalEffectKind::Conditional)) {
       CurContext.setNonExhaustiveCatch(true);
     }
 
@@ -2156,7 +2243,7 @@ private:
 
     auto savedContext = CurContext;
     if (doThrowingKind != ConditionalEffectKind::Always &&
-        CurContext.isRethrows()) {
+        CurContext.hasPolymorphicEffect(EffectKind::Throws)) {
       // If this catch clause is reachable at all, it's because a function
       // parameter throws. So let's temporarily state that the body is allowed
       // to throw.
@@ -2174,6 +2261,7 @@ private:
     // But if the expression didn't type-check, suppress diagnostics.
     ApplyClassifier classifier;
     classifier.RethrowsDC = RethrowsDC;
+    classifier.ReasyncDC = ReasyncDC;
     auto classification = classifier.classifyApply(E);
 
     checkThrowAsyncSite(E, /*requiresTry*/ true, classification);
@@ -2231,7 +2319,7 @@ private:
 
   ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
     // Diagnose async let in a context that doesn't handle async.
-    if (!CurContext.handlesAsync()) {
+    if (!CurContext.handlesAsync(ConditionalEffectKind::Always)) {
       CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
     }
 
@@ -2307,14 +2395,12 @@ private:
       break;
 
     case ConditionalEffectKind::Conditional:
-      llvm_unreachable("Not supported yet\n");
-
     case ConditionalEffectKind::Always:
       // Remember that we've seen an async call.
       Flags.set(ContextFlags::HasAnyAsyncSite);
 
       // Diagnose async calls in a context that doesn't handle async.
-      if (!CurContext.handlesAsync()) {
+      if (!CurContext.handlesAsync(asyncKind)) {
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E);
       }
       // Diagnose async calls that are outside of an await context.
@@ -2370,7 +2456,7 @@ private:
     // course we're in a context that could never handle an 'async'. Then, we
     // produce an error.
     if (!Flags.has(ContextFlags::HasAnyAsyncSite)) {
-      if (CurContext.handlesAsync())
+      if (CurContext.handlesAsync(ConditionalEffectKind::Conditional))
         Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
       else
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E);
@@ -2395,7 +2481,7 @@ private:
 
     // Diagnose all the call sites within a single unhandled 'try'
     // at the same time.
-    } else if (CurContext.handlesNothing()) {
+    } else if (!CurContext.handlesThrows(ConditionalEffectKind::Conditional)) {
       CurContext.diagnoseUnhandledTry(Ctx.Diags, E);
     }
 
@@ -2436,16 +2522,27 @@ private:
   }
 
   ShouldRecurse_t checkForEach(ForEachStmt *S) {
-    // FIXME: Handle 'for try await' inside a 'rethrows'-by-conformance
-    // function
-    if (S->getTryLoc().isValid() && 
-        !CurContext.handlesThrows(ConditionalEffectKind::Always)) {
-      CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
+    if (!S->getAwaitLoc().isValid())
+      return ShouldRecurse;
+
+    ApplyClassifier classifier;
+    classifier.RethrowsDC = RethrowsDC;
+    classifier.ReasyncDC = ReasyncDC;
+
+    if (S->getTryLoc().isValid()) {
+      auto classification = classifier.classifyConformance(
+          S->getSequenceConformance(), EffectKind::Throws);
+      auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
+      if (!CurContext.handlesThrows(throwsKind))
+        CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
     }
-    if (S->getAwaitLoc().isValid() &&
-        !CurContext.handlesAsync()) {
+
+    auto classification = classifier.classifyConformance(
+        S->getSequenceConformance(), EffectKind::Async);
+    auto asyncKind = classification.getConditionalKind(EffectKind::Async);
+    if (!CurContext.handlesAsync(asyncKind))
       CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S);
-    }
+
     return ShouldRecurse;
   }
 };

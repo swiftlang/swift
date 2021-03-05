@@ -131,6 +131,8 @@ public:
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
   IGNORED_ATTR(Concurrent)
+  IGNORED_ATTR(AtRethrows)
+  IGNORED_ATTR(AtReasync)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -225,7 +227,6 @@ public:
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
-  void visitAtRethrowsAttr(AtRethrowsAttr *attr);
 
   void checkApplicationMainAttribute(DeclAttribute *attr,
                                      Identifier Id_ApplicationDelegate,
@@ -280,7 +281,6 @@ public:
   void visitMarkerAttr(MarkerAttr *attr);
 
   void visitReasyncAttr(ReasyncAttr *attr);
-  void visitAtReasyncAttr(AtReasyncAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2064,8 +2064,8 @@ void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {
 }
 
 void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
-  // 'rethrows' only applies to functions that take throwing functions
-  // as parameters.
+  // Make sure the function takes a 'throws' function argument or a
+  // conformance to a '@rethrows' protocol.
   auto fn = dyn_cast<AbstractFunctionDecl>(D);
   if (fn->getPolymorphicEffectKind(EffectKind::Throws)
         != PolymorphicEffectKind::Invalid) {
@@ -2075,8 +2075,6 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
   attr->setInvalid();
 }
-
-void AttributeChecker::visitAtRethrowsAttr(AtRethrowsAttr *attr) {}
 
 /// Collect all used generic parameter types from a given type.
 static void collectUsedGenericParameters(
@@ -5566,10 +5564,17 @@ void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
 }
 
 void AttributeChecker::visitReasyncAttr(ReasyncAttr *attr) {
-  // FIXME
-}
+  // Make sure the function takes a 'throws' function argument or a
+  // conformance to a '@rethrows' protocol.
+  auto fn = dyn_cast<AbstractFunctionDecl>(D);
+  if (fn->getPolymorphicEffectKind(EffectKind::Async)
+        != PolymorphicEffectKind::Invalid) {
+    return;
+  }
 
-void AttributeChecker::visitAtReasyncAttr(AtReasyncAttr *attr) {}
+  diagnose(attr->getLocation(), diag::reasync_without_async_parameter);
+  attr->setInvalid();
+}
 
 namespace {
 
