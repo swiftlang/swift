@@ -1399,6 +1399,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
       Attr = IEC->getVerificationType();
+    } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
+      Attr = DVI->poisonRefs();
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
