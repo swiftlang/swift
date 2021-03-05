@@ -1470,7 +1470,9 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   ASTContext &ctx = VD->getASTContext();
 
   addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]{
-    return ObjCAttr::create(ctx, note.ObjCName, false);
+    auto attr = ObjCAttr::create(ctx, note.ObjCName, false);
+    attr->setAddedByAccessNote();
+    return attr;
   });
 
   addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, [&]{

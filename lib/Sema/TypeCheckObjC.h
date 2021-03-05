@@ -69,6 +69,9 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
+    /// Has an explicit '@objc' attribute added by an access note, rather than
+    /// written in source code.
+    ExplicitlyObjCByAccessNote,
 
     // These kinds do not appear in diagnostics.
 

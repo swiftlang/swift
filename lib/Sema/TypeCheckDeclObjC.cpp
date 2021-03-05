@@ -54,6 +54,9 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
       return DiagnosticBehavior::Unspecified;
     return DiagnosticBehavior::Ignore;
 
+  case ObjCReason::ExplicitlyObjCByAccessNote:
+    return DiagnosticBehavior::Remark;
+
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
   case ObjCReason::ElementOfObjCEnum:
@@ -79,6 +82,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
   case ObjCReason::MemberOfObjCExtension:
+  case ObjCReason::ExplicitlyObjCByAccessNote:
     return static_cast<unsigned>(reason);
 
   case ObjCReason::MemberOfObjCSubclass:
@@ -113,6 +117,10 @@ static void describeObjCReason(const ValueDecl *VD, ObjCReason Reason) {
                 VD->getDescriptiveKind(), requirement->getName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())
                   ->getName());
+  }
+  else if (Reason == ObjCReason::ExplicitlyObjCByAccessNote) {
+    // FIXME: Look up the Reason string in the access note and emit a note that
+    // includes it
   }
 }
 
@@ -1119,6 +1127,13 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   return classDecl->checkAncestry(AncestryFlags::ObjCMembers);
 }
 
+static ObjCReason reasonForObjCAttr(const ObjCAttr *attr) {
+  if (attr->getAddedByAccessNote())
+    return ObjCReason::ExplicitlyObjCByAccessNote;
+
+  return ObjCReason::ExplicitlyObjC;
+}
+
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
@@ -1191,7 +1206,7 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       }
     }
 
-    return ObjCReason(ObjCReason::ExplicitlyObjC);
+    return reasonForObjCAttr(CD->getAttrs().getAttribute<ObjCAttr>());
   }
 
   if (ancestry.contains(AncestryFlags::ObjC)) {
@@ -1272,8 +1287,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   };
 
   // explicitly declared @objc.
-  if (VD->getAttrs().hasAttribute<ObjCAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyObjC);
+  if (auto attr = VD->getAttrs().getAttribute<ObjCAttr>())
+    return reasonForObjCAttr(attr);
   // Getter or setter for an @objc property or subscript.
   if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
     if (accessor->getAccessorKind() == AccessorKind::Get ||
@@ -1486,18 +1501,18 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
     if (isEnumObjC(enumDecl))
-      isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+      isObjC = reasonForObjCAttr(enumDecl->getAttrs().getAttribute<ObjCAttr>());
   } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
     // Enum elements can be @objc so long as the containing enum is @objc.
     if (enumElement->getParentEnum()->isObjC()) {
-      if (enumElement->getAttrs().hasAttribute<ObjCAttr>())
-        isObjC = ObjCReason::ExplicitlyObjC;
+      if (auto attr = enumElement->getAttrs().getAttribute<ObjCAttr>())
+        isObjC = reasonForObjCAttr(attr);
       else
         isObjC = ObjCReason::ElementOfObjCEnum;
     }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
-    if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+    if (auto attr = proto->getAttrs().getAttribute<ObjCAttr>()) {
+      isObjC = reasonForObjCAttr(attr);
 
       // If the protocol is @objc, it may only refine other @objc protocols.
       // FIXME: Revisit this restriction.

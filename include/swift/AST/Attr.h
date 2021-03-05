@@ -118,7 +118,7 @@ protected:
       Invalid : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1+1,
+    SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1+1+1,
       /// Whether this attribute has location information that trails the main
       /// record, which contains the locations of the parentheses and any names.
       HasTrailingLocationInfo : 1,
@@ -128,7 +128,10 @@ protected:
 
       /// Whether the @objc was inferred using Swift 3's deprecated inference
       /// rules.
-      Swift3Inferred : 1
+      Swift3Inferred : 1,
+
+      /// Whether the @objc was created by an access note.
+      AddedByAccessNote : 1
     );
 
     SWIFT_INLINE_BITFIELD(DynamicReplacementAttr, DeclAttribute, 1,
@@ -749,6 +752,7 @@ class ObjCAttr final : public DeclAttribute,
     Bits.ObjCAttr.HasTrailingLocationInfo = false;
     Bits.ObjCAttr.ImplicitName = implicitName;
     Bits.ObjCAttr.Swift3Inferred = false;
+    Bits.ObjCAttr.AddedByAccessNote = false;
 
     if (name) {
       NameData = name->getOpaqueValue();
@@ -866,6 +870,17 @@ public:
   /// @objc inference rules.
   void setSwift3Inferred(bool inferred = true) {
     Bits.ObjCAttr.Swift3Inferred = inferred;
+  }
+
+  /// Determine whether this attribute was added by an access note. If it is,
+  /// the compiler will not treat it as a hard error if the attribute is
+  /// invalid.
+  bool getAddedByAccessNote() const {
+    return Bits.ObjCAttr.AddedByAccessNote;
+  }
+
+  void setAddedByAccessNote(bool accessNote = true) {
+    Bits.ObjCAttr.AddedByAccessNote = accessNote;
   }
 
   /// Clear the name of this entity.
