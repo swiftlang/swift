@@ -1558,70 +1558,83 @@ namespace {
       return false;
     }
 
+    enum class AsyncMarkingResult {
+      FoundAsync, // successfully marked an implicitly-async operation
+      NotFound,  // fail: no valid implicitly-async operation was found
+      SyncContext, // fail: a valid implicitly-async op, but in sync context
+      NotConcurrentValue  // fail: valid op and context, but not ConcurrentValue
+    };
+
+    /// Attempts to identify and mark a valid cross-actor use of a synchronous
+    /// actor-isolated member (e.g., sync function application, property access)
+    AsyncMarkingResult tryMarkImplicitlyAsync(SourceLoc declLoc,
+                                              ConcreteDeclRef concDeclRef,
+                                              Expr* context) {
+      // If our current context isn't an asynchronous one, don't
+      if (!isInAsynchronousContext())
+        return AsyncMarkingResult::NotFound;
+
+      ValueDecl *decl = concDeclRef.getDecl();
+      AsyncMarkingResult result = AsyncMarkingResult::NotFound;
+
+      // is it an access to a property?
+      if (isPropOrSubscript(decl)) {
+        if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
+          if (usageEnv(declRef) == VarRefUseEnv::Read) {
+            declRef->setImplicitlyAsync(true);
+            result = AsyncMarkingResult::FoundAsync;
+          }
+        } else if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
+          if (usageEnv(lookupExpr) == VarRefUseEnv::Read) {
+            lookupExpr->setImplicitlyAsync(true);
+            result = AsyncMarkingResult::FoundAsync;
+          }
+        }
+
+      } else if (llvm::isa_and_nonnull<SelfApplyExpr>(context) &&
+          isa<AbstractFunctionDecl>(decl)) {
+        // actor-isolated non-isolated-self calls are implicitly async
+        // and thus OK.
+        markNearestCallAsImplicitlyAsync();
+        result = AsyncMarkingResult::FoundAsync;
+
+      } else if (!applyStack.empty()) {
+        // Check our applyStack metadata from the traversal.
+        // Our goal is to identify whether the actor reference appears
+        // as the called value of the enclosing ApplyExpr. We cannot simply
+        // inspect Parent here because of expressions like (callee)()
+        // and the fact that the reference may be just an argument to an apply
+        ApplyExpr *apply = applyStack.back();
+        Expr *fn = apply->getFn()->getValueProvidingExpr();
+        if (auto memberRef = findMemberReference(fn)) {
+          auto concDecl = memberRef->first;
+          if (decl == concDecl.getDecl() && !apply->implicitlyAsync()) {
+            // then this ValueDecl appears as the called value of the ApplyExpr.
+            markNearestCallAsImplicitlyAsync();
+            result = AsyncMarkingResult::FoundAsync;
+          }
+        }
+      }
+
+      if (result == AsyncMarkingResult::FoundAsync) {
+        // Check for non-concurrent types.
+        bool problemFound =
+            diagnoseNonConcurrentTypesInReference(
+              concDeclRef, getDeclContext(), declLoc,
+              ConcurrentReferenceKind::SynchronousAsAsyncCall);
+        if (problemFound)
+          result = AsyncMarkingResult::NotConcurrentValue;
+      }
+
+      return result;
+    }
+
     /// Check a reference to an entity within a global actor.
     bool checkGlobalActorReference(
         ConcreteDeclRef valueRef, SourceLoc loc, Type globalActor,
         bool isCrossActor,
         Expr *context) {
       ValueDecl *value = valueRef.getDecl();
-
-      /// Returns true if this global-actor reference is acceptable because
-      /// it is part of an implicitly async operation, such as a call or
-      /// property access.
-      /// NOTE: This check will mutate the AST if it returns true!
-      auto inspectForImplicitlyAsync = [&] () -> bool {
-        // If our current context isn't an asynchronous one, don't
-        if (!isInAsynchronousContext())
-          return false;
-
-        bool asyncAccess = false;
-
-        // Is this global-actor reference part of a LookupExpr or DeclRefExpr?
-        if (isPropOrSubscript(valueRef.getDecl())) {
-          if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
-            if (usageEnv(declRef) == VarRefUseEnv::Read) {
-              declRef->setImplicitlyAsync(true);
-              asyncAccess = true;
-            }
-          } else if (auto lookupExpr = dyn_cast_or_null<LookupExpr>(context)) {
-            if (usageEnv(lookupExpr) == VarRefUseEnv::Read) {
-              lookupExpr->setImplicitlyAsync(true);
-              asyncAccess = true;
-            }
-          }
-        }
-
-        // Is this global-actor reference within an apply?
-        if (!applyStack.empty()) {
-          // Check our applyStack metadata from the traversal.
-          // Our goal is to identify whether this global actor reference appears
-          // as the called value of the enclosing ApplyExpr. We cannot simply
-          // inspect Parent here because of expressions like (callee)()
-          // and the fact that the reference may be just an argument to an apply
-          ApplyExpr *apply = applyStack.back();
-          Expr *fn = apply->getFn()->getValueProvidingExpr();
-          if (auto memberRef = findMemberReference(fn)) {
-            auto concDecl = memberRef->first;
-            if (value == concDecl.getDecl() && !apply->implicitlyAsync()) {
-              // then this ValueDecl appears as the called value of the ApplyExpr.
-              markNearestCallAsImplicitlyAsync();
-              asyncAccess = true;
-            }
-          }
-        }
-
-        if (asyncAccess) {
-          // Check for non-concurrent types.
-          (void)diagnoseNonConcurrentTypesInReference(
-              valueRef, getDeclContext(), loc,
-              ConcurrentReferenceKind::SynchronousAsAsyncCall);
-
-          return true;
-        }
-
-        return false;
-      };
-
       auto declContext = getDeclContext();
 
       // Check whether we are within the same isolation context, in which
@@ -1641,7 +1654,8 @@ namespace {
 
       switch (contextIsolation) {
       case ActorIsolation::ActorInstance: {
-        if (inspectForImplicitlyAsync())
+        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        if (result == AsyncMarkingResult::FoundAsync)
           return false;
 
         auto useKind = static_cast<unsigned>(
@@ -1659,7 +1673,8 @@ namespace {
       case ActorIsolation::GlobalActorUnsafe: {
         // Check if this decl reference is the callee of the enclosing Apply,
         // making it OK as an implicitly async call.
-        if (inspectForImplicitlyAsync())
+        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        if (result == AsyncMarkingResult::FoundAsync)
           return false;
 
         auto useKind = static_cast<unsigned>(
@@ -1679,7 +1694,8 @@ namespace {
         return false;
 
       case ActorIsolation::Independent: {
-        if (inspectForImplicitlyAsync())
+        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        if (result == AsyncMarkingResult::FoundAsync)
           return false;
 
         auto useKind = static_cast<unsigned>(
@@ -1695,7 +1711,8 @@ namespace {
 
       case ActorIsolation::Unspecified: {
         // NOTE: we must always inspect for implicitlyAsync
-        bool implicitlyAsyncExpr = inspectForImplicitlyAsync();
+        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+        bool implicitlyAsyncExpr = (result == AsyncMarkingResult::FoundAsync);
         bool didEmitDiagnostic = false;
 
         auto emitError = [&](bool justNote = false) {
@@ -1938,47 +1955,15 @@ namespace {
       }
 
       case ActorIsolationRestriction::ActorSelf: {
-        /// Local function to check for implicit async promotion.
-        /// returns None if it is not applicable; true if there is an error.
-        auto checkImplicitlyAsync = [&]() -> Optional<bool> {
-          if (!isInAsynchronousContext())
-            return None;
-
-          bool validAccess = false;
-
-          // actor-isolated non-isolated-self calls are implicitly async
-          // and thus OK.
-          if (llvm::isa_and_nonnull<SelfApplyExpr>(context) &&
-              isa<AbstractFunctionDecl>(member)) {
-            markNearestCallAsImplicitlyAsync();
-            validAccess = true;
-
-          } else if (llvm::isa_and_nonnull<LookupExpr>(context) &&
-                    isPropOrSubscript(member) &&
-                    usageEnv(cast<LookupExpr>(context)) == VarRefUseEnv::Read) {
-            cast<LookupExpr>(context)->setImplicitlyAsync(true);
-            validAccess = true;
-          } else {
-            // It's not wrong to have declref context here; simply unimplemented
-            assert(context == nullptr || !isa<DeclRefExpr>(context));
-          }
-
-          if (validAccess) {
-            // Check for non-concurrent types.
-            return diagnoseNonConcurrentTypesInReference(
-                memberRef, getDeclContext(), memberLoc,
-                ConcurrentReferenceKind::SynchronousAsAsyncCall);
-          }
-
-          return None;
-        };
-
         // Must reference actor-isolated state on 'self'.
         auto *selfVar = getReferencedSelf(base);
         if (!selfVar) {
           // Check for implicit async.
-          if (auto result = checkImplicitlyAsync())
-            return *result;
+          auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
+          if (result == AsyncMarkingResult::FoundAsync)
+            return false; // no problems
+          else if (result == AsyncMarkingResult::NotConcurrentValue)
+            return true;
 
           auto useKind = static_cast<unsigned>(
               kindOfUsage(member, context).getValueOr(VarRefUseEnv::Read));
@@ -2017,9 +2002,11 @@ namespace {
             return false;
 
           case ActorIsolation::Independent: {
-            // Check for implicit async.
-            if (auto result = checkImplicitlyAsync())
-              return *result;
+            auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
+            if (result == AsyncMarkingResult::FoundAsync)
+              return false; // no problems
+            else if (result == AsyncMarkingResult::NotConcurrentValue)
+              return true;
 
             // The 'self' is for an actor-independent member, which means
             // we cannot refer to actor-isolated state.
@@ -2033,20 +2020,22 @@ namespace {
           }
 
           case ActorIsolation::GlobalActor:
-          case ActorIsolation::GlobalActorUnsafe:
-            // Check for implicit async.
-            if (auto result = checkImplicitlyAsync())
-              return *result;
+          case ActorIsolation::GlobalActorUnsafe: {
+            auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
+            if (result == AsyncMarkingResult::FoundAsync)
+              return false; // no problems
+            else if (result == AsyncMarkingResult::NotConcurrentValue)
+              return true;
 
             // The 'self' is for a member that's part of a global actor, which
             // means we cannot refer to actor-isolated state.
-            ctx.Diags.diagnose(
-                memberLoc, diag::actor_isolated_global_actor_context,
-                member->getDescriptiveKind(),
-                member->getName(),
-                contextIsolation.getGlobalActor());
+            ctx.Diags.diagnose(memberLoc,
+                               diag::actor_isolated_global_actor_context,
+                               member->getDescriptiveKind(), member->getName(),
+                               contextIsolation.getGlobalActor());
             noteIsolatedActorMember(member, context);
             return true;
+          }
         }
         llvm_unreachable("Unhandled actor isolation");
       }
