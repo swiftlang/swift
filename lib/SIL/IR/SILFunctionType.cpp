@@ -3135,7 +3135,7 @@ static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
     return false;
 
   // Must be a type member.
-  if (constant.getParameterListCount() != 2)
+  if (!accessor->hasImplicitSelfDecl())
     return false;
 
   // Must be imported from a function.
