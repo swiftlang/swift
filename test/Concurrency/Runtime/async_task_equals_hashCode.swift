@@ -4,12 +4,6 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: OS=windows-msvc
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func simple() async {
   print("\(#function) -----------------------")
   let one = await Task.current()

@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_sum_nextOnCompleted() async {
   let numbers = [1, 2, 3, 4, 5]
   let expected = 15 // FIXME: numbers.reduce(0, +) this hangs?
@@ -28,7 +22,7 @@ func test_sum_nextOnCompleted() async {
 
     // We specifically want to await on completed child tasks in this test,
     // so give them some time to complete before we hit group.next()
-    sleep(2)
+    await Task.sleep(2_000_000_000)
 
     var sum = 0
     do {

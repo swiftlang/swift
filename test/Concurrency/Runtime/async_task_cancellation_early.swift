@@ -6,17 +6,11 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_runDetached_cancel_child_early() async {
   print(#function) // CHECK: test_runDetached_cancel_child_early
   let h: Task.Handle<Bool, Error> = Task.runDetached {
     async let childCancelled: Bool = { () -> Bool in
-      sleep(2)
+      await Task.sleep(2_000_000_000)
       return Task.isCancelled
     }()
 

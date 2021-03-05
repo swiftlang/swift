@@ -63,8 +63,26 @@ using namespace swift;
 SWIFT_CC(swift)
 void (*swift::swift_task_enqueueGlobal_hook)(Job *job) = nullptr;
 
+SWIFT_CC(swift)
+void (*swift::swift_task_enqueueGlobalWithDelay_hook)(unsigned long long delay, Job *job) = nullptr;
+
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+
+#include <chrono>
+#include <thread>
+
 static Job *JobQueue = nullptr;
+
+class DelayedJob {
+public:
+  Job *job;
+  unsigned long long when;
+  DelayedJob *next;
+
+  DelayedJob(Job *job, unsigned long long when) : job(job), when(when), next(nullptr) {}
+};
+
+static DelayedJob *DelayedJobQueue = nullptr;
 
 /// Get the next-in-queue storage slot.
 static Job *&nextInQueue(Job *cur) {
@@ -89,13 +107,58 @@ static void insertIntoJobQueue(Job *newJob) {
   *position = newJob;
 }
 
+static unsigned long long currentNanos() {
+  auto now = std::chrono::steady_clock::now();
+  auto nowNanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
+  auto value = std::chrono::duration_cast<std::chrono::nanoseconds>(nowNanos.time_since_epoch());
+  return value.count();
+}
+
+/// Insert a job into the cooperative global queue.
+static void insertIntoDelayedJobQueue(unsigned long long delay, Job *job) {
+  DelayedJob **position = &DelayedJobQueue;
+  DelayedJob *newJob = new DelayedJob(job, currentNanos() + delay);
+
+  while (auto cur = *position) {
+    // If we find a job with lower priority, insert here.
+    if (cur->when > newJob->when) {
+      newJob->next = cur;
+      *position = newJob;
+      return;
+    }
+
+    // Otherwise, keep advancing through the queue.
+    position = &cur->next;
+  }
+  *position = newJob;
+}
+
 /// Claim the next job from the cooperative global queue.
 static Job *claimNextFromJobQueue() {
-  if (auto job = JobQueue) {
-    JobQueue = nextInQueue(job);
-    return job;
+  // Check delayed jobs first
+  while (true) {
+    if (auto delayedJob = DelayedJobQueue) {
+      if (delayedJob->when < currentNanos()) {
+        DelayedJobQueue = delayedJob->next;
+        auto job = delayedJob->job;
+        
+        delete delayedJob;
+
+        return job;
+      }
+    }
+    if (auto job = JobQueue) {
+      JobQueue = nextInQueue(job);
+      return job;
+    }
+    // there are only delayed jobs left, but they are not ready,
+    // so we sleep until the first one is
+    if (auto delayedJob = DelayedJobQueue) {
+      std::this_thread::sleep_for(std::chrono::nanoseconds(delayedJob->when - currentNanos()));
+      continue;
+    }
+    return nullptr;
   }
-  return nullptr;
 }
 
 void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
@@ -174,6 +237,30 @@ void swift::swift_task_enqueueGlobal(Job *job) {
                                          /*flags*/ 0);
 
   dispatch_async_f(queue, dispatchContext, dispatchFunction);
+#endif
+}
+
+void swift::swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job) {
+  assert(job && "no job provided");
+
+  // If the hook is defined, use it.
+  if (swift_task_enqueueGlobalWithDelay_hook)
+    return swift_task_enqueueGlobalWithDelay_hook(delay, job);
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  insertIntoDelayedJobQueue(delay, job);
+#else
+
+  dispatch_function_t dispatchFunction = &__swift_run_job;
+  void *dispatchContext = job;
+
+  JobPriority priority = job->getPriority();
+
+  // TODO: cache this to avoid the extra call
+  auto queue = dispatch_get_global_queue((dispatch_qos_class_t) priority,
+                                         /*flags*/ 0);
+  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
+  dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
 #endif
 }
 

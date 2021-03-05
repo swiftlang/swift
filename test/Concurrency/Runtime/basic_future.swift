@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
 }
@@ -34,7 +28,7 @@ func testSimple(
     // can complete.
     if doSuspend {
       print("- Future sleeping")
-      sleep(1) // TODO: await Task.sleep would be preferable here
+      await Task.sleep(1_000_000_000)
     }
 
     if (shouldThrow) {
@@ -50,7 +44,7 @@ func testSimple(
   // can complete.
   if !doSuspend {
     print("+ Reader sleeping")
-    sleep(1)
+    await Task.sleep(1_000_000_000)
   }
 
   do {

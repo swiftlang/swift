@@ -6,16 +6,10 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func test_runDetached_cancel_while_child_running() async {
   let h: Task.Handle<Bool, Error> = Task.runDetached {
     async let childCancelled: Bool = { () -> Bool in
-      sleep(3)
+      await Task.sleep(3_000_000_000)
       return Task.isCancelled
     }()
 
@@ -27,7 +21,7 @@ func test_runDetached_cancel_while_child_running() async {
   }
 
   // sleep here, i.e. give the task a moment to start running
-  sleep(2)
+  await Task.sleep(2_000_000_000)
 
   h.cancel()
   print("handle cancel")

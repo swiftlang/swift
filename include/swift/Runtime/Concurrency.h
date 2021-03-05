@@ -486,6 +486,9 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
+
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
@@ -498,6 +501,11 @@ void swift_MainActor_register(HeapObject *actor);
 /// TODO: figure out a better abstraction plan than this.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void (*swift_task_enqueueGlobal_hook)(Job *job);
+
+/// A hook to take over global enqueuing with delay.
+/// TODO: figure out a better abstraction plan than this.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void (*swift_task_enqueueGlobalWithDelay_hook)(unsigned long long delay, Job *job);
 
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
