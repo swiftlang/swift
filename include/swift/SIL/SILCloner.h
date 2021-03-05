@@ -1807,7 +1807,8 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
 
   recordClonedInstruction(
       Inst, getBuilder().createDestroyValue(getOpLocation(Inst->getLoc()),
-                                            getOpValue(Inst->getOperand())));
+                                            getOpValue(Inst->getOperand()),
+                                            Inst->poisonRefs()));
 }
 
 template <typename ImplClass>

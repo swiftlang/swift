@@ -5178,7 +5178,7 @@ destroy_value
 
 ::
 
-  sil-instruction ::= 'destroy_value' sil-operand
+  sil-instruction ::= 'destroy_value' '[poison]'? sil-operand
 
   destroy_value %0 : $A
 

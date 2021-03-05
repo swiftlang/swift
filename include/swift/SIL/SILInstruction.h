@@ -7141,8 +7141,17 @@ class DestroyValueInst
                                   NonValueInstruction> {
   friend class SILBuilder;
 
-  DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand) {}
+  DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand, bool poisonRefs)
+      : UnaryInstructionBase(DebugLoc, operand) {
+    setPoisonRefs(poisonRefs);
+  }
+
+public:
+  bool poisonRefs() const { return SILNode::Bits.DestroyValueInst.PoisonRefs; }
+
+  void setPoisonRefs(bool poisonRefs = true) {
+    SILNode::Bits.DestroyValueInst.PoisonRefs = poisonRefs;
+  }
 };
 
 /// Given an object reference, return true iff it is non-nil and refers
