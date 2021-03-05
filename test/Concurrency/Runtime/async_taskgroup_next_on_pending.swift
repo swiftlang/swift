@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// REQUIRES: rdar75096485
+
 import Dispatch
 
 func completeSlowly(n: Int) async -> Int {

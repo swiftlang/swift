@@ -2528,8 +2528,6 @@ static void typeCheckSynthesizedWrapperInitializer(
           dyn_cast_or_null<Initializer>(pbd->getInitContext(i))) {
     TypeChecker::contextualizeInitializer(initializerContext, initializer);
   }
-  checkPropertyWrapperActorIsolation(pbd, initializer);
-  TypeChecker::checkPropertyWrapperEffects(pbd, initializer);
 }
 
 static PropertyWrapperMutability::Value
@@ -2875,6 +2873,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       // Check initializer effects.
       auto *initContext = new (ctx) PropertyWrapperInitializer(
           dc, param, PropertyWrapperInitializer::Kind::WrappedValue);
+      TypeChecker::contextualizeInitializer(initContext, wrappedValueInit);
+      checkInitializerActorIsolation(initContext, wrappedValueInit);
       TypeChecker::checkInitializerEffects(initContext, wrappedValueInit);
     } else {
       typeCheckSynthesizedWrapperInitializer(

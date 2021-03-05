@@ -4406,6 +4406,11 @@ ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
 
+ERROR(actor_instance_property_wrapper,none,
+      "%0 property in property wrapper type %1 cannot be isolated to "
+      "the actor instance; consider @actorIndependent",
+      (Identifier, Identifier))
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
@@ -4437,8 +4442,6 @@ ERROR(global_actor_on_actor_class,none,
       "actor class %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
-ERROR(global_actor_on_struct_property,none,
-      "stored property %0 of a struct cannot have a global actor", (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
       
