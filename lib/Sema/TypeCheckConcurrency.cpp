@@ -419,13 +419,26 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
 
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 GlobalActorAttributeRequest::evaluate(
-    Evaluator &evaluator, Decl *decl) const {
-  ASTContext &ctx = decl->getASTContext();
-  auto dc = decl->getDeclContext();
+    Evaluator &evaluator,
+    llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
+  DeclContext *dc;
+  DeclAttributes *declAttrs;
+  SourceLoc loc;
+  if (auto decl = subject.dyn_cast<Decl *>()) {
+    dc = decl->getDeclContext();
+    declAttrs = &decl->getAttrs();
+    loc = decl->getLoc();
+  } else {
+    auto closure = subject.get<ClosureExpr *>();
+    dc = closure;
+    declAttrs = &closure->getAttrs();
+    loc = closure->getLoc();
+  }
+  ASTContext &ctx = dc->getASTContext();
   CustomAttr *globalActorAttr = nullptr;
   NominalTypeDecl *globalActorNominal = nullptr;
 
-  for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+  for (auto attr : declAttrs->getAttributes<CustomAttr>()) {
     auto mutableAttr = const_cast<CustomAttr *>(attr);
     // Figure out which nominal declaration this custom attribute refers to.
     auto nominal = evaluateOrDefault(ctx.evaluator,
@@ -440,10 +453,10 @@ GlobalActorAttributeRequest::evaluate(
     if (!nominal->isGlobalActor())
       continue;
 
-    // Only a single global actor can be applied to a given declaration.
+    // Only a single global actor can be applied to a given entity.
     if (globalActorAttr) {
-      decl->diagnose(
-          diag::multiple_global_actors, globalActorNominal->getName(),
+      ctx.Diags.diagnose(
+          loc, diag::multiple_global_actors, globalActorNominal->getName(),
           nominal->getName());
       continue;
     }
@@ -455,8 +468,14 @@ GlobalActorAttributeRequest::evaluate(
   if (!globalActorAttr)
     return None;
 
+  // Closures can always have a global actor attached.
+  if (auto closure = subject.dyn_cast<ClosureExpr *>()) {
+    return std::make_pair(globalActorAttr, globalActorNominal);
+  }
+
   // Check that a global actor attribute makes sense on this kind of
   // declaration.
+  auto decl = subject.get<Decl *>();
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // Nominal types are okay...
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
@@ -1473,8 +1492,13 @@ namespace {
 
       auto dc = const_cast<DeclContext *>(constDC);
       while (!dc->isModuleScopeContext()) {
-        // Look through non-escaping closures.
         if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+          // If this closure has specific isolation, use it.
+          auto closureIsolation = getActorIsolationOfContext(dc);
+          if (closureIsolation != ActorIsolation::Independent)
+            return closureIsolation;
+
+          // Look through non-escaping closures.
           if (auto type = closure->getType()) {
             if (auto fnType = type->getAs<AnyFunctionType>()) {
               if (fnType->isNoEscape()) {
@@ -2039,12 +2063,50 @@ namespace {
       llvm_unreachable("unhandled actor isolation kind!");
     }
 
+    // Attempt to resolve the global actor type of a closure.
+    Type resolveGlobalActorType(ClosureExpr *closure) {
+      auto globalActorAttr = evaluateOrDefault(
+          ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
+      if (!globalActorAttr)
+        return Type();
+
+      Type globalActor = evaluateOrDefault(
+          ctx.evaluator,
+          CustomAttrTypeRequest{
+            globalActorAttr->first, closure, CustomAttrTypeKind::GlobalActor},
+            Type());
+      if (!globalActor || globalActor->hasError())
+        return Type();
+
+      // Actor-isolated closures must be async.
+      bool isAsync = false;
+      if (Type closureType = closure->getType()) {
+        if (auto closureFnType = closureType->getAs<FunctionType>())
+          isAsync = closureFnType->isAsync();
+      }
+
+      if (!isAsync) {
+        ctx.Diags.diagnose(
+            closure->getLoc(), diag::global_actor_isolated_synchronous_closure,
+            globalActor);
+        return Type();
+      }
+
+      return globalActor;
+    }
+
     /// Determine the isolation of a particular closure.
     ///
     /// This function assumes that enclosing closures have already had their
     /// isolation checked.
     ClosureActorIsolation determineClosureIsolation(
         AbstractClosureExpr *closure) {
+      // If the closure specifies a global actor, use it.
+      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (Type globalActorType = resolveGlobalActorType(explicitClosure))
+          return ClosureActorIsolation::forGlobalActor(globalActorType);
+      }
+
       // Escaping and concurrent closures are always actor-independent.
       if (isEscapingClosure(closure) || isConcurrentClosure(closure))
         return ClosureActorIsolation::forIndependent();

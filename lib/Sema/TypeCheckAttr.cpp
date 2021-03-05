@@ -5584,9 +5584,10 @@ namespace {
 class ClosureAttributeChecker
     : public AttributeVisitor<ClosureAttributeChecker> {
   ASTContext &ctx;
+  ClosureExpr *closure;
 public:
   ClosureAttributeChecker(ClosureExpr *closure)
-    : ctx(closure->getASTContext()) { }
+    : ctx(closure->getASTContext()), closure(closure) { }
 
   void visitDeclAttribute(DeclAttribute *attr) {
     ctx.Diags.diagnose(
@@ -5598,6 +5599,29 @@ public:
 
   void visitConcurrentAttr(ConcurrentAttr *attr) {
     // Nothing else to check.
+  }
+
+  void visitCustomAttr(CustomAttr *attr) {
+    // Check whether this custom attribute is the global actor attribute.
+    auto globalActorAttr = evaluateOrDefault(
+        ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
+    if (globalActorAttr && globalActorAttr->first == attr)
+      return;
+
+    // Otherwise, it's an error.
+    std::string typeName;
+    if (auto typeRepr = attr->getTypeRepr()) {
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+    } else {
+      typeName = attr->getType().getString();
+    }
+
+    ctx.Diags.diagnose(
+        attr->getLocation(), diag::unsupported_closure_attr,
+        attr->isDeclModifier(), typeName)
+      .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
   }
 };
 
