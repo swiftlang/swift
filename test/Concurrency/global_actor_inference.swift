@@ -243,7 +243,7 @@ func barSync() {
 struct WrapperOnActor<Wrapped> {
   @actorIndependent(unsafe) private var stored: Wrapped
 
-  init(wrappedValue: Wrapped) {
+  @actorIndependent init(wrappedValue: Wrapped) {
     stored = wrappedValue
   }
 
@@ -333,6 +333,16 @@ actor WrapperActorBad2<Wrapped> {
   var projectedValue: Wrapped { // expected-error{{'projectedValue' property in property wrapper type 'WrapperActorBad2' cannot be isolated to the actor instance; consider @actorIndependent}}
     get { storage }
     set { storage = newValue }
+  }
+}
+
+actor ActorWithWrapper {
+  @WrapperOnActor var synced: Int = 0
+  // expected-note@-1 3{{mutable state is only available within the actor instance}}
+  func f() {
+    _ = synced // expected-error{{'synced' isolated to global actor}}
+    _ = $synced // expected-error{{'$synced' isolated to global actor}}
+    _ = _synced // expected-error{{'_synced' isolated to global actor}}
   }
 }
 

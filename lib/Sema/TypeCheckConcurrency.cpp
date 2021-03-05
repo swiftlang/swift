@@ -2398,47 +2398,47 @@ ActorIsolation ActorIsolationRequest::evaluate(
     return getActorIsolation(accessor->getStorage());
   }
 
-  if (shouldInferAttributeInContext(value->getDeclContext())) {
-    if (auto var = dyn_cast<VarDecl>(value)) {
-      // If this is a variable with a property wrapper, infer from the property
-      // wrapper's wrappedValue.
-      if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-        if (auto wrappedValue = wrapperInfo.valueVar) {
-          if (auto isolation = getActorIsolation(wrappedValue))
-            return inferredIsolation(isolation, /*propagateUnsafe=*/true);
-        }
+  if (auto var = dyn_cast<VarDecl>(value)) {
+    // If this is a variable with a property wrapper, infer from the property
+    // wrapper's wrappedValue.
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
+      if (auto wrappedValue = wrapperInfo.valueVar) {
+        if (auto isolation = getActorIsolation(wrappedValue))
+          return inferredIsolation(isolation, /*propagateUnsafe=*/true);
       }
+    }
 
-      // If this is the backing storage for a property wrapper, infer from the
-      // type of the outermost property wrapper.
-      if (auto originalVar = var->getOriginalWrappedProperty(
-              PropertyWrapperSynthesizedPropertyKind::Backing)) {
-        if (auto backingType =
-                originalVar->getPropertyWrapperBackingPropertyType()) {
-          if (auto backingNominal = backingType->getAnyNominal()) {
-            if (!isa<ClassDecl>(backingNominal) ||
-                !cast<ClassDecl>(backingNominal)->isActor()) {
-              if (auto isolation = getActorIsolation(backingNominal))
-                return inferredIsolation(isolation, /*propagateUnsafe=*/true);
-            }
-          }
-        }
-      }
-
-      // If this is the projected property for a property wrapper, infer from
-      // the property wrapper's projectedValue.
-      if (auto originalVar = var->getOriginalWrappedProperty(
-              PropertyWrapperSynthesizedPropertyKind::Projection)) {
-        if (auto wrapperInfo =
-                originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
-          if (auto projectedValue = wrapperInfo.projectedValueVar) {
-            if (auto isolation = getActorIsolation(projectedValue))
+    // If this is the backing storage for a property wrapper, infer from the
+    // type of the outermost property wrapper.
+    if (auto originalVar = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::Backing)) {
+      if (auto backingType =
+              originalVar->getPropertyWrapperBackingPropertyType()) {
+        if (auto backingNominal = backingType->getAnyNominal()) {
+          if (!isa<ClassDecl>(backingNominal) ||
+              !cast<ClassDecl>(backingNominal)->isActor()) {
+            if (auto isolation = getActorIsolation(backingNominal))
               return inferredIsolation(isolation, /*propagateUnsafe=*/true);
           }
         }
       }
     }
 
+    // If this is the projected property for a property wrapper, infer from
+    // the property wrapper's projectedValue.
+    if (auto originalVar = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::Projection)) {
+      if (auto wrapperInfo =
+              originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
+        if (auto projectedValue = wrapperInfo.projectedValueVar) {
+          if (auto isolation = getActorIsolation(projectedValue))
+            return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+        }
+      }
+    }
+  }
+
+  if (shouldInferAttributeInContext(value->getDeclContext())) {
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
     if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
@@ -2615,6 +2615,13 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
         // features.
         if (func->getAttrs().hasAttribute<AsyncHandlerAttr>())
           return true;
+
+        // If we're in an accessor declaration, also check the storage
+        // declaration.
+        if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+          if (getIsolationFromAttributes(accessor->getStorage()))
+            return true;
+        }
       }
     }
 
