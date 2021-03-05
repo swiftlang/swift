@@ -1377,6 +1377,17 @@ static ManagedValue emitBuiltinCancelAsyncTask(
   return SGF.emitCancelAsyncTask(loc, args[0].borrow(SGF, loc).forward(SGF));
 }
 
+// Helper to lower a function argument to be usable as the entry point of a
+// new async task
+static ManagedValue
+emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
+                                           SILLocation loc,
+                                           ManagedValue function,
+                                           CanType formalReturnTy) {
+  // The function is consumed by the underlying runtime call.
+  return function.ensurePlusOne(SGF, loc);
+}
+
 // Emit SIL for the named builtin: createAsyncTask.
 static ManagedValue emitBuiltinCreateAsyncTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
@@ -1384,12 +1395,14 @@ static ManagedValue emitBuiltinCreateAsyncTask(
   ASTContext &ctx = SGF.getASTContext();
   auto flags = args[0].forward(SGF);
   auto parentTask = args[1].borrow(SGF, loc).forward(SGF);
-  auto function = args[2].borrow(SGF, loc).forward(SGF);
+  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc,
+                             args[2], TupleType::getEmpty(SGF.getASTContext()));
+  
   auto apply = SGF.B.createBuiltin(
       loc,
       ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, parentTask, function });
+      { flags, parentTask, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
@@ -1417,13 +1430,14 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
       SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
   }).borrow(SGF, loc).forward(SGF);
 
-  auto function = args[2].borrow(SGF, loc).forward(SGF);
+  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[2],
+                                                             futureResultType);
   auto apply = SGF.B.createBuiltin(
       loc,
       ctx.getIdentifier(
           getBuiltinName(BuiltinValueKind::CreateAsyncTaskFuture)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, parentTask, futureResultMetadata, function });
+      { flags, parentTask, futureResultMetadata, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 
@@ -1452,13 +1466,14 @@ static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
       SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
   }).borrow(SGF, loc).forward(SGF);
 
-  auto function = args[3].borrow(SGF, loc).forward(SGF);
+  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[3],
+                                                             futureResultType);
   auto apply = SGF.B.createBuiltin(
       loc,
       ctx.getIdentifier(
           getBuiltinName(BuiltinValueKind::CreateAsyncTaskGroupFuture)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, parentTask, group, futureResultMetadata, function });
+      { flags, parentTask, group, futureResultMetadata, function.forward(SGF) });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 

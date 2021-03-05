@@ -33,10 +33,11 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_task
-sil hidden [ossa] @launch_task : $@convention(method) @async (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed () -> (@error Error)) -> () {
-bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed () -> (@error Error)):
+sil hidden [ossa] @launch_task : $@convention(method) @async (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_owned () -> (@error Error)) -> () {
+bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_owned () -> (@error Error)):
   %copy = copy_value %1 : $Optional<Builtin.NativeObject>
   %3 = begin_borrow %copy : $Optional<Builtin.NativeObject>
+  %4 = copy_value %2 : $@async @callee_owned () -> (@error Error)
   // CHECK: [[FN_CONTEXT:%.*]] = load %swift.refcounted*, %swift.refcounted** %.data
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT]])
   // CHECK: [[NEW_TASK_AND_CONTEXT:%.*]] = call swift{{(tail)?}}cc %swift.async_task_and_context @swift_task_create_f(
@@ -44,7 +45,7 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   // CHECK-NEXT: [[NEW_CONTEXT:%.*]] = bitcast %swift.context* [[NEW_CONTEXT_RAW]] to
   // CHECK-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]]
   // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
-  %20 = builtin "createAsyncTask"(%0 : $Int, %3 : $Optional<Builtin.NativeObject>, %2 : $@async @callee_guaranteed () -> (@error Error)) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTask"(%0 : $Int, %3 : $Optional<Builtin.NativeObject>, %4 : $@async @callee_owned () -> (@error Error)) : $(Builtin.NativeObject, Builtin.RawPointer)
   end_borrow %3 : $Optional<Builtin.NativeObject>
   destroy_value %copy : $Optional<Builtin.NativeObject>
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
@@ -53,12 +54,13 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future
-sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, @in_guaranteed T) -> () {
-bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, %3: $*T):
+sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, @in_guaranteed T) -> () {
+bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>, %3: $*T):
   %copy = copy_value %1 : $Optional<Builtin.NativeObject>
   // CHECK-32: [[TEMP:%.*]] = inttoptr i32 %1 to %swift.refcounted*
   // CHECK-64: [[TEMP:%.*]] = inttoptr i64 %1 to %swift.refcounted*
   %4 = begin_borrow %copy : $Optional<Builtin.NativeObject>
+  %5 = copy_value %2 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[TEMP]])
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[FN_CONTEXT:%.*]])
   %9 = metatype $@thick T.Type
@@ -69,7 +71,7 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   // CHECK-32-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 6
   // CHECK-64-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 7
   // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
-  %20 = builtin "createAsyncTaskFuture"<T>(%0 : $Int, %4 : $Optional<Builtin.NativeObject>, %10 : $@thick Any.Type, %2 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTaskFuture"<T>(%0 : $Int, %4 : $Optional<Builtin.NativeObject>, %10 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
   end_borrow %4 : $Optional<Builtin.NativeObject>
   destroy_value %copy : $Optional<Builtin.NativeObject>
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)
@@ -78,10 +80,11 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_void_future
-sil hidden [ossa] @launch_void_future : $@convention(method) (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
-bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):
+sil hidden [ossa] @launch_void_future : $@convention(method) (Int, Optional<Builtin.NativeObject>, @guaranteed @async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) -> () {
+bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>):
   %copy = copy_value %1 : $Optional<Builtin.NativeObject>
   %4 = begin_borrow %copy : $Optional<Builtin.NativeObject>
+  %5 = copy_value %2 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>
   // CHECK-32: [[TEMP:%.*]] = inttoptr i32 %1 to %swift.refcounted*
   // CHECK-64: [[TEMP:%.*]] = inttoptr i64 %1 to %swift.refcounted*
   // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned [[TEMP]])
@@ -94,7 +97,7 @@ bb0(%0 : $Int, %1: @unowned $Optional<Builtin.NativeObject>, %2: @guaranteed $@a
   // CHECK-32-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 6
   // CHECK-64-NEXT: [[CONTEXT_INFO_LOC:%.*]] = getelementptr inbounds <{{.*}}>* [[NEW_CONTEXT]], i32 0, i32 7
   // CHECK-NEXT: store %swift.refcounted* [[FN_CONTEXT]], %swift.refcounted** [[CONTEXT_INFO_LOC]]
-  %20 = builtin "createAsyncTaskFuture"<()>(%0 : $Int, %4 : $Optional<Builtin.NativeObject>, %9 : $@thick Any.Type, %2 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
+  %20 = builtin "createAsyncTaskFuture"<()>(%0 : $Int, %4 : $Optional<Builtin.NativeObject>, %9 : $@thick Any.Type, %5 : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
   end_borrow %4 : $Optional<Builtin.NativeObject>
   destroy_value %copy : $Optional<Builtin.NativeObject>
   destroy_value %20 : $(Builtin.NativeObject, Builtin.RawPointer)

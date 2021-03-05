@@ -18,7 +18,7 @@ public struct X {
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV10launchTaskyyYF : $@convention(method) @async (X) -> ()
   func launchTask() async {
-    // CHECK: builtin "createAsyncTask"([[FLAGS:%.*]] : $Int, [[PARENT:%.*]] : $Optional<Builtin.NativeObject>, [[FN:%.*]] : $@async @callee_guaranteed () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
+    // CHECK: builtin "createAsyncTask"([[FLAGS:%.*]] : $Int, [[PARENT:%.*]] : $Optional<Builtin.NativeObject>, [[FN:%.*]] : $@async @callee_owned () -> @error Error) : $(Builtin.NativeObject, Builtin.RawPointer)
     let task = Builtin.getCurrentAsyncTask()
     let childTask = Builtin.createAsyncTask(0, task) {
       await launchTask()
@@ -28,7 +28,7 @@ public struct X {
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV12launchFutureyyxlF : $@convention(method) <T> (@in_guaranteed T, X) -> ()
   func launchFuture<T>(_ value: T) {
-    // CHECK: builtin "createAsyncTaskFuture"<T>([[ZERO:%.*]] : $Int, [[NIL:%.*]] : $Optional<Builtin.NativeObject>, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+    // CHECK: builtin "createAsyncTaskFuture"<T>([[ZERO:%.*]] : $Int, [[NIL:%.*]] : $Optional<Builtin.NativeObject>, [[FN:%.*]] : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
     let task = Builtin.createAsyncTaskFuture(0, nil) { () async throws -> T in
       return value
     }
@@ -36,7 +36,7 @@ public struct X {
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV16launchGroupChildyyxlF : $@convention(method) <T> (@in_guaranteed T, X) -> () {
   func launchGroupChild<T>(_ value: T) {
-    // CHECK: builtin "createAsyncTaskGroupFuture"<T>([[ZERO:%.*]] : $Int, [[NIL:%.*]] : $Optional<Builtin.NativeObject>, [[NIL:%.*]] : $Optional<Builtin.RawPointer>, [[FN:%.*]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
+    // CHECK: builtin "createAsyncTaskGroupFuture"<T>([[ZERO:%.*]] : $Int, [[NIL:%.*]] : $Optional<Builtin.NativeObject>, [[NIL:%.*]] : $Optional<Builtin.RawPointer>, [[FN:%.*]] : $@async @callee_owned @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) : $(Builtin.NativeObject, Builtin.RawPointer)
     let task = Builtin.createAsyncTaskGroupFuture(0, nil, nil) { () async throws -> T in
       return value
     }

@@ -244,11 +244,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
-    // FIXME: SIL treats the function/context parameter as "guaranteed", but
-    // the runtime entry point assumes it is owned. Introduce an extra retain
-    // of the context to balance things out.
-    IGF.emitNativeStrongRetain(taskContext, IGF.getDefaultAtomicity());
-
     auto newTaskAndContext = emitTaskCreate(
         IGF, flags, parentTask, taskGroup, futureResultType, taskFunction, taskContext,
         substitutions);
