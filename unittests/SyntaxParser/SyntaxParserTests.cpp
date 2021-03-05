@@ -19,21 +19,21 @@
 using namespace swift;
 
 static swiftparse_client_node_t
-parse(const char *source, swiftparse_node_handler_t node_handler,
+parse(StringRef source, swiftparse_node_handler_t node_handler,
       swiftparse_node_lookup_t node_lookup) {
   swiftparse_parser_t parser = swiftparse_parser_create();
   swiftparse_parser_set_node_handler(parser, node_handler);
   swiftparse_parser_set_node_lookup(parser, node_lookup);
-  swiftparse_client_node_t top = swiftparse_parse_string(parser, source);
+  swiftparse_client_node_t top = swiftparse_parse_string(parser, source.data(), source.size());
   swiftparse_parser_dispose(parser);
   return top;
 }
 
 TEST(SwiftSyntaxParserTests, IncrementalParsing) {
-  const char *source1 =
+  StringRef source1 =
   "func t1() { }\n"
   "func t2() { }\n";
-  const char *source2 =
+  StringRef source2 =
   "func t1renamed() { }\n"
   "func t2() { }\n";
 
