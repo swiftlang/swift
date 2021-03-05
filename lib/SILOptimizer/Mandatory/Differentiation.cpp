@@ -1076,7 +1076,8 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   copyParameterArgumentsForApply(ai, newArgs, newArgsToDestroy,
                                  newBuffersToDealloc);
   auto *newApply = builder.createApply(
-      loc, newThunkRef, ai->getSubstitutionMap(), newArgs, ai->isNonThrowing());
+      loc, newThunkRef, ai->getSubstitutionMap(), newArgs,
+      ai->getApplyOptions());
   for (auto arg : newArgsToDestroy)
     builder.emitDestroyOperation(loc, arg);
   for (auto *alloc : newBuffersToDealloc)

@@ -438,7 +438,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     auto *TAI = cast<TryApplyInst>(AI);
     NewAI = Builder.createTryApply(AI.getLoc(), FRI,
                                    SubstitutionMap(), NewArgs,
-                                   TAI->getNormalBB(), TAI->getErrorBB());
+                                   TAI->getNormalBB(), TAI->getErrorBB(),
+                                   TAI->getApplyOptions());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
@@ -458,8 +459,8 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   case FullApplySiteKind::ApplyInst: {
     auto oldApply = cast<ApplyInst>(AI);
     auto newApply = Builder.createApply(oldApply->getLoc(), FRI,
-                                        SubstitutionMap(),
-                                        NewArgs, oldApply->isNonThrowing());
+                                        SubstitutionMap(), NewArgs,
+                                        oldApply->getApplyOptions());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.

@@ -225,7 +225,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
             auto resultTy = cast<FunctionType>(arg.getType()).getResult();
             arg = SGF.emitMonomorphicApply(
                 Loc, std::move(arg).getAsSingleValue(SGF, Loc), { }, resultTy,
-                resultTy, ApplyOptions::None, None, None);
+                resultTy, ApplyOptions(), None, None);
           }
         }
 

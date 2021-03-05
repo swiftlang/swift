@@ -2298,12 +2298,17 @@ private:
     checkThrowAsyncSite(E, /*requiresTry*/ true, classification,
                         Context::Call);
 
-    // HACK: functions can get queued multiple times in
-    // definedFunctions, so be sure to be idempotent.
-    if (!E->isThrowsSet() && !classification.isInvalid()) {
-      auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
-      E->setThrows(throwsKind == ConditionalEffectKind::Conditional ||
-                   throwsKind == ConditionalEffectKind::Always);
+    if (!classification.isInvalid()) {
+      // HACK: functions can get queued multiple times in
+      // definedFunctions, so be sure to be idempotent.
+      if (!E->isThrowsSet()) {
+        auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
+        E->setThrows(throwsKind == ConditionalEffectKind::Conditional ||
+                     throwsKind == ConditionalEffectKind::Always);
+      }
+
+      auto asyncKind = classification.getConditionalKind(EffectKind::Async);
+      E->setNoAsync(asyncKind == ConditionalEffectKind::None);
     }
 
     // If current apply expression did not type-check, don't attempt

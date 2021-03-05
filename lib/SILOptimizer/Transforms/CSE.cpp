@@ -1285,7 +1285,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
 
   ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI,
                                        ToAI->getSubstitutionMap(), Args,
-                                       ToAI->isNonThrowing());
+                                       ToAI->getApplyOptions());
   FromAI->replaceAllUsesWith(NAI);
   FromAI->eraseFromParent();
   ++NumOpenExtRemoved;

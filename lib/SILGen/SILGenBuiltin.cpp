@@ -1127,7 +1127,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     for (auto origFnArgVal : origFnArgVals)
       applyArgs.push_back(origFnArgVal);
     auto differential = SGF.B.createApply(loc, derivativeFn, SubstitutionMap(),
-                                          applyArgs, /*isNonThrowing*/ false);
+                                          applyArgs);
 
     derivativeFn = SILValue();
 
@@ -1140,8 +1140,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
 
   // Do the apply for the direct result case.
   auto resultTuple = SGF.B.createApply(
-      loc, derivativeFn, SubstitutionMap(), origFnArgVals,
-      /*isNonThrowing*/ false);
+      loc, derivativeFn, SubstitutionMap(), origFnArgVals);
 
   derivativeFn = SILValue();
 
