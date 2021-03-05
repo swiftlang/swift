@@ -3030,7 +3030,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
-    UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
@@ -3057,6 +3056,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
+  case SILInstructionKind::DestroyValueInst: {
+    bool poisonRefs = false;
+    if (parseSILOptional(poisonRefs, *this, "poison")
+        || parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDestroyValue(InstLoc, Val, poisonRefs);
+    break;
+  }
   case SILInstructionKind::BeginCOWMutationInst: {
     bool native = false;
     if (parseSILOptional(native, *this, "native") ||

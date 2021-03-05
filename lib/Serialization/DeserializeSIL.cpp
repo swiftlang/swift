@@ -1858,7 +1858,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
-  UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedReleaseValue)
@@ -1895,6 +1894,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getLocalValue(ValID, getSILType(MF->getType(TyID),
                                         (SILValueCategory)TyCategory, Fn)),
         verificationType);
+    break;
+  }
+
+  case SILInstructionKind::DestroyValueInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    unsigned poisonRefs = Attr;
+    ResultInst = Builder.createDestroyValue(
+        Loc,
+        getLocalValue(ValID, getSILType(MF->getType(TyID),
+                                        (SILValueCategory)TyCategory, Fn)),
+        poisonRefs != 0);
     break;
   }
 
