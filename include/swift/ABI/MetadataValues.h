@@ -1173,9 +1173,6 @@ namespace SpecialPointerAuthDiscriminators {
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
 
-  /// Actor enqueue(partialTask:).
-  const uint16_t ActorEnqueuePartialTask = 0x8f3d;
-
   /// Jobs, tasks, and continuations.
   const uint16_t JobInvokeFunction = 0xcc64; // = 52324
   const uint16_t TaskResumeFunction = 0x2c42; // = 11330
