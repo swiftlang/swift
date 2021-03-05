@@ -1245,13 +1245,14 @@ public:
                       CopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
-  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
+  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
+                                       bool poisonRefs = false) {
     assert(isLoadableOrOpaque(operand->getType()));
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
-    return insert(new (getModule())
-                      DestroyValueInst(getSILDebugLocation(Loc), operand));
+    return insert(new (getModule()) DestroyValueInst(getSILDebugLocation(Loc),
+                                                     operand, poisonRefs));
   }
 
   UnconditionalCheckedCastInst *

@@ -1715,6 +1715,8 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitDestroyValueInst(DestroyValueInst *I) {
+    if (I->poisonRefs())
+      *this << "[poison] ";
     *this << getIDAndType(I->getOperand());
   }
 
