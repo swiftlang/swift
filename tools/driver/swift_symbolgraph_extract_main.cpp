@@ -217,12 +217,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   }
 
   auto M = CI.getASTContext().getModuleByName(options::ModuleName);
-  SmallVector<Identifier, 32> VisibleModuleNames;
-  CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
   if (!M) {
     llvm::errs()
       << "Couldn't load module '" << options::ModuleName << '\''
       << " in the current SDK and search paths.\n";
+    
+    SmallVector<Identifier, 32> VisibleModuleNames;
+    CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
 
     if (VisibleModuleNames.empty()) {
       llvm::errs() << "Could not find any modules.\n";
