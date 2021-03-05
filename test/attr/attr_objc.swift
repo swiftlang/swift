@@ -15,25 +15,31 @@ enum ErrorEnum : Error {
   case failed
 }
 
-@objc class Class_ObjC1 {}
+@objc
+class Class_ObjC1 {}
 
 protocol Protocol_Class1 : class {} // expected-note {{protocol 'Protocol_Class1' declared here}}
 
 protocol Protocol_Class2 : class {}
 
-@objc protocol Protocol_ObjC1 {}
+@objc
+protocol Protocol_ObjC1 {}
 
-@objc protocol Protocol_ObjC2 {}
+@objc
+protocol Protocol_ObjC2 {}
 
 
 
 
 //===--- Subjects of @objc attribute.
 
-@objc extension PlainStruct { } // expected-error{{'@objc' can only be applied to an extension of a class}}{{1-7=}}
+@objc // expected-error{{'@objc' can only be applied to an extension of a class}}{{1-7=}}
+extension PlainStruct { }
 
 class FáncyName {}
-@objc (FancyName) extension FáncyName {}
+
+@objc(FancyName)
+extension FáncyName {}
 
 @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 var subject_globalVar: Int
@@ -138,7 +144,7 @@ struct subject_struct {
   func subject_instanceFunc() {}
 }
 
-@objc   // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
+@objc // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_genericStruct<T> {
   @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
   var subject_instanceVar: Int
@@ -193,18 +199,21 @@ class subject_genericClass2<T> : Class_ObjC1 {
 }
 
 extension subject_genericClass where T : Hashable {
-  @objc var prop: Int { return 0 } // expected-error{{members of constrained extensions cannot be declared @objc}}
+  @objc
+  var prop: Int { return 0 } // expected-error{{members of constrained extensions cannot be declared @objc}}
 }
 
 extension subject_genericClass {
-  @objc var extProp: Int { return 0 } // expected-error{{extensions of generic classes cannot contain '@objc' members}}
+  @objc
+  var extProp: Int { return 0 } // expected-error{{extensions of generic classes cannot contain '@objc' members}}
   
-  @objc func extFoo() {} // expected-error{{extensions of generic classes cannot contain '@objc' members}}
+  @objc
+  func extFoo() {} // expected-error{{extensions of generic classes cannot contain '@objc' members}}
 }
 
 @objc
 enum subject_enum: Int {
-  @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
+  @objc // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement1
 
   @objc(subject_enumElement2)
@@ -213,7 +222,7 @@ enum subject_enum: Int {
   @objc(subject_enumElement3) // expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-31=}}
   case subject_enumElement3, subject_enumElement4
 
-  @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
+  @objc // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
 
   @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
@@ -240,10 +249,12 @@ protocol subject_protocol1 {
   func subject_instanceFunc()
 }
 
-@objc protocol subject_protocol2 {} // no-error
+@objc // no-error
+protocol subject_protocol2 {}
 // CHECK-LABEL: @objc protocol subject_protocol2 {
 
-@objc protocol subject_protocol3 {} // no-error
+@objc // no-error
+protocol subject_protocol3 {}
 // CHECK-LABEL: @objc protocol subject_protocol3 {
 
 @objc
@@ -296,20 +307,25 @@ protocol subject_containerObjCProtocol1 {
 @objc
 protocol subject_containerObjCProtocol2 {
   init(a: Int)
-  @objc init(a: Double)
+  @objc
+  init(a: Double)
 
   func func1() -> Int
-  @objc func func1_() -> Int
+  @objc
+  func func1_() -> Int
 
   var instanceVar1: Int { get set }
-  @objc var instanceVar1_: Int { get set }
+  @objc
+  var instanceVar1_: Int { get set }
 
   subscript(i: Int) -> Int { get set }
-  @objc subscript(i: String) -> Int { get set}
+  @objc
+  subscript(i: String) -> Int { get set}
 }
 
 protocol nonObjCProtocol {
-  @objc func objcRequirement() // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  func objcRequirement()
 }
 
 func concreteContext1() {
@@ -326,44 +342,46 @@ class ConcreteContext3 {
 
   func dynamicSelf1() -> Self { return self }
 
-  @objc func dynamicSelf1_() -> Self { return self }
+  @objc
+  func dynamicSelf1_() -> Self { return self }
 
-  @objc func genericParams<T: NSObject>() -> [T] { return [] }
-  // expected-error@-1{{method cannot be marked @objc because it has generic parameters}}
+  @objc
+  func genericParams<T: NSObject>() -> [T] { return [] } // expected-error{{method cannot be marked @objc because it has generic parameters}}
 
-  @objc func returnObjCProtocolMetatype() -> NSCoding.Protocol { return NSCoding.self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  @objc
+  func returnObjCProtocolMetatype() -> NSCoding.Protocol { return NSCoding.self } // expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
   typealias AnotherNSCoding = NSCoding
   typealias MetaNSCoding1 = NSCoding.Protocol
   typealias MetaNSCoding2 = AnotherNSCoding.Protocol
 
-  @objc func returnObjCAliasProtocolMetatype1() -> AnotherNSCoding.Protocol { return NSCoding.self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  @objc
+  func returnObjCAliasProtocolMetatype1() -> AnotherNSCoding.Protocol { return NSCoding.self } // expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
-  @objc func returnObjCAliasProtocolMetatype2() -> MetaNSCoding1 { return NSCoding.self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  @objc
+  func returnObjCAliasProtocolMetatype2() -> MetaNSCoding1 { return NSCoding.self } // expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
-  @objc func returnObjCAliasProtocolMetatype3() -> MetaNSCoding2 { return NSCoding.self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  @objc
+  func returnObjCAliasProtocolMetatype3() -> MetaNSCoding2 { return NSCoding.self } // expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
   typealias Composition = NSCopying & NSCoding
 
-  @objc func returnCompositionMetatype1() -> Composition.Protocol { return Composition.self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  @objc
+  func returnCompositionMetatype1() -> Composition.Protocol { return Composition.self } // expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
-  @objc func returnCompositionMetatype2() -> (NSCopying & NSCoding).Protocol { return (NSCopying & NSCoding).self }
-  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+  @objc
+  func returnCompositionMetatype2() -> (NSCopying & NSCoding).Protocol { return (NSCopying & NSCoding).self } // expected-error{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
   typealias NSCodingExistential = NSCoding.Type
 
-  @objc func inoutFunc(a: inout Int) {}
-  // expected-error@-1{{method cannot be marked @objc because inout parameters cannot be represented in Objective-C}}
-  @objc func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {}
-  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc
+  func inoutFunc(a: inout Int) {} // expected-error{{method cannot be marked @objc because inout parameters cannot be represented in Objective-C}}
 
-  @objc func metatypeOfExistentialMetatypePram2(a: NSCoding.Type.Protocol) {}
-  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc
+  func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+
+  @objc
+  func metatypeOfExistentialMetatypePram2(a: NSCoding.Type.Protocol) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 }
 
 func genericContext1<T>(_: T) {
@@ -422,21 +440,24 @@ class GenericContext4<T> {
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
 extension ConcreteSubclassOfGeneric {
-  @objc func foo() {} // okay
+  @objc
+  func foo() {} // okay
 }
 
 @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc'}} {{1-7=}}
 class ConcreteSubclassOfGeneric2 : subject_genericClass2<Int> {}
 
 extension ConcreteSubclassOfGeneric2 {
-  @objc func foo() {} // okay
+  @objc
+  func foo() {} // okay
 }
 
 @objc(CustomNameForSubclassOfGeneric) // okay
 class ConcreteSubclassOfGeneric3 : GenericContext3<Int> {}
 
 extension ConcreteSubclassOfGeneric3 {
-  @objc func foo() {} // okay
+  @objc
+  func foo() {} // okay
 }
 
 class subject_subscriptIndexed1 {
@@ -516,8 +537,8 @@ class subject_subscriptGeneric<T> {
 }
 
 class subject_subscriptInvalid1 {
-  @objc class subscript(_ i: Int) -> AnyObject? {
-  // expected-error@-1 {{class subscript cannot be marked @objc}}
+  @objc
+  class subscript(_ i: Int) -> AnyObject? { // expected-error {{class subscript cannot be marked @objc}}
     return nil
   }
 }
@@ -587,185 +608,219 @@ class infer_instanceFunc1 {
   func func1() {}
 // CHECK-LABEL: @objc func func1() {
 
-  @objc func func1_() {} // no-error
+  @objc
+  func func1_() {} // no-error
 
   func func2(a: Int) {}
 // CHECK-LABEL: @objc func func2(a: Int) {
 
-  @objc func func2_(a: Int) {} // no-error
+  @objc
+  func func2_(a: Int) {} // no-error
 
   func func3(a: Int) -> Int {}
 // CHECK-LABEL: @objc func func3(a: Int) -> Int {
 
-  @objc func func3_(a: Int) -> Int {} // no-error
+  @objc
+  func func3_(a: Int) -> Int {} // no-error
 
   func func4(a: Int, b: Double) {}
 // CHECK-LABEL: @objc func func4(a: Int, b: Double) {
 
-  @objc func func4_(a: Int, b: Double) {} // no-error
+  @objc
+  func func4_(a: Int, b: Double) {} // no-error
 
   func func5(a: String) {}
 // CHECK-LABEL: @objc func func5(a: String) {
 
-  @objc func func5_(a: String) {} // no-error
+  @objc
+  func func5_(a: String) {} // no-error
 
   func func6() -> String {}
 // CHECK-LABEL: @objc func func6() -> String {
 
-  @objc func func6_() -> String {} // no-error
+  @objc
+  func func6_() -> String {} // no-error
 
   func func7(a: PlainClass) {}
 // CHECK-LABEL: {{^}} func func7(a: PlainClass) {
 
-  @objc func func7_(a: PlainClass) {}
+  @objc
+  func func7_(a: PlainClass) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
 
   func func7m(a: PlainClass.Type) {}
 // CHECK-LABEL: {{^}} func func7m(a: PlainClass.Type) {
 
-  @objc func func7m_(a: PlainClass.Type) {}
+  @objc
+  func func7m_(a: PlainClass.Type) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 
   func func8() -> PlainClass {}
 // CHECK-LABEL: {{^}} func func8() -> PlainClass {
 
-  @objc func func8_() -> PlainClass {}
+  @objc
+  func func8_() -> PlainClass {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
 
   func func8m() -> PlainClass.Type {}
 // CHECK-LABEL: {{^}} func func8m() -> PlainClass.Type {
 
-  @objc func func8m_() -> PlainClass.Type {}
+  @objc
+  func func8m_() -> PlainClass.Type {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
 
   func func9(a: PlainStruct) {}
 // CHECK-LABEL: {{^}} func func9(a: PlainStruct) {
 
-  @objc func func9_(a: PlainStruct) {}
+  @objc
+  func func9_(a: PlainStruct) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   func func10() -> PlainStruct {}
 // CHECK-LABEL: {{^}} func func10() -> PlainStruct {
 
-  @objc func func10_() -> PlainStruct {}
+  @objc
+  func func10_() -> PlainStruct {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   func func11(a: PlainEnum) {}
 // CHECK-LABEL: {{^}} func func11(a: PlainEnum) {
 
-  @objc func func11_(a: PlainEnum) {}
+  @objc
+  func func11_(a: PlainEnum) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
 
   func func12(a: PlainProtocol) {}
 // CHECK-LABEL: {{^}} func func12(a: PlainProtocol) {
 
-  @objc func func12_(a: PlainProtocol) {}
+  @objc
+  func func12_(a: PlainProtocol) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   func func13(a: Class_ObjC1) {}
 // CHECK-LABEL: @objc func func13(a: Class_ObjC1) {
 
-  @objc func func13_(a: Class_ObjC1) {} // no-error
+  @objc
+  func func13_(a: Class_ObjC1) {} // no-error
 
   func func14(a: Protocol_Class1) {}
 // CHECK-LABEL: {{^}} func func14(a: Protocol_Class1) {
 
-  @objc func func14_(a: Protocol_Class1) {}
+  @objc
+  func func14_(a: Protocol_Class1) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   func func15(a: Protocol_ObjC1) {}
 // CHECK-LABEL: @objc func func15(a: Protocol_ObjC1) {
-  @objc func func15_(a: Protocol_ObjC1) {} // no-error
+  @objc
+  func func15_(a: Protocol_ObjC1) {} // no-error
 
   func func16(a: AnyObject) {}
 // CHECK-LABEL: @objc func func16(a: AnyObject) {
 
-  @objc func func16_(a: AnyObject) {} // no-error
+  @objc
+  func func16_(a: AnyObject) {} // no-error
 
   func func17(a: @escaping () -> ()) {}
 // CHECK-LABEL: {{^}}  @objc func func17(a: @escaping () -> ()) {
 
-  @objc func func17_(a: @escaping () -> ()) {}
+  @objc
+  func func17_(a: @escaping () -> ()) {}
 
   func func18(a: @escaping (Int) -> (), b: Int) {}
 // CHECK-LABEL: {{^}}  @objc func func18(a: @escaping (Int) -> (), b: Int)
 
-  @objc func func18_(a: @escaping (Int) -> (), b: Int) {}
+  @objc
+  func func18_(a: @escaping (Int) -> (), b: Int) {}
 
   func func19(a: @escaping (String) -> (), b: Int) {}
 // CHECK-LABEL: {{^}}  @objc func func19(a: @escaping (String) -> (), b: Int) {
 
-  @objc func func19_(a: @escaping (String) -> (), b: Int) {}
+  @objc
+  func func19_(a: @escaping (String) -> (), b: Int) {}
 
   func func_FunctionReturn1() -> () -> () {}
 // CHECK-LABEL: {{^}}  @objc func func_FunctionReturn1() -> () -> () {
 
-  @objc func func_FunctionReturn1_() -> () -> () {}
+  @objc
+  func func_FunctionReturn1_() -> () -> () {}
 
   func func_FunctionReturn2() -> (Int) -> () {}
 // CHECK-LABEL: {{^}}  @objc func func_FunctionReturn2() -> (Int) -> () {
 
-  @objc func func_FunctionReturn2_() -> (Int) -> () {}
+  @objc
+  func func_FunctionReturn2_() -> (Int) -> () {}
 
   func func_FunctionReturn3() -> () -> Int {}
 // CHECK-LABEL: {{^}}  @objc func func_FunctionReturn3() -> () -> Int {
 
-  @objc func func_FunctionReturn3_() -> () -> Int {}
+  @objc
+  func func_FunctionReturn3_() -> () -> Int {}
 
   func func_FunctionReturn4() -> (String) -> () {}
 // CHECK-LABEL: {{^}}  @objc func func_FunctionReturn4() -> (String) -> () {
 
-  @objc func func_FunctionReturn4_() -> (String) -> () {}
+  @objc
+  func func_FunctionReturn4_() -> (String) -> () {}
 
   func func_FunctionReturn5() -> () -> String {}
 // CHECK-LABEL: {{^}}  @objc func func_FunctionReturn5() -> () -> String {
 
-  @objc func func_FunctionReturn5_() -> () -> String {}
+  @objc
+  func func_FunctionReturn5_() -> () -> String {}
 
 
   func func_ZeroParams1() {}
 // CHECK-LABEL: @objc func func_ZeroParams1() {
 
-  @objc func func_ZeroParams1a() {} // no-error
+  @objc
+  func func_ZeroParams1a() {} // no-error
 
 
   func func_OneParam1(a: Int) {}
 // CHECK-LABEL: @objc func func_OneParam1(a: Int) {
 
-  @objc func func_OneParam1a(a: Int) {} // no-error
+  @objc
+  func func_OneParam1a(a: Int) {} // no-error
 
 
   func func_TupleStyle1(a: Int, b: Int) {}
   // CHECK-LABEL: {{^}} @objc func func_TupleStyle1(a: Int, b: Int) {
 
-  @objc func func_TupleStyle1a(a: Int, b: Int) {}
+  @objc
+  func func_TupleStyle1a(a: Int, b: Int) {}
 
   func func_TupleStyle2(a: Int, b: Int, c: Int) {}
 // CHECK-LABEL: {{^}} @objc func func_TupleStyle2(a: Int, b: Int, c: Int) {
 
-  @objc func func_TupleStyle2a(a: Int, b: Int, c: Int) {}
+  @objc
+  func func_TupleStyle2a(a: Int, b: Int, c: Int) {}
 
   // Check that we produce diagnostics for every parameter and return type.
-  @objc func func_MultipleDiags(a: PlainStruct, b: PlainEnum) -> Any {}
+  @objc
+  func func_MultipleDiags(a: PlainStruct, b: PlainEnum) -> Any {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter 1 cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-error@-3 {{method cannot be marked @objc because the type of the parameter 2 cannot be represented in Objective-C}}
   // expected-note@-4 {{non-'@objc' enums cannot be represented in Objective-C}}
 
-  @objc func func_UnnamedParam1(_: Int) {} // no-error
+  @objc
+  func func_UnnamedParam1(_: Int) {} // no-error
 
-  @objc func func_UnnamedParam2(_: PlainStruct) {}
+  @objc
+  func func_UnnamedParam2(_: PlainStruct) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
-  @objc func func_varParam1(a: AnyObject) {
+  @objc
+  func func_varParam1(a: AnyObject) {
     var a = a
     let b = a; a = b
   }
@@ -825,7 +880,8 @@ class infer_instanceVar1 {
   // CHECK: @objc var instanceVar2: Int
   // CHECK: {{^}}  var instanceVar3: PlainProtocol
 
-  @objc var (instanceVar1_, instanceVar2_): (Int, PlainProtocol)
+  @objc
+  var (instanceVar1_, instanceVar2_): (Int, PlainProtocol)
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
@@ -843,7 +899,8 @@ class infer_instanceVar1 {
     // CHECK-NEXT: @objc set {}
   }
 
-  @objc var instanceVar5_: Int {
+  @objc
+  var instanceVar5_: Int {
   // CHECK: @objc var instanceVar5_: Int {
     get {}
     // CHECK-NEXT: @objc get {}
@@ -861,7 +918,8 @@ class infer_instanceVar1 {
     // CHECK-NEXT: {{^}} @objc set {
   }
 
-  @objc var observingAccessorsVar1_: Int {
+  @objc
+  var observingAccessorsVar1_: Int {
   // CHECK: {{^}} @objc @_hasStorage var observingAccessorsVar1_: Int {
     willSet {}
     // CHECK-NEXT: {{^}} @objc get {
@@ -897,26 +955,30 @@ class infer_instanceVar1 {
   var var_tuple1: ()
 // CHECK-LABEL: {{^}} @_hasInitialValue var var_tuple1: ()
 
-  @objc var var_tuple1_: ()
+  @objc
+  var var_tuple1_: ()
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple2: Void
 // CHECK-LABEL: {{^}} @_hasInitialValue var var_tuple2: Void
 
-  @objc var var_tuple2_: Void
+  @objc
+  var var_tuple2_: Void
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple3: (Int)
 // CHECK-LABEL: @objc var var_tuple3: (Int)
 
-  @objc var var_tuple3_: (Int) // no-error
+  @objc
+  var var_tuple3_: (Int) // no-error
 
   var var_tuple4: (Int, Int)
 // CHECK-LABEL: {{^}} var var_tuple4: (Int, Int)
 
-  @objc var var_tuple4_: (Int, Int)
+  @objc
+  var var_tuple4_: (Int, Int)
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{tuples cannot be represented in Objective-C}}
 
@@ -946,93 +1008,108 @@ class infer_instanceVar1 {
   var var_PlainClass: PlainClass
 // CHECK-LABEL: {{^}}  var var_PlainClass: PlainClass
 
-  @objc var var_PlainClass_: PlainClass
+  @objc
+  var var_PlainClass_: PlainClass
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{classes not annotated with @objc cannot be represented in Objective-C}}
 
   var var_PlainStruct: PlainStruct
 // CHECK-LABEL: {{^}}  var var_PlainStruct: PlainStruct
 
-  @objc var var_PlainStruct_: PlainStruct
+  @objc
+  var var_PlainStruct_: PlainStruct
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_PlainEnum: PlainEnum
 // CHECK-LABEL: {{^}} var var_PlainEnum: PlainEnum
 
-  @objc var var_PlainEnum_: PlainEnum
+  @objc
+  var var_PlainEnum_: PlainEnum
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
 
   var var_PlainProtocol: PlainProtocol
 // CHECK-LABEL: {{^}}  var var_PlainProtocol: PlainProtocol
 
-  @objc var var_PlainProtocol_: PlainProtocol
+  @objc
+  var var_PlainProtocol_: PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_ClassObjC: Class_ObjC1
 // CHECK-LABEL: @objc var var_ClassObjC: Class_ObjC1
 
-  @objc var var_ClassObjC_: Class_ObjC1 // no-error
+  @objc
+  var var_ClassObjC_: Class_ObjC1 // no-error
 
   var var_ProtocolClass: Protocol_Class1
 // CHECK-LABEL: {{^}}  var var_ProtocolClass: Protocol_Class1
 
-  @objc var var_ProtocolClass_: Protocol_Class1
+  @objc
+  var var_ProtocolClass_: Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_ProtocolObjC: Protocol_ObjC1
 // CHECK-LABEL: @objc var var_ProtocolObjC: Protocol_ObjC1
 
-  @objc var var_ProtocolObjC_: Protocol_ObjC1 // no-error
+  @objc
+  var var_ProtocolObjC_: Protocol_ObjC1 // no-error
 
 
   var var_PlainClassMetatype: PlainClass.Type
 // CHECK-LABEL: {{^}}  var var_PlainClassMetatype: PlainClass.Type
 
-  @objc var var_PlainClassMetatype_: PlainClass.Type
+  @objc
+  var var_PlainClassMetatype_: PlainClass.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_PlainStructMetatype: PlainStruct.Type
 // CHECK-LABEL: {{^}}  var var_PlainStructMetatype: PlainStruct.Type
 
-  @objc var var_PlainStructMetatype_: PlainStruct.Type
+  @objc
+  var var_PlainStructMetatype_: PlainStruct.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_PlainEnumMetatype: PlainEnum.Type
 // CHECK-LABEL: {{^}}  var var_PlainEnumMetatype: PlainEnum.Type
 
-  @objc var var_PlainEnumMetatype_: PlainEnum.Type
+  @objc
+  var var_PlainEnumMetatype_: PlainEnum.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_PlainExistentialMetatype: PlainProtocol.Type
 // CHECK-LABEL: {{^}}  var var_PlainExistentialMetatype: PlainProtocol.Type
 
-  @objc var var_PlainExistentialMetatype_: PlainProtocol.Type
+  @objc
+  var var_PlainExistentialMetatype_: PlainProtocol.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ClassObjCMetatype: Class_ObjC1.Type
 // CHECK-LABEL: @objc var var_ClassObjCMetatype: Class_ObjC1.Type
 
-  @objc var var_ClassObjCMetatype_: Class_ObjC1.Type // no-error
+  @objc
+  var var_ClassObjCMetatype_: Class_ObjC1.Type // no-error
 
   var var_ProtocolClassMetatype: Protocol_Class1.Type
 // CHECK-LABEL: {{^}}  var var_ProtocolClassMetatype: Protocol_Class1.Type
 
-  @objc var var_ProtocolClassMetatype_: Protocol_Class1.Type
+  @objc
+  var var_ProtocolClassMetatype_: Protocol_Class1.Type
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ProtocolObjCMetatype1: Protocol_ObjC1.Type
 // CHECK-LABEL: @objc var var_ProtocolObjCMetatype1: Protocol_ObjC1.Type
 
-  @objc var var_ProtocolObjCMetatype1_: Protocol_ObjC1.Type // no-error
+  @objc
+  var var_ProtocolObjCMetatype1_: Protocol_ObjC1.Type // no-error
 
   var var_ProtocolObjCMetatype2: Protocol_ObjC2.Type
 // CHECK-LABEL: @objc var var_ProtocolObjCMetatype2: Protocol_ObjC2.Type
 
-  @objc var var_ProtocolObjCMetatype2_: Protocol_ObjC2.Type // no-error
+  @objc
+  var var_ProtocolObjCMetatype2_: Protocol_ObjC2.Type // no-error
 
   var var_AnyObject1: AnyObject
   var var_AnyObject2: AnyObject.Type
@@ -1042,66 +1119,76 @@ class infer_instanceVar1 {
   var var_Existential0: Any
 // CHECK-LABEL: @objc var var_Existential0: Any
 
-  @objc var var_Existential0_: Any
+  @objc
+  var var_Existential0_: Any
 
   var var_Existential1: PlainProtocol
   // CHECK-LABEL: {{^}}  var var_Existential1: PlainProtocol
 
-  @objc var var_Existential1_: PlainProtocol
+  @objc
+  var var_Existential1_: PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential2: PlainProtocol & PlainProtocol
 // CHECK-LABEL: {{^}}  var var_Existential2: PlainProtocol
 
-  @objc var var_Existential2_: PlainProtocol & PlainProtocol
+  @objc
+  var var_Existential2_: PlainProtocol & PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential3: PlainProtocol & Protocol_Class1
 // CHECK-LABEL: {{^}}  var var_Existential3: PlainProtocol & Protocol_Class1
 
-  @objc var var_Existential3_: PlainProtocol & Protocol_Class1
+  @objc
+  var var_Existential3_: PlainProtocol & Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential4: PlainProtocol & Protocol_ObjC1
 // CHECK-LABEL: {{^}}  var var_Existential4: PlainProtocol & Protocol_ObjC1
 
-  @objc var var_Existential4_: PlainProtocol & Protocol_ObjC1
+  @objc
+  var var_Existential4_: PlainProtocol & Protocol_ObjC1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'PlainProtocol' cannot be represented in Objective-C}}
 
   var var_Existential5: Protocol_Class1
   // CHECK-LABEL: {{^}}  var var_Existential5: Protocol_Class1
 
-  @objc var var_Existential5_: Protocol_Class1
+  @objc
+  var var_Existential5_: Protocol_Class1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential6: Protocol_Class1 & Protocol_Class2
 // CHECK-LABEL: {{^}}  var var_Existential6: Protocol_Class1 & Protocol_Class2
 
-  @objc var var_Existential6_: Protocol_Class1 & Protocol_Class2
+  @objc
+  var var_Existential6_: Protocol_Class1 & Protocol_Class2
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential7: Protocol_Class1 & Protocol_ObjC1
 // CHECK-LABEL: {{^}}  var var_Existential7: Protocol_Class1 & Protocol_ObjC1
 
-  @objc var var_Existential7_: Protocol_Class1 & Protocol_ObjC1
+  @objc
+  var var_Existential7_: Protocol_Class1 & Protocol_ObjC1
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{protocol-constrained type containing protocol 'Protocol_Class1' cannot be represented in Objective-C}}
 
   var var_Existential8: Protocol_ObjC1
 // CHECK-LABEL: @objc var var_Existential8: Protocol_ObjC1
 
-  @objc var var_Existential8_: Protocol_ObjC1 // no-error
+  @objc
+  var var_Existential8_: Protocol_ObjC1 // no-error
 
   var var_Existential9: Protocol_ObjC1 & Protocol_ObjC2
 // CHECK-LABEL: @objc var var_Existential9: Protocol_ObjC1 & Protocol_ObjC2
 
-  @objc var var_Existential9_: Protocol_ObjC1 & Protocol_ObjC2 // no-error
+  @objc
+  var var_Existential9_: Protocol_ObjC1 & Protocol_ObjC2 // no-error
 
 
   var var_ExistentialMetatype0: Any.Type
@@ -1354,116 +1441,137 @@ class infer_instanceVar1 {
   var var_FunctionTypeReturn1: () -> () -> ()
 // CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn1: () -> () -> ()
 
-  @objc var var_FunctionTypeReturn1_: () -> () -> () // no-error
+  @objc
+  var var_FunctionTypeReturn1_: () -> () -> () // no-error
 
   var var_FunctionTypeReturn2: () -> (Int) -> ()
 // CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn2: () -> (Int) -> ()
 
-  @objc var var_FunctionTypeReturn2_: () -> (Int) -> () // no-error
+  @objc
+  var var_FunctionTypeReturn2_: () -> (Int) -> () // no-error
 
   var var_FunctionTypeReturn3: () -> () -> Int
 // CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn3: () -> () -> Int
 
-  @objc var var_FunctionTypeReturn3_: () -> () -> Int // no-error
+  @objc
+  var var_FunctionTypeReturn3_: () -> () -> Int // no-error
 
   var var_FunctionTypeReturn4: () -> (String) -> ()
 // CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn4: () -> (String) -> ()
 
-  @objc var var_FunctionTypeReturn4_: () -> (String) -> () // no-error
+  @objc
+  var var_FunctionTypeReturn4_: () -> (String) -> () // no-error
 
   var var_FunctionTypeReturn5: () -> () -> String
 // CHECK-LABEL: {{^}}  @objc var var_FunctionTypeReturn5: () -> () -> String
 
-  @objc var var_FunctionTypeReturn5_: () -> () -> String // no-error
+  @objc
+  var var_FunctionTypeReturn5_: () -> () -> String // no-error
 
 
   var var_BlockFunctionType1: @convention(block) () -> ()
 // CHECK-LABEL: @objc var var_BlockFunctionType1: @convention(block) () -> ()
 
-  @objc var var_BlockFunctionType1_: @convention(block) () -> () // no-error
+  @objc
+  var var_BlockFunctionType1_: @convention(block) () -> () // no-error
 
   var var_ArrayType1: [AnyObject]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType1: [AnyObject]
 
-  @objc var var_ArrayType1_: [AnyObject] // no-error
+  @objc
+  var var_ArrayType1_: [AnyObject] // no-error
 
   var var_ArrayType2: [@convention(block) (AnyObject) -> AnyObject] // no-error
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType2: [@convention(block) (AnyObject) -> AnyObject]
 
-  @objc var var_ArrayType2_: [@convention(block) (AnyObject) -> AnyObject] // no-error
+  @objc
+  var var_ArrayType2_: [@convention(block) (AnyObject) -> AnyObject] // no-error
 
   var var_ArrayType3: [PlainStruct]
   // CHECK-LABEL: {{^}}  var var_ArrayType3: [PlainStruct]
 
-  @objc var var_ArrayType3_: [PlainStruct]
+  @objc
+  var var_ArrayType3_: [PlainStruct]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType4: [(AnyObject) -> AnyObject] // no-error
   // CHECK-LABEL: {{^}}  var var_ArrayType4: [(AnyObject) -> AnyObject]
 
-  @objc var var_ArrayType4_: [(AnyObject) -> AnyObject]
+  @objc
+  var var_ArrayType4_: [(AnyObject) -> AnyObject]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType5: [Protocol_ObjC1]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType5: [Protocol_ObjC1]
 
-  @objc var var_ArrayType5_: [Protocol_ObjC1] // no-error
+  @objc
+  var var_ArrayType5_: [Protocol_ObjC1] // no-error
 
   var var_ArrayType6: [Class_ObjC1]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType6: [Class_ObjC1]
 
-  @objc var var_ArrayType6_: [Class_ObjC1] // no-error
+  @objc
+  var var_ArrayType6_: [Class_ObjC1] // no-error
 
   var var_ArrayType7: [PlainClass]
   // CHECK-LABEL: {{^}}  var var_ArrayType7: [PlainClass]
 
-  @objc var var_ArrayType7_: [PlainClass]
+  @objc
+  var var_ArrayType7_: [PlainClass]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType8: [PlainProtocol]
   // CHECK-LABEL: {{^}}  var var_ArrayType8: [PlainProtocol]
 
-  @objc var var_ArrayType8_: [PlainProtocol]
+  @objc
+  var var_ArrayType8_: [PlainProtocol]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType9: [Protocol_ObjC1 & PlainProtocol]
   // CHECK-LABEL: {{^}}  var var_ArrayType9: [PlainProtocol & Protocol_ObjC1]
 
-  @objc var var_ArrayType9_: [Protocol_ObjC1 & PlainProtocol]
+  @objc
+  var var_ArrayType9_: [Protocol_ObjC1 & PlainProtocol]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType10: [Protocol_ObjC1 & Protocol_ObjC2]
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType10: [Protocol_ObjC1 & Protocol_ObjC2]
 
-  @objc var var_ArrayType10_: [Protocol_ObjC1 & Protocol_ObjC2]
+  @objc
+  var var_ArrayType10_: [Protocol_ObjC1 & Protocol_ObjC2]
   // no-error
 
   var var_ArrayType11: [Any]
   // CHECK-LABEL: @objc var var_ArrayType11: [Any]
 
-  @objc var var_ArrayType11_: [Any]
+  @objc
+  var var_ArrayType11_: [Any]
 
   var var_ArrayType13: [Any?]
   // CHECK-LABEL: {{^}}  var var_ArrayType13: [Any?]
 
-  @objc var var_ArrayType13_: [Any?]
+  @objc
+  var var_ArrayType13_: [Any?]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType15: [AnyObject?]
   // CHECK-LABEL: {{^}}  var var_ArrayType15: [AnyObject?]
 
-  @objc var var_ArrayType15_: [AnyObject?]
+  @objc
+  var var_ArrayType15_: [AnyObject?]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 
   var var_ArrayType16: [[@convention(block) (AnyObject) -> AnyObject]] // no-error
   // CHECK-LABEL: {{^}}  @objc var var_ArrayType16: {{\[}}[@convention(block) (AnyObject) -> AnyObject]]
 
-  @objc var var_ArrayType16_: [[@convention(block) (AnyObject) -> AnyObject]] // no-error
+  @objc
+  var var_ArrayType16_: [[@convention(block) (AnyObject) -> AnyObject]] // no-error
 
   var var_ArrayType17: [[(AnyObject) -> AnyObject]] // no-error
   // CHECK-LABEL: {{^}}  var var_ArrayType17: {{\[}}[(AnyObject) -> AnyObject]]
 
-  @objc var var_ArrayType17_: [[(AnyObject) -> AnyObject]]
+  @objc
+  var var_ArrayType17_: [[(AnyObject) -> AnyObject]]
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
 }
 
@@ -1483,57 +1591,66 @@ class infer_instanceVar2<
   var var_GP_Unconstrained: GP_Unconstrained
 // CHECK-LABEL: {{^}}  var var_GP_Unconstrained: GP_Unconstrained
 
-  @objc var var_GP_Unconstrained_: GP_Unconstrained
+  @objc
+  var var_GP_Unconstrained_: GP_Unconstrained
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_PlainClass: GP_PlainClass
 // CHECK-LABEL: {{^}}  var var_GP_PlainClass: GP_PlainClass
 
-  @objc var var_GP_PlainClass_: GP_PlainClass
+  @objc
+  var var_GP_PlainClass_: GP_PlainClass
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_PlainProtocol: GP_PlainProtocol
 // CHECK-LABEL: {{^}}  var var_GP_PlainProtocol: GP_PlainProtocol
 
-  @objc var var_GP_PlainProtocol_: GP_PlainProtocol
+  @objc
+  var var_GP_PlainProtocol_: GP_PlainProtocol
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Class_ObjC: GP_Class_ObjC
 // CHECK-LABEL: {{^}}  var var_GP_Class_ObjC: GP_Class_ObjC
 
-  @objc var var_GP_Class_ObjC_: GP_Class_ObjC
+  @objc
+  var var_GP_Class_ObjC_: GP_Class_ObjC
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Protocol_Class: GP_Protocol_Class
 // CHECK-LABEL: {{^}}  var var_GP_Protocol_Class: GP_Protocol_Class
 
-  @objc var var_GP_Protocol_Class_: GP_Protocol_Class
+  @objc
+  var var_GP_Protocol_Class_: GP_Protocol_Class
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   var var_GP_Protocol_ObjC: GP_Protocol_ObjC
 // CHECK-LABEL: {{^}}  var var_GP_Protocol_ObjC: GP_Protocol_ObjC
 
-  @objc var var_GP_Protocol_ObjCa: GP_Protocol_ObjC
+  @objc
+  var var_GP_Protocol_ObjCa: GP_Protocol_ObjC
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
   func func_GP_Unconstrained(a: GP_Unconstrained) {}
 // CHECK-LABEL: {{^}} func func_GP_Unconstrained(a: GP_Unconstrained) {
 
-  @objc func func_GP_Unconstrained_(a: GP_Unconstrained) {}
+  @objc
+  func func_GP_Unconstrained_(a: GP_Unconstrained) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
-  @objc func func_GP_Unconstrained_() -> GP_Unconstrained {}
+  @objc
+  func func_GP_Unconstrained_() -> GP_Unconstrained {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 
-  @objc func func_GP_Class_ObjC__() -> GP_Class_ObjC {}
+  @objc
+  func func_GP_Class_ObjC__() -> GP_Class_ObjC {}
   // expected-error@-1 {{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
 }
@@ -1658,7 +1775,8 @@ protocol infer_protocol5 : Protocol_ObjC1, Protocol_Class1 {
 
 class C {
   // Don't crash.
-  @objc func foo(x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
+  @objc
+  func foo(x: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
   @IBAction func myAction(sender: Undeclared) {} // expected-error {{cannot find type 'Undeclared' in scope}}
   @IBSegueAction func myAction(coder: Undeclared, sender: Undeclared) -> Undeclared {fatalError()} // expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}} expected-error {{cannot find type 'Undeclared' in scope}}
 }
@@ -1759,7 +1877,8 @@ class HasNSManaged {
 //===--- Pointer argument types
 //===---
 
-@objc class TakesCPointers {
+@objc
+class TakesCPointers {
 // CHECK-LABEL: {{^}}@objc class TakesCPointers {
   func constUnsafeMutablePointer(p: UnsafePointer<Int>) {}
   // CHECK-LABEL: @objc func constUnsafeMutablePointer(p: UnsafePointer<Int>) {
@@ -1835,7 +1954,7 @@ enum BadEnum1: Int { case X }
 
 @objc
 enum BadEnum2: Int {
-  @objc(X:)   // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
+  @objc(X:) // expected-error{{'@objc' enum case must have a simple name}}{{10-11=}}
   case X
 }
 
@@ -1872,27 +1991,35 @@ class BadClass2 {
   init() { }
 
   var _prop = 5
-  @objc var prop: Int {
-    @objc(property) get { return _prop }
-    @objc(setProperty:) set { _prop = newValue }
+  @objc
+  var prop: Int {
+    @objc(property)
+    get { return _prop }
+    @objc(setProperty:)
+    set { _prop = newValue }
   }
 
   var prop2: Int {
-    @objc(property) get { return _prop } // expected-error{{'@objc' getter for non-'@objc' property}}
-    @objc(setProperty:) set { _prop = newValue } // expected-error{{'@objc' setter for non-'@objc' property}}
+    @objc(property)
+    get { return _prop } // expected-error{{'@objc' getter for non-'@objc' property}}
+    @objc(setProperty:)
+    set { _prop = newValue } // expected-error{{'@objc' setter for non-'@objc' property}}
   }
 
   var prop3: Int {
-    @objc(setProperty:) didSet { } // expected-error{{observing accessors are not allowed to be marked @objc}} {{5-25=}}
+    @objc(setProperty:) // expected-error{{observing accessors are not allowed to be marked @objc}} {{5-25=}}
+    didSet { }
   }
 
   @objc
   subscript (c: Class_ObjC1) -> Class_ObjC1 {
-    @objc(getAtClass:) get {
+    @objc(getAtClass:)
+    get {
       return c
     }
 
-    @objc(setAtClass:class:) set {
+    @objc(setAtClass:class:)
+    set {
     }
   }
 }
@@ -1902,7 +2029,8 @@ class Super {
   @objc(renamedFoo)
   var foo: Int { get { return 3 } } // expected-note 2{{overridden declaration is here}}
 
-  @objc func process(i: Int) -> Int { } // expected-note {{overriding '@objc' method 'process(i:)' here}}
+  @objc
+  func process(i: Int) -> Int { } // expected-note {{overriding '@objc' method 'process(i:)' here}}
 }
 
 class Sub1 : Super {
@@ -1936,18 +2064,25 @@ struct NotObjCStruct {}
 
 // Closure arguments can only be @objc if their parameters and returns are.
 // CHECK-LABEL: @objc class ClosureArguments
-@objc class ClosureArguments {
+@objc
+class ClosureArguments {
   // CHECK: @objc func foo
-  @objc func foo(f: (Int) -> ()) {}
+  @objc
+  func foo(f: (Int) -> ()) {}
   // CHECK: @objc func bar
-  @objc func bar(f: (NotObjCEnum) -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc
+  func bar(f: (NotObjCEnum) -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func bas
-  @objc func bas(f: (NotObjCEnum) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc
+  func bas(f: (NotObjCEnum) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zim
-  @objc func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc
+  func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zang
-  @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
-  @objc func zangZang(f: (Int...) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc
+  func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc
+  func zangZang(f: (Int...) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func fooImplicit
   func fooImplicit(f: (Int) -> ()) {}
   // CHECK: {{^}}  func barImplicit
@@ -1966,13 +2101,15 @@ typealias GoodBlock = @convention(block) (Int) -> ()
 typealias BadBlock = @convention(block) (NotObjCEnum) -> () // expected-error{{'(NotObjCEnum) -> ()' is not representable in Objective-C, so it cannot be used with '@convention(block)'}}
 
 
-@objc class AccessControl {
+@objc
+class AccessControl {
   // CHECK: @objc func foo
   func foo() {}
   // CHECK: {{^}} private func bar
   private func bar() {}
   // CHECK: @objc private func baz
-  @objc private func baz() {}
+  @objc
+  private func baz() {}
 }
 
 //===--- Ban @objc +load methods
@@ -1984,36 +2121,51 @@ class Load1 {
   class func initialize() {}
 }
 
-@objc class Load2 {
+@objc
+class Load2 {
   class func load() { } // expected-error{{method 'load()' defines Objective-C class method 'load', which is not permitted by Swift}}
   class func alloc() {} // expected-error{{method 'alloc()' defines Objective-C class method 'alloc', which is not permitted by Swift}}
   class func allocWithZone(_: Int) {} // expected-error{{method 'allocWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
   class func initialize() {} // expected-error{{method 'initialize()' defines Objective-C class method 'initialize', which is not permitted by Swift}}
 }
 
-@objc class Load3 {
+@objc
+class Load3 {
   class var load: Load3 {
     get { return Load3() } // expected-error{{getter for 'load' defines Objective-C class method 'load', which is not permitted by Swift}}
     set { }
   }
 
-  @objc(alloc) class var prop: Int { return 0 } // expected-error{{getter for 'prop' defines Objective-C class method 'alloc', which is not permitted by Swift}}
-  @objc(allocWithZone:) class func fooWithZone(_: Int) {} // expected-error{{method 'fooWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
-  @objc(initialize) class func barnitialize() {} // expected-error{{method 'barnitialize()' defines Objective-C class method 'initialize', which is not permitted by Swift}}
+  @objc(alloc)
+  class var prop: Int { return 0 } // expected-error{{getter for 'prop' defines Objective-C class method 'alloc', which is not permitted by Swift}}
+  @objc(allocWithZone:)
+  class func fooWithZone(_: Int) {} // expected-error{{method 'fooWithZone' defines Objective-C class method 'allocWithZone:', which is not permitted by Swift}}
+  @objc(initialize)
+  class func barnitialize() {} // expected-error{{method 'barnitialize()' defines Objective-C class method 'initialize', which is not permitted by Swift}}
 }
 
 // Members of protocol extensions cannot be @objc
 
 extension PlainProtocol {
-  @objc var property: Int { return 5 } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc func fun() { } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  var property: Int { return 5 }
+
+  @objc // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() }
+
+  @objc // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  func fun() { }
 }
 
 extension Protocol_ObjC1 {
-  @objc var property: Int { return 5 } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc func fun() { } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  var property: Int { return 5 }
+
+  @objc // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() }
+
+  @objc // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  func fun() { }
 }
 
 extension Protocol_ObjC1 {
@@ -2028,46 +2180,59 @@ extension Protocol_ObjC1 {
 //===---
 class ClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
-  @objc func methodReturnsVoid() throws { }
+  @objc
+  func methodReturnsVoid() throws { }
 
   // CHECK: @objc func methodReturnsObjCClass() throws -> Class_ObjC1
-  @objc func methodReturnsObjCClass() throws -> Class_ObjC1 {
+  @objc
+  func methodReturnsObjCClass() throws -> Class_ObjC1 {
     return Class_ObjC1()
   }
 
   // CHECK: @objc func methodReturnsBridged() throws -> String
-  @objc func methodReturnsBridged() throws -> String { return String() }
+  @objc
+  func methodReturnsBridged() throws -> String { return String() }
 
   // CHECK: @objc func methodReturnsArray() throws -> [String]
-  @objc func methodReturnsArray() throws -> [String] { return [String]() }
+  @objc
+  func methodReturnsArray() throws -> [String] { return [String]() }
 
   // CHECK: @objc init(degrees: Double) throws
-  @objc init(degrees: Double) throws { }
+  @objc
+  init(degrees: Double) throws { }
 
   // Errors
 
-  @objc func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type 'Class_ObjC1?'; 'nil' indicates failure to Objective-C}}
+  @objc
+  func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type 'Class_ObjC1?'; 'nil' indicates failure to Objective-C}}
 
-  @objc func methodReturnsOptionalArray() throws -> [String]? { return nil } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type '[String]?'; 'nil' indicates failure to Objective-C}}
+  @objc
+  func methodReturnsOptionalArray() throws -> [String]? { return nil } // expected-error{{throwing method cannot be marked @objc because it returns a value of optional type '[String]?'; 'nil' indicates failure to Objective-C}}
 
-  @objc func methodReturnsInt() throws -> Int { return 0 } // expected-error{{throwing method cannot be marked @objc because it returns a value of type 'Int'; return 'Void' or a type that bridges to an Objective-C class}}
+  @objc
+  func methodReturnsInt() throws -> Int { return 0 } // expected-error{{throwing method cannot be marked @objc because it returns a value of type 'Int'; return 'Void' or a type that bridges to an Objective-C class}}
 
-  @objc func methodAcceptsThrowingFunc(fn: (String) throws -> Int) { }
+  @objc
+  func methodAcceptsThrowingFunc(fn: (String) throws -> Int) { }
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{throwing function types cannot be represented in Objective-C}}
 
-  @objc init?(radians: Double) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
+  @objc
+  init?(radians: Double) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
 
-  @objc init!(string: String) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
+  @objc
+  init!(string: String) throws { } // expected-error{{a failable and throwing initializer cannot be marked @objc because 'nil' indicates failure to Objective-C}}
 
-  @objc func fooWithErrorEnum1(x: ErrorEnum) {}
+  @objc
+  func fooWithErrorEnum1(x: ErrorEnum) {}
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{non-'@objc' enums cannot be represented in Objective-C}}
 
   // CHECK: {{^}} func fooWithErrorEnum2(x: ErrorEnum)
   func fooWithErrorEnum2(x: ErrorEnum) {}
 
-  @objc func fooWithErrorProtocolComposition1(x: Error & Protocol_ObjC1) { }
+  @objc
+  func fooWithErrorProtocolComposition1(x: Error & Protocol_ObjC1) { }
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{protocol-constrained type containing 'Error' cannot be represented in Objective-C}}
 
@@ -2077,7 +2242,8 @@ class ClassThrows1 {
 
 
 // CHECK-DUMP-LABEL: class_decl{{.*}}"ImplicitClassThrows1"
-@objc class ImplicitClassThrows1 {
+@objc
+class ImplicitClassThrows1 {
   // CHECK: @objc func methodReturnsVoid() throws
   // CHECK-DUMP: func_decl{{.*}}"methodReturnsVoid()"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   func methodReturnsVoid() throws { }
@@ -2108,7 +2274,8 @@ class ClassThrows1 {
   // CHECK: {{^}} func methodReturnsBridgedValueType() throws -> NSRange
   func methodReturnsBridgedValueType() throws -> NSRange { return NSRange() }
 
-  @objc func methodReturnsBridgedValueType2() throws -> NSRange {
+  @objc
+  func methodReturnsBridgedValueType2() throws -> NSRange {
     return NSRange()
   }
   // expected-error@-3{{throwing method cannot be marked @objc because it returns a value of type 'NSRange' (aka '_NSRange'); return 'Void' or a type that bridges to an Objective-C class}}
@@ -2125,40 +2292,57 @@ class ClassThrows1 {
 }
 
 // CHECK-DUMP-LABEL: class_decl{{.*}}"SubclassImplicitClassThrows1"
-@objc class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
+@objc
+class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
   // CHECK: @objc override func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping ((Int) -> Int), fn3: @escaping ((Int) -> Int))
   // CHECK-DUMP: func_decl{{.*}}"methodWithTrailingClosures(_:fn1:fn2:fn3:)"{{.*}}foreign_error=ZeroResult,unowned,param=1,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int)) throws { }
 }
 
 class ThrowsRedecl1 {
-  @objc func method1(_ x: Int, error: Class_ObjC1) { } // expected-note{{declared here}}
-  @objc func method1(_ x: Int) throws { } // expected-error{{with Objective-C selector 'method1:error:'}}
+  @objc
+  func method1(_ x: Int, error: Class_ObjC1) { } // expected-note{{declared here}}
+  @objc
+  func method1(_ x: Int) throws { } // expected-error{{with Objective-C selector 'method1:error:'}}
 
-  @objc func method2AndReturnError(_ x: Int) { } // expected-note{{declared here}}
-  @objc func method2() throws { } // expected-error{{with Objective-C selector 'method2AndReturnError:'}}
+  @objc
+  func method2AndReturnError(_ x: Int) { } // expected-note{{declared here}}
+  @objc
+  func method2() throws { } // expected-error{{with Objective-C selector 'method2AndReturnError:'}}
 
-  @objc func method3(_ x: Int, error: Int, closure: @escaping (Int) -> Int) { }  // expected-note{{declared here}}
-  @objc func method3(_ x: Int, closure: (Int) -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
+  @objc
+  func method3(_ x: Int, error: Int, closure: @escaping (Int) -> Int) { }  // expected-note{{declared here}}
+  @objc
+  func method3(_ x: Int, closure: (Int) -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
 
-  @objc(initAndReturnError:) func initMethod1(error: Int) { } // expected-note{{declared here}}
-  @objc init() throws { } // expected-error{{with Objective-C selector 'initAndReturnError:'}}
+  @objc(initAndReturnError:)
+  func initMethod1(error: Int) { } // expected-note{{declared here}}
+  @objc
+  init() throws { } // expected-error{{with Objective-C selector 'initAndReturnError:'}}
 
-  @objc(initWithString:error:) func initMethod2(string: String, error: Int) { } // expected-note{{declared here}}
-  @objc init(string: String) throws { } // expected-error{{with Objective-C selector 'initWithString:error:'}}
+  @objc(initWithString:error:)
+  func initMethod2(string: String, error: Int) { } // expected-note{{declared here}}
+  @objc
+  init(string: String) throws { } // expected-error{{with Objective-C selector 'initWithString:error:'}}
 
-  @objc(initAndReturnError:fn:) func initMethod3(error: Int, fn: @escaping (Int) -> Int) { } // expected-note{{declared here}}
-  @objc init(fn: (Int) -> Int) throws { } // expected-error{{with Objective-C selector 'initAndReturnError:fn:'}}
+  @objc(initAndReturnError:fn:)
+  func initMethod3(error: Int, fn: @escaping (Int) -> Int) { } // expected-note{{declared here}}
+  @objc
+  init(fn: (Int) -> Int) throws { } // expected-error{{with Objective-C selector 'initAndReturnError:fn:'}}
 }
 
 class ThrowsObjCName {
-  @objc(method4:closure:error:) func method4(x: Int, closure: @escaping (Int) -> Int) throws { }
+  @objc(method4:closure:error:)
+  func method4(x: Int, closure: @escaping (Int) -> Int) throws { }
 
-  @objc(method5AndReturnError:x:closure:) func method5(x: Int, closure: @escaping (Int) -> Int) throws { }
+  @objc(method5AndReturnError:x:closure:)
+  func method5(x: Int, closure: @escaping (Int) -> Int) throws { }
 
-  @objc(method6) func method6() throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
+  @objc(method6) // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
+  func method6() throws { }
 
-  @objc(method7) func method7(x: Int) throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
+  @objc(method7) // expected-error{{@objc' method name provides names for 0 arguments, but method has 2 parameters (including the error parameter)}}
+  func method7(x: Int) throws { }
 
   // CHECK-DUMP: func_decl{{.*}}"method8(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=2,paramtype=Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>,resulttype=ObjCBool
   @objc(method8:fn1:error:fn2:)
@@ -2177,34 +2361,42 @@ class SubclassThrowsObjCName : ThrowsObjCName {
   override func method9(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int) throws { }
 }
 
-@objc protocol ProtocolThrowsObjCName {
-  @objc optional func doThing(_ x: String) throws -> String // expected-note{{requirement 'doThing' declared here}}
+@objc
+protocol ProtocolThrowsObjCName {
+  @objc
+  optional func doThing(_ x: String) throws -> String // expected-note{{requirement 'doThing' declared here}}
 }
 
 class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {
-  @objc func doThing(_ x: String) throws -> String { return x } // okay
+  @objc
+  func doThing(_ x: String) throws -> String { return x } // okay
 }
 
 class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
-  @objc func doThing(_ x: Int) throws -> String { return "" }
+  @objc
+  func doThing(_ x: Int) throws -> String { return "" }
   // expected-warning@-1{{instance method 'doThing' nearly matches optional requirement 'doThing' of protocol 'ProtocolThrowsObjCName'}}
   // expected-note@-2{{move 'doThing' to an extension to silence this warning}}
-  // expected-note@-3{{make 'doThing' private to silence this warning}}{{9-9=private }}
+  // expected-note@-3{{make 'doThing' private to silence this warning}}{{3-3=private }}
   // expected-note@-4{{candidate has non-matching type '(Int) throws -> String'}}
 }
 
-@objc class DictionaryTest {
+@objc
+class DictionaryTest {
   // CHECK-LABEL: @objc func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>)
   func func_dictionary1a(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
 
   // CHECK-LABEL: @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>)
-  @objc func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
+  @objc
+  func func_dictionary1b(x: Dictionary<ObjC_Class1, ObjC_Class1>) { }
 
   func func_dictionary2a(x: Dictionary<String, Int>) { }
-  @objc func func_dictionary2b(x: Dictionary<String, Int>) { }
+  @objc
+  func func_dictionary2b(x: Dictionary<String, Int>) { }
 }
 
-@objc extension PlainClass {
+@objc
+extension PlainClass {
   // CHECK-LABEL: @objc final func objc_ext_objc_okay(_: Int) {
   final func objc_ext_objc_okay(_: Int) { }
 
@@ -2216,7 +2408,8 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
   @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
 }
 
-@objc class ObjC_Class1 : Hashable {
+@objc
+class ObjC_Class1 : Hashable {
   func hash(into hasher: inout Hasher) {}
 }
 
@@ -2225,18 +2418,21 @@ func ==(lhs: ObjC_Class1, rhs: ObjC_Class1) -> Bool {
 }
 
 // CHECK-LABEL: @objc class OperatorInClass
-@objc class OperatorInClass {
+@objc
+class OperatorInClass {
   // CHECK: {{^}} static func == (lhs: OperatorInClass, rhs: OperatorInClass) -> Bool
   static func ==(lhs: OperatorInClass, rhs: OperatorInClass) -> Bool {
     return true
   }
   // CHECK: {{^}} @objc static func + (lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass
-  @objc static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass { // expected-error {{operator methods cannot be declared @objc}}
+  @objc
+  static func +(lhs: OperatorInClass, rhs: OperatorInClass) -> OperatorInClass { // expected-error {{operator methods cannot be declared @objc}}
     return lhs
   }
 } // CHECK: {{^}$}}
 
-@objc protocol OperatorInProtocol {
+@objc
+protocol OperatorInProtocol {
   static func +(lhs: Self, rhs: Self) -> Self // expected-error {{@objc protocols must not have operator requirements}}
 }
 
@@ -2247,7 +2443,8 @@ class AdoptsOperatorInProtocol : OperatorInProtocol {
 
 //===--- @objc inference for witnesses
 
-@objc protocol InferFromProtocol {
+@objc
+protocol InferFromProtocol {
   @objc(inferFromProtoMethod1:)
   optional func method1(value: Int)
 }
@@ -2303,15 +2500,18 @@ extension SubclassInfersFromProtocol2 {
   func method1(value: Int) { }
 }
 
-@objc class NeverReturningMethod {
-  @objc func doesNotReturn() -> Never {}
+@objc
+class NeverReturningMethod {
+  @objc
+  func doesNotReturn() -> Never {}
 }
 
 // SR-5025
 class User: NSObject {
 }
 
-@objc extension User {
+@objc
+extension User {
 	var name: String {
 		get {
 			return "No name"
@@ -2345,7 +2545,8 @@ protocol ObjCProtocolWithUnownedProperty {
 
 // rdar://problem/46699152: errors about read/modify accessors being implicitly
 // marked @objc.
-@objc class MyObjCClass: NSObject {}
+@objc
+class MyObjCClass: NSObject {}
 
 @objc
 extension MyObjCClass {
@@ -2361,7 +2562,8 @@ extension MyObjCClass {
     private func stillExposedToObjCDespiteBeingPrivate() {}
 }
 
-@objc private extension MyObjCClass {
+@objc
+private extension MyObjCClass {
   // CHECK: {{^}} @objc dynamic func alsoExposedToObjCDespiteBeingPrivate()
   func alsoExposedToObjCDespiteBeingPrivate() {}
 }
@@ -2375,7 +2577,8 @@ extension MyObjCClass {
 
 class SR_9035_C {}
 
-@objc protocol SR_9035_P {
+@objc
+protocol SR_9035_P {
   func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
   func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
   // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
@@ -2383,6 +2586,7 @@ class SR_9035_C {}
 
 // SR-12801: Make sure we reject an @objc generic subscript.
 class SR12801 {
-  @objc subscript<T>(foo : [T]) -> Int { return 0 }
+  @objc
+  subscript<T>(foo : [T]) -> Int { return 0 }
   // expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
 }
