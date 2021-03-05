@@ -336,21 +336,6 @@ extension Task {
       }
     }
 
-    /// Whether this (or its parents) have task local values.
-    var hasLocalValues: Bool {
-      get {
-        (bits & (1 << 27)) != 0
-      }
-
-      set {
-        if newValue {
-          bits = bits | 1 << 27
-        } else {
-          bits = (bits & ~(1 << 27))
-        }
-      }
-    }
-
   }
 }
 
