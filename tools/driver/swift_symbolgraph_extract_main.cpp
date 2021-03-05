@@ -260,7 +260,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   // don't need to print these errors.
   CI.removeDiagnosticConsumer(&DiagPrinter);
   
-  SmallVector<ModuleDecl *, 2> Overlays;
+  SmallVector<ModuleDecl *> Overlays;
   M->findDeclaredCrossImportOverlaysTransitive(Overlays);
   for (const auto *OM : Overlays) {
     auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());
