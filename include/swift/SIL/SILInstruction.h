@@ -26,6 +26,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
@@ -2152,6 +2153,16 @@ struct TerribleOverloadTokenHack :
 template <class T>
 using OverloadToken = TerribleOverloadTokenHack::Hack<T>;
 
+enum class ApplyFlags : uint8_t {
+  /// This is a call to a 'rethrows' function that is known not to throw.
+  DoesNotThrow = 0x1,
+
+  /// This is a call to a 'reasync' function that is known not to 'await'.
+  DoesNotAwait = 0x2
+};
+
+using ApplyOptions = OptionSet<ApplyFlags>;
+
 /// ApplyInstBase - An abstract class for different kinds of function
 /// application.
 template <class Impl, class Base,
@@ -2172,12 +2183,11 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   /// points to the specialization info of the inlined function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// Used for apply_inst instructions: true if the called function has an
-  /// error result but is not actually throwing.
-  unsigned NonThrowing: 1;
+  /// Stores an ApplyOptions.
+  unsigned Options: 2;
 
   /// The number of call arguments as required by the callee.
-  unsigned NumCallArguments : 31;
+  unsigned NumCallArguments : 30;
 
   /// The total number of type-dependent operands.
   unsigned NumTypeDependentOperands;
@@ -2198,7 +2208,7 @@ protected:
                 As... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo),
-        NonThrowing(false), NumCallArguments(args.size()),
+        NumCallArguments(args.size()),
         NumTypeDependentOperands(typeDependentOperands.size()),
         Substitutions(subs) {
 
@@ -2230,12 +2240,24 @@ protected:
                                   ArrayRef<SILValue> typeDependentOperands) {
     return NumStaticOperands + args.size() + typeDependentOperands.size();
   }
-
-  void setNonThrowing(bool isNonThrowing) { NonThrowing = isNonThrowing; }
-  
-  bool isNonThrowingApply() const { return NonThrowing; }
   
 public:
+  void setApplyOptions(ApplyOptions options) {
+    Options = unsigned(options.toRaw());
+  }
+  
+  ApplyOptions getApplyOptions() const {
+    return ApplyOptions(ApplyFlags(Options));
+  }
+
+  bool isNonThrowing() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotThrow);
+  }
+  
+  bool isNonAsync() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
+  }
+
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
@@ -2555,22 +2577,16 @@ class ApplyInst final
             SubstitutionMap Substitutions,
             ArrayRef<SILValue> Args,
             ArrayRef<SILValue> TypeDependentOperands,
-            bool isNonThrowing,
+            ApplyOptions options,
             const GenericSpecializationInformation *SpecializationInfo);
 
   static ApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee,
          SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
-         bool isNonThrowing, Optional<SILModuleConventions> ModuleConventions,
+         ApplyOptions options,
+         Optional<SILModuleConventions> ModuleConventions,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
-
-public:
-  /// Returns true if the called function has an error result but is not actually
-  /// throwing an error.
-  bool isNonThrowing() const {
-    return isNonThrowingApply();
-  }
 };
 
 /// PartialApplyInst - Represents the creation of a closure object by partial
@@ -2670,13 +2686,13 @@ class BeginApplyInst final
                  SubstitutionMap substitutions,
                  ArrayRef<SILValue> args,
                  ArrayRef<SILValue> typeDependentOperands,
-                 bool isNonThrowing,
+                 ApplyOptions options,
                  const GenericSpecializationInformation *specializationInfo);
 
   static BeginApplyInst *
   create(SILDebugLocation debugLoc, SILValue Callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
-         bool isNonThrowing, Optional<SILModuleConventions> moduleConventions,
+         ApplyOptions options, Optional<SILModuleConventions> moduleConventions,
          SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
          const GenericSpecializationInformation *specializationInfo);
 
@@ -2689,12 +2705,6 @@ public:
 
   SILInstructionResultArray getYieldedValues() const {
     return getAllResultsBuffer().drop_back();
-  }
-
-  /// Returns true if the called coroutine has an error result but is not
-  /// actually throwing an error.
-  bool isNonThrowing() const {
-    return isNonThrowingApply();
   }
 
   void getCoroutineEndPoints(
@@ -8903,14 +8913,18 @@ class TryApplyInst final
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> TypeDependentOperands,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+               ApplyOptions options,
                const GenericSpecializationInformation *SpecializationInfo);
 
   static TryApplyInst *
   create(SILDebugLocation DebugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
-         SILBasicBlock *normalBB, SILBasicBlock *errorBB, SILFunction &F,
+         SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+         ApplyOptions options, SILFunction &F,
          SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
+
+
 };
 
 /// DifferentiableFunctionInst - creates a `@differentiable` function-typed

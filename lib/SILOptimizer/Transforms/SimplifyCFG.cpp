@@ -2639,9 +2639,13 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         .createCopyValue(calleeLoc, newCallee);
       newCallee = makeNewValueAvailable(newCallee, TAI->getParent());
     }
+
+    ApplyOptions Options = TAI->getApplyOptions();
+    if (CalleeFnTy->hasErrorResult())
+      Options |= ApplyFlags::DoesNotThrow;
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), newCallee,
                                            TAI->getSubstitutionMap(),
-                                           Args, CalleeFnTy->hasErrorResult());
+                                           Args, Options);
 
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();

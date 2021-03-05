@@ -47,30 +47,6 @@ using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 class ArgumentScope;
 class Scope;
 
-enum class ApplyOptions : unsigned {
-  /// No special treatment is required.
-  None = 0,
-
-  /// Suppress the error-handling edge out of the call.  This should
-  /// be used carefully; it's used to implement features like 'rethrows'.
-  DoesNotThrow = 0x1,
-};
-inline ApplyOptions operator|(ApplyOptions lhs, ApplyOptions rhs) {
-  return ApplyOptions(unsigned(lhs) | unsigned(rhs));
-}
-inline ApplyOptions &operator|=(ApplyOptions &lhs, ApplyOptions rhs) {
-  return (lhs = (lhs | rhs));
-}
-inline bool operator&(ApplyOptions lhs, ApplyOptions rhs) {
-  return ((unsigned(lhs) & unsigned(rhs)) != 0);
-}
-inline ApplyOptions operator-(ApplyOptions lhs, ApplyOptions rhs) {
-  return ApplyOptions(unsigned(lhs) & ~unsigned(rhs));
-}
-inline ApplyOptions &operator-=(ApplyOptions &lhs, ApplyOptions rhs) {
-  return (lhs = (lhs - rhs));
-}
-
 struct LValueOptions {
   bool IsNonAccessing = false;
 
