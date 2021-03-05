@@ -168,8 +168,8 @@ public:
   /// the current actor.
   // FIXME: we likely don't need this isolation level?
   static ActorIsolationRestriction forDistributedActorSelf(
-      ClassDecl *actorClass) {
-    ActorIsolationRestriction result(DistributedActor);
+      ClassDecl *actorClass, bool isCrossActor) {
+    ActorIsolationRestriction result(DistributedActor, isCrossActor);
     result.data.actorClass = actorClass;
     return result;
   }

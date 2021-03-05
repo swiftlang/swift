@@ -632,13 +632,15 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
         // Accessing properties on a distributed actor is only allowed when
         // accessing 'self'; this includes `let` properties as well,
         // unlike local actors
-        return forDistributedActorSelf(isolation.getActor());
+        return forDistributedActorSelf(isolation.getActor(),
+                                       /*isCrossActor*/ false); // TODO: not sure?
 
       case ActorIsolation::ActorInstance:
       case ActorIsolation::Unspecified:
       case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
       case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
         // Continue checking normal local actor isolation rules
         LLVM_FALLTHROUGH;
     }
@@ -669,7 +671,8 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
       if (func->isDistributed()) {
         if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-          return forDistributedActorSelf(classDecl);
+          return forDistributedActorSelf(classDecl,
+                                         /*isCrossActor*/ false); // TODO: not sure?
         } else {
           func->diagnose(
               diag::distributed_actor_func_defined_outside_of_distributed_actor,
@@ -710,7 +713,8 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
 
     case ActorIsolation::DistributedActorInstance:
       // Only distributed functions can be called externally on a distributed actor.
-      return forDistributedActorSelf(isolation.getActor());
+      return forDistributedActorSelf(isolation.getActor(),
+                                    /*isCrossActor*/ false); // TODO: not sure?
 
     case ActorIsolation::GlobalActorUnsafe:
     case ActorIsolation::GlobalActor: {
@@ -2948,6 +2952,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
       return;
 
     case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
       // Diagnose below.
       break;
 
@@ -2971,6 +2976,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
       return;
 
     case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::Independent:
     case ActorIsolation::IndependentUnsafe:
       // Diagnose below.
