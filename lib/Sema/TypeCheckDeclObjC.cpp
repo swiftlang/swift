@@ -1141,6 +1141,13 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
   auto ancestry = CD->checkAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
+    auto reason = objCReasonForObjCAttr(attr);
+    auto behavior = behaviorLimitForObjCReason(reason, ctx);
+
+    SourceLoc attrLoc = attr->getLocation();
+    if (attrLoc.isInvalid())
+      attrLoc = CD->getLoc();
+
     if (ancestry.contains(AncestryFlags::Generic)) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
@@ -1150,8 +1157,9 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         return None;
       }
 
-      ctx.Diags.diagnose(attr->getLocation(), diag::objc_for_generic_class)
-        .fixItRemove(attr->getRangeWithAt());
+      ctx.Diags.diagnose(attrLoc, diag::objc_for_generic_class)
+        .fixItRemove(attr->getRangeWithAt())
+        .limitBehavior(behavior);
     }
 
     // If the class has resilient ancestry, @objc just controls the runtime
@@ -1170,12 +1178,13 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
       auto range = getMinOSVersionForClassStubs(target);
       auto *ancestor = getResilientAncestor(CD->getParentModule(), CD);
-      ctx.Diags.diagnose(attr->getLocation(),
+      ctx.Diags.diagnose(attrLoc,
                          diag::objc_for_resilient_class,
                          ancestor->getName(),
                          platform,
                          range.getLowerEndpoint())
-        .fixItRemove(attr->getRangeWithAt());
+        .fixItRemove(attr->getRangeWithAt())
+        .limitBehavior(behavior);
     }
 
     // Only allow ObjC-rooted classes to be @objc.
@@ -1183,9 +1192,10 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     if (ancestry.contains(AncestryFlags::ObjC) &&
         !ancestry.contains(AncestryFlags::ClangImported)) {
       if (ctx.LangOpts.EnableObjCAttrRequiresFoundation) {
-        ctx.Diags.diagnose(attr->getLocation(),
+        ctx.Diags.diagnose(attrLoc,
                            diag::invalid_objc_swift_rooted_class)
-          .fixItRemove(attr->getRangeWithAt());
+          .fixItRemove(attr->getRangeWithAt())
+          .limitBehavior(behavior);
         // If the user has not spelled out a superclass, offer to insert
         // 'NSObject'. We could also offer to replace the existing superclass,
         // but that's a touch aggressive.
@@ -1193,20 +1203,23 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
            auto nameEndLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr,
                                                         CD->getNameLoc());
            CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
-             .fixItInsert(nameEndLoc, ": NSObject");
+             .fixItInsert(nameEndLoc, ": NSObject")
+             .limitBehavior(behavior);
          } else if (CD->getSuperclass().isNull()) {
            CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
-             .fixItInsert(CD->getInherited().front().getLoc(), "NSObject, ");
+             .fixItInsert(CD->getInherited().front().getLoc(), "NSObject, ")
+             .limitBehavior(behavior);
          }
       }
 
       if (!ctx.LangOpts.EnableObjCInterop) {
-        ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-          .fixItRemove(attr->getRangeWithAt());
+        ctx.Diags.diagnose(attrLoc, diag::objc_interop_disabled)
+          .fixItRemove(attr->getRangeWithAt())
+          .limitBehavior(behavior);
       }
     }
 
-    return objCReasonForObjCAttr(CD->getAttrs().getAttribute<ObjCAttr>());
+    return reason;
   }
 
   if (ancestry.contains(AncestryFlags::ObjC)) {
