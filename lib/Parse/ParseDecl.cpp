@@ -1570,42 +1570,68 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacrosComputed = true;
 }
 
-static HasAsyncAlternativeAttr *parseAsyncAlternativeAttribute(
-    Parser &P, StringRef AttrName, SourceLoc AtLoc, DeclAttrKind DK) {
+static CompletionHandlerAsyncAttr *
+parseCompletionHandlerAsyncAttribute(Parser &P, StringRef AttrName,
+                                     SourceLoc AtLoc, DeclAttrKind DK) {
   SourceLoc Loc = P.PreviousLoc;
 
-  // Unnamed @hasAsyncAlternative attribute
-  if (P.Tok.isNot(tok::l_paren))
-    return new (P.Context) HasAsyncAlternativeAttr(AtLoc, Loc);
-
-  P.consumeToken(tok::l_paren);
+  if (!P.consumeIf(tok::l_paren)) {
+    P.diagnose(P.getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+    return nullptr;
+  }
 
   if (!P.Tok.is(tok::string_literal)) {
     P.diagnose(Loc, diag::attr_expected_string_literal, AttrName);
     return nullptr;
   }
 
-  auto Value = P.getStringLiteralIfNotInterpolated(
-      Loc, ("argument of '" + AttrName + "'").str());
+  SourceLoc nameLoc = P.Tok.getLoc();
+  Optional<StringRef> asyncFunctionName = P.getStringLiteralIfNotInterpolated(
+      nameLoc, ("argument of '" + AttrName + "'").str());
   P.consumeToken(tok::string_literal);
-  if (!Value)
+
+  if (!asyncFunctionName)
     return nullptr;
 
-  ParsedDeclName parsedName = parseDeclName(Value.getValue());
-  if (!parsedName || !parsedName.ContextName.empty()) {
-    P.diagnose(AtLoc, diag::has_async_alternative_invalid_name, AttrName);;
+  ParsedDeclName parsedAsyncName = parseDeclName(*asyncFunctionName);
+  if (!parsedAsyncName || !parsedAsyncName.ContextName.empty()) {
+    P.diagnose(nameLoc, diag::attr_completion_handler_async_invalid_name,
+               AttrName);
     return nullptr;
+  }
+
+  size_t handlerIndex = 0;
+  SourceLoc handlerIndexLoc = SourceLoc();
+  if (P.consumeIf(tok::comma)) {
+    // The completion handler is explicitly specified, parse it
+    if (P.parseSpecificIdentifier("completionHandlerIndex",
+                                  diag::attr_missing_label,
+                                  "completionHandlerIndex", AttrName) ||
+        P.parseToken(tok::colon, diag::expected_colon_after_label,
+                     "completionHandlerIndex")) {
+      return nullptr;
+    }
+
+    if (P.Tok.getText().getAsInteger(0, handlerIndex)) {
+      P.diagnose(P.Tok.getLoc(), diag::attr_expected_integer_literal, AttrName);
+      return nullptr;
+    }
+
+    handlerIndexLoc = P.consumeToken(tok::integer_literal);
   }
 
   SourceRange AttrRange = SourceRange(Loc, P.Tok.getRange().getStart());
   if (!P.consumeIf(tok::r_paren)) {
-    P.diagnose(Loc, diag::attr_expected_rparen, AttrName,
+    P.diagnose(P.getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
     return nullptr;
   }
 
-  return new (P.Context) HasAsyncAlternativeAttr(
-      parsedName.formDeclNameRef(P.Context), AtLoc, AttrRange);
+  return new (P.Context) CompletionHandlerAsyncAttr(
+      parsedAsyncName.formDeclNameRef(P.Context), nameLoc,
+      handlerIndexLoc.isValid(), handlerIndex, handlerIndexLoc, AtLoc,
+      AttrRange);
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -2686,8 +2712,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         name, AtLoc, range, /*implicit*/ false));
     break;
   }
-  case DAK_HasAsyncAlternative: {
-    auto *attr = parseAsyncAlternativeAttribute(*this, AttrName, AtLoc, DK);
+  case DAK_CompletionHandlerAsync: {
+    auto *attr =
+        parseCompletionHandlerAsyncAttribute(*this, AttrName, AtLoc, DK);
     if (!attr) {
       skipUntilDeclStmtRBrace(tok::r_paren);
       consumeIf(tok::r_paren);

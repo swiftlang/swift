@@ -2622,21 +2622,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_HasAsyncAlternative: {
-      auto *attr = cast<HasAsyncAlternativeAttr>(DA);
+    case DAK_CompletionHandlerAsync: {
+      auto *attr = cast<CompletionHandlerAsyncAttr>(DA);
       auto abbrCode =
-          S.DeclTypeAbbrCodes[HasAsyncAlternativeDeclAttrLayout::Code];
+          S.DeclTypeAbbrCodes[CompletionHandlerAsyncDeclAttrLayout::Code];
+
+      assert(attr->AsyncFunctionDecl &&
+             "Serializing unresolved completion handler async function decl");
+      auto asyncFuncDeclID = S.addDeclRef(attr->AsyncFunctionDecl);
 
       SmallVector<IdentifierID, 4> pieces;
-      if (attr->hasName()) {
-        pieces.push_back(S.addDeclBaseNameRef(attr->Name.getBaseName()));
-        for (auto argName : attr->Name.getArgumentNames())
-          pieces.push_back(S.addDeclBaseNameRef(argName));
-      }
 
-      HasAsyncAlternativeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->Name.isCompoundName(),
-          pieces);
+      pieces.push_back(
+          S.addDeclBaseNameRef(attr->AsyncFunctionName.getBaseName()));
+      for (auto argName : attr->AsyncFunctionName.getArgumentNames())
+        pieces.push_back(S.addDeclBaseNameRef(argName));
+
+      CompletionHandlerAsyncDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          attr->ExplicitCompletionHandlerIndex, attr->CompletionHandlerIndex,
+          asyncFuncDeclID, attr->AsyncFunctionName.isCompoundName(), pieces);
       return;
     }
     }

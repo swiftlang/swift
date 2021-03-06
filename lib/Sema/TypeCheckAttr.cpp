@@ -105,7 +105,6 @@ public:
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(ForbidSerializingReference)
-  IGNORED_ATTR(HasAsyncAlternative)
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(HasMissingDesignatedInitializers)
   IGNORED_ATTR(InheritsConvenienceInitializers)
@@ -282,6 +281,7 @@ public:
 
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
+  void visitCompletionHandlerAsyncAttr(CompletionHandlerAsyncAttr *attr);
 };
 } // end anonymous namespace
 
@@ -5676,5 +5676,164 @@ void TypeChecker::checkClosureAttributes(ClosureExpr *closure) {
   ClosureAttributeChecker checker(closure);
   for (auto attr : closure->getAttrs()) {
     checker.visit(attr);
+  }
+}
+
+void AttributeChecker::visitCompletionHandlerAsyncAttr(
+    CompletionHandlerAsyncAttr *attr) {
+
+  // Check phases:
+  //  1. Attached function shouldn't be async and should have enough args
+  //     to have a completion handler
+  //  2. Completion handler should be a function type that returns void.
+  //     Completion handler type should be escaping and not autoclosure
+  //  3. Find functionDecl that the attachedFunction is being mapped to
+  //      - Find all with the same name
+  //      - Keep any that are async
+  //      - Do some sanity checking on types
+
+  // Phase 1: Typecheck the function the attribute is attached to
+  auto attachedFunctionDecl = cast<AbstractFunctionDecl>(D);
+  if (attachedFunctionDecl->hasAsync()) {
+    diagnose(attr->getLocation(),
+             diag::attr_completion_handler_async_handler_not_func, attr);
+    diagnose(attachedFunctionDecl->getAsyncLoc(),
+             diag::note_attr_function_declared_async);
+    return;
+  }
+
+  const ParameterList *attachedFunctionParams =
+      attachedFunctionDecl->getParameters();
+  assert(attachedFunctionParams && "Attached function has no parameter list");
+  if (attachedFunctionParams->size() == 0) {
+    diagnose(attr->getLocation(),
+             diag::attr_completion_handler_async_handler_not_func, attr);
+    return;
+  }
+  size_t completionHandlerIndex = attr->ExplicitCompletionHandlerIndex
+                                      ? attr->CompletionHandlerIndex
+                                      : attachedFunctionParams->size() - 1;
+  if (attachedFunctionParams->size() < completionHandlerIndex) {
+    diagnose(attr->CompletionHandlerIndexLoc,
+             diag::attr_completion_handler_async_handler_out_of_range);
+    return;
+  }
+
+  // Phase 2: Typecheck the completion handler
+  const ParamDecl *completionHandlerParamDecl =
+      attachedFunctionParams->get(completionHandlerIndex);
+  {
+    AnyFunctionType *handlerType =
+        completionHandlerParamDecl->getType()->getAs<AnyFunctionType>();
+    if (!handlerType) {
+      diagnose(attr->getLocation(),
+               diag::attr_completion_handler_async_handler_not_func, attr);
+      diagnose(completionHandlerParamDecl->getTypeRepr()->getLoc(),
+               diag::note_attr_completion_handler_async_type_is_not_function,
+               completionHandlerParamDecl->getType())
+          .highlight(
+              completionHandlerParamDecl->getTypeRepr()->getSourceRange());
+      return;
+    }
+
+    auto handlerTypeRepr =
+        dyn_cast<AttributedTypeRepr>(completionHandlerParamDecl->getTypeRepr());
+    const TypeAttributes *handlerTypeAttrs = nullptr;
+    if (handlerTypeRepr)
+      handlerTypeAttrs = &handlerTypeRepr->getAttrs();
+
+    const bool missingVoid = !handlerType->getResult()->isVoid();
+    const bool hasAutoclosure =
+        handlerTypeAttrs ? handlerTypeAttrs->has(TAK_autoclosure) : false;
+    const bool hasEscaping =
+        handlerTypeAttrs ? handlerTypeAttrs->has(TAK_escaping) : false;
+    const bool hasError = missingVoid | hasAutoclosure | !hasEscaping;
+
+    if (hasError) {
+      diagnose(attr->getLocation(),
+               diag::attr_completion_handler_async_handler_not_func, attr);
+
+      if (missingVoid)
+        diagnose(completionHandlerParamDecl->getLoc(),
+                 diag::note_attr_completion_function_must_return_void)
+            .highlight(
+                completionHandlerParamDecl->getTypeRepr()->getSourceRange());
+
+      if (!hasEscaping)
+        diagnose(completionHandlerParamDecl->getLoc(),
+                 diag::note_attr_completion_handler_async_handler_attr_req,
+                 true, "escaping")
+            .highlight(
+                completionHandlerParamDecl->getTypeRepr()->getSourceRange());
+
+      if (hasAutoclosure)
+        diagnose(handlerTypeAttrs->getLoc(TAK_autoclosure),
+                 diag::note_attr_completion_handler_async_handler_attr_req,
+                 false, "autoclosure");
+      return;
+    }
+  }
+
+  // Phase 3: Find mapped async function
+  {
+    // Get the list of candidates based on the name
+    // Grab all functions that are async
+    // TODO: Sanity check types -- we just use the DeclName for now
+    //  - Need a throwing decl if the completion handler takes a Result type
+    //    containing an error, or if it takes a tuple containing an optional
+    //    error.
+    //  Find a declref that works.
+    //  Get list of candidates based on the name.
+    //  The correct candidate will need to be async.
+    //
+    //  TODO: Implement the type matching stuff eventually
+    //  If the completion handler takes a single type, then we find the async
+    //  function that returns just that type. (easy case)
+    //
+    //  If the completion handler takes a result type consisting of a type and
+    //  an error, the async function should be throwing and return that type.
+    //  (easy-ish case)
+    //
+    //  If the completion handler takes an optional type and an optional Error
+    //  type, this could map to either of these two. The intent isn't clear.
+    //    - func foo() async throws -> Int
+    //    - func foo() async throws -> Int?
+    //  This case is ambiguous, so we will report an error.
+    //
+    //  If the completion handler takes multiple types, the async function
+    //  should return all of those types in a tuple
+
+    SmallVector<ValueDecl *, 2> allCandidates;
+    lookupReplacedDecl(attr->AsyncFunctionName, attr, attachedFunctionDecl,
+                       allCandidates);
+    SmallVector<AbstractFunctionDecl *, 2> candidates;
+    candidates.reserve(allCandidates.size());
+    for (ValueDecl *candidate : allCandidates) {
+      AbstractFunctionDecl *funcDecl =
+          dyn_cast<AbstractFunctionDecl>(candidate);
+      if (!funcDecl) // Only consider functions
+        continue;
+      if (!funcDecl->hasAsync()) // only consider async functions
+        continue;
+      candidates.push_back(funcDecl);
+    }
+
+    if (candidates.empty()) {
+      diagnose(attr->AsyncFunctionNameLoc,
+               diag::attr_completion_handler_async_no_suitable_function,
+               attr->AsyncFunctionName);
+      return;
+    } else if (candidates.size() > 1) {
+      diagnose(attr->AsyncFunctionNameLoc,
+               diag::attr_completion_handler_async_ambiguous_function, attr,
+               attr->AsyncFunctionName);
+
+      for (AbstractFunctionDecl *candidate : candidates) {
+        diagnose(candidate->getLoc(), diag::decl_declared_here,
+                 candidate->getName());
+      }
+      return;
+    }
+    attr->AsyncFunctionDecl = candidates.front();
   }
 }
