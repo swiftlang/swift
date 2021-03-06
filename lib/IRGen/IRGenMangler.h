@@ -483,6 +483,7 @@ public:
   std::string mangleOutlinedCopyFunction(CanType ty,
                                          CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
@@ -492,6 +493,7 @@ public:
   std::string mangleOutlinedConsumeFunction(CanType ty,
                                             CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(ty);
     if (sig)
       appendGenericSignature(sig);
@@ -502,6 +504,7 @@ public:
   std::string mangleOutlinedRetainFunction(CanType t,
                                            CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -511,6 +514,7 @@ public:
   std::string mangleOutlinedReleaseFunction(CanType t,
                                             CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -521,6 +525,7 @@ public:
   std::string mangleOutlinedInitializeWithTakeFunction(CanType t,
                                                        CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -530,6 +535,7 @@ public:
   std::string mangleOutlinedInitializeWithCopyFunction(CanType t,
                                                        CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -539,6 +545,7 @@ public:
   std::string mangleOutlinedAssignWithTakeFunction(CanType t,
                                                    CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -548,6 +555,7 @@ public:
   std::string mangleOutlinedAssignWithCopyFunction(CanType t,
                                                    CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -557,6 +565,7 @@ public:
   std::string mangleOutlinedDestroyFunction(CanType t,
                                             CanGenericSignature sig) {
     beginMangling();
+    bindGenericParameters(sig);
     appendType(t);
     if (sig)
       appendGenericSignature(sig);
@@ -571,11 +580,8 @@ public:
   }
 
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
-                                           Type Ty);
-  
-  SymbolicMangling mangleProtocolConformanceForReflection(IRGenModule &IGM,
-                                            Type Ty,
-                                            ProtocolConformanceRef conformance);
+                                           CanGenericSignature genericSig,
+                                           CanType Ty);
 
   std::string mangleTypeForLLVMTypeName(CanType Ty);
 
