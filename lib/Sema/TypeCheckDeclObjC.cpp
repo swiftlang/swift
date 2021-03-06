@@ -1663,11 +1663,16 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
             *attr->getName() != overriddenNameAsSel) {
           // If the user explicitly wrote the wrong name, complain.
           if (!attr->isNameImplicit()) {
-            ctx.Diags.diagnose(attr->AtLoc,
+            SourceLoc diagLoc = attr->AtLoc, firstNameLoc;
+            if (diagLoc.isInvalid())
+              diagLoc = decl->getLoc();
+            if (!attr->getNameLocs().empty())
+              firstNameLoc = attr->getNameLocs().front();
+            ctx.Diags.diagnose(diagLoc,
                         diag::objc_override_property_name_mismatch,
                         attr->getName()->getSelectorPieces()[0],
                         overriddenName)
-              .fixItReplaceChars(attr->getNameLocs().front(),
+              .fixItReplaceChars(firstNameLoc,
                                  attr->getRParenLoc(),
                                  overriddenName.str());
             overridden->diagnose(diag::overridden_here);

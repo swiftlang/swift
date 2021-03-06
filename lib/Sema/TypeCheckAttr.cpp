@@ -1030,9 +1030,15 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
       // names. Complain and recover by chopping off everything
       // after the first name.
       if (objcName->getNumArgs() > 0) {
-        SourceLoc firstNameLoc = attr->getNameLocs().front();
-        SourceLoc afterFirstNameLoc =
-          Lexer::getLocForEndOfToken(Ctx.SourceMgr, firstNameLoc);
+        SourceLoc firstNameLoc, afterFirstNameLoc;
+        if (!attr->getNameLocs().empty()) {
+          firstNameLoc = attr->getNameLocs().front();
+          afterFirstNameLoc =
+            Lexer::getLocForEndOfToken(Ctx.SourceMgr, firstNameLoc);
+        }
+        else {
+          firstNameLoc = D->getLoc();
+        }
         diagnose(firstNameLoc, diag::objc_name_req_nullary,
                  D->getDescriptiveKind())
           .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc())
@@ -1042,7 +1048,10 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
           /*implicit=*/false);
       }
     } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
-      diagnose(attr->getLParenLoc(),
+      SourceLoc diagLoc = attr->getLParenLoc();
+      if (diagLoc.isInvalid())
+        diagLoc = D->getLoc();
+      diagnose(diagLoc,
                isa<SubscriptDecl>(D)
                  ? diag::objc_name_subscript
                  : diag::objc_name_deinit)
@@ -1074,7 +1083,10 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
 
       unsigned numArgumentNames = objcName->getNumArgs();
       if (numArgumentNames != numParameters) {
-        diagnose(attr->getNameLocs().front(),
+        SourceLoc firstNameLoc = func->getLoc();
+        if (!attr->getNameLocs().empty())
+          firstNameLoc = attr->getNameLocs().front();
+        diagnose(firstNameLoc,
                  diag::objc_name_func_mismatch,
                  isa<FuncDecl>(func),
                  numArgumentNames,
