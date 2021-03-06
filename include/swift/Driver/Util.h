@@ -49,6 +49,7 @@ namespace driver {
       SourceInputActions,
       InputJobsAndSourceInputActions,
       Output,
+      IndexUnitOutputPaths,
       /// Batch mode frontend invocations may have so many supplementary
       /// outputs that they don't comfortably fit as command-line arguments.
       /// In that case, add a FilelistInfo to record the path to the file.
