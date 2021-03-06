@@ -45,14 +45,6 @@ public let StringSplitting = [
 	  setUpFunction: setup),
 ]
 
-private var c = 0
-
-@inline(never)
-public func blackHole(_ x: String) {
-  c += x.isEmpty ? 1 : 0
-}
-
-
 
 // Line-sink benchmarks: Implement `lines`-like functionality
 enum View {
@@ -108,9 +100,9 @@ fileprivate func _linesByScalars(
   source scalarSource: () throws -> Unicode.Scalar?,
   sink lineSink: (String) -> ()
 ) rethrows {
-	guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
-		fatalError("unavailable")
-	}
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
+    fatalError("unavailable")
+  }
 
   var buffer: Array<UInt8> = []
   func yield() {
@@ -141,7 +133,7 @@ fileprivate func _linesByScalars(
   }
 }
 
-// Inline always to try to ignore any closure stuff
+
 @inline(__always)
 fileprivate func _linesByBytes(
   source byteSource: () throws -> UInt8?,
@@ -171,6 +163,7 @@ fileprivate func _linesByBytes(
       guard let next = try byteSource() else { return }
       if next != _LF { buffer.append(next) }
     case 0x0A..<0x0D: yield()
+
     case 0xE2:
       // Try to read: 80 [A8 | A9].
       // If we can't, then we put the byte in the buffer for error correction
@@ -304,7 +297,7 @@ private let alphaInteriorNewlines: String =
   )def\(Unicode.Scalar(0x0B)!   // VT
   )ghi\(Unicode.Scalar(0x0C)!   // FF
   )jkl\(Unicode.Scalar(0x0D)!   // CR
-  )mno\(Unicode.Scalar(0x0D)!   // CR-LF
+  )mno\(Unicode.Scalar(0x0D)!)\(Unicode.Scalar(0x0A)!   // CR-LF
   )pqr\(Unicode.Scalar(0x2028)! // LS
   )stu\(Unicode.Scalar(0x2029)! // PS
   )vwx
