@@ -1496,11 +1496,6 @@ void CastOptimizer::deleteInstructionsAfterUnreachable(
   while (UnreachableInstIt != Block->end()) {
     SILInstruction *CurInst = &*UnreachableInstIt;
     ++UnreachableInstIt;
-    if (auto *DeallocStack = dyn_cast<DeallocStackInst>(CurInst))
-      if (!isa<SILUndef>(DeallocStack->getOperand())) {
-        DeallocStack->moveBefore(TrapInst);
-        continue;
-      }
     CurInst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstAction(CurInst);
   }
@@ -1622,17 +1617,6 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     // Remove the cast and insert a trap, followed by an
     // unreachable instruction.
     SILBuilderWithScope Builder(Inst, builderContext);
-    // mem2reg's invariants get unhappy if we don't try to
-    // initialize a loadable result.
-    if (!dynamicCast.getTargetLoweredType().isAddressOnly(
-            Builder.getFunction())) {
-      auto undef = SILValue(
-          SILUndef::get(dynamicCast.getTargetLoweredType().getObjectType(),
-                        Builder.getFunction()));
-      Builder.emitStoreValueOperation(Loc, undef, dynamicCast.getDest(),
-                                      StoreOwnershipQualifier::Init);
-    }
-    Builder.emitDestroyAddr(Loc, Inst->getSrc());
     auto *TrapI = Builder.createBuiltinTrap(Loc);
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(TrapI->getIterator()));
