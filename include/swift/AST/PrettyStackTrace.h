@@ -167,13 +167,12 @@ public:
 /// PrettyStackTraceConformance - Observe that we are processing a
 /// specific protocol conformance.
 class PrettyStackTraceConformance : public llvm::PrettyStackTraceEntry {
-  const ASTContext &Context;
   const ProtocolConformance *Conformance;
   const char *Action;
 public:
-  PrettyStackTraceConformance(const ASTContext &C, const char *action,
+  PrettyStackTraceConformance(const char *action,
                               const ProtocolConformance *conformance)
-    : Context(C), Conformance(conformance), Action(action) {}
+    : Conformance(conformance), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const override;
 };
 
