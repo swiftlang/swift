@@ -231,7 +231,7 @@ func bar() async {
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func barSync() {
-  foo() // expected-error {{global function 'foo()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  foo() // expected-error {{global function 'foo()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
 }
 
 // ----------------------------------------------------------------------
@@ -283,9 +283,9 @@ struct HasWrapperOnActor {
 
   // expected-note@+1 3{{to make instance method 'testErrors()'}}
   func testErrors() {
-    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this context}}
-    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
-    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from this context}}
+    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
   }
 
   @MainActor mutating func testOnMain() {
