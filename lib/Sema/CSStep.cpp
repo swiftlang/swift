@@ -598,10 +598,6 @@ bool TypeChecker::isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB) {
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
-  // Never skip disjunction choices in diagnostic mode.
-  if (CS.shouldAttemptFixes())
-    return false;
-
   auto skip = [&](std::string reason) -> bool {
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
@@ -613,11 +609,14 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     return true;
   };
 
-  if (choice.isDisabled())
+
+  // Skip disabled overloads in the diagnostic mode if they do not have a
+  // fix attached to them e.g. overloads where labels didn't match up.
+  if (choice.isDisabled() && !(CS.shouldAttemptFixes() && choice.hasFix()))
     return skip("disabled");
 
-  // Skip unavailable overloads.
-  if (choice.isUnavailable())
+  // Skip unavailable overloads (unless in dignostic mode).
+  if (choice.isUnavailable() && !CS.shouldAttemptFixes())
     return skip("unavailable");
 
   if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
