@@ -610,7 +610,7 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
 }
 
 bool ConstraintSystem::Candidate::solve(
-    llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) {
+    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
   // Don't attempt to solve candidate if there is closure
   // expression involved, because it's handled specially
   // by parent constraint system (e.g. parameter lists).
@@ -722,11 +722,11 @@ bool ConstraintSystem::Candidate::solve(
 
 void ConstraintSystem::Candidate::applySolutions(
     llvm::SmallVectorImpl<Solution> &solutions,
-    llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) const {
+    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const {
   // A collection of OSRs with their newly reduced domains,
   // it's domains are sets because multiple solutions can have the same
   // choice for one of the type variables, and we want no duplication.
-  llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSet<ValueDecl *, 2>>
+  llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSetVector<ValueDecl *, 2>>
     domains;
   for (auto &solution : solutions) {
     for (auto choice : solution.overloadChoices) {
@@ -743,7 +743,7 @@ void ConstraintSystem::Candidate::applySolutions(
       auto overload = choice.getSecond().choice;
       auto type = overload.getDecl()->getInterfaceType();
 
-      // One of the solutions has polymorphic type assigned with one of it's
+      // One of the solutions has polymorphic type associated with one of its
       // type variables. Such functions can only be properly resolved
       // via complete expression, so we'll have to forget solutions
       // we have already recorded. They might not include all viable overload
@@ -1094,7 +1094,7 @@ void ConstraintSystem::shrink(Expr *expr) {
   // so we can start solving them separately.
   expr->walk(collector);
 
-  llvm::SmallDenseSet<OverloadSetRefExpr *> shrunkExprs;
+  llvm::SmallSetVector<OverloadSetRefExpr *, 4> shrunkExprs;
   for (auto &candidate : collector.Candidates) {
     // If there are no results, let's forget everything we know about the
     // system so far. This actually is ok, because some of the expressions
@@ -1110,7 +1110,7 @@ void ConstraintSystem::shrink(Expr *expr) {
             return childExpr;
 
           OSR->setDecls(domain->getSecond());
-          shrunkExprs.erase(OSR);
+          shrunkExprs.remove(OSR);
         }
 
         return childExpr;
