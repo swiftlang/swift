@@ -238,6 +238,12 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      // Skip stub constructors.
+      if (auto *ctor = dyn_cast<ConstructorDecl>(D)) {
+        if (ctor->hasStubImplementation())
+          return false;
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
