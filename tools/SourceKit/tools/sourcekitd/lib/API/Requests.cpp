@@ -2496,6 +2496,8 @@ public:
 
   void recordFormattedText(StringRef Text) override;
 
+  bool diagnosticsEnabled() override { return Opts.EnableDiagnostics; }
+
   void setDiagnosticStage(UIdent DiagStage) override;
   void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override;

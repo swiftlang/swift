@@ -2016,7 +2016,8 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer, bool ReportDi
           "same time is not supported. Use the syntax tree to compute the "
           "document structure.");
     }
-  } else {
+  } else if (Consumer.documentStructureEnabled() ||
+             Consumer.syntaxMapEnabled()) {
     ide::SyntaxModelContext ModelContext(Impl.SyntaxInfo->getSourceFile());
 
     SwiftEditorSyntaxWalker SyntaxWalker(
@@ -2498,6 +2499,14 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     if (EditorDoc->getSyntaxTree().hasValue()) {
       SyntaxCache.emplace(EditorDoc->getSyntaxTree().getValue());
       SyntaxCache->addEdit(Offset, Offset + Length, Buf->getBufferSize());
+    }
+
+    // If client doesn't need any information, we doen't need to parse it.
+    if (!Consumer.documentStructureEnabled() &&
+        !Consumer.syntaxMapEnabled() &&
+        !Consumer.diagnosticsEnabled() &&
+        !Consumer.syntaxTreeEnabled()) {
+      return;
     }
 
     SyntaxParsingCache *SyntaxCachePtr = nullptr;
