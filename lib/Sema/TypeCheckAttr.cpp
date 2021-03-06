@@ -1130,6 +1130,9 @@ void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
+  if (auto VD = dyn_cast<ValueDecl>(D))
+    TypeChecker::applyAccessNote(VD);
+  
   AttributeChecker Checker(D);
   // We need to check all OriginallyDefinedInAttr relative to each other, so
   // collect them and check in batch later.

@@ -1514,6 +1514,11 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   }
 }
 
+void TypeChecker::applyAccessNote(ValueDecl *VD) {
+  (void)evaluateOrDefault(VD->getASTContext().evaluator,
+                          ApplyAccessNoteRequest{VD}, {});
+}
+
 evaluator::SideEffect
 ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
@@ -1545,8 +1550,7 @@ public:
     PrettyStackTraceDecl StackTrace("type-checking", decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl))
-      (void)evaluateOrDefault(VD->getASTContext().evaluator,
-                              ApplyAccessNoteRequest{VD}, {});
+      TypeChecker::applyAccessNote(VD);
 
     DeclVisitor<DeclChecker>::visit(decl);
 
