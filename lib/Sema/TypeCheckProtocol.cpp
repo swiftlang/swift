@@ -1813,8 +1813,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 ProtocolConformance *MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
-  PrettyStackTraceConformance trace(getASTContext(), "type-checking",
-                                    conformance);
+  PrettyStackTraceConformance trace("type-checking", conformance);
 
   std::vector<MissingWitness> revivedMissingWitnesses;
   switch (conformance->getState()) {

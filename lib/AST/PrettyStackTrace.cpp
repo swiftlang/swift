@@ -232,6 +232,7 @@ void PrettyStackTraceTypeRepr::print(llvm::raw_ostream &out) const {
 
 void PrettyStackTraceConformance::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
+  auto &Context = Conformance->getDeclContext()->getASTContext();
   printConformanceDescription(out, Conformance, Context);
 }
 
