@@ -1699,6 +1699,12 @@ static void writeOutputToFilelist(llvm::raw_fd_ostream &out, const Job *job,
   for (auto &output : outputInfo.getPrimaryOutputFilenames())
     out << output << "\n";
 }
+static void writeIndexUnitOutputPathsToFilelist(llvm::raw_fd_ostream &out,
+                                                const Job *job) {
+  const CommandOutput &outputInfo = job->getOutput();
+  for (auto &output : outputInfo.getIndexUnitOutputFilenames())
+    out << output << "\n";
+}
 static void writeSupplementarOutputToFilelist(llvm::raw_fd_ostream &out,
                                               const Job *job) {
   job->getOutput().writeOutputFileMap(out);
@@ -1732,13 +1738,15 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       writeInputJobsToFilelist(out, job, filelistInfo.type);
       writeSourceInputActionsToFilelist(out, job, args);
       break;
-    case FilelistInfo::WhichFiles::Output: {
+    case FilelistInfo::WhichFiles::Output:
       writeOutputToFilelist(out, job, filelistInfo.type);
       break;
-      }
-      case FilelistInfo::WhichFiles::SupplementaryOutput:
-        writeSupplementarOutputToFilelist(out, job);
-        break;
+    case FilelistInfo::WhichFiles::IndexUnitOutputPaths:
+      writeIndexUnitOutputPathsToFilelist(out, job);
+      break;
+    case FilelistInfo::WhichFiles::SupplementaryOutput:
+      writeSupplementarOutputToFilelist(out, job);
+      break;
     }
   }
   return ok;
