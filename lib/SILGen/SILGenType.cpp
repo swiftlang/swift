@@ -498,8 +498,7 @@ public:
     if (!Conformance)
       return nullptr;
 
-    PrettyStackTraceConformance trace(SGM.getASTContext(),
-                                      "generating SIL witness table",
+    PrettyStackTraceConformance trace("generating SIL witness table",
                                       Conformance);
 
     auto *proto = Conformance->getProtocol();
@@ -886,8 +885,7 @@ public:
   }
 
   void emit() {
-    PrettyStackTraceConformance trace(SGM.getASTContext(),
-                                      "generating SIL witness table",
+    PrettyStackTraceConformance trace("generating SIL witness table",
                                       conformance);
 
     // Add entries for all the requirements.

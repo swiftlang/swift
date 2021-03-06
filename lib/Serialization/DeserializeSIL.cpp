@@ -3437,8 +3437,7 @@ llvm::Expected<SILWitnessTable *>
   auto theConformance = cast<RootProtocolConformance>(
                           maybeConformance.get().getConcrete());
 
-  PrettyStackTraceConformance trace(SILMod.getASTContext(),
-                                    "deserializing SIL witness table for",
+  PrettyStackTraceConformance trace("deserializing SIL witness table for",
                                     theConformance);
 
   if (!existingWt)
