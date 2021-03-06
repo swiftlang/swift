@@ -110,9 +110,9 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getParameters();
   }
 
-  bool hasPropertyWrapperParameters() const {
+  bool hasExternalPropertyWrapperParameters() const {
     return llvm::any_of(*getParameters(), [](const ParamDecl *param) {
-      return param->hasAttachedPropertyWrapper();
+      return param->hasExternalPropertyWrapper();
     });
   }
 

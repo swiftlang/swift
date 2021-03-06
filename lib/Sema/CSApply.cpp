@@ -689,7 +689,7 @@ namespace {
       Expr *result = forceUnwrapIfExpected(declRefExpr, choice, locator);
 
       if (auto *fnDecl = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (AnyFunctionRef(fnDecl).hasPropertyWrapperParameters() &&
+        if (AnyFunctionRef(fnDecl).hasExternalPropertyWrapperParameters() &&
             (declRefExpr->getFunctionRefKind() == FunctionRefKind::Compound ||
              declRefExpr->getFunctionRefKind() == FunctionRefKind::Unapplied)) {
           auto &appliedWrappers = solution.appliedPropertyWrappers[locator.getAnchor()];
@@ -7932,7 +7932,7 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         rewriteFunction(closure);
 
-        if (AnyFunctionRef(closure).hasPropertyWrapperParameters()) {
+        if (AnyFunctionRef(closure).hasExternalPropertyWrapperParameters()) {
           return { false, rewriteClosure(closure) };
         }
 

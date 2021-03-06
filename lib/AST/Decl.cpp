@@ -5903,6 +5903,27 @@ bool VarDecl::hasImplicitPropertyWrapper() const {
   return !isImplicit() && getName().hasDollarPrefix() && isClosureParam;
 }
 
+bool VarDecl::hasExternalPropertyWrapper() const {
+  if (!hasAttachedPropertyWrapper())
+    return false;
+
+  // This decision needs to be made before closures are type checked (and
+  // the wrapper types are potentially inferred) so closure parameters with
+  // property wrappers are always "external". This is fine, because the
+  // type checker will always inject a thunk with the wrapped or projected type
+  // around the closure, so the wrapper will never affect the caller's
+  // arguments directly anyway.
+  if (isa<AbstractClosureExpr>(getDeclContext()))
+    return true;
+
+  // Wrappers with attribute arguments are always implementation-detail.
+  if (getAttachedPropertyWrappers().front()->getArg())
+    return false;
+
+  auto wrapperInfo = getAttachedPropertyWrapperTypeInfo(0);
+  return wrapperInfo.projectedValueVar && wrapperInfo.hasProjectedValueInit;
+}
+
 /// Whether all of the attached property wrappers have an init(wrappedValue:)
 /// initializer.
 bool VarDecl::allAttachedPropertyWrappersHaveWrappedValueInit() const {
@@ -6303,7 +6324,7 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
 
 AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   if (!type) {
-    if (hasAttachedPropertyWrapper() && !hasImplicitPropertyWrapper()) {
+    if (hasExternalPropertyWrapper()) {
       type = getPropertyWrapperBackingPropertyType();
     } else {
       type = getInterfaceType();
