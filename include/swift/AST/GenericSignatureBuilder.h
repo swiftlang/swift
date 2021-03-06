@@ -1590,9 +1590,9 @@ public:
   /// type of the given protocol, unless the \c kind implies that
   /// a potential archetype should not be created if it's missing.
   PotentialArchetype *
-  updateNestedTypeForConformance(GenericSignatureBuilder &builder,
-                                 AssociatedTypeDecl *assocType,
-                                 ArchetypeResolutionKind kind);
+  getOrCreateNestedType(GenericSignatureBuilder &builder,
+                        AssociatedTypeDecl *assocType,
+                        ArchetypeResolutionKind kind);
 
   /// Retrieve the dependent type that describes this potential
   /// archetype.
