@@ -110,15 +110,18 @@ protected:
   union {
     uint64_t OpaqueBits;
 
-    SWIFT_INLINE_BITFIELD_BASE(DeclAttribute, bitmax(NumDeclAttrKindBits,8)+1+1,
+    SWIFT_INLINE_BITFIELD_BASE(DeclAttribute, bitmax(NumDeclAttrKindBits,8)+1+1+1,
       Kind : bitmax(NumDeclAttrKindBits,8),
       // Whether this attribute was implicitly added.
       Implicit : 1,
 
-      Invalid : 1
+      Invalid : 1,
+
+      /// Whether the attribute was created by an access note.
+      AddedByAccessNote : 1
     );
 
-    SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1+1+1,
+    SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1+1,
       /// Whether this attribute has location information that trails the main
       /// record, which contains the locations of the parentheses and any names.
       HasTrailingLocationInfo : 1,
@@ -128,10 +131,7 @@ protected:
 
       /// Whether the @objc was inferred using Swift 3's deprecated inference
       /// rules.
-      Swift3Inferred : 1,
-
-      /// Whether the @objc was created by an access note.
-      AddedByAccessNote : 1
+      Swift3Inferred : 1
     );
 
     SWIFT_INLINE_BITFIELD(DynamicReplacementAttr, DeclAttribute, 1,
@@ -194,6 +194,7 @@ protected:
     Bits.DeclAttribute.Kind = static_cast<unsigned>(DK);
     Bits.DeclAttribute.Implicit = Implicit;
     Bits.DeclAttribute.Invalid = false;
+    Bits.DeclAttribute.AddedByAccessNote = false;
   }
 
 private:
@@ -331,6 +332,18 @@ public:
   void setInvalid() { Bits.DeclAttribute.Invalid = true; }
 
   bool isValid() const { return !isInvalid(); }
+
+
+  /// Determine whether this attribute was added by an access note. If it was,
+  /// the compiler will generally recover from failures involving this attribute
+  /// as though it is not present.
+  bool getAddedByAccessNote() const {
+    return Bits.DeclAttribute.AddedByAccessNote;
+  }
+
+  void setAddedByAccessNote(bool accessNote = true) {
+    Bits.DeclAttribute.AddedByAccessNote = accessNote;
+  }
 
   /// Returns the address of the next pointer field.
   /// Used for object deserialization.
@@ -752,7 +765,6 @@ class ObjCAttr final : public DeclAttribute,
     Bits.ObjCAttr.HasTrailingLocationInfo = false;
     Bits.ObjCAttr.ImplicitName = implicitName;
     Bits.ObjCAttr.Swift3Inferred = false;
-    Bits.ObjCAttr.AddedByAccessNote = false;
 
     if (name) {
       NameData = name->getOpaqueValue();
@@ -870,17 +882,6 @@ public:
   /// @objc inference rules.
   void setSwift3Inferred(bool inferred = true) {
     Bits.ObjCAttr.Swift3Inferred = inferred;
-  }
-
-  /// Determine whether this attribute was added by an access note. If it is,
-  /// the compiler will not treat it as a hard error if the attribute is
-  /// invalid.
-  bool getAddedByAccessNote() const {
-    return Bits.ObjCAttr.AddedByAccessNote;
-  }
-
-  void setAddedByAccessNote(bool accessNote = true) {
-    Bits.ObjCAttr.AddedByAccessNote = accessNote;
   }
 
   /// Clear the name of this entity.

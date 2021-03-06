@@ -1447,6 +1447,7 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
 
   if (*expected) {
     attr = willCreate();
+    attr->setAddedByAccessNote();
     VD->getAttrs().add(attr);
 
     SmallString<64> attrString;
@@ -1470,9 +1471,7 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   ASTContext &ctx = VD->getASTContext();
 
   addOrRemoveAttr<ObjCAttr>(VD, notes, note.ObjC, [&]{
-    auto attr = ObjCAttr::create(ctx, note.ObjCName, false);
-    attr->setAddedByAccessNote();
-    return attr;
+    return ObjCAttr::create(ctx, note.ObjCName, false);
   });
 
   addOrRemoveAttr<DynamicAttr>(VD, notes, note.Dynamic, [&]{

@@ -1127,7 +1127,7 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   return classDecl->checkAncestry(AncestryFlags::ObjCMembers);
 }
 
-static ObjCReason reasonForObjCAttr(const ObjCAttr *attr) {
+ObjCReason swift::objCReasonForObjCAttr(const ObjCAttr *attr) {
   if (attr->getAddedByAccessNote())
     return ObjCReason::ExplicitlyObjCByAccessNote;
 
@@ -1206,7 +1206,7 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       }
     }
 
-    return reasonForObjCAttr(CD->getAttrs().getAttribute<ObjCAttr>());
+    return objCReasonForObjCAttr(CD->getAttrs().getAttribute<ObjCAttr>());
   }
 
   if (ancestry.contains(AncestryFlags::ObjC)) {
@@ -1288,7 +1288,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
 
   // explicitly declared @objc.
   if (auto attr = VD->getAttrs().getAttribute<ObjCAttr>())
-    return reasonForObjCAttr(attr);
+    return objCReasonForObjCAttr(attr);
   // Getter or setter for an @objc property or subscript.
   if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
     if (accessor->getAccessorKind() == AccessorKind::Get ||
@@ -1501,18 +1501,19 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
     if (isEnumObjC(enumDecl))
-      isObjC = reasonForObjCAttr(enumDecl->getAttrs().getAttribute<ObjCAttr>());
+      isObjC = objCReasonForObjCAttr(
+                                 enumDecl->getAttrs().getAttribute<ObjCAttr>());
   } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
     // Enum elements can be @objc so long as the containing enum is @objc.
     if (enumElement->getParentEnum()->isObjC()) {
       if (auto attr = enumElement->getAttrs().getAttribute<ObjCAttr>())
-        isObjC = reasonForObjCAttr(attr);
+        isObjC = objCReasonForObjCAttr(attr);
       else
         isObjC = ObjCReason::ElementOfObjCEnum;
     }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
     if (auto attr = proto->getAttrs().getAttribute<ObjCAttr>()) {
-      isObjC = reasonForObjCAttr(attr);
+      isObjC = objCReasonForObjCAttr(attr);
 
       // If the protocol is @objc, it may only refine other @objc protocols.
       // FIXME: Revisit this restriction.
