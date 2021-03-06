@@ -9373,7 +9373,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   AppliedDisjunctions[disjunction->getLocator()] = argFnType;
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       /*numOptionalUnwraps*/ result->second,
-                                      applicableFn->getLocator());
+                                      locator);
 }
 
 bool ConstraintSystem::simplifyAppliedOverloads(
