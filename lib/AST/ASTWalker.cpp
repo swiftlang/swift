@@ -217,9 +217,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
-    if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
+    if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody()))) {
       TLCD->setBody(S);
-    return false;
+      return false;
+    }
+    return true;
   }
 
   bool visitIfConfigDecl(IfConfigDecl *ICD) {
