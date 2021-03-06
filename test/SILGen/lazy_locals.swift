@@ -37,3 +37,9 @@ func generic<T>(x: T) -> T {
 }
 
 // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11lazy_locals7generic1xxx_tlF1zL_xvg : $@convention(thin) <T> (@guaranteed <τ_0_0> { var Optional<τ_0_0> } <T>, @in_guaranteed T) -> @out T {
+
+func lazyLocalWithNestedClosure() {
+  lazy var x = {
+    return 3
+  }()
+}
