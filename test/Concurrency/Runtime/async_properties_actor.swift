@@ -3,7 +3,6 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
-// REQUIRES: rdar75104136
 
 @propertyWrapper
 struct SuccessTracker {
