@@ -2278,7 +2278,7 @@ private:
     /// domains have been successfully shrunk so far.
     ///
     /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs);
+    bool solve(llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs);
 
     /// Apply solutions found by solver as reduced OSR sets for
     /// for current and all of it's sub-expressions.
@@ -2290,14 +2290,14 @@ private:
     /// domains have been successfully shrunk so far.
     void applySolutions(
         llvm::SmallVectorImpl<Solution> &solutions,
-        llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) const;
+        llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const;
 
     /// Check if attempt at solving of the candidate makes sense given
     /// the current conditions - number of shrunk domains which is related
     /// to the given candidate over the total number of disjunctions present.
     static bool
     isTooComplexGiven(ConstraintSystem *const cs,
-                      llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) {
+                      llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
       SmallVector<Constraint *, 8> disjunctions;
       cs->collectDisjunctions(disjunctions);
 
