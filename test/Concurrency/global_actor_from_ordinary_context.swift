@@ -57,7 +57,7 @@ func referenceAsyncGlobalActor() {
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'callGlobalActor()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func callGlobalActor() {
-  syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
 }
 
 func fromClosure() {
@@ -67,20 +67,20 @@ func fromClosure() {
     x()
   }()
 
-  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
   let _ = { syncGlobActorFn() }()
 }
 
 class Taylor {
   init() {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
   }
 
   deinit {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
@@ -88,7 +88,7 @@ class Taylor {
 
   // expected-note@+1 2 {{add '@SomeGlobalActor' to make instance method 'method1()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
   func method1() {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn
@@ -96,7 +96,7 @@ class Taylor {
 
   // expected-note@+1 2 {{add '@SomeGlobalActor' to make instance method 'cannotBeHandler()' part of global actor 'SomeGlobalActor'}} {{3-3=@SomeGlobalActor }}
   func cannotBeHandler() -> Int {
-    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+    syncGlobActorFn() // expected-error {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
 
     // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
     _ = syncGlobActorFn

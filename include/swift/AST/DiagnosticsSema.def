@@ -4298,20 +4298,21 @@ ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_global_actor_context,none,
-      "actor-isolated %0 %1 can not be referenced from context of global "
-      "actor %2",
-      (DescriptiveDeclKind, DeclName, Type))
+      "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}3 "
+      "from%select{| synchronous}4 context of global actor %2",
+      (DescriptiveDeclKind, DeclName, Type, unsigned, bool))
 ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4 from actor %3",
-      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned))
+      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
+      " from actor %3 %select{|in a synchronous context}5",
+      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
 ERROR(global_actor_from_other_global_actor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from different global actor %3",
-      (DescriptiveDeclKind, DeclName, Type, Type, unsigned))
+      " from different global actor %3 %select{|in a synchronous context}5",
+      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
 ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from %select{this|an '@actorIndependent'}3 context",
-      (DescriptiveDeclKind, DeclName, Type, bool, unsigned))
+      " from %select{this|an '@actorIndependent'}3%select{| synchronous}5 context",
+      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))

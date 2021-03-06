@@ -203,6 +203,16 @@ func blender(_ peeler : () -> Void) {
   await (true ? wisk : {n in return})(1)
 }
 
+actor Chain {
+  var next : Chain?
+}
+
+func walkChain(chain : Chain) async {
+  _ = chain.next?.next?.next?.next // expected-error 4 {{property access is 'async' but is not marked with 'await'}}
+  _ = (await chain.next)?.next?.next?.next // expected-error 3 {{property access is 'async' but is not marked with 'await'}}
+  _ = (await chain.next?.next)?.next?.next // expected-error 2 {{property access is 'async' but is not marked with 'await'}}
+}
+
 
 // want to make sure there is no note about implicitly async on this func.
 @BananaActor func rice() async {}
