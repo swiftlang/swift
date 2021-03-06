@@ -309,7 +309,6 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
 class ClassWithUnavailableProperties {
     // expected-note@-1 4{{add @available attribute to enclosing class}}
 
-  @available(OSX, introduced: 10.9) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   var nonLazyAvailableOn10_9Stored: Int = 9
 
   @available(OSX, introduced: 10.51) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
@@ -538,17 +537,17 @@ enum CompassPoint {
 
   case WithAvailableByEnumPayload(p : EnumIntroducedOn10_51)
 
+  // expected-error@+1 {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 10.52)
   case WithAvailableByEnumElementPayload(p : EnumIntroducedOn10_52)
 
+  // expected-error@+1 2{{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
   @available(OSX, introduced: 10.52)
   case WithAvailableByEnumElementPayload1(p : EnumIntroducedOn10_52), WithAvailableByEnumElementPayload2(p : EnumIntroducedOn10_52)
 
   case WithUnavailablePayload(p : EnumIntroducedOn10_52) // expected-error {{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing case}}
 
-    case WithUnavailablePayload1(p : EnumIntroducedOn10_52), WithUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
-      // expected-note@-1 2{{add @available attribute to enclosing case}}
+  case WithUnavailablePayload1(p : EnumIntroducedOn10_52), WithUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
 }
 
 @available(OSX, introduced: 10.52)
@@ -1337,11 +1336,9 @@ enum EnumForFixit {
       // expected-note@-1 2{{add @available attribute to enclosing enum}} {{1-1=@available(macOS 10.51, *)\n}}
   case CaseWithUnavailablePayload(p: ClassAvailableOn10_51)
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing case}} {{3-3=@available(macOS 10.51, *)\n  }}
 
   case CaseWithUnavailablePayload2(p: ClassAvailableOn10_51), WithoutPayload
       // expected-error@-1 {{'ClassAvailableOn10_51' is only available in macOS 10.51 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing case}} {{3-3=@available(macOS 10.51, *)\n  }}
       
 }
 

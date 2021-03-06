@@ -1471,12 +1471,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   SourceLoc attrLoc = attr->getLocation();
 
-  Optional<Diag<>> MaybeNotAllowed =
-      TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
-  if (MaybeNotAllowed.hasValue()) {
-    diagnose(attrLoc, MaybeNotAllowed.getValue());
-  }
-
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
@@ -1494,16 +1488,27 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     EnclosingDecl = getEnclosingDeclForDecl(EnclosingDecl);
   }
 
-  if (!EnclosingDecl)
-    return;
-
   AvailabilityContext AttrRange{
       VersionRange::allGTE(attr->Introduced.getValue())};
 
-  if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
-    diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
-    diagnose(EnclosingDecl->getLoc(),
-             diag::availability_decl_more_than_enclosing_enclosing_here);
+  if (EnclosingDecl) {
+    if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
+      diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
+      diagnose(EnclosingDecl->getLoc(),
+               diag::availability_decl_more_than_enclosing_enclosing_here);
+    }
+  }
+
+  Optional<Diag<>> MaybeNotAllowed =
+      TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
+  if (MaybeNotAllowed.hasValue()) {
+    AvailabilityContext DeploymentRange
+        = AvailabilityContext::forDeploymentTarget(Ctx);
+    if (EnclosingAnnotatedRange.hasValue())
+      DeploymentRange.intersectWith(*EnclosingAnnotatedRange);
+
+    if (!DeploymentRange.isContainedIn(AttrRange))
+      diagnose(attrLoc, MaybeNotAllowed.getValue());
   }
 }
 
@@ -3399,31 +3404,26 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
 
 Optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
-  DeclContext *DC = D->getDeclContext();
-  // Do not permit potential availability of script-mode global variables;
-  // their initializer expression is not lazily evaluated, so this would
-  // not be safe.
-  if (isa<VarDecl>(D) && DC->isModuleScopeContext() &&
-      DC->getParentSourceFile()->isScriptMode()) {
-    return diag::availability_global_script_no_potential;
-  }
-
-  // For now, we don't allow stored properties to be potentially unavailable.
-  // We will want to support these eventually, but we haven't figured out how
-  // this will interact with Definite Initialization, deinitializers and
-  // resilience yet.
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    // Globals and statics are lazily initialized, so they are safe
-    // for potential unavailability. Note that if D is a global in script
-    // mode (which are not lazy) then we will already have returned
-    // a diagnosis above.
-    bool lazilyInitializedStored = VD->isStatic() ||
-                                   VD->getAttrs().hasAttribute<LazyAttr>() ||
-                                   DC->isModuleScopeContext();
+    if (!VD->hasStorage())
+      return None;
 
-    if (VD->hasStorage() && !lazilyInitializedStored) {
+    // Do not permit potential availability of script-mode global variables;
+    // their initializer expression is not lazily evaluated, so this would
+    // not be safe.
+    if (VD->isTopLevelGlobal())
+      return diag::availability_global_script_no_potential;
+
+    // Globals and statics are lazily initialized, so they are safe
+    // for potential unavailability.
+    if (!VD->isStatic() && !VD->getDeclContext()->isModuleScopeContext())
       return diag::availability_stored_property_no_potential;
-    }
+
+  } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+    // An enum element with an associated value cannot be potentially
+    // unavailable.
+    if (EED->hasAssociatedValues())
+      return diag::availability_enum_element_no_potential;
   }
 
   return None;
