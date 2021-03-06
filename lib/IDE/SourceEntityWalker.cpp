@@ -181,7 +181,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
                                           : CharSourceRange();
   bool ShouldVisitChildren = SEWalker.walkToDeclPre(D, Range);
-  if (IsExtension) {
+  // walkToDeclPost is only called when visiting children, so make sure to only
+  // push the extension decl in that case (otherwise it won't be popped)
+  if (IsExtension && ShouldVisitChildren) {
     ExtDecls.push_back(static_cast<ExtensionDecl*>(D));
   }
   return ShouldVisitChildren;
@@ -193,13 +195,6 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
 
   if (shouldIgnore(D))
     return true;
-
-  // Note: This should match any early (non-cancelling) returns in
-  // `walkToDeclPre` above
-  if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-    if (SEWalker.shouldWalkInactiveConfigRegion())
-      return true;
-  }
 
   if (isa<ExtensionDecl>(D)) {
     assert(ExtDecls.back() == D);
