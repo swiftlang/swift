@@ -14,32 +14,32 @@ import TestsUtils
 
 public let StringSplitting = [
   BenchmarkInfo(
-	  name: "StringSplitting_LineSink_bytes_alpha",
+	  name: "LineSink.bytes.alpha",
 	  runFunction: run_LinkSink_bytes_alpha,
 	  tags: [.validation, .String],
 	  setUpFunction: setup),
   BenchmarkInfo(
-	  name: "StringSplitting_LineSink_bytes_complex",
+	  name: "LineSink.bytes.complex",
 	  runFunction: run_LinkSink_bytes_complex,
 	  tags: [.validation, .String],
 	  setUpFunction: setup),
   BenchmarkInfo(
-	  name: "StringSplitting_LineSink_scalars_alpha",
+	  name: "LineSink.scalars.alpha",
 	  runFunction: run_LinkSink_scalars_alpha,
 	  tags: [.validation, .String],
 	  setUpFunction: setup),
   BenchmarkInfo(
-	  name: "StringSplitting_LineSink_scalars_complex",
+	  name: "LineSink.scalars.complex",
 	  runFunction: run_LinkSink_scalars_complex,
 	  tags: [.validation, .String],
 	  setUpFunction: setup),
 	BenchmarkInfo(
-	  name: "StringSplitting_LineSink_characters_alpha",
+	  name: "LineSink.characters.alpha",
 	  runFunction: run_LinkSink_characters_alpha,
 	  tags: [.validation, .String],
 	  setUpFunction: setup),
   BenchmarkInfo(
-	  name: "StringSplitting_LineSink_characters_complex",
+	  name: "LineSink.characters.complex",
 	  runFunction: run_LinkSink_characters_complex,
 	  tags: [.validation, .String],
 	  setUpFunction: setup),
@@ -227,7 +227,7 @@ private let longComplexNewlines: String = {
 
 public func run_LinkSink_bytes_alpha(_ N: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<N {
+  for _ in 0..<(N*50) {
     lineSink(str, view: .utf8, sink: blackHole)
   }
 }
@@ -239,7 +239,7 @@ public func run_LinkSink_bytes_complex(_ N: Int) {
 }
 public func run_LinkSink_scalars_alpha(_ N: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<N {
+  for _ in 0..<(N*50) {
     lineSink(str, view: .scalar, sink: blackHole)
   }
 }
@@ -251,7 +251,7 @@ public func run_LinkSink_scalars_complex(_ N: Int) {
 }
 public func run_LinkSink_characters_alpha(_ N: Int) {
   let str = alphaInteriorNewlines
-  for _ in 0..<N {
+  for _ in 0..<(N*50) {
     lineSink(str, view: .character, sink: blackHole)
   }
 }
