@@ -93,3 +93,36 @@ extension EnumeratedSequence: Sequence {
     return Iterator(_base: _base.makeIterator())
   }
 }
+
+extension EnumeratedSequence: Collection where Base: Collection {
+  public subscript(position: Base.Index) -> (offset: Int, element: Base.Element) {
+    get {
+      // This could probably be more efficient for non random access collections
+      return (offset: distance(from: startIndex, to: position), element: _base[position])
+    }
+  }
+  
+  public var startIndex: Base.Index {
+    _base.startIndex
+  }
+  
+  public var endIndex: Base.Index {
+    _base.endIndex
+  }
+  
+  public var indices: Base.Indices {
+    _base.indices
+  }
+  
+  public func index(after i: Base.Index) -> Base.Index {
+    _base.index(after: i)
+  }
+}
+
+extension EnumeratedSequence: BidirectionalCollection where Base: BidirectionalCollection {
+  public func index(before i: Base.Index) -> Base.Index {
+    _base.index(before: i)
+  }
+}
+
+extension EnumeratedSequence: RandomAccessCollection where Base: RandomAccessCollection {}
