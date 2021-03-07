@@ -29,7 +29,7 @@ actor A6: A1, Actor { // expected-error{{redundant conformance of 'A6' to protoc
 
 actor A7 {
   // Okay: satisfy the requirement explicitly
-  @actorIndependent func enqueue(partialTask: PartialAsyncTask) { }
+  nonisolated func enqueue(partialTask: PartialAsyncTask) { }
 }
 
 // A non-actor can conform to the Actor protocol, if it does it properly.

@@ -48,9 +48,9 @@ actor OtherActor: SyncProtocol {
   @asyncHandler
   func syncMethodB() { }
 
-  // @actorIndependent methods are okay.
-  // FIXME: Consider suggesting @actorIndependent if this didn't match.
-  @actorIndependent func syncMethodC() -> Int { 5 }
+  // nonisolated methods are okay.
+  // FIXME: Consider suggesting nonisolated if this didn't match.
+  nonisolated func syncMethodC() -> Int { 5 }
 
   subscript (index: Int) -> String { "\(index)" }
   // expected-error@-1{{actor-isolated subscript 'subscript(_:)' cannot be used to satisfy a protocol requirement}}

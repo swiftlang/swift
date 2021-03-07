@@ -631,7 +631,8 @@ DECL_ATTR(hasAsyncAlternative, HasAsyncAlternative,
   111)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
-  OnFunc | OnConstructor | OnVar | OnSubscript | ConcurrencyOnly |
+  DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript |
+  ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,
   112)
