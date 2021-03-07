@@ -655,4 +655,15 @@ class SomeClassWithInits {
   }
 
   func isolated() { }
+
+  func hasDetached() {
+    Task.runDetached {
+      // okay
+      await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-concurrent-value type 'SomeClassWithInits' from concurrently-executed code}}
+      self.isolated() // expected-warning{{cannot use parameter 'self' with a non-concurrent-value type 'SomeClassWithInits' from concurrently-executed code}}
+      // expected-error@-1{{call is 'async' but is not marked with 'await'}}
+
+      print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-concurrent-value type 'SomeClassWithInits' from concurrently-executed code}}
+    }
+  }
 }
