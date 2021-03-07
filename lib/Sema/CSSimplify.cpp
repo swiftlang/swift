@@ -10588,9 +10588,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     // Double <-> CGFloat conversion locations.
     if (!ArgumentInfos.count(memberLoc)) {
       auto &ctx = getASTContext();
-      ArgumentInfo callInfo{.Labels = ctx.Allocate<Identifier>(
-                                1, AllocationArena::ConstraintSolver),
-                            .UnlabeledTrailingClosureIndex = None};
+      ArgumentInfo callInfo{
+          ctx.Allocate<Identifier>(1, AllocationArena::ConstraintSolver), None};
       ArgumentInfos.insert({memberLoc, std::move(callInfo)});
     }
 
