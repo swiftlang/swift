@@ -570,7 +570,8 @@ HopToExecutorInst* SILGenFunction::emitHopToTargetActor(SILLocation loc,
   case ActorIsolation::IndependentUnsafe:
     break;
 
-  case ActorIsolation::ActorInstance: {
+  case ActorIsolation::ActorInstance:
+  case ActorIsolation::DistributedActorInstance: {
     // "self" here means the actor instance's "self" value.
     assert(maybeSelf.hasValue() && "actor-instance but no self provided?");
     auto self = maybeSelf.getValue();

@@ -672,7 +672,7 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
       if (func->isDistributed()) {
         if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
           return forDistributedActorSelf(classDecl,
-                                         /*isCrossActor*/ false); // TODO: not sure?
+                                         /*isCrossActor*/ isAccessibleAcrossActors); // TODO: not sure?
         } else {
           func->diagnose(
               diag::distributed_actor_func_defined_outside_of_distributed_actor,
@@ -684,17 +684,17 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
         isAccessibleAcrossActors = true;
     }
 
-//    // Local captures can only be referenced in their local context or a
-//    // context that is guaranteed not to run concurrently with it.
-//    if (cast<ValueDecl>(decl)->isLocalCapture()) {
-      // FIXME: is this necessary
-      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (func->isDistributed()) {
-          if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-            return forDistributedActorSelf(classDecl);
-          }
-        }
-      }
+////    // Local captures can only be referenced in their local context or a
+////    // context that is guaranteed not to run concurrently with it.
+////    if (cast<ValueDecl>(decl)->isLocalCapture()) {
+//      // FIXME: is this necessary
+//      if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+//        if (func->isDistributed()) {
+//          if (auto classDecl = dyn_cast<ClassDecl>(decl->getDeclContext())) {
+//            return forDistributedActorSelf(classDecl, isAccessibleAcrossActors);
+//          }
+//        }
+//      }
 
 //      // Local functions are safe to capture; their bodies are checked based on
 //      // where that capture is used.
@@ -1478,13 +1478,14 @@ namespace {
         func->diagnose(diag::actor_isolated_sync_func,
           decl->getDescriptiveKind(),
           decl->getName());
-      } else if (isa<VarDecl>(decl)) {
-        // TODO: can we check this against the context rather than the boolean?
-        if (distributedActor)
-          decl->diagnose(diag::distributed_actor_isolated_property);
 
         // was it an attempt to mutate an actor instance's isolated state?
       } else if (auto environment = kindOfUsage(decl, context)) {
+        if (distributedActor) {
+          // Distributed actor properties are never accessible externally.
+          decl->diagnose(diag::distributed_actor_isolated_property);
+          return;
+        }
 
         if (environment.getValue() == VarRefUseEnv::Read)
           decl->diagnose(diag::kind_declared_here, decl->getDescriptiveKind());
@@ -1802,6 +1803,9 @@ namespace {
       }
 
       switch (contextIsolation) {
+      case ActorIsolation::DistributedActorInstance:
+        // FIXME: implement tryMarkImplicitlyAsyncThrowing?
+        LLVM_FALLTHROUGH;
       case ActorIsolation::ActorInstance: {
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
@@ -2118,7 +2122,7 @@ namespace {
           if (auto func = dyn_cast<FuncDecl>(member)) {
             if (!func->isDistributed()) {
               ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
-              noteIsolatedActorMember(member);
+              noteIsolatedActorMember(member, context);
               return true;
             } else {
               // distributed func, excellent
@@ -2138,7 +2142,7 @@ namespace {
               memberLoc, diag::distributed_actor_isolated_non_self_reference,
               member->getDescriptiveKind(),
               member->getName());
-          noteIsolatedActorMember(member);
+          noteIsolatedActorMember(member, context);
           return true;
         }
 

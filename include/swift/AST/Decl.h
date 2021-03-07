@@ -3945,7 +3945,6 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
-  Actor,
   DistributedActor,
 };
 
