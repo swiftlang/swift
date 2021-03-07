@@ -3621,7 +3621,7 @@ We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
 This instruction is only valid in functions in Ownership SSA form.
 
 end_lifetime
-``````````
+````````````
 
 ::
 
