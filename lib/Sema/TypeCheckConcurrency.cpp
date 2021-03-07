@@ -2241,13 +2241,16 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
   auto independentAttr = decl->getAttrs().getAttribute<ActorIndependentAttr>();
+  auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
   unsigned numIsolationAttrs =
-    (independentAttr ? 1 : 0) + (globalActorAttr ? 1 : 0);
+    (nonisolatedAttr ? 1 : 0) + (independentAttr ? 1 : 0) +
+    (globalActorAttr ? 1 : 0);
   if (numIsolationAttrs == 0)
     return None;
 
-  // Only one such attribute is valid.
+  // Only one such attribute is valid, but we only actually care of one of
+  // them is a global actor.
   if (numIsolationAttrs > 1) {
     DeclName name;
     if (auto value = dyn_cast<ValueDecl>(decl)) {
@@ -2257,15 +2260,33 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
         name = selfTypeDecl->getName();
     }
 
-    if (shouldDiagnose) {
-      decl->diagnose(
-          diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
-          name, independentAttr->getAttrName(),
-          globalActorAttr->second->getName().str())
-        .highlight(independentAttr->getRangeWithAt())
-        .highlight(globalActorAttr->first->getRangeWithAt());
+    if (globalActorAttr) {
+      StringRef nonisolatedAttrName;
+      SourceRange nonisolatedRange;
+      if (independentAttr) {
+        nonisolatedAttrName = independentAttr->getAttrName();
+        nonisolatedRange = independentAttr->getRangeWithAt();
+      } else {
+        nonisolatedAttrName = nonisolatedAttr->getAttrName();
+        nonisolatedRange = nonisolatedAttr->getRangeWithAt();
+      }
+
+      if (shouldDiagnose) {
+        decl->diagnose(
+            diag::actor_isolation_multiple_attr, decl->getDescriptiveKind(),
+            name, nonisolatedAttrName,
+            globalActorAttr->second->getName().str())
+          .highlight(nonisolatedRange)
+          .highlight(globalActorAttr->first->getRangeWithAt());
+      }
     }
   }
+
+    // If the declaration is explicitly marked 'nonisolated', report it as
+    // independent.
+    if (nonisolatedAttr) {
+      return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
+    }
 
   // If the declaration is explicitly marked @actorIndependent, report it as
   // independent.

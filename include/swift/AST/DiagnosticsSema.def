@@ -4212,8 +4212,8 @@ NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
 NOTE(note_add_asynchandler_to_function,none,
      "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
-NOTE(note_add_actorindependent_to_decl,none,
-     "add '@actorIndependent' to %0 to make this %1 independent of the actor",
+NOTE(note_add_nonisolated_to_decl,none,
+     "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
@@ -4407,9 +4407,20 @@ ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
 
+ERROR(nonisolated_let,none,
+      "'nonisolated' is meaningless on 'let' declarations because "
+      "they are immutable",
+      ())
+ERROR(nonisolated_mutable_storage,none,
+      "nonisolated' can not be applied to stored properties",
+      ())
+ERROR(nonisolated_local_var,none,
+      "'nonisolated' can not be applied to local variables",
+      ())
+
 ERROR(actor_instance_property_wrapper,none,
       "%0 property in property wrapper type %1 cannot be isolated to "
-      "the actor instance; consider @actorIndependent",
+      "the actor instance; consider 'nonisolated'",
       (Identifier, Identifier))
 
 ERROR(concurrency_lib_missing,none,

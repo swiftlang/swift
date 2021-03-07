@@ -94,12 +94,12 @@ func checkAsyncPropertyAccess() async {
 }
 
 extension MyActor {
-  @actorIndependent var actorIndependentVar: Int {
+  nonisolated var actorIndependentVar: Int {
     get { 5 }
     set { }
   }
 
-  @actorIndependent func actorIndependentFunc(otherActor: MyActor) -> Int {
+  nonisolated func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
     _ = mutable // expected-error{{actor-isolated property 'mutable' can not be referenced from an '@actorIndependent'}}
     _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from an '@actorIndependent' context}}
@@ -593,22 +593,22 @@ actor LazyActor {
     lazy var l24: Int = self.l
     lazy var l25: Int = { [unowned self] in self.l }()
 
-    @actorIndependent lazy var l31: Int = { v }()
+    nonisolated lazy var l31: Int = { v }()
     // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l32: Int = v
+    nonisolated lazy var l32: Int = v
     // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l33: Int = { self.v }()
+    nonisolated lazy var l33: Int = { self.v }()
     // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l34: Int = self.v
+    nonisolated lazy var l34: Int = self.v
     // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l35: Int = { [unowned self] in self.v }()
+    nonisolated lazy var l35: Int = { [unowned self] in self.v }()
     // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
 
-    @actorIndependent lazy var l41: Int = { l }()
-    @actorIndependent lazy var l42: Int = l
-    @actorIndependent lazy var l43: Int = { self.l }()
-    @actorIndependent lazy var l44: Int = self.l
-    @actorIndependent lazy var l45: Int = { [unowned self] in self.l }()
+    nonisolated lazy var l41: Int = { l }()
+    nonisolated lazy var l42: Int = l
+    nonisolated lazy var l43: Int = { self.l }()
+    nonisolated lazy var l44: Int = self.l
+    nonisolated lazy var l45: Int = { [unowned self] in self.l }()
 }
 
 // Infer global actors from context only for instance members.

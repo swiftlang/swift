@@ -44,8 +44,8 @@ actor MyActor {
   @objc var badProp: AnyObject { self } // expected-error{{actor-isolated property 'badProp' cannot be @objc}}
   @objc subscript(index: Int) -> AnyObject { self } // expected-error{{actor-isolated subscript 'subscript(_:)' cannot be @objc}}
 
-  // CHECK: @objc @actorIndependent func synchronousGood()
-  @objc @actorIndependent func synchronousGood() { }
+  // CHECK: @objc nonisolated func synchronousGood()
+  @objc nonisolated func synchronousGood() { }
 }
 
 // CHECK: actor class MyActor2
