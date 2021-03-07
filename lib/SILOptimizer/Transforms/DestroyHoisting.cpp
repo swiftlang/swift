@@ -124,9 +124,9 @@ class DestroyHoisting {
 public:
   DestroyHoisting(SILFunction *function, DominanceAnalysis *DA) :
     function(function),
-    // We currently don't handle enum data projections, because they cannot
-    // re-created easily. We could support this in future.
-    locations(/*handleEnumDataProjections*/ false), DA(DA) {}
+    // We currently don't handle enum and existential projections, because they
+    // cannot be re-created easily. We could support this in future.
+    locations(/*handleNonTrivialProjections*/ false), DA(DA) {}
 
   bool hoistDestroys();
 };
@@ -348,11 +348,19 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
       // ... or abort_apply.
       getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
       break;
+    case SILInstructionKind::SelectEnumAddrInst:
+    case SILInstructionKind::ExistentialMetatypeInst:
+    case SILInstructionKind::ValueMetatypeInst:
+    case SILInstructionKind::IsUniqueInst:
+    case SILInstructionKind::FixLifetimeInst:
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::StoreBorrowInst:
     case SILInstructionKind::CopyAddrInst:
     case SILInstructionKind::InjectEnumAddrInst:
+    case SILInstructionKind::UncheckedRefCastAddrInst:
+    case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+    case SILInstructionKind::CheckedCastAddrBranchInst:
     case SILInstructionKind::PartialApplyInst:
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
