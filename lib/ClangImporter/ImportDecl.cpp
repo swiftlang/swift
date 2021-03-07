@@ -4458,8 +4458,10 @@ namespace {
         return nullptr;
       
       Decl *SwiftDecl = Impl.importDecl(decl->getUnderlyingDecl(), getActiveSwiftVersion());
+      if (!SwiftDecl)
+        return nullptr;
+
       const TypeDecl *SwiftTypeDecl = dyn_cast<TypeDecl>(SwiftDecl);
-      
       if (!SwiftTypeDecl)
         return nullptr;
       
