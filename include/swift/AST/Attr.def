@@ -620,7 +620,7 @@ SIMPLE_DECL_ATTR(reasync, Reasync,
   109)
 
 SIMPLE_DECL_ATTR(reasync, AtReasync,
-  OnProtocol |
+  OnProtocol | ConcurrencyOnly |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   110)
 
@@ -629,6 +629,13 @@ DECL_ATTR(hasAsyncAlternative, HasAsyncAlternative,
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIStableToRemove,
   111)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
+  OnFunc | OnConstructor | OnVar | OnSubscript | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIStableToRemove,
+  112)
+
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

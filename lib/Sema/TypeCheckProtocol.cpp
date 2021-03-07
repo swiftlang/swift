@@ -2748,10 +2748,10 @@ bool ConformanceChecker::checkActorIsolation(
       auto witnessVar = dyn_cast<VarDecl>(witness);
       if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
         auto independentNote = witness->diagnose(
-            diag::note_add_actorindependent_to_decl,
+            diag::note_add_nonisolated_to_decl,
             witness->getName(), witness->getDescriptiveKind());
-        independentNote.fixItInsert(witness->getAttributeInsertionLoc(false),
-            "@actorIndependent ");
+        independentNote.fixItInsert(witness->getAttributeInsertionLoc(true),
+            "nonisolated ");
       }
     }
 
