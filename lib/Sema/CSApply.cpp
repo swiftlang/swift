@@ -8554,16 +8554,15 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
-      resultExpr = Rewriter.coerceToType(resultExpr,
-                                         solution.simplifyType(convertType),
-                                         cs.getConstraintLocator(expr));
+      resultExpr =
+          Rewriter.coerceToType(resultExpr, solution.simplifyType(convertType),
+                                cs.getConstraintLocator(resultExpr));
     } else if (cs.getType(resultExpr)->hasLValueType() &&
                !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
       resultExpr = Rewriter.coerceToType(
-          resultExpr,
-          cs.getType(resultExpr)->getRValueType(),
-          cs.getConstraintLocator(expr));
+          resultExpr, cs.getType(resultExpr)->getRValueType(),
+          cs.getConstraintLocator(resultExpr));
     }
 
     if (!resultExpr)

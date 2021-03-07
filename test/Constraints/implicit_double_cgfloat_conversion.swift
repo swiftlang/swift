@@ -107,3 +107,20 @@ func test_conversions_with_optionals(v: CGFloat?) {
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
   let _: Double = (v ?? 0)
 }
+
+func test_static_members_are_contextually_convertible() {
+  struct S {
+    static var testProp: CGFloat { 42 }
+    static func testFunc() -> CGFloat { 42 }
+  }
+
+  func test_prop(s: S) -> Double {
+    // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
+    return S.testProp // Ok
+  }
+
+  func test_method(s: S) -> Double {
+    // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
+    return S.testFunc() // Ok
+  }
+}
