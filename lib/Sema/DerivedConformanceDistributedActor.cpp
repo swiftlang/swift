@@ -30,25 +30,7 @@ bool DerivedConformance::canDeriveDistributedActor(
 }
 // ==== ------------------------------------------------------------------------
 
+// TODO: remove, this is not actually used nowadays, we do this in CodeSynthesisDistributedActor
 ValueDecl *DerivedConformance::deriveDistributedActor(ValueDecl *requirement) {
-//  ASTContext &C = ConformanceDecl->getASTContext();
-//
-//  const auto name = requirement->getName();
-//  fprintf(stderr, "[%s:%d] >> (%s) TRY %s \n", __FILE__, __LINE__, __FUNCTION__, name);
-
-  // TODO: turns out this is the wrong place to synthesize things,
-  //       and instead we do earlier in the pipeline, since we need to add properties
-  //
-  //       We may want to remove this file and hooks entirely, depends if we find
-  //       something useful to synthesize here.
-
-//  // Synthesize functions
-//  auto func = dyn_cast<FuncDecl>(requirement);
-//  if (func) {
-//    fprintf(stderr, "[%s:%d] >> (%s) function .... \n", __FILE__, __LINE__, __FUNCTION__);
-//    // TODO: derive encode impl
-//    return nullptr;
-//  }
-
  return nullptr;
 }

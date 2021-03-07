@@ -333,8 +333,6 @@ createDistributedActorInit(ClassDecl *classDecl,
       break;
   }
 
-//  requirement->dump();
-//  fprintf(stderr, "[%s:%d] >> (%s) %s \n", __FILE__, __LINE__, __FUNCTION__, "unrecognized constructor requirement for DistributedActor");
   return nullptr; // TODO: make it assert(false); after we're done with all
 }
 
@@ -478,16 +476,18 @@ static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
         /*isStatic=*/false, /*isFinal=*/true);
 
     // mark as @_distributedActorIndependent, allowing access to it from everywhere
-    propDecl->getAttrs().add(new (C)
-                                 DistributedActorIndependentAttr(/*IsImplicit=*/true));
+    propDecl->getAttrs().add(
+        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
 
     decl->addMember(propDecl);
     decl->addMember(pbDecl);
   }
 
   // ```
+  // @_distributedActorIndependent
   // let actorTransport: ActorTransport
   // ```
+  // (no need for @actorIndependent because it is an immutable let)
   {
     auto propertyType = C.getActorTransportDecl()->getDeclaredInterfaceType();
 
@@ -498,6 +498,10 @@ static void addImplicitDistributedActorStoredProperties(ClassDecl *decl) {
         VarDecl::Introducer::Let, C.Id_actorTransport,
         propertyType, propertyType,
         /*isStatic=*/false, /*isFinal=*/true);
+
+    // mark as @_distributedActorIndependent, allowing access to it from everywhere
+    propDecl->getAttrs().add(
+        new (C) DistributedActorIndependentAttr(/*IsImplicit=*/true));
 
     decl->addMember(propDecl);
     decl->addMember(pbDecl);

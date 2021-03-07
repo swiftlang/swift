@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-distributed
 // REQUIRES: concurrency
 
 // Synthesis of distributed actors.
@@ -8,13 +8,9 @@ distributed actor D1 {
 }
 
 distributed actor D2 {
-  let actorTransport: String // expected-error{{}}
+  let actorTransport: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'actorTransport'}}
+  let actorAddress: String // expected-error{{invalid redeclaration of synthesized implementation for protocol requirement 'actorAddress'}}
 }
-
-// TODO: produce better errors if users attempt to manually write synthesized fields
-//distributed actor D3 {
-//  let actorTransport: ActorTransport
-//}
 
 // ==== Tests ------------------------------------------------------------------
 

@@ -3648,6 +3648,7 @@ class CallEmission {
   Callee callee;
   FormalEvaluationScope initialWritebackScope;
   bool implicitlyAsync;
+  bool implicitlyThrows;
 
 public:
   /// Create an emission for a call of the given callee.
@@ -3696,6 +3697,12 @@ public:
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
   void setImplicitlyAsync(bool flag) { implicitlyAsync = flag; }
+
+  /// Sets a flag that indicates whether this call be treated as being
+  /// implicitly throws, i.e., the call may be delegating to a proxy function
+  /// which actually is throwing, regardless whether or not the actual target
+  /// function can throw or not.
+  void setImplicitlyThrows(bool flag) { implicitlyThrows = flag; }
 
   CleanupHandle applyCoroutine(SmallVectorImpl<ManagedValue> &yields);
 

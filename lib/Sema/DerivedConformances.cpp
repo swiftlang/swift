@@ -311,18 +311,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
-//    // DistributedActor.actorAddress
-//    if (name.isSimpleName(ctx.Id_actorAddress)) {
-//      fprintf(stderr, "[%s:%d] >> derived conformances: Id_actorAddress \n", __FILE__, __LINE__);
-//      return getRequirement(KnownProtocolKind::DistributedActor);
-//    }
-//
-//    // DistributedActor.actorTransport
-//    if (name.isSimpleName(ctx.Id_actorTransport)) {
-//      fprintf(stderr, "[%s:%d] >> derived conformances: Id_actorTransport \n", __FILE__, __LINE__);
-//      return getRequirement(KnownProtocolKind::DistributedActor);
-//    }
-
     return nullptr;
   }
 
@@ -382,21 +370,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       // Decodable.init(from: Decoder)
       if (argumentNames[0] == ctx.Id_from)
         return getRequirement(KnownProtocolKind::Decodable);
-
-//      // DistributedActor.init(transport: ActorTransport)
-//      if (argumentNames[0] == ctx.Id_transport) {
-//        fprintf(stderr, "[%s:%d] >> derived conformances: distributed actor initializer \n", __FILE__, __LINE__);
-//        return getRequirement(KnownProtocolKind::DistributedActor);
-//      }
     }
-//    else if (argumentNames.size() == 2) {
-//      // DistributedActor.init(transport: ActorTransport)
-//      if (argumentNames[0] == ctx.Id_resolve &&
-//          argumentNames[1] == ctx.Id_transport) {
-//        fprintf(stderr, "[%s:%d] >> derived conformances: distributed actor resolve initializer \n", __FILE__, __LINE__);
-//        return getRequirement(KnownProtocolKind::DistributedActor);
-//      }
-//    }
 
     return nullptr;
   }

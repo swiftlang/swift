@@ -2789,6 +2789,10 @@ bool ValueDecl::isDynamic() const {
     getAttrs().hasAttribute<DynamicAttr>());
 }
 
+bool ValueDecl::isDistributedActorIndependent() const {
+  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
+}
+
 bool ValueDecl::isObjCDynamicInGenericClass() const {
   if (!isObjCDynamic())
     return false;
@@ -5151,6 +5155,10 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
       return true;
   }
   return false;
+}
+
+bool AbstractStorageDecl::isDistributedActorIndependent() const {
+  return getAttrs().hasAttribute<DistributedActorIndependentAttr>();
 }
 
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,

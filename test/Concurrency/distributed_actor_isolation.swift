@@ -3,7 +3,7 @@
 
 actor LocalActor_1 {
   let name: String = "alice"
-  var mutable: String = "" // expected-note{{mutable state is only available within the actor instance}}
+  var mutable: String = ""
 
   distributed func nope() {
     // expected-error@-1{{'distributed' function can only be declared within 'distributed actor'}}
@@ -22,8 +22,8 @@ distributed actor class DistributedActor_0 { // expected-warning{{'actor class' 
 
 distributed actor DistributedActor_1 {
 
-  let name: String = "alice" // expected-note{{mutable state is only available within the actor instance}}
-  var mutable: String = "alice" // expected-note{{mutable state is only available within the actor instance}}
+  let name: String = "alice" // expected-note{{property declared here}}
+  var mutable: String = "alice" // expected-note{{property declared here}}
   var computedMutable: String {
     get {
       "hey"
@@ -109,23 +109,20 @@ func test_outside(
   _ = distributed.actorAddress // ok
   distributed.actorAddress = ActorAddress(parse: "mock://1.1.1.1:8080/#123121") // expected-error{{cannot assign to property: 'actorAddress' is immutable}}
 
-  // just to make sure synthesized fields like transport didn't get special treated:
-  _ = distributed.actorTransport // expected-error{{distributed actor-isolated property 'actorTransport' can only be referenced inside the distributed actor}}
-
-  // FIXME: dont set the (never) on the transport
-
   _ = local.name // ok, special case that let constants are okey
+  let _: String = local.mutable // ok, special case that let constants are okey
   _ = distributed.name // expected-error{{distributed actor-isolated property 'name' can only be referenced inside the distributed actor}}
-  _ = local.mutable // expected-error{{actor-isolated property 'mutable' can only be referenced inside the actor}}
   _ = distributed.mutable // expected-error{{distributed actor-isolated property 'mutable' can only be referenced inside the distributed actor}}
 
-  // ==== functions // TODO: once we automatically infer async and throws unlock this
-//  try await distributed.distHello()
-//  try await distributed.distHelloAsync()
-//  try await distributed.distHelloThrows()
-//  try await distributed.distHelloAsyncThrows()
+  // ==== special properties (@_distributedActorIndependent)
+  // the distributed actor's special fields may always be referred to
+  _ = distributed.actorAddress
+  _ = distributed.actorTransport
 
-  // special: the actorAddress may always be referred to
+  // ==== non-distributed functions
+  _ = await distributed.hello() //expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = await distributed.helloAsync() //expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = try await distributed.helloAsyncThrows() //expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
 }
 
 // ==== Codable parameters and return types ------------------------------------

@@ -2290,6 +2290,8 @@ public:
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 
+  bool isDistributedActorIndependent() const;
+
 private:
   bool isObjCDynamic() const {
     return isObjC() && isDynamic();
@@ -4628,6 +4630,8 @@ public:
   bool hasDidSetOrWillSetDynamicReplacement() const;
 
   bool hasAnyNativeDynamicAccessors() const;
+
+  bool isDistributedActorIndependent() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

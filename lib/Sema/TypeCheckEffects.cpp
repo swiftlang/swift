@@ -733,6 +733,7 @@ public:
 
     // If the function doesn't have any effects, we're done here.
     if (!fnType->isThrowing() &&
+        !E->implicitlyThrows() &&
         !fnType->isAsync() &&
         !E->implicitlyAsync()) {
       return Classification();
@@ -752,8 +753,8 @@ public:
 
     auto classifyApplyEffect = [&](EffectKind kind) {
       if (!fnType->hasEffect(kind) &&
-          !(kind == EffectKind::Async &&
-            E->implicitlyAsync())) {
+          !(kind == EffectKind::Async && E->implicitlyAsync()) &&
+          !(kind == EffectKind::Throws && E->implicitlyThrows())) {
         return;
       }
 
@@ -2325,9 +2326,15 @@ private:
     if (E->isImplicitlyAsync()) {
       Context::AsyncSiteKind lookupKind = Context::Property;
       // check the kind of thing we're looking up to give better diagnostics
-      if (auto valueDecl = E->getMember().getDecl())
+      if (auto valueDecl = E->getMember().getDecl()) {
         if (isa<SubscriptDecl>(valueDecl))
           lookupKind = Context::Subscript;
+
+//        // FIXME: rdar://75147394 tryMarkImplicitlyAsync does not properly recognize a synthesized VarDecl?
+//        if (auto var = dyn_cast<VarDecl>(valueDecl))
+//          if (var->getAttrs().getAttribute<DistributedActorIndependentAttr>())
+//            return ShouldRecurse;
+      }
 
       checkThrowAsyncSite(E, /*requiresTry=*/false,
             Classification::forUnconditional(EffectKind::Async,
@@ -2371,6 +2378,13 @@ private:
           }
           checkThrowAsyncSite(E, /*requiresTry=*/throws, result,
                               Context::AsyncLet);
+        }
+      } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (func->isDistributed()) {
+          checkThrowAsyncSite(E, /*requiresTry=*/true,
+                              Classification::forUnconditional(
+                                  EffectKind::Async, PotentialEffectReason::forApply()),
+                              Context::Call);
         }
       }
     }
@@ -2503,7 +2517,7 @@ private:
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowReason());
       } else if (!isTryCovered) {
-        CurContext.diagnoseUncoveredThrowSite(Ctx, E,
+        CurContext.diagnoseUncoveredThrowSite(Ctx, E, // we want this one to trigger
                                               classification.getThrowReason());
       }
       break;

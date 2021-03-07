@@ -4347,8 +4347,8 @@ NOTE(actor_isolated_sync_func,none,
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
 ERROR(distributed_actor_isolated_method,none,
-      "only 'distributed' asynchronous methods can be used outside the distributed actor instance; "
-      "do you want to add 'distributed'?", ())
+      "only 'distributed' functions can be called from outside the distributed actor",
+      ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
       (StringRef, Type))
