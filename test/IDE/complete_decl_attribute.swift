@@ -255,6 +255,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
+// ON_MEMBER_LAST-DAG: Keyword/None:                       apex[#Declaration Attribute#]; name=apex
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
@@ -306,6 +307,7 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // KEYWORD_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
+// KEYWORD_LAST-DAG: Keyword/None:                       apex[#Declaration Attribute#]; name=apex
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST:                  End completions

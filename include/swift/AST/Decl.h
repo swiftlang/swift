@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -6997,6 +6997,10 @@ public:
   }
   MutableArrayRef<Relation> getMutableLowerThan() {
     return { getLowerThanBuffer(), NumLowerThan };
+  }
+
+  bool isApex() const {
+    return getAttrs().hasAttribute<ApexAttr>();
   }
 
   static bool classof(const Decl *D) {

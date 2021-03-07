@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1244,6 +1244,30 @@ extension ${Self} {
 }
 
 //===----------------------------------------------------------------------===//
+// Placeholder Operators
+//===----------------------------------------------------------------------===//
+
+//  TODO: Remove these operators once protocol-based math functions are
+//  incorporated from Swift Numerics into the standard library.
+
+${Availability(bits)}
+extension ${Self} {
+  @_alwaysEmitIntoClient
+  @available(*, unavailable,
+    message: "Import C standard library or Foundation to use 'pow' instead")
+  public static func ** (_ lhs: Self, _ rhs: Self) -> Self {
+    fatalError()
+  }
+  
+  @_alwaysEmitIntoClient
+  @available(*, unavailable,
+    message: "Import C standard library or Foundation to use 'pow' instead")
+  public static func **= (_ lhs: inout Self, _ rhs: Self) {
+    fatalError()
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
@@ -1346,10 +1370,6 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 ${Availability(bits)}
 extension ${Self} : ConcurrentValue { }
 
-//===----------------------------------------------------------------------===//
-// Deprecated operators
-//===----------------------------------------------------------------------===//
-
 % if bits in [16,80]:
 #else
 
@@ -1373,6 +1393,10 @@ public struct ${Self} {
 #endif
 % end
 % end # for bits in all_floating_point_types
+
+//===----------------------------------------------------------------------===//
+// Deprecated Operators
+//===----------------------------------------------------------------------===//
 
 @_transparent
 @available(*, unavailable,
