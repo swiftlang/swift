@@ -873,7 +873,8 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   if (ResultNotUsed) {
     for (auto Use : Dest->getUses()) {
       auto *User = Use->getUser();
-      if (isa<DeallocStackInst>(User) || User == Inst)
+      if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
+          User == Inst)
         continue;
       ResultNotUsed = false;
       break;
@@ -905,6 +906,11 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       if (shouldTakeOnSuccess(Inst->getConsumptionKind())) {
         auto &srcTL = Builder.getTypeLowering(Src->getType());
         srcTL.emitDestroyAddress(Builder, Loc, Src);
+      }
+      for (auto iter = Dest->use_begin(); iter != Dest->use_end();) {
+        SILInstruction *user = (*iter++)->getUser();
+        if (isa<DestroyAddrInst>(user))
+          eraseInstAction(user);
       }
       eraseInstAction(Inst);
       Builder.setInsertionPoint(BB);

@@ -1009,6 +1009,19 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
            node->getKind() <= SILNodeKind::Last_##ID;                          \
   }
 
+/// Abstract base class which defines the source and destination operand numbers
+/// for copy-like instructions, like store, assign, copy_addr and cast
+/// instructions.
+class CopyLikeInstruction {
+public:
+  enum {
+    /// The source operand index.
+    Src,
+    /// The destination operand index.
+    Dest
+  };
+};
+
 /// Abstract base class used for isa checks on instructions to determine if they
 /// forward ownership and to verify that the set of ownership instructions and
 /// the ownership utilities stay in sync via assertions.
@@ -3823,7 +3836,8 @@ static_assert(2 == SILNode::NumStoreOwnershipQualifierBits, "Size mismatch");
 /// StoreInst - Represents a store from a memory location.
 class StoreInst
     : public InstructionBase<SILInstructionKind::StoreInst,
-                             NonValueInstruction> {
+                             NonValueInstruction>,
+      public CopyLikeInstruction {
   friend SILBuilder;
 
 private:
@@ -3833,13 +3847,6 @@ private:
             StoreOwnershipQualifier Qualifier);
 
 public:
-  enum {
-    /// the value being stored
-    Src,
-    /// the lvalue being stored to
-    Dest
-  };
-
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
@@ -3915,16 +3922,9 @@ inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
 /// address. Must be paired with an end_borrow in its use-def list.
 class StoreBorrowInst
     : public InstructionBase<SILInstructionKind::StoreBorrowInst,
-                             SingleValueInstruction> {
+                             SingleValueInstruction>,
+      public CopyLikeInstruction {
   friend class SILBuilder;
-
-public:
-  enum {
-    /// The source of the value being borrowed.
-    Src,
-    /// The destination of the borrowed value.
-    Dest
-  };
 
 private:
   FixedOperandList<2> Operands;
@@ -4326,7 +4326,8 @@ static_assert(2 == SILNode::NumAssignOwnershipQualifierBits, "Size mismatch");
 
 template <SILInstructionKind Kind, int NumOps>
 class AssignInstBase
-    : public InstructionBase<Kind, NonValueInstruction> {
+    : public InstructionBase<Kind, NonValueInstruction>,
+      public CopyLikeInstruction {
 
 protected:
   FixedOperandList<NumOps> Operands;
@@ -4337,13 +4338,6 @@ protected:
       Operands(this, std::forward<T>(args)...) { }
 
 public:
-  enum {
-    /// the value being stored
-    Src,
-    /// the lvalue being stored to
-    Dest
-  };
-
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
@@ -4663,17 +4657,9 @@ class Store##Name##Inst \
 /// but a copy instruction must be used for address-only types.
 class CopyAddrInst
     : public InstructionBase<SILInstructionKind::CopyAddrInst,
-                             NonValueInstruction> {
+                             NonValueInstruction>,
+      public CopyLikeInstruction {
   friend SILBuilder;
-
-public:
-  enum {
-    /// The lvalue being loaded from.
-    Src,
-
-    /// The lvalue being stored to.
-    Dest
-  };
 
 private:
   FixedOperandList<2> Operands;
@@ -8657,7 +8643,8 @@ template<SILInstructionKind Kind,
          typename Base>
 class AddrCastInstBase
     : public InstructionBaseWithTrailingOperands<Kind, Derived,
-                                                 TypesForAddrCasts<Base>> {
+                                                 TypesForAddrCasts<Base>>,
+      public CopyLikeInstruction {
 protected:
   friend InstructionBaseWithTrailingOperands<Kind, Derived, Operand>;
 
@@ -8687,13 +8674,6 @@ public:
   MutableArrayRef<Operand> getTypeDependentOperands() {
     return this->getAllOperands().slice(2);
   }
-
-  enum {
-    /// the value being stored
-    Src,
-    /// the lvalue being stored to
-    Dest
-  };
 
   SILValue getSrc() const { return this->getAllOperands()[Src].get(); }
   SILValue getDest() const { return this->getAllOperands()[Dest].get(); }

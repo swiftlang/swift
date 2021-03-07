@@ -189,18 +189,16 @@ private:
   /// small. They can be handled separately with handleSingleBlockLocations().
   llvm::SmallVector<SingleValueInstruction *, 16> singleBlockLocations;
 
-  /// A Cache for single-payload enums.
-  llvm::DenseMap<SILType, EnumElementDecl *> singlePayloadEnums;
-
   /// The bit-set of locations for which numNonTrivialFieldsNotCovered is > 0.
   Bits nonTrivialLocations;
 
-  /// If true, support init_enum_data_addr and unchecked_take_enum_data_addr
-  bool handleEnumDataProjections;
+  /// If true, support init_enum_data_addr, unchecked_take_enum_data_addr,
+  /// init_existential_addr and open_existential_addr.
+  bool handleNonTrivialProjections;
 
 public:
-  MemoryLocations(bool handleEnumDataProjections) :
-    handleEnumDataProjections(handleEnumDataProjections) {}
+  MemoryLocations(bool handleNonTrivialProjections) :
+    handleNonTrivialProjections(handleNonTrivialProjections) {}
 
   MemoryLocations(const MemoryLocations &) = delete;
   MemoryLocations &operator=(const MemoryLocations &) = delete;
@@ -236,16 +234,30 @@ public:
 
   /// Sets the location bits os \p addr in \p bits, if \p addr is associated
   /// with a location.
-  void setBits(Bits &bits, SILValue addr) {
+  void setBits(Bits &bits, SILValue addr) const {
     if (auto *loc = getLocation(addr))
       bits |= loc->subLocations;
   }
 
   /// Clears the location bits os \p addr in \p bits, if \p addr is associated
   /// with a location.
-  void clearBits(Bits &bits, SILValue addr) {
+  void clearBits(Bits &bits, SILValue addr) const {
     if (auto *loc = getLocation(addr))
       bits.reset(loc->subLocations);
+  }
+  
+  void genBits(Bits &genSet, Bits &killSet, SILValue addr) const {
+    if (auto *loc = getLocation(addr)) {
+      killSet.reset(loc->subLocations);
+      genSet |= loc->subLocations;
+    }
+  }
+
+  void killBits(Bits &genSet, Bits &killSet, SILValue addr) const {
+    if (auto *loc = getLocation(addr)) {
+      killSet |= loc->subLocations;
+      genSet.reset(loc->subLocations);
+    }
   }
 
   /// Analyzes all locations in a function.
@@ -282,15 +294,6 @@ private:
 
   // (locationIdx, fieldNr) -> subLocationIdx
   using SubLocationMap = llvm::DenseMap<std::pair<unsigned, unsigned>, unsigned>;
-
-  /// Returns the payload case of a single-payload enum.
-  ///
-  /// Returns null if \p enumTy is not a single-payload enum.
-  /// We are currently only handling enum data projections for single-payload
-  /// enums, because it's much simpler to represent them with Locations. We
-  /// could also support multi-payload enums, but that gets complicated. Most
-  /// importantly, we can handle Swift.Optional.
-  EnumElementDecl *getSinglePayloadEnumCase(SILType enumTy);
 
   /// Helper function called by analyzeLocation to check all uses of the
   /// location recursively.
@@ -368,17 +371,11 @@ public:
     // Utility functions for setting and clearing gen- and kill-bits.
 
     void genBits(SILValue addr, const MemoryLocations &locs) {
-      if (auto *loc = locs.getLocation(addr)) {
-        killSet.reset(loc->subLocations);
-        genSet |= loc->subLocations;
-      }
+      locs.genBits(genSet, killSet, addr);
     }
 
     void killBits(SILValue addr, const MemoryLocations &locs) {
-      if (auto *loc = locs.getLocation(addr)) {
-        genSet.reset(loc->subLocations);
-        killSet |= loc->subLocations;
-      }
+      locs.killBits(genSet, killSet, addr);
     }
 
     bool exitReachable() const {
