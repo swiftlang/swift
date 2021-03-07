@@ -803,7 +803,7 @@ public:
   /// Check if this is a CGFloat type from `CoreGraphics` module.
   bool isCGFloatType();
 
-  /// Check if thih sis a Double type from standard library.
+  /// Check if this is a Double type from standard library.
   bool isDoubleType();
 
   /// Check if this is either an Array, Set or Dictionary collection type defined
