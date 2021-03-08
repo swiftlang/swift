@@ -3793,7 +3793,9 @@ bool ConstraintSystem::repairFailures(
       // Because result type of the optional evaluation is supposed to
       // represent the type of its sub-expression with added level of
       // optionality if needed.
-      if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable()) {
+      auto contextualTy = simplifyType(rhs)->getOptionalObjectType();
+      if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable() &&
+          !contextualTy->isTypeVariableOrMember()) {
         conversionsOrFixes.push_back(IgnoreContextualType::create(
             *this, lhs, rhs, getConstraintLocator(OEE->getSubExpr())));
         return true;
