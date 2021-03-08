@@ -1575,6 +1575,11 @@ namespace {
 
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
+        // we assume let-bound properties are taken care of elsewhere,
+        // since they are never implicitly async.
+        assert(!isa<VarDecl>(decl) || cast<VarDecl>(decl)->isLet() == false
+               && "unexpected let-bound property; never implicitly async!");
+
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
 
