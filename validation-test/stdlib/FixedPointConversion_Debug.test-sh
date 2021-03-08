@@ -1,8 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb %S/Inputs/FixedPointConversion.swift.gyb -Dtarget_ptrsize=%target-ptrsize -o %t/FixedPointConversion.swift
-// RUN: %line-directive %t/FixedPointConversion.swift -- %target-build-swift %t/FixedPointConversion.swift -o %t/a.out_Debug -Onone
-// RUN: %target-codesign %t/a.out_Debug
-//
-// RUN: %line-directive %t/FixedPointConversion.swift -- %target-run %t/a.out_Debug
+// RUN: %gyb \
+// RUN:   -Dconfiguration=Debug \
+// RUN:   -Dtarget_ptrsize=%target-ptrsize \
+// RUN:   %S/Inputs/FixedPointConversion.swift.gyb | \
+// RUN:   %{python} %utils/split_file.py -o %t
+// RUN: %line-directive %t/*.swift -- %target-build-swift \
+// RUN:   -o %t/a.out \
+// RUN:   -Onone \
+// RUN:   -whole-module-optimization \
+// RUN:   %t/*.swift
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
-// REQUIRES: long_test

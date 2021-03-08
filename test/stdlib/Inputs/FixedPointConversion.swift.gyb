@@ -1,233 +1,194 @@
-// FIXME(integers): add tests that perform the same checks in generic code
-
-%{
-from SwiftIntTypes import all_integer_types, int_max, int_min
-from SwiftFloatingPointTypes import all_floating_point_types, getFtoIBounds
-
-from decimal import Decimal
-}%
+% # FIXME(integers): add tests that perform the same checks in generic code.
+%
+% from SwiftIntTypes import all_integer_types, int_max
+% from SwiftFloatingPointTypes import all_floating_point_types
+% from decimal import Decimal
+%
+% test_suites = []
+%
+% word_bits = int(target_ptrsize)
+% for self_ty in all_integer_types(word_bits):
+%   Self = self_ty.stdlib_name
+%   selfMax = self_ty.max
+%   selfMin = self_ty.min
+%
+%   test_suite = 'FixedPointConversion_' + configuration + '_To' + Self
+%   test_suites.append(test_suite)
+%
+//===----------------------------------------------------------------------===//
+// BEGIN ${test_suite}.swift
+//===----------------------------------------------------------------------===//
 
 import StdlibUnittest
 
-var FixedPointConversionTraps = TestSuite("FixedPointToFixedPointConversionTraps")
-var FixedPointConversionFailure = TestSuite("FixedPointToFixedPointConversionFailures")
+func register${test_suite}() {
 
-var FloatingPointConversionTruncations = TestSuite("FloatingPointToFixedPointConversionTruncations")
-var FloatingPointConversionTraps = TestSuite("FloatingPointConversionTraps")
-var FloatingPointConversionFailures = TestSuite("FloatingPointToFixedPointConversionFailures")
+  let ${test_suite} = TestSuite("${test_suite}")
 
-func getInfiniteOrNaNMessage() -> String {
-  if _isDebugAssertConfiguration() {
-    return "either infinite or NaN"
-  }
-  return ""
-}
-
-func getTooSmallMessage() -> String {
-  if _isDebugAssertConfiguration() {
-    return "would be less than"
-  }
-  return ""
-}
-
-func getTooLargeMessage() -> String {
-  if _isDebugAssertConfiguration() {
-    return "would be greater than"
-  }
-  return ""
-}
-
-% word_bits = int(target_ptrsize)
-% for self_ty in all_integer_types(word_bits):
-%   selfBits = self_ty.bits
-%   selfSigned = self_ty.is_signed
-%   selfMin = self_ty.min
-%   selfMax = self_ty.max
-%   Self = self_ty.stdlib_name
-
-%   # Test conversion behaviors for all integer types
+%   # Test conversion behaviors for all integer types.
 %   for other_ty in all_integer_types(word_bits):
-%     otherBits = other_ty.bits
-%     otherSigned = other_ty.is_signed
-%     otherMin = other_ty.min
-%     otherMax = other_ty.max
 %     Other = other_ty.stdlib_name
+%     otherMax = other_ty.max
+%     otherMin = other_ty.min
+%
+  //===--------------------------------------------------------------------===//
+  // ${Other}
+  //===--------------------------------------------------------------------===//
 
-%     for testValue in [selfMin, selfMax, selfMin - 1, selfMax + 1, otherMin, otherMax]:
+%     testValues = [
+%       selfMin,
+%       selfMax,
+%       selfMin - 1,
+%       selfMax + 1,
+%       otherMin,
+%       otherMax
+%     ]
+%     for testValue in testValues:
+%       testLiteralValue = str(testValue)
+%       if otherMin <= testValue <= otherMax:
+%         if selfMin <= testValue <= selfMax:
+  ${test_suite}.test("From${Other}(${testLiteralValue})_NeverTraps") {
+    let input = get${Other}(${testLiteralValue})
+    let actual = ${Self}(input)
+    expectEqual(${testLiteralValue}, actual)
+  }
 
-%       if testValue < otherMin or testValue > otherMax:
-%         # Can't construct `other` value, do nothing and continue.
-%         pass
-%       elif testValue >= selfMin and testValue <= selfMax:
-%         # Test value can be represented by Self, test conversion succeeds
+  ${test_suite}.test("From${Other}(${testLiteralValue})_NeverFails") {
+    let input = get${Other}(${testLiteralValue})
+    let actual = ${Self}(exactly: input)
+    expectEqual(${testLiteralValue}, actual)
+  }
 
-/// Always-safe conversion from ${Other}(${testValue}) to ${Self}.
-FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
-  // Test that nothing interesting happens and we end up with the same result after converting.
-  let input = get${Other}(${testValue})
-  expectEqual(${testValue}, ${Self}(input))
-}
+%         else:
+  ${test_suite}.test("From${Other}(${testLiteralValue})_AlwaysTraps") {
+    let input = get${Other}(${testLiteralValue})
+    expectCrash {
+      let actual = ${Self}(input)
+      _blackHole(actual)
+    }
+  }
 
-/// Never-nil failable conversion from ${Other}(${testValue}) to ${Self}.
-FixedPointConversionFailure.test("${Other}To${Self}FailableConversion/dest=${testValue}") {
-  // Test that nothing interesting happens and we end up with a non-nil, identical result.
-  let input = get${Other}(${testValue})
-  let result = ${Self}(exactly: input)
-  expectEqual(${testValue}, result)
-}
+  ${test_suite}.test("From${Other}(${testLiteralValue})_AlwaysFails") {
+    let input = get${Other}(${testLiteralValue})
+    let actual = ${Self}(exactly: input)
+    expectNil(actual)
+  }
 
-%       else:
-%         # Test value is out of range of Self, test conversion fails
-
-/// Always-failing conversion from ${Other}(${testValue}) to ${Self}.
-FixedPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValue}") {
-  // Test that we check if we fail and crash when an integer would be truncated in conversion.
-  let input = get${Other}(${testValue})
-  expectCrashLater()
-  let result = ${Self}(input)
-  _blackHole(result)
-}
-
-/// Always-nil failable conversion from ${Other}(${testValue}) to ${Self}.
-FixedPointConversionFailure.test("${Other}To${Self}Conversion/dest=${testValue}") {
-  // Test that we check if we return nil when an integer would be truncated in conversion.
-  let input = get${Other}(${testValue})
-  expectNil(${Self}(exactly: input))
-}
-
-%       end
-%     end # for testValue in ...
-%   end # for in all_integer_types (Other)
-
-%   # Test conversion behaviors for all floating-point types
+%         end # if
+%       end # if
+%     end # for
+%   end # for
+%
+%   # Test conversion behaviors for all floating-point types.
 %   for other_type in all_floating_point_types():
 %     Other = "Float" + str(other_type.bits)
-%     otherMin = -int_max(bits=other_type.explicit_significand_bits, signed=False)
 %     otherMax = int_max(bits=other_type.explicit_significand_bits, signed=False)
-%     (selfFtoIMin, selfFtoIMax) = getFtoIBounds(other_type.bits, selfBits, selfSigned)
+%     otherMin = -otherMax
+%
+  //===--------------------------------------------------------------------===//
+  // ${Other}
+  //===--------------------------------------------------------------------===//
 
 %     if Other == 'Float16':
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+
 %     elif Other == 'Float80':
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
-%     end
 
+%     end # if
+%
 %     testValues = [
 %       Decimal(selfMin),
 %       Decimal(selfMax),
-%       Decimal(selfFtoIMin) - Decimal('0.1'),
-%       Decimal(selfFtoIMax) + Decimal('0.1'),
+%       Decimal(selfMin - 1),
+%       Decimal(selfMax + 1),
 %       Decimal(otherMin),
 %       Decimal(otherMax),
 %       Decimal('0.0'),
 %       Decimal('-0.0'),
 %       Decimal('0.1'),
-%       Decimal('-0.1')
+%       Decimal('-0.1'),
+%       Decimal('-123.45')
 %     ]
 %     for testValue in testValues:
-%       testValueStr = str(testValue)
+%       testLiteralValue = str(testValue)
+%       if otherMin <= testValue <= otherMax:
+%         if (selfMin - 1) < testValue < (selfMax + 1):
+  ${test_suite}.test("From${Other}(${testLiteralValue})_NeverTraps") {
+    let input = get${Other}(${testLiteralValue})
+    let actual = ${Self}(input)
+    expectEqual(${str(int(testValue))}, actual)
+  }
 
-%       if testValue < otherMin or testValue > otherMax:
-%         # Can't construct `other` value to test from, do nothing and continue.
-%         pass
-%       elif testValue >= selfFtoIMin and testValue <= selfFtoIMax and (testValue % 1).is_zero():
-%         # Test value can be represented exactly by Self, test two-way conversion
-
-FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
-  let input = get${Other}(${testValueStr})
-  let result = ${Self}(input)
-  let resultConvertedBack = ${Other}(result)
-  expectEqual(${testValueStr}, resultConvertedBack)
-}
-
-FloatingPointConversionFailures.test("${Other}To${Self}FailableConversion/dest=${testValueStr}") {
-  let input = get${Other}(${testValueStr})
-  expectNotNil(${Self}(exactly: input))
-}
-
-%       else:
-%         if testValue > selfFtoIMax:
-%           # Test value exceeds maximum value of Self, test for too large message
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValueStr}")
-.crashOutputMatches(getTooLargeMessage()).code {
-  expectCrashLater()
-%         elif testValue < selfFtoIMin:
-%           # Test value doesn't reach minimum value of Self, test for too small message
-FloatingPointConversionTraps.test("${Other}To${Self}Conversion/dest=${testValueStr}")
-.crashOutputMatches(getTooSmallMessage()).code {
-  expectCrashLater()
 %         else:
-%           # Test value can be represented inexactly by Self, test for truncation
-FloatingPointConversionTruncations.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
-%         end
-  let input = get${Other}(${testValueStr})
-  let result = ${Self}(input)
-  let resultConvertedBack = ${Other}(result)
-  expectNotEqual(input, resultConvertedBack)
-}
+  ${test_suite}.test("From${Other}(${testLiteralValue})_AlwaysTraps") {
+    let input = get${Other}(${testLiteralValue})
+    expectCrash {
+      let actual = ${Self}(input)
+      _blackHole(actual)
+    }
+  }
 
-FloatingPointConversionFailures.test("${Other}To${Self}Conversion/dest=${testValueStr}") {
-  let input = get${Other}(${testValueStr})
-  expectNil(${Self}(exactly: input))
-}
-%       end
-%     end # for in testValues
+%         end # if
+%
+%         if (selfMin <= testValue <= selfMax) and (testValue % 1).is_zero():
+  ${test_suite}.test("From${Other}(${testLiteralValue})_NeverFails") {
+    let input = get${Other}(${testLiteralValue})
+    let actual = ${Self}(exactly: input)
+    expectEqual(${str(int(testValue))}, actual)
+  }
 
-// Test Always-Trapping conversions.
+%         else:
+  ${test_suite}.test("From${Other}(${testLiteralValue})_AlwaysFails") {
+    let input = get${Other}(${testLiteralValue})
+    let actual = ${Self}(exactly: input)
+    expectNil(actual)
+  }
 
-%     if not selfSigned:
+%         end # if
+%       end # if
+%     end # for
+%
+%     for testExpression in ['-.infinity', '.infinity', '-.nan', '.nan']:
+  ${test_suite}.test("From${Other}(${testExpression})_AlwaysTraps") {
+    let input = get${Other}(${testExpression})
+    expectCrash {
+      let actual = ${Self}(input)
+      _blackHole(actual)
+    }
+  }
 
-FloatingPointConversionTraps.test("${Self}/${Other}/negative")
-  .crashOutputMatches(getTooSmallMessage()).code {
-  expectCrashLater()
-  _blackHole(${Self}(get${Other}(-123.0)))
-}
+  ${test_suite}.test("From${Other}(${testExpression})_AlwaysFails") {
+    let input = get${Other}(${testExpression})
+    let actual = ${Self}(exactly: input)
+    expectNil(actual)
+  }
 
-FloatingPointConversionFailures.test("${Self}/${Other}/negative") {
-  expectNil(${Self}(exactly: get${Other}(-123.0)))
-}
-
-%     end
-
-FloatingPointConversionTraps.test("${Self}/${Other}/+inf")
-  .crashOutputMatches(getInfiniteOrNaNMessage()).code {
-  expectCrashLater()
-  _blackHole(${Self}(get${Other}(${Other}.infinity)))
-}
-
-FloatingPointConversionFailures.test("${Self}/${Other}/+inf") {
-  expectNil(${Self}(exactly: get${Other}(${Other}.infinity)))
-}
-
-FloatingPointConversionTraps.test("${Self}/${Other}/-inf")
-  .crashOutputMatches(getInfiniteOrNaNMessage()).code {
-  expectCrashLater()
-  _blackHole(${Self}(get${Other}(-${Other}.infinity)))
-}
-
-FloatingPointConversionFailures.test("${Self}/${Other}/-inf") {
-  expectNil(${Self}(exactly: get${Other}(-${Other}.infinity)))
-}
-
-FloatingPointConversionTraps.test("${Self}/${Other}/NaN")
-  .crashOutputMatches(getInfiniteOrNaNMessage()).code {
-  expectCrashLater()
-  _blackHole(${Self}(get${Other}(${Other}.nan)))
-}
-
-FloatingPointConversionFailures.test("${Self}/${Other}/NaN") {
-  expectNil(${Self}(exactly: get${Other}(${Other}.nan)))
-}
-
+%     end # for
+%
 %     if Other == 'Float16':
 }
-#endif
-%     elif Other == 'Float80':
-#endif
-%     end
+#endif // Float16
 
-%   end # for in all_floating_point_types (Other)
-% end # for in all_integer_types (Self)
+%     elif Other == 'Float80':
+#endif // Float80
+
+%     end # if
+%
+%   end # for
+} // func
+
+% end # for
+%
+//===----------------------------------------------------------------------===//
+// BEGIN main.swift
+//===----------------------------------------------------------------------===//
+
+import StdlibUnittest
+
+% for test_suite in test_suites:
+register${test_suite}()
+% end # for
 
 runAllTests()
