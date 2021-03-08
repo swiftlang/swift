@@ -1602,8 +1602,9 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
 
-  /// Set the @objc name.
   ASTContext &ctx = decl->getASTContext();
+
+  /// Set the @objc name.
   auto setObjCName = [&](ObjCSelector selector) {
     // If there already is an @objc attribute, update its name.
     if (attr) {
@@ -1627,13 +1628,18 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
         // Determine whether there is a name conflict.
         bool shouldFixName = !attr || !attr->hasName();
         if (attr && attr->hasName() && *attr->getName() != overriddenSelector) {
+          auto reason = objCReasonForObjCAttr(attr);
+          auto behavior = behaviorLimitForObjCReason(reason, ctx);
+
           // If the user explicitly wrote the incorrect name, complain.
           if (!attr->isNameImplicit()) {
             {
-              auto diag = ctx.Diags.diagnose(
-                            attr->AtLoc,
-                            diag::objc_override_method_selector_mismatch,
-                            *attr->getName(), overriddenSelector);
+              auto diag = std::move(
+                              ctx.Diags.diagnose(
+                                attr->AtLoc,
+                                diag::objc_override_method_selector_mismatch,
+                                *attr->getName(), overriddenSelector)
+                      .limitBehavior(behavior));
               fixDeclarationObjCName(diag, decl, attr->getName(),
                                      overriddenSelector);
             }
@@ -1661,6 +1667,9 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
         bool shouldFixName = !attr || !attr->hasName();
         if (attr && attr->hasName() &&
             *attr->getName() != overriddenNameAsSel) {
+          auto reason = objCReasonForObjCAttr(attr);
+          auto behavior = behaviorLimitForObjCReason(reason, ctx);
+
           // If the user explicitly wrote the wrong name, complain.
           if (!attr->isNameImplicit()) {
             SourceLoc diagLoc = attr->AtLoc, firstNameLoc;
@@ -1674,7 +1683,8 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
                         overriddenName)
               .fixItReplaceChars(firstNameLoc,
                                  attr->getRParenLoc(),
-                                 overriddenName.str());
+                                 overriddenName.str())
+              .limitBehavior(behavior);
             overridden->diagnose(diag::overridden_here);
           }
 
