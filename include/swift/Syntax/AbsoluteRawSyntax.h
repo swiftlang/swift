@@ -32,14 +32,29 @@ public:
 
   /// Assuming that this index points to the start of \p Raw, advance it so that
   /// it points to the next sibling of \p Raw.
-  SyntaxIndexInTree advancedBy(const RawSyntax *Raw) const;
+  SyntaxIndexInTree advancedBy(const RawSyntax *Raw) const {
+    auto NewIndexInTree = IndexInTree;
+    if (Raw) {
+      NewIndexInTree += Raw->getTotalNodes();
+    }
+    return SyntaxIndexInTree(NewIndexInTree);
+  }
 
   /// Assuming that this index points to the next sibling of \p Raw, reverse it
   /// so that it points to the start of \p Raw.
-  SyntaxIndexInTree reversedBy(const RawSyntax *Raw) const;
+  SyntaxIndexInTree reversedBy(const RawSyntax *Raw) const {
+    auto NewIndexInTree = IndexInTree;
+    if (Raw) {
+      NewIndexInTree -= Raw->getTotalNodes();
+    }
+    return SyntaxIndexInTree(NewIndexInTree);
+  }
 
   /// Advance this index to point to its first immediate child.
-  SyntaxIndexInTree advancedToFirstChild() const;
+  SyntaxIndexInTree advancedToFirstChild() const {
+    auto NewIndexInTree = IndexInTree + 1;
+    return SyntaxIndexInTree(NewIndexInTree);
+  }
 
   bool operator==(SyntaxIndexInTree Other) const {
     return IndexInTree == Other.IndexInTree;
@@ -138,11 +153,25 @@ public:
 
   /// Assuming that this position points to the start of \p Raw, advance it so
   /// that it points to the next sibling of \p Raw.
-  AbsoluteSyntaxPosition advancedBy(const RawSyntax *Raw) const;
+  AbsoluteSyntaxPosition advancedBy(const RawSyntax *Raw) const {
+    OffsetType NewOffset = Offset;
+    if (Raw) {
+      NewOffset += Raw->getTextLength();
+    }
+    IndexInParentType NewIndexInParent = IndexInParent + 1;
+    return AbsoluteSyntaxPosition(NewOffset, NewIndexInParent);
+  }
 
   /// Assuming that this position points to the next sibling of \p Raw, reverse
   /// it so that it points to the start of \p Raw.
-  AbsoluteSyntaxPosition reversedBy(const RawSyntax *Raw) const;
+  AbsoluteSyntaxPosition reversedBy(const RawSyntax *Raw) const {
+    OffsetType NewOffset = Offset;
+    if (Raw) {
+      NewOffset -= Raw->getTextLength();
+    }
+    IndexInParentType NewIndexInParent = IndexInParent - 1;
+    return AbsoluteSyntaxPosition(NewOffset, NewIndexInParent);
+  }
 
   /// Get the position of the node's first immediate child.
   AbsoluteSyntaxPosition advancedToFirstChild() const {

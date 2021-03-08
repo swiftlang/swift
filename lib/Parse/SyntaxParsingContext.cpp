@@ -88,7 +88,7 @@ size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
     return 0;
   }
   Mode = AccumulationMode::SkippedForIncrementalUpdate;
-  auto length = foundNode.getRecordedRange().getByteLength();
+  auto length = foundNode.getRange().getByteLength();
   getStorage().push_back(std::move(foundNode));
   return length;
 }
