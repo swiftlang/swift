@@ -897,6 +897,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::Open:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::Close:
@@ -912,6 +913,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                        Opts.ReplaceText.getValue().c_str());
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::PrintAnnotations:

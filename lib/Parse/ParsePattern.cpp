@@ -851,7 +851,8 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
 
   while (true) {
     // 'async'
-    bool isReasync = Tok.isContextualKeyword("reasync");
+    bool isReasync = (shouldParseExperimentalConcurrency() &&
+                      Tok.isContextualKeyword("reasync"));
     if (Tok.isContextualKeyword("async") ||
         isReasync) {
       if (asyncLoc.isValid()) {

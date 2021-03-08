@@ -456,20 +456,30 @@ public:
 
   ApplyInst *createApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing = false,
+      ArrayRef<SILValue> Args) {
+    return createApply(Loc, Fn, Subs, Args,
+                       /*options=*/ApplyOptions(),
+                       /*SpecializationInfo=*/nullptr);
+  }
+
+  ApplyInst *createApply(
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
+      ArrayRef<SILValue> Args,
+      ApplyOptions options,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
-                                    isNonThrowing, C.silConv, *F,
+                                    options, C.silConv, *F,
                                     C.OpenedArchetypes, SpecializationInfo));
   }
 
   TryApplyInst *createTryApply(
       SILLocation Loc, SILValue fn, SubstitutionMap subs,
       ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
+      ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insertTerminator(TryApplyInst::create(
-        getSILDebugLocation(Loc), fn, subs, args, normalBB, errorBB, *F,
-        C.OpenedArchetypes, SpecializationInfo));
+        getSILDebugLocation(Loc), fn, subs, args, normalBB, errorBB,
+        options, *F, C.OpenedArchetypes, SpecializationInfo));
   }
 
   PartialApplyInst *createPartialApply(
@@ -485,10 +495,10 @@ public:
 
   BeginApplyInst *createBeginApply(
       SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
-      ArrayRef<SILValue> Args, bool isNonThrowing = false,
+      ArrayRef<SILValue> Args, ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(BeginApplyInst::create(
-        getSILDebugLocation(Loc), Fn, Subs, Args, isNonThrowing, C.silConv, *F,
+        getSILDebugLocation(Loc), Fn, Subs, Args, options, C.silConv, *F,
         C.OpenedArchetypes, SpecializationInfo));
   }
 
@@ -877,10 +887,10 @@ public:
                                                SILValue Src, SILValue Dest,
                                                SILValue Initializer,
                                                SILValue Setter,
-                                          AssignOwnershipQualifier Qualifier) {
+                                               AssignByWrapperInst::Mode mode) {
     return insert(new (getModule())
                   AssignByWrapperInst(getSILDebugLocation(Loc), Src, Dest,
-                                       Initializer, Setter, Qualifier));
+                                       Initializer, Setter, mode));
   }
 
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
@@ -1245,13 +1255,14 @@ public:
                       CopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
-  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
+  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
+                                       bool poisonRefs = false) {
     assert(isLoadableOrOpaque(operand->getType()));
     assert(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
-    return insert(new (getModule())
-                      DestroyValueInst(getSILDebugLocation(Loc), operand));
+    return insert(new (getModule()) DestroyValueInst(getSILDebugLocation(Loc),
+                                                     operand, poisonRefs));
   }
 
   UnconditionalCheckedCastInst *
@@ -1845,10 +1856,20 @@ public:
   createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
                            CanType FormalConcreteType, SILValue Concrete,
                            ArrayRef<ProtocolConformanceRef> Conformances) {
+    return createInitExistentialRef(Loc, ExistentialType, FormalConcreteType,
+                                    Concrete, Conformances,
+                                    Concrete.getOwnershipKind());
+  }
+
+  InitExistentialRefInst *
+  createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
+                           CanType FormalConcreteType, SILValue Concrete,
+                           ArrayRef<ProtocolConformanceRef> Conformances,
+                           ValueOwnershipKind forwardingOwnershipKind) {
     return insert(InitExistentialRefInst::create(
         getSILDebugLocation(Loc), ExistentialType, FormalConcreteType, Concrete,
         Conformances, &getFunction(), C.OpenedArchetypes,
-        Concrete.getOwnershipKind()));
+        forwardingOwnershipKind));
   }
 
   DeinitExistentialAddrInst *createDeinitExistentialAddr(SILLocation Loc,
@@ -2295,6 +2316,14 @@ public:
                           SILType destLoweredTy, CanType destFormalTy,
                           SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
+                          ProfileCounter Target1Count = ProfileCounter(),
+                          ProfileCounter Target2Count = ProfileCounter());
+
+  CheckedCastBranchInst *
+  createCheckedCastBranch(SILLocation Loc, bool isExact, SILValue op,
+                          SILType destLoweredTy, CanType destFormalTy,
+                          SILBasicBlock *successBB, SILBasicBlock *failureBB,
+                          ValueOwnershipKind forwardingOwnershipKind,
                           ProfileCounter Target1Count = ProfileCounter(),
                           ProfileCounter Target2Count = ProfileCounter());
 

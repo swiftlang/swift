@@ -153,7 +153,7 @@ actor GenericSub<T> : GenericSuper<[T]> {
   override func method() { }  // expected-note 2{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
 
   @GenericGlobalActor<T> override func method2() { } // expected-error{{global actor 'GenericGlobalActor<T>'-isolated instance method 'method2()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
-  @actorIndependent override func method3() { } // expected-error{{actor-independent instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
+  nonisolated override func method3() { } // expected-error{{actor-independent instance method 'method3()' has different actor isolation from global actor 'GenericGlobalActor<[T]>'-isolated overridden declaration}}
 
   @OtherGlobalActor func testMethod() {
     method() // expected-error{{instance method 'method()' isolated to global actor 'GenericGlobalActor<[T]>' can not be referenced from different global actor 'OtherGlobalActor'}}
@@ -231,15 +231,126 @@ func bar() async {
 
 // expected-note@+1 {{add '@SomeGlobalActor' to make global function 'barSync()' part of global actor 'SomeGlobalActor'}} {{1-1=@SomeGlobalActor }}
 func barSync() {
-  foo() // expected-error {{global function 'foo()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+  foo() // expected-error {{global function 'foo()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
 }
 
+// ----------------------------------------------------------------------
+// Property wrappers
+// ----------------------------------------------------------------------
+
+@propertyWrapper
+@OtherGlobalActor
+struct WrapperOnActor<Wrapped> {
+  @actorIndependent(unsafe) private var stored: Wrapped
+
+  nonisolated init(wrappedValue: Wrapped) {
+    stored = wrappedValue
+  }
+
+  @MainActor var wrappedValue: Wrapped {
+    get { stored }
+    set { stored = newValue }
+  }
+
+  @SomeGlobalActor var projectedValue: Wrapped {
+    get { stored }
+    set { stored = newValue }
+  }
+}
+
+@propertyWrapper
+actor WrapperActor<Wrapped> {
+  @actorIndependent(unsafe) var storage: Wrapped
+
+  init(wrappedValue: Wrapped) {
+    storage = wrappedValue
+  }
+
+  nonisolated var wrappedValue: Wrapped {
+    get { storage }
+    set { storage = newValue }
+  }
+
+  nonisolated var projectedValue: Wrapped {
+    get { storage }
+    set { storage = newValue }
+  }
+}
+
+struct HasWrapperOnActor {
+  @WrapperOnActor var synced: Int = 0
+  // expected-note@-1 3{{property declared here}}
+
+  // expected-note@+1 3{{to make instance method 'testErrors()'}}
+  func testErrors() {
+    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from this synchronous context}}
+  }
+
+  @MainActor mutating func testOnMain() {
+    _ = synced
+    synced = 17
+  }
+
+  @WrapperActor var actorSynced: Int = 0
+
+  func testActorSynced() {
+    _ = actorSynced
+    _ = $actorSynced
+    _ = _actorSynced
+  }
+}
+
+
+@propertyWrapper
+actor WrapperActorBad1<Wrapped> {
+  var storage: Wrapped
+
+  init(wrappedValue: Wrapped) {
+    storage = wrappedValue
+  }
+
+  var wrappedValue: Wrapped { // expected-error{{'wrappedValue' property in property wrapper type 'WrapperActorBad1' cannot be isolated to the actor instance; consider 'nonisolated'}}}}
+    get { storage }
+    set { storage = newValue }
+  }
+}
+
+@propertyWrapper
+actor WrapperActorBad2<Wrapped> {
+  @actorIndependent(unsafe) var storage: Wrapped
+
+  init(wrappedValue: Wrapped) {
+    storage = wrappedValue
+  }
+
+  nonisolated var wrappedValue: Wrapped {
+    get { storage }
+    set { storage = newValue }
+  }
+
+  var projectedValue: Wrapped { // expected-error{{'projectedValue' property in property wrapper type 'WrapperActorBad2' cannot be isolated to the actor instance; consider 'nonisolated'}}
+    get { storage }
+    set { storage = newValue }
+  }
+}
+
+actor ActorWithWrapper {
+  @WrapperOnActor var synced: Int = 0
+  // expected-note@-1 3{{property declared here}}
+  func f() {
+    _ = synced // expected-error{{'synced' isolated to global actor}}
+    _ = $synced // expected-error{{'$synced' isolated to global actor}}
+    _ = _synced // expected-error{{'_synced' isolated to global actor}}
+  }
+}
 
 // ----------------------------------------------------------------------
 // Unsafe global actors
 // ----------------------------------------------------------------------
 protocol UGA {
-  @SomeGlobalActor(unsafe) func req()
+  @SomeGlobalActor(unsafe) func req() // expected-note{{calls to instance method 'req()' from outside of its actor context are implicitly asynchronous}}
 }
 
 struct StructUGA1: UGA {
@@ -247,12 +358,12 @@ struct StructUGA1: UGA {
 }
 
 struct StructUGA2: UGA {
-  @actorIndependent func req() { }
+  nonisolated func req() { }
 }
 
 @GenericGlobalActor<String>
 func testUGA<T: UGA>(_ value: T) {
-  value.req()
+  value.req() // expected-error{{instance method 'req()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'GenericGlobalActor<String>'}}
 }
 
 class UGAClass {
@@ -265,4 +376,46 @@ class UGASubclass1: UGAClass {
 
 class UGASubclass2: UGAClass {
   override func method() { }
+}
+
+@propertyWrapper
+@OtherGlobalActor(unsafe)
+struct WrapperOnUnsafeActor<Wrapped> {
+  @actorIndependent(unsafe) private var stored: Wrapped
+
+  init(wrappedValue: Wrapped) {
+    stored = wrappedValue
+  }
+
+  @MainActor(unsafe) var wrappedValue: Wrapped {
+    get { stored }
+    set { stored = newValue }
+  }
+
+  @SomeGlobalActor(unsafe) var projectedValue: Wrapped {
+    get { stored }
+    set { stored = newValue }
+  }
+}
+
+struct HasWrapperOnUnsafeActor {
+  @WrapperOnUnsafeActor var synced: Int = 0
+  // expected-note@-1 3{{property declared here}}
+
+  func testUnsafeOkay() {
+    _ = synced
+    _ = $synced
+    _ = _synced
+  }
+
+  nonisolated func testErrors() {
+    _ = synced // expected-error{{property 'synced' isolated to global actor 'MainActor' can not be referenced from}}
+    _ = $synced // expected-error{{property '$synced' isolated to global actor 'SomeGlobalActor' can not be referenced from}}
+    _ = _synced // expected-error{{property '_synced' isolated to global actor 'OtherGlobalActor' can not be referenced from}}
+  }
+
+  @MainActor mutating func testOnMain() {
+    _ = synced
+    synced = 17
+  }
 }

@@ -1536,7 +1536,11 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
     SerializationOptions serializationOpts =
         Invocation.computeSerializationOptions(outs, Instance.getMainModule());
-    if (serializationOpts.ExperimentalCrossModuleIncrementalInfo) {
+
+    const bool canEmitIncrementalInfoIntoModule =
+        !serializationOpts.DisableCrossModuleIncrementalInfo &&
+        (Action == FrontendOptions::ActionType::MergeModules);
+    if (canEmitIncrementalInfoIntoModule) {
       const auto alsoEmitDotFile =
           Instance.getInvocation()
               .getLangOptions()
@@ -1665,7 +1669,10 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     const PrimarySpecificPaths &PSPs =
         opts.InputsAndOutputs.getPrimarySpecificPathsForPrimary(
             PrimarySourceFile->getFilename());
-    (void) index::indexAndRecord(PrimarySourceFile, PSPs.OutputFilename,
+    StringRef OutputFile = PSPs.IndexUnitOutputFilename;
+    if (OutputFile.empty())
+      OutputFile = PSPs.OutputFilename;
+    (void) index::indexAndRecord(PrimarySourceFile, OutputFile,
                                  opts.IndexStorePath, opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib, isDebugCompilation,
                                  Invocation.getTargetTriple(),
@@ -1674,10 +1681,11 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
     std::string moduleToken =
         Invocation.getModuleOutputPathForAtMostOnePrimary();
     if (moduleToken.empty())
-      moduleToken = opts.InputsAndOutputs.getSingleOutputFilename();
+      moduleToken = opts.InputsAndOutputs.getSingleIndexUnitOutputFilename();
 
     (void) index::indexAndRecord(Instance.getMainModule(),
-                                 opts.InputsAndOutputs.copyOutputFilenames(),
+                                 opts.InputsAndOutputs
+                                   .copyIndexUnitOutputFilenames(),
                                  moduleToken, opts.IndexStorePath,
                                  opts.IndexSystemModules,
                                  opts.IndexIgnoreStdlib,

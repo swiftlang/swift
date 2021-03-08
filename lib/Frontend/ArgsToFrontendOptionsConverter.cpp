@@ -106,8 +106,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
 
-  Opts.EnableExperimentalCrossModuleIncrementalBuild |=
-      Args.hasArg(OPT_enable_experimental_cross_module_incremental_build);
+  Opts.DisableCrossModuleIncrementalBuild |=
+      Args.hasArg(OPT_disable_incremental_imports);
 
   // Always track system dependencies when scanning dependencies.
   if (const Arg *ModeArg = Args.getLastArg(OPT_modes_Group)) {
@@ -517,8 +517,8 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
     return false;
   }
   Optional<std::vector<std::string>> outputFilenames =
-      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(Args,
-                                                                       Diags);
+      OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
+        Args, Diags, options::OPT_o, options::OPT_output_filelist);
 
   std::string nameToStem =
       outputFilenames && outputFilenames->size() == 1 &&
@@ -534,14 +534,17 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
 bool ArgsToFrontendOptionsConverter::
     computeMainAndSupplementaryOutputFilenames() {
   std::vector<std::string> mainOutputs;
+  std::vector<std::string> mainOutputForIndexUnits;
   std::vector<SupplementaryOutputPaths> supplementaryOutputs;
   const bool hadError = ArgsToFrontendOutputsConverter(
                             Args, Opts.ModuleName, Opts.InputsAndOutputs, Diags)
-                            .convert(mainOutputs, supplementaryOutputs);
+                            .convert(mainOutputs, mainOutputForIndexUnits,
+                                     supplementaryOutputs);
   if (hadError)
     return true;
   Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,
-                                                       supplementaryOutputs);
+                                                       supplementaryOutputs,
+                                                       mainOutputForIndexUnits);
   return false;
 }
 

@@ -391,9 +391,7 @@ void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
   BridgeHeaderTopLevelDecls.push_back(D);
 }
 
-bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
-    clang::Decl *D) {
-  // Ignore forward references;
+bool importer::isForwardDeclOfType(const clang::Decl *D) {
   if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(D)) {
     if (!ID->isThisDeclarationADefinition())
       return true;
@@ -405,6 +403,11 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
       return true;
   }
   return false;
+}
+
+bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
+    clang::Decl *D) {
+  return importer::isForwardDeclOfType(D);
 }
 
 ClangImporter::ClangImporter(ASTContext &ctx,

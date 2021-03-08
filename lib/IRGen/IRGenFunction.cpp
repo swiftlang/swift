@@ -695,6 +695,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   {
     // Setup the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
+    arguments.push_back(IGM.getInt32(2)); // swiftasync context index
     arguments.push_back(AsyncCoroutineCurrentResume);
     auto resumeProjFn = getOrCreateResumePrjFn();
     arguments.push_back(

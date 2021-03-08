@@ -95,7 +95,7 @@ public:
     setDiagnosticHandler(nullptr);
   }
 
-  swiftparse_client_node_t parse(const char *source);
+  swiftparse_client_node_t parse(const char *source, size_t len);
 };
 
 class CLibParseActions : public SyntaxParseActions {
@@ -183,7 +183,8 @@ private:
     auto numValue = serialization::getNumericValue(kind);
     node.kind = numValue;
     assert(node.kind == numValue && "syntax kind value is too large");
-    node.layout_data.nodes = elements.data();
+    node.layout_data.nodes =
+        const_cast<const swiftparse_client_node_t *>(elements.data());
     node.layout_data.nodes_count = elements.size();
     makeCRange(node.range, range);
     node.present = true;
@@ -194,10 +195,6 @@ private:
                                                const SourceFile &SF) override {
     // We don't support realizing syntax nodes from the C layout.
     return None;
-  }
-
-  void discardRecordedNode(OpaqueSyntaxNode node) override {
-    // FIXME: This method should not be called at all.
   }
 
   std::pair<size_t, OpaqueSyntaxNode>
@@ -277,10 +274,10 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   }
 };
 
-swiftparse_client_node_t SynParser::parse(const char *source) {
+swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   SourceManager SM;
-  unsigned bufID = SM.addNewSourceBuffer(
-    llvm::MemoryBuffer::getMemBuffer(source, "syntax_parse_source"));
+  unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
+      StringRef(source, len), "syntax_parse_source"));
   TypeCheckerOptions tyckOpts;
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
@@ -302,7 +299,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
     pConsumer = std::make_unique<SynParserDiagConsumer>(*this, bufID);
     PU.getDiagnosticEngine().addConsumer(*pConsumer);
   }
-  return PU.parse();
+  return const_cast<swiftparse_client_node_t>(PU.parse());
 }
 }
 //===--- C API ------------------------------------------------------------===//
@@ -332,10 +329,11 @@ swiftparse_parser_set_node_lookup(swiftparse_parser_t c_parser,
   parser->setNodeLookup(lookup);
 }
 
-swiftparse_client_node_t
-swiftparse_parse_string(swiftparse_parser_t c_parser, const char *source) {
+swiftparse_client_node_t swiftparse_parse_string(swiftparse_parser_t c_parser,
+                                                 const char *source,
+                                                 size_t len) {
   SynParser *parser = static_cast<SynParser*>(c_parser);
-  return parser->parse(source);
+  return parser->parse(source, len);
 }
 
 const char* swiftparse_syntax_structure_versioning_identifier(void) {

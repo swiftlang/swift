@@ -204,7 +204,7 @@ bb3:
 // CHECK-LABEL: sil [ossa] @looprotate_with_opened_archetype :
 // CHECK: return
 // CHECK-LABEL: } // end sil function 'looprotate_with_opened_archetype'
-sil [ossa] @looprotate_with_opened_archetype : $@convention(thin) (Int32, @in P) -> Int32 {
+sil [ossa] @looprotate_with_opened_archetype : $@convention(thin) (Int32, @in_guaranteed P) -> Int32 {
 bb0(%0 : $Int32, %25: $*P):
   %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0

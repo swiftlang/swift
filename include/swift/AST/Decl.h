@@ -678,6 +678,7 @@ protected:
   friend class DeclIterator;
   friend class IterableDeclContext;
   friend class MemberLookupTable;
+  friend class DeclDeserializer;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -694,6 +695,10 @@ private:
   };
   mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
   const CachedExternalSourceLocs *getSerializedLocs() const;
+
+  /// Directly set the invalid bit
+  void setInvalidBit();
+
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -872,7 +877,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment(bool SerializedOK = true) const;
+  RawComment getRawComment(bool SerializedOK = false) const;
 
   Optional<StringRef> getGroupName() const;
 
@@ -3004,6 +3009,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DeclContext;
   friend class IterableDeclContext;
   friend class DirectLookupRequest;
+  friend class LookupAllConformancesInContextRequest;
   friend ArrayRef<ValueDecl *>
   ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
@@ -3934,7 +3940,6 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
-  Actor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -6152,14 +6157,6 @@ public:
   bool isCallAsFunctionMethod() const;
 
   bool isMainTypeMainMethod() const;
-
-  /// Whether the given name is enqueue(partialTask:), which is used for
-  /// actors.
-  static bool isEnqueuePartialTaskName(ASTContext &ctx, DeclName name);
-
-  /// Determine whether this function is the witness to the Actor protocol's
-  /// enqueue(partialTask:) operation within an actor.
-  bool isActorEnqueuePartialTaskWitness() const;
 
   SelfAccessKind getSelfAccessKind() const;
 

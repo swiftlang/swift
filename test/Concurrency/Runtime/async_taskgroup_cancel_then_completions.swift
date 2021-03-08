@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
@@ -24,7 +18,7 @@ func test_taskGroup_cancel_then_completions() async {
     print("group cancelled: \(group.isCancelled)") // CHECK: group cancelled: false
     let addedFirst = await group.add {
       print("start first")
-      sleep(1)
+      await Task.sleep(1_000_000_000)
       print("done first")
       return (1, Task.isCancelled)
     }
@@ -33,7 +27,7 @@ func test_taskGroup_cancel_then_completions() async {
 
     let addedSecond = await group.add {
       print("start second")
-      sleep(3)
+      await Task.sleep(3_000_000_000)
       print("done second")
       return (2, Task.isCancelled)
     }

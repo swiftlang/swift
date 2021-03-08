@@ -2639,9 +2639,13 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         .createCopyValue(calleeLoc, newCallee);
       newCallee = makeNewValueAvailable(newCallee, TAI->getParent());
     }
+
+    ApplyOptions Options = TAI->getApplyOptions();
+    if (CalleeFnTy->hasErrorResult())
+      Options |= ApplyFlags::DoesNotThrow;
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), newCallee,
                                            TAI->getSubstitutionMap(),
-                                           Args, CalleeFnTy->hasErrorResult());
+                                           Args, Options);
 
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
@@ -3372,7 +3376,9 @@ bool SimplifyCFG::run() {
     if (simplifyBlocks())
       removeUnreachableBlocks(Fn);
   }
-  Fn.verifyCriticalEdges();
+
+  if (Fn.getModule().getOptions().VerifyAll)
+    Fn.verifyCriticalEdges();
 
   // Canonicalize switch_enum instructions.
   Changed |= canonicalizeSwitchEnums();
@@ -4139,7 +4145,7 @@ public:
   void run() override {
     auto &Fn = *getFunction();
 
-    if (OnlyNonCondBrEdges)
+    if (OnlyNonCondBrEdges && Fn.getModule().getOptions().VerifyAll)
       Fn.verifyCriticalEdges();
 
     // Split all critical edges from all or non only cond_br terminators.

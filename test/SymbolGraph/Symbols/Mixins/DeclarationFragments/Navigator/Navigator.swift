@@ -22,10 +22,12 @@ public struct MyStruct<S> { public var x: S
 // MYSTRUCT-NEXT:          }
 // MYSTRUCT-NEXT:      ]
 
+// when `navigator` and `subHeading` would be identical, the former is elided
+
 // FOO-LABEL: "precise": "s:9Navigator8MyStructV3fooyySTRzlF"
 // FOO:        names
 // FOO-NEXT:      "title": "foo()",
-// FOO-NEXT:      "navigator": [
+// FOO-NEXT:      "subHeading": [
 // FOO-NEXT:          {
 // FOO-NEXT:              "kind": "keyword"
 // FOO-NEXT:              "spelling": "func"
@@ -47,7 +49,7 @@ public struct MyStruct<S> { public var x: S
 // BAR-LABEL: "precise": "s:9Navigator8MyStructV3bar1xyqd___tSTRd__lF"
 // BAR:        names
 // BAR-NEXT:      "title": "bar(x:)",
-// BAR-NEXT:      "navigator": [
+// BAR-NEXT:      "subHeading": [
 // BAR-NEXT:          {
 // BAR-NEXT:            "kind": "keyword",
 // BAR-NEXT:            "spelling": "func"

@@ -1008,8 +1008,9 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
-    const bool EnableCrossModuleDependencies = ArgList->hasArg(
-        options::OPT_enable_experimental_cross_module_incremental_build);
+    const bool EnableCrossModuleDependencies
+        = ArgList->hasArg(options::OPT_enable_incremental_imports,
+                          options::OPT_disable_incremental_imports, true);
 
     // clang-format off
     C = std::make_unique<Compilation>(
@@ -2048,6 +2049,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_RawSIB:
       case file_types::TY_RawSIL:
       case file_types::TY_Nothing:
+      case file_types::TY_IndexUnitOutputPath:
       case file_types::TY_INVALID:
         llvm_unreachable("these types should never be inferred");
       }
@@ -2514,6 +2516,28 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
   else
     Buffer.append(".so");
   return Buffer.str();
+}
+
+static StringRef getIndexUnitOutputFilename(Compilation &C,
+                                            const JobAction *JA,
+                                            const TypeToPathMap *OutputMap,
+                                            bool AtTopLevel) {
+  if (JA->getType() == file_types::TY_Nothing)
+    return {};
+
+  if (OutputMap) {
+    auto iter = OutputMap->find(file_types::TY_IndexUnitOutputPath);
+    if (iter != OutputMap->end())
+      return iter->second;
+  }
+
+  if (AtTopLevel) {
+    const llvm::opt::DerivedArgList &Args = C.getArgs();
+    if (Arg *FinalOutput = Args.getLastArg(options::OPT_index_unit_output_path))
+      return FinalOutput->getValue();
+  }
+
+  return {};
 }
 
 static StringRef getOutputFilename(Compilation &C,
@@ -3030,7 +3054,7 @@ void Driver::computeMainOutput(
     SmallVectorImpl<const Job *> &InputJobs, const TypeToPathMap *OutputMap,
     StringRef workingDirectory, StringRef BaseInput, StringRef PrimaryInput,
     llvm::SmallString<128> &Buf, CommandOutput *Output) const {
-  StringRef OutputFile;
+  StringRef OutputFile, IndexUnitOutputFile;
   if (C.getOutputInfo().isMultiThreading() && isa<CompileJobAction>(JA) &&
       file_types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
@@ -3051,8 +3075,10 @@ void Driver::computeMainOutput(
 
       OutputFile = getOutputFilename(C, JA, OMForInput, workingDirectory,
                                      AtTopLevel, Base, Primary, Buf);
+      IndexUnitOutputFile = getIndexUnitOutputFilename(C, JA, OMForInput,
+                                                       AtTopLevel);
       Output->addPrimaryOutput(CommandInputPair(Base, Primary),
-                               OutputFile);
+                               OutputFile, IndexUnitOutputFile);
     };
     // Add an output file for each input action.
     for (const Action *A : InputActions) {
@@ -3072,8 +3098,10 @@ void Driver::computeMainOutput(
     // The common case: there is a single output file.
     OutputFile = getOutputFilename(C, JA, OutputMap, workingDirectory,
                                    AtTopLevel, BaseInput, PrimaryInput, Buf);
+    IndexUnitOutputFile = getIndexUnitOutputFilename(C, JA, OutputMap,
+                                                     AtTopLevel);
     Output->addPrimaryOutput(CommandInputPair(BaseInput, PrimaryInput),
-                             OutputFile);
+                             OutputFile, IndexUnitOutputFile);
   }
 }
 

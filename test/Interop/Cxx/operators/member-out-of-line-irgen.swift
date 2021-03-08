@@ -5,7 +5,7 @@
 
 import MemberOutOfLine
 
-public func add(_ lhs: inout IntBox, _ rhs: IntBox) -> IntBox { lhs + rhs }
+public func add(_ lhs: inout LoadableIntWrapper, _ rhs: LoadableIntWrapper) -> LoadableIntWrapper { lhs + rhs }
 
-// CHECK: call {{i32|i64}} [[NAME:@_ZNK6IntBoxplES_]](%struct.IntBox* %{{[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.IntBox\* byval\(.*\) align 4}} %{{[0-9]+}})
-// CHECK: declare {{(dso_local )?}}{{i32|i64}} [[NAME]](%struct.IntBox* nonnull dereferenceable(4), {{i32|\[1 x i32\]|i64|%struct.IntBox\* byval\(%struct.IntBox\) align 4}})
+// CHECK: call {{i32|i64}} [[NAME:@_ZNK18LoadableIntWrapperplES_]](%struct.LoadableIntWrapper* %{{[0-9]+}}, {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(.*\) align 4}} %{{[0-9]+}})
+// CHECK: declare {{(dso_local )?}}{{i32|i64}} [[NAME]](%struct.LoadableIntWrapper* nonnull dereferenceable(4), {{i32|\[1 x i32\]|i64|%struct.LoadableIntWrapper\* byval\(%struct.LoadableIntWrapper\) align 4}})

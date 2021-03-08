@@ -122,10 +122,6 @@ void swift_task_cancel(AsyncTask *task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *group);
 
-/// Get 'active' AsyncTask, depending on platform this may use thread local storage.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-AsyncTask* swift_task_get_active();
-
 /// Escalate the priority of a task and all of its child tasks.
 ///
 /// This can be called from any thread.
@@ -174,80 +170,105 @@ using TaskGroupFutureWaitThrowingSignature =
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_wait_next_throwing(
+/// func swift_taskGroup_wait_next_throwing(
 ///     waitingTask: Builtin.NativeObject, // current task
-///     group: UnsafeRawPointer,
+///     group: UnsafeRawPointer
 /// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 TaskGroupFutureWaitThrowingSignature::FunctionType
-swift_task_group_wait_next_throwing;
+swift_taskGroup_wait_next_throwing;
 
-/// Create a new `TaskGroup` using the task's allocator.
+/// Create a new `TaskGroup`.
 /// The caller is responsible for retaining and managing the group's lifecycle.
 ///
 /// Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_create(
+/// func swift_taskGroup_create(
 ///     _ task: Builtin.NativeObject
-/// ) -> Builtin.NativeObject
+/// ) -> Builtin.RawPointer
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-swift::TaskGroup* swift_task_group_create(AsyncTask *task);
+TaskGroup* swift_taskGroup_create(AsyncTask *task); // TODO: probably remove this call, and just use the initialize always
 
-/// Attach a child task to the parent task's task group record.
+/// Initialize a `TaskGroup` in the passed `group` memory location.
+/// The caller is responsible for retaining and managing the group's lifecycle.
 ///
 /// Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_attachChild(
-///     group: UnsafeRawPointer,
+/// func swift_taskGroup_initialize(
+///     _ task: Builtin.NativeObject,
+///     group: Builtin.RawPointer,
+/// )
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group);
+
+/// Attach a child task to the parent task's task group record.
+///
+/// This function MUST be called from the AsyncTask running the task group.
+///
+/// Since the group (or rather, its record) is inserted in the parent task at
+/// creation we do not need the parent task here, the group already is attached
+/// to it.
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_attachChild(
+///     group: Builtin.RawPointer,
 ///     parent: Builtin.NativeObject,
 ///     child: Builtin.NativeObject
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_group_attachChild(TaskGroup *group,
-                                  AsyncTask *parent, AsyncTask *child);
+void swift_taskGroup_attachChild(TaskGroup *group, AsyncTask *child);
 
 /// Its Swift signature is
 ///
+/// This function MUST be called from the AsyncTask running the task group.
+///
 /// \code
-/// func swift_task_group_destroy(
+/// func swift_taskGroup_destroy(
 ///     _ task: Builtin.NativeObject,
 ///     _ group: UnsafeRawPointer
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_group_destroy(AsyncTask *task, TaskGroup *group);
+void swift_taskGroup_destroy(AsyncTask *task, TaskGroup *group);
 
 /// Before starting a task group child task, inform the group that there is one
 /// more 'pending' child to account for.
 ///
-/// This can be called from any thread. Its Swift signature is
+/// This function SHOULD be called from the AsyncTask running the task group,
+/// however is generally thread-safe as it only only works with the group status.
+///
+/// Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_add_pending(
-///     group: UnsafeRawPointer
+/// func swift_taskGroup_addPending(
+///     group: Builtin.RawPointer
 /// ) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_group_add_pending(TaskGroup *group);
+bool swift_taskGroup_addPending(TaskGroup *group);
 
 /// Cancel all tasks in the group.
 /// This also prevents new tasks from being added.
 ///
-/// This can be called from any thread. Its Swift signature is
+/// This can be called from any thread.
+///
+/// Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_cancel_all(
+/// func swift_taskGroup_cancelAll(
 ///     task: Builtin.NativeObject,
 ///     group: UnsafeRawPointer
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group);
+void swift_taskGroup_cancelAll(AsyncTask *task, TaskGroup *group);
 
 /// Check ONLY if the group was explicitly cancelled, e.g. by `cancelAll`.
 ///
@@ -257,25 +278,25 @@ void swift_task_group_cancel_all(AsyncTask *task, TaskGroup *group);
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_is_cancelled(
+/// func swift_taskGroup_isCancelled(
 ///     task: Builtin.NativeObject,
 ///     group: UnsafeRawPointer
 /// )
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_group_is_cancelled(AsyncTask *task, TaskGroup *group);
+bool swift_taskGroup_isCancelled(AsyncTask *task, TaskGroup *group);
 
 /// Check the readyQueue of a task group, return true if it has no pending tasks.
 ///
 /// This can be called from any thread. Its Swift signature is
 ///
 /// \code
-/// func swift_task_group_is_empty(
-///     _ group: UnsafeRawPointer
+/// func swift_taskGroup_isEmpty(
+///     _ group: Builtin.RawPointer
 /// ) -> Bool
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_group_is_empty(TaskGroup *group);
+bool swift_taskGroup_isEmpty(TaskGroup *group);
 
 /// Add a status record to a task.  The record should not be
 /// modified while it is registered with a task.
@@ -343,8 +364,6 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(
     AsyncTask *task, CancellationNotificationStatusRecord *record);
 
-using TaskLocalValuesFragment = AsyncTask::TaskLocalValuesFragment;
-
 /// Get a task local value from the passed in task. Its Swift signature is
 ///
 /// \code
@@ -358,7 +377,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 OpaqueValue*
 swift_task_localValueGet(AsyncTask* task,
                          const Metadata *keyType,
-                         TaskLocalValuesFragment::TaskLocalInheritance inheritance);
+                         TaskLocal::TaskLocalInheritance inheritance);
 
 /// Add a task local value to the passed in task.
 ///
@@ -467,6 +486,9 @@ void swift_task_enqueue(Job *job, ExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueGlobal(Job *job);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDelay(unsigned long long delay, Job *job);
+
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_enqueueMainExecutor(Job *job);
@@ -479,6 +501,11 @@ void swift_MainActor_register(HeapObject *actor);
 /// TODO: figure out a better abstraction plan than this.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void (*swift_task_enqueueGlobal_hook)(Job *job);
+
+/// A hook to take over global enqueuing with delay.
+/// TODO: figure out a better abstraction plan than this.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void (*swift_task_enqueueGlobalWithDelay_hook)(unsigned long long delay, Job *job);
 
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

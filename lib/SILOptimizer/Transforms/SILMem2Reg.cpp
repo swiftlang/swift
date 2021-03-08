@@ -1032,7 +1032,8 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
 bool MemoryToRegisters::run() {
   bool Changed = false;
 
-  F.verifyCriticalEdges();
+  if (F.getModule().getOptions().VerifyAll)
+    F.verifyCriticalEdges();
 
   // Compute dominator tree node levels for the function.
   DomTreeLevelMap DomTreeLevels;

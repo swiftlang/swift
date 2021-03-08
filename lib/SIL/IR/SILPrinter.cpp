@@ -1226,6 +1226,8 @@ public:
   void visitApplyInst(ApplyInst *AI) {
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
+    if (AI->isNonAsync())
+      *this << "[noasync] ";
     visitApplyInstBase(AI);
   }
 
@@ -1236,6 +1238,8 @@ public:
   }
 
   void visitTryApplyInst(TryApplyInst *AI) {
+    if (AI->isNonAsync())
+      *this << "[noasync] ";
     visitApplyInstBase(AI);
     *this << ", normal " << Ctx.getID(AI->getNormalBB());
     *this << ", error " << Ctx.getID(AI->getErrorBB());
@@ -1453,7 +1457,19 @@ public:
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
     *this << getIDAndType(AI->getSrc()) << " to ";
-    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    switch (AI->getMode()) {
+    case AssignByWrapperInst::Unknown:
+      break;
+    case AssignByWrapperInst::Initialization:
+      *this << "[initialization] ";
+      break;
+    case AssignByWrapperInst::Assign:
+      *this << "[assign] ";
+      break;
+    case AssignByWrapperInst::AssignWrappedValue:
+      *this << "[assign_wrapped_value] ";
+      break;
+    }
     *this << getIDAndType(AI->getDest())
           << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
@@ -1703,6 +1719,8 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitDestroyValueInst(DestroyValueInst *I) {
+    if (I->poisonRefs())
+      *this << "[poison] ";
     *this << getIDAndType(I->getOperand());
   }
 

@@ -453,6 +453,8 @@ bool Decl::isInvalid() const {
   llvm_unreachable("Unknown decl kind");
 }
 
+void Decl::setInvalidBit() { Bits.Decl.Invalid = true; }
+
 void Decl::setInvalid() {
   switch (getKind()) {
 #define VALUE_DECL(ID, PARENT)
@@ -600,6 +602,9 @@ const Decl::CachedExternalSourceLocs *Decl::getSerializedLocs() const {
     return CachedSerializedLocs;
   }
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  assert(File->getKind() == FileUnitKind::SerializedAST &&
+         "getSerializedLocs() should only be called on decls in "
+         "a 'SerializedASTFile'");
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
     static const Decl::CachedExternalSourceLocs NullLocs{};
@@ -5078,8 +5083,6 @@ Optional<KnownDerivableProtocolKind>
     return KnownDerivableProtocolKind::AdditiveArithmetic;
   case KnownProtocolKind::Differentiable:
     return KnownDerivableProtocolKind::Differentiable;
-  case KnownProtocolKind::Actor:
-    return KnownDerivableProtocolKind::Actor;
   default: return None;
   }
 }
@@ -7554,56 +7557,6 @@ bool FuncDecl::isMainTypeMainMethod() const {
          getParameters()->size() == 0;
 }
 
-bool FuncDecl::isEnqueuePartialTaskName(ASTContext &ctx, DeclName name) {
-  if (name.isCompoundName() && name.getBaseName() == ctx.Id_enqueue) {
-    auto argumentNames = name.getArgumentNames();
-    return argumentNames.size() == 1 && argumentNames[0] == ctx.Id_partialTask;
-  }
-
-  return false;
-}
-
-bool FuncDecl::isActorEnqueuePartialTaskWitness() const {
-  if (!isEnqueuePartialTaskName(getASTContext(), getName()))
-    return false;
-
-  auto classDecl = getDeclContext()->getSelfClassDecl();
-  if (!classDecl)
-    return false;
-
-  if (!classDecl->isActor())
-    return false;
-
-  ASTContext &ctx = getASTContext();
-  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
-  if (!actorProto)
-    return false;
-
-  FuncDecl *requirement = nullptr;
-  for (auto protoMember : actorProto->getParsedMembers()) {
-    if (auto protoFunc = dyn_cast<FuncDecl>(protoMember)) {
-      if (isEnqueuePartialTaskName(ctx, protoFunc->getName())) {
-        requirement = protoFunc;
-        break;
-      }
-    }
-  }
-
-  if (!requirement)
-    return false;
-
-  SmallVector<ProtocolConformance *, 1> conformances;
-  classDecl->lookupConformance(
-      classDecl->getModuleContext(), actorProto, conformances);
-  for (auto conformance : conformances) {
-    auto witness = conformance->getWitnessDecl(requirement);
-    if (witness == this)
-      return true;
-  }
-
-  return false;
-}
-
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  bool Failable, SourceLoc FailabilityLoc,
                                  bool Throws,
@@ -7998,17 +7951,6 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 }
 
 bool ClassDecl::hasExplicitCustomActorMethods() const {
-  auto &ctx = getASTContext();
-  for (auto member: getMembers()) {
-    if (member->isImplicit()) continue;
-
-    // Methods called enqueue(partialTask:)
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      if (FuncDecl::isEnqueuePartialTaskName(ctx, func->getName()))
-        return true;
-    }
-  }
-
   return false;
 }
 
@@ -8083,7 +8025,8 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
       return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
 
     case ClosureActorIsolation::GlobalActor: {
-      return ActorIsolation::forGlobalActor(isolation.getGlobalActor());
+      return ActorIsolation::forGlobalActor(
+          isolation.getGlobalActor(), /*unsafe=*/false);
     }
 
     case ClosureActorIsolation::ActorInstance: {

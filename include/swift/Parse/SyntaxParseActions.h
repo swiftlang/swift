@@ -33,7 +33,7 @@ class SourceFileSyntax;
 enum class SyntaxKind;
 }
 
-typedef void *OpaqueSyntaxNode;
+typedef const void *OpaqueSyntaxNode;
 
 class SyntaxParseActions {
   virtual void _anchor();
@@ -61,13 +61,6 @@ public:
   /// doesn't support the realization of syntax nodes.
   virtual Optional<syntax::SourceFileSyntax>
   realizeSyntaxRoot(OpaqueSyntaxNode root, const SourceFile &SF) = 0;
-
-  /// Discard raw syntax node.
-  /// 
-  /// FIXME: This breaks invariant that any recorded node will be a part of the
-  /// result SourceFile syntax. This method is a temporary workaround, and
-  /// should be removed when we fully migrate to libSyntax parsing.
-  virtual void discardRecordedNode(OpaqueSyntaxNode node) = 0;
 
   /// Used for incremental re-parsing.
   virtual std::pair<size_t, OpaqueSyntaxNode>

@@ -2,12 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
+// UNSUPPORTED: OS=windows-msvc
 
 func simple() async {
   print("\(#function) -----------------------")

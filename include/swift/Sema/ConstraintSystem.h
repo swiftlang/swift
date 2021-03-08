@@ -775,9 +775,11 @@ enum ScoreKind {
   SK_Hole,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
-  /// A reference to an async function in a synchronous context, or
-  /// vice versa.
-  SK_AsyncSyncMismatch,
+  /// A reference to an async function in a synchronous context.
+  SK_AsyncInSyncMismatch,
+  /// Synchronous function in an asynchronous context or a conversion of
+  /// a synchronous function to an asynchronous one.
+  SK_SyncInAsync,
   /// A use of the "forward" scan for trailing closures.
   SK_ForwardTrailingClosure,
   /// A use of a disfavored overload.
@@ -2276,7 +2278,7 @@ private:
     /// domains have been successfully shrunk so far.
     ///
     /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs);
+    bool solve(llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs);
 
     /// Apply solutions found by solver as reduced OSR sets for
     /// for current and all of it's sub-expressions.
@@ -2288,14 +2290,14 @@ private:
     /// domains have been successfully shrunk so far.
     void applySolutions(
         llvm::SmallVectorImpl<Solution> &solutions,
-        llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) const;
+        llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const;
 
     /// Check if attempt at solving of the candidate makes sense given
     /// the current conditions - number of shrunk domains which is related
     /// to the given candidate over the total number of disjunctions present.
     static bool
     isTooComplexGiven(ConstraintSystem *const cs,
-                      llvm::SmallDenseSet<OverloadSetRefExpr *> &shrunkExprs) {
+                      llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
       SmallVector<Constraint *, 8> disjunctions;
       cs->collectDisjunctions(disjunctions);
 
@@ -3631,6 +3633,10 @@ public:
 
     /// Indicates that we are applying a fix.
     TMF_ApplyingFix = 0x02,
+
+    /// Indicates that we are attempting a possible type for
+    /// a type variable.
+    TMF_BindingTypeVariable = 0x04,
   };
 
   /// Options that govern how type matching should proceed.
@@ -3702,10 +3708,14 @@ public:
   /// \param type The fixed type to which the type variable will be bound.
   ///
   /// \param updateState Whether to update the state based on this binding.
-  /// False when we're only assigning a type as part of reconstructing 
+  /// False when we're only assigning a type as part of reconstructing
   /// a complete solution from partial solutions.
+  ///
+  /// \param notifyBindingInference Whether to notify binding inference about
+  /// the change to this type variable.
   void assignFixedType(TypeVariableType *typeVar, Type type,
-                       bool updateState = true);
+                       bool updateState = true,
+                       bool notifyBindingInference = true);
 
   /// Determine if the type in question is an Array<T> and, if so, provide the
   /// element type of the array.

@@ -577,12 +577,6 @@ def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
-def enable_experimental_cross_module_incremental_build :
-  Flag<["-"], "enable-experimental-cross-module-incremental-build">,
-  Flags<[FrontendOption]>,
-  HelpText<"(experimental) Enable cross-module incremental build metadata and "
-           "driver scheduling">;
-
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
@@ -624,6 +618,11 @@ def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
 def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
+
+def warn_concurrency : Flag<["-"], "warn-concurrency">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about code that is unsafe according to the Swift Concurrency "
+           "model and will become ill-formed in a future language version">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -1118,6 +1117,18 @@ def emit_supported_features : Flag<["-"], "emit-supported-features">,
   HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
+def enable_incremental_imports :
+  Flag<["-"], "enable-incremental-imports">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable cross-module incremental build metadata and "
+           "driver scheduling for Swift modules">;
+
+def disable_incremental_imports :
+  Flag<["-"], "disable-incremental-imports">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable cross-module incremental build metadata and "
+           "driver scheduling for Swift modules">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -1129,6 +1140,10 @@ def index_file_path : Separate<["-"], "index-file-path">,
 def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
+
+def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
+  Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
+  HelpText<"Use <path> as the output path in the produced index data.">;
 
 def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   Flags<[NoInteractiveOption]>,

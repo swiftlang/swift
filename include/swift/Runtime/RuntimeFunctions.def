@@ -1564,6 +1564,22 @@ FUNCTION(DefaultActorDestroy,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+//// void swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group);
+//FUNCTION(TaskGroupInitialize,
+//         swift_taskGroup_initialize, SwiftCC,
+//         ConcurrencyAvailability,
+//         RETURNS(VoidTy),
+//         ARGS(RefCountedPtrTy, RefCountedPtrTy),
+//         ATTRS(NoUnwind))
+//
+//// void swift_taskGroup_destroy(AsyncTask *task, TaskGroup *group);
+//FUNCTION(TaskGroupDestroy,
+//         swift_taskGroup_destroy, SwiftCC,
+//         ConcurrencyAvailability,
+//         RETURNS(VoidTy),
+//         ARGS(RefCountedPtrTy, RefCountedPtrTy),
+//         ATTRS(NoUnwind))
+
 // AutoDiffLinearMapContext *swift_autoDiffCreateLinearMapContext(size_t);
 FUNCTION(AutoDiffCreateLinearMapContext,
          swift_autoDiffCreateLinearMapContext, SwiftCC,

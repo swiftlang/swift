@@ -7,7 +7,7 @@ actor BankAccount {
 
   private var accountHolder : String = "unknown"
 
-  // expected-note@+1 2 {{mutable state is only available within the actor instance}}
+  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   var owner : String {
     get { accountHolder }
     set { accountHolder = newValue }
@@ -35,7 +35,7 @@ actor BankAccount {
   }
 
   func testSelfBalance() async {
-    _ = await balance() // expected-warning {{no calls to 'async' functions occur within 'await' expression}}
+    _ = await balance() // expected-warning {{no 'async' operations occur within 'await' expression}}
   }
 
   // returns the amount actually withdrawn
@@ -118,19 +118,21 @@ func anotherAsyncFunc() async {
   _ = a.deposit(1)  // expected-error{{call is 'async' but is not marked with 'await'}}
   _ = b.balance()   // expected-error{{call is 'async' but is not marked with 'await'}}
   
-  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can only be referenced inside the actor}}
+  _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can only be referenced from inside the actor}}
 
-  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can only be referenced inside the actor}}
-  _ = b.owner // expected-error{{actor-isolated property 'owner' can only be referenced inside the actor}}
+  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can only be mutated from inside the actor}}
+  _ = b.owner // expected-error{{property access is 'async' but is not marked with 'await'}}
+  _ = await b.owner == "cat"
+
 
 }
 
 func regularFunc() {
   let a = BankAccount(initialDeposit: 34)
 
-  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can only be referenced inside the actor}}
+  _ = a.deposit //expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
 
-  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can only be referenced inside the actor}}
+  _ = a.deposit(1)  // expected-error{{actor-isolated instance method 'deposit' can only be referenced from inside the actor}}
 }
 
 
@@ -150,11 +152,30 @@ func blender(_ peeler : () -> Void) {
   peeler()
 }
 
-@BananaActor func wisk(_ something : Any) { } // expected-note 4 {{calls to global function 'wisk' from outside of its actor context are implicitly asynchronous}}
+// expected-note@+2 {{var declared here}}
+// expected-note@+1 2 {{mutation of this var is only permitted within the actor}}
+@BananaActor var dollarsInBananaStand : Int = 250000
+
+@BananaActor func wisk(_ something : Any) { } // expected-note 5 {{calls to global function 'wisk' from outside of its actor context are implicitly asynchronous}}
 
 @BananaActor func peelBanana() { } // expected-note 2 {{calls to global function 'peelBanana()' from outside of its actor context are implicitly asynchronous}}
 
+@BananaActor func takeInout(_ x : inout Int) {}
+
 @OrangeActor func makeSmoothie() async {
+  var money = await dollarsInBananaStand
+  money -= 1200
+
+  dollarsInBananaStand = money // expected-error{{var 'dollarsInBananaStand' isolated to global actor 'BananaActor' can not be mutated from different global actor 'OrangeActor'}}
+
+  // FIXME: these two errors seem a bit redundant.
+  // expected-error@+2 {{actor-isolated var 'dollarsInBananaStand' cannot be passed 'inout' to implicitly 'async' function call}}
+  // expected-error@+1 {{var 'dollarsInBananaStand' isolated to global actor 'BananaActor' can not be used 'inout' from different global actor 'OrangeActor'}}
+  await takeInout(&dollarsInBananaStand)
+
+  _ = wisk // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
+
+
   await wisk({})
   // expected-warning@-1{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
   await wisk(1)
@@ -173,13 +194,23 @@ func blender(_ peeler : () -> Void) {
   await (((wisk)))(((wisk))) // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
   // expected-warning@-1{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
 
-  // expected-warning@+2 {{no calls to 'async' functions occur within 'await' expression}}
+  // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
   // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
   await {wisk}()(1)
 
-  // expected-warning@+2 {{no calls to 'async' functions occur within 'await' expression}}
+  // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
   // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
   await (true ? wisk : {n in return})(1)
+}
+
+actor Chain {
+  var next : Chain?
+}
+
+func walkChain(chain : Chain) async {
+  _ = chain.next?.next?.next?.next // expected-error 4 {{property access is 'async' but is not marked with 'await'}}
+  _ = (await chain.next)?.next?.next?.next // expected-error 3 {{property access is 'async' but is not marked with 'await'}}
+  _ = (await chain.next?.next)?.next?.next // expected-error 2 {{property access is 'async' but is not marked with 'await'}}
 }
 
 
@@ -210,14 +241,14 @@ actor Calculator {
 @OrangeActor func doSomething() async {
   let _ = (await bananaAdd(1))(2)
   // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
-  let _ = await (await bananaAdd(1))(2) // expected-warning{{no calls to 'async' functions occur within 'await' expression}}
+  let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
   // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
   // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
-  let _ = await (await calc.addCurried(1))(2) // expected-warning{{no calls to 'async' functions occur within 'await' expression}}
+  let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
   // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))

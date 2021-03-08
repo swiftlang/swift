@@ -93,3 +93,36 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
 
   func uiActorMethod() { }
 }
+
+// ConcurrentValue conformance inference for imported types.
+func acceptCV<T: ConcurrentValue>(_: T) { }
+func testCV(r: NSRange) {
+  acceptCV(r)
+}
+
+// Global actor (unsafe) isolation.
+
+actor SomeActor { }
+
+@globalActor
+struct SomeGlobalActor {
+  static let shared = SomeActor()
+}
+
+class MyButton : NXButton {
+  @MainActor func testMain() {
+    onButtonPress() // okay
+  }
+
+  @SomeGlobalActor func testOther() {
+    onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
+  }
+
+  func test() {
+    onButtonPress() // okay
+  }
+}
+
+func testButtons(mb: MyButton) {
+  mb.onButtonPress()
+}

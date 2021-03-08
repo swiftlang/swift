@@ -17,50 +17,6 @@ using namespace swift;
 using namespace swift::syntax;
 using namespace llvm;
 
-ParsedRawSyntaxNode
-ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
-                                  MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
-                                  SyntaxParsingContext &ctx) {
-  CharSourceRange range;
-  if (deferredNodes.empty()) {
-    return ParsedRawSyntaxNode(k, range, {});
-  }
-  ParsedRawSyntaxNode *newPtr =
-    ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
-
-#ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(deferredNodes);
-#endif
-  auto ptr = newPtr;
-  for (auto &node : deferredNodes) {
-    // Cached range.
-    if (!node.isNull() && !node.isMissing()) {
-      auto nodeRange = node.getDeferredRange();
-      if (nodeRange.isValid()) {
-        if (range.isInvalid())
-          range = nodeRange;
-        else
-          range.widen(nodeRange);
-      }
-    }
-
-    // uninitialized move;
-    :: new (static_cast<void *>(ptr++)) ParsedRawSyntaxNode(std::move(node));
-  }
-  return ParsedRawSyntaxNode(k, range,
-                             makeMutableArrayRef(newPtr, deferredNodes.size()));
-}
-
-ParsedRawSyntaxNode
-ParsedRawSyntaxNode::makeDeferred(Token tok, StringRef leadingTrivia,
-                                  StringRef trailingTrivia,
-                                  SyntaxParsingContext &ctx) {
-  CharSourceRange tokRange = tok.getRange();
-  return ParsedRawSyntaxNode(tok.getKind(), tokRange.getStart(),
-                             tokRange.getByteLength(), leadingTrivia,
-                             trailingTrivia);
-}
-
 void ParsedRawSyntaxNode::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
   llvm::errs() << '\n';

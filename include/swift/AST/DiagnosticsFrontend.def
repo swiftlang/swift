@@ -165,15 +165,15 @@ ERROR(error_mode_requires_one_sil_multi_sib,none,
       ())
 
 ERROR(error_no_output_filename_specified,none,
-      "an output filename was not specified for a mode which requires an "
-      "output filename", ())
+      "an %0 filename was not specified for a mode which requires an "
+      "%0 filename", (StringRef))
 
 ERROR(error_implicit_output_file_is_directory,none,
       "the implicit output file '%0' is a directory; explicitly specify a "
-      "filename using -o", (StringRef))
+      "filename using %1", (StringRef, StringRef))
 
 ERROR(error_if_any_output_files_are_specified_they_all_must_be,none,
-      "if any output files are specified, they all must be", ())
+      "if any %0 files are specified, they all must be", (StringRef))
 
 ERROR(error_primary_file_not_found,none,
       "primary file '%0' was not found in file list '%1'",
@@ -211,6 +211,8 @@ ERROR(error_index_failed_status_check,none,
       "failed file status check: %0", (StringRef))
 ERROR(error_index_inputs_more_than_outputs,none,
       "index output filenames do not match input source files", ())
+WARNING(warn_index_unit_output_path_without_index_store,none,
+      "-index-unit-output-path is ignored without -index-store-path", ())
 
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",

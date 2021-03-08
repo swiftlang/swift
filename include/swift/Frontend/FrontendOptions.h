@@ -301,7 +301,7 @@ public:
   ///
   /// This flag is currently only propagated from the driver to
   /// any merge-modules jobs.
-  bool EnableExperimentalCrossModuleIncrementalBuild = false;
+  bool DisableCrossModuleIncrementalBuild = false;
 
   /// Best effort to output a .swiftmodule regardless of any compilation
   /// errors. SIL generation and serialization is skipped entirely when there

@@ -37,7 +37,9 @@ struct InvalidRethrows : InvalidRethrowingProtocol {
   // expected-error@-1{{'rethrows' function must take a throwing function argument}}
 }
 
-func freeFloatingRethrowing<R: RethrowingProtocol>(_ r: R) rethrows { }
+func freeFloatingRethrowing<R: RethrowingProtocol>(_ r: R) rethrows {
+  try r.source()
+}
 
 func freeFloatingRethrowingFromExistential(_ r: RethrowingProtocol) rethrows {
   // expected-error@-1{{'rethrows' function must take a throwing function argument}}
@@ -64,7 +66,9 @@ protocol HasAssociatedRethrower {
   func makeRethrower() -> Rethrower
 }
 
-func freeFloatingRethrowing<R: HasAssociatedRethrower>(_ r: R) rethrows { }
+func freeFloatingRethrowing<R: HasAssociatedRethrower>(_ r: R) rethrows {
+  try r.makeRethrower().source()
+}
 
 @rethrows
 protocol InheritsRethrowing: RethrowingProtocol {}
@@ -75,7 +79,10 @@ func freeFloatingInheritedRethrowingFunctionFromExistential(_ r: InheritsRethrow
   // expected-error@-1{{'rethrows' function must take a throwing function argument}}
 }
 
-func closureAndRethrowing<R: RethrowingProtocol>(_ r: R, _ closure: () throws -> Void) rethrows { }
+func closureAndRethrowing<R: RethrowingProtocol>(_ r: R, _ closure: () throws -> Void) rethrows {
+  try r.source()
+  try closure()
+}
 
 closureAndRethrowing(NonThrows()) { }
 try closureAndRethrowing(NonThrows()) { } // expected-warning{{no calls to throwing functions occur within 'try' expression}}
@@ -85,8 +92,13 @@ try closureAndRethrowing(NonThrows()) { () throws -> Void in }
 // Make sure we handle the case where both the 'self' parameter and a closure
 // argument are rethrows sources.
 extension RethrowingProtocol {
-  func selfRethrowing() rethrows { }
-  func closureAndSelfRethrowing(_ closure: () throws -> Void) rethrows { }
+  func selfRethrowing() rethrows {
+    try source()
+  }
+  func closureAndSelfRethrowing(_ closure: () throws -> Void) rethrows {
+    try source()
+    try closure()
+  }
 }
 
 NonThrows().selfRethrowing()
@@ -213,6 +225,18 @@ enum MyEnum : WitnessedByEnumCase {
   case bar
 }
 
-func takesWitnessedByEnumCase<T : WitnessedByEnumCase>(_: T) rethrows {}
+func takesWitnessedByEnumCase<T : WitnessedByEnumCase>(_: T) rethrows {
+  _ = try T.foo(123)
+}
 
 takesWitnessedByEnumCase(MyEnum.bar)
+
+// Invalid cases
+enum HorseError : Error {
+  case bolted
+}
+
+func hasRethrowsConformanceAndThrowsBody<T : Empty>(_: T) rethrows {
+  throw HorseError.bolted
+  // expected-error@-1 {{a function declared 'rethrows' may only throw if its parameter does}}
+}

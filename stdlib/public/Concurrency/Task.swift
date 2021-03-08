@@ -392,12 +392,9 @@ extension Task {
   @discardableResult
   public static func runDetached<T>(
     priority: Priority = .default,
-    startingOn executor: ExecutorRef? = nil,
     operation: @concurrent @escaping () async -> T
     // TODO: Allow inheriting task-locals?
   ) -> Handle<T, Never> {
-    assert(executor == nil, "Custom executor support is not implemented yet.") // FIXME
-
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -448,11 +445,8 @@ extension Task {
   @discardableResult
   public static func runDetached<T, Failure>(
     priority: Priority = .default,
-    startingOn executor: ExecutorRef? = nil,
     operation: @concurrent @escaping () async throws -> T
   ) -> Handle<T, Failure> {
-    assert(executor == nil, "Custom executor support is not implemented yet.") // FIXME
-
     // Set up the job flags for a new task.
     var flags = JobFlags()
     flags.kind = .task
@@ -478,19 +472,29 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
   )
 }
 
-// ==== Voluntary Suspension -----------------------------------------------------
+// ==== Async Sleep ------------------------------------------------------------
 
 extension Task {
-
-  /// Explicitly suspend the current task, potentially giving up execution actor
-  /// of current actor/task, allowing other tasks to execute.
+  /// Suspends the current task for _at least_ the given duration
+  /// in nanoseconds.
   ///
-  /// This is not a perfect cure for starvation;
-  /// if the task is the highest-priority task in the system, it might go
-  /// immediately back to executing.
-  @available(*, deprecated, message: "Not implemented yet.")
-  public static func yield() async {
-    fatalError("\(#function) not implemented yet.")
+  /// This function does _not_ block the underlying thread.
+  public static func sleep(_ duration: UInt64) async {
+    // Set up the job flags for a new task.
+    var flags = JobFlags()
+    flags.kind = .task
+    flags.priority = .default
+    flags.isFuture = true
+
+    // Create the asynchronous task future.
+    // FIXME: This should be an empty closure instead. Returning `0` here is
+    //        a workaround for rdar://74957357
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, { return 0 })
+
+    // Enqueue the resulting job.
+    _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
+
+    let _ = await Handle<Int, Never>(task).get()
   }
 }
 
@@ -508,7 +512,7 @@ extension Task {
   ///
   /// The returned value must not be accessed from tasks other than the current one.
   public static var unsafeCurrent: UnsafeCurrentTask? {
-    guard let _task = _getActiveAsyncTask() else {
+    guard let _task = _getCurrentAsyncTask() else {
       return nil
     }
     // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
@@ -583,8 +587,8 @@ extension UnsafeCurrentTask: Equatable {
 
 // ==== Internal ---------------------------------------------------------------
 
-@_silgen_name("swift_task_get_active")
-func _getActiveAsyncTask() -> Builtin.NativeObject?
+@_silgen_name("swift_task_getCurrent")
+func _getCurrentAsyncTask() -> Builtin.NativeObject?
 
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
@@ -592,6 +596,10 @@ func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
+
+@_silgen_name("swift_task_enqueueGlobalWithDelay")
+@usableFromInline
+func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 
 @available(*, deprecated)
 @_silgen_name("swift_task_runAndBlockThread")
@@ -601,6 +609,7 @@ public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 public func _asyncMainDrainQueue() -> Never
 
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
+#if os(Windows)
   Task.runDetached {
     do {
       try await asyncFun()
@@ -609,6 +618,21 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
       _errorInMain(error)
     }
   }
+#else
+  @MainActor @concurrent
+  func _doMain(_ asyncFun: @escaping () async throws -> ()) async {
+    do {
+      try await asyncFun()
+    } catch {
+      _errorInMain(error)
+    }
+  }
+
+  Task.runDetached {
+    await _doMain(asyncFun)
+    exit(0)
+  }
+#endif
   _asyncMainDrainQueue()
 }
 

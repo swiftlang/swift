@@ -577,6 +577,15 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
         if (BIT->isFixedWidth() && BIT->getFixedWidth() == BFT->getBitWidth())
           break;
+      
+    // Support VecNxInt1 -> IntN bitcast for SIMD comparison results.
+    if (auto *Vec = CheckInput->getAs<BuiltinVectorType>())
+      if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
+        if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
+          if (Element->getFixedWidth() == 1 &&
+              BIT->isFixedWidth() &&
+              BIT->getFixedWidth() == Vec->getNumElements())
+            break;
 
     // FIXME: Implement bitcast typechecking.
     llvm_unreachable("Bitcast not supported yet!");
@@ -1864,7 +1873,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
-  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
   case IITDescriptor::VecOfBitcastsToInt:
   case IITDescriptor::Subdivide2Argument:
@@ -1891,6 +1899,15 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
     return makeVector(eltType, D.Vector_Width.getKnownMinValue());
+  }
+  
+  // The element type of a vector type.
+  case IITDescriptor::VecElementArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    auto vecType = argType->getAs<BuiltinVectorType>();
+    if (!vecType) return Type();
+    return vecType->getElementType();
   }
 
   // A pointer to an immediate type.

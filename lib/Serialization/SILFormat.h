@@ -367,14 +367,13 @@ namespace sil_block {
     SIL_PARTIAL_APPLY,
     SIL_BUILTIN,
     SIL_TRY_APPLY,
-    SIL_NON_THROWING_APPLY,
-    SIL_BEGIN_APPLY,
-    SIL_NON_THROWING_BEGIN_APPLY
+    SIL_BEGIN_APPLY
   };
 
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind
+    BCFixed<2>,           // ApplyOptions
     SubstitutionMapIDField,  // substitution map
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type

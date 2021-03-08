@@ -260,6 +260,7 @@ bb0(%0 : @owned $B, %1 : @owned $B):
   store %1 to [assign] %3 : $*B
   %7 = existential_metatype $@thick Any.Type, %2 : $*Any
   %99 = tuple (%5 : $@thick Any.Type, %7 : $@thick Any.Type)
+  destroy_addr %2 : $*Any
   dealloc_stack %2 : $*Any
   return %99 : $(@thick Any.Type, @thick Any.Type)
 }

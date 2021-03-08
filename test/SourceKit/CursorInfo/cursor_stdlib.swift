@@ -169,33 +169,6 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-REPLACEMENT4:         "identifier": "swift.method"
 // CHECK-REPLACEMENT4:       },
 // CHECK-REPLACEMENT4:       "names": {
-// CHECK-REPLACEMENT4:         "navigator": [
-// CHECK-REPLACEMENT4:           {
-// CHECK-REPLACEMENT4:             "kind": "keyword",
-// CHECK-REPLACEMENT4:             "spelling": "func"
-// CHECK-REPLACEMENT4:           },
-// CHECK-REPLACEMENT4:           {
-// CHECK-REPLACEMENT4:             "kind": "text",
-// CHECK-REPLACEMENT4:             "spelling": " "
-// CHECK-REPLACEMENT4:           },
-// CHECK-REPLACEMENT4:           {
-// CHECK-REPLACEMENT4:             "kind": "identifier",
-// CHECK-REPLACEMENT4:             "spelling": "append"
-// CHECK-REPLACEMENT4:           },
-// CHECK-REPLACEMENT4:           {
-// CHECK-REPLACEMENT4:             "kind": "text",
-// CHECK-REPLACEMENT4:             "spelling": "("
-// CHECK-REPLACEMENT4:           },
-// CHECK-REPLACEMENT4:           {
-// CHECK-REPLACEMENT4:             "kind": "typeIdentifier",
-// CHECK-REPLACEMENT4:             "preciseIdentifier": "s:13cursor_stdlib2S1V",
-// CHECK-REPLACEMENT4:             "spelling": "S1"
-// CHECK-REPLACEMENT4:           },
-// CHECK-REPLACEMENT4:           {
-// CHECK-REPLACEMENT4:             "kind": "text",
-// CHECK-REPLACEMENT4:             "spelling": ")"
-// CHECK-REPLACEMENT4:           }
-// CHECK-REPLACEMENT4:         ],
 // CHECK-REPLACEMENT4:         "subHeading": [
 // CHECK-REPLACEMENT4:           {
 // CHECK-REPLACEMENT4:             "kind": "keyword",

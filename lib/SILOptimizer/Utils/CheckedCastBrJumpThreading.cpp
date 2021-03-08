@@ -657,7 +657,8 @@ void CheckedCastBrJumpThreading::optimizeFunction() {
     return;
 
   // Second phase: transformation.
-  Fn->verifyCriticalEdges();
+  if (Fn->getModule().getOptions().VerifyAll)
+    Fn->verifyCriticalEdges();
 
   for (Edit *edit : Edits) {
     BasicBlockCloner Cloner(edit->CCBBlock);

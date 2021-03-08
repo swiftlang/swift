@@ -40,8 +40,11 @@ static StringRef getScoreKindName(ScoreKind kind) {
   case SK_Unavailable:
     return "use of an unavailable declaration";
 
-  case SK_AsyncSyncMismatch:
-    return "async/synchronous mismatch";
+  case SK_AsyncInSyncMismatch:
+    return "async-in-synchronous mismatch";
+
+  case SK_SyncInAsync:
+    return "sync-in-asynchronous";
 
   case SK_ForwardTrailingClosure:
     return "forward scan when matching a trailing closure";

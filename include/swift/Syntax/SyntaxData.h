@@ -51,20 +51,6 @@
 namespace swift {
 namespace syntax {
 
-/// A reference counted box that can contain any type.
-template <typename T>
-class RefCountedBox final
-    : public llvm::ThreadSafeRefCountedBase<RefCountedBox<T>> {
-public:
-  const T Data;
-
-  RefCountedBox(const T Data) : Data(Data) {}
-
-  static RC<RefCountedBox<T>> make(const T &Data) {
-    return RC<RefCountedBox<T>>{new RefCountedBox(Data)};
-  }
-};
-
 /// The class for holding parented syntax.
 ///
 /// This structure should not contain significant public
@@ -72,67 +58,69 @@ public:
 ///
 /// It is essentially a wrapper around \c AbsoluteRawSyntax that also keeps
 /// track of the parent.
-class SyntaxData {
+class SyntaxData : public llvm::ThreadSafeRefCountedBase<SyntaxData> {
   const AbsoluteRawSyntax AbsoluteRaw;
-  RC<RefCountedBox<SyntaxData>> Parent;
+  RC<const SyntaxData> Parent;
 
-  SyntaxData(AbsoluteRawSyntax AbsoluteRaw,
-             const RC<RefCountedBox<SyntaxData>> &Parent)
-      : AbsoluteRaw(AbsoluteRaw), Parent(Parent) {}
+  /// If this node is the root of a Syntax tree (i.e. \c Parent is \c nullptr ),
+  /// the arena in which this node's \c RawSyntax node has been allocated.
+  /// This keeps this \c RawSyntax nodes referenced by this tree alive.
+  RC<SyntaxArena> Arena;
+
+  /// Create a intermediate node with a parent.
+  SyntaxData(AbsoluteRawSyntax AbsoluteRaw, const RC<const SyntaxData> &Parent)
+      : AbsoluteRaw(AbsoluteRaw), Parent(Parent), Arena(nullptr) {}
+
+  /// Create a new root node
+  SyntaxData(AbsoluteRawSyntax AbsoluteRaw)
+      : AbsoluteRaw(AbsoluteRaw), Parent(nullptr),
+        Arena(AbsoluteRaw.getRaw()->getArena()) {}
 
 public:
   /// With a new \c RawSyntax node, create a new node from this one and
   /// recursively rebuild the parental chain up to the root.
-  SyntaxData replacingSelf(const RC<RawSyntax> &NewRaw) const;
+  RC<const SyntaxData> replacingSelf(const RawSyntax *NewRaw) const;
 
   /// Replace a child in the raw syntax and recursively rebuild the
   /// parental chain up to the root.
   template <typename CursorType>
-  SyntaxData replacingChild(const RC<RawSyntax> &RawChild,
-                            CursorType ChildCursor) const {
+  RC<const SyntaxData> replacingChild(const RawSyntax *RawChild,
+                                      CursorType ChildCursor) const {
     auto NewRaw = AbsoluteRaw.getRaw()->replacingChild(ChildCursor, RawChild);
     return replacingSelf(NewRaw);
   }
 
   /// Get the node immediately before this current node that does contain a
-  /// non-missing token. Return \c None if we cannot find such node.
-  Optional<SyntaxData> getPreviousNode() const;
+  /// non-missing token. Return \c nullptr if we cannot find such node.
+  RC<const SyntaxData> getPreviousNode() const;
 
   /// Get the node immediately after this current node that does contain a
-  /// non-missing token. Return \c None if we cannot find such node.
-  Optional<SyntaxData> getNextNode() const;
+  /// non-missing token. Return \c nullptr if we cannot find such node.
+  RC<const SyntaxData> getNextNode() const;
 
-  /// Get the first non-missing token node in this tree. Return \c None if
+  /// Get the first non-missing token node in this tree. Return \c nullptr if
   /// this node does not contain non-missing tokens.
-  Optional<SyntaxData> getFirstToken() const;
+  RC<const SyntaxData> getFirstToken() const;
 
-  /// Get the last non-missing token node in this tree. Return \c None if
+  /// Get the last non-missing token node in this tree. Return \c nullptr if
   /// this node does not contain non-missing tokens.
-  Optional<SyntaxData> getLastToken() const;
+  RC<const SyntaxData> getLastToken() const;
 
   /// Make a new \c SyntaxData node for the tree's root.
-  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw) {
-    return make(AbsoluteRaw, nullptr);
+  static RC<const SyntaxData> makeRoot(AbsoluteRawSyntax AbsoluteRaw) {
+    return RC<const SyntaxData>(new SyntaxData(AbsoluteRaw));
   }
-  static SyntaxData make(AbsoluteRawSyntax AbsoluteRaw,
-                         const RC<RefCountedBox<SyntaxData>> &Parent);
 
   const AbsoluteRawSyntax &getAbsoluteRaw() const { return AbsoluteRaw; }
 
   /// Returns the raw syntax node for this syntax node.
-  const RC<RawSyntax> &getRaw() const { return AbsoluteRaw.getRaw(); }
+  const RawSyntax *getRaw() const { return AbsoluteRaw.getRaw(); }
 
   /// Returns the kind of syntax node this is.
   SyntaxKind getKind() const { return AbsoluteRaw.getRaw()->getKind(); }
 
   /// Return the parent syntax if there is one.
-  Optional<SyntaxData> getParent() const {
-    if (Parent) {
-      return Parent->Data;
-    } else {
-      return None;
-    }
-  }
+  RC<const SyntaxData> getParent() const { return Parent; }
 
   /// Returns true if this syntax node has a parent.
   bool hasParent() const {
@@ -152,13 +140,13 @@ public:
 
   /// Gets the child at the index specified by the provided cursor.
   template <typename CursorType>
-  Optional<SyntaxData> getChild(CursorType Cursor) const {
+  RC<const SyntaxData> getChild(CursorType Cursor) const {
     return getChild(
         (AbsoluteSyntaxPosition::IndexInParentType)cursorIndex(Cursor));
   }
 
   /// Gets the child at the specified \p Index.
-  Optional<SyntaxData>
+  RC<const SyntaxData>
   getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const;
 
   /// Get the offset at which the leading trivia of this node starts.

@@ -27,14 +27,6 @@
 using namespace swift;
 using namespace swift::syntax;
 
-static RC<RawSyntax> transferOpaqueNode(OpaqueSyntaxNode opaqueN) {
-  if (!opaqueN)
-    return nullptr;
-  RC<RawSyntax> raw{(RawSyntax *)opaqueN};
-  raw->Release(); // -1 since it's transfer of ownership.
-  return raw;
-}
-
 SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
                                      SyntaxParsingCache *syntaxCache,
                                      RC<syntax::SyntaxArena> arena)
@@ -103,7 +95,7 @@ public:
 Optional<SourceFileSyntax>
 SyntaxTreeCreator::realizeSyntaxRoot(OpaqueSyntaxNode rootN,
                                      const SourceFile &SF) {
-  auto raw = transferOpaqueNode(rootN);
+  auto raw = static_cast<const RawSyntax *>(rootN);
   auto rootNode = makeRoot<SourceFileSyntax>(raw);
 
   // Verify the tree if specified.
@@ -138,34 +130,28 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
   auto raw =
       TokenCache->getToken(Arena, tokenKind, range.getByteLength(), tokenText,
                            leadingTriviaText, trailingTriviaText);
-  OpaqueSyntaxNode opaqueN = raw.get();
-  raw.resetWithoutRelease();
-  return opaqueN;
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
   auto raw = RawSyntax::missing(kind, getTokenText(kind), Arena);
-  OpaqueSyntaxNode opaqueN = raw.get();
-  raw.resetWithoutRelease();
-  return opaqueN;
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
                                    ArrayRef<OpaqueSyntaxNode> elements,
                                    CharSourceRange range) {
-  SmallVector<RC<RawSyntax>, 16> parts;
+  SmallVector<const RawSyntax *, 16> parts;
   parts.reserve(elements.size());
   for (OpaqueSyntaxNode opaqueN : elements) {
-    parts.push_back(transferOpaqueNode(opaqueN));
+    parts.push_back(static_cast<const RawSyntax *>(opaqueN));
   }
   size_t TextLength = range.isValid() ? range.getByteLength() : 0;
   auto raw =
       RawSyntax::make(kind, parts, TextLength, SourcePresence::Present, Arena);
-  OpaqueSyntaxNode opaqueN = raw.get();
-  raw.resetWithoutRelease();
-  return opaqueN;
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 std::pair<size_t, OpaqueSyntaxNode>
@@ -175,15 +161,7 @@ SyntaxTreeCreator::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
   auto cacheLookup = SyntaxCache->lookUp(lexerOffset, kind);
   if (!cacheLookup)
     return {0, nullptr};
-  RC<RawSyntax> raw = cacheLookup->getRaw();
-  OpaqueSyntaxNode opaqueN = raw.get();
+  const RawSyntax *raw = cacheLookup->getRaw();
   size_t length = raw->getTextLength();
-  raw.resetWithoutRelease();
-  return {length, opaqueN};
-}
-
-void SyntaxTreeCreator::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
-  if (!opaqueN)
-    return;
-  static_cast<RawSyntax *>(opaqueN)->Release();
+  return {length, static_cast<OpaqueSyntaxNode>(raw)};
 }

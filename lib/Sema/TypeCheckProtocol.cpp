@@ -1813,8 +1813,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 ProtocolConformance *MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
-  PrettyStackTraceConformance trace(getASTContext(), "type-checking",
-                                    conformance);
+  PrettyStackTraceConformance trace("type-checking", conformance);
 
   std::vector<MissingWitness> revivedMissingWitnesses;
   switch (conformance->getState()) {
@@ -2725,6 +2724,7 @@ bool ConformanceChecker::checkActorIsolation(
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
   bool isCrossActor = false;
+  bool witnessIsUnsafe = false;
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
@@ -2748,10 +2748,10 @@ bool ConformanceChecker::checkActorIsolation(
       auto witnessVar = dyn_cast<VarDecl>(witness);
       if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
         auto independentNote = witness->diagnose(
-            diag::note_add_actorindependent_to_decl,
+            diag::note_add_nonisolated_to_decl,
             witness->getName(), witness->getDescriptiveKind());
-        independentNote.fixItInsert(witness->getAttributeInsertionLoc(false),
-            "@actorIndependent ");
+        independentNote.fixItInsert(witness->getAttributeInsertionLoc(true),
+            "nonisolated ");
       }
     }
 
@@ -2762,13 +2762,14 @@ bool ConformanceChecker::checkActorIsolation(
     return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
 
-  case ActorIsolationRestriction::CrossGlobalActor:
-    isCrossActor = true;
+  case ActorIsolationRestriction::GlobalActorUnsafe:
+    witnessIsUnsafe = true;
     LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
     // Hang on to the global actor that's used for the witness. It will need
     // to match that of the requirement.
+    isCrossActor = witnessRestriction.isCrossActor;
     witnessGlobalActor = witness->getDeclContext()->mapTypeIntoContext(
         witnessRestriction.getGlobalActor());
     break;
@@ -2785,9 +2786,14 @@ bool ConformanceChecker::checkActorIsolation(
 
   // Check whether the requirement requires some particular actor isolation.
   Type requirementGlobalActor;
+  bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
     llvm_unreachable("There are not actor protocols");
+
+  case ActorIsolation::GlobalActorUnsafe:
+    requirementIsUnsafe = true;
+    LLVM_FALLTHROUGH;
 
   case ActorIsolation::GlobalActor: {
     auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
@@ -2837,6 +2843,10 @@ bool ConformanceChecker::checkActorIsolation(
     if (requirement->hasClangNode())
       return false;
 
+    // If the witness is "unsafe", allow the mismatch.
+    if (witnessIsUnsafe)
+      return false;
+
     witness->diagnose(
         diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
         witness->getName(), witnessGlobalActor, Proto->getName());
@@ -2846,9 +2856,11 @@ bool ConformanceChecker::checkActorIsolation(
 
   // If the requirement has a global actor but the witness does not, we have
   // an isolation error.
-  //
-  // FIXME: Within a module, this will be an inference rule.
   if (requirementGlobalActor && !witnessGlobalActor) {
+    // If the requirement's global actor was "unsafe", we allow this.
+    if (requirementIsUnsafe)
+      return false;
+
     if (isCrossActor) {
       return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
@@ -4508,17 +4520,6 @@ void ConformanceChecker::resolveValueWitnesses() {
 
       auto &C = witness->getASTContext();
 
-      // Ensure that Actor.enqueue(partialTask:) is implemented within the
-      // actor class itself.
-      if (FuncDecl::isEnqueuePartialTaskName(C, requirement->getName()) &&
-          Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
-          DC != witness->getDeclContext() &&
-          Adoptee->getClassOrBoundGenericClass() &&
-          Adoptee->getClassOrBoundGenericClass()->isActor()) {
-        witness->diagnose(diag::enqueue_partial_task_not_in_context, Adoptee);
-        return;
-      }
-
       if (checkActorIsolation(requirement, witness))
         return;
 
@@ -5650,13 +5651,6 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-std::vector<ProtocolConformance *>
-LookupAllConformancesInContextRequest::evaluate(
-    Evaluator &eval, const IterableDeclContext *IDC) const {
-  auto result = IDC->getLocalConformances(ConformanceLookupKind::All);
-  return std::vector<ProtocolConformance *>(result.begin(), result.end());
-}
-
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto *const dc = idc->getAsGenericContext();
 
@@ -5672,9 +5666,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   const auto defaultAccess = nominal->getFormalAccess();
 
   // Check each of the conformances associated with this context.
-  auto conformances =
-      evaluateOrDefault(dc->getASTContext().evaluator,
-                        LookupAllConformancesInContextRequest{idc}, {});
+  auto conformances = idc->getLocalConformances();
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();
@@ -5724,8 +5716,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   // Check constraints of ConcurrentValue.
   if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
-    bool asWarning = errorConformance || codingKeyConformance;
-    checkConcurrentValueConformance(concurrentValueConformance, asWarning);
+    ConcurrentValueCheck check = ConcurrentValueCheck::Explicit;
+    if (errorConformance || codingKeyConformance)
+      check = ConcurrentValueCheck::ImpliedByStandardProtocol;
+    checkConcurrentValueConformance(concurrentValueConformance, check);
   }
 
   // Check all conformances.
@@ -6195,9 +6189,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
-
-  case KnownDerivableProtocolKind::Actor:
-    return derived.deriveActor(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(

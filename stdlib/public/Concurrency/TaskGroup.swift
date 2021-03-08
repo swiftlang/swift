@@ -146,7 +146,7 @@ extension Task {
         flags.bits, _task, _group, operation)
 
       // Attach it to the group's task record in the current task.
-      _taskGroupAttachChild(group: _group, parent: _task, child: childTask)
+      _taskGroupAttachChild(group: _group, child: childTask)
 
       // Enqueue the resulting job.
       _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
@@ -242,14 +242,20 @@ extension Task {
     /// This function may be called even from within child (or any other) tasks,
     /// and will reliably cause the group to become cancelled.
     ///
-    /// - SeeAlso: `Task.addCancellationHandler`
-    /// - SeeAlso: `Task.checkCancelled`
     /// - SeeAlso: `Task.isCancelled`
+    /// - SeeAlso: `TaskGroup.isCancelled`
     public func cancelAll() {
       _taskGroupCancelAll(task: _task, group: _group)
     }
 
-    // Returns `true` if the group was cancelled, e.g. by `cancelAll`.
+    /// Returns `true` if the group was cancelled, e.g. by `cancelAll`.
+    ///
+    /// If the task currently running this group was cancelled, the group will
+    /// also be implicitly cancelled, which will be reflected in the return
+    /// value of this function as well.
+    ///
+    /// - Returns: `true` if the group (or its parent task) was cancelled,
+    ///            `false` otherwise.
     public var isCancelled: Bool {
       return _taskIsCancelled(_task) ||
         _taskGroupIsCancelled(task: _task, group: _group)
@@ -335,31 +341,30 @@ func _swiftRelease(
   _ object: Builtin.NativeObject
 )
 
-@_silgen_name("swift_task_group_create")
+@_silgen_name("swift_taskGroup_create")
 func _taskGroupCreate(
   task: Builtin.NativeObject
 ) -> Builtin.RawPointer
 
 /// Attach task group child to the group group to the task.
-@_silgen_name("swift_task_group_attachChild")
+@_silgen_name("swift_taskGroup_attachChild")
 func _taskGroupAttachChild(
   group: Builtin.RawPointer,
-  parent: Builtin.NativeObject,
   child: Builtin.NativeObject
 ) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
 
-@_silgen_name("swift_task_group_destroy")
+@_silgen_name("swift_taskGroup_destroy")
 func _taskGroupDestroy(
   task: Builtin.NativeObject,
   group: __owned Builtin.RawPointer
 )
 
-@_silgen_name("swift_task_group_add_pending")
+@_silgen_name("swift_taskGroup_addPending")
 func _taskGroupAddPendingTask(
   group: Builtin.RawPointer
 ) -> Bool
 
-@_silgen_name("swift_task_group_cancel_all")
+@_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(
   task: Builtin.NativeObject,
   group: Builtin.RawPointer
@@ -367,13 +372,13 @@ func _taskGroupCancelAll(
 
 /// Checks ONLY if the group was specifically cancelled.
 /// The task itself being cancelled must be checked separately.
-@_silgen_name("swift_task_group_is_cancelled")
+@_silgen_name("swift_taskGroup_isCancelled")
 func _taskGroupIsCancelled(
   task: Builtin.NativeObject,
   group: Builtin.RawPointer
 ) -> Bool
 
-@_silgen_name("swift_task_group_wait_next_throwing")
+@_silgen_name("swift_taskGroup_wait_next_throwing")
 func _taskGroupWaitNext<T>(
   waitingTask: Builtin.NativeObject,
   group: Builtin.RawPointer
@@ -386,7 +391,7 @@ enum PollStatus: Int {
   case error   = 3
 }
 
-@_silgen_name("swift_task_group_is_empty")
+@_silgen_name("swift_taskGroup_isEmpty")
 func _taskGroupIsEmpty(
   _ group: Builtin.RawPointer
 ) -> Bool

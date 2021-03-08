@@ -94,6 +94,12 @@ def run_build_script_helper(action, host_target, product, args):
     foundation_build_dir = os.path.join(
         build_root, '%s-%s' % ('foundation', host_target))
 
+    # Pass the swift lit tests if we're testing and the Swift tests were built
+    swift_build_dir = os.path.join(
+        build_root, 'swift-{}'.format(host_target))
+    lit_test_dir = os.path.join(
+        swift_build_dir, 'test-{}'.format(host_target))
+
     is_release = product.is_release()
     configuration = 'release' if is_release else 'debug'
     helper_cmd = [
@@ -113,6 +119,10 @@ def run_build_script_helper(action, host_target, product, args):
     if os.path.exists(foundation_build_dir):
         helper_cmd += [
             '--foundation-build-dir', foundation_build_dir
+        ]
+    if os.path.exists(lit_test_dir) and action == 'test':
+        helper_cmd += [
+            '--lit-test-dir', lit_test_dir
         ]
     if args.verbose_build:
         helper_cmd.append('--verbose')

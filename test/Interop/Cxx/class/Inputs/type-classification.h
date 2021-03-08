@@ -189,4 +189,10 @@ struct StructWithCopyConstructorAndSubobjectCopyConstructorAndValue {
       : member(other.member) {}
 };
 
+template<class> struct DependentParent { struct Child { }; };
+
+struct HasUnsupportedUsingShadow : DependentParent<int> {
+  using typename DependentParent<int>::Child;
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H

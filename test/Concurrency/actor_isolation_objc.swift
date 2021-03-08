@@ -16,17 +16,31 @@ actor A {
   func keypaths() {
     _ = #keyPath(A.x) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'x'}}
     _ = #keyPath(A.y) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'y'}}
+    _ = #keyPath(A.computed) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'computed'}}
     _ = #keyPath(A.z)
   }
 
   var x: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
+
   @objc var y: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
   // expected-error@-1{{actor-isolated property 'y' cannot be @objc}}
+
   @objc @actorIndependent(unsafe) var z: Int = 0
+
+  // expected-note@+1 {{add '@objc' to expose this property to Objective-C}}
+  @objc var computed : Int { // expected-error{{actor-isolated property 'computed' cannot be @objc}}
+    get { 120 }
+  }
 
   func f() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}
   func g() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}
   @objc func h() async { }
+
+  @objc @asyncHandler func i() {}
+}
+
+func outside(a : A) async {
+  await a.i() // expected-warning {{no 'async' operations occur within 'await' expression}}
 }
 
 

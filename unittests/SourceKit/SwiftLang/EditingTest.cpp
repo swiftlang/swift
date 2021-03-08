@@ -92,6 +92,8 @@ private:
 
   void recordFormattedText(StringRef Text) override {}
 
+  bool diagnosticsEnabled() override { return true; }
+
   void setDiagnosticStage(UIdent diagStage) override { DiagStage = diagStage; }
   void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override {

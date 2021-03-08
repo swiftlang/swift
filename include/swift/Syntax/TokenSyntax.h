@@ -33,10 +33,11 @@ protected:
     assert(getRaw()->isToken());
   }
 public:
-  TokenSyntax(const SyntaxData Data) : Syntax(Data) {}
+  TokenSyntax(const RC<const SyntaxData> &Data) : Syntax(Data) {}
 
-  static TokenSyntax missingToken(const tok Kind, StringRef Text) {
-    return makeRoot<TokenSyntax>(RawSyntax::missing(Kind, Text));
+  static TokenSyntax missingToken(const tok Kind, StringRef Text,
+                                  const RC<SyntaxArena> &Arena) {
+    return makeRoot<TokenSyntax>(RawSyntax::missing(Kind, Text, Arena));
   }
 
   StringRef getLeadingTrivia() const { return getRaw()->getLeadingTrivia(); }
@@ -49,12 +50,12 @@ public:
 
   TokenSyntax withLeadingTrivia(StringRef Trivia) const {
     auto NewRaw = getRaw()->withLeadingTrivia(Trivia);
-    return TokenSyntax(getData().replacingSelf(NewRaw));
+    return TokenSyntax(getData()->replacingSelf(NewRaw));
   }
 
   TokenSyntax withTrailingTrivia(StringRef Trivia) const {
     auto NewRaw = getRaw()->withTrailingTrivia(Trivia);
-    return TokenSyntax(getData().replacingSelf(NewRaw));
+    return TokenSyntax(getData()->replacingSelf(NewRaw));
   }
 
   /* TODO: If we really need them.

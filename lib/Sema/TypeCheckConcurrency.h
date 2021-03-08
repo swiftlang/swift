@@ -74,29 +74,31 @@ public:
     /// There is no restriction on references to the given declaration.
     Unrestricted,
 
-    /// Access to the declaration is unsafe in a concurrent context.
+    /// Access to the declaration is unsafe in any concurrent context.
     Unsafe,
 
     /// References to this entity are allowed from anywhere, but doing so
-    /// may cross an actor boundary if it is not on \c self.
+    /// may cross an actor boundary if it is not from within the same actor's
+    /// isolation domain.
     CrossActorSelf,
 
-    /// References to this member of an actor are only permitted on 'self'.
+    /// References to this member of an actor are only permitted from within
+    /// the actor's isolation domain.
     ActorSelf,
 
-    /// References to a declaration that is part of a global actor are only
-    /// permitted from other declarations with that same global actor.
+    /// References to a declaration that is part of a global actor are
+    /// permitted from other declarations with that same global actor or
+    /// are permitted from elsewhere as a cross-actor reference.
     GlobalActor,
 
-    /// Referneces to this entity are allowed from anywhere, but doing so may
-    /// cross an actor bounder if it is not from the same global actor.
-    CrossGlobalActor,
+    /// References to a declaration that is part of a global actor are
+    /// permitted from other declarations with that same global actor or
+    /// are permitted from elsewhere as a cross-actor reference, but
+    /// contexts with unspecified isolation won't diagnose anything.
+    GlobalActorUnsafe,
   };
 
 private:
-  /// The kind of restriction.
-  Kind kind;
-
   union {
     /// The local context that an entity is tied to.
     DeclContext *localContext;
@@ -108,9 +110,17 @@ private:
     TypeBase *globalActor;
   } data;
 
-  explicit ActorIsolationRestriction(Kind kind) : kind(kind) { }
+  explicit ActorIsolationRestriction(Kind kind, bool isCrossActor)
+      : kind(kind), isCrossActor(isCrossActor) { }
 
 public:
+  /// The kind of restriction.
+  const Kind kind;
+
+  /// Whether referencing this from another actor constitutes a cross-acter
+  /// reference.
+  const bool isCrossActor;
+
   Kind getKind() const { return kind; }
 
   /// Retrieve the actor class that the declaration is within.
@@ -121,25 +131,26 @@ public:
 
   /// Retrieve the actor class that the declaration is within.
   Type getGlobalActor() const {
-    assert(kind == GlobalActor || kind == CrossGlobalActor);
+    assert(kind == GlobalActor || kind == GlobalActorUnsafe);
     return Type(data.globalActor);
   }
 
   /// There are no restrictions on the use of the entity.
   static ActorIsolationRestriction forUnrestricted() {
-    return ActorIsolationRestriction(Unrestricted);
+    return ActorIsolationRestriction(Unrestricted, /*isCrossActor=*/false);
   }
 
   /// Accesses to the given declaration are unsafe.
   static ActorIsolationRestriction forUnsafe() {
-    return ActorIsolationRestriction(Unsafe);
+    return ActorIsolationRestriction(Unsafe, /*isCrossActor=*/false);
   }
 
   /// Accesses to the given declaration can only be made via the 'self' of
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
       ClassDecl *actorClass, bool isCrossActor) {
-    ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf);
+    ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
+                                     isCrossActor);
     result.data.actorClass = actorClass;
     return result;
   }
@@ -147,9 +158,9 @@ public:
   /// Accesses to the given declaration can only be made via this particular
   /// global actor or is a cross-actor access.
   static ActorIsolationRestriction forGlobalActor(
-      Type globalActor, bool isCrossActor) {
+      Type globalActor, bool isCrossActor, bool isUnsafe) {
     ActorIsolationRestriction result(
-        isCrossActor ? CrossGlobalActor : GlobalActor);
+        isUnsafe ? GlobalActorUnsafe : GlobalActor, isCrossActor);
     result.data.globalActor = globalActor.getPointer();
     return result;
   }
@@ -190,9 +201,25 @@ bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind);
 
+/// How the concurrent value check should be performed.
+enum class ConcurrentValueCheck {
+  /// ConcurrentValue conformance was explicitly stated and should be
+  /// fully checked.
+  Explicit,
+
+  /// ConcurrentValue conformance was implied by one of the standard library
+  /// protocols that added ConcurrentValue after-the-fact.
+  ImpliedByStandardProtocol,
+
+  /// Implicit conformance to ConcurrentValue for structs and enums.
+  Implicit,
+};
+
 /// Check the correctness of the given ConcurrentValue conformance.
-void checkConcurrentValueConformance(
-    ProtocolConformance *conformance, bool asWarning);
+///
+/// \returns true if an error occurred.
+bool checkConcurrentValueConformance(
+    ProtocolConformance *conformance, ConcurrentValueCheck check);
 
 } // end namespace swift
 

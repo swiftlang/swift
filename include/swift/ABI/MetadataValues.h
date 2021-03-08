@@ -46,6 +46,9 @@ enum {
   /// The number of words (in addition to the heap-object header)
   /// in a default actor.
   NumWords_DefaultActor = 10,
+
+  /// The number of words in a task group.
+  NumWords_TaskGroup = 32,
 };
 
 struct InProcess;
@@ -120,6 +123,9 @@ const size_t MaximumAlignment = 16;
 
 /// The alignment of a DefaultActor.
 const size_t Alignment_DefaultActor = MaximumAlignment;
+
+/// The alignment of a TaskGroup.
+const size_t Alignment_TaskGroup = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -1166,9 +1172,6 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
-
-  /// Actor enqueue(partialTask:).
-  const uint16_t ActorEnqueuePartialTask = 0x8f3d;
 
   /// Jobs, tasks, and continuations.
   const uint16_t JobInvokeFunction = 0xcc64; // = 52324

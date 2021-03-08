@@ -900,7 +900,7 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
       Inst, getBuilder().createApply(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
-                Inst->isNonThrowing(),
+                Inst->getApplyOptions(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 
@@ -915,6 +915,7 @@ SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
                 getOpBasicBlock(Inst->getNormalBB()),
                 getOpBasicBlock(Inst->getErrorBB()),
+                Inst->getApplyOptions(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 
@@ -941,7 +942,7 @@ SILCloner<ImplClass>::visitBeginApplyInst(BeginApplyInst *Inst) {
       Inst, getBuilder().createBeginApply(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCallee()),
                 getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
-                Inst->isNonThrowing(),
+                Inst->getApplyOptions(),
                 GenericSpecializationInformation::create(Inst, getBuilder())));
 }
 
@@ -1243,7 +1244,7 @@ void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
                                       getOpValue(Inst->getDest()),
                                       getOpValue(Inst->getInitializer()),
                                       getOpValue(Inst->getSetter()),
-                                      Inst->getOwnershipQualifier()));
+                                      Inst->getMode()));
 }
 
 template<typename ImplClass>
@@ -1807,7 +1808,8 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
 
   recordClonedInstruction(
       Inst, getBuilder().createDestroyValue(getOpLocation(Inst->getLoc()),
-                                            getOpValue(Inst->getOperand())));
+                                            getOpValue(Inst->getOperand()),
+                                            Inst->poisonRefs()));
 }
 
 template <typename ImplClass>
@@ -2697,8 +2699,8 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                 getOpLocation(Inst->getLoc()), Inst->isExact(),
                 getOpValue(Inst->getOperand()),
                 getOpType(Inst->getTargetLoweredType()),
-                getOpASTType(Inst->getTargetFormalType()),
-                OpSuccBB, OpFailBB, TrueCount, FalseCount));
+                getOpASTType(Inst->getTargetFormalType()), OpSuccBB, OpFailBB,
+                Inst->getForwardingOwnershipKind(), TrueCount, FalseCount));
 }
 
 template <typename ImplClass>

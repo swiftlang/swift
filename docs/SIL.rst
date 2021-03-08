@@ -2036,7 +2036,15 @@ and as a result:
 
 * Textual SIL does not represent the ownership of forwarding instructions
   explicitly. Instead, the instruction's ownership is inferred normally from the
-  parsed operand. Since the SILVerifier runs on Textual SIL after parsing, you
+  parsed operand.
+  In some cases the forwarding ownership kind is different from the ownership kind
+  of its operand. In such cases, textual SIL represents the forwarding ownership kind
+  explicity.
+  Eg: ::
+
+    %cast = unchecked_ref_cast %val : $Klass to $Optional<Klass>, forwarding: @unowned
+
+  Since the SILVerifier runs on Textual SIL after parsing, you
   can feel confident that ownership constraints were inferred correctly.
 
 Forwarding has slightly different ownership semantics depending on the value
@@ -3547,6 +3555,27 @@ by an `end_borrow`_ instruction. All `load_borrow`_ instructions must be
 paired with exactly one `end_borrow`_ instruction along any path through the
 program. Until `end_borrow`_, it is illegal to invalidate or store to ``%0``.
 
+store_borrow
+````````````
+
+::
+
+  sil-instruction ::= 'store_borrow' sil-value 'to' sil-operand
+
+  store_borrow %0 to %1 : $*T
+  // $T must be a loadable type
+  // %1 must be an alloc_stack $T
+
+Stores the value ``%0`` to a stack location ``%1``, which must be an
+``alloc_stack $T``.
+The stored value is alive until the ``dealloc_stack`` or until another
+``store_borrow`` overwrites the value. During the its lifetime, the stored
+value must not be modified or destroyed.
+The source value ``%0`` is borrowed (i.e. not copied) and it's borrow scope
+must outlive the lifetime of the stored value.
+
+Note: This is the current implementation and the design is not final.
+
 begin_borrow
 ````````````
 
@@ -3591,6 +3620,20 @@ We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
 
 This instruction is only valid in functions in Ownership SSA form.
 
+end_lifetime
+````````````
+
+::
+
+   sil-instruction ::= 'end_lifetime' sil-operand
+
+This instruction signifies the end of it's operand's lifetime to the ownership
+verifier. It is inserted by the compiler in instances where it could be illegal
+to insert a destroy operation. Ex: if the sil-operand had an undef value.
+
+This instruction is valid only in OSSA and is lowered to a no-op when lowering
+to non-OSSA.
+
 assign
 ``````
 ::
@@ -3621,7 +3664,9 @@ assign_by_wrapper
 ``````````````````
 ::
 
-  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+
+  mode ::= '[initialization]' | '[assign]' | '[assign_wrapped_value]'
 
   assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
@@ -3632,13 +3677,22 @@ assign_by_wrapper
 Similar to the `assign`_ instruction, but the assignment is done via a
 delegate.
 
-In case of an initialization, the function ``%2`` is called with ``%0`` as
-argument. The result is stored to ``%1``. In case ``%2`` is an address type,
-it is simply passed as a first out-argument to ``%2``.
+Initially the instruction is created with no mode. Once the mode is decided
+(by the definitive initialization pass), the instruction is lowered as follows:
 
-In case of a re-assignment, the function ``%3`` is called with ``%0`` as
-argument. As ``%3`` is a setter (e.g. for the property in the containing
-nominal type), the destination address ``%1`` is not used in this case.
+If the mode is ``initialization``, the function ``%2`` is called with ``%0`` as
+argument. The result is stored to ``%1``. In case of an address type, ``%1`` is
+simply passed as a first out-argument to ``%2``.
+
+The ``assign`` mode works similar to ``initialization``, except that the
+destination is "assigned" rather than "initialized". This means that the
+existing value in the destination is destroyed before the new value is
+stored.
+
+If the mode is ``assign_wrapped_value``, the function ``%3`` is called with
+``%0`` as argument. As ``%3`` is a setter (e.g. for the property in the
+containing nominal type), the destination address ``%1`` is not used in this
+case.
 
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
@@ -5157,7 +5211,7 @@ destroy_value
 
 ::
 
-  sil-instruction ::= 'destroy_value' sil-operand
+  sil-instruction ::= 'destroy_value' '[poison]'? sil-operand
 
   destroy_value %0 : $A
 

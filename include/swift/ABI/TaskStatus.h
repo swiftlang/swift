@@ -20,8 +20,8 @@
 #ifndef SWIFT_ABI_TASKSTATUS_H
 #define SWIFT_ABI_TASKSTATUS_H
 
-#include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/Task.h"
+#include "swift/ABI/MetadataValues.h"
 
 namespace swift {
 
@@ -164,6 +164,8 @@ public:
 
 /// A status record which states that a task has a task group.
 ///
+/// A record always is a specific `TaskGroupImpl`.
+///
 /// The child tasks are stored as an invasive single-linked list, starting
 /// from `FirstChild` and continuing through the `NextChild` pointers of all
 /// the linked children.
@@ -177,21 +179,18 @@ public:
 /// Group child tasks DO NOT have their own `ChildTaskStatusRecord` entries,
 /// and are only tracked by their respective `TaskGroupTaskStatusRecord`.
 class TaskGroupTaskStatusRecord : public TaskStatusRecord {
-  TaskGroup *Group;
   AsyncTask *FirstChild;
 public:
-  TaskGroupTaskStatusRecord(TaskGroup *group)
+  TaskGroupTaskStatusRecord()
     : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
-      Group(group),
       FirstChild(nullptr) {}
 
-  TaskGroupTaskStatusRecord(TaskGroup *group, AsyncTask *child)
+  TaskGroupTaskStatusRecord(AsyncTask *child)
     : TaskStatusRecord(TaskStatusRecordKind::TaskGroup),
-      Group(group),
       FirstChild(child) {}
 
-  TaskGroup* getGroup() const {
-    return Group;
+  TaskGroup* getGroup() {
+    return reinterpret_cast<TaskGroup *>(this);
   }
 
   /// Return the first child linked by this record.  This may be null;
@@ -205,7 +204,7 @@ public:
   void attachChild(AsyncTask *child) {
     assert(child->groupChildFragment());
     assert(child->hasGroupChildFragment());
-    assert(child->groupChildFragment()->getGroup() == Group);
+    assert(child->groupChildFragment()->getGroup() == getGroup());
 
     if (!FirstChild) {
       // This is the first child we ever attach, so store it as FirstChild.
@@ -214,12 +213,10 @@ public:
     }
 
     // We need to traverse the siblings to find the last one and add the child there.
+    // FIXME: just set prepend to the current head, no need to traverse.
 
     auto cur = FirstChild;
-    auto i = 0;
     while (cur) {
-      i++;
-
       // no need to check hasChildFragment, all tasks we store here have them.
       auto fragment = cur->childFragment();
       if (auto next = fragment->getNextChild()) {

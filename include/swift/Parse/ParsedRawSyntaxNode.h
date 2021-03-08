@@ -22,7 +22,7 @@
 
 namespace swift {
 
-typedef void *OpaqueSyntaxNode;
+typedef const void *OpaqueSyntaxNode;
 class SyntaxParsingContext;
 
 /// Represents a raw syntax node formed by the parser.
@@ -40,6 +40,7 @@ class SyntaxParsingContext;
 /// there are instances that it's not clear what will be the final syntax node
 /// in the current parsing context.
 class ParsedRawSyntaxNode {
+  friend class ParsedRawSyntaxRecorder;
   enum class DataKind: uint8_t {
     Null,
     Recorded,
@@ -291,25 +292,6 @@ public:
   }
 
   //==========================================================================//
-
-  /// Form a deferred syntax layout node.
-  static ParsedRawSyntaxNode makeDeferred(syntax::SyntaxKind k,
-                        MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
-                                          SyntaxParsingContext &ctx);
-
-  /// Form a deferred token node.
-  static ParsedRawSyntaxNode makeDeferred(Token tok, StringRef leadingTrivia,
-                                          StringRef trailingTrivia,
-                                          SyntaxParsingContext &ctx);
-
-  /// Form a deferred missing token node.
-  static ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc) {
-    auto raw = ParsedRawSyntaxNode(tokKind, loc, /*tokLength=*/0,
-                                   /*leadingTrivia=*/StringRef(),
-                                   /*trailingTrivia=*/StringRef());
-    raw.IsMissing = true;
-    return raw;
-  }
 
   /// Dump this piece of syntax recursively for debugging or testing.
   SWIFT_DEBUG_DUMP;
