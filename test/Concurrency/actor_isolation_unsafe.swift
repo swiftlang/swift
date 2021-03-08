@@ -47,7 +47,7 @@ class C2: C1 {
 
 class C3: C1 {
   @actorIndependent override func method() {
-    globalSome() // expected-error{{global function 'globalSome()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' synchronous context}}
+    globalSome() // expected-error{{global function 'globalSome()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
   }
 }
 

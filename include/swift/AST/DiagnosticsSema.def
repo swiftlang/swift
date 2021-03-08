@@ -4287,8 +4287,8 @@ ERROR(actor_isolated_non_self_reference,none,
         "%select{from inside the actor|on 'self'}2",
         (DescriptiveDeclKind, DeclName, bool, unsigned))
 ERROR(actor_isolated_self_independent_context,none,
-        "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from an "
-        "'@actorIndependent' context",
+        "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from a "
+        "non-isolated context",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
@@ -4311,7 +4311,7 @@ ERROR(global_actor_from_other_global_actor_context,none,
       (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
 ERROR(global_actor_from_nonactor_context,none,
       "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
-      " from %select{this|an '@actorIndependent'}3%select{| synchronous}5 context",
+      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
       (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
