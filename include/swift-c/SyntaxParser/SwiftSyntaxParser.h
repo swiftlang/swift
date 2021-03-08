@@ -103,6 +103,8 @@ typedef struct {
   uint16_t leading_trivia_count;
   uint16_t trailing_trivia_count;
   swiftparse_token_kind_t kind;
+  /// Represents the range for the node, including trivia.
+  swiftparse_range_t range;
 } swiftparse_token_data_t;
 
 typedef struct {
@@ -115,9 +117,6 @@ typedef struct {
     swiftparse_token_data_t token_data;
     swiftparse_layout_data_t layout_data;
   };
-  /// Represents the range for the node. For a token node the range includes
-  /// the trivia associated with it.
-  swiftparse_range_t range;
   /// The syntax kind. A value of '0' means this is a token node.
   swiftparse_syntax_kind_t kind;
   bool present;

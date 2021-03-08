@@ -150,7 +150,7 @@ private:
     node.token_data.trailing_trivia_count = trailingTrivia.size();
     assert(node.token_data.trailing_trivia_count == trailingTrivia.size() &&
            "trailing trivia count value is too large");
-    makeCRange(node.range, range);
+    makeCRange(node.token_data.range, range);
     node.present = true;
   }
 
@@ -186,7 +186,6 @@ private:
     node.layout_data.nodes =
         const_cast<const swiftparse_client_node_t *>(elements.data());
     node.layout_data.nodes_count = elements.size();
-    makeCRange(node.range, range);
     node.present = true;
     return getNodeHandler()(&node);
   }
