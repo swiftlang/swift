@@ -82,6 +82,22 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     return nullptr;
   }
 
+  // The property must not be isolated to an actor instance.
+  switch (auto isolation = getActorIsolation(var)) {
+  case ActorIsolation::ActorInstance:
+    var->diagnose(
+        diag::actor_instance_property_wrapper, var->getName(),
+        nominal->getName());
+    return nullptr;
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+  case ActorIsolation::Independent:
+  case ActorIsolation::IndependentUnsafe:
+  case ActorIsolation::Unspecified:
+    break;
+  }
+
   return var;
 }
 

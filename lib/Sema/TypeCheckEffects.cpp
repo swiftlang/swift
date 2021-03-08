@@ -431,6 +431,8 @@ public:
       recurse = asImpl().checkOptionalTry(optionalTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
+    } else if (auto lookup = dyn_cast<LookupExpr>(E)) {
+      recurse = asImpl().checkLookup(lookup);
     } else if (auto declRef = dyn_cast<DeclRefExpr>(E)) {
       recurse = asImpl().checkDeclRef(declRef);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
@@ -980,6 +982,9 @@ private:
       ThrowKind = std::max(ThrowKind, classification.getConditionalKind(EffectKind::Throws));
       return ShouldRecurse;
     }
+    ShouldRecurse_t checkLookup(LookupExpr *E) {
+      return ShouldRecurse; // NOTE: currently, lookups can't throw
+    }
     ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
       return ShouldNotRecurse;
     }
@@ -1081,7 +1086,12 @@ private:
       AsyncKind = std::max(AsyncKind, classification.getConditionalKind(EffectKind::Async));
       return ShouldRecurse;
     }
+    ShouldRecurse_t checkLookup(LookupExpr *E) {
+      // FIXME should the logic from CheckEffectsCoverage::checkLookup be here?
+      return ShouldRecurse;
+    }
     ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
+      // FIXME should the logic from CheckEffectsCoverage::checkDeclRef be here?
       return ShouldNotRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
@@ -1771,47 +1781,73 @@ public:
     llvm_unreachable("bad context kind");
   }
 
-  void diagnoseUncoveredAsyncSite(ASTContext &ctx, ASTNode node) {
-    SourceRange highlight;
+  /// NOTE: the values backing these enums match up with a %select
+  /// in the diagnostics!
+  enum AsyncSiteKind {
+    Unspecified = 0,
+    Call = 1,
+    Await = 2,
+    AsyncLet = 3,
+    Property = 4,
+    Subscript = 5
+  };
 
-    // Generate more specific messages in some cases.
-
-    // Reference to an 'async let' missing an 'await'.
-    if (auto declRef = dyn_cast_or_null<DeclRefExpr>(node.dyn_cast<Expr *>())) {
-      if (auto var = dyn_cast<VarDecl>(declRef->getDecl())) {
-        if (var->isAsyncLet()) {
-          ctx.Diags.diagnose(
-              declRef->getLoc(), diag::async_let_without_await, var->getName());
-          return;
-        }
-      }
-    }
-
-    if (auto apply = dyn_cast_or_null<ApplyExpr>(node.dyn_cast<Expr*>()))
-      highlight = apply->getSourceRange();
-
+  void diagnoseUncoveredAsyncSite(ASTContext &ctx, ASTNode node,
+                                  AsyncSiteKind kind) {
+    SourceRange highlight = node.getSourceRange();
     auto diag = diag::async_call_without_await;
 
-    // To produce a better error message, check if it is an autoclosure.
-    // We do not use 'Context::isAutoClosure' b/c it gives conservative answers.
-    if (Function) {
-      if (auto autoclosure = dyn_cast_or_null<AutoClosureExpr>(
-              Function->getAbstractClosureExpr())) {
-        switch (autoclosure->getThunkKind()) {
-        case AutoClosureExpr::Kind::None:
-          diag = diag::async_call_without_await_in_autoclosure;
-          break;
-
-        case AutoClosureExpr::Kind::AsyncLet:
-          diag = diag::async_call_without_await_in_async_let;
-          break;
-
-        case AutoClosureExpr::Kind::SingleCurryThunk:
-        case AutoClosureExpr::Kind::DoubleCurryThunk:
-          break;
+    switch (kind) {
+    case AsyncSiteKind::AsyncLet:
+      // Reference to an 'async let' missing an 'await'.
+      if (auto declR = dyn_cast_or_null<DeclRefExpr>(node.dyn_cast<Expr*>())) {
+        if (auto var = dyn_cast<VarDecl>(declR->getDecl())) {
+          if (var->isAsyncLet()) {
+            ctx.Diags.diagnose(declR->getLoc(), diag::async_let_without_await,
+                               var->getName());
+            return;
+          }
         }
       }
+      LLVM_FALLTHROUGH; // fallthrough to a message about property access
+
+    case AsyncSiteKind::Property:
+      diag = diag::async_prop_access_without_await;
+      break;
+
+    case AsyncSiteKind::Subscript:
+      diag = diag::async_subscript_access_without_await;
+      break;
+
+    case AsyncSiteKind::Unspecified:
+    case AsyncSiteKind::Call: {
+      if (Function) {
+        // To produce a better error message, check if it is an autoclosure.
+        // We do not use 'Context::isAutoClosure' b/c it gives conservative
+        // answers.
+        if (auto autoclosure = dyn_cast_or_null<AutoClosureExpr>(
+                Function->getAbstractClosureExpr())) {
+          switch (autoclosure->getThunkKind()) {
+          case AutoClosureExpr::Kind::None:
+            diag = diag::async_call_without_await_in_autoclosure;
+            break;
+
+          case AutoClosureExpr::Kind::AsyncLet:
+            diag = diag::async_call_without_await_in_async_let;
+            break;
+
+          case AutoClosureExpr::Kind::SingleCurryThunk:
+          case AutoClosureExpr::Kind::DoubleCurryThunk:
+            break;
+          }
+        }
+      }
+      break;
     }
+
+    case AsyncSiteKind::Await:
+      llvm_unreachable("diagnosing an uncovered await?");
+    };
 
     ctx.Diags.diagnose(node.getStartLoc(), diag)
         .fixItInsert(node.getStartLoc(), "await ")
@@ -1859,20 +1895,15 @@ public:
       addAsyncNotes(func);
   }
 
-  void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node) {
+  /// providing a \c kind helps tailor the emitted message.
+  void diagnoseUnhandledAsyncSite(DiagnosticEngine &Diags, ASTNode node,
+                                  AsyncSiteKind kind) {
     switch (getKind()) {
-    case Kind::PotentiallyHandled: {
-      unsigned kind = 0;
-      if (node.isExpr(ExprKind::Await))
-        kind = 1;
-      else if (node.isExpr(ExprKind::DeclRef) ||
-               node.isDecl(DeclKind::PatternBinding))
-        kind = 2;
+    case Kind::PotentiallyHandled:
       Diags.diagnose(node.getStartLoc(), diag::async_in_nonasync_function,
-                     kind, isAutoClosure());
+                     static_cast<unsigned>(kind), isAutoClosure());
       maybeAddAsyncNote(Diags);
       return;
-    }
 
     case Kind::EnumElementInitializer:
     case Kind::GlobalVarInitializer:
@@ -2264,14 +2295,20 @@ private:
     classifier.ReasyncDC = ReasyncDC;
     auto classification = classifier.classifyApply(E);
 
-    checkThrowAsyncSite(E, /*requiresTry*/ true, classification);
+    checkThrowAsyncSite(E, /*requiresTry*/ true, classification,
+                        Context::Call);
 
-    // HACK: functions can get queued multiple times in
-    // definedFunctions, so be sure to be idempotent.
-    if (!E->isThrowsSet() && !classification.isInvalid()) {
-      auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
-      E->setThrows(throwsKind == ConditionalEffectKind::Conditional ||
-                   throwsKind == ConditionalEffectKind::Always);
+    if (!classification.isInvalid()) {
+      // HACK: functions can get queued multiple times in
+      // definedFunctions, so be sure to be idempotent.
+      if (!E->isThrowsSet()) {
+        auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
+        E->setThrows(throwsKind == ConditionalEffectKind::Conditional ||
+                     throwsKind == ConditionalEffectKind::Always);
+      }
+
+      auto asyncKind = classification.getConditionalKind(EffectKind::Async);
+      E->setNoAsync(asyncKind == ConditionalEffectKind::None);
     }
 
     // If current apply expression did not type-check, don't attempt
@@ -2284,8 +2321,31 @@ private:
     return !type || type->hasError() ? ShouldNotRecurse : ShouldRecurse;
   }
 
+  ShouldRecurse_t checkLookup(LookupExpr *E) {
+    if (E->isImplicitlyAsync()) {
+      Context::AsyncSiteKind lookupKind = Context::Property;
+      // check the kind of thing we're looking up to give better diagnostics
+      if (auto valueDecl = E->getMember().getDecl())
+        if (isa<SubscriptDecl>(valueDecl))
+          lookupKind = Context::Subscript;
+
+      checkThrowAsyncSite(E, /*requiresTry=*/false,
+            Classification::forUnconditional(EffectKind::Async,
+                                             PotentialEffectReason::forApply()),
+                          lookupKind);
+    }
+
+    return ShouldRecurse;
+  }
+
   ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
-    if (auto decl = E->getDecl()) {
+    if (E->isImplicitlyAsync()) {
+      checkThrowAsyncSite(E, /*requiresTry=*/false,
+            Classification::forUnconditional(EffectKind::Async,
+                                             PotentialEffectReason::forApply()),
+                          Context::Property);
+
+    } else if (auto decl = E->getDecl()) {
       if (auto var = dyn_cast<VarDecl>(decl)) {
         // "Async let" declarations are treated as an asynchronous call
         // (to the underlying task's "get"). If the initializer was throwing,
@@ -2309,7 +2369,8 @@ private:
                            EffectKind::Throws,
                            PotentialEffectReason::forThrowingAsyncLet()));
           }
-          checkThrowAsyncSite(E, /*requiresTry=*/throws, result);
+          checkThrowAsyncSite(E, /*requiresTry=*/throws, result,
+                              Context::AsyncLet);
         }
       }
     }
@@ -2320,7 +2381,8 @@ private:
   ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
     // Diagnose async let in a context that doesn't handle async.
     if (!CurContext.handlesAsync(ConditionalEffectKind::Always)) {
-      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding);
+      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, patternBinding,
+                                            Context::AsyncLet);
     }
 
     return ShouldRecurse;
@@ -2377,8 +2439,11 @@ private:
     return ShouldRecurse;
   }
 
+  /// providing a \c kind helps tailor any possible diagnostic messages
+  /// related to async-ness
   void checkThrowAsyncSite(ASTNode E, bool requiresTry,
-                           const Classification &classification) {
+                           const Classification &classification,
+                           Context::AsyncSiteKind kind) {
     // Suppress all diagnostics when there's an un-analyzable throw site.
     if (classification.isInvalid()) {
       Flags.set(ContextFlags::HasAnyThrowSite);
@@ -2401,11 +2466,11 @@ private:
 
       // Diagnose async calls in a context that doesn't handle async.
       if (!CurContext.handlesAsync(asyncKind)) {
-        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E);
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, kind);
       }
       // Diagnose async calls that are outside of an await context.
       else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
-        CurContext.diagnoseUncoveredAsyncSite(Ctx, E);
+        CurContext.diagnoseUncoveredAsyncSite(Ctx, E, kind);
       }
     }
 
@@ -2459,7 +2524,7 @@ private:
       if (CurContext.handlesAsync(ConditionalEffectKind::Conditional))
         Ctx.Diags.diagnose(E->getAwaitLoc(), diag::no_async_in_await);
       else
-        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E);
+        CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, Context::Await);
     }
     
     // Inform the parent of the walk that an 'await' exists here.
@@ -2541,7 +2606,7 @@ private:
         S->getSequenceConformance(), EffectKind::Async);
     auto asyncKind = classification.getConditionalKind(EffectKind::Async);
     if (!CurContext.handlesAsync(asyncKind))
-      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S);
+      CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, Context::Unspecified);
 
     return ShouldRecurse;
   }

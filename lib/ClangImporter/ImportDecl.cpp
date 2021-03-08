@@ -4458,8 +4458,10 @@ namespace {
         return nullptr;
       
       Decl *SwiftDecl = Impl.importDecl(decl->getUnderlyingDecl(), getActiveSwiftVersion());
+      if (!SwiftDecl)
+        return nullptr;
+
       const TypeDecl *SwiftTypeDecl = dyn_cast<TypeDecl>(SwiftDecl);
-      
       if (!SwiftTypeDecl)
         return nullptr;
       
@@ -8539,8 +8541,7 @@ void ClangImporter::Implementation::finishNormalConformance(
   (void)unused;
 
   auto *proto = conformance->getProtocol();
-  PrettyStackTraceConformance trace(SwiftContext, "completing import of",
-                                    conformance);
+  PrettyStackTraceConformance trace("completing import of", conformance);
 
   finishTypeWitnesses(conformance);
   conformance->finishSignatureConformances();

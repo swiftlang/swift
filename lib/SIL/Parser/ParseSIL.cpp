@@ -3030,7 +3030,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     UNARY_INSTRUCTION(IsUnique)
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
-    UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
@@ -3057,6 +3056,14 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
+  case SILInstructionKind::DestroyValueInst: {
+    bool poisonRefs = false;
+    if (parseSILOptional(poisonRefs, *this, "poison")
+        || parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createDestroyValue(InstLoc, Val, poisonRefs);
+    break;
+  }
   case SILInstructionKind::BeginCOWMutationInst: {
     bool native = false;
     if (parseSILOptional(native, *this, "native") ||
@@ -5635,13 +5642,15 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
   auto PartialApplyConvention = ParameterConvention::Direct_Owned;
-  bool IsNonThrowingApply = false;
+  ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
   StringRef AttrName;
 
   while (parseSILOptional(AttrName, *this)) {
     if (AttrName.equals("nothrow"))
-      IsNonThrowingApply = true;
+      ApplyOpts |= ApplyFlags::DoesNotThrow;
+    else if (AttrName.equals("noasync"))
+      ApplyOpts |= ApplyFlags::DoesNotAwait;
     else if (AttrName.equals("callee_guaranteed"))
       PartialApplyConvention = ParameterConvention::Direct_Guaranteed;
     else if (AttrName.equals("on_stack"))
@@ -5746,7 +5755,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
       Args.push_back(getLocalValue(ArgName, expectedTy, InstLoc, B));
     }
 
-    ResultVal = B.createApply(InstLoc, FnVal, subs, Args, IsNonThrowingApply);
+    ResultVal = B.createApply(InstLoc, FnVal, subs, Args, ApplyOpts);
     break;
   }
   case SILInstructionKind::BeginApplyInst: {
@@ -5762,7 +5771,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     ResultVal =
-      B.createBeginApply(InstLoc, FnVal, subs, Args, IsNonThrowingApply);
+      B.createBeginApply(InstLoc, FnVal, subs, Args, ApplyOpts);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
@@ -5810,7 +5819,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
 
     SILBasicBlock *normalBB = getBBForReference(normalBBName, normalBBLoc);
     SILBasicBlock *errorBB = getBBForReference(errorBBName, errorBBLoc);
-    ResultVal = B.createTryApply(InstLoc, FnVal, subs, args, normalBB, errorBB);
+    ResultVal = B.createTryApply(InstLoc, FnVal, subs, args, normalBB, errorBB,
+                                 ApplyOpts);
     break;
   }
   }

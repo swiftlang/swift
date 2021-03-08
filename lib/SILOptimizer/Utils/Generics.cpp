@@ -2073,7 +2073,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
                                argsNeedingEndBorrow);
         });
     auto *newTAI = builder.createTryApply(loc, callee, subs, arguments,
-                                          resultBlock, tai->getErrorBB());
+                                          resultBlock, tai->getErrorBB(),
+                                          tai->getApplyOptions());
     if (resultOut) {
       assert(substConv.useLoweredAddresses());
       // The original normal result of the try_apply is an empty tuple.
@@ -2097,7 +2098,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
                                argsNeedingEndBorrow);
         });
     auto *newAI =
-        builder.createApply(loc, callee, subs, arguments, ai->isNonThrowing());
+        builder.createApply(loc, callee, subs, arguments,
+                            ai->getApplyOptions());
     if (resultOut) {
       if (!calleeSILSubstFnTy.isNoReturnFunction(
               builder.getModule(), builder.getTypeExpansionContext())) {
@@ -2126,7 +2128,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite applySite,
                                argsNeedingEndBorrow);
         });
     auto *newBAI = builder.createBeginApply(loc, callee, subs, arguments,
-                                            bai->isNonThrowing());
+                                            bai->getApplyOptions());
     bai->replaceAllUsesPairwiseWith(newBAI);
     return newBAI;
   }

@@ -39,7 +39,7 @@ func asyncFunction() async {}
 
 func callReasyncFunction() async {
   reasyncFunction { }
-  await reasyncFunction { } // expected-warning {{no calls to 'async' functions occur within 'await' expression}}
+  await reasyncFunction { } // expected-warning {{no 'async' operations occur within 'await' expression}}
 
   reasyncFunction { await asyncFunction() } // expected-error {{call is 'async' but is not marked with 'await'}}
   await reasyncFunction { await asyncFunction() }
@@ -52,11 +52,11 @@ enum HorseError : Error {
 func callReasyncRethrowsFunction() async throws {
   reasyncRethrowsFunction { }
   await reasyncRethrowsFunction { }
-  // expected-warning@-1 {{no calls to 'async' functions occur within 'await' expression}}
+  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}
   try reasyncRethrowsFunction { }
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
   try await reasyncRethrowsFunction { }
-  // expected-warning@-1 {{no calls to 'async' functions occur within 'await' expression}}
+  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}
   // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
 
   reasyncRethrowsFunction { await asyncFunction() }
@@ -74,10 +74,10 @@ func callReasyncRethrowsFunction() async throws {
   await reasyncRethrowsFunction { throw HorseError.colic }
   // expected-error@-1 {{call can throw but is not marked with 'try'}}
   // expected-note@-2 {{call is to 'rethrows' function, but argument function can throw}}
-  // expected-warning@-3 {{no calls to 'async' functions occur within 'await' expression}}
+  // expected-warning@-3 {{no 'async' operations occur within 'await' expression}}
   try reasyncRethrowsFunction { throw HorseError.colic }
   try await reasyncRethrowsFunction { throw HorseError.colic }
-  // expected-warning@-1 {{no calls to 'async' functions occur within 'await' expression}}
+  // expected-warning@-1 {{no 'async' operations occur within 'await' expression}}
 
   reasyncRethrowsFunction { await asyncFunction(); throw HorseError.colic }
   // expected-error@-1 {{call can throw but is not marked with 'try'}}
@@ -101,11 +101,11 @@ func callReasyncWithAutoclosure1() {
 // expected-note@-2 2{{add '@asyncHandler' to function 'callReasyncWithAutoclosure1()' to create an implicit asynchronous context}}
   reasyncWithAutoclosure(computeValue())
   await reasyncWithAutoclosure(await computeValueAsync())
-  // expected-error@-1 {{'async' in a function that does not support concurrency}}
+  // expected-error@-1 {{'async' call in a function that does not support concurrency}}
 
   await reasyncWithAutoclosure(computeValueAsync())
   // expected-error@-1 {{call is 'async' in an autoclosure argument that is not marked with 'await'}}
-  // expected-error@-2 {{'async' in a function that does not support concurrency}}
+  // expected-error@-2 {{'async' call in a function that does not support concurrency}}
 }
 
 func callReasyncWithAutoclosure2() async {
@@ -123,7 +123,7 @@ func callReasyncWithAutoclosure2() async {
 func invalidReasyncBody(_: () async -> ()) reasync {
 // expected-note@-1 {{add 'async' to function 'invalidReasyncBody' to make it asynchronous}}
   _ = await computeValueAsync()
-  // expected-error@-1 {{'async' in a function that does not support concurrency}}
+  // expected-error@-1 {{'async' call in a function that does not support concurrency}}
 }
 
 func validReasyncBody(_ fn: () async -> ()) reasync {

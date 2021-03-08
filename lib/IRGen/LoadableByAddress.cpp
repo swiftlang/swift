@@ -2530,7 +2530,8 @@ void LoadableByAddress::recreateSingleApply(
     SILValue newApply =
       applyBuilder.createApply(castedApply->getLoc(), callee,
                                applySite.getSubstitutionMap(),
-                               callArgs, castedApply->isNonThrowing());
+                               callArgs,
+                               castedApply->getApplyOptions());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -2547,7 +2548,7 @@ void LoadableByAddress::recreateSingleApply(
     auto newApply =
       applyBuilder.createBeginApply(oldApply->getLoc(), callee,
                                     applySite.getSubstitutionMap(), callArgs,
-                                    oldApply->isNonThrowing());
+                                    oldApply->getApplyOptions());
 
     // Use the new token result.
     oldApply->getTokenResult()->replaceAllUsesWith(newApply->getTokenResult());

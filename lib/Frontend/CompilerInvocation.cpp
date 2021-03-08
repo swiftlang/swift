@@ -549,6 +549,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
+
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
 

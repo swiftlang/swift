@@ -281,6 +281,7 @@ public:
   void visitMarkerAttr(MarkerAttr *attr);
 
   void visitReasyncAttr(ReasyncAttr *attr);
+  void visitNonisolatedAttr(NonisolatedAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1471,12 +1472,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   SourceLoc attrLoc = attr->getLocation();
 
-  Optional<Diag<>> MaybeNotAllowed =
-      TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
-  if (MaybeNotAllowed.hasValue()) {
-    diagnose(attrLoc, MaybeNotAllowed.getValue());
-  }
-
   // Find the innermost enclosing declaration with an availability
   // range annotation and ensure that this attribute's available version range
   // is fully contained within that declaration's range. If there is no such
@@ -1494,16 +1489,27 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
     EnclosingDecl = getEnclosingDeclForDecl(EnclosingDecl);
   }
 
-  if (!EnclosingDecl)
-    return;
-
   AvailabilityContext AttrRange{
       VersionRange::allGTE(attr->Introduced.getValue())};
 
-  if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
-    diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
-    diagnose(EnclosingDecl->getLoc(),
-             diag::availability_decl_more_than_enclosing_enclosing_here);
+  if (EnclosingDecl) {
+    if (!AttrRange.isContainedIn(EnclosingAnnotatedRange.getValue())) {
+      diagnose(attr->getLocation(), diag::availability_decl_more_than_enclosing);
+      diagnose(EnclosingDecl->getLoc(),
+               diag::availability_decl_more_than_enclosing_enclosing_here);
+    }
+  }
+
+  Optional<Diag<>> MaybeNotAllowed =
+      TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D);
+  if (MaybeNotAllowed.hasValue()) {
+    AvailabilityContext DeploymentRange
+        = AvailabilityContext::forDeploymentTarget(Ctx);
+    if (EnclosingAnnotatedRange.hasValue())
+      DeploymentRange.intersectWith(*EnclosingAnnotatedRange);
+
+    if (!DeploymentRange.isContainedIn(AttrRange))
+      diagnose(attrLoc, MaybeNotAllowed.getValue());
   }
 }
 
@@ -3399,31 +3405,26 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
 
 Optional<Diag<>>
 TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
-  DeclContext *DC = D->getDeclContext();
-  // Do not permit potential availability of script-mode global variables;
-  // their initializer expression is not lazily evaluated, so this would
-  // not be safe.
-  if (isa<VarDecl>(D) && DC->isModuleScopeContext() &&
-      DC->getParentSourceFile()->isScriptMode()) {
-    return diag::availability_global_script_no_potential;
-  }
-
-  // For now, we don't allow stored properties to be potentially unavailable.
-  // We will want to support these eventually, but we haven't figured out how
-  // this will interact with Definite Initialization, deinitializers and
-  // resilience yet.
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    // Globals and statics are lazily initialized, so they are safe
-    // for potential unavailability. Note that if D is a global in script
-    // mode (which are not lazy) then we will already have returned
-    // a diagnosis above.
-    bool lazilyInitializedStored = VD->isStatic() ||
-                                   VD->getAttrs().hasAttribute<LazyAttr>() ||
-                                   DC->isModuleScopeContext();
+    if (!VD->hasStorage())
+      return None;
 
-    if (VD->hasStorage() && !lazilyInitializedStored) {
+    // Do not permit potential availability of script-mode global variables;
+    // their initializer expression is not lazily evaluated, so this would
+    // not be safe.
+    if (VD->isTopLevelGlobal())
+      return diag::availability_global_script_no_potential;
+
+    // Globals and statics are lazily initialized, so they are safe
+    // for potential unavailability.
+    if (!VD->isStatic() && !VD->getDeclContext()->isModuleScopeContext())
       return diag::availability_stored_property_no_potential;
-    }
+
+  } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+    // An enum element with an associated value cannot be potentially
+    // unavailable.
+    if (EED->hasAssociatedValues())
+      return diag::availability_enum_element_no_potential;
   }
 
   return None;
@@ -4843,10 +4844,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   // Diagnose if original function and derivative differ in terms of static declaration.
   if (!compatibleStaticDecls()) {
     bool derivativeMustBeStatic = !derivative->isStatic();
-    diags.diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
-                   diag::derivative_attr_static_method_mismatch_original,
-                   originalAFD->getName(), derivative->getName(),
-                   derivativeMustBeStatic);
+    diags
+        .diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
+                  diag::derivative_attr_static_method_mismatch_original,
+                  originalAFD->getName(), derivative->getName(),
+                  derivativeMustBeStatic)
+        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diags.diagnose(originalAFD->getNameLoc(),
                    diag::derivative_attr_static_method_mismatch_original_note,
                    originalAFD->getName(), derivativeMustBeStatic);
@@ -5393,7 +5396,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
              diag::transpose_attr_static_method_mismatch_original,
              originalAFD->getName(), transpose->getName(),
-             transposeMustBeStatic);
+             transposeMustBeStatic)
+        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
     diagnose(originalAFD->getNameLoc(),
              diag::transpose_attr_static_method_mismatch_original_note,
              originalAFD->getName(), transposeMustBeStatic);
@@ -5458,6 +5462,41 @@ void AttributeChecker::visitActorIndependentAttr(ActorIndependentAttr *attr) {
     // @actorIndependent can not be applied to local properties.
     if (dc->isLocalContext()) {
       diagnoseAndRemoveAttr(attr, diag::actorindependent_local_var);
+      return;
+    }
+
+    // If this is a static or global variable, we're all set.
+    if (dc->isModuleScopeContext() ||
+        (dc->isTypeContext() && var->isStatic())) {
+      return;
+    }
+  }
+
+  if (auto VD = dyn_cast<ValueDecl>(D)) {
+    (void)getActorIsolation(VD);
+  }
+}
+
+void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
+  // 'nonisolated' can be applied to global and static/class variables
+  // that do not have storage.
+  auto dc = D->getDeclContext();
+  if (auto var = dyn_cast<VarDecl>(D)) {
+    // 'nonisolated' is meaningless on a `let`.
+    if (var->isLet()) {
+      diagnoseAndRemoveAttr(attr, diag::nonisolated_let);
+      return;
+    }
+
+    // 'nonisolated' can not be applied to stored properties.
+    if (var->hasStorage()) {
+      diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage);
+      return;
+    }
+
+    // @actorIndependent can not be applied to local properties.
+    if (dc->isLocalContext()) {
+      diagnoseAndRemoveAttr(attr, diag::nonisolated_local_var);
       return;
     }
 
@@ -5581,9 +5620,10 @@ namespace {
 class ClosureAttributeChecker
     : public AttributeVisitor<ClosureAttributeChecker> {
   ASTContext &ctx;
+  ClosureExpr *closure;
 public:
   ClosureAttributeChecker(ClosureExpr *closure)
-    : ctx(closure->getASTContext()) { }
+    : ctx(closure->getASTContext()), closure(closure) { }
 
   void visitDeclAttribute(DeclAttribute *attr) {
     ctx.Diags.diagnose(
@@ -5595,6 +5635,29 @@ public:
 
   void visitConcurrentAttr(ConcurrentAttr *attr) {
     // Nothing else to check.
+  }
+
+  void visitCustomAttr(CustomAttr *attr) {
+    // Check whether this custom attribute is the global actor attribute.
+    auto globalActorAttr = evaluateOrDefault(
+        ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
+    if (globalActorAttr && globalActorAttr->first == attr)
+      return;
+
+    // Otherwise, it's an error.
+    std::string typeName;
+    if (auto typeRepr = attr->getTypeRepr()) {
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+    } else {
+      typeName = attr->getType().getString();
+    }
+
+    ctx.Diags.diagnose(
+        attr->getLocation(), diag::unsupported_closure_attr,
+        attr->isDeclModifier(), typeName)
+      .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
   }
 };
 

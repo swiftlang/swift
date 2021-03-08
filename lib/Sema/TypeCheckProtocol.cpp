@@ -1813,8 +1813,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 ProtocolConformance *MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
-  PrettyStackTraceConformance trace(getASTContext(), "type-checking",
-                                    conformance);
+  PrettyStackTraceConformance trace("type-checking", conformance);
 
   std::vector<MissingWitness> revivedMissingWitnesses;
   switch (conformance->getState()) {
@@ -2749,10 +2748,10 @@ bool ConformanceChecker::checkActorIsolation(
       auto witnessVar = dyn_cast<VarDecl>(witness);
       if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
         auto independentNote = witness->diagnose(
-            diag::note_add_actorindependent_to_decl,
+            diag::note_add_nonisolated_to_decl,
             witness->getName(), witness->getDescriptiveKind());
-        independentNote.fixItInsert(witness->getAttributeInsertionLoc(false),
-            "@actorIndependent ");
+        independentNote.fixItInsert(witness->getAttributeInsertionLoc(true),
+            "nonisolated ");
       }
     }
 
@@ -4521,17 +4520,6 @@ void ConformanceChecker::resolveValueWitnesses() {
 
       auto &C = witness->getASTContext();
 
-      // Ensure that Actor.enqueue(partialTask:) is implemented within the
-      // actor class itself.
-      if (FuncDecl::isEnqueuePartialTaskName(C, requirement->getName()) &&
-          Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
-          DC != witness->getDeclContext() &&
-          Adoptee->getClassOrBoundGenericClass() &&
-          Adoptee->getClassOrBoundGenericClass()->isActor()) {
-        witness->diagnose(diag::enqueue_partial_task_not_in_context, Adoptee);
-        return;
-      }
-
       if (checkActorIsolation(requirement, witness))
         return;
 
@@ -6201,9 +6189,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
 
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
-
-  case KnownDerivableProtocolKind::Actor:
-    return derived.deriveActor(Requirement);
 
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(

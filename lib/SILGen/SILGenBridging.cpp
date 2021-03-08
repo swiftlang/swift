@@ -244,7 +244,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
                     ManagedValue::forUnmanaged(witnessRef), subs,
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
-                    calleeTypeInfo, ApplyOptions::None, context, None);
+                    calleeTypeInfo, ApplyOptions(), context, None);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -276,7 +276,7 @@ static ManagedValue emitBridgeBoolToWindowsBool(SILGenFunction &SGF,
                                                 SILLocation L, ManagedValue b) {
   // func _convertToWindowsBool(Bool) -> WindowsBool
   SILValue F = SGF.emitGlobalFunctionRef(L, SGF.SGM.getBoolToWindowsBoolFn());
-  SILValue R = SGF.B.createApply(L, F, {}, b.forward(SGF), false);
+  SILValue R = SGF.B.createApply(L, F, {}, b.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(R);
 }
 
@@ -470,7 +470,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   ManagedValue result = SGF.emitMonomorphicApply(loc, fn, args,
                                                  formalNativeResultType,
                                                  formalNativeResultType,
-                                                 ApplyOptions::None,
+                                                 ApplyOptions(),
                                                  None, None, C)
     .getAsSingleValue(SGF, loc);
 
@@ -909,7 +909,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   ManagedValue result = SGF.emitMonomorphicApply(loc, block, args,
                            formalBlockTy.getResult(),
                            formalResultType,
-                           ApplyOptions::None,
+                           ApplyOptions(),
                            /*override CC*/ SILFunctionTypeRepresentation::Block,
                            /*foreign error*/ None,
                            SGFContext(init.get()))
@@ -2199,7 +2199,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forUnmanaged(fn), subs, args,
-                  calleeTypeInfo, ApplyOptions::None, context, None)
+                  calleeTypeInfo, ApplyOptions(), context, None)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

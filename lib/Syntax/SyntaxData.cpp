@@ -15,16 +15,15 @@
 using namespace swift;
 using namespace swift::syntax;
 
-SyntaxData SyntaxData::replacingSelf(const RawSyntax *NewRaw) const {
+RC<const SyntaxData> SyntaxData::replacingSelf(const RawSyntax *NewRaw) const {
   if (hasParent()) {
     auto NewRoot = getParent()->replacingChild(NewRaw, getIndexInParent());
-    auto NewRootBox = RefCountedBox<SyntaxData>::make(NewRoot);
     auto NewSelf = AbsoluteRaw.replacingSelf(
-        NewRaw, NewRoot.AbsoluteRaw.getNodeId().getRootId());
-    return SyntaxData(NewSelf, NewRootBox);
+        NewRaw, NewRoot->AbsoluteRaw.getNodeId().getRootId());
+    return RC<const SyntaxData>(new SyntaxData(NewSelf, NewRoot));
   } else {
     auto NewSelf = AbsoluteRawSyntax::forRoot(NewRaw);
-    return SyntaxData(NewSelf);
+    return RC<const SyntaxData>(new SyntaxData(NewSelf));
   }
 }
 
@@ -47,7 +46,7 @@ void SyntaxData::dump(llvm::raw_ostream &OS) const {
 
 void SyntaxData::dump() const { dump(llvm::errs()); }
 
-Optional<SyntaxData> SyntaxData::getPreviousNode() const {
+RC<const SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
     if (hasParent()) {
       for (size_t I = N - 1; ; --I) {
@@ -60,10 +59,10 @@ Optional<SyntaxData> SyntaxData::getPreviousNode() const {
       }
     }
   }
-  return hasParent() ? getParent()->getPreviousNode() : None;
+  return hasParent() ? getParent()->getPreviousNode() : nullptr;
 }
 
-Optional<SyntaxData> SyntaxData::getNextNode() const {
+RC<const SyntaxData> SyntaxData::getNextNode() const {
   if (hasParent()) {
     for (size_t I = getIndexInParent() + 1, N = getParent()->getNumChildren();
          I != N; ++I) {
@@ -74,12 +73,12 @@ Optional<SyntaxData> SyntaxData::getNextNode() const {
     }
     return getParent()->getNextNode();
   }
-  return None;
+  return nullptr;
 }
 
-Optional<SyntaxData> SyntaxData::getFirstToken() const {
+RC<const SyntaxData> SyntaxData::getFirstToken() const {
   if (getRaw()->isToken()) {
-    return *this;
+    return RC<const SyntaxData>(this);
   }
 
   for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
@@ -93,16 +92,16 @@ Optional<SyntaxData> SyntaxData::getFirstToken() const {
       }
     }
   }
-  return None;
+  return nullptr;
 }
 
-Optional<SyntaxData> SyntaxData::getLastToken() const {
+RC<const SyntaxData> SyntaxData::getLastToken() const {
   if (getRaw()->isToken() && !getRaw()->isMissing()) {
-    return *this;
+    return RC<const SyntaxData>(this);
   }
 
   if (getNumChildren() == 0) {
-    return None;
+    return nullptr;
   }
   for (int I = getNumChildren() - 1; I >= 0; --I) {
     if (auto Child = getChild(I)) {
@@ -116,13 +115,13 @@ Optional<SyntaxData> SyntaxData::getLastToken() const {
       }
     }
   }
-  return None;
+  return nullptr;
 }
 
-Optional<SyntaxData>
+RC<const SyntaxData>
 SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
   if (!getRaw()->getChild(Index)) {
-    return None;
+    return nullptr;
   }
   /// FIXME: Start from the back (advancedToEndOfChildren) and reverse from
   /// there if Index is closer to the end as a performance improvement?
@@ -137,10 +136,9 @@ SyntaxData::getChild(AbsoluteSyntaxPosition::IndexInParentType Index) const {
   }
   AbsoluteSyntaxInfo Info(Position, NodeId);
 
-  const RC<RefCountedBox<SyntaxData>> RefCountedParent =
-      RefCountedBox<SyntaxData>::make(*this);
-  return SyntaxData(AbsoluteRawSyntax(getRaw()->getChild(Index), Info),
-                    RefCountedParent);
+  const RC<const SyntaxData> RefCountedParent = RC<const SyntaxData>(this);
+  return RC<const SyntaxData>(new SyntaxData(
+      AbsoluteRawSyntax(getRaw()->getChild(Index), Info), RefCountedParent));
 }
 
 AbsoluteOffsetPosition

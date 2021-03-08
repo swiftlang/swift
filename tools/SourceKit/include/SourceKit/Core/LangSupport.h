@@ -276,6 +276,8 @@ public:
 
   virtual void recordFormattedText(StringRef Text) = 0;
 
+  virtual bool diagnosticsEnabled() = 0;
+
   virtual void setDiagnosticStage(UIdent DiagStage) = 0;
   virtual void handleDiagnostic(const DiagnosticEntryInfo &Info,
                                 UIdent DiagStage) = 0;

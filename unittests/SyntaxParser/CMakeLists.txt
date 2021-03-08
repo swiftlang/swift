@@ -10,7 +10,8 @@ endif()
 
 target_link_libraries(SwiftSyntaxParserTests
   PRIVATE
-  libSwiftSyntaxParser)
+  libSwiftSyntaxParser
+  swiftSyntax)
 
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
   set_target_properties(SwiftSyntaxParserTests PROPERTIES

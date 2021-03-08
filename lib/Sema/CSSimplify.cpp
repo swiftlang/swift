@@ -9221,13 +9221,6 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
       for (auto *choice : choices.slice(1))
         choice->setDisabled();
     }
-
-    // Don't attempt further optimization in "diagnostic mode" because
-    // in such mode we'd like to attempt all of the available overloads
-    // regardless of problems related to missing or extraneous labels
-    // and/or arguments.
-    if (solverState)
-      return false;
   }
 
   /// The common result type amongst all function overloads.
@@ -9380,7 +9373,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
   AppliedDisjunctions[disjunction->getLocator()] = argFnType;
   return simplifyAppliedOverloadsImpl(disjunction, fnTypeVar, argFnType,
                                       /*numOptionalUnwraps*/ result->second,
-                                      locator);
+                                      applicableFn->getLocator());
 }
 
 bool ConstraintSystem::simplifyAppliedOverloads(

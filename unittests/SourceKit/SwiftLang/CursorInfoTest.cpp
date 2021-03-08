@@ -72,6 +72,8 @@ class NullEditorConsumer : public EditorConsumer {
 
   void recordAffectedLineRange(unsigned Line, unsigned Length) override {}
 
+  bool diagnosticsEnabled() override { return false; }
+
   void setDiagnosticStage(UIdent DiagStage) override {}
   void handleDiagnostic(const DiagnosticEntryInfo &Info,
                         UIdent DiagStage) override {}

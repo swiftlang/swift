@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
@@ -25,7 +19,7 @@ func test_taskGroup_isEmpty() async {
       print("before add: isEmpty=\(group.isEmpty)")
 
       await group.add {
-        sleep(2)
+        await Task.sleep(2_000_000_000)
         return await asyncEcho(1)
       }
 

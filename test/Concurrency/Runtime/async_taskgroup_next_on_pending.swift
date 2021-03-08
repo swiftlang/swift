@@ -4,16 +4,12 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// REQUIRES: rdar75096485
+
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 func completeSlowly(n: Int) async -> Int {
-  sleep(UInt32(n + 1))
+  await Task.sleep(UInt64((n * 1_000_000_000) + 1_000_000_000))
   print("  complete group.add { \(n) }")
   return n
 }

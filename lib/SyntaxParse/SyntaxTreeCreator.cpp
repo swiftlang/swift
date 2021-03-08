@@ -35,10 +35,9 @@ SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
       SyntaxCache(syntaxCache),
       TokenCache(new RawSyntaxTokenCache()) {
   StringRef BufferContent = SM.getEntireTextForBuffer(BufferID);
-  char *Data = (char *)Arena->Allocate(BufferContent.size(), alignof(char *));
-  std::uninitialized_copy(BufferContent.begin(), BufferContent.end(), Data);
+  const char *Data = BufferContent.data();
+  Arena->copyStringToArenaIfNecessary(Data, BufferContent.size());
   ArenaSourceBuffer = StringRef(Data, BufferContent.size());
-  assert(ArenaSourceBuffer == BufferContent);
   Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
                                ArenaSourceBuffer.end());
 }

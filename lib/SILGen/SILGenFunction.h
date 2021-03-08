@@ -47,30 +47,6 @@ using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 class ArgumentScope;
 class Scope;
 
-enum class ApplyOptions : unsigned {
-  /// No special treatment is required.
-  None = 0,
-
-  /// Suppress the error-handling edge out of the call.  This should
-  /// be used carefully; it's used to implement features like 'rethrows'.
-  DoesNotThrow = 0x1,
-};
-inline ApplyOptions operator|(ApplyOptions lhs, ApplyOptions rhs) {
-  return ApplyOptions(unsigned(lhs) | unsigned(rhs));
-}
-inline ApplyOptions &operator|=(ApplyOptions &lhs, ApplyOptions rhs) {
-  return (lhs = (lhs | rhs));
-}
-inline bool operator&(ApplyOptions lhs, ApplyOptions rhs) {
-  return ((unsigned(lhs) & unsigned(rhs)) != 0);
-}
-inline ApplyOptions operator-(ApplyOptions lhs, ApplyOptions rhs) {
-  return ApplyOptions(unsigned(lhs) & ~unsigned(rhs));
-}
-inline ApplyOptions &operator-=(ApplyOptions &lhs, ApplyOptions rhs) {
-  return (lhs = (lhs - rhs));
-}
-
 struct LValueOptions {
   bool IsNonAccessing = false;
 
@@ -857,12 +833,13 @@ public:
   // Concurrency
   //===--------------------------------------------------------------------===//
 
-  /// Generates code to obtain the callee function's executor, if the function
-  /// is actor-isolated.
+  /// Generates code to obtain the executor for the given actor isolation,
+  /// as-needed, and emits a \c hop_to_executor to that executor.
   ///
-  /// \returns a SILValue representing the executor, if an executor exists.
-  Optional<SILValue> emitLoadActorExecutorForCallee(ValueDecl *calleeVD,
-                                                    ArrayRef<ManagedValue> args);
+  /// \returns a non-null pointer if a \c hop_to_executor was emitted.
+  HopToExecutorInst* emitHopToTargetActor(SILLocation loc,
+                            Optional<ActorIsolation> actorIso,
+                            Optional<ManagedValue> actorSelf);
 
   /// Generates code to obtain the executor given the actor's decl.
   /// \returns a SILValue representing the executor.

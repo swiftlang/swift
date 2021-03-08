@@ -95,7 +95,7 @@ public:
     setDiagnosticHandler(nullptr);
   }
 
-  swiftparse_client_node_t parse(const char *source);
+  swiftparse_client_node_t parse(const char *source, size_t len);
 };
 
 class CLibParseActions : public SyntaxParseActions {
@@ -150,7 +150,7 @@ private:
     node.token_data.trailing_trivia_count = trailingTrivia.size();
     assert(node.token_data.trailing_trivia_count == trailingTrivia.size() &&
            "trailing trivia count value is too large");
-    makeCRange(node.range, range);
+    makeCRange(node.token_data.range, range);
     node.present = true;
   }
 
@@ -186,7 +186,6 @@ private:
     node.layout_data.nodes =
         const_cast<const swiftparse_client_node_t *>(elements.data());
     node.layout_data.nodes_count = elements.size();
-    makeCRange(node.range, range);
     node.present = true;
     return getNodeHandler()(&node);
   }
@@ -274,10 +273,10 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
   }
 };
 
-swiftparse_client_node_t SynParser::parse(const char *source) {
+swiftparse_client_node_t SynParser::parse(const char *source, size_t len) {
   SourceManager SM;
-  unsigned bufID = SM.addNewSourceBuffer(
-    llvm::MemoryBuffer::getMemBuffer(source, "syntax_parse_source"));
+  unsigned bufID = SM.addNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(
+      StringRef(source, len), "syntax_parse_source"));
   TypeCheckerOptions tyckOpts;
   LangOptions langOpts;
   langOpts.BuildSyntaxTree = true;
@@ -329,10 +328,11 @@ swiftparse_parser_set_node_lookup(swiftparse_parser_t c_parser,
   parser->setNodeLookup(lookup);
 }
 
-swiftparse_client_node_t
-swiftparse_parse_string(swiftparse_parser_t c_parser, const char *source) {
+swiftparse_client_node_t swiftparse_parse_string(swiftparse_parser_t c_parser,
+                                                 const char *source,
+                                                 size_t len) {
   SynParser *parser = static_cast<SynParser*>(c_parser);
-  return parser->parse(source);
+  return parser->parse(source, len);
 }
 
 const char* swiftparse_syntax_structure_versioning_identifier(void) {

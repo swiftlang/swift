@@ -4190,8 +4190,12 @@ ERROR(async_call_without_await_in_autoclosure,none,
 ERROR(async_call_without_await_in_async_let,none,
       "call is 'async' in an 'async let' initializer that is not marked "
       "with 'await'", ())
+ERROR(async_prop_access_without_await,none,
+      "property access is 'async' but is not marked with 'await'", ())
+ERROR(async_subscript_access_without_await,none,
+      "subscript access is 'async' but is not marked with 'await'", ())
 WARNING(no_async_in_await,none,
-        "no calls to 'async' functions occur within 'await' expression", ())
+        "no 'async' operations occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
       "'async' call cannot occur in "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
@@ -4201,15 +4205,15 @@ ERROR(await_in_illegal_context,none,
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(async_in_nonasync_function,none,
-      "%select{'async'|'await'|'async let'}0 in "
+      "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
       "%select{a function|an autoclosure}1 that does not support concurrency",
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
 NOTE(note_add_asynchandler_to_function,none,
      "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
-NOTE(note_add_actorindependent_to_decl,none,
-     "add '@actorIndependent' to %0 to make this %1 independent of the actor",
+NOTE(note_add_nonisolated_to_decl,none,
+     "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
@@ -4279,13 +4283,13 @@ ERROR(actor_with_nonactor_superclass,none,
       "actor class cannot inherit from non-actor class %0", (DeclName))
 
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can only be referenced "
-        "%select{inside the actor|on 'self'}2",
-        (DescriptiveDeclKind, DeclName, bool))
+        "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
+        "%select{from inside the actor|on 'self'}2",
+        (DescriptiveDeclKind, DeclName, bool, unsigned))
 ERROR(actor_isolated_self_independent_context,none,
-        "actor-isolated %0 %1 can not be referenced from an "
-        "'@actorIndependent' context",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from a "
+        "non-isolated context",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
       "%select{| implicitly}2 'async' function call",
@@ -4294,20 +4298,21 @@ ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_global_actor_context,none,
-      "actor-isolated %0 %1 can not be referenced from context of global "
-      "actor %2",
-      (DescriptiveDeclKind, DeclName, Type))
+      "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}3 "
+      "from%select{| synchronous}4 context of global actor %2",
+      (DescriptiveDeclKind, DeclName, Type, unsigned, bool))
 ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be referenced from actor %3",
-      (DescriptiveDeclKind, DeclName, Type, DeclName))
+      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
+      " from actor %3 %select{|in a synchronous context}5",
+      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
 ERROR(global_actor_from_other_global_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be referenced from "
-      "different global actor %3",
-      (DescriptiveDeclKind, DeclName, Type, Type))
+      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
+      " from different global actor %3 %select{|in a synchronous context}5",
+      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
 ERROR(global_actor_from_nonactor_context,none,
-      "%0 %1 isolated to global actor %2 can not be referenced from "
-      "%select{this|an '@actorIndependent'}3 context",
-      (DescriptiveDeclKind, DeclName, Type, bool))
+      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
+      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
+      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
@@ -4315,17 +4320,17 @@ ERROR(concurrent_access_local,none,
         "use of local %0 %1 in concurrently-executing code",
         (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_from_concurrent_closure,none,
-        "actor-isolated %0 %1 cannot be referenced from a concurrent closure",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent closure",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_concurrent_function,none,
-        "actor-isolated %0 %1 cannot be referenced from a concurrent function",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent function",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_async_let,none,
-        "actor-isolated %0 %1 cannot be referenced from 'async let' initializer",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_escaping_closure,none,
-        "actor-isolated %0 %1 cannot be referenced from an '@escaping' closure",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from an '@escaping' closure",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@concurrent'",
       (DescriptiveDeclKind, DeclName))
@@ -4338,7 +4343,8 @@ NOTE(actor_isolated_sync_func,none,
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
 NOTE(actor_mutable_state,none,
-     "mutable state is only available within the actor instance", ())
+     "mutation of this %0 is only permitted within the actor",
+     (DescriptiveDeclKind))
 WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
@@ -4375,38 +4381,20 @@ ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
       "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
-WARNING(non_concurrent_type_member_warn,none,
-      "%select{stored property %1|associated value %1}0 of "
-      "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
-      (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
-      "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
-      (DeclName, DescriptiveDeclKind, DeclName))
-WARNING(concurrent_value_class_mutable_property_warn,none,
       "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_outside_source_file,none,
       "conformance to 'ConcurrentValue' must occur in the same source file as "
       "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
-WARNING(concurrent_value_outside_source_file_warn,none,
-      "conformance to 'ConcurrentValue' must occur in the same source file as "
-      "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
-      (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to `ConcurrentValue`; "
-      "use `UnsafeConcurrentValue`", (DeclName))
-WARNING(concurrent_value_nonfinal_class_warn,none,
       "non-final class %0 cannot conform to `ConcurrentValue`; "
       "use `UnsafeConcurrentValue`", (DeclName))
 ERROR(concurrent_value_inherit,none,
       "`ConcurrentValue` class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
-WARNING(concurrent_value_inherit_warn,none,
-        "`ConcurrentValue` class %1 cannot inherit from another class"
-        "%select{| other than 'NSObject'}0",
-        (bool, DeclName))
 
 ERROR(actorindependent_let,none,
       "'@actorIndependent' is meaningless on 'let' declarations because "
@@ -4419,15 +4407,27 @@ ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
 
+ERROR(nonisolated_let,none,
+      "'nonisolated' is meaningless on 'let' declarations because "
+      "they are immutable",
+      ())
+ERROR(nonisolated_mutable_storage,none,
+      "nonisolated' can not be applied to stored properties",
+      ())
+ERROR(nonisolated_local_var,none,
+      "'nonisolated' can not be applied to local variables",
+      ())
+
+ERROR(actor_instance_property_wrapper,none,
+      "%0 property in property wrapper type %1 cannot be isolated to "
+      "the actor instance; consider 'nonisolated'",
+      (Identifier, Identifier))
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
 ERROR(async_main_no_concurrency,none,
       "'_Concurrency' module not imported, required for async main", ())
-
-ERROR(enqueue_partial_task_not_in_context,none,
-      "'enqueue(partialTask:)' can only be implemented in the definition of "
-      "actor class %0", (Type))
 
 ERROR(global_actor_missing_shared,none,
       "global actor %0 requires a static property 'shared' that produces an "
@@ -4454,14 +4454,15 @@ ERROR(global_actor_on_actor_class,none,
       "actor class %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
-ERROR(global_actor_on_struct_property,none,
-      "stored property %0 of a struct cannot have a global actor", (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
       "global actor attribute %0 argument can only be '(unsafe)'", (Type))
       
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))
+ERROR(global_actor_isolated_synchronous_closure,none,
+      "closure isolated to global actor %0 must be 'async'",
+      (Type))
 
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %1 %2 has different actor isolation from %3 overridden declaration",
@@ -5193,6 +5194,10 @@ ERROR(availability_global_script_no_potential,
 
 ERROR(availability_stored_property_no_potential,
       none, "stored properties cannot be marked potentially unavailable with "
+      "'@available'", ())
+
+ERROR(availability_enum_element_no_potential,
+      none, "enum cases with associated values cannot be marked potentially unavailable with "
       "'@available'", ())
 
 ERROR(availability_protocol_requires_version,

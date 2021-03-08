@@ -15,7 +15,6 @@
 #include "Callee.h"
 #include "Condition.h"
 #include "Conversion.h"
-#include "ExitableFullExpr.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -2199,6 +2198,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   return SGF.emitDynamicMemberRefExpr(E, C);
 }
 
@@ -2220,6 +2220,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(
                                       DynamicSubscriptExpr *E, SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
@@ -2269,7 +2270,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                captures);
 
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, captures, calleeTypeInfo, ApplyOptions::None, C, None);
+                   subs, captures, calleeTypeInfo, ApplyOptions(), C, None);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2292,7 +2293,7 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C, None);
+                   subs, {}, calleeTypeInfo, ApplyOptions(), C, None);
 }
 
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
@@ -3199,7 +3200,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                      loc, ManagedValue::forUnmanaged(equalsWitness),
                      equatableSub,
                      {lhsArg, rhsArg, metatyValue},
-                     equalsInfo, ApplyOptions::None, SGFContext(), None)
+                     equalsInfo, ApplyOptions(), SGFContext(), None)
           .getUnmanagedSingleValue(subSGF, loc);
       }
       

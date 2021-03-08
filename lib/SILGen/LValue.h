@@ -209,10 +209,16 @@ class PhysicalPathComponent : public PathComponent {
   virtual void _anchor() override;
 
 protected:
-  PhysicalPathComponent(LValueTypeData typeData, KindTy Kind)
-    : PathComponent(typeData, Kind) {
+  Optional<ActorIsolation> ActorIso;
+  PhysicalPathComponent(LValueTypeData typeData, KindTy Kind,
+                        Optional<ActorIsolation> actorIso = None)
+    : PathComponent(typeData, Kind), ActorIso(actorIso) {
     assert(isPhysical() && "PhysicalPathComponent Kind isn't physical");
   }
+
+public:
+  // Obtains the actor-isolation required for any loads of this component.
+  Optional<ActorIsolation> getActorIsolation() const { return ActorIso; }
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -421,12 +427,19 @@ public:
     Path.emplace_back(new T(std::forward<As>(args)...));
   }
 
+  // NOTE: Optional<ActorIsolation> inside of LValues
+  // Some path components carry an ActorIsolation value, which is an indicator
+  // that the access to that component must be performed by switching to the
+  // given actor's isolation domain. If the indicator is not present, that
+  // only means that a switch does not need to be emitted during the access.
+
   void addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                 VarDecl *var, SubstitutionMap subs,
                                 LValueOptions options,
                                 SGFAccessKind accessKind,
                                 AccessStrategy strategy,
-                                CanType formalRValueType);
+                                CanType formalRValueType,
+                                Optional<ActorIsolation> actorIso = None);
 
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
@@ -448,7 +461,8 @@ public:
                              SGFAccessKind accessKind,
                              AccessStrategy accessStrategy,
                              CanType formalRValueType,
-                             bool isOnSelf = false);
+                             bool isOnSelf = false,
+                             Optional<ActorIsolation> actorIso = None);
 
   void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                    SubscriptDecl *subscript,
@@ -460,7 +474,8 @@ public:
                                    CanType formalRValueType,
                                    PreparedArguments &&indices,
                                    Expr *indexExprForDiagnostics,
-                                   bool isOnSelfParameter = false);
+                                   bool isOnSelfParameter = false,
+                                   Optional<ActorIsolation> actorIso = None);
 
   /// Add a subst-to-orig reabstraction component.  That is, given
   /// that this l-value trafficks in values following the substituted

@@ -102,7 +102,7 @@
 //
 // B) Run with -index-unit-output-path values different from the -o values:
 //    RUN: %target-swift-frontend -typecheck -parse-stdlib -enable-batch-mode \
-//    RUN:     -module-name mod_name -index-store-path %t/idx_with \
+//    RUN:     -module-name mod_name -index-store-path %t/idx_batch_with \
 //    RUN:     -primary-file %t/main.swift -primary-file %t/second.swift \
 //    RUN:     -o %t/main_out.o -o %t/second_out.o \
 //    RUN:     -index-unit-output-path %t/custom_main.o -index-unit-output-path %t/custom_second.o
