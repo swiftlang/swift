@@ -217,12 +217,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   }
 
   auto M = CI.getASTContext().getModuleByName(options::ModuleName);
-  SmallVector<Identifier, 32> VisibleModuleNames;
-  CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
   if (!M) {
     llvm::errs()
       << "Couldn't load module '" << options::ModuleName << '\''
       << " in the current SDK and search paths.\n";
+    
+    SmallVector<Identifier, 32> VisibleModuleNames;
+    CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
 
     if (VisibleModuleNames.empty()) {
       llvm::errs() << "Could not find any modules.\n";
@@ -260,16 +261,16 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv
   // don't need to print these errors.
   CI.removeDiagnosticConsumer(&DiagPrinter);
   
-  for (const auto &ModuleName : VisibleModuleNames) {
-    if (ModuleName.str().startswith("_")) {
-      auto CIM = CI.getASTContext().getModuleByName(ModuleName.str());
-      if (CIM && CIM->isCrossImportOverlayOf(M)) {
-        const auto &CIMainFile = CIM->getMainFile(FileUnitKind::SerializedAST);
-        llvm::errs() << "Emitting symbol graph for cross-import overlay module file: "
-          << CIMainFile.getModuleDefiningPath() << '\n';
-        
-        Success |= symbolgraphgen::emitSymbolGraphForModule(CIM, Options);
-      }
+  SmallVector<ModuleDecl *> Overlays;
+  M->findDeclaredCrossImportOverlaysTransitive(Overlays);
+  for (const auto *OM : Overlays) {
+    auto CIM = CI.getASTContext().getModuleByName(OM->getNameStr());
+    if (CIM) {
+      const auto &CIMainFile = CIM->getMainFile(FileUnitKind::SerializedAST);
+      llvm::errs() << "Emitting symbol graph for cross-import overlay module file: "
+        << CIMainFile.getModuleDefiningPath() << '\n';
+      
+      Success |= symbolgraphgen::emitSymbolGraphForModule(CIM, Options);
     }
   }
 
