@@ -85,11 +85,11 @@ ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
       if (subnode.isNull()) {
         subnodes.push_back(nullptr);
       } else if (subnode.isRecorded()) {
-        localRange = subnode.getRecordedRange();
+        localRange = subnode.getRange();
         subnodes.push_back(subnode.takeOpaqueNode());
       } else {
         auto recorded = getRecordedNode(subnode.copyDeferred(), *this);
-        localRange = recorded.getRecordedRange();
+        localRange = recorded.getRange();
         subnodes.push_back(recorded.takeOpaqueNode());
       }
 
@@ -131,7 +131,7 @@ ParsedRawSyntaxNode ParsedRawSyntaxRecorder::makeDeferred(
   for (auto &node : deferredNodes) {
     // Cached range.
     if (!node.isNull() && !node.isMissing()) {
-      auto nodeRange = node.getDeferredRange();
+      auto nodeRange = node.getRange();
       if (nodeRange.isValid()) {
         if (range.isInvalid())
           range = nodeRange;
@@ -185,9 +185,7 @@ void ParsedRawSyntaxRecorder::verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> 
   for (const auto &elem: elements) {
     if (elem.isMissing() || elem.isNull())
       continue;
-    CharSourceRange range = elem.isRecorded()
-      ? elem.getRecordedRange()
-      : elem.getDeferredRange();
+    CharSourceRange range = elem.getRange();
     if (range.isValid()) {
       assert((prevEndLoc.isInvalid() || range.getStart() == prevEndLoc)
              && "Non-contiguous child ranges?");
