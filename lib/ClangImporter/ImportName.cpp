@@ -1797,6 +1797,23 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       isFunction = true;
       addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
       break;
+    case clang::OverloadedOperatorKind::OO_Subscript: {
+      auto returnType = functionDecl->getReturnType();
+      if (!returnType->isReferenceType()) {
+        // TODO: support non-reference return types (SR-14351)
+        return ImportedName();
+      }
+      if (returnType->getPointeeType().isConstQualified()) {
+        baseName = "__operatorSubscriptConst";
+        result.info.accessorKind = ImportedAccessorKind::SubscriptGetter;
+      } else {
+        baseName = "__operatorSubscript";
+        result.info.accessorKind = ImportedAccessorKind::SubscriptSetter;
+      }
+      isFunction = true;
+      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      break;
+    }
     default:
       // We don't import these yet.
       return ImportedName();

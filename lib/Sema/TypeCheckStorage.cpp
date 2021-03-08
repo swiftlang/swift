@@ -2311,6 +2311,9 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
           break;
         }
       }
+      if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+        break;
+      }
 
       // Anything else should not have a synthesized setter.
       LLVM_FALLTHROUGH;
