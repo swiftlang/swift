@@ -85,15 +85,15 @@ actor FromProperty {
   // expected-note@+1 2{{property declared here}}
   var counter : Int = 0
 
-  // expected-error@+2{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+  // expected-error@+2{{actor-isolated property 'counter' can not be referenced from a non-isolated context}}
   @actorIndependent
   var halfCounter : Int { counter / 2 }
 
   @actorIndependent
   var ticks : Int {
-    // expected-error@+1{{actor-isolated property 'counter' can not be referenced from an '@actorIndependent' context}}
+    // expected-error@+1{{actor-isolated property 'counter' can not be referenced from a non-isolated context}}
     get { counter }
-    // expected-error@+1{{actor-isolated property 'counter' can not be mutated from an '@actorIndependent' context}}
+    // expected-error@+1{{actor-isolated property 'counter' can not be mutated from a non-isolated context}}
     set { counter = newValue }
   }
 }
