@@ -36,8 +36,10 @@ SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
   const char *Data = BufferContent.data();
   Arena->copyStringToArenaIfNecessary(Data, BufferContent.size());
   ArenaSourceBuffer = StringRef(Data, BufferContent.size());
-  Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
-                               ArenaSourceBuffer.end());
+  if (!ArenaSourceBuffer.empty()) {
+    Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
+                                 ArenaSourceBuffer.end());
+  }
 }
 
 SyntaxTreeCreator::~SyntaxTreeCreator() = default;
