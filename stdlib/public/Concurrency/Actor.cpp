@@ -1309,7 +1309,7 @@ void swift::swift_distributedActor_destroy(DefaultActor *_actor) {
   //       something like: actor.transport.resignAddress(actor.address)
 
   // FIXME: if this is a proxy, we would destroy a bit differently I guess? less memory was allocated etc.
-  asImpl(_actor)->destroy();
+  asImpl(_actor)->destroy(); // today we just replicate what defaultActor_destroy does
 }
 
 void swift::swift_defaultActor_enqueue(Job *job, DefaultActor *_actor) {
