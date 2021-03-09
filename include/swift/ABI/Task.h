@@ -553,6 +553,15 @@ public:
   using AsyncContext::AsyncContext;
 };
 
+/// An asynchronous context within a task that describes a general "Future"
+/// task that was started with a closure context.
+class FutureClosureAsyncContext : public FutureAsyncContext {
+public:
+  HeapObject *closureContext;
+
+  using FutureAsyncContext::FutureAsyncContext;
+};
+
 } // end namespace swift
 
 #endif
