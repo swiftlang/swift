@@ -1094,8 +1094,15 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
 /// the current thread, and keep processing whatever actor we're
 /// running when code returns back to us until we're not processing
 /// any actors anymore.
+///
+/// \param currentActor is expected to be passed in as retained to ensure that
+///                     the actor lives for the duration of job execution.
+///                     Note that this may conflict with the retain/release
+///                     design in the DefaultActorImpl, but it does fix bugs!
 static void processDefaultActor(DefaultActorImpl *currentActor,
                                 RunningJobInfo runner) {
+  DefaultActorImpl *actor = currentActor;
+
   // Register that we're processing a default actor in this frame.
   ExecutorTrackingInfo trackingInfo;
   auto activeTrackingInfo = trackingInfo.enterOrUpdate(
@@ -1142,6 +1149,8 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
   // If we still have an active actor, we should give it up.
   if (currentActor)
     currentActor->giveUpThread(runner);
+
+  swift_release(actor);
 }
 
 void ProcessInlineJob::process(Job *job, ExecutorRef _executor) {
@@ -1153,6 +1162,7 @@ void ProcessInlineJob::process(Job *job, ExecutorRef _executor) {
   auto runner = RunningJobInfo::forInline(targetPriority);
 
   // FIXME: force tail call
+  swift_retain(actor);
   return processDefaultActor(actor, runner);
 }
 
@@ -1168,6 +1178,7 @@ void ProcessOutOfLineJob::process(Job *job, ExecutorRef _executor) {
   delete self;
 
   // FIXME: force tail call
+  swift_retain(actor);
   return processDefaultActor(actor, runner);
 }
 
@@ -1179,6 +1190,7 @@ void ProcessOverrideJob::process(Job *job, ExecutorRef _executor) {
   auto runner = RunningJobInfo::forOverride(self);
 
   // FIXME: force tail call
+  swift_retain(actor);
   return processDefaultActor(actor, runner);
 }
 
