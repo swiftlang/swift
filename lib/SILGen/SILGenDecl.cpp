@@ -1190,14 +1190,16 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     if (var && var->getDeclContext()->isLocalContext()) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
         auto wrapperInfo = orig->getPropertyWrapperBackingPropertyInfo();
-        Init = wrapperInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue();
+        if (auto *placeholder = wrapperInfo.getWrappedValuePlaceholder()) {
+          Init = placeholder->getOriginalWrappedValue();
 
-        auto value = emitRValue(Init);
-        emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
-                                                     getForwardingSubstitutionMap(),
-                                                     std::move(value))
-          .forwardInto(*this, SILLocation(PBD), initialization.get());
-        return;
+          auto value = emitRValue(Init);
+          emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
+                                                       getForwardingSubstitutionMap(),
+                                                       std::move(value))
+            .forwardInto(*this, SILLocation(PBD), initialization.get());
+          return;
+        }
       }
     }
 
