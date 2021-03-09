@@ -2181,6 +2181,18 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   return NewInst;
 }
 
+/// Returns true if \p val is a literal instruction or a struct of a literal
+/// instruction.
+/// What we want to catch here is a UnsafePointer<Int8> of a string literal.
+static bool isLiteral(SILValue val) {
+  while (auto *str = dyn_cast<StructInst>(val)) {
+    if (str->getNumOperands() != 1)
+      return false;
+    val = str->getOperand(0);
+  }
+  return isa<LiteralInst>(val);
+}
+
 SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   auto base = lookThroughOwnershipInsts(mdi->getBase());
 
@@ -2241,6 +2253,14 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
         return eraseInstFromFunction(*mdi);
       }
     }
+  }
+  
+  if (isLiteral(mdi->getValue())) {
+    // A literal lives forever, so no mark_dependence is needed.
+    // This pattern can occur after StringOptimization when a utf8CString of
+    // a literal is replace by the string_literal itself.
+    replaceInstUsesWith(*mdi, mdi->getValue());
+    return eraseInstFromFunction(*mdi);
   }
 
   return nullptr;
