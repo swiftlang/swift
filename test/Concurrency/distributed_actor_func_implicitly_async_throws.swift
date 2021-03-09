@@ -13,6 +13,12 @@ distributed actor D {
   distributed func distHelloAsyncThrows() async throws { } // ok
 }
 
+func test_not_distributed_funcs(distributed: D) {
+  distributed.hello()
+  distributed.helloAsync()
+  distributed.helloAsyncThrows()
+}
+
 func test_outside(distributed: D) async throws {
   distributed.distHello() // expected-error{{call is 'async' but is not marked with 'await'}}
   // expected-error@-1{{call can throw but is not marked with 'try'}}

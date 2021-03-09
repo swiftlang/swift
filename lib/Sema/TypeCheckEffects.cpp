@@ -1852,8 +1852,6 @@ public:
       llvm_unreachable("diagnosing an uncovered await?");
     };
 
-        fprintf(stderr, "[%s:%d] (%s) diagnose diagnoseUncoveredAsyncSite\n", __FILE__, __LINE__, __FUNCTION__);
-
     ctx.Diags.diagnose(node.getStartLoc(), diag)
         .fixItInsert(node.getStartLoc(), "await ")
         .highlight(highlight);
@@ -2473,14 +2471,10 @@ private:
 
       // Diagnose async calls in a context that doesn't handle async.
       if (!CurContext.handlesAsync(asyncKind)) {
-        E.dump();
-        fprintf(stderr, "[%s:%d] (%s) diagnose because NOT handled async \n", __FILE__, __LINE__, __FUNCTION__);
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, kind);
       }
       // Diagnose async calls that are outside of an await context.
       else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
-        E.dump();
-        fprintf(stderr, "[%s:%d] (%s) diagnose because NOT is async covered \n", __FILE__, __LINE__, __FUNCTION__);
         CurContext.diagnoseUncoveredAsyncSite(Ctx, E, kind);
       }
     }
