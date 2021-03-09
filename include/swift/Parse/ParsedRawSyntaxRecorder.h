@@ -43,7 +43,9 @@ class ParsedRawSyntaxRecorder final {
 
   /// Assuming that \p node is a deferred layout or token node, record it and
   /// return the recorded node.
-  ParsedRawSyntaxNode recordDeferredNode(const ParsedRawSyntaxNode &node);
+  /// This consumes the data from \c node, which is unusable after it has been
+  /// recorded. The returned node should be used afterwards instead.
+  ParsedRawSyntaxNode recordDeferredNode(ParsedRawSyntaxNode &node);
 
 public:
   explicit ParsedRawSyntaxRecorder(std::shared_ptr<SyntaxParseActions> spActions)

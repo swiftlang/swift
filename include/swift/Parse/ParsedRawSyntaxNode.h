@@ -106,16 +106,25 @@ public:
   /// null).
   DataKind getDataKind() const { return Data.getKind(); }
 
-  /// Returns the opaque data of this node. This must be interpreted by the
-  /// \c SyntaxParseAction, which likely also needs the node type to know
-  /// what type of node the data represents.
-  OpaqueSyntaxNode getData() const { return Data.getOpaque(); }
+  /// Returns the opaque data of this node, assuming that it is deferred. This
+  /// must be interpreted by the \c SyntaxParseAction, which likely also needs
+  /// the node type (layout or token) to interpret the data.
+  /// The data opaque data returned by this function *must not* be used to
+  /// record the node, only to insepect it.
+  OpaqueSyntaxNode getUnsafeDeferredOpaqueData() const {
+    assert(isDeferredLayout() || isDeferredToken());
+    return Data.getOpaque();
+  }
 
-  RecordedOrDeferredNode getRecordedOrDeferredNode() const { return Data; }
+  RecordedOrDeferredNode takeRecordedOrDeferredNode() {
+    RecordedOrDeferredNode Data = this->Data;
+    reset();
+    return Data;
+  }
 
   /// Return the opaque data of this node and reset it.
   OpaqueSyntaxNode takeData() {
-    OpaqueSyntaxNode Data = this->getData();
+    OpaqueSyntaxNode Data = this->Data.getOpaque();
     reset();
     return Data;
   }

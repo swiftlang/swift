@@ -28,19 +28,19 @@ using namespace swift;
 using namespace swift::syntax;
 
 ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::recordDeferredNode(const ParsedRawSyntaxNode &node) {
+ParsedRawSyntaxRecorder::recordDeferredNode(ParsedRawSyntaxNode &node) {
   switch (node.getDataKind()) {
   case RecordedOrDeferredNode::Kind::Null:
   case RecordedOrDeferredNode::Kind::Recorded:
     llvm_unreachable("Not deferred");
   case RecordedOrDeferredNode::Kind::DeferredLayout: {
-    OpaqueSyntaxNode Data = SPActions->recordDeferredLayout(node.getData());
+    OpaqueSyntaxNode Data = SPActions->recordDeferredLayout(node.takeData());
     return ParsedRawSyntaxNode(
         Data, node.getRange(), node.getKind(), node.getTokenKind(),
         ParsedRawSyntaxNode::DataKind::Recorded, node.isMissing());
   }
   case RecordedOrDeferredNode::Kind::DeferredToken: {
-    OpaqueSyntaxNode Data = SPActions->recordDeferredToken(node.getData());
+    OpaqueSyntaxNode Data = SPActions->recordDeferredToken(node.takeData());
     return ParsedRawSyntaxNode(
         Data, node.getRange(), node.getKind(), node.getTokenKind(),
         ParsedRawSyntaxNode::DataKind::Recorded, node.isMissing());
@@ -158,7 +158,7 @@ ParsedRawSyntaxNode ParsedRawSyntaxRecorder::makeDeferred(
       }
     }
 
-    children[i] = node.getRecordedOrDeferredNode();
+    children[i] = node.takeRecordedOrDeferredNode();
   }
   auto data = SPActions->makeDeferredLayout(k, /*IsMissing=*/false, children);
   return ParsedRawSyntaxNode(data, range, k, tok::NUM_TOKENS,
@@ -213,8 +213,9 @@ ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::getDeferredChild(const ParsedRawSyntaxNode &parent,
                                           size_t childIndex) const {
   assert(parent.isDeferredLayout());
-  auto childInfo = SPActions->getDeferredChild(parent.getData(), childIndex,
-                                               parent.getRange().getStart());
+  auto childInfo = SPActions->getDeferredChild(
+      parent.getUnsafeDeferredOpaqueData(),
+      childIndex, parent.getRange().getStart());
   return ParsedRawSyntaxNode(childInfo.Data, childInfo.Range,
                              childInfo.SyntaxKind, childInfo.TokenKind,
                              childInfo.SyntaxKind == syntax::SyntaxKind::Token
@@ -226,7 +227,7 @@ ParsedRawSyntaxRecorder::getDeferredChild(const ParsedRawSyntaxNode &parent,
 size_t ParsedRawSyntaxRecorder::getDeferredNumChildren(
     const ParsedRawSyntaxNode &node) const {
   assert(node.isDeferredLayout());
-  return SPActions->getDeferredNumChildren(node.getData());
+  return SPActions->getDeferredNumChildren(node.getUnsafeDeferredOpaqueData());
 }
 
 #ifndef NDEBUG
