@@ -67,13 +67,13 @@ public:
 /// \c getDeferredChild to maintain a clean dependency relationship of
 /// \c ParsedRawSyntaxNode being on a higher level than \c SyntaxParseActions.
 struct DeferredNodeInfo {
-  OpaqueSyntaxNode Data;
+  RecordedOrDeferredNode Data;
   syntax::SyntaxKind SyntaxKind;
   tok TokenKind;
   bool IsMissing;
   CharSourceRange Range;
 
-  DeferredNodeInfo(OpaqueSyntaxNode Data, syntax::SyntaxKind SyntaxKind,
+  DeferredNodeInfo(RecordedOrDeferredNode Data, syntax::SyntaxKind SyntaxKind,
                    tok TokenKind, bool IsMissing, CharSourceRange Range)
       : Data(Data), SyntaxKind(SyntaxKind), TokenKind(TokenKind),
         IsMissing(IsMissing), Range(Range) {}

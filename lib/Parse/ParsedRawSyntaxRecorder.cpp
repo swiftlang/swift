@@ -214,14 +214,11 @@ ParsedRawSyntaxRecorder::getDeferredChild(const ParsedRawSyntaxNode &parent,
                                           size_t childIndex) const {
   assert(parent.isDeferredLayout());
   auto childInfo = SPActions->getDeferredChild(
-      parent.getUnsafeDeferredOpaqueData(),
-      childIndex, parent.getRange().getStart());
-  return ParsedRawSyntaxNode(childInfo.Data, childInfo.Range,
+      parent.getUnsafeDeferredOpaqueData(), childIndex,
+      parent.getRange().getStart());
+  return ParsedRawSyntaxNode(childInfo.Data.getOpaque(), childInfo.Range,
                              childInfo.SyntaxKind, childInfo.TokenKind,
-                             childInfo.SyntaxKind == syntax::SyntaxKind::Token
-                                 ? RecordedOrDeferredNode::Kind::DeferredToken
-                                 : RecordedOrDeferredNode::Kind::DeferredLayout,
-                             childInfo.IsMissing);
+                             childInfo.Data.getKind(), childInfo.IsMissing);
 }
 
 size_t ParsedRawSyntaxRecorder::getDeferredNumChildren(

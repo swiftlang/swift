@@ -147,21 +147,28 @@ DeferredNodeInfo SyntaxParseActions::getDeferredChild(OpaqueSyntaxNode node,
   auto Child = Data->Children[ChildIndex];
   switch (Child.getKind()) {
   case RecordedOrDeferredNode::Kind::Null:
-    llvm_unreachable("A child node should not be Null");
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(nullptr, RecordedOrDeferredNode::Kind::Null),
+        syntax::SyntaxKind::Unknown, tok::NUM_TOKENS,
+        /*IsMissing=*/false, CharSourceRange());
   case RecordedOrDeferredNode::Kind::Recorded:
     llvm_unreachable("Children of deferred nodes must also be deferred");
     break;
   case RecordedOrDeferredNode::Kind::DeferredLayout: {
     auto ChildData = static_cast<const DeferredLayoutNode *>(Child.getOpaque());
-    return DeferredNodeInfo(ChildData, ChildData->Kind, tok::NUM_TOKENS,
-                            /*IsMissing=*/false,
-                            CharSourceRange(StartLoc, ChildData->Length));
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(ChildData,
+                               RecordedOrDeferredNode::Kind::DeferredLayout),
+        ChildData->Kind, tok::NUM_TOKENS,
+        /*IsMissing=*/false, CharSourceRange(StartLoc, ChildData->Length));
   }
   case RecordedOrDeferredNode::Kind::DeferredToken: {
     auto ChildData = static_cast<const DeferredTokenNode *>(Child.getOpaque());
-    return DeferredNodeInfo(ChildData, syntax::SyntaxKind::Token,
-                            ChildData->TokenKind, ChildData->IsMissing,
-                            ChildData->Range);
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(ChildData,
+                               RecordedOrDeferredNode::Kind::DeferredToken),
+        syntax::SyntaxKind::Token, ChildData->TokenKind, ChildData->IsMissing,
+        ChildData->Range);
   }
   }
 }
