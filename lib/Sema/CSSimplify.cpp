@@ -9282,9 +9282,9 @@ retry_after_fail:
         }
 
         // Determine the type that this choice will have.
-        Type choiceType =
-            getEffectiveOverloadType(choice, /*allowMembers=*/true,
-                                     constraint->getOverloadUseDC());
+        Type choiceType = getEffectiveOverloadType(
+            constraint->getLocator(), choice, /*allowMembers=*/true,
+            constraint->getOverloadUseDC());
         if (!choiceType) {
           hasUnhandledConstraints = true;
           return true;

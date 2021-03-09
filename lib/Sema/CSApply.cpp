@@ -1285,8 +1285,8 @@ namespace {
                          ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
                          AccessSemantics semantics) {
-      auto choice = overload.choice;
-      auto openedType = overload.openedType;
+      const auto &choice = overload.choice;
+      const auto openedType = overload.openedType;
 
       ValueDecl *member = choice.getDecl();
 
@@ -1369,9 +1369,10 @@ namespace {
         return forceUnwrapIfExpected(DSBI, choice, memberLocator);
       }
 
-      bool isUnboundInstanceMember =
-        (!baseIsInstance && member->isInstanceMember());
-      bool isPartialApplication = shouldBuildCurryThunk(choice, baseIsInstance);
+      const bool isUnboundInstanceMember =
+          (!baseIsInstance && member->isInstanceMember());
+      const bool isPartialApplication =
+          shouldBuildCurryThunk(choice, baseIsInstance);
 
       // The formal type of the 'self' value for the member's declaration.
       Type containerTy = getBaseType(refTy->castTo<FunctionType>());
@@ -1531,8 +1532,8 @@ namespace {
           base->setImplicit();
         }
 
-        auto hasDynamicSelf =
-          varDecl->getValueInterfaceType()->hasDynamicSelfType();
+        const auto hasDynamicSelf =
+            varDecl->getValueInterfaceType()->hasDynamicSelfType();
 
         auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
@@ -1546,11 +1547,15 @@ namespace {
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
 
+        // If the property is of dynamic 'Self' type, wrap an implicit
+        // conversion around the resulting expression, with the destination
+        // type having 'Self' swapped for the appropriate replacement
+        // type -- usually the base object type.
         if (hasDynamicSelf) {
-          if (!baseTy->isEqual(containerTy)) {
-            result = new (context) CovariantReturnConversionExpr(
-                result, simplifyType(openedType));
-            cs.cacheType(result);
+          const auto conversionTy = simplifyType(openedType);
+          if (!containerTy->isEqual(conversionTy)) {
+            result = cs.cacheType(new (context) CovariantReturnConversionExpr(
+                result, conversionTy));
           }
         }
         return forceUnwrapIfExpected(result, choice, memberLocator);
@@ -1567,9 +1572,8 @@ namespace {
       cs.setType(declRefExpr, refTy);
       Expr *ref = declRefExpr;
 
-      if (isPartialApplication) {
-        auto curryThunkTy = refTy->castTo<FunctionType>();
-
+      const auto isSuperPartialApplication = isPartialApplication && isSuper;
+      if (isSuperPartialApplication) {
         // A partial application thunk consists of two nested closures:
         //
         // { self in { args... in self.method(args...) } }
@@ -1588,17 +1592,12 @@ namespace {
         // very specific shape, we only emit a single closure here and
         // capture the original SuperRefExpr, since its evaluation does not
         // have side effects, instead of abstracting out a 'self' parameter.
-        if (isSuper) {
-          auto selfFnTy = curryThunkTy->getResult()->castTo<FunctionType>();
+        const auto selfFnTy =
+            refTy->castTo<FunctionType>()->getResult()->castTo<FunctionType>();
 
-          auto closure = buildCurryThunk(member, selfFnTy, base, ref,
-                                         memberLocator);
-
-          // Skip the code below -- we're not building an extra level of
-          // call by applying the 'super', instead the closure we just
-          // built is the curried reference.
-          return closure;
-        }
+        ref = buildCurryThunk(member, selfFnTy, base, ref, memberLocator);
+      } else if (isPartialApplication) {
+        auto curryThunkTy = refTy->castTo<FunctionType>();
 
         // Another case where we want to build a single closure is when
         // we have a partial application of a constructor on a statically-
@@ -1618,7 +1617,7 @@ namespace {
                                          memberLocator);
 
           // Skip the code below -- we're not building an extra level of
-          // call by applying the metatype instead the closure we just
+          // call by applying the metatype; instead, the closure we just
           // built is the curried reference.
           return closure;
         }
@@ -1695,20 +1694,39 @@ namespace {
         ref = outerClosure;
       }
 
-      // If this is a method whose result type is dynamic Self, or a
-      // construction, replace the result type with the actual object type.
+      // If the member is a method with a dynamic 'Self' result type, wrap an
+      // implicit function type conversion around the resulting expression,
+      // with the destination type having 'Self' swapped for the appropriate
+      // replacement type -- usually the base object type.
       if (!member->getDeclContext()->getSelfProtocolDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
           if (func->hasDynamicSelfResult() &&
               !baseTy->getOptionalObjectType()) {
-            if (!baseTy->isEqual(containerTy)) {
-              auto dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
-              ref = new (context) CovariantFunctionConversionExpr(ref,
-                                                            dynamicSelfFnType);
-              cs.cacheType(ref);
+            // FIXME: Once CovariantReturnConversionExpr (unchecked_ref_cast)
+            // supports a class existential dest., consider using the opened
+            // type directly to avoid recomputing the 'Self' replacement and
+            // substituting.
+            const Type replacementTy = getDynamicSelfReplacementType(
+                baseTy, member, memberLocator.getBaseLocator());
+            if (!replacementTy->isEqual(containerTy)) {
+              Type conversionTy =
+                  refTy->replaceCovariantResultType(replacementTy, 2);
+              if (isSuperPartialApplication) {
+                conversionTy =
+                    conversionTy->castTo<FunctionType>()->getResult();
+              }
+
+              ref = cs.cacheType(new (context) CovariantFunctionConversionExpr(
+                  ref, conversionTy));
             }
           }
         }
+      }
+
+      // The thunk that is built for a 'super' method reference does not
+      // require application.
+      if (isSuperPartialApplication) {
+        return forceUnwrapIfExpected(ref, choice, memberLocator);
       }
 
       ApplyExpr *apply;
@@ -2113,22 +2131,35 @@ namespace {
       if (!base)
         return nullptr;
 
+      const auto hasDynamicSelf =
+          subscript->getElementInterfaceType()->hasDynamicSelfType();
+
       // Form the subscript expression.
       auto subscriptExpr = SubscriptExpr::create(
           ctx, base, index, subscriptRef, isImplicit, semantics, getType);
       cs.setType(subscriptExpr, fullSubscriptTy->getResult());
       subscriptExpr->setIsSuper(isSuper);
+      cs.setType(subscriptExpr,
+                 hasDynamicSelf
+                     ? fullSubscriptTy->getResult()->replaceCovariantResultType(
+                           containerTy, 0)
+                     : fullSubscriptTy->getResult());
 
       Expr *result = subscriptExpr;
       closeExistential(result, locator);
 
-      if (subscript->getElementInterfaceType()->hasDynamicSelfType()) {
-        auto dynamicSelfFnType =
-          openedFullFnType->replaceCovariantResultType(baseTy, 2);
-        result =
-            new (ctx) CovariantReturnConversionExpr(result, dynamicSelfFnType);
-        cs.cacheType(result);
-        cs.setType(result, simplifyType(baseTy));
+      // If the element is of dynamic 'Self' type, wrap an implicit conversion
+      // around the resulting expression, with the destination type having
+      // 'Self' swapped for the appropriate replacement type -- usually the
+      // base object type.
+      if (hasDynamicSelf) {
+        const auto conversionTy = simplifyType(
+            selected.openedType->castTo<FunctionType>()->getResult());
+
+        if (!containerTy->isEqual(conversionTy)) {
+          result = cs.cacheType(
+              new (ctx) CovariantReturnConversionExpr(result, conversionTy));
+        }
       }
 
       return result;
