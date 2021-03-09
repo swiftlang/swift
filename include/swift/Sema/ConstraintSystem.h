@@ -3873,12 +3873,13 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param base The optional base expression of this value reference
+  /// \param memberLocator The locator anchored at this value reference, when
+  /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
-                                  const DeclRefExpr *base = nullptr,
+                                  ConstraintLocator *memberLocator = nullptr,
                                   bool wantInterfaceType = false);
 
   /// Return the type-of-reference of the given value.
@@ -3889,7 +3890,8 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param base The optional base expression of this value reference
+  /// \param memberLocator The locator anchored at this value reference, when
+  /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   ///
@@ -3897,7 +3899,7 @@ public:
   static Type
   getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
                              llvm::function_ref<Type(VarDecl *)> getType,
-                             const DeclRefExpr *base = nullptr,
+                             ConstraintLocator *memberLocator = nullptr,
                              bool wantInterfaceType = false);
 
   /// Retrieve the type of a reference to the given value declaration,
@@ -3916,8 +3918,7 @@ public:
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
-                          ConstraintLocatorBuilder locator,
-                          const DeclRefExpr *base = nullptr,
+                          ConstraintLocator *locator,
                           OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
@@ -4018,7 +4019,8 @@ public:
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
-  Type getEffectiveOverloadType(const OverloadChoice &overload,
+  Type getEffectiveOverloadType(ConstraintLocator *locator,
+                                const OverloadChoice &overload,
                                 bool allowMembers,
                                 DeclContext *useDC);
 
@@ -5280,6 +5282,14 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type);
 /// `RawPepresentable` protocol and return witness type.
 Type isRawRepresentable(ConstraintSystem &cs, Type type,
                         KnownProtocolKind rawRepresentableProtocol);
+
+/// Compute the type that shall stand in for dynamic 'Self' in a member
+/// reference with a base of the given object type.
+///
+/// \param memberLocator The locator of the member constraint; used to retrieve
+/// the expression that the locator is anchored to.
+Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
+                                   ConstraintLocator *memberLocator);
 
 class DisjunctionChoice {
   ConstraintSystem &CS;

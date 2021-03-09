@@ -662,8 +662,9 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *decl = constraint->getOverloadChoice().getDecl();
     if (decl->getBaseIdentifier().isArithmeticOperator()) {
       auto *useDC = constraint->getOverloadUseDC();
-      auto choiceType = CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
-                                                    /*allowMembers=*/true, useDC);
+      auto choiceType = CS.getEffectiveOverloadType(
+          constraint->getLocator(), constraint->getOverloadChoice(),
+          /*allowMembers=*/true, useDC);
       auto choiceFnType = choiceType->getAs<FunctionType>();
       auto genericFnType = decl->getInterfaceType()->getAs<GenericFunctionType>();
       auto signature = genericFnType->getGenericSignature();

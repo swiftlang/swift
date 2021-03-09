@@ -76,10 +76,6 @@ class A<T> {
     return copy
   }
 
-  var copied: Self {
-    let copy = Self.init(a: 11)
-    return copy
-  }
   subscript (i: Int) -> Self { // expected-error {{mutable subscript cannot have covariant 'Self' type}}
     get {
       return Self.init(a: i)
@@ -104,14 +100,6 @@ class B: A<Int> {
   }
   override class func y() {
     print("override \(Self.self).\(#function)")
-  }
-  override func copy() -> Self {
-    let copy = super.copy() as! Self // supported
-    return copy
-  }
-  override var copied: Self {
-    let copy = super.copied as! Self // unsupported
-    return copy
   }
 }
 
@@ -313,4 +301,62 @@ class HasDynamicSelfProperty {
 // in a stored property initializer.
 class UsesDynamicSelfProperty {
   var c = HasDynamicSelfProperty().me
+}
+
+// Test that dynamic 'Self' gets substituted with the object type of the
+// associated 'self' parameter in 'super'-based invocations.
+do {
+  class A {
+    required init() {}
+
+    func method() -> Self { self }
+    var property: Self { self }
+    subscript() -> Self { self }
+
+    class func method() -> Self { self.init() }
+    class var property: Self { self.init() }
+    class subscript() -> Self { self.init() }
+  }
+
+  class B: A {
+    override func method() -> Self { super.method() }
+    override var property: Self { super.property }
+    override subscript() -> Self { super[] }
+
+    override class func method() -> Self {
+      // Constructors must always have dynamic 'Self' replaced with the base
+      // object type.
+      // FIXME: Statically dispatches to the superclass init, but constructs an
+      // object of the 'Self' type.
+      let _: Self = super.init() // expected-error {{cannot convert value of type 'A' to specified type 'Self'}}
+      return super.method()
+    }
+    override class var property: Self { super.property }
+    override class subscript() -> Self { super[] }
+  }
+
+  class C: B {}
+
+  class D: C {
+    func testWithStaticSelf() {
+      let _: Self = super.method() // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super.property // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super[] // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: () -> Self = super.method // expected-error {{cannot convert value of type '() -> D' to specified type '() -> Self'}}
+    }
+
+    static func testWithStaticSelfStatic() {
+      // Constructors must always have dynamic 'Self' replaced with the base
+      // object type.
+      // FIXME: Statically dispatches to the superclass init, but constructs an
+      // object of the 'Self' type.
+      let _: Self = super.init() // expected-error {{cannot convert value of type 'C' to specified type 'Self'}}
+      let _: Self = super.method() // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super.property // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super[] // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: () -> Self = super.method
+      // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
+      // expected-error@-2 {{cannot convert value of type '(C) -> () -> D' to specified type '() -> Self'}}
+    }
+  }
 }
