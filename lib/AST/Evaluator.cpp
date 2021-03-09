@@ -71,8 +71,12 @@ bool Evaluator::checkDependency(const ActiveRequest &request) {
 
 void Evaluator::diagnoseCycle(const ActiveRequest &request) {
   if (debugDumpCycles) {
-    llvm::errs() << "===CYCLE DETECTED===\n";
+    llvm::errs() << "=== CYCLE DETECTED ===\n";
     for (auto &req : activeRequests) {
+      if (req == request)
+        llvm::errs() << "==> ";
+      else
+        llvm::errs() << "    ";
       simple_display(llvm::errs(), req);
       llvm::errs() << "\n";
     }
