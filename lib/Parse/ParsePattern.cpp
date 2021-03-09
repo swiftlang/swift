@@ -1263,7 +1263,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
 
   if (SyntaxContext->isEnabled()) {
     if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
-      PatternCtx.addSyntax(UPES->getDeferredPattern());
+      PatternCtx.addSyntax(UPES->getDeferredPattern(SyntaxContext));
     } else {
       PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
     }

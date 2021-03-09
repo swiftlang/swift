@@ -17,6 +17,12 @@ using namespace swift;
 using namespace swift::syntax;
 using namespace llvm;
 
+ParsedRawSyntaxNode ParsedRawSyntaxNode::getDeferredChild(
+    size_t ChildIndex, const SyntaxParsingContext *SyntaxContext) const {
+  assert(isDeferredLayout());
+  return SyntaxContext->getRecorder().getDeferredChild(*this, ChildIndex);
+}
+
 void ParsedRawSyntaxNode::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
   llvm::errs() << '\n';
@@ -42,11 +48,7 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
       break;
     case DataKind::DeferredLayout:
       dumpSyntaxKind(OS, getKind());
-      OS << " [deferred]";
-      for (const auto &child : getDeferredChildren()) {
-        OS << "\n";
-        child.dump(OS, Indent + 2);
-      }
+      OS << " [deferred layout]";
       break;
     case DataKind::DeferredToken:
       dumpSyntaxKind(OS, getKind());

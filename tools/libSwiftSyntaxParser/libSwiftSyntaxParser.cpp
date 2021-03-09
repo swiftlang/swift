@@ -176,9 +176,9 @@ private:
     return getNodeHandler()(&node);
   }
 
-  OpaqueSyntaxNode recordRawSyntax(SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) override {
+  OpaqueSyntaxNode
+  recordRawSyntax(SyntaxKind kind,
+                  ArrayRef<OpaqueSyntaxNode> elements) override {
     CRawSyntaxNode node;
     auto numValue = serialization::getNumericValue(kind);
     node.kind = numValue;
