@@ -12,8 +12,17 @@ class SwiftClass {}
 sil_vtable SwiftClass {}
 sil @$s13partial_apply10SwiftClassCfD : $@async @convention(method) (SwiftClass) -> ()
 
-sil @partially_applyable_to_class : $@async @convention(thin) (@owned SwiftClass) -> ()
-sil @partially_applyable_to_two_classes : $@async @convention(thin) (@owned SwiftClass, @owned SwiftClass) -> ()
+sil @partially_applyable_to_class : $@async @convention(thin) (@owned SwiftClass) -> () {
+entry(%c : $SwiftClass):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+sil @partially_applyable_to_two_classes : $@async @convention(thin) (@owned SwiftClass, @owned SwiftClass) -> () {
+entry(%c : $SwiftClass, %d : $SwiftClass):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+
 
 sil @use_closure : $@async @convention(thin) (@noescape @async @callee_guaranteed () -> ()) -> ()
 
@@ -53,7 +62,10 @@ entry(%a : $SwiftClass, %b: $SwiftClass):
   return %t : $()
 }
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s22generic_captured_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-sil public_external @generic_captured_param : $@async @convention(thin) <T> (Int, @inout T) -> Int
+sil @generic_captured_param : $@async @convention(thin) <T> (Int, @inout T) -> Int {
+entry(%i : $Int, %t : $*T):
+return %i : $Int
+}
 
 sil @partial_apply_generic_capture : $@async @convention(thin) (Int) -> @async @callee_owned (Int) -> Int {
 entry(%x : $Int):
@@ -65,7 +77,11 @@ entry(%x : $Int):
   return %p : $@async @callee_owned (Int) -> Int
 }
 
-sil public_external @generic_captured_and_open_param : $@async @convention(thin) <T> (@in T, @inout T) -> @out T
+sil public @generic_captured_and_open_param : $@async @convention(thin) <T> (@in T, @inout T) -> @out T {
+entry(%o : $*T, %i : $*T, %io : $*T):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_open_generic_capture(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 sil @partial_apply_open_generic_capture : $@async @convention(thin) <T> (@inout T) -> @async @callee_owned (@in T) -> @out T {
@@ -80,7 +96,11 @@ entry(%a : $*T):
 /* as the partial apply context.                                             */
 /*****************************************************************************/
 
-sil public_external @guaranteed_captured_class_param : $@async @convention(thin) (Int, @guaranteed SwiftClass) -> Int
+sil public @guaranteed_captured_class_param : $@async @convention(thin) (Int, @guaranteed SwiftClass) -> Int {
+entry(%i : $Int, %c : $SwiftClass):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_guaranteed_class_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
@@ -91,7 +111,11 @@ bb0(%x : $SwiftClass):
   return %p : $@async @callee_owned (Int) -> Int
 }
 
-sil public_external @indirect_guaranteed_captured_class_param : $@async @convention(thin) (Int, @in_guaranteed SwiftClass) -> Int
+sil public @indirect_guaranteed_captured_class_param : $@async @convention(thin) (Int, @in_guaranteed SwiftClass) -> Int {
+entry(%i : $Int, %c : $*SwiftClass):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_indirect_guaranteed_class_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s40indirect_guaranteed_captured_class_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[1-9]+}}) {{#[0-9]+}} {
@@ -103,7 +127,11 @@ bb0(%x : $*SwiftClass):
   return %p : $@async @callee_owned (Int) -> Int
 }
 
-sil public_external @indirect_consumed_captured_class_param : $@async @convention(thin) (Int, @in SwiftClass) -> Int
+sil public @indirect_consumed_captured_class_param : $@async @convention(thin) (Int, @in SwiftClass) -> Int {
+entry(%i : $Int, %c : $*SwiftClass):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_indirect_consumed_class_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[1-9]+}}) {{#[0-9]+}} {
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s38indirect_consumed_captured_class_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
@@ -122,7 +150,12 @@ bb0(%x : $*SwiftClass):
 
 struct SwiftClassPair { var x: SwiftClass, y: SwiftClass }
 
-sil public_external @guaranteed_captured_class_pair_param : $@async @convention(thin) (Int, @guaranteed SwiftClassPair) -> Int
+sil public @guaranteed_captured_class_pair_param : $@async @convention(thin) (Int, @guaranteed SwiftClassPair) -> Int {
+entry(%i : $Int, %c : $SwiftClassPair):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_guaranteed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s36guaranteed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
@@ -134,7 +167,11 @@ bb0(%x : $SwiftClassPair):
   return %p : $@async @callee_owned (Int) -> Int
 }
 
-sil public_external @indirect_guaranteed_captured_class_pair_param : $@async @convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+sil public @indirect_guaranteed_captured_class_pair_param : $@async @convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int {
+entry(%i : $Int, %c : $*SwiftClassPair):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_indirect_guaranteed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s45indirect_guaranteed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
@@ -146,7 +183,12 @@ bb0(%x : $*SwiftClassPair):
   return %p : $@async @callee_owned (Int) -> Int
 }
 
-sil public_external @indirect_consumed_captured_class_pair_param : $@async @convention(thin) (Int, @in SwiftClassPair) -> Int
+sil public @indirect_consumed_captured_class_pair_param : $@async @convention(thin) (Int, @in SwiftClassPair) -> Int {
+entry(%i : $Int, %c : $*SwiftClassPair):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_indirect_consumed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s43indirect_consumed_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
@@ -158,7 +200,11 @@ bb0(%x : $*SwiftClassPair):
   return %p : $@async @callee_owned (Int) -> Int
 }
 
-sil public_external @captured_fixed_and_dependent_params : $@async @convention(thin) <A> (@owned SwiftClass, @in A, Int) -> ()
+sil public @captured_fixed_and_dependent_params : $@async @convention(thin) <A> (@owned SwiftClass, @in A, Int) -> () {
+entry(%c : $SwiftClass, %a : $*A, %i : $Int):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_indirect_non_fixed_layout(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s35captured_fixed_and_dependent_paramsTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
@@ -169,7 +215,11 @@ bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
   return %p : $@async @callee_owned () -> ()
 }
 
-sil public_external @captured_dependent_out_param : $@async @convention(thin) <A> (@in A) -> @out A
+sil public @captured_dependent_out_param : $@async @convention(thin) <A> (@in A) -> @out A {
+entry(%o : $*A, %i : $*A):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 sil @partial_apply_with_out_param : $@async @convention(thin) <T> (@in T) -> @async @callee_owned () -> @out T {
 bb0(%x : $*T):
@@ -207,9 +257,6 @@ sil public_external @receive_closure : $@async @convention(thin) <C where C : Ba
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @test_partial_apply(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s26parametric_casting_closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s26parametric_casting_closureTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-
 sil @test_partial_apply : $@async @convention(thin) (@owned Base) -> () {
 bb0(%0 : $Base):
  %1 = function_ref @parametric_casting_closure : $@async @convention(thin) <C where C : Base> (@owned Base) -> @owned C
@@ -221,26 +268,15 @@ bb0(%0 : $Base):
  return %5 : $()
 }
 
-sil public_external @partial_empty_box : $@async @convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @empty_box(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-sil @empty_box : $@async @convention(thin) () -> () {
-entry:
-  // CHECK: [[BOX:%.*]] = call {{.*}}swift_allocEmptyBox
-  // CHECK: store %swift.refcounted* [[BOX]]
-  // CHECK: store %swift.opaque* undef
-  %b = alloc_box $<τ_0_0> { var τ_0_0 } <()>
-  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <()>, 0
-  %f = function_ref @partial_empty_box : $@async @convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
-  %g = partial_apply %f(%b, %ba) : $@async @convention(thin) (@owned <τ_0_0> { var τ_0_0 } <()>, @inout_aliasable ()) -> ()
-  return undef : $()
-}
-
 protocol P0 {}
 protocol P1 { associatedtype X : P0 }
 protocol P2 { associatedtype Y : P1 }
 
-sil hidden_external @complex_generic_function : $@async @convention(thin) <T where T : P2, T.Y : P2> (Int) -> ()
+sil hidden @complex_generic_function : $@async @convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
+entry(%i : $Int):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 sil @partial_apply_complex_generic_function : $@async @convention(thin) <T where T : P2, T.Y : P2> (Int) -> () {
 bb0(%0 : $Int):
@@ -250,14 +286,15 @@ bb0(%0 : $Int):
   return %result : $()
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_complex_generic_function(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s24complex_generic_functionTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-
 struct ComplexBoundedType<T: P2> {}
 
 // SR-901: Ensure that a partial_apply which captures bound generic type
 // metadata doesn't crash when restoring the generic context.
 
-sil hidden_external @generic_function : $@async @convention(thin) <T> () -> ()
+sil hidden @generic_function : $@async @convention(thin) <T> () -> () {
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 sil @partial_apply_with_generic_type : $@async @convention(thin) <U: P2> () -> () {
 bb0:
   %fn = function_ref @generic_function : $@async @convention(thin) <T> () -> ()
@@ -286,16 +323,18 @@ enum GenericEnum<T> {
   case X(String)
   case Y(T, T, T, T, T)
 }
-sil public_external @generic_indirect_return : $@async @convention(thin) <T> (Int) -> @owned GenericEnum<T>
+sil public @generic_indirect_return : $@async @convention(thin) <T> (Int) -> @owned GenericEnum<T> {
+entry(%i : $Int):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_generic_indirect_return(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s23generic_indirect_returnTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 sil @partial_apply_generic_indirect_return : $@async @convention(thin) (Int) -> @async @callee_owned () -> @owned GenericEnum<Int> {
   bb0(%0 : $Int):
   %fn = function_ref @generic_indirect_return :$@async @convention(thin) <T> (Int) -> @owned GenericEnum<T>
   %pa = partial_apply %fn<Int> (%0) : $@async @convention(thin) <T> (Int) -> @owned GenericEnum<T>
   return %pa : $@async @callee_owned () -> @owned GenericEnum<Int>
-
 }
 
 // Crash on partial apply of a generic enum.
@@ -303,10 +342,13 @@ enum GenericEnum2<T> {
   case X(String)
   case Y(T)
 }
-sil public_external @generic_indirect_return2 : $@async @convention(thin) <T> (Int) -> @owned GenericEnum2<T>
+sil public @generic_indirect_return2 : $@async @convention(thin) <T> (Int) -> @owned GenericEnum2<T> {
+entry(%i : $Int):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_generic_indirect_return2(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s24generic_indirect_return2TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 sil @partial_apply_generic_indirect_return2 : $@async @convention(thin) (Int) -> @async @callee_owned () -> @owned GenericEnum2<Int> {
   bb0(%0 : $Int):
   %fn = function_ref @generic_indirect_return2 :$@async @convention(thin) <T> (Int) -> @owned GenericEnum2<T>
@@ -316,7 +358,11 @@ sil @partial_apply_generic_indirect_return2 : $@async @convention(thin) (Int) ->
 
 struct SwiftStruct {}
 
-sil @fun : $@async @convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> ()
+sil @fun : $@async @convention(thin) (@thin SwiftStruct.Type, @owned SwiftClass) -> () {
+entry(%t : $@thin SwiftStruct.Type, %c : $SwiftClass):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_thin_type(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
@@ -358,7 +404,11 @@ struct A2<T>  {
 
 class  A3 {}
 
-sil @amethod : $@async @convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+sil @amethod : $@async @convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error) {
+entry(%a : $*A2<A3>):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 sil @repo : $@async @convention(thin) (@in_guaranteed A2<A3>) -> @owned @async @callee_guaranteed () -> (@owned A1, @error Error) {
 bb0(%0 : $*A2<A3>):
@@ -405,7 +455,6 @@ bb0(%x : $*SwiftClassPair):
 sil public_external @use_closure2 : $@async @convention(thin) (@noescape @async @callee_guaranteed (Int) -> Int) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
 sil @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param : $@async @convention(thin) (@in_guaranteed SwiftClassPair) -> () {
 bb0(%x : $*SwiftClassPair):
@@ -419,9 +468,12 @@ bb0(%x : $*SwiftClassPair):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_stack_callee_guaranteed_indirect_in_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s37indirect_in_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
-sil public_external @indirect_in_captured_class_pair_param : $@async @convention(thin) (Int, @in SwiftClassPair) -> Int
+sil public @indirect_in_captured_class_pair_param : $@async @convention(thin) (Int, @in SwiftClassPair) -> Int {
+entry(%i : $Int, %p : $*SwiftClassPair):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 sil @partial_apply_stack_callee_guaranteed_indirect_in_class_pair_param : $@async @convention(thin) (@in SwiftClassPair) -> () {
 bb0(%x : $*SwiftClassPair):
@@ -437,9 +489,12 @@ bb0(%x : $*SwiftClassPair):
 
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @partial_apply_stack_callee_guaranteed_indirect_in_constant_class_pair_param(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s46indirect_in_constant_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
-sil public_external @indirect_in_constant_captured_class_pair_param : $@async @convention(thin) (Int, @in_constant SwiftClassPair) -> Int
+sil public @indirect_in_constant_captured_class_pair_param : $@async @convention(thin) (Int, @in_constant SwiftClassPair) -> Int {
+entry(%i : $Int, %ic : $*SwiftClassPair):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 sil @partial_apply_stack_callee_guaranteed_indirect_in_constant_class_pair_param : $@async @convention(thin) (@in SwiftClassPair) -> () {
 bb0(%x : $*SwiftClassPair):
@@ -453,7 +508,11 @@ bb0(%x : $*SwiftClassPair):
   return %t : $()
 }
 
-sil public_external @closure : $@async @convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> ()
+sil public @closure : $@async @convention(thin) (@in_guaranteed ResilientInt, @guaranteed SwiftClass) -> () {
+entry(%i : $*ResilientInt, %c : $SwiftClass):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // Make sure that we use the heap header size (16) for the initial offset.
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @test_initial_offset(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
@@ -476,7 +535,11 @@ struct SomeType : Proto2 {
   var x : Int
 }
 
-sil @foo : $@async @convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> ()
+sil @foo : $@async @convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Proto1, τ_0_1 : Proto2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> () {
+entry(%z : $*τ_0_0, %o : $*τ_0_1):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 // CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @empty_followed_by_non_fixed(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
@@ -503,7 +566,11 @@ struct FixedType {
 }
 // CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @fixed_followed_by_empty_followed_by_non_fixed(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
 
-sil @foo2 : $@async @convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
+sil @foo2 : $@async @convention(thin) <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> () {
+entry(%z : $*τ_0_0, %o : $*τ_0_1, %t : $*τ_0_2):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 sil @fixed_followed_by_empty_followed_by_non_fixed : $@async @convention(thin)  (EmptyType, @in_guaranteed SomeType, FixedType) -> () {
 entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   %5 = alloc_stack $EmptyType
@@ -524,3 +591,12 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   %40 = tuple()
   return %40 : $()
 }
+
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s26parametric_casting_closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s26parametric_casting_closureTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s24complex_generic_functionTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s23generic_indirect_returnTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s24generic_indirect_return2TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s37indirect_in_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s46indirect_in_constant_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
