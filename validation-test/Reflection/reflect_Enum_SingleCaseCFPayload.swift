@@ -56,7 +56,7 @@ reflect(enum: SingleCaseCFPayloadEnum.only(cfs1))
 // CHECK-32: Reflecting an enum.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
 // CHECK-32: Type reference:
-// CHECK-32: (class reflect_Enum_SingleCaseCFPayload.SingleCaseCFPayloadEnum)
+// CHECK-32: (enum reflect_Enum_SingleCaseCFPayload.SingleCaseCFPayloadEnum)
 // CHECK-32: Type info:
 // CHECK-32: <null type info>
 // CHECK-32: Enum value:
