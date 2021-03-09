@@ -1360,3 +1360,17 @@ SR5688_1!.count // expected-error {{function 'SR5688_1' was used as a property; 
 
 func SR5688_2() -> Int? { 0 }
 let _: Int = SR5688_2! // expected-error {{function 'SR5688_2' was used as a property; add () to call it}} {{22-22=()}}
+
+
+// rdar://74696023 - Fallback error when passing incorrect optional type to `==` operator
+func rdar74696023() {
+  struct MyError {
+    var code: Int = 0
+  }
+
+  func test(error: MyError?, code: Int32) {
+    guard error?.code == code else { fatalError() } // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+    // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+}
