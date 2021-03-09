@@ -1843,12 +1843,16 @@ public:
           }
         }
       }
+
+
       break;
     }
 
     case AsyncSiteKind::Await:
       llvm_unreachable("diagnosing an uncovered await?");
     };
+
+        fprintf(stderr, "[%s:%d] (%s) diagnose diagnoseUncoveredAsyncSite\n", __FILE__, __LINE__, __FUNCTION__);
 
     ctx.Diags.diagnose(node.getStartLoc(), diag)
         .fixItInsert(node.getStartLoc(), "await ")
@@ -2329,17 +2333,13 @@ private:
       if (auto valueDecl = E->getMember().getDecl()) {
         if (isa<SubscriptDecl>(valueDecl))
           lookupKind = Context::Subscript;
-
-//        // FIXME: rdar://75147394 tryMarkImplicitlyAsync does not properly recognize a synthesized VarDecl?
-//        if (auto var = dyn_cast<VarDecl>(valueDecl))
-//          if (var->getAttrs().getAttribute<DistributedActorIndependentAttr>())
-//            return ShouldRecurse;
       }
 
-      checkThrowAsyncSite(E, /*requiresTry=*/false,
-            Classification::forUnconditional(EffectKind::Async,
-                                             PotentialEffectReason::forApply()),
-                          lookupKind);
+      checkThrowAsyncSite(
+          E, /*requiresTry=*/false,
+          Classification::forUnconditional(
+              EffectKind::Async, PotentialEffectReason::forApply()),
+          lookupKind);
     }
 
     return ShouldRecurse;
@@ -2378,13 +2378,6 @@ private:
           }
           checkThrowAsyncSite(E, /*requiresTry=*/throws, result,
                               Context::AsyncLet);
-        }
-      } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (func->isDistributed()) {
-          checkThrowAsyncSite(E, /*requiresTry=*/true,
-                              Classification::forUnconditional(
-                                  EffectKind::Async, PotentialEffectReason::forApply()),
-                              Context::Call);
         }
       }
     }
@@ -2480,10 +2473,14 @@ private:
 
       // Diagnose async calls in a context that doesn't handle async.
       if (!CurContext.handlesAsync(asyncKind)) {
+        E.dump();
+        fprintf(stderr, "[%s:%d] (%s) diagnose because NOT handled async \n", __FILE__, __LINE__, __FUNCTION__);
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, kind);
       }
       // Diagnose async calls that are outside of an await context.
       else if (!Flags.has(ContextFlags::IsAsyncCovered)) {
+        E.dump();
+        fprintf(stderr, "[%s:%d] (%s) diagnose because NOT is async covered \n", __FILE__, __LINE__, __FUNCTION__);
         CurContext.diagnoseUncoveredAsyncSite(Ctx, E, kind);
       }
     }

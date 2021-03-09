@@ -4346,8 +4346,11 @@ NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
-ERROR(distributed_actor_isolated_method,none,
+NOTE(distributed_actor_isolated_method_note,none,
       "only 'distributed' functions can be called from outside the distributed actor",
+      ())
+ERROR(distributed_actor_isolated_method,none,
+      "only 'distributed' functions can be called from outside the distributed actor", // TODO: more like 'non-distributed' ... defined here
       ())
 ERROR(distributed_actor_func_param_not_codable,none,
       "distributed function parameter '%0' of type %1 does not conform to 'Codable'",
@@ -4475,7 +4478,7 @@ ERROR(distributed_actor_func_not_in_distributed_actor,none,
 ERROR(distributed_actor_independent_property_must_be_let,none,
       "_distributedActorIndependent can be applied to properties, however they must be 'let'",
       ())
-ERROR(distributed_actor_isolated_property,none,
+NOTE(distributed_actor_isolated_property,none,
       "distributed actor state is only available within the actor instance",
       ())
 

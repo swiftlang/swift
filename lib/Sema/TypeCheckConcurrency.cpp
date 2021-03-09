@@ -1455,15 +1455,21 @@ namespace {
     /// Note that the given actor member is isolated.
     /// @param context is allowed to be null if no context is appropriate.
     void noteIsolatedActorMember(ValueDecl *decl, Expr *context,
-                                 bool distributedActor = false) {
+                                 bool isDistributedActor) {
       // FIXME: Make this diagnostic more sensitive to the isolation context
       // of the declaration.
-      if (distributedActor) {
-        // Distributed actor properties are never accessible externally.
-        decl->diagnose(diag::distributed_actor_isolated_property);
-
+      if (isDistributedActor) {
+        // TODO: detect isDistributedActor based on the decl, rather than an explicit boolean
+        if (dyn_cast<VarDecl>(decl)) {
+          // Distributed actor properties are never accessible externally.
+          decl->diagnose(diag::distributed_actor_isolated_property);
+        } else {
+          // it's a function or subscript
+          fprintf(stderr, "[%s:%d] (%s) warning about not isolated , distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+          decl->diagnose(diag::distributed_actor_isolated_method_note);
+        }
       } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        func->diagnose(diag::actor_isolated_sync_func,
+        func->diagnose(diag::actor_isolated_sync_func, // FIXME: this is emitted wrongly for self.hello()
           decl->getDescriptiveKind(),
           decl->getName());
 
@@ -1836,9 +1842,12 @@ namespace {
             ConcurrentReferenceKind::CrossActor);
       }
 
+      bool isDistributedActor = false;
       switch (contextIsolation) {
-      case ActorIsolation::ActorInstance:
-      case ActorIsolation::DistributedActorInstance: {
+      case ActorIsolation::DistributedActorInstance:
+        isDistributedActor = true;
+        LLVM_FALLTHROUGH;
+      case ActorIsolation::ActorInstance: {
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
@@ -1850,7 +1859,8 @@ namespace {
                            value->getDescriptiveKind(), value->getName(),
                            globalActor, contextIsolation.getActor()->getName(),
                            useKind, result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context);
+        fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+        noteIsolatedActorMember(value, context, isDistributedActor);
         return true;
       }
 
@@ -1871,7 +1881,8 @@ namespace {
             value->getDescriptiveKind(), value->getName(), globalActor,
             contextIsolation.getGlobalActor(), useKind,
             result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context);
+        fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+        noteIsolatedActorMember(value, context, isDistributedActor);
         return true;
       }
 
@@ -1892,7 +1903,8 @@ namespace {
                            globalActor,
                            /*actorIndependent=*/true, useKind,
                            result == AsyncMarkingResult::SyncContext);
-        noteIsolatedActorMember(value, context);
+        fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+        noteIsolatedActorMember(value, context, isDistributedActor);
         return true;
       }
 
@@ -1913,7 +1925,8 @@ namespace {
               /*actorIndependent=*/false, useKind,
               result == AsyncMarkingResult::SyncContext);
           }
-          noteIsolatedActorMember(value, context);
+            fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+            noteIsolatedActorMember(value, context, isDistributedActor);
         };
 
         if (AbstractFunctionDecl const* fn =
@@ -2123,6 +2136,7 @@ namespace {
         return false;
 
       auto member = memberRef.getDecl();
+      bool isDistributedActor = false;
       switch (auto isolation =
                   ActorIsolationRestriction::forDeclaration(memberRef)) {
       case ActorIsolationRestriction::Unrestricted:
@@ -2144,6 +2158,11 @@ namespace {
       }
 
       case ActorIsolationRestriction::DistributedActor: {
+        fprintf(stderr, "[%s:%d] (%s) member [%s] reference isolation: DistributedActor \n", __FILE__, __LINE__, __FUNCTION__,
+                member->getBaseName().userFacingName());
+        /// mark for later diagnostics that we have we're in a distributed actor.
+        isDistributedActor = true;
+
         // distributed actor isolation is more strict;
         // we do not allow any property access, or synchronous access at all.
 
@@ -2152,54 +2171,80 @@ namespace {
         auto *selfVar = getReferencedSelf(base);
         if (!selfVar) {
           // invocation on not-'self', is only okey if this is a distributed func
+          fprintf(stderr, "[%s:%d] (%s) invocation on non self\n", __FILE__, __LINE__, __FUNCTION__);
+
           if (auto func = dyn_cast<FuncDecl>(member)) {
             if (!func->isDistributed()) {
               ctx.Diags.diagnose(memberLoc, diag::distributed_actor_isolated_method);
               // TODO: offer a fixit to add 'distributed' on the member; how to test fixits? See also https://github.com/apple/swift/pull/35930/files
-              noteIsolatedActorMember(member, context);
+//              member->dump();
+//              fprintf(stderr, "[%s:%d] (%s) issuing note about [%s] isolation, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__,
+//                      member->getBaseName().userFacingName(), isDistributedActor);
+              fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+              noteIsolatedActorMember(member, context, isDistributedActor);
               return true;
             }
 
             assert(func->isDistributed());
-            auto result = tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+
+            if (!func->hasAsync())
+              tryMarkImplicitlyAsync(memberLoc, memberRef, context);
+
+            tryMarkImplicitlyThrows(memberLoc, memberRef, context);
+
+            // TODO: mark implicitly async here?
             // TODO: we don't really need to do anythign with the result, dont get it?
 
             // distributed func reference, that passes all checks, great!
             continueToCheckingLocalIsolation = true;
-          }
+          } // end FuncDecl
 
           if (!continueToCheckingLocalIsolation) {
-            // @_distributedActorIndependent decls are accessible always,
-            // regardless of distributed actor-isolation; e.g. actorAddress
-            if (auto attr = member->getAttrs().getAttribute<DistributedActorIndependentAttr>())
-              switch (attr->getKind()) {
-                case DistributedActorIndependentKind::Default:
-                  continueToCheckingLocalIsolation = true;
+            // it wasn't a function (including a distributed function),
+            // so we need to perform some more checks
+            if (auto var = dyn_cast<VarDecl>(member)) {
+              // @_distributedActorIndependent decls are accessible always,
+              // regardless of distributed actor-isolation; e.g. actorAddress
+              if (member->getAttrs().hasAttribute<DistributedActorIndependentAttr>())
+                return false;
+
+              // otherwise, no other properties are accessible on a distributed actor
+              if (!continueToCheckingLocalIsolation) {
+//          fprintf(stderr, "[%s:%d] (%s) issuing note about [%s] isolation, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__,
+//                  member->getBaseName().userFacingName(), isDistributedActor);
+                fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+                ctx.Diags.diagnose(
+                    memberLoc, diag::distributed_actor_isolated_non_self_reference,
+                    member->getDescriptiveKind(),
+                    member->getName());
+                noteIsolatedActorMember(member, context, isDistributedActor);
+                return true;
               }
+            }
+
+            // TODO: would have to also consider subscripts and other things
           }
+        } // end !selfVar
 
-          if (!continueToCheckingLocalIsolation) {
-            ctx.Diags.diagnose(
-                memberLoc, diag::distributed_actor_isolated_non_self_reference,
-                member->getDescriptiveKind(),
-                member->getName());
-            noteIsolatedActorMember(member, context);
-            return true;
-          }
-
-          return false;
-        }
-
-        // continue checking as if it was actor self isolated
-        assert(selfVar);
-        LLVM_FALLTHROUGH;
+        fprintf(stderr, "[%s:%d] (%s) member referenced on distributed actor: [%s]\n", __FILE__, __LINE__, __FUNCTION__,
+                member->getBaseName().userFacingName());
+        return false;
+//        // continue checking as if it was actor self isolated
+//        assert(selfVar);
+//        // LLVM_FALLTHROUGH;
+//        return false;
       }
 
       case ActorIsolationRestriction::ActorSelf: {
+        fprintf(stderr, "[%s:%d] (%s) member [%s] reference isolation: DistributedActor \n", __FILE__, __LINE__, __FUNCTION__,
+                member->getBaseName().userFacingName());
+
         // Must reference actor-isolated state on 'self'.
         auto *selfVar = getReferencedSelf(base);
         if (!selfVar) {
           // Check for implicit async.
+          fprintf(stderr, "[%s:%d] (%s) [%s] referenced on not self... check implicitly async\n", __FILE__, __LINE__, __FUNCTION__,
+                  member->getBaseName().userFacingName());
           auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
           if (result == AsyncMarkingResult::FoundAsync)
             return false; // no problems
@@ -2217,15 +2262,20 @@ namespace {
                 getNearestEnclosingActorContext(getDeclContext()),
               useKind
               );
-          noteIsolatedActorMember(member, context);
+          fprintf(stderr, "[%s:%d] (%s) issuing note about [%s] isolation, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__,
+                  member->getBaseName().userFacingName(), isDistributedActor);
+          noteIsolatedActorMember(member, context, isDistributedActor);
           return true;
         }
 
         // Check whether the current context is differently-isolated.
         auto curDC = const_cast<DeclContext *>(getDeclContext());
         switch (auto contextIsolation = getActorIsolationOfContext(curDC)) {
-          case ActorIsolation::ActorInstance:
           case ActorIsolation::DistributedActorInstance:
+            fprintf(stderr, "[%s:%d] (%s) isolation of [%s] is DISTRIBUTED\n", __FILE__, __LINE__, __FUNCTION__,
+                    member->getBaseName().userFacingName());
+            LLVM_FALLTHROUGH;
+          case ActorIsolation::ActorInstance:
             // An escaping partial application of something that is part of
             // the actor's isolated state is never permitted.
             if (isEscapingPartialApply) {
@@ -2233,7 +2283,10 @@ namespace {
                   memberLoc, diag::actor_isolated_partial_apply,
                   member->getDescriptiveKind(),
                   member->getName());
-              noteIsolatedActorMember(member, context);
+              fprintf(stderr, "[%s:%d] (%s) issuing note about [%s] isolation, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__,
+                      member->getBaseName().userFacingName(), isDistributedActor);
+              fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+              noteIsolatedActorMember(member, context, isDistributedActor);
               return true;
             }
 
@@ -2244,6 +2297,8 @@ namespace {
             return false;
 
           case ActorIsolation::Independent: {
+            fprintf(stderr, "[%s:%d] isolation of [%s] IS INDEPENDENT\n", __FILE__, __LINE__, __FUNCTION__,
+                    member->getBaseName().userFacingName());
             auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
             if (result == AsyncMarkingResult::FoundAsync)
               return false; // no problems
@@ -2257,7 +2312,10 @@ namespace {
             auto diag = findActorIndependentReason(curDC);
             ctx.Diags.diagnose(memberLoc, diag, member->getDescriptiveKind(),
                                member->getName(), useKind);
-            noteIsolatedActorMember(member, context);
+            fprintf(stderr, "[%s:%d] (%s) issuing note about [%s] isolation, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__,
+                    member->getBaseName().userFacingName(), isDistributedActor);
+            fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+            noteIsolatedActorMember(member, context, isDistributedActor);
             return true;
           }
 
@@ -2279,7 +2337,10 @@ namespace {
                                contextIsolation.getGlobalActor(), useKind,
                                result == AsyncMarkingResult::SyncContext
                                );
-            noteIsolatedActorMember(member, context);
+            fprintf(stderr, "[%s:%d] (%s) issuing note about [%s] isolation, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__,
+                    member->getBaseName().userFacingName(), isDistributedActor);
+            fprintf(stderr, "[%s:%d] (%s) about to call noteIsolatedActorMember, distributed:%d\n", __FILE__, __LINE__, __FUNCTION__, isDistributedActor);
+            noteIsolatedActorMember(member, context, isDistributedActor);
             return true;
           }
         }
