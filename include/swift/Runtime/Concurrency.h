@@ -515,9 +515,13 @@ void swift_defaultActor_initialize(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_destroy(DefaultActor *actor);
 
-/// Initialize the runtime storage for a distributed *remote* actor.
+/// Initialize the runtime storage for a distributed remote actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_distributedActor_initialize_remote(DefaultActor *actor);
+void swift_distributedActor_remote_initialize(DefaultActor *actor);
+
+/// Destroy the runtime storage for a default actor.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_distributedActor_destroy(DefaultActor *actor);
 
 /// Enqueue a job on the default actor implementation.
 ///

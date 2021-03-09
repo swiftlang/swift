@@ -723,13 +723,13 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
-///// Initialize a "proxy" for a distributed remote actor.
-//BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
-//                       "initializeDistributedRemoteActor", "", Special)
-//
-///// Destroy the distributed-remote-actor instance in a "proxy" actor object.
-//BUILTIN_MISC_OPERATION(DestroyDistributedRemote,
-//                       "destroyDistributedRemote", "", Special)
+/// Initialize a "proxy" for a distributed remote actor.
+BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
+                       "initializeDistributedRemoteActor", "", Special)
+
+/// Destroy the distributed-actor instance in a "proxy" actor object.
+BUILTIN_MISC_OPERATION(DestroyDistributedActor,
+                       "destroyDistributedActor", "", Special)
 
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.

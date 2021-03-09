@@ -1564,25 +1564,17 @@ FUNCTION(DefaultActorDestroy,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-//// void swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group);
-//FUNCTION(TaskGroupInitialize,
-//         swift_taskGroup_initialize, SwiftCC,
-//         ConcurrencyAvailability,
-//         RETURNS(VoidTy),
-//         ARGS(RefCountedPtrTy, RefCountedPtrTy),
-//         ATTRS(NoUnwind))
-//
-//// void swift_taskGroup_destroy(AsyncTask *task, TaskGroup *group);
-//FUNCTION(TaskGroupDestroy,
-//         swift_taskGroup_destroy, SwiftCC,
-//         ConcurrencyAvailability,
-//         RETURNS(VoidTy),
-//         ARGS(RefCountedPtrTy, RefCountedPtrTy),
-//         ATTRS(NoUnwind))
-
-// void swift_distributedActor_initialize_remote(DefaultActor *actor);
+// void swift_distributedActor_remote_initialize(DefaultActor *actor);
 FUNCTION(DistributedActorInitializeRemote,
-         swift_distributedActor_initialize_remote, SwiftCC,
+         swift_distributedActor_remote_initialize, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy), // TODO also address and transport?
+         ATTRS(NoUnwind))
+
+// void swift_distributedActor_destroy(DefaultActor *actor); // TODO: ProxyActor *proxy?
+FUNCTION(DistributedActorDestroy,
+         swift_distributedActor_destroy, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),

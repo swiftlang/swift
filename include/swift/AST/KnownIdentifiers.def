@@ -227,6 +227,10 @@ IDENTIFIER(className)
 IDENTIFIER(_defaultActorInitialize)
 IDENTIFIER(_defaultActorDestroy)
 
+// IDENTIFIER(_distributedActorInitializeLocal) - this is just `_defaultActorInitialize`
+IDENTIFIER(_distributedActorRemoteInitialize)
+IDENTIFIER(_distributedActorDestroy)
+
 IDENTIFIER_(ErrorType)
 IDENTIFIER(Code)
 IDENTIFIER_(nsError)
