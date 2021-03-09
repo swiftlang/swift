@@ -44,12 +44,14 @@ class ParsedRawSyntaxNode {
   friend class ParsedRawSyntaxRecorder;
   using DataKind = RecordedOrDeferredNode::Kind;
 
-  OpaqueSyntaxNode Data;
+  /// The opaque data of this node. Needs to be interpreted by the \c
+  /// SyntaxParseActions, which created it.
+  RecordedOrDeferredNode Data;
+
   /// The range of this node, including trivia.
   CharSourceRange Range;
   uint16_t SynKind;
   uint16_t TokKind;
-  DataKind DK;
   /// Primary used for capturing a deferred missing token.
   bool IsMissing = false;
 
@@ -58,21 +60,22 @@ class ParsedRawSyntaxNode {
 
 public:
   ParsedRawSyntaxNode()
-      : Data(nullptr), Range(), SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
-        TokKind(uint16_t(tok::unknown)), DK(DataKind::Null) {}
+      : Data(nullptr, DataKind::Null), Range(),
+        SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
+        TokKind(uint16_t(tok::unknown)) {}
 
   ParsedRawSyntaxNode(OpaqueSyntaxNode Opaque, CharSourceRange Range,
                       syntax::SyntaxKind SynKind, tok TokKind, DataKind DK,
                       bool IsMissing)
-      : Data(Opaque), Range(Range), SynKind(uint16_t(SynKind)),
-        TokKind(uint16_t(TokKind)), DK(DK), IsMissing(IsMissing) {
+      : Data(Opaque, DK), Range(Range), SynKind(uint16_t(SynKind)),
+        TokKind(uint16_t(TokKind)), IsMissing(IsMissing) {
     assert(getKind() == SynKind && "Syntax kind with too large value!");
     assert(getTokenKind() == TokKind && "Token kind with too large value!");
   }
 
 #ifndef NDEBUG
   bool ensureDataIsNotRecorded() {
-    if (DK != DataKind::Recorded)
+    if (getDataKind() != DataKind::Recorded)
       return true;
     llvm::dbgs() << "Leaking node: ";
     dump(llvm::dbgs());
@@ -88,7 +91,6 @@ public:
     Range = std::move(other.Range);
     SynKind = std::move(other.SynKind);
     TokKind = std::move(other.TokKind);
-    DK = std::move(other.DK);
     IsMissing = std::move(other.IsMissing);
     other.reset();
     return *this;
@@ -102,12 +104,14 @@ public:
 
   /// Returns the type of this node (recorded, deferred layout, deferred token,
   /// null).
-  DataKind getDataKind() const { return DK; }
+  DataKind getDataKind() const { return Data.getKind(); }
 
   /// Returns the opaque data of this node. This must be interpreted by the
   /// \c SyntaxParseAction, which likely also needs the node type to know
   /// what type of node the data represents.
-  OpaqueSyntaxNode getData() const { return Data; }
+  OpaqueSyntaxNode getData() const { return Data.getOpaque(); }
+
+  RecordedOrDeferredNode getRecordedOrDeferredNode() const { return Data; }
 
   /// Return the opaque data of this node and reset it.
   OpaqueSyntaxNode takeData() {
@@ -126,22 +130,23 @@ public:
     return getTokenKind() == tokKind;
   }
 
-  bool isNull() const {
-    return DK == DataKind::Null;
-  }
+  bool isNull() const { return getDataKind() == DataKind::Null; }
 
-  bool isRecorded() const { return DK == DataKind::Recorded; }
-  bool isDeferredLayout() const { return DK == DataKind::DeferredLayout; }
-  bool isDeferredToken() const { return DK == DataKind::DeferredToken; }
+  bool isRecorded() const { return getDataKind() == DataKind::Recorded; }
+  bool isDeferredLayout() const {
+    return getDataKind() == DataKind::DeferredLayout;
+  }
+  bool isDeferredToken() const {
+    return getDataKind() == DataKind::DeferredToken;
+  }
 
   /// Primary used for a deferred missing token.
   bool isMissing() const { return IsMissing; }
 
   void reset() {
-    Data = nullptr;
+    Data = RecordedOrDeferredNode(nullptr, DataKind::Null);
     SynKind = uint16_t(syntax::SyntaxKind::Unknown);
     TokKind = uint16_t(tok::unknown);
-    DK = DataKind::Null;
     IsMissing = false;
   }
 
@@ -151,7 +156,6 @@ public:
     copy.Range = Range;
     copy.SynKind = SynKind;
     copy.TokKind = TokKind;
-    copy.DK = DK;
     copy.IsMissing = IsMissing;
     return copy;
   }
@@ -161,13 +165,13 @@ public:
 
   // Recorded Data ===========================================================//
 
-  const OpaqueSyntaxNode &getOpaqueNode() const {
+  OpaqueSyntaxNode getOpaqueNode() const {
     assert(isRecorded());
-    return Data;
+    return Data.getOpaque();
   }
   OpaqueSyntaxNode takeOpaqueNode() {
     assert(isRecorded());
-    auto opaque = Data;
+    auto opaque = Data.getOpaque();
     reset();
     return opaque;
   }
@@ -184,14 +188,12 @@ public:
                    const SyntaxParsingContext *SyntaxContext) const;
 
   ParsedRawSyntaxNode copyDeferred() const {
-    assert(DK == DataKind::DeferredLayout ||
-           DK == DataKind::DeferredToken && "node not deferred");
+    assert(isDeferredLayout() || isDeferredToken() && "node not deferred");
     ParsedRawSyntaxNode copy;
     copy.Data = Data;
     copy.Range = Range;
     copy.SynKind = SynKind;
     copy.TokKind = TokKind;
-    copy.DK = DK;
     copy.IsMissing = IsMissing;
     return copy;
   }

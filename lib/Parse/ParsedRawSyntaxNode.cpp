@@ -33,7 +33,7 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     OS << ' ';
   OS << '(';
 
-  switch (DK) {
+  switch (getDataKind()) {
     case DataKind::Null:
       OS << "<NULL>";
       break;
