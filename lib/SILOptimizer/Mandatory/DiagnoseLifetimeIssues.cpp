@@ -37,6 +37,7 @@
 #include "swift/SILOptimizer/Utils/PrunedLiveness.h"
 #include "swift/Demangling/Demangler.h"
 #include "llvm/Support/Debug.h"
+#include "clang/AST/DeclObjC.h"
 
 using namespace swift;
 
@@ -51,7 +52,7 @@ class DiagnoseLifetimeIssues {
 
   bool computeCanonicalLiveness(SILValue def);
 
-  bool isDeadStore(StoreWeakInst *store);
+  void reportDeadStore(SILInstruction *storeInst, SILValue src);
 
 public:
   DiagnoseLifetimeIssues() {}
@@ -96,7 +97,8 @@ bool DiagnoseLifetimeIssues::computeCanonicalLiveness(SILValue def) {
       auto *user = use->getUser();
 
       // Recurse through copies and enums.
-      if (isa<CopyValueInst>(user) || isa<EnumInst>(user)) {
+      if (isa<CopyValueInst>(user) || isa<EnumInst>(user) ||
+          isa<InitExistentialRefInst>(user)) {
         defUseWorklist.insert(cast<SingleValueInstruction>(user));
         continue;
       }
@@ -156,25 +158,30 @@ static SILValue getCanonicalDef(SILValue val) {
         continue;
       }
     }
+    if (auto *initExRef = dyn_cast<InitExistentialRefInst>(val)) {
+      val = initExRef->getOperand();
+      continue;
+    }
     return val;
   }
 }
 
-/// Returns true if the stored object of \p store is never loaded within the
-/// lifetime of the stored object.
-bool DiagnoseLifetimeIssues::isDeadStore(StoreWeakInst *store) {
-  SILValue storedDef = getCanonicalDef(store->getSrc());
+/// Reports a warning if the stored object \p storedObj is never loaded within
+/// the lifetime of the stored object.
+void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *storeInst,
+                                             SILValue storedObj) {
+  SILValue storedDef = getCanonicalDef(storedObj);
   
   // Only for allocations we know that a destroy will actually deallocate the
   // object. Otherwise the object could be kept alive by other references and
   // we would issue a false alarm.
   if (!isAllocation(storedDef))
-    return false;
+    return;
 
+  liveness.clear();
   liveness.initializeDefBlock(storedDef->getParentBlock());
   if (!computeCanonicalLiveness(storedDef))
-    return false;
-
+    return;
 
   // Check if the lifetime of the stored object ends at the store_weak.
   //
@@ -186,23 +193,56 @@ bool DiagnoseLifetimeIssues::isDeadStore(StoreWeakInst *store) {
   // always see a potential load if the lifetime of the object goes beyond the
   // store_weak.
 
-  SILBasicBlock *storeBlock = store->getParent();
+  SILBasicBlock *storeBlock = storeInst->getParent();
   if (liveness.getBlockLiveness(storeBlock) != PrunedLiveBlocks::LiveWithin)
-    return false;
+    return;
 
   // If there are any uses after the store_weak, it means that the liferange of
   // the object goes beyond the store_weak.
-  for (SILInstruction &inst : make_range(std::next(store->getIterator()),
+  for (SILInstruction &inst : make_range(std::next(storeInst->getIterator()),
                                          storeBlock->end())) {
     switch (liveness.isInterestingUser(&inst)) {
     case PrunedLiveness::NonUser:
       break;
     case PrunedLiveness::NonLifetimeEndingUse:
     case PrunedLiveness::LifetimeEndingUse:
-      return false;
+      return;
     }
   }
-  return true;
+
+  // Issue the warning.
+  storeInst->getModule().getASTContext().Diags.diagnose(
+    storeInst->getLoc().getSourceLoc(), diag::warn_dead_weak_store);
+}
+
+/// Returns true if \p inst is a call of an ObjC setter to a weak property.
+static bool isStoreObjcWeak(SILInstruction *inst) {
+  auto *apply = dyn_cast<ApplyInst>(inst);
+  if (!apply || apply->getNumArguments() < 1)
+    return false;
+    
+  auto *method = dyn_cast<ObjCMethodInst>(apply->getCallee());
+  if (!method)
+    return false;
+  
+  Decl *decl = method->getMember().getDecl();
+  auto *accessor = dyn_cast<AccessorDecl>(decl);
+  if (!accessor)
+    return false;
+
+  auto *var = dyn_cast<VarDecl>(accessor->getStorage());
+  if (!var)
+    return false;
+
+  ClangNode clangNode = var->getClangNode();
+  if (!clangNode)
+    return false;
+  
+  auto *objcDecl = dyn_cast_or_null<clang::ObjCPropertyDecl>(clangNode.getAsDecl());
+  if (!objcDecl)
+    return false;
+
+  return objcDecl->getSetterKind() == clang::ObjCPropertyDecl::Weak;
 }
 
 /// Prints warnings for dead weak stores in \p function.
@@ -210,11 +250,11 @@ void DiagnoseLifetimeIssues::diagnose(SILFunction *function) {
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (auto *stWeak = dyn_cast<StoreWeakInst>(&inst)) {
-        if (isDeadStore(stWeak)) {
-          function->getModule().getASTContext().Diags.diagnose(
-              stWeak->getLoc().getSourceLoc(), diag::warn_dead_weak_store);
-        }
-        liveness.clear();
+        reportDeadStore(stWeak, stWeak->getSrc());
+        continue;
+      }
+      if (isStoreObjcWeak(&inst)) {
+        reportDeadStore(&inst, cast<ApplyInst>(&inst)->getArgument(0));
         continue;
       }
     }
