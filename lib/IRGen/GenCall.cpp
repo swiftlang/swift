@@ -3767,85 +3767,23 @@ llvm::Value *irgen::emitTaskCreate(
   parentTask = IGF.Builder.CreateBitOrPointerCast(
       parentTask, IGF.IGM.SwiftTaskPtrTy);
 
-  // Determine the size of the async context for the closure.
-  ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  CanSILFunctionType taskFunctionType;
-  CanSILFunctionType substTaskFunctionType;
-  if (futureResultType) {
-    auto genericParam = GenericTypeParamType::get(0, 0, ctx);
-    auto genericSig = GenericSignature::get({genericParam}, {});
-    auto *ty = GenericFunctionType::get(genericSig, { }, genericParam, extInfo);
-
-    taskFunctionType = IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
-    substTaskFunctionType = taskFunctionType->withInvocationSubstitutions(subs);
-  } else {
-    auto *ty = FunctionType::get({ }, ctx.TheEmptyTupleType, extInfo);
-    taskFunctionType = IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
-    substTaskFunctionType = taskFunctionType;
-  }
-  auto layout = getAsyncContextLayout(
-      IGF.IGM, taskFunctionType, substTaskFunctionType, subs,
-      /*suppress generics*/ false);
-
-  CanSILFunctionType taskContinuationFunctionTy = [&]() {
-    ASTContext &ctx = IGF.IGM.IRGen.SIL.getASTContext();
-    auto extInfo =
-        ASTExtInfoBuilder()
-            .withRepresentation(FunctionTypeRepresentation::CFunctionPointer)
-            .build();
-    // FIXME: Use the appropriate signature for TaskContinuationFunction:
-    //
-    //            using TaskContinuationFunction =
-    //              SWIFT_CC(swift)
-    //              void (AsyncTask *, ExecutorRef, AsyncContext *);
-    auto ty = FunctionType::get({}, ctx.TheEmptyTupleType, extInfo);
-    return IGF.IGM.getLoweredType(ty).castTo<SILFunctionType>();
-  }();
-
-  // Call the function.
   llvm::CallInst *result;
-  llvm::Value *theSize, *theFunction;
-  auto taskFunctionPointer = FunctionPointer::forExplosionValue(
-      IGF, taskFunction, substTaskFunctionType);
-  std::tie(theFunction, theSize) =
-      getAsyncFunctionAndSize(IGF, SILFunctionTypeRepresentation::Thick,
-                              taskFunctionPointer, localContextInfo);
-  if (auto authInfo = PointerAuthInfo::forFunctionPointer(
-          IGF.IGM, taskContinuationFunctionTy)) {
-    theFunction = emitPointerAuthResign(
-        IGF, theFunction, taskFunctionPointer.getAuthInfo(), authInfo);
-  }
-  theFunction = IGF.Builder.CreateBitOrPointerCast(
-      theFunction, IGF.IGM.TaskContinuationFunctionPtrTy);
-  theSize = IGF.Builder.CreateZExtOrBitCast(theSize, IGF.IGM.SizeTy);
   if (taskGroup && futureResultType) {
     taskGroup = IGF.Builder.CreateBitOrPointerCast(
         taskGroup, IGF.IGM.SwiftTaskGroupPtrTy);
     result = IGF.Builder.CreateCall(
-        IGF.IGM.getTaskCreateGroupFutureFuncFn(),
-        {flags, parentTask, taskGroup, futureResultType, theFunction, theSize});
+        IGF.IGM.getTaskCreateGroupFutureFn(),
+        {flags, parentTask, taskGroup, futureResultType,
+         taskFunction, localContextInfo});
   } else if (futureResultType) {
     result = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCreateFutureFuncFn(),
-      { flags, parentTask, futureResultType, theFunction, theSize });
+      IGF.IGM.getTaskCreateFutureFn(),
+      {flags, parentTask, futureResultType, taskFunction, localContextInfo});
   } else {
-    result = IGF.Builder.CreateCall(IGF.IGM.getTaskCreateFuncFn(),
-                                    {flags, parentTask, theFunction, theSize});
+    llvm_unreachable("no future?!");
   }
   result->setDoesNotThrow();
   result->setCallingConv(IGF.IGM.SwiftCC);
-
-  // Write the local context information into the initial context for the task.
-  assert(layout.hasLocalContext());
-  // Dig out the initial context returned from task creation.
-  auto initialContext = IGF.Builder.CreateExtractValue(result, {1});
-  Address initialContextAddr = layout.emitCastTo(IGF, initialContext);
-
-  auto localContextLayout = layout.getLocalContextLayout();
-  auto localContextAddr =
-      localContextLayout.project(IGF, initialContextAddr, llvm::None);
-  IGF.Builder.CreateStore(localContextInfo, localContextAddr);
 
   return result;
 }
