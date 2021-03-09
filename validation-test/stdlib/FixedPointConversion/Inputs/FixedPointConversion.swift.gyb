@@ -11,6 +11,7 @@
 %
 % # Generate a test-suite file for each integer type.
 % for (configuration, ptrsize) in product(['Debug', 'Release'], [32, 64]):
+%   long_test = ', long_test' if (configuration, ptrsize) == ('Release', 32) else ''
 %   optimizations = '-Onone' if configuration == 'Debug' else '-O'
 %
 %   for self_type in all_integer_types(ptrsize):
@@ -28,7 +29,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// REQUIRES: executable_test
+// REQUIRES: executable_test${long_test}
 // REQUIRES: PTRSIZE=${str(ptrsize)}
 // RUN: %target-run-simple-swift(${optimizations})
 // END.

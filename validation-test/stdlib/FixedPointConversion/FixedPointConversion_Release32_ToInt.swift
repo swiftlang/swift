@@ -5,7 +5,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// REQUIRES: executable_test
+// REQUIRES: executable_test, long_test
 // REQUIRES: PTRSIZE=32
 // RUN: %target-run-simple-swift(-O)
 // END.
