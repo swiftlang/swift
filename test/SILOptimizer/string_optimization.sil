@@ -11,6 +11,7 @@ sil [readonly] [_semantics "string.init_empty"] @empty_string : $@convention(met
 sil [_semantics "string.init_empty"] @empty_string_with_capacity : $@convention(method) (Int, @thin String.Type) -> @owned String
 sil [_semantics "string.append"] @string_append : $@convention(method) (@guaranteed String, @inout String) -> ()
 sil [_semantics "string.concat"] @string_concat : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
+sil [readonly] [_semantics "string.getUTF8CString"] @string_getUTF8CString : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
 
 // CHECK-LABEL: sil @append_to_empty_string
 // CHECK:       [[S:%[0-9]+]] = alloc_stack $String
@@ -230,5 +231,26 @@ bb0(%0 : $String):
   %12 = function_ref @string_concat : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
   %13 = apply %12(%8, %11, %6) : $@convention(method) (@guaranteed String, @guaranteed String, @thin String.Type) -> @owned String
   return %13 : $String
+}
+
+// CHECK-LABEL: sil @test_cstring
+// CHECK:       %0 = string_literal utf8 "a"
+// CHECK:       return %0
+// CHECK:     } // end sil function 'test_cstring'
+sil @test_cstring : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %3 = string_literal utf8 "a"
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = metatype $@thin String.Type
+  %7 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = apply %7(%3, %4, %5, %6) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %9 = function_ref @string_getUTF8CString : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
+  %10 = apply %9(%8) : $@convention(method) (@guaranteed String) -> @owned ContiguousArray<Int8>
+  %11 = struct_extract %10 : $ContiguousArray<Int8>, #ContiguousArray._buffer
+  %12 = struct_extract %11 : $_ContiguousArrayBuffer<Int8>, #_ContiguousArrayBuffer._storage
+  %13 = ref_tail_addr %12 : $__ContiguousArrayStorageBase, $Int8
+  %14 = address_to_pointer %13 : $*Int8 to $Builtin.RawPointer
+  return %14 : $Builtin.RawPointer
 }
 
