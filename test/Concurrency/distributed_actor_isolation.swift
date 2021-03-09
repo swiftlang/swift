@@ -22,8 +22,8 @@ distributed actor class DistributedActor_0 { // expected-warning{{'actor class' 
 
 distributed actor DistributedActor_1 {
 
-  let name: String = "alice" // expected-note{{property declared here}}
-  var mutable: String = "alice" // expected-note{{property declared here}}
+  let name: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
+  var mutable: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
   var computedMutable: String {
     get {
       "hey"
@@ -41,9 +41,9 @@ distributed actor DistributedActor_1 {
 
   distributed static func distributedStatic() {} // expected-error{{'distributed' functions cannot be 'static'}}
 
-  func hello() {} // ok
-  func helloAsync() async {} // ok
-  func helloAsyncThrows() async throws {} // ok
+  func hello() {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
+  func helloAsync() async {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
+  func helloAsyncThrows() async throws {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
 
   distributed func distHello() { } // ok
   distributed func distHelloAsync() async { } // ok
@@ -120,9 +120,9 @@ func test_outside(
   _ = distributed.actorTransport
 
   // ==== non-distributed functions
-  _ = await distributed.hello() //expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
-  _ = await distributed.helloAsync() //expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
-  _ = try await distributed.helloAsyncThrows() //expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = await distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
 }
 
 // ==== Codable parameters and return types ------------------------------------

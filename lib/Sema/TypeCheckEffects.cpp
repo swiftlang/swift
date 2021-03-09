@@ -1843,6 +1843,8 @@ public:
           }
         }
       }
+
+
       break;
     }
 
@@ -2329,17 +2331,13 @@ private:
       if (auto valueDecl = E->getMember().getDecl()) {
         if (isa<SubscriptDecl>(valueDecl))
           lookupKind = Context::Subscript;
-
-//        // FIXME: rdar://75147394 tryMarkImplicitlyAsync does not properly recognize a synthesized VarDecl?
-//        if (auto var = dyn_cast<VarDecl>(valueDecl))
-//          if (var->getAttrs().getAttribute<DistributedActorIndependentAttr>())
-//            return ShouldRecurse;
       }
 
-      checkThrowAsyncSite(E, /*requiresTry=*/false,
-            Classification::forUnconditional(EffectKind::Async,
-                                             PotentialEffectReason::forApply()),
-                          lookupKind);
+      checkThrowAsyncSite(
+          E, /*requiresTry=*/false,
+          Classification::forUnconditional(
+              EffectKind::Async, PotentialEffectReason::forApply()),
+          lookupKind);
     }
 
     return ShouldRecurse;
@@ -2378,13 +2376,6 @@ private:
           }
           checkThrowAsyncSite(E, /*requiresTry=*/throws, result,
                               Context::AsyncLet);
-        }
-      } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-        if (func->isDistributed()) {
-          checkThrowAsyncSite(E, /*requiresTry=*/true,
-                              Classification::forUnconditional(
-                                  EffectKind::Async, PotentialEffectReason::forApply()),
-                              Context::Call);
         }
       }
     }
