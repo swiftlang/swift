@@ -64,9 +64,9 @@ private:
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override;
 
-  OpaqueSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) override;
+  OpaqueSyntaxNode
+  recordRawSyntax(syntax::SyntaxKind kind,
+                  ArrayRef<OpaqueSyntaxNode> elements) override;
 
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;
