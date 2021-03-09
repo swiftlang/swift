@@ -1429,36 +1429,35 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
     }
   } while (!parameters.empty());
 
-  // Drop the argument labels for a property accessor; they aren't used.
-  if (result.isPropertyAccessor())
-    result.ArgumentLabels.clear();
-
   return result;
 }
 
-DeclName ParsedDeclName::formDeclName(ASTContext &ctx) const {
-  return formDeclNameRef(ctx).getFullName();
+DeclName ParsedDeclName::formDeclName(ASTContext &ctx, bool isSubscript) const {
+  return formDeclNameRef(ctx, isSubscript).getFullName();
 }
 
-DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx) const {
+DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx,
+                                            bool isSubscript) const {
   return swift::formDeclNameRef(ctx, BaseName, ArgumentLabels, IsFunctionName,
-                                /*IsInitializer=*/true);
+                                /*IsInitializer=*/true, isSubscript);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
                              StringRef baseName,
                              ArrayRef<StringRef> argumentLabels,
                              bool isFunctionName,
-                             bool isInitializer) {
+                             bool isInitializer,
+                             bool isSubscript) {
   return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
-                         isInitializer).getFullName();
+                         isInitializer, isSubscript).getFullName();
 }
 
 DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
                                    StringRef baseName,
                                    ArrayRef<StringRef> argumentLabels,
                                    bool isFunctionName,
-                                   bool isInitializer) {
+                                   bool isInitializer,
+                                   bool isSubscript) {
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
     return DeclNameRef();
@@ -1466,12 +1465,17 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
     return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
-  DeclBaseName baseNameId = ((isInitializer && baseName == "init")
-                             ? DeclBaseName::createConstructor()
-                             : ctx.getIdentifier(baseName));
+  DeclBaseName baseNameId;
+  if (isInitializer && baseName == "init")
+    baseNameId = DeclBaseName::createConstructor();
+  else if (isSubscript && baseName == "subscript")
+    baseNameId = DeclBaseName::createSubscript();
+  else
+    baseNameId = ctx.getIdentifier(baseName);
 
   // For non-functions, just use the base name.
-  if (!isFunctionName) return DeclNameRef(baseNameId);
+  if (!isFunctionName && !baseNameId.isSubscript())
+    return DeclNameRef(baseNameId);
 
   // For functions, we need to form a complete name.
 
