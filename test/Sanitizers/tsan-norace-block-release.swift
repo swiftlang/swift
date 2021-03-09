@@ -8,9 +8,6 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
-// rdar://problem/75006869
-// UNSUPPORTED: OS=macosx && CPU=arm64
-
 // Test that we do not report a race on block release operation.
 import Dispatch
 #if canImport(Darwin)
