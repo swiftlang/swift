@@ -5,6 +5,7 @@ struct Wrapper<T> {
   var wrappedValue: T
   var projectedValue: Wrapper { self }
 
+  // CHECK-LABEl: sil hidden [ossa] @$s22property_wrapper_local7WrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <T> (@in T, @thin Wrapper<T>.Type) -> @out Wrapper<T>
   init(wrappedValue: T) {
     self.wrappedValue = wrappedValue
   }
@@ -65,7 +66,7 @@ func testInitialValue() {
   // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local16testInitialValueyyF : $@convention(thin) () -> () {
 
   @Wrapper var value: Int = 10
-  // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int>
+  // CHECK: function_ref @$s22property_wrapper_local7WrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
 
   value = 15
   // CHECK: function_ref @$s22property_wrapper_local16testInitialValueyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> ()
@@ -77,8 +78,6 @@ func testInitialValue() {
   // CHECK-NOT: assign_by_wrapper
 
   // CHECK: return
-
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testInitialValueyyF5valueL_SivpfP : $@convention(thin) (Int) -> Wrapper<Int> {
 }
 
 @propertyWrapper
@@ -86,6 +85,7 @@ enum Lazy<Value> {
   case uninitialized(() -> Value)
   case initialized(Value)
 
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local4LazyO12wrappedValueACyxGxyXA_tcfC : $@convention(method) <Value> (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Value>, @thin Lazy<Value>.Type) -> @out Lazy<Value>
   init(wrappedValue initialValue: @autoclosure @escaping () -> Value) {
     self = .uninitialized(initialValue)
   }
@@ -111,19 +111,65 @@ func testLocalLazy() {
   // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local13testLocalLazyyyF : $@convention(thin) () -> () {
 
   @Lazy var value = "hello!"
-  // CHECK: [[C:%.*]] = function_ref @$s22property_wrapper_local13testLocalLazyyyFSSycfu_SSycfu0_ : $@convention(thin) () -> @owned String
-  // CHECK: [[C2:%.*]] = thin_to_thick_function [[C]] : $@convention(thin) () -> @owned String to $@callee_guaranteed () -> @owned String
-  // CHECK: [[I:%.*]] = function_ref @$s22property_wrapper_local13testLocalLazyyyF5valueL_SSvpfP : $@convention(thin) (@owned @callee_guaranteed () -> @owned String) -> @owned Lazy<String>
-  //CHECK: apply [[I]]([[C2]])
+  // CHECK: function_ref @$s22property_wrapper_local13testLocalLazyyyFSSycfu_ : $@convention(thin) () -> @owned String
+  // CHECK: [[I:%.*]] = function_ref @$s22property_wrapper_local4LazyO12wrappedValueACyxGxyXA_tcfC : $@convention(method) <τ_0_0> (@owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <τ_0_0>, @thin Lazy<τ_0_0>.Type) -> @out Lazy<τ_0_0>
+  //CHECK: apply [[I]]<String>
 
   _ = value
   // CHECK: function_ref @$s22property_wrapper_local13testLocalLazyyyF5valueL_SSvg : $@convention(thin) (@guaranteed { var Lazy<String> }) -> @owned String
 
-
-  // property wrapper backing initializer of value #1 in testLocalLazy()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local13testLocalLazyyyF5valueL_SSvpfP : $@convention(thin) (@owned @callee_guaranteed () -> @owned String) -> @owned Lazy<String> {
-
   // getter of value #1 in testLocalLazy()
   // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local13testLocalLazyyyF5valueL_SSvg : $@convention(thin) (@guaranteed { var Lazy<String> }) -> @owned String {
   // CHECK: function_ref @$s22property_wrapper_local4LazyO12wrappedValuexvg : $@convention(method) <τ_0_0> (@inout Lazy<τ_0_0>) -> @out τ_0_0
+}
+
+@propertyWrapper
+struct BoundedNumber<T: Numeric & Comparable> {
+  private let min:T
+  private let max:T
+  var value:T
+
+  var wrappedValue: T {
+    get { value }
+    set {
+      if value < min {
+        value =  min
+      } else if value > max {
+        value = max
+      }
+    }
+  }
+
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local13BoundedNumberV12wrappedValue3min3maxACyxGx_xxtcfC : $@convention(method) <T where T : Comparable, T : Numeric> (@in T, @in T, @in T, @thin BoundedNumber<T>.Type) -> @out BoundedNumber<T>
+  init(wrappedValue: T, min: T, max: T) {
+    self.min = min
+    self.max = max
+
+    if wrappedValue < min {
+      self.value =  min
+    } else if wrappedValue > max {
+      self.value = max
+    } else {
+      self.value = wrappedValue
+    }
+  }
+}
+
+func testLocalReference(count: Int) {
+  // CHECK-LABEL: sil hidden [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF : $@convention(thin) (Int) -> ()
+
+  @BoundedNumber(min: 0, max: count) var value = 10
+  // CHECK: function_ref @$s22property_wrapper_local13BoundedNumberV12wrappedValue3min3maxACyxGx_xxtcfC : $@convention(method) <τ_0_0 where τ_0_0 : Comparable, τ_0_0 : Numeric> (@in τ_0_0, @in τ_0_0, @in τ_0_0, @thin BoundedNumber<τ_0_0>.Type) -> @out BoundedNumber<τ_0_0>
+
+  _ = value
+  // CHECK: function_ref @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivg : $@convention(thin) (@guaranteed { var BoundedNumber<Int> }) -> Int
+
+  value = count
+  // CHECK: function_ref @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var BoundedNumber<Int> }) -> ()
+
+  // getter of value #1 in testLocalReference(count:)
+  // CHECK: sil private [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivg : $@convention(thin) (@guaranteed { var BoundedNumber<Int> }) -> Int
+
+  // setter of value #1 in testLocalReference(count:)
+  // CHECK: sil private [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var BoundedNumber<Int> }) -> ()
 }

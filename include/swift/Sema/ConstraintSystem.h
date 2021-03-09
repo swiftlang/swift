@@ -1796,14 +1796,20 @@ public:
   }
 
   /// Whether or not an opaque value placeholder should be injected into the
-  /// first \c wrappedValue argument of an apply expression.
+  /// first \c wrappedValue argument of an apply expression so the initializer
+  /// expression can be turned into a property wrapper generator function.
   bool shouldInjectWrappedValuePlaceholder(ApplyExpr *apply) const {
     if (kind != Kind::expression ||
         expression.contextualPurpose != CTP_Initialization)
       return false;
 
     auto *wrappedVar = expression.propertyWrapper.wrappedVar;
-    if (!apply || !wrappedVar || wrappedVar->isStatic())
+    if (!apply || !wrappedVar)
+      return false;
+
+    // Don't create property wrapper generator functions for static variables and
+    // local variables with initializers.
+    if (wrappedVar->isStatic() || wrappedVar->getDeclContext()->isLocalContext())
       return false;
 
     return expression.propertyWrapper.innermostWrappedValueInit == apply;
