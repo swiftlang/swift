@@ -329,7 +329,8 @@ OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
   // the root context.
   getStorage().clear();
 
-  return root.takeOpaqueNode();
+  assert(root.isRecorded() && "Root of syntax tree should be recorded");
+  return root.takeData();
 }
 
 void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {

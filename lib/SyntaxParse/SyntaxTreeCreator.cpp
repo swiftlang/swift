@@ -137,14 +137,17 @@ SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) {
+                                   ArrayRef<OpaqueSyntaxNode> elements) {
   SmallVector<const RawSyntax *, 16> parts;
   parts.reserve(elements.size());
+  size_t TextLength = 0;
   for (OpaqueSyntaxNode opaqueN : elements) {
-    parts.push_back(static_cast<const RawSyntax *>(opaqueN));
+    auto Raw = static_cast<const RawSyntax *>(opaqueN);
+    parts.push_back(Raw);
+    if (Raw) {
+      TextLength += Raw->getTextLength();
+    }
   }
-  size_t TextLength = range.isValid() ? range.getByteLength() : 0;
   auto raw =
       RawSyntax::make(kind, parts, TextLength, SourcePresence::Present, Arena);
   return static_cast<OpaqueSyntaxNode>(raw);
