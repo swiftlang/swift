@@ -125,6 +125,7 @@ public:
 
   // MARK: - Retrieving related nodes
 
+  /// Return the parent \c SyntaxDataRef if it exists, otherwise \c nullptr.
   const SyntaxDataRef *getParentRef() const {
     return Parent;
   }
