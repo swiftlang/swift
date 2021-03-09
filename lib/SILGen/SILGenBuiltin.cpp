@@ -1388,24 +1388,6 @@ emitFunctionArgumentForAsyncTaskEntryPoint(SILGenFunction &SGF,
   return function.ensurePlusOne(SGF, loc);
 }
 
-// Emit SIL for the named builtin: createAsyncTask.
-static ManagedValue emitBuiltinCreateAsyncTask(
-    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args, SGFContext C) {
-  ASTContext &ctx = SGF.getASTContext();
-  auto flags = args[0].forward(SGF);
-  auto parentTask = args[1].borrow(SGF, loc).forward(SGF);
-  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc,
-                             args[2], TupleType::getEmpty(SGF.getASTContext()));
-  
-  auto apply = SGF.B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CreateAsyncTask)),
-      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
-      { flags, parentTask, function.forward(SGF) });
-  return SGF.emitManagedRValueWithCleanup(apply);
-}
-
 // Emit SIL for the named builtin: createAsyncTaskFuture.
 static ManagedValue emitBuiltinCreateAsyncTaskFuture(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,

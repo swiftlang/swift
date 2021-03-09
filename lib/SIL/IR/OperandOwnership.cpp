@@ -748,20 +748,6 @@ BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 
 OperandOwnership
-OperandOwnershipBuiltinClassifier::visitCreateAsyncTask(BuiltinInst *bi,
-                                                        StringRef attr) {
-  // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(2))
-    return OperandOwnership::DestroyingConsume;
-  
-  // FIXME: These are considered InteriorPointer because they may propagate a
-  // pointer into a borrowed values. If they do not propagate an interior pointer,
-  // then they should be InstantaneousUse instead and should not require a
-  // guaranteed value.
-  return OperandOwnership::InteriorPointer;
-}
-
-OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
                                                               StringRef attr) {
   // The function operand is consumed by the new task.

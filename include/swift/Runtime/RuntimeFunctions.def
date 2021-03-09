@@ -1513,6 +1513,18 @@ FUNCTION(TaskCreateFunc,
          ARGS(SizeTy, SwiftTaskPtrTy, TaskContinuationFunctionPtrTy, SizeTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// AsyncTaskAndContext swift_task_create_future(
+//     size_t flags, AsyncTask *task,
+//     const Metadata *futureResultType,
+//     void *closureEntry, HeapObject *closureContext);
+FUNCTION(TaskCreateFuture,
+         swift_task_create_future, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(AsyncTaskAndContextTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, TypeMetadataPtrTy,
+              Int8PtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 // AsyncTaskAndContext swift_task_create_future_f(
 //     size_t flags, AsyncTask *task,
 //     const Metadata *futureResultType,
@@ -1523,6 +1535,19 @@ FUNCTION(TaskCreateFutureFunc,
          RETURNS(AsyncTaskAndContextTy),
          ARGS(SizeTy, SwiftTaskPtrTy, TypeMetadataPtrTy,
               TaskContinuationFunctionPtrTy, SizeTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
+// AsyncTaskAndContext swift_task_create_group_future(
+//     size_t flags, AsyncTask *task, TaskGroup *group,
+//     const Metadata *futureResultType,
+//     void *closureEntry, HeapObject *closureContext);
+FUNCTION(TaskCreateGroupFuture,
+         swift_task_create_group_future, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(AsyncTaskAndContextTy),
+         ARGS(SizeTy, SwiftTaskPtrTy, SwiftTaskGroupPtrTy,
+              TypeMetadataPtrTy,
+              Int8PtrTy, RefCountedPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
 // AsyncTaskAndContext swift_task_create_group_future_f(

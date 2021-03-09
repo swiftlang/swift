@@ -44,12 +44,30 @@ using FutureAsyncSignature =
   AsyncSignature<void(void*), /*throws*/ true>;
 
 /// Create a task object with a future which will run the given
+/// closure.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create_future(
+    JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
+    void *closureEntryPoint,
+    HeapObject * /* +1 */ closureContext);
+
+/// Create a task object with a future which will run the given
 /// function.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTaskAndContext swift_task_create_future_f(
     JobFlags flags, AsyncTask *parent, const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize);
+
+/// Create a task object with a future which will run the given
+/// closure, and offer its result to the task group
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+AsyncTaskAndContext swift_task_create_group_future(
+    JobFlags flags,
+    AsyncTask *parent, TaskGroup *group,
+    const Metadata *futureResultType,
+    void *closureEntryPoint,
+    HeapObject * /* +1 */ closureContext);
 
 /// Create a task object with a future which will run the given
 /// function, and offer its result to the task group

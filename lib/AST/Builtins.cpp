@@ -1347,16 +1347,6 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
-static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  return getBuiltinFunction(
-      id,
-      { ctx.getIntDecl()->getDeclaredInterfaceType(),
-        OptionalType::get(ctx.TheNativeObjectType),
-        FunctionType::get({ }, ctx.TheEmptyTupleType, extInfo) },
-      getAsyncTaskAndContextType(ctx));
-}
-
 static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
@@ -2557,9 +2547,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
-
-  case BuiltinValueKind::CreateAsyncTask:
-    return getCreateAsyncTask(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTaskFuture:
     return getCreateAsyncTaskFuture(Context, Id);
