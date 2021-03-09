@@ -3,9 +3,9 @@
 
 distributed actor D {
 
-  func hello() {} // ok
-  func helloAsync() async {} // ok
-  func helloAsyncThrows() async throws {} // ok
+  func hello() {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
+  func helloAsync() async {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
+  func helloAsyncThrows() async throws {} // expected-note{{only 'distributed' functions can be called from outside the distributed actor}}
 
   distributed func distHello() { } // ok
   distributed func distHelloAsync() async { } // ok
@@ -13,10 +13,13 @@ distributed actor D {
   distributed func distHelloAsyncThrows() async throws { } // ok
 }
 
-func test_not_distributed_funcs(distributed: D) {
-  distributed.hello()
-  distributed.helloAsync()
-  distributed.helloAsyncThrows()
+func test_not_distributed_funcs(distributed: D) async {
+  distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  // expected-error@-1{{call is 'async' but is not marked with 'await'}} // TODO: no need to diagnose this, it is impossible to call anyway
+  distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+  // expected-error@-1{{call is 'async' but is not marked with 'await'}} // TODO: no need to diagnose this, it is impossible to call anyway
+  // expected-error@-2{{call can throw, but it is not marked with 'try' and the error is not handled}} // TODO: no need to diagnose this, it is impossible to call anyway
 }
 
 func test_outside(distributed: D) async throws {
