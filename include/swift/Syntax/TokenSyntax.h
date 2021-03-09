@@ -33,7 +33,9 @@ protected:
     assert(getRaw()->isToken());
   }
 public:
-  TokenSyntax(const RC<const SyntaxData> &Data) : Syntax(Data) {}
+  TokenSyntax(const RC<const SyntaxData> &Data) : Syntax(Data) {
+    validate();
+  }
 
   static TokenSyntax missingToken(const tok Kind, StringRef Text,
                                   const RC<SyntaxArena> &Arena) {

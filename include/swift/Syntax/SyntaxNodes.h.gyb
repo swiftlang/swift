@@ -56,9 +56,7 @@ class ${node.name} ${qualifier} : public ${node.base_type} {
 %     if node.is_buildable():
       friend class ${node.name}Builder;
 %     end
-%     if node.requires_validation():
   void validate() const;
-%     end
 
 public:
 %     if node.children:
@@ -70,10 +68,8 @@ public:
 %     end
 
   ${node.name}(const RC<const SyntaxData> &Data) : ${node.base_type}(Data) {
-%     if node.requires_validation():
-      this->validate();
-%     end
-    }
+    this->validate();
+  }
 
 %     for child in node.children:
 %       for line in dedented_lines(child.description):

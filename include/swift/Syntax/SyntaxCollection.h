@@ -68,10 +68,14 @@ private:
   }
 
 public:
-  SyntaxCollection(const RC<const SyntaxData> &Data) : Syntax(Data) {}
+  SyntaxCollection(const RC<const SyntaxData> &Data) : Syntax(Data) {
+    validate();
+  }
 
   SyntaxCollection(std::initializer_list<Element> list):
     SyntaxCollection(SyntaxCollection::makeData(list)) {}
+
+  void validate() {}
 
   /// Returns true if the collection is empty.
   bool empty() const {
