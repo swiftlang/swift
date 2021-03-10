@@ -219,6 +219,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // getCurrentActor has no arguments.
+  if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
+    auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetCurrentExecutorFn(),
+                                        {});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    out.add(call);
+    return;
+  }
+
   // Everything else cares about the (rvalue) argument.
 
   if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {

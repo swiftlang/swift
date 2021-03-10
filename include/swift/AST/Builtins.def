@@ -736,6 +736,13 @@ BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
+// getCurrentExecutor: () async -> Builtin.Word
+//
+// Retrieve the ExecutorRef on which the current asynchronous
+// function is executing.
+// Does not retain an actor executor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "n", Special)
+
 // getCurrentAsyncTask: () -> Builtin.NativeObject
 //
 // Retrieve the pointer to the task in which the current asynchronous
