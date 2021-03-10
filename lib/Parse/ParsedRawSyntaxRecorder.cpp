@@ -231,7 +231,7 @@ size_t ParsedRawSyntaxRecorder::getDeferredNumChildren(
 void ParsedRawSyntaxRecorder::verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements) {
   SourceLoc prevEndLoc;
   for (const auto &elem: elements) {
-    if (elem.isMissing() || elem.isNull())
+    if (elem.isNull() || elem.isMissing())
       continue;
     CharSourceRange range = elem.getRange();
     if (range.isValid()) {
