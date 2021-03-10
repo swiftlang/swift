@@ -127,129 +127,93 @@ IRGenThunk::IRGenThunk(IRGenFunction &IGF, SILDeclRef declRef)
 // conceptually all we're doing is forwarding the arguments verbatim
 // using the sync or async calling convention.
 void IRGenThunk::prepareArguments() {
-  if (isAsync) {
-    assert(!isCoroutine);
+  Explosion original = IGF.collectParameters();
 
-    assert(asyncLayout->hasLocalContext());
-    auto context = asyncLayout->emitCastTo(IGF, IGF.getAsyncContext());
-    auto localContextAddr =
-        asyncLayout->getLocalContextLayout().project(
-            IGF, context, llvm::None);
-    selfValue = IGF.Builder.CreateLoad(localContextAddr);
+  if (isWitnessMethod) {
+    witnessMetadata.SelfWitnessTable = original.takeLast();
+    witnessMetadata.SelfMetadata = original.takeLast();
+  }
 
-    if (isWitnessMethod) {
-      assert(asyncLayout->hasTrailingWitnesses());
-      auto context = asyncLayout->emitCastTo(
-          IGF, IGF.getAsyncContext());
-
-      auto metadataAddr =
-          asyncLayout->getSelfMetadataLayout().project(
-              IGF, context, llvm::None);
-      witnessMetadata.SelfMetadata = IGF.Builder.CreateLoad(metadataAddr);
-
-      auto wtableAddr =
-          asyncLayout->getSelfWitnessTableLayout().project(
-              IGF, context, llvm::None);
-      witnessMetadata.SelfWitnessTable = IGF.Builder.CreateLoad(wtableAddr);
-    }
-
-    if (origTy->hasErrorResult()) {
+  if (origTy->hasErrorResult()) {
+    if (isAsync) {
+      auto context = asyncLayout->emitCastTo(IGF, IGF.getAsyncContext());
       auto errorLayout = asyncLayout->getErrorLayout();
       Address pointerToAddress =
           errorLayout.project(IGF, context, /*offsets*/ llvm::None);
       auto load = IGF.Builder.CreateLoad(pointerToAddress);
       auto addr = Address(load, IGF.IGM.getPointerAlignment());
       IGF.setCallerErrorResultSlot(addr.getAddress());
-    }
-
-    for (unsigned i = 0, e = asyncLayout->getIndirectReturnCount(); i < e; ++i) {
-      Address addr = asyncLayout->getIndirectReturnLayout(i).project(
-          IGF, context, llvm::None);
-      params.add(IGF.Builder.CreateLoad(addr));
-    }
-
-    for (unsigned i = 0, e = asyncLayout->getArgumentCount(); i < e; ++i) {
-      auto layout = asyncLayout->getArgumentLayout(i);
-      Address addr = layout.project(IGF, context, llvm::None);
-      auto &ti = cast<LoadableTypeInfo>(layout.getType());
-      ti.loadAsTake(IGF, addr, params);
-    }
-
-    if (asyncLayout->hasBindings()) {
-      Address addr = asyncLayout->getBindingsLayout().project(
-          IGF, context, llvm::None);
-      asyncLayout->getBindings().save(IGF, addr, params);
-    }
-  } else {
-    Explosion original = IGF.collectParameters();
-
-    if (isWitnessMethod) {
-      witnessMetadata.SelfWitnessTable = original.takeLast();
-      witnessMetadata.SelfMetadata = original.takeLast();
-    }
-
-    if (origTy->hasErrorResult()) {
+    } else {
       errorResult = original.takeLast();
       IGF.setCallerErrorResultSlot(errorResult);
     }
-
-    if (isCoroutine) {
-      original.transferInto(params, 1);
-    }
-
-    selfValue = original.takeLast();
-
-    // Prepare indirect results, if any.
-    SILFunctionConventions conv(origTy, IGF.getSILModule());
-    SILType directResultType = conv.getSILResultType(expansionContext);
-    auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
-    auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
-    if (schema.requiresIndirect()) {
-      indirectReturnSlot = original.claimNext();
-    }
-
-    original.transferInto(params, conv.getNumIndirectSILResults());
-
-    // Prepare each parameter.
-    for (auto param : origTy->getParameters().drop_back()) {
-      auto paramType = conv.getSILType(param, expansionContext);
-
-      // If the SIL parameter isn't passed indirectly, we need to map it
-      // to an explosion.
-      if (paramType.isObject()) {
-        auto &paramTI = IGF.getTypeInfo(paramType);
-        auto &loadableParamTI = cast<LoadableTypeInfo>(paramTI);
-        auto &nativeSchema = loadableParamTI.nativeParameterValueSchema(IGF.IGM);
-        unsigned size = nativeSchema.size();
-
-        Explosion nativeParam;
-        if (nativeSchema.requiresIndirect()) {
-          // If the explosion must be passed indirectly, load the value from the
-          // indirect address.
-          Address paramAddr =
-            loadableParamTI.getAddressForPointer(original.claimNext());
-          loadableParamTI.loadAsTake(IGF, paramAddr, nativeParam);
-        } else {
-          if (!nativeSchema.empty()) {
-            // Otherwise, we map from the native convention to the type's explosion
-            // schema.
-            Explosion paramExplosion;
-            original.transferInto(paramExplosion, size);
-            nativeParam = nativeSchema.mapFromNative(IGF.IGM, IGF, paramExplosion,
-                                                     paramType);
-          }
-        }
-
-        nativeParam.transferInto(params, nativeParam.size());
-      } else {
-        params.add(original.claimNext());
-      }
-    }
-
-    // Anything else, just pass along.  This will include things like
-    // generic arguments.
-    params.add(original.claimAll());
   }
+
+  if (isCoroutine) {
+    original.transferInto(params, 1);
+  }
+
+  selfValue = original.takeLast();
+
+  // Prepare indirect results, if any.
+  SILFunctionConventions conv(origTy, IGF.getSILModule());
+  SILType directResultType = conv.getSILResultType(expansionContext);
+  auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
+  auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
+  if (schema.requiresIndirect()) {
+    indirectReturnSlot = original.claimNext();
+  }
+
+  original.transferInto(params, conv.getNumIndirectSILResults());
+
+  // Chop off the async context parameters.
+  if (isAsync) {
+    // FIXME: Once we remove async task and executor this should be one not
+    // three.
+    unsigned numAsyncContextParams =
+        (unsigned)AsyncFunctionArgumentIndex::Context + 1;
+    (void)original.claim(numAsyncContextParams);
+  }
+
+  // Prepare each parameter.
+  for (auto param : origTy->getParameters().drop_back()) {
+    auto paramType = conv.getSILType(param, expansionContext);
+
+    // If the SIL parameter isn't passed indirectly, we need to map it
+    // to an explosion.
+    if (paramType.isObject()) {
+      auto &paramTI = IGF.getTypeInfo(paramType);
+      auto &loadableParamTI = cast<LoadableTypeInfo>(paramTI);
+      auto &nativeSchema = loadableParamTI.nativeParameterValueSchema(IGF.IGM);
+      unsigned size = nativeSchema.size();
+
+      Explosion nativeParam;
+      if (nativeSchema.requiresIndirect()) {
+        // If the explosion must be passed indirectly, load the value from the
+        // indirect address.
+        Address paramAddr =
+            loadableParamTI.getAddressForPointer(original.claimNext());
+        loadableParamTI.loadAsTake(IGF, paramAddr, nativeParam);
+      } else {
+        if (!nativeSchema.empty()) {
+          // Otherwise, we map from the native convention to the type's
+          // explosion schema.
+          Explosion paramExplosion;
+          original.transferInto(paramExplosion, size);
+          nativeParam = nativeSchema.mapFromNative(IGF.IGM, IGF, paramExplosion,
+                                                   paramType);
+        }
+      }
+
+      nativeParam.transferInto(params, nativeParam.size());
+    } else {
+      params.add(original.claimNext());
+    }
+  }
+
+  // Anything else, just pass along.  This will include things like
+  // generic arguments.
+  params.add(original.claimAll());
 }
 
 Callee IRGenThunk::lookupMethod() {
@@ -292,10 +256,12 @@ void IRGenThunk::emit() {
   GenericContextScope scope(IGF.IGM, origTy->getInvocationGenericSignature());
 
   if (isAsync) {
-    IGF.setupAsync();
+    auto asyncContextIdx =
+        Signature::forAsyncEntry(IGF.IGM, origTy).getAsyncContextIndex();
+    IGF.setupAsync(asyncContextIdx);
 
     auto entity = LinkEntity::forDispatchThunk(declRef);
-    emitAsyncFunctionEntry(IGF, *asyncLayout, entity);
+    emitAsyncFunctionEntry(IGF, *asyncLayout, entity, asyncContextIdx);
     emitAsyncFunctionPointer(IGF.IGM, IGF.CurFn, entity,
                              asyncLayout->getSize());
   }

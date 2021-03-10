@@ -86,11 +86,12 @@ public:
 
   using AsyncContext::AsyncContext;
 
-  void fillWithSuccess(AsyncTask::FutureFragment *future) {
-    fillWithSuccess(future->getStoragePtr(), future->getResultType());
+  void fillWithSuccess(AsyncTask::FutureFragment *future, OpaqueValue *result) {
+    fillWithSuccess(future->getStoragePtr(), future->getResultType(), result);
   }
-  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
-    successType->vw_initializeWithCopy(successResultPointer, src);
+  void fillWithSuccess(OpaqueValue *src, const Metadata *successType,
+                       OpaqueValue *result) {
+    successType->vw_initializeWithCopy(result, src);
   }
 
   void fillWithError(AsyncTask::FutureFragment *future) {

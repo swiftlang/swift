@@ -519,6 +519,8 @@ void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
 
 static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
                                 PollResult result) {
+
+  assert(false && "FIXME");
   /// Fill in the result value
   switch (result.status) {
   case PollStatus::MustWait:
@@ -609,6 +611,8 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context,
         auto waitingContext =
             static_cast<TaskFutureWaitAsyncContext *>(
                 waitingTask->ResumeContext);
+
+        assert(false && "FIXME");
         fillGroupNextResult(waitingContext, result);
 
         // TODO: allow the caller to suggest an executor
@@ -651,6 +655,7 @@ void swift::swift_taskGroup_wait_next_throwing(
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
+  assert(false && "FIXME");
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
   auto task = context->task;
   auto group = asImpl(context->group);
