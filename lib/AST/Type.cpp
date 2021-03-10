@@ -358,6 +358,46 @@ bool CanType::isTypeErasedGenericClassTypeImpl(CanType type) {
   return false;
 }
 
+bool TypeBase::isActorType() {
+  // Nominal types: check whether the declaration is an actor.
+  if (auto nominal = getAnyNominal())
+    return nominal->isActor();
+
+  // Archetypes check for conformance to Actor.
+  if (auto archetype = getAs<ArchetypeType>()) {
+    auto actorProto = getASTContext().getProtocol(KnownProtocolKind::Actor);
+    if (!actorProto)
+      return false;
+
+    auto interfaceType = archetype->getInterfaceType();
+    auto genericEnv = archetype->getGenericEnvironment();
+    return genericEnv->getGenericSignature()->requiresProtocol(
+        interfaceType, actorProto);
+  }
+
+  // Existential types: check for Actor protocol.
+  if (isExistentialType()) {
+    auto actorProto = getASTContext().getProtocol(KnownProtocolKind::Actor);
+    if (!actorProto)
+      return false;
+
+    auto layout = getExistentialLayout();
+    if (auto superclass = layout.getSuperclass()) {
+      if (superclass->isActorType())
+        return true;
+    }
+
+    for (auto proto : layout.getProtocols()) {
+      if (proto->isActorType())
+        return true;
+    }
+
+    return false;
+  }
+
+  return false;
+}
+
 bool TypeBase::isSpecialized() {
   Type t = getCanonicalType();
 
