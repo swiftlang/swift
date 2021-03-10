@@ -238,7 +238,7 @@ extension Strideable where Self: FixedWidthInteger & SignedInteger {
           : (Self(Self.Stride(value) + distance), false)
     return overflow
       ? (.min, distance < (0 as Self.Stride) ? .min : .max)
-      : (.max, partialValue)
+      : (nil, partialValue)
   }
 }
 
@@ -253,7 +253,7 @@ extension Strideable where Self: FixedWidthInteger & UnsignedInteger {
       : current.value.addingReportingOverflow(Self(distance))
     return overflow
       ? (.min, distance < (0 as Self.Stride) ? .min : .max)
-      : (.max, partialValue)
+      : (nil, partialValue)
   }
 }
 
