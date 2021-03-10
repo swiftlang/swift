@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -149,42 +149,6 @@ public protocol Strideable: Comparable {
   /// `_step` is an implementation detail of `Strideable`; do not use it
   /// directly.
   ///
-  /// To stride over values of most types, it is sufficient at each step to call
-  /// `advanced(by:)` in order to offset a value by a specified `distance` with
-  /// no need to keep track of the number of prior steps. In that case, the
-  /// result's `index` is set to `nil`. If the result of advancing by a given
-  /// `distance` is not representable as a value of this type, then a runtime
-  /// error may occur.
-  ///
-  /// In the case of floating-point types, serially calling `advanced(by:)`
-  /// would accumulate rounding error at each step. To avoid such error, the
-  /// result's `index` is incremented with each step and is never `nil`; the
-  /// result's `value` is computed by multiplying the number of steps by the
-  /// specified `distance`.
-  ///
-  /// In the case of fixed-width integer types, it is possible to make use of
-  /// arithmetic operations reporting overflow to avoid incurring runtime
-  /// errors that arise from advancing past representable bounds. Where overflow
-  /// occurs, the result's `index` is negative, and the result's `value` is
-  /// either the maximum representable value of this type if `distance` is
-  /// positive or the minimum representable value of this type otherwise. Where
-  /// the number of prior steps is not being tracked, then `index` is `Int.min`
-  /// if overflow occurs or `Int.max` otherwise.
-  ///
-  /// - Parameters:
-  ///   - current: A tuple of `index`, the current number of steps, and `value`,
-  ///     the current value striding that number of steps from `start` by
-  ///     `distance`. If the current number of steps is not being tracked, then
-  ///     `index` may be `Int.max` or `nil`.
-  ///   - start: The starting value used for the striding sequence.
-  ///   - distance: The amount to step by with each iteration of the striding
-  ///     sequence.
-  /// - Returns: A tuple of `index`, the next number of steps, and `value`, the
-  ///   next value striding that number of steps from `start` by `distance`. If
-  ///   that value is not representable, then `index` is negative. If the
-  ///   next number of steps is not being tracked, then `index` may be
-  ///   `Int.max`, `nil`, or (if the next value is not representable) `Int.min`.
-  ///
   /// - Complexity: O(1)
   static func _step(
     after current: (index: Int?, value: Self),
@@ -313,16 +277,7 @@ extension StrideToIterator: IteratorProtocol {
     if _stride > 0 ? result >= _end : result <= _end {
       return nil
     }
-    // The following check is needed because we might otherwise advance
-    // `_current` past the representable bounds of the `Strideable` type
-    // unnecessarily. Where a runtime error is not possible in such cases,
-    // `Strideable._step` returns a non-nil `index`.
-    if _current.index == nil
-        && result.distance(to: _end).magnitude < _stride.magnitude {
-      _current = (index: nil, value: _end)
-    } else {
-      _current = Element._step(after: _current, from: _start, by: _stride)
-    }
+    _current = Element._step(after: _current, from: _start, by: _stride)
     return result
   }
 }
@@ -524,32 +479,19 @@ extension StrideThroughIterator: IteratorProtocol {
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
-      // (Note how we use the `>=` and `<=` operators above.)
-      //
-      // This check is needed because, to prevent advancing `_current` past the
-      // representable bounds of the `Strideable` type, we may represent steps
-      // past the end as `(index: nil, value: _end)`.
+      // Note the `>=` and `<=` operators above. When `result == _end`, the
+      // following check is needed to prevent advancing `_current` past the
+      // representable bounds of the `Strideable` type unnecessarily.
       //
       // If the `Strideable` type is a fixed-width integer, overflowed results
-      // are represented using a sentinel value for `_current.index` that is
-      // negative.
-      if result == _end && !_didReturnEnd && (_current.index ?? .max) >= 0 {
+      // are represented using a sentinel value for `_current.index`, `Int.min`.
+      if result == _end && !_didReturnEnd && _current.index != .min {
         _didReturnEnd = true
         return result
       }
       return nil
     }
-    // The following check is needed because we might otherwise advance
-    // `_current` past the representable bounds of the `Strideable` type
-    // unnecessarily. Where a runtime error is not possible in such cases,
-    // `Strideable._step` returns a non-nil `index`.
-    if _current.index == nil
-        && result.distance(to: _end).magnitude < _stride.magnitude {
-      _didReturnEnd = true
-      _current = (index: nil, value: _end)
-    } else {
-      _current = Element._step(after: _current, from: _start, by: _stride)
-    }
+    _current = Element._step(after: _current, from: _start, by: _stride)
     return result
   }
 }
