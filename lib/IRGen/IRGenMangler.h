@@ -574,7 +574,8 @@ public:
   }
 
   std::string manglePartialApplyForwarder(StringRef FuncName);
-  
+  std::string mangleAsyncNonconstantPartialApplyThunk(StringRef FuncName);
+
   std::string mangleTypeForForeignMetadataUniquing(Type type) {
     return mangleTypeWithoutPrefix(type);
   }

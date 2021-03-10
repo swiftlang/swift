@@ -606,6 +606,11 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
 }
 
+void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
+  Buffer << "Tw";
+  mangleSingleChildNode(node); // global
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {

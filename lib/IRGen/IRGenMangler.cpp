@@ -79,6 +79,22 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
   return finalize();
 }
 
+std::string
+IRGenMangler::mangleAsyncNonconstantPartialApplyThunk(StringRef FuncName) {
+  if (FuncName.empty()) {
+    beginMangling();
+  } else {
+    if (FuncName.startswith(MANGLING_PREFIX_STR)) {
+      Buffer << FuncName;
+    } else {
+      beginMangling();
+      appendIdentifier(FuncName);
+    }
+  }
+  appendOperator("Tw");
+  return finalize();
+}
+
 SymbolicMangling
 IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
