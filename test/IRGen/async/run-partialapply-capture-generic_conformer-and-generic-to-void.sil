@@ -69,13 +69,13 @@ sil @test_case : $@convention(thin) @async () -> () {
   strong_retain %observableImpl : $ObservableImpl
   %observableImpl_addr = alloc_stack $ObservableImpl
   store %observableImpl to %observableImpl_addr : $*ObservableImpl
-  %witness_method = function_ref @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
-  %partiallyApplied = apply %witness_method<ObservableImpl, ObserverImpl>(%observableImpl_addr) : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> ()
+  %witness_method = function_ref @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_guaranteed (@in O) -> ()
+  %partiallyApplied = apply %witness_method<ObservableImpl, ObserverImpl>(%observableImpl_addr) : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_guaranteed (@in O) -> ()
   %observerImpl = alloc_ref $ObserverImpl
   %observerImpl_addr = alloc_stack $ObserverImpl
   store %observerImpl to %observerImpl_addr : $*ObserverImpl
 
-  %result = apply %partiallyApplied(%observerImpl_addr) : $@async @callee_owned (@in ObserverImpl) -> ()
+  %result = apply %partiallyApplied(%observerImpl_addr) : $@async @callee_guaranteed (@in ObserverImpl) -> ()
 
   dealloc_stack %observerImpl_addr : $*ObserverImpl
   dealloc_stack %observableImpl_addr : $*ObservableImpl
