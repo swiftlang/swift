@@ -59,6 +59,8 @@ public:
   using BuiltType = swift::Type;
   using BuiltTypeDecl = swift::GenericTypeDecl *; // nominal or type alias
   using BuiltProtocolDecl = swift::ProtocolDecl *;
+  using BuiltSubstitution = std::pair<Type, Type>;
+  using BuiltRequirement = swift::Requirement;
   explicit ASTBuilder(ASTContext &ctx) : Ctx(ctx) {}
 
   ASTContext &getASTContext() { return Ctx; }
@@ -99,11 +101,14 @@ public:
                           Type output, FunctionTypeFlags flags);
 
   Type createImplFunctionType(
-    Demangle::ImplParameterConvention calleeConvention,
-    ArrayRef<Demangle::ImplFunctionParam<Type>> params,
-    ArrayRef<Demangle::ImplFunctionResult<Type>> results,
-    Optional<Demangle::ImplFunctionResult<Type>> errorResult,
-    ImplFunctionTypeFlags flags);
+      Demangle::ImplParameterConvention calleeConvention,
+      BuiltRequirement *witnessMethodConformanceRequirement,
+      ArrayRef<BuiltType> GenericParameters,
+      ArrayRef<BuiltRequirement> Requirements,
+      ArrayRef<Demangle::ImplFunctionParam<Type>> params,
+      ArrayRef<Demangle::ImplFunctionResult<Type>> results,
+      Optional<Demangle::ImplFunctionResult<Type>> errorResult,
+      ImplFunctionTypeFlags flags);
 
   Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
                                      Type superclass,
@@ -128,8 +133,6 @@ public:
 
   Type createSILBoxType(Type base);
   using BuiltSILBoxField = llvm::PointerIntPair<Type, 1>;
-  using BuiltSubstitution = std::pair<Type, Type>;
-  using BuiltRequirement = swift::Requirement;
   using BuiltLayoutConstraint = swift::LayoutConstraint;
   Type createSILBoxTypeWithLayout(ArrayRef<BuiltSILBoxField> Fields,
                                   ArrayRef<BuiltSubstitution> Substitutions,
