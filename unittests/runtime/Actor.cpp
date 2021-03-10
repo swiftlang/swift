@@ -119,14 +119,14 @@ class TaskContinuationFromLambda {
 
   SWIFT_CC(swiftasync)
   static void invoke(AsyncTask *task, ExecutorRef executor,
-                     SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+                     SWIFT_ASYNC_CONTEXT AsyncContext *context, HeapObject *) {
     (*lambdaStorage)(task, executor, static_cast<Context*>(context));
   }
 
 public:
   static TaskContinuationFunction *get(Fn &&fn) {
     lambdaStorage.emplace(std::move(fn));
-    return &invoke;
+    return (TaskContinuationFunction*) &invoke;
   }
 };
 

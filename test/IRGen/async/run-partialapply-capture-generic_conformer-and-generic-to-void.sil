@@ -29,7 +29,7 @@ class ObservableImpl : Observable {
 }
 sil_vtable ObservableImpl {
 }
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @subscribe_ObservableImpl_Observable(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @subscribe_ObservableImpl_Observable(
 sil hidden @subscribe_ObservableImpl_Observable : $@convention(witness_method: Observable) @async <τ_0_0 where τ_0_0 : Observer> (@in_guaranteed τ_0_0, @in_guaranteed ObservableImpl) -> () {
 bb0(%observer : $*τ_0_0, %self : $*ObservableImpl):
   %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -121,7 +121,7 @@ sil_witness_table ObserverImpl : Observer module main {
 //       CHECK-SIL:   return [[RESULT]] : $()                                 
 // CHECK-SIL-LABEL: } // end sil function '$s14witness_methodTw_'
 
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s14witness_methodTw_TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s14witness_methodTw_TA"(
 sil hidden @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_guaranteed (@in O) -> () {
 bb0(%0 : $*S):
   %1 = witness_method $S, #Observable.subscribe : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()

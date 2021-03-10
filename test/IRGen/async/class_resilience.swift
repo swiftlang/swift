@@ -41,14 +41,14 @@ open class MyBaseClass<T> {
 // CHECK-LABEL: @"$s16class_resilience9MyDerivedCMn" = hidden constant
 // CHECK-SAME: %swift.async_func_pointer* @"$s16class_resilience9MyDerivedC4waitSiyYF010resilient_A09BaseClassCADxyYFTVTu"
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience14callsAwaitableyx010resilient_A09BaseClassCyxGYlF"(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience14callsAwaitableyx010resilient_A09BaseClassCyxGYlF"(%swift.opaque* noalias nocapture %0, %swift.task* %1, %swift.executor* %2, %swift.context* swiftasync %3{{.*}})
 // CHECK: %swift.async_func_pointer* @"$s15resilient_class9BaseClassC4waitxyYFTjTu"
 // CHECK: ret void
 public func callsAwaitable<T>(_ c: BaseClass<T>) async -> T {
   return await c.wait()
 }
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience11MyBaseClassC4waitxyYFTj"(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2) #0 {
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience11MyBaseClassC4waitxyYFTj"(%swift.opaque* noalias nocapture %0, %swift.task* %1, %swift.executor* %2, %swift.context* swiftasync %3, %T16class_resilience11MyBaseClassC* swiftself %4) #0 {
 
 class MyDerived : BaseClass<Int> {
   override func wait() async -> Int {

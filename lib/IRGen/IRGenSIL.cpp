@@ -1450,6 +1450,7 @@ public:
   llvm::Value *getCallerErrorResultArgument() override {
     return allParamValues.takeLast();
   }
+  void mapAsyncParameters() override{/* nothing to map*/};
   llvm::Value *getContext() override { return allParamValues.takeLast(); }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
     assert(size > 0);
@@ -1512,12 +1513,11 @@ public:
 class AsyncNativeCCEntryPointArgumentEmission final
     : public NativeCCEntryPointArgumentEmission,
       public AsyncEntryPointArgumentEmission {
-  llvm::Value *task;
-  llvm::Value *executor;
-  llvm::Value *context;
+  llvm::Value *task = nullptr;
+  llvm::Value *executor = nullptr;
+  llvm::Value *context = nullptr;
   /*const*/ AsyncContextLayout layout;
-  const Address dataAddr;
-  unsigned polymorphicParameterIndex = 0;
+  Address dataAddr;
 
   Explosion loadExplosion(ElementLayout layout) {
     Address addr = layout.project(IGF, dataAddr, /*offsets*/ llvm::None);
@@ -1536,9 +1536,14 @@ public:
                                           SILBasicBlock &entry,
                                           Explosion &allParamValues)
       : AsyncEntryPointArgumentEmission(IGF, entry, allParamValues),
-        task(allParamValues.claimNext()), executor(allParamValues.claimNext()),
-        context(allParamValues.claimNext()), layout(getAsyncContextLayout(IGF)),
-        dataAddr(layout.emitCastTo(IGF, context)){};
+        layout(getAsyncContextLayout(IGF)){};
+
+  void mapAsyncParameters() override {
+    task = allParamValues.claimNext();
+    executor = allParamValues.claimNext();
+    context = allParamValues.claimNext();
+    dataAddr = layout.emitCastTo(IGF, context);
+  };
 
   llvm::Value *getCallerErrorResultArgument() override {
     auto errorLayout = layout.getErrorLayout();
@@ -1548,73 +1553,35 @@ public:
     auto addr = Address(load, IGF.IGM.getPointerAlignment());
     return addr.getAddress();
   }
-  llvm::Value *getContext() override {
-    auto contextLayout = layout.getLocalContextLayout();
-    return loadValue(contextLayout);
-  }
+  llvm::Value *getContext() override { return allParamValues.takeLast(); }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
-    auto argumentLayout = layout.getArgumentLayout(index);
-    auto result = loadExplosion(argumentLayout);
+    assert(size > 0);
+    Explosion result;
+    allParamValues.transferInto(result, size);
     return result;
   }
-  bool requiresIndirectResult(SILType retType) override { return false; }
+  bool requiresIndirectResult(SILType retType) override {
+    auto &schema =
+        IGF.IGM.getTypeInfo(retType).nativeReturnValueSchema(IGF.IGM);
+    return schema.requiresIndirect();
+  }
   llvm::Value *getIndirectResultForFormallyDirectResult() override {
-    llvm_unreachable("async function do not need to lower direct SIL results "
-                     "into indirect IR results because all results are already "
-                     "indirected through the context");
-  }
-  Address getNextUncastBinding() {
-    auto index = polymorphicParameterIndex;
-    ++polymorphicParameterIndex;
-
-    assert(layout.hasBindings());
-
-    auto bindingLayout = layout.getBindingsLayout();
-    auto bindingsAddr = bindingLayout.project(IGF, dataAddr, /*offsets*/ None);
-    auto erasedBindingsAddr =
-        IGF.Builder.CreateBitCast(bindingsAddr, IGF.IGM.Int8PtrPtrTy);
-    auto uncastBindingAddr = IGF.Builder.CreateConstArrayGEP(
-        erasedBindingsAddr, index, IGF.IGM.getPointerSize());
-    return uncastBindingAddr;
-  }
-  llvm::Value *castUncastBindingToMetadata(Address uncastBindingAddr) {
-    auto bindingAddrAddr = IGF.Builder.CreateBitCast(
-        uncastBindingAddr.getAddress(), IGF.IGM.TypeMetadataPtrPtrTy);
-    auto bindingAddr =
-        IGF.Builder.CreateLoad(bindingAddrAddr, IGF.IGM.getPointerAlignment());
-    return bindingAddr;
-  }
-  llvm::Value *castUncastBindingToWitnessTable(Address uncastBindingAddr) {
-    auto bindingAddrAddr = IGF.Builder.CreateBitCast(
-        uncastBindingAddr.getAddress(), IGF.IGM.WitnessTablePtrPtrTy);
-    auto bindingAddr =
-        IGF.Builder.CreateLoad(bindingAddrAddr, IGF.IGM.getPointerAlignment());
-    return bindingAddr;
+    return allParamValues.claimNext();
   }
   llvm::Value *
   getNextPolymorphicParameter(GenericRequirement &requirement) override {
-    auto uncastBindingAddr = getNextUncastBinding();
-    if (requirement.Protocol) {
-      return castUncastBindingToWitnessTable(uncastBindingAddr);
-    } else {
-      return castUncastBindingToMetadata(uncastBindingAddr);
-    }
+    return allParamValues.claimNext();
   }
   llvm::Value *getNextPolymorphicParameterAsMetadata() override {
-    return castUncastBindingToMetadata(getNextUncastBinding());
+    return allParamValues.claimNext();
   }
   llvm::Value *getIndirectResult(unsigned index) override {
-    auto fieldLayout = layout.getIndirectReturnLayout(index);
-    return loadValue(fieldLayout);
+    return allParamValues.claimNext();
   };
   llvm::Value *getSelfWitnessTable() override {
-    auto fieldLayout = layout.getSelfWitnessTableLayout();
-    return loadValue(fieldLayout);
+    return allParamValues.takeLast();
   }
-  llvm::Value *getSelfMetadata() override {
-    auto fieldLayout = layout.getSelfMetadataLayout();
-    return loadValue(fieldLayout);
-  }
+  llvm::Value *getSelfMetadata() override { return allParamValues.takeLast(); }
   llvm::Value *getCoroutineBuffer() override {
     llvm_unreachable(
         "async functions do not use a fixed size coroutine buffer");
@@ -1625,7 +1592,35 @@ public:
                      const LoadableTypeInfo &loadableArgTI,
                      std::function<Explosion(unsigned index, unsigned size)>
                          explosionForArgument) override {
-    return explosionForArgument(index, 1);
+    Explosion paramValues;
+    // If the explosion must be passed indirectly, load the value from the
+    // indirect address.
+    auto &nativeSchema = loadableArgTI.nativeParameterValueSchema(IGF.IGM);
+    if (nativeSchema.requiresIndirect()) {
+      Explosion paramExplosion = explosionForArgument(index, 1);
+      Address paramAddr =
+          loadableParamTI.getAddressForPointer(paramExplosion.claimNext());
+      if (loadableParamTI.getStorageType() != loadableArgTI.getStorageType())
+        paramAddr =
+            loadableArgTI.getAddressForPointer(IGF.Builder.CreateBitCast(
+                paramAddr.getAddress(),
+                loadableArgTI.getStorageType()->getPointerTo()));
+      loadableArgTI.loadAsTake(IGF, paramAddr, paramValues);
+    } else {
+      if (!nativeSchema.empty()) {
+        // Otherwise, we map from the native convention to the type's explosion
+        // schema.
+        Explosion nativeParam;
+        unsigned size = nativeSchema.size();
+        Explosion paramExplosion = explosionForArgument(index, size);
+        paramExplosion.transferInto(nativeParam, size);
+        paramValues = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeParam,
+                                                 param->getType());
+      } else {
+        assert(loadableParamTI.getSchema().empty());
+      }
+    }
+    return paramValues;
   };
 };
 
@@ -1757,8 +1752,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     IGM.createReplaceableProlog(*this, f);
   }
 
-  if (f->getLoweredFunctionType()->isAsync())
-    setupAsync();
+  if (f->getLoweredFunctionType()->isAsync()) {
+    setupAsync(Signature::forAsyncEntry(IGM, f->getLoweredFunctionType())
+                   .getAsyncContextIndex());
+  }
 }
 
 IRGenSILFunction::~IRGenSILFunction() {
@@ -1851,10 +1848,6 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
   SILType directResultType = IGF.CurSILFn->mapTypeIntoContext(
       fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
   if (requiresIndirectResult(directResultType)) {
-    assert(!IGF.CurSILFn->isAsync() &&
-           "async function do not need to lower direct SIL results into "
-           "indirect IR results because all results are already indirected "
-           "through the context");
     auto &paramTI = IGF.IGM.getTypeInfo(directResultType);
     auto &retTI =
         IGF.IGM.getTypeInfo(IGF.getLoweredTypeInContext(directResultType));
@@ -1951,6 +1944,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
         return emission->requiresIndirectResult(retType);
       });
 
+  // Map the async context parameters if present.
+  emission->mapAsyncParameters();
+
   // The witness method CC passes Self as a final argument.
   WitnessMetadata witnessMetadata;
   if (funcTy->getRepresentation() == SILFunctionTypeRepresentation::WitnessMethod) {
@@ -1975,9 +1971,10 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
 
   if (funcTy->isAsync()) {
-    emitAsyncFunctionEntry(IGF,
-                           getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
-                           LinkEntity::forSILFunction(IGF.CurSILFn));
+    emitAsyncFunctionEntry(
+        IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
+        LinkEntity::forSILFunction(IGF.CurSILFn),
+        Signature::forAsyncEntry(IGF.IGM, funcTy).getAsyncContextIndex());
   }
 
   SILFunctionConventions conv(funcTy, IGF.getSILModule());
@@ -2004,7 +2001,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     //
     // For async functions, there will be a thick context within the async
     // context whenever there is no self context.
-  } else if (funcTy->isAsync() || funcTy->hasErrorResult() ||
+  } else if ((!funcTy->isAsync() && funcTy->hasErrorResult()) ||
              funcTy->getRepresentation() ==
                  SILFunctionTypeRepresentation::Thick) {
     llvm::Value *contextPtr = emission->getContext();
@@ -3482,26 +3479,31 @@ static void emitReturnInst(IRGenSILFunction &IGF,
   // Even if SIL has a direct return, the IR-level calling convention may
   // require an indirect return.
   if (IGF.IndirectReturn.isValid()) {
-    assert(!IGF.isAsync());
     auto &retTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
     retTI.initialize(IGF, result, IGF.IndirectReturn, false);
-    IGF.Builder.CreateRetVoid();
-  } else if (IGF.isAsync()) {
-    // If we're generating an async function, store the result into the buffer.
-    assert(!IGF.IndirectReturn.isValid() &&
-           "Formally direct results should stay direct results for async "
-           "functions");
     auto asyncLayout = getAsyncContextLayout(IGF);
-    emitAsyncReturn(IGF, asyncLayout, fnType, result);
+    if (!IGF.isAsync()) {
+      IGF.Builder.CreateRetVoid();
+      return;
+    } else {
+      return emitAsyncReturn(IGF, asyncLayout, fnType, llvm::None);
+    }
+  }
+
+  SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
+                              IGF.getSILModule());
+  auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
+      conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
+
+  if (IGF.isAsync()) {
+    // If we're generating an async function, store the result into the buffer.
+    auto asyncLayout = getAsyncContextLayout(IGF);
+    emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
     assert(swiftCCReturn ||
            funcLang == SILFunctionLanguage::C && "Need to handle all cases");
-    SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
-                                IGF.getSILModule());
-    auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
-        conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
     IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn,
                          false);
   }
@@ -3534,7 +3536,14 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   // Async functions just return to the continuation.
   if (isAsync()) {
     auto layout = getAsyncContextLayout(*this);
-    emitAsyncReturn(*this, layout, i->getFunction()->getLoweredFunctionType());
+    SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
+                                getSILModule());
+    auto funcResultType = CurSILFn->mapTypeIntoContext(
+        conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+
+    Explosion empty;
+    emitAsyncReturn(*this, layout, funcResultType,
+                    i->getFunction()->getLoweredFunctionType(), empty);
     return;
   }
 

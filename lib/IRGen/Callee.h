@@ -176,10 +176,15 @@ namespace irgen {
         switch (getSpecialKind()) {
         case SpecialKind::TaskFutureWait:
         case SpecialKind::TaskFutureWaitThrowing:
+          // FIXME: I have disabled this optimization, if we bring it back we
+          // need to debug why it currently does not work (call emission
+          // computes an undef return pointer) and change the runtime entries to
+          // remove the extra type parameter.
+          //
           // We suppress generics from these as a code-size optimization
           // because the runtime can recover the success type from the
           // future.
-          return true;
+          return false;
         case SpecialKind::TaskGroupWaitNext:
           return false;
         }
