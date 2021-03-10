@@ -25,7 +25,7 @@ bb0(%x : $Int32, %f : $@async @callee_owned (Int32) -> @out T):
   return %p : $@async @callee_owned () -> @out T
 }
 
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$sTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s36partial_apply_dynamic_with_out_paramTwTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 // CHECK-LL: define internal swift{{(tail)?}}cc void @"$s6calleeTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 sil @callee : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T {
 entry(%out_t : $*T, %x : $Int32, %in_t : $*T):
