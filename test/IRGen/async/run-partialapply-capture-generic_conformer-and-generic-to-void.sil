@@ -2,6 +2,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -partial-apply-lowering %s | %FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
@@ -13,7 +14,6 @@
 
 import Builtin
 import Swift
-import PrintShims
 import _Concurrency
 
 sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -55,12 +55,78 @@ sil_witness_table ObserverImpl : Observer module main {
     associated_type Result : ()
 }
 
+// CHECK-SIL-LABEL: sil hidden @witness_method
+//  CHECK-SIL-SAME: : $@convention(thin) @async
+//  CHECK-SIL-SAME:     <S where S : Observable>
+//  CHECK-SIL-SAME:     <O where O : Observer, S.Result == O.Result>
+//  CHECK-SIL-SAME:     (@in S) -> @owned @async @callee_guaranteed (@in O) -> () {
+//       CHECK-SIL: bb0([[S_INSTANCE:%[^,]+]] : $*S):
+//       CHECK-SIL:   [[WITNESS_METHOD:%[^,]+]] = witness_method $S, #Observable.subscribe
+//  CHECK-SIL-SAME:       : <Self where Self : Observable><T where T : Observer> (Self) -> (T) async -> ()
+//  CHECK-SIL-SAME:       : $@convention(witness_method: Observable) @async
+//  CHECK-SIL-SAME:           <τ_0_0 where τ_0_0 : Observable>
+//  CHECK-SIL-SAME:           <τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result>
+//  CHECK-SIL-SAME:           (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+//       CHECK-SIL:   [[THUNK:%[^,]+]] = function_ref @$s14witness_methodTw_
+//  CHECK-SIL-SAME:       : $@convention(thin) @async
+//  CHECK-SIL-SAME:           <τ_0_0 where τ_0_0 : Observable>
+//  CHECK-SIL-SAME:           <τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result>
+//  CHECK-SIL-SAME:           (
+//  CHECK-SIL-SAME:               @in τ_1_0,
+//  CHECK-SIL-SAME:               @in_guaranteed τ_0_0,
+//  CHECK-SIL-SAME:               @convention(witness_method: Observable) @async
+//  CHECK-SIL-SAME:                   <τ_0_0 where τ_0_0 : Observable>
+//  CHECK-SIL-SAME:                   <τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result>
+//  CHECK-SIL-SAME:                   (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+//  CHECK-SIL-SAME:           ) -> ()
+//       CHECK-SIL:   [[RESULT:%[^,]+]] = partial_apply [callee_guaranteed] [[THUNK]]<S, O>([[S_INSTANCE]], [[WITNESS_METHOD]])
+//  CHECK-SIL-SAME:       : $@convention(thin) @async
+//  CHECK-SIL-SAME:           <τ_0_0 where τ_0_0 : Observable>
+//  CHECK-SIL-SAME:           <τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result>
+//  CHECK-SIL-SAME:           (
+//  CHECK-SIL-SAME:               @in τ_1_0,
+//  CHECK-SIL-SAME:               @in_guaranteed τ_0_0,
+//  CHECK-SIL-SAME:               @convention(witness_method: Observable) @async
+//  CHECK-SIL-SAME:                   <τ_0_0 where τ_0_0 : Observable>
+//  CHECK-SIL-SAME:                   <τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result>
+//  CHECK-SIL-SAME:                   (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+//  CHECK-SIL-SAME:           ) -> ()
+//       CHECK-SIL:   return [[RESULT]] : $@async @callee_guaranteed (@in O) -> ()
+// CHECK-SIL-LABEL: } // end sil function 'witness_method'
+
+// CHECK-SIL-LABEL: sil private [thunk] [ossa] @$s14witness_methodTw_ 
+//  CHECK-SIL-SAME: : $@convention(thin) @async 
+//  CHECK-SIL-SAME:     <S where S : Observable>
+//  CHECK-SIL-SAME:     <O where O : Observer, S.Result == O.Result> 
+//  CHECK-SIL-SAME:     (
+//  CHECK-SIL-SAME:         @in O, 
+//  CHECK-SIL-SAME:         @in_guaranteed S, 
+//  CHECK-SIL-SAME:         @convention(witness_method: Observable) @async 
+//  CHECK-SIL-SAME:             <S where S : Observable>
+//  CHECK-SIL-SAME:             <O where O : Observer, S.Result == O.Result> 
+//  CHECK-SIL-SAME:             (@in O, @in_guaranteed S) -> ()
+//  CHECK-SIL-SAME:     ) -> () {
+//       CHECK-SIL: bb0(
+//  CHECK-SIL-SAME:     [[O_INSTANCE:%[^,]+]] : $*O, 
+//  CHECK-SIL-SAME:     [[S_INSTANCE:%[^,]+]] : $*S, 
+//  CHECK-SIL-SAME:     [[WITNESS_METHOD:%[^,]+]] : $
+//  CHECK-SIL-SAME:         @convention(witness_method: Observable) @async 
+//  CHECK-SIL-SAME:         <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> 
+//  CHECK-SIL-SAME:         (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+//  CHECK-SIL-SAME: ):
+//       CHECK-SIL:   [[RESULT:%[^,]+]] = apply [[WITNESS_METHOD]]<S, O>(
+//  CHECK-SIL-SAME:       [[O_INSTANCE]], 
+//  CHECK-SIL-SAME:       [[S_INSTANCE]]
+//  CHECK-SIL-SAME:   ) : $@convention(witness_method: Observable) @async <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> () 
+//       CHECK-SIL:   return [[RESULT]] : $()                                 
+// CHECK-SIL-LABEL: } // end sil function '$s14witness_methodTw_'
+
 // CHECK-LL: define internal swift{{(tail)?}}cc void @"$s14witness_methodTw_TA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
-sil hidden @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> () {
+sil hidden @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_guaranteed (@in O) -> () {
 bb0(%0 : $*S):
   %1 = witness_method $S, #Observable.subscribe : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
-  %2 = partial_apply %1<S, O>(%0) : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
-  return %2 : $@async @callee_owned (@in O) -> ()
+  %2 = partial_apply [callee_guaranteed] %1<S, O>(%0) : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  return %2 : $@async @callee_guaranteed (@in O) -> ()
 }
 
 
