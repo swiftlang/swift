@@ -1245,7 +1245,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
       /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
       FEOpts.PrebuiltModuleCachePath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.shouldTrackSystemDependencies());
+      FEOpts.shouldTrackSystemDependencies(),
+      RequireOSSAModules_t(instance.getSILOptions()));
 
   // Explore the dependencies of every module.
   for (unsigned currentModuleIdx = 0; currentModuleIdx < allModules.size();
@@ -1336,7 +1337,8 @@ swift::dependencies::performBatchModuleScan(
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
-            FEOpts.shouldTrackSystemDependencies());
+            FEOpts.shouldTrackSystemDependencies(),
+            RequireOSSAModules_t(instance.getSILOptions()));
         Optional<ModuleDependencies> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
@@ -1403,7 +1405,8 @@ swift::dependencies::performBatchModulePrescan(
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
-            FEOpts.shouldTrackSystemDependencies());
+            FEOpts.shouldTrackSystemDependencies(),
+            RequireOSSAModules_t(instance.getSILOptions()));
         Optional<ModuleDependencies> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
