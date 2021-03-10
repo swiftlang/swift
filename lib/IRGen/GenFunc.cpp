@@ -80,13 +80,14 @@
 #include "swift/IRGen/Linking.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Module.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/ADT/StringSwitch.h"
 
 #include "BitPatternBuilder.h"
 #include "Callee.h"
@@ -1152,23 +1153,8 @@ public:
     return loadValue(layout.getLocalContextLayout());
   }
   llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
-    assert(dynamicFunction && dynamicFunction->pointer);
-    auto *context = dynamicFunction->context;
-    if (!context) {
-      return dynamicFunction->pointer;
-    }
-    auto *rawFunction = subIGF.Builder.CreateBitCast(
-        dynamicFunction->pointer, origSig.getType()->getPointerTo());
-    auto functionPointer =
-        FunctionPointer(FunctionPointer::Kind::AsyncFunctionPointer,
-                        rawFunction, authInfo, origSig);
-    llvm::Value *size = nullptr;
-    llvm::Value *function = nullptr;
-    std::tie(function, size) = getAsyncFunctionAndSize(
-        subIGF, origType->getRepresentation(), functionPointer, context,
-        {/*function*/ true, /*size*/ false});
-    assert(size == nullptr);
-    return function;
+    llvm_unreachable(
+        "async partial applies never have dynamic function pointers");
   }
   llvm::Value *getDynamicFunctionContext() override {
     assert((dynamicFunction && dynamicFunction->context) ||
@@ -1321,7 +1307,7 @@ getPartialApplicationForwarderEmission(
 /// If 'layout' is null, there is a single captured value of
 /// Swift-refcountable type that is being used directly as the
 /// context object.
-static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
+static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    const Optional<FunctionPointer> &staticFnPtr,
                                    bool calleeHasContext,
                                    const Signature &origSig,
@@ -1347,6 +1333,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Function *fwd =
       llvm::Function::Create(fwdTy, llvm::Function::InternalLinkage,
                              llvm::StringRef(thunkName), &IGM.Module);
+  llvm::Value *asyncFunctionPtr = nullptr;
   fwd->setCallingConv(outSig.getCallingConv());
 
   fwd->setAttributes(outAttrs);
@@ -1356,8 +1343,20 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
-  if (origType->isAsync())
+  if (origType->isAsync()) {
     subIGF.setupAsync();
+
+    auto *calleeAFP = staticFnPtr->getDirectPointer();
+    LinkEntity entity = LinkEntity::forPartialApplyForwarder(fwd);
+    auto size = Size(0);
+    assert(!asyncFunctionPtr &&
+           "already had an async function pointer to the forwarder?!");
+    asyncFunctionPtr = emitAsyncFunctionPointer(IGM, fwd, entity, size);
+    subIGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::coro_async_size_replace,
+        {subIGF.Builder.CreateBitCast(asyncFunctionPtr, IGM.Int8PtrTy),
+         subIGF.Builder.CreateBitCast(calleeAFP, IGM.Int8PtrTy)});
+  }
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(subIGF, fwd);
 
@@ -1406,11 +1405,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   } else if (!layout->isKnownEmpty()) {
     rawData = emission->getContext();
     data = layout->emitCastTo(subIGF, rawData);
-    if (origType->isAsync()) {
-      // Async layouts contain the size of the needed async context as their
-      // first element.  It is not a parameter and needs to be skipped.
-      ++nextCapturedField;
-    }
 
     // Restore type metadata bindings, if we have them.
     if (layout->hasBindings()) {
@@ -1844,7 +1838,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   emission->createReturn(call);
   emission->end();
 
-  return fwd;
+  return asyncFunctionPtr ? asyncFunctionPtr : fwd;
 }
 
 /// Emit a partial application thunk for a function pointer applied to a partial
@@ -1864,19 +1858,6 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
-
-  if (origType->isAsync()) {
-    // Store the size of the partially applied async function's context here so
-    // that it can be recovered by at the apply site.
-    auto int32ASTType =
-        BuiltinIntegerType::get(32, IGF.IGM.IRGen.SIL.getASTContext())
-            ->getCanonicalType();
-    auto int32SILType = SILType::getPrimitiveObjectType(int32ASTType);
-    const TypeInfo &int32TI = IGF.IGM.getTypeInfo(int32SILType);
-    argValTypes.push_back(int32SILType);
-    argTypeInfos.push_back(&int32TI);
-    argConventions.push_back(ParameterConvention::Direct_Unowned);
-  }
 
   // A context's HeapLayout stores all of the partially applied args.
   // A HeapLayout is "fixed" if all of its fields have a fixed layout.
@@ -1907,20 +1888,10 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   auto bindings = NecessaryBindings::forPartialApplyForwarder(
       IGF.IGM, origType, subs, considerParameterSources);
 
+  // TODO: Revisit.  Now that async thick functions are always represented with
+  //       an async function pointer, it should again be possible to allow
+  //       contexts that consist of only a single swift refcounted value.
   if (origType->isAsync()) {
-    // The size of the async context needs to be available at the apply site.
-    //
-    // TODO: In the "single refcounted context" case the async "function
-    //       pointer" (actually a pointer to a
-    //         constant {
-    //           /*context size*/ i32,
-    //           /*relative address of function*/ i32
-    //         }
-    //       rather than a pointer directly to the function) would be able to
-    //       provide the async context size required.  At the apply site, it is
-    //       possible to determine whether we're in the "single refcounted
-    //       context" by looking at the metadata of a nonnull context pointer
-    //       and checking whether it is TargetHeapMetadata.
     hasSingleSwiftRefcountedContext = No;
   }
 
@@ -2115,7 +2086,7 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
          && "argument info lists out of sync");
   HeapLayout layout(IGF.IGM, LayoutStrategy::Optimal, argValTypes, argTypeInfos,
                     /*typeToFill*/ nullptr, std::move(bindings),
-                    /*bindingsIndex*/ origType->isAsync() ? 1 : 0);
+                    /*bindingsIndex*/ 0);
 
   llvm::Value *data;
 
@@ -2146,15 +2117,6 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
     Address dataAddr = layout.emitCastTo(IGF, data);
     
     unsigned i = 0;
-
-    if (origType->isAsync()) {
-      auto &fieldLayout = layout.getElement(i);
-      auto &fieldTI = fieldLayout.getType();
-      Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
-      cast<LoadableTypeInfo>(fieldTI).initialize(IGF, args, fieldAddr,
-                                                 isOutlined);
-      ++i;
-    }
 
     // Store necessary bindings, if we have them.
     if (layout.hasBindings()) {
