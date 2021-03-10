@@ -181,10 +181,16 @@ struct PropertyWrapperAuxiliaryVariables {
   /// of the original wrapped property prefixed with \c $
   VarDecl *projectionVar = nullptr;
 
+  /// The synthesized local wrapped value property, which shadows the original wrapped
+  /// declaration if it is a parameter.
+  VarDecl *localWrappedValueVar = nullptr;
+
   PropertyWrapperAuxiliaryVariables() {}
 
-  PropertyWrapperAuxiliaryVariables(VarDecl *backingVar, VarDecl *projectionVar)
-      : backingVar(backingVar), projectionVar(projectionVar) {}
+  PropertyWrapperAuxiliaryVariables(VarDecl *backingVar, VarDecl *projectionVar,
+                                    VarDecl *localWrappedValueVar = nullptr)
+      : backingVar(backingVar), projectionVar(projectionVar),
+        localWrappedValueVar(localWrappedValueVar) {}
 
   /// Whether this is a valid property wrapper.
   bool isValid() const {

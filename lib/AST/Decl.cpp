@@ -5981,12 +5981,7 @@ VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
 }
 
 VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
-  auto &ctx = getASTContext();
-  auto mutableThis = const_cast<VarDecl *>(this);
-  return evaluateOrDefault(
-      ctx.evaluator,
-      PropertyWrapperWrappedValueVarRequest{mutableThis},
-      nullptr);
+  return getPropertyWrapperAuxiliaryVariables().localWrappedValueVar;
 }
 
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {

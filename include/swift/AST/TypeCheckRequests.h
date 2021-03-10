@@ -753,26 +753,6 @@ public:
   bool isCached() const;
 };
 
-/// Request the synthesized local wrapped value var for a parameter
-/// that has an attached property wrapper.
-class PropertyWrapperWrappedValueVarRequest :
-    public SimpleRequest<PropertyWrapperWrappedValueVarRequest,
-                         VarDecl *(VarDecl *),
-                         RequestFlags::Cached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  VarDecl *evaluate(Evaluator &evaluator, VarDecl *var) const;
-
-public:
-  // Caching
-  bool isCached() const;
-};
-
 /// Retrieve the structural type of an alias type.
 class StructuralTypeRequest :
     public SimpleRequest<StructuralTypeRequest,

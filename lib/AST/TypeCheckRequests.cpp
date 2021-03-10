@@ -498,11 +498,6 @@ bool PropertyWrapperInitializerInfoRequest::isCached() const {
   return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
 
-bool PropertyWrapperWrappedValueVarRequest::isCached() const {
-  auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
-}
-
 bool PropertyWrapperMutabilityRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();

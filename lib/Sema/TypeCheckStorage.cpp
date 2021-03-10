@@ -2406,6 +2406,53 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   return Storage;
 }
 
+/// Synthesize a computed property representing the wrapped value for a
+/// parameter with an attached property wrapper.
+static VarDecl *synthesizeLocalWrappedValueVar(VarDecl *var) {
+  if (!var->hasAttachedPropertyWrapper() || !isa<ParamDecl>(var))
+    return nullptr;
+
+  auto dc = var->getDeclContext();
+  auto &ctx = var->getASTContext();
+
+  SmallString<64> nameBuf;
+  if (var->getName().hasDollarPrefix()) {
+    nameBuf = var->getName().str().drop_front();
+  } else {
+    nameBuf = var->getName().str();
+  }
+  Identifier name = ctx.getIdentifier(nameBuf);
+
+  VarDecl *localVar = new (ctx) VarDecl(/*IsStatic=*/false,
+                                        VarDecl::Introducer::Var,
+                                        var->getLoc(), name, dc);
+  if (!var->hasImplicitPropertyWrapper())
+    localVar->setInterfaceType(var->getInterfaceType());
+  localVar->setImplicit();
+  localVar->getAttrs() = var->getAttrs();
+  localVar->overwriteAccess(var->getFormalAccess());
+
+  if (var->hasImplicitPropertyWrapper()) {
+    // FIXME: This can have a setter, but we need a resolved wrapper type
+    // to figure it out.
+    localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
+  } else {
+    auto mutability = *var->getPropertyWrapperMutability();
+    if (mutability.Getter == PropertyWrapperMutability::Mutating) {
+      ctx.Diags.diagnose(var->getLoc(), diag::property_wrapper_param_mutating);
+      return nullptr;
+    }
+
+    if (mutability.Setter == PropertyWrapperMutability::Nonmutating) {
+      localVar->setImplInfo(StorageImplInfo::getMutableComputed());
+    } else {
+      localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
+    }
+  }
+
+  return localVar;
+}
+
 /// Synthesize a computed property `$foo` for a property with an attached
 /// wrapper that has a `projectedValue` property.
 static VarDecl *synthesizePropertyWrapperProjectionVar(
@@ -2710,6 +2757,7 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
   auto dc = var->getDeclContext();
   VarDecl *backingVar = nullptr;
   VarDecl *projectionVar = nullptr;
+  VarDecl *wrappedValueVar = nullptr;
 
   if (auto *param = dyn_cast<ParamDecl>(var)) {
     backingVar = ParamDecl::cloneWithoutType(ctx, param);
@@ -2768,7 +2816,14 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
         ctx, var, wrapperType, wrapperInfo.projectedValueVar);
   }
 
-  return PropertyWrapperAuxiliaryVariables(backingVar, projectionVar);
+  if ((wrappedValueVar = synthesizeLocalWrappedValueVar(var))) {
+    // Record the backing storage for the local wrapped value var, which
+    // is needed for synthesizing its accessors.
+    evaluator.cacheOutput(PropertyWrapperAuxiliaryVariablesRequest{wrappedValueVar},
+                          PropertyWrapperAuxiliaryVariables(backingVar, projectionVar));
+  }
+
+  return PropertyWrapperAuxiliaryVariables(backingVar, projectionVar, wrappedValueVar);
 }
 
 PropertyWrapperInitializerInfo
@@ -2886,56 +2941,6 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   return PropertyWrapperInitializerInfo(wrappedValueInit, projectedValueInit);
-}
-
-VarDecl *
-PropertyWrapperWrappedValueVarRequest::evaluate(Evaluator &evaluator,
-                                                VarDecl *var) const {
-  auto wrapperInfo = var->getPropertyWrapperAuxiliaryVariables();
-  if (!wrapperInfo || !isa<ParamDecl>(var))
-    return nullptr;
-
-  auto dc = var->getDeclContext();
-  auto &ctx = var->getASTContext();
-
-  SmallString<64> nameBuf;
-  if (var->getName().hasDollarPrefix()) {
-    nameBuf = var->getName().str().drop_front();
-  } else {
-    nameBuf = var->getName().str();
-  }
-  Identifier name = ctx.getIdentifier(nameBuf);
-
-  VarDecl *localVar = new (ctx) VarDecl(/*IsStatic=*/false,
-                                        VarDecl::Introducer::Var,
-                                        var->getLoc(), name, dc);
-  if (!var->hasImplicitPropertyWrapper())
-    localVar->setInterfaceType(var->getInterfaceType());
-  localVar->setImplicit();
-  localVar->getAttrs() = var->getAttrs();
-  localVar->overwriteAccess(var->getFormalAccess());
-
-  if (var->hasImplicitPropertyWrapper()) {
-    // FIXME: This can have a setter, but we need a resolved wrapper type
-    // to figure it out.
-    localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
-  } else {
-    auto mutability = *var->getPropertyWrapperMutability();
-    if (mutability.Getter == PropertyWrapperMutability::Mutating) {
-      ctx.Diags.diagnose(var->getLoc(), diag::property_wrapper_param_mutating);
-      return nullptr;
-    }
-
-    if (mutability.Setter == PropertyWrapperMutability::Nonmutating) {
-      localVar->setImplInfo(StorageImplInfo::getMutableComputed());
-    } else {
-      localVar->setImplInfo(StorageImplInfo::getImmutableComputed());
-    }
-  }
-
-  evaluator.cacheOutput(PropertyWrapperAuxiliaryVariablesRequest{localVar},
-                        std::move(wrapperInfo));
-  return localVar;
 }
 
 /// Given a storage declaration in a protocol, set it up with the right
