@@ -215,45 +215,26 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
   swift_release(task);
 }
 
-AsyncTaskAndContext
-swift::swift_task_create(JobFlags flags, AsyncTask *parent,
-        const ThinNullaryAsyncSignature::FunctionPointer *function) {
-  return swift_task_create_f(flags, parent, function->Function.get(),
-                             function->ExpectedContextSize);
+/// The function that we put in the context of a simple task
+/// to handle the final return from a closure.
+SWIFT_CC(swiftasync)
+static void completeTaskWithClosure(AsyncTask *task, ExecutorRef executor,
+                                    SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+  // Release the closure context.
+  auto contextWithClosure = static_cast<FutureClosureAsyncContext*>(context);
+  swift_release(contextWithClosure->closureContext);
+  
+  // Clean up the rest of the task.
+  return completeTask(task, executor, context);
 }
 
-AsyncTaskAndContext
-swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
-                ThinNullaryAsyncSignature::FunctionType *function,
-                           size_t initialContextSize) {
-  return swift_task_create_future_f(
-      flags, parent, nullptr, function, initialContextSize);
-}
-
-AsyncTaskAndContext swift::swift_task_create_future(
-    JobFlags flags, AsyncTask *parent,
-    const Metadata *futureResultType,
-    const FutureAsyncSignature::FunctionPointer *function) {
-  return swift_task_create_future_f(
-      flags, parent, futureResultType, function->Function.get(),
-      function->ExpectedContextSize);
-}
-
-AsyncTaskAndContext swift::swift_task_create_future_f(
-    JobFlags flags, AsyncTask *parent,
-    const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
-  assert(!flags.task_isGroupChildTask() &&
-  "use swift_task_create_group_future_f to initialize task group child tasks");
-  return swift_task_create_group_future_f(
-      flags, parent, /*group=*/nullptr, futureResultType,
-      function, initialContextSize);
-}
-
-AsyncTaskAndContext swift::swift_task_create_group_future_f(
+/// All `swift_task_create*` variants funnel into this common implementation.
+static AsyncTaskAndContext swift_task_create_group_future_impl(
     JobFlags flags, AsyncTask *parent, TaskGroup *group,
     const Metadata *futureResultType,
-    FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
+    FutureAsyncSignature::FunctionType *function,
+    HeapObject * /* +1 */ closureContext,
+    size_t initialContextSize) {
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
@@ -319,6 +300,22 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     futureContext->errorResult = &futureFragment->getError();
     futureContext->indirectResult = futureFragment->getStoragePtr();
   }
+  
+  // Stash the closure context in the future if there's room.
+  // We do this unconditionally because a null context value could still in
+  // theory be an expected context value (for instance, a captured boolean
+  // value could be represented as either nullptr or (void*)-1 on platforms
+  // where swift_retain ignores negative values). If the given entry point
+  // is not a closure invocation function, then stashing null into the context
+  // should be harmless, since it's just unused junk space at this point.
+  if (initialContextSize >= sizeof(FutureClosureAsyncContext)) {
+    auto futureClosureContext
+      = static_cast<FutureClosureAsyncContext *>(initialContext);
+    
+    futureClosureContext->closureContext = closureContext;
+  } else {
+    assert(!closureContext && "got a context but nowhere to put it?!");
+  }
 
   // Perform additional linking between parent and child task.
   if (parent) {
@@ -338,7 +335,8 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   // as if they might be null, even though the only time they ever might
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
-  initialContext->ResumeParent = &completeTask;
+  initialContext->ResumeParent
+    = closureContext ? &completeTaskWithClosure : &completeTask;
   initialContext->ResumeParentExecutor = ExecutorRef::generic();
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
@@ -355,6 +353,112 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
   }
 
   return {task, initialContext};
+}
+
+AsyncTaskAndContext
+swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
+                ThinNullaryAsyncSignature::FunctionType *function,
+                           size_t initialContextSize) {
+  return swift_task_create_future_f(
+      flags, parent, nullptr, function, initialContextSize);
+}
+
+AsyncTaskAndContext swift::swift_task_create_future_f(
+    JobFlags flags, AsyncTask *parent,
+    const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
+  assert(!flags.task_isGroupChildTask() &&
+  "use swift_task_create_group_future_f to initialize task group child tasks");
+  return swift_task_create_group_future_f(
+      flags, parent, /*group=*/nullptr, futureResultType,
+      function, initialContextSize);
+}
+
+AsyncTaskAndContext swift::swift_task_create_group_future_f(
+    JobFlags flags, AsyncTask *parent, TaskGroup *group,
+    const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function,
+    size_t initialContextSize) {
+  return swift_task_create_group_future_impl(flags, parent, group,
+                                             futureResultType,
+                                             function, nullptr,
+                                             initialContextSize);
+}
+
+namespace {
+/// The header of a function context (closure captures) of
+/// a thick async function with a non-null context.
+struct ThickAsyncFunctionContext: HeapObject {
+  uint32_t ExpectedContextSize;
+};
+
+/// Extract the entry point address and initial context size from an async closure value.
+template<typename AsyncSignature, uint16_t AuthDiscriminator>
+SWIFT_ALWAYS_INLINE // so this doesn't hang out as a ptrauth gadget
+std::pair<typename AsyncSignature::FunctionType *, size_t>
+getAsyncClosureEntryPointAndContextSize(void *function,
+                                        HeapObject *functionContext) {
+  // If the function context is non-null, then the function pointer is
+  // an ordinary function pointer.
+  if (functionContext) {
+    function = swift_auth_code(function, AuthDiscriminator);
+    size_t contextSize =
+      static_cast<ThickAsyncFunctionContext*>(functionContext)
+        ->ExpectedContextSize;
+    return {reinterpret_cast<typename AsyncSignature::FunctionType *>(function),
+            contextSize};
+  // Otherwise, the function pointer is an async function pointer.
+  } else {
+    auto fnPtr =
+      reinterpret_cast<const AsyncFunctionPointer<AsyncSignature> *>(function);
+#if SWIFT_PTRAUTH
+    fnPtr = (const AsyncFunctionPointer<AsyncSignature> *)ptrauth_auth_data(
+      (void *)fnPtr, ptrauth_key_process_independent_code,
+      AuthDiscriminator);
+#endif
+    return {
+      reinterpret_cast<typename AsyncSignature::FunctionType *>(fnPtr->Function.get()),
+      fnPtr->ExpectedContextSize};
+  }
+}
+}
+
+AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
+                     AsyncTask *parent,
+                     const Metadata *futureResultType,
+                     void *closureEntry,
+                     HeapObject * /* +1 */ closureContext) {
+  FutureAsyncSignature::FunctionType *taskEntry;
+  size_t initialContextSize;
+  std::tie(taskEntry, initialContextSize)
+    = getAsyncClosureEntryPointAndContextSize<
+      FutureAsyncSignature,
+      SpecialPointerAuthDiscriminators::AsyncFutureFunction
+    >(closureEntry, closureContext);
+
+  return swift_task_create_group_future_impl(
+      flags, parent, nullptr, futureResultType,
+      taskEntry, closureContext,
+      initialContextSize);
+}
+
+AsyncTaskAndContext
+swift::swift_task_create_group_future(
+                        JobFlags flags, AsyncTask *parent, TaskGroup *group,
+                        const Metadata *futureResultType,
+                        void *closureEntry,
+                        HeapObject * /*+1*/closureContext) {
+  FutureAsyncSignature::FunctionType *taskEntry;
+  size_t initialContextSize;
+  std::tie(taskEntry, initialContextSize)
+    = getAsyncClosureEntryPointAndContextSize<
+      FutureAsyncSignature,
+      SpecialPointerAuthDiscriminators::AsyncFutureFunction
+    >(closureEntry, closureContext);
+  return swift_task_create_group_future_impl(
+      flags, parent, group, futureResultType,
+      taskEntry, closureContext,
+      initialContextSize);
 }
 
 void swift::swift_task_future_wait(
@@ -417,12 +521,6 @@ void swift::swift_task_future_wait_throwing(
 }
 
 namespace {
-/// The header of a function context (closure captures) of
-/// a thick async function with a non-null context.
-struct ThickAsyncFunctionContext: HeapObject {
-  uint32_t ExpectedContextSize;
-};
-
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 
@@ -495,35 +593,15 @@ static void runAndBlock_start(AsyncTask *task, ExecutorRef executor,
                               SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   auto callerContext = static_cast<RunAndBlockContext*>(_context);
 
-  size_t calleeContextSize;
   RunAndBlockSignature::FunctionType *function;
-
-  // If the function context is non-null, then the function pointer is
-  // an ordinary function pointer.
+  size_t calleeContextSize;
   auto functionContext = callerContext->FunctionContext;
-  if (functionContext) {
-    function = reinterpret_cast<RunAndBlockSignature::FunctionType*>(
-                   const_cast<void*>(callerContext->Function));
-    function = swift_auth_code(
-        function, SpecialPointerAuthDiscriminators::AsyncRunAndBlockFunction);
-    calleeContextSize =
-      static_cast<ThickAsyncFunctionContext*>(functionContext)
-        ->ExpectedContextSize;
-
-  // Otherwise, the function pointer is an async function pointer.
-  } else {
-    auto fnPtr =
-        reinterpret_cast<const RunAndBlockSignature::FunctionPointer *>(
-            const_cast<void *>(callerContext->Function));
-#if SWIFT_PTRAUTH
-    fnPtr = (const RunAndBlockSignature::FunctionPointer *)ptrauth_auth_data(
-        (void *)fnPtr, ptrauth_key_process_independent_code,
-        SpecialPointerAuthDiscriminators::AsyncRunAndBlockFunction);
-#endif
-    function = fnPtr->Function;
-    calleeContextSize = fnPtr->ExpectedContextSize;
-  }
-
+  std::tie(function, calleeContextSize)
+    = getAsyncClosureEntryPointAndContextSize<
+      RunAndBlockSignature,
+      SpecialPointerAuthDiscriminators::AsyncRunAndBlockFunction
+    >(const_cast<void*>(callerContext->Function), functionContext);
+  
   auto calleeContext =
     pushAsyncContext<RunAndBlockSignature>(task, executor, callerContext,
                                            calleeContextSize,

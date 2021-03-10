@@ -80,7 +80,7 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note {{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   func independentMethod() {
-    syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from an '@actorIndependent' context}}
+    syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from a non-isolated context}}
   }
 
   func asyncHandlerMethod() {

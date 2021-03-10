@@ -64,7 +64,7 @@ extension Task {
     resultType: TaskResult.Type,
     returning returnType: BodyResult.Type = BodyResult.self,
     body: (inout Task.Group<TaskResult>) async throws -> BodyResult
-  ) async throws -> BodyResult {
+  ) async rethrows -> BodyResult {
     let task = Builtin.getCurrentAsyncTask()
     let _group = _taskGroupCreate(task: task)
     var group: Task.Group<TaskResult>! = Task.Group(task: task, group: _group)

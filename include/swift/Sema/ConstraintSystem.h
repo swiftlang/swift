@@ -1796,14 +1796,20 @@ public:
   }
 
   /// Whether or not an opaque value placeholder should be injected into the
-  /// first \c wrappedValue argument of an apply expression.
+  /// first \c wrappedValue argument of an apply expression so the initializer
+  /// expression can be turned into a property wrapper generator function.
   bool shouldInjectWrappedValuePlaceholder(ApplyExpr *apply) const {
     if (kind != Kind::expression ||
         expression.contextualPurpose != CTP_Initialization)
       return false;
 
     auto *wrappedVar = expression.propertyWrapper.wrappedVar;
-    if (!apply || !wrappedVar || wrappedVar->isStatic())
+    if (!apply || !wrappedVar)
+      return false;
+
+    // Don't create property wrapper generator functions for static variables and
+    // local variables with initializers.
+    if (wrappedVar->isStatic() || wrappedVar->getDeclContext()->isLocalContext())
       return false;
 
     return expression.propertyWrapper.innermostWrappedValueInit == apply;
@@ -3873,12 +3879,13 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param base The optional base expression of this value reference
+  /// \param memberLocator The locator anchored at this value reference, when
+  /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                   DeclContext *UseDC,
-                                  const DeclRefExpr *base = nullptr,
+                                  ConstraintLocator *memberLocator = nullptr,
                                   bool wantInterfaceType = false);
 
   /// Return the type-of-reference of the given value.
@@ -3889,7 +3896,8 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
-  /// \param base The optional base expression of this value reference
+  /// \param memberLocator The locator anchored at this value reference, when
+  /// it is a member reference.
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   ///
@@ -3897,7 +3905,7 @@ public:
   static Type
   getUnopenedTypeOfReference(VarDecl *value, Type baseType, DeclContext *UseDC,
                              llvm::function_ref<Type(VarDecl *)> getType,
-                             const DeclRefExpr *base = nullptr,
+                             ConstraintLocator *memberLocator = nullptr,
                              bool wantInterfaceType = false);
 
   /// Retrieve the type of a reference to the given value declaration,
@@ -3916,8 +3924,7 @@ public:
                           Type baseTy, ValueDecl *decl, DeclContext *useDC,
                           bool isDynamicResult,
                           FunctionRefKind functionRefKind,
-                          ConstraintLocatorBuilder locator,
-                          const DeclRefExpr *base = nullptr,
+                          ConstraintLocator *locator,
                           OpenedTypeMap *replacements = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
@@ -4018,7 +4025,8 @@ public:
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
-  Type getEffectiveOverloadType(const OverloadChoice &overload,
+  Type getEffectiveOverloadType(ConstraintLocator *locator,
+                                const OverloadChoice &overload,
                                 bool allowMembers,
                                 DeclContext *useDC);
 
@@ -5280,6 +5288,14 @@ Type isRawRepresentable(ConstraintSystem &cs, Type type);
 /// `RawPepresentable` protocol and return witness type.
 Type isRawRepresentable(ConstraintSystem &cs, Type type,
                         KnownProtocolKind rawRepresentableProtocol);
+
+/// Compute the type that shall stand in for dynamic 'Self' in a member
+/// reference with a base of the given object type.
+///
+/// \param memberLocator The locator of the member constraint; used to retrieve
+/// the expression that the locator is anchored to.
+Type getDynamicSelfReplacementType(Type baseObjTy, const ValueDecl *member,
+                                   ConstraintLocator *memberLocator);
 
 class DisjunctionChoice {
   ConstraintSystem &CS;

@@ -58,7 +58,6 @@ NumParses("n", cl::desc("number of invocations"), cl::init(1));
 namespace {
 struct SPNode {
   swiftparse_syntax_kind_t kind;
-  StringRef nodeText;
 
   Optional<swiftparse_token_kind_t> tokKind;
   StringRef leadingTriviaText;
@@ -111,9 +110,9 @@ static swiftparse_client_node_t
 makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
   SPNode *node = new SPNode();
   node->kind = raw_node->kind;
-  auto range = raw_node->range;
-  node->nodeText = source.substr(range.offset, range.length);
   if (raw_node->kind == 0) {
+    auto range = raw_node->token_data.range;
+    auto nodeText = source.substr(range.offset, range.length);
     node->tokKind = raw_node->token_data.kind;
     size_t leadingTriviaLen =
       trivialLen(makeArrayRef(raw_node->token_data.leading_trivia,
@@ -121,11 +120,10 @@ makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
     size_t trailingTriviaLen =
       trivialLen(makeArrayRef(raw_node->token_data.trailing_trivia,
                               raw_node->token_data.trailing_trivia_count));
-    node->leadingTriviaText = node->nodeText.take_front(leadingTriviaLen);
-    node->tokenText =
-      node->nodeText.substr(leadingTriviaLen,
-                            range.length-leadingTriviaLen-trailingTriviaLen);
-    node->trailingTriviaText = node->nodeText.take_back(trailingTriviaLen);
+    node->leadingTriviaText = nodeText.take_front(leadingTriviaLen);
+    node->tokenText = nodeText.substr(
+        leadingTriviaLen, range.length - leadingTriviaLen - trailingTriviaLen);
+    node->trailingTriviaText = nodeText.take_back(trailingTriviaLen);
   } else {
     for (unsigned i = 0, e = raw_node->layout_data.nodes_count; i != e; ++i) {
       auto subnode = convertClientNode(raw_node->layout_data.nodes[i]);

@@ -18,7 +18,6 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
-  class RawSyntaxTokenCache;
   class SourceManager;
   class SyntaxParsingCache;
   class SourceFile;
@@ -49,10 +48,6 @@ class SyntaxTreeCreator: public SyntaxParseActions {
   /// tree.
   SyntaxParsingCache *SyntaxCache;
 
-  /// Tokens nodes that have already been created and may be reused in other
-  /// parts of the syntax tree.
-  std::unique_ptr<RawSyntaxTokenCache> TokenCache;
-
 public:
   SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
                     SyntaxParsingCache *syntaxCache,
@@ -69,9 +64,9 @@ private:
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override;
 
-  OpaqueSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) override;
+  OpaqueSyntaxNode
+  recordRawSyntax(syntax::SyntaxKind kind,
+                  ArrayRef<OpaqueSyntaxNode> elements) override;
 
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;

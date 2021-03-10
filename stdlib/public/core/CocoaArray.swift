@@ -83,12 +83,13 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     let result = _ContiguousArrayBuffer<AnyObject>(
       _uninitializedCount: boundsCount,
       minimumCapacity: 0)
-
-    // Tell Cocoa to copy the objects into our storage
-    core.getObjects(
-      UnsafeMutableRawPointer(result.firstElementAddress)
-      .assumingMemoryBound(to: AnyObject.self),
-      range: _SwiftNSRange(location: bounds.lowerBound, length: boundsCount))
+    
+    let base = UnsafeMutableRawPointer(result.firstElementAddress)
+      .assumingMemoryBound(to: AnyObject.self)
+      
+    for idx in 0..<boundsCount {
+      (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound))
+    }
 
     return _SliceBuffer(_buffer: result, shiftedToStartIndex: bounds.lowerBound)
   }

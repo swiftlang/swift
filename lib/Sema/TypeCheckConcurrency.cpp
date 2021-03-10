@@ -1575,6 +1575,11 @@ namespace {
 
       // is it an access to a property?
       if (isPropOrSubscript(decl)) {
+        // we assume let-bound properties are taken care of elsewhere,
+        // since they are never implicitly async.
+        assert(!isa<VarDecl>(decl) || cast<VarDecl>(decl)->isLet() == false
+               && "unexpected let-bound property; never implicitly async!");
+
         if (auto declRef = dyn_cast_or_null<DeclRefExpr>(context)) {
           if (usageEnv(declRef) == VarRefUseEnv::Read) {
 
@@ -1724,61 +1729,36 @@ namespace {
       }
 
       case ActorIsolation::Unspecified: {
-        // NOTE: we must always inspect for implicitlyAsync
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
-        bool implicitlyAsyncExpr = (result == AsyncMarkingResult::FoundAsync);
-        bool didEmitDiagnostic = false;
+        if (result == AsyncMarkingResult::FoundAsync)
+          return false;
 
-        auto emitError = [&](bool justNote = false) {
-          didEmitDiagnostic = true;
-          if (!justNote) {
-            auto useKind = static_cast<unsigned>(
-                kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
-            ctx.Diags.diagnose(
-              loc, diag::global_actor_from_nonactor_context,
-              value->getDescriptiveKind(), value->getName(), globalActor,
-              /*actorIndependent=*/false, useKind,
-              result == AsyncMarkingResult::SyncContext);
-          }
-          noteIsolatedActorMember(value, context);
-        };
+        // Diagnose the reference.
+        auto useKind = static_cast<unsigned>(
+            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
+        ctx.Diags.diagnose(
+          loc, diag::global_actor_from_nonactor_context,
+          value->getDescriptiveKind(), value->getName(), globalActor,
+          /*actorIndependent=*/false, useKind,
+          result == AsyncMarkingResult::SyncContext);
 
-        if (AbstractFunctionDecl const* fn =
-            dyn_cast_or_null<AbstractFunctionDecl>(declContext->getAsDecl())) {
-          bool isAsyncContext = fn->isAsyncContext();
-
-          if (implicitlyAsyncExpr && isAsyncContext)
-            return didEmitDiagnostic; // definitely an OK reference.
-
-          // otherwise, there's something wrong.
-          
-          // if it's an implicitly-async call in a non-async context,
-          // then we know later type-checking will raise an error,
-          // so we just emit a note pointing out that callee of the call is
-          // implicitly async.
-          emitError(/*justNote=*/implicitlyAsyncExpr);
-
-          // otherwise, if it's any kind of global-actor reference within
-          // this synchronous function, we'll additionally suggest becoming
-          // part of the global actor associated with the reference,
-          // since this function is not associated with an actor.
-          if (isa<FuncDecl>(fn) && !isAsyncContext) {
-            didEmitDiagnostic = true;
-            fn->diagnose(diag::note_add_globalactor_to_function, 
+        // If we are in a synchronous function on the global actor,
+        // suggest annotating with the global actor itself.
+        if (auto fn = dyn_cast<FuncDecl>(declContext)) {
+          if (!isa<AccessorDecl>(fn) && !fn->isAsyncContext()) {
+            fn->diagnose(diag::note_add_globalactor_to_function,
                 globalActor->getWithoutParens().getString(),
                 fn->getDescriptiveKind(),
                 fn->getName(),
                 globalActor)
-              .fixItInsert(fn->getAttributeInsertionLoc(false), 
+              .fixItInsert(fn->getAttributeInsertionLoc(false),
                 diag::insert_globalactor_attr, globalActor);
           }
-
-        } else {
-          // just the generic error with note.
-          emitError();
         }
 
-        return didEmitDiagnostic;
+        noteIsolatedActorMember(value, context);
+
+        return true;
       } // end Unspecified case
       } // end switch
       llvm_unreachable("unhandled actor isolation kind!");

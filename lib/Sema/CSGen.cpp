@@ -464,9 +464,9 @@ namespace {
         return;
       }
 
-      Type overloadType =
-          CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
-                                      /*allowMembers=*/true, CS.DC);
+      Type overloadType = CS.getEffectiveOverloadType(
+          constraint->getLocator(), constraint->getOverloadChoice(),
+          /*allowMembers=*/true, CS.DC);
       if (!overloadType)
         continue;
 
@@ -489,9 +489,9 @@ namespace {
     // result type.
     if (numFavoredConstraints == 1) {
       auto overloadChoice = firstFavored->getOverloadChoice();
-      auto overloadType =
-        CS.getEffectiveOverloadType(overloadChoice, /*allowMembers=*/true,
-                                    CS.DC);
+      auto overloadType = CS.getEffectiveOverloadType(
+          firstFavored->getLocator(), overloadChoice, /*allowMembers=*/true,
+          CS.DC);
       auto resultType = overloadType->castTo<AnyFunctionType>()->getResult();
       if (!resultType->hasTypeParameter())
         CS.setFavoredType(expr, resultType.getPointer());

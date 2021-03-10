@@ -406,9 +406,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       if (InputNode.is<ParsedTupleTypeSyntax>()) {
         auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>();
         // Decompose TupleTypeSyntax and repack into FunctionType.
-        auto LeftParen = TupleTypeNode.getDeferredLeftParen();
-        auto Arguments = TupleTypeNode.getDeferredElements();
-        auto RightParen = TupleTypeNode.getDeferredRightParen();
+        auto LeftParen = TupleTypeNode.getDeferredLeftParen(SyntaxContext);
+        auto Arguments = TupleTypeNode.getDeferredElements(SyntaxContext);
+        auto RightParen = TupleTypeNode.getDeferredRightParen(SyntaxContext);
         Builder
           .useLeftParen(std::move(LeftParen))
           .useArguments(std::move(Arguments))

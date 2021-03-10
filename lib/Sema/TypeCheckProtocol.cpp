@@ -902,8 +902,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   ConstraintLocator *reqLocator = nullptr;
   ConstraintLocator *witnessLocator = nullptr;
   Type witnessType, openWitnessType;
-  Type openedFullWitnessType;
-  Type reqType, openedFullReqType;
+  Type reqType;
 
   GenericSignature reqSig = proto->getGenericSignature();
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(req)) {
@@ -988,12 +987,11 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     reqLocator = cs->getConstraintLocator(
         static_cast<Expr *>(nullptr), LocatorPathElt::ProtocolRequirement(req));
     OpenedTypeMap reqReplacements;
-    std::tie(openedFullReqType, reqType)
+    std::tie(std::ignore, reqType)
       = cs->getTypeOfMemberReference(selfTy, req, dc,
                                      /*isDynamicResult=*/false,
                                      FunctionRefKind::DoubleApply,
                                      reqLocator,
-                                     /*base=*/nullptr,
                                      &reqReplacements);
     reqType = reqType->getRValueType();
 
@@ -1022,13 +1020,13 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     witnessLocator = cs->getConstraintLocator({},
                                               LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
-      std::tie(openedFullWitnessType, openWitnessType) 
+      std::tie(std::ignore, openWitnessType)
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
                                        /*isDynamicResult=*/false,
                                        FunctionRefKind::DoubleApply,
                                        witnessLocator);
     } else {
-      std::tie(openedFullWitnessType, openWitnessType) 
+      std::tie(std::ignore, openWitnessType)
         = cs->getTypeOfReference(witness,
                                  FunctionRefKind::DoubleApply,
                                  witnessLocator, /*useDC=*/nullptr);

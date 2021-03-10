@@ -164,7 +164,6 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     }
     SmallString<256> OutputDir(serializationOpts.SymbolGraphOutputDir);
     llvm::sys::fs::make_absolute(OutputDir);
-    llvm::sys::path::remove_filename(OutputDir);
     serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
   }
   

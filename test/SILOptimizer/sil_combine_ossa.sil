@@ -4195,6 +4195,19 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
   return %4 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil [ossa] @mark_dependence_string_literal
+// CHECK:       %1 = string_literal utf8 "a"
+// CHECK:       %2 = struct $UnsafePointer<Int8> (%1 : $Builtin.RawPointer)
+// CHECK:       return %2
+// CHECK: } // end sil function 'mark_dependence_string_literal'
+sil [ossa] @mark_dependence_string_literal : $@convention(thin) (@guaranteed Builtin.NativeObject) -> UnsafePointer<Int8> {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = string_literal utf8 "a"
+  %2 = struct $UnsafePointer<Int8> (%1 : $Builtin.RawPointer)
+  %3 = mark_dependence %2 : $UnsafePointer<Int8> on %0 : $Builtin.NativeObject
+  return %3 : $UnsafePointer<Int8>
+}
+
 // Test to see if we can constant fold a classify_bridge_object on a Swift class
 // to false.
 // CHECK-LABEL: sil [ossa] @test_classify_fold :

@@ -17,17 +17,31 @@ using namespace swift;
 using namespace swift::syntax;
 using namespace llvm;
 
+ParsedRawSyntaxNode ParsedRawSyntaxNode::getDeferredChild(
+    size_t ChildIndex, const SyntaxParsingContext *SyntaxContext) const {
+  assert(isDeferredLayout());
+  return SyntaxContext->getRecorder().getDeferredChild(*this, ChildIndex);
+}
+
+size_t ParsedRawSyntaxNode::getDeferredNumChildren(
+    const SyntaxParsingContext *SyntaxContext) const {
+  assert(isDeferredLayout());
+  return SyntaxContext->getRecorder().getDeferredNumChildren(*this);
+}
+
 void ParsedRawSyntaxNode::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
   llvm::errs() << '\n';
 }
 
-void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
+void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS,
+                               const SyntaxParsingContext *Context,
+                               unsigned Indent) const {
   for (decltype(Indent) i = 0; i < Indent; ++i)
     OS << ' ';
   OS << '(';
 
-  switch (DK) {
+  switch (getDataKind()) {
     case DataKind::Null:
       OS << "<NULL>";
       break;
@@ -43,9 +57,15 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     case DataKind::DeferredLayout:
       dumpSyntaxKind(OS, getKind());
       OS << " [deferred]";
-      for (const auto &child : getDeferredChildren()) {
-        OS << "\n";
-        child.dump(OS, Indent + 2);
+      if (Context) {
+        size_t numChildren = getDeferredNumChildren(Context);
+        for (size_t i = 0; i < numChildren; ++i) {
+          auto child = getDeferredChild(i, Context);
+          OS << "\n";
+          child.dump(OS, Context, Indent + 2);
+        }
+      } else {
+        OS << " (unknown children)";
       }
       break;
     case DataKind::DeferredToken:

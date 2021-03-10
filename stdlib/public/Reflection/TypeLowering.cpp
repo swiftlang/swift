@@ -393,7 +393,7 @@ public:
                    /*BitwiseTakable*/ true,
                    EnumKind::NoPayloadEnum, Cases) {
     assert(Cases.size() >= 2);
-//    assert(getNumPayloadCases() == 0);
+    assert(getNumPayloadCases() == 0);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -437,7 +437,7 @@ public:
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
                    BitwiseTakable, EnumKind::SinglePayloadEnum, Cases) {
     assert(Cases[0].TR != 0);
-//    assert(getNumPayloadCases() == 1);
+    assert(getNumPayloadCases() == 1);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -555,6 +555,7 @@ public:
     assert(Cases[1].TR != 0);
     assert(getNumPayloadCases() > 1);
     assert(getSize() > getPayloadSize());
+    assert(getCases().size() > 1);
   }
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
@@ -1766,14 +1767,14 @@ class EnumTypeInfoBuilder {
     if (TI == nullptr) {
       DEBUG_LOG(fprintf(stderr, "No TypeInfo for case type: "); TR->dump());
       Invalid = true;
-      return;
+      static TypeInfo emptyTI;
+      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, emptyTI});
+    } else {
+      Size = std::max(Size, TI->getSize());
+      Alignment = std::max(Alignment, TI->getAlignment());
+      BitwiseTakable &= TI->isBitwiseTakable();
+      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, *TI});
     }
-
-    Size = std::max(Size, TI->getSize());
-    Alignment = std::max(Alignment, TI->getAlignment());
-    BitwiseTakable &= TI->isBitwiseTakable();
-
-    Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, *TI});
   }
 
 public:
@@ -1800,6 +1801,7 @@ public:
       } else {
         PayloadCases.push_back(Case);
         auto *CaseTR = getCaseTypeRef(Case);
+        assert(CaseTR != nullptr);
         auto *CaseTI = TC.getTypeInfo(CaseTR, ExternalTypeInfo);
         addCase(Case.Name, CaseTR, CaseTI);
       }

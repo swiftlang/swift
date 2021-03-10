@@ -41,6 +41,12 @@ namespace syntax {
 class ParsedRawSyntaxRecorder final {
   std::shared_ptr<SyntaxParseActions> SPActions;
 
+  /// Assuming that \p node is a deferred layout or token node, record it and
+  /// return the recorded node.
+  /// This consumes the data from \c node, which is unusable after it has been
+  /// recorded. The returned node should be used afterwards instead.
+  ParsedRawSyntaxNode recordDeferredNode(ParsedRawSyntaxNode &node);
+
 public:
   explicit ParsedRawSyntaxRecorder(std::shared_ptr<SyntaxParseActions> spActions)
     : SPActions(std::move(spActions)) {}
@@ -69,6 +75,10 @@ public:
                                                      SourceLoc loc);
 
   /// Form a deferred syntax layout node.
+  /// All nodes in \p deferred nodes must be deferred. Otherwise, we'd have a
+  /// deferred layout node with recorded child nodes. Should we decide to
+  /// discard the deferred layout node, we would also need to discard its
+  /// recorded children, which cannot be done.
   ParsedRawSyntaxNode
   makeDeferred(syntax::SyntaxKind k,
                MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
@@ -85,9 +95,17 @@ public:
   ParsedRawSyntaxNode lookupNode(size_t lexerOffset, SourceLoc loc,
                                  syntax::SyntaxKind kind);
 
-  #ifndef NDEBUG
+  /// For a deferred layout node \p parent, retrieve the deferred child node
+  /// at \p ChildIndex.
+  ParsedRawSyntaxNode getDeferredChild(const ParsedRawSyntaxNode &parent,
+                                       size_t ChildIndex) const;
+
+  /// For a deferred layout node \p node, retrieve the number of children.
+  size_t getDeferredNumChildren(const ParsedRawSyntaxNode &node) const;
+
+#ifndef NDEBUG
   static void verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements);
-  #endif
+#endif
 };
 
 } // end namespace swift

@@ -3793,7 +3793,9 @@ bool ConstraintSystem::repairFailures(
       // Because result type of the optional evaluation is supposed to
       // represent the type of its sub-expression with added level of
       // optionality if needed.
-      if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable()) {
+      auto contextualTy = simplifyType(rhs)->getOptionalObjectType();
+      if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable() &&
+          !contextualTy->isTypeVariableOrMember()) {
         conversionsOrFixes.push_back(IgnoreContextualType::create(
             *this, lhs, rhs, getConstraintLocator(OEE->getSubExpr())));
         return true;
@@ -9282,9 +9284,9 @@ retry_after_fail:
         }
 
         // Determine the type that this choice will have.
-        Type choiceType =
-            getEffectiveOverloadType(choice, /*allowMembers=*/true,
-                                     constraint->getOverloadUseDC());
+        Type choiceType = getEffectiveOverloadType(
+            constraint->getLocator(), choice, /*allowMembers=*/true,
+            constraint->getOverloadUseDC());
         if (!choiceType) {
           hasUnhandledConstraints = true;
           return true;

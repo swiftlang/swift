@@ -22,7 +22,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/OwnedString.h"
-#include "RawSyntaxTokenCache.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -30,15 +29,12 @@ using namespace swift::syntax;
 SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
                                      SyntaxParsingCache *syntaxCache,
                                      RC<syntax::SyntaxArena> arena)
-    : SM(SM), BufferID(bufferID),
-      Arena(std::move(arena)),
-      SyntaxCache(syntaxCache),
-      TokenCache(new RawSyntaxTokenCache()) {
+    : SM(SM), BufferID(bufferID), Arena(std::move(arena)),
+      SyntaxCache(syntaxCache) {
   StringRef BufferContent = SM.getEntireTextForBuffer(BufferID);
-  char *Data = (char *)Arena->Allocate(BufferContent.size(), alignof(char *));
-  std::uninitialized_copy(BufferContent.begin(), BufferContent.end(), Data);
+  const char *Data = BufferContent.data();
+  Arena->copyStringToArenaIfNecessary(Data, BufferContent.size());
   ArenaSourceBuffer = StringRef(Data, BufferContent.size());
-  assert(ArenaSourceBuffer == BufferContent);
   Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
                                ArenaSourceBuffer.end());
 }
@@ -127,9 +123,9 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
   StringRef trailingTriviaText = ArenaSourceBuffer.substr(
       trailingTriviaStartOffset, trailingTrivia.size());
 
-  auto raw =
-      TokenCache->getToken(Arena, tokenKind, range.getByteLength(), tokenText,
-                           leadingTriviaText, trailingTriviaText);
+  auto raw = RawSyntax::make(tokenKind, tokenText, range.getByteLength(),
+                             leadingTriviaText, trailingTriviaText,
+                             SourcePresence::Present, Arena);
   return static_cast<OpaqueSyntaxNode>(raw);
 }
 
@@ -141,14 +137,17 @@ SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) {
+                                   ArrayRef<OpaqueSyntaxNode> elements) {
   SmallVector<const RawSyntax *, 16> parts;
   parts.reserve(elements.size());
+  size_t TextLength = 0;
   for (OpaqueSyntaxNode opaqueN : elements) {
-    parts.push_back(static_cast<const RawSyntax *>(opaqueN));
+    auto Raw = static_cast<const RawSyntax *>(opaqueN);
+    parts.push_back(Raw);
+    if (Raw) {
+      TextLength += Raw->getTextLength();
+    }
   }
-  size_t TextLength = range.isValid() ? range.getByteLength() : 0;
   auto raw =
       RawSyntax::make(kind, parts, TextLength, SourcePresence::Present, Arena);
   return static_cast<OpaqueSyntaxNode>(raw);
