@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskLocal.h"
@@ -293,7 +294,7 @@ static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *
 }
 
 /// All `swift_task_create*` variants funnel into this common implementation.
-static AsyncTaskAndContext swift_task_create_group_future_impl(
+static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     JobFlags flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
@@ -444,6 +445,11 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
   return {task, initialContext};
 }
 
+static AsyncTaskAndContext swift_task_create_group_future_common(
+    JobFlags flags, TaskGroup *group, const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function,
+    HeapObject * /* +1 */ closureContext, size_t initialContextSize);
+
 AsyncTaskAndContext
 swift::swift_task_create_f(JobFlags flags,
                 ThinNullaryAsyncSignature::FunctionType *function,
@@ -468,10 +474,10 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize) {
-  return swift_task_create_group_future_impl(flags, group,
-                                             futureResultType,
-                                             function, nullptr,
-                                             initialContextSize);
+  return swift_task_create_group_future_common(flags, group,
+                                               futureResultType,
+                                               function, nullptr,
+                                               initialContextSize);
 }
 
 /// Extract the entry point address and initial context size from an async closure value.
@@ -503,7 +509,7 @@ AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
 
-  return swift_task_create_group_future_impl(
+  return swift_task_create_group_future_common(
       flags, nullptr, futureResultType,
       taskEntry, closureContext,
       initialContextSize);
@@ -522,16 +528,16 @@ swift::swift_task_create_group_future(
       FutureAsyncSignature,
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
-  return swift_task_create_group_future_impl(
+  return swift_task_create_group_future_common(
       flags, group, futureResultType,
       taskEntry, closureContext,
       initialContextSize);
 }
 
 SWIFT_CC(swiftasync)
-void swift::swift_task_future_wait(OpaqueValue *result,
-                                   SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
-                                   AsyncTask *task, Metadata *T) {
+static void swift_task_future_waitImpl(OpaqueValue *result,
+                                       SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+                                       AsyncTask *task, Metadata *T) {
   // Suspend the waiting task.
   auto waitingTask = swift_task_getCurrent();
   waitingTask->ResumeTask = rawContext->ResumeParent;
@@ -564,9 +570,9 @@ void swift::swift_task_future_wait(OpaqueValue *result,
 }
 
 SWIFT_CC(swiftasync)
-void swift::swift_task_future_wait_throwing(OpaqueValue *result,
-    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext, AsyncTask *task,
-    Metadata *T) {
+void swift_task_future_wait_throwingImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+    AsyncTask *task, Metadata *T) {
   auto waitingTask = swift_task_getCurrent();
   // Suspend the waiting task.
   auto originalResumeParent =
@@ -747,9 +753,9 @@ static void resumeTaskAfterContinuation(AsyncTask *task,
 }
 
 SWIFT_CC(swift)
-void swift::swift_continuation_resume(/* +1 */ OpaqueValue *result,
-                                      void *continuation,
-                                      const Metadata *resumeType) {
+static void swift_continuation_resumeImpl(/* +1 */ OpaqueValue *result,
+                                          void *continuation,
+                                          const Metadata *resumeType) {
   auto task = reinterpret_cast<AsyncTask*>(continuation);
   auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
   resumeType->vw_initializeWithTake(context->NormalResult, result);
@@ -758,17 +764,17 @@ void swift::swift_continuation_resume(/* +1 */ OpaqueValue *result,
 }
 
 SWIFT_CC(swift)
-void swift::swift_continuation_throwingResume(/* +1 */ OpaqueValue *result,
-                                              void *continuation,
-                                              const Metadata *resumeType) {
+static void swift_continuation_throwingResumeImpl(/* +1 */ OpaqueValue *result,
+                                                  void *continuation,
+                                                  const Metadata *resumeType) {
   return swift_continuation_resume(result, continuation, resumeType);
 }
 
 
 SWIFT_CC(swift)
-void swift::swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
-                                                       void *continuation,
-                                                       const Metadata *resumeType) {
+void static swift_continuation_throwingResumeWithErrorImpl(/* +1 */ SwiftError *error,
+                                                           void *continuation,
+                                                           const Metadata *resumeType) {
   auto task = reinterpret_cast<AsyncTask*>(continuation);
   auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
   context->ErrorResult = error;
@@ -780,8 +786,9 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
   return task->isCancelled();
 }
 
-CancellationNotificationStatusRecord*
-swift::swift_task_addCancellationHandler(
+SWIFT_CC(swift)
+static CancellationNotificationStatusRecord*
+swift_task_addCancellationHandlerImpl(
     CancellationNotificationStatusRecord::FunctionType handler) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
@@ -793,7 +800,8 @@ swift::swift_task_addCancellationHandler(
   return record;
 }
 
-void swift::swift_task_removeCancellationHandler(
+SWIFT_CC(swift)
+static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
   swift_task_removeStatusRecord(record);
   swift_task_dealloc(record);
@@ -804,7 +812,8 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
 
-void swift::swift_task_asyncMainDrainQueue() {
+SWIFT_CC(swift)
+static void swift_task_asyncMainDrainQueueImpl() {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   bool Finished = false;
   donateThreadToGlobalExecutorUntil([](void *context) {
@@ -844,3 +853,6 @@ void swift::swift_task_asyncMainDrainQueue() {
 #endif
 #endif
 }
+
+#define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

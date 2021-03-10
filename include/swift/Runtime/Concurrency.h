@@ -479,14 +479,25 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_MainActor_register(HeapObject *actor);
 
 /// A hook to take over global enqueuing.
-/// TODO: figure out a better abstraction plan than this.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void (*swift_task_enqueueGlobal_hook)(Job *job);
+typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueGlobal_hook)(
+    Job *job, swift_task_enqueueGlobal_original original);
 
 /// A hook to take over global enqueuing with delay.
-/// TODO: figure out a better abstraction plan than this.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void (*swift_task_enqueueGlobalWithDelay_hook)(unsigned long long delay, Job *job);
+typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_original)(
+    unsigned long long delay, Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_hook)(
+    unsigned long long delay, Job *job,
+    swift_task_enqueueGlobalWithDelay_original original);
+
+/// A hook to take over main executor enqueueing.
+typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(
+    Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_hook)(
+    Job *job, swift_task_enqueueMainExecutor_original original);
 
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
