@@ -1,0 +1,233 @@
+% # FIXME(integers): add tests that perform the same checks in generic code.
+% #
+% # cd validation-test/stdlib/FixedPointConversion/
+% # ../../../utils/gyb --line-directive="" \
+% #   ./Inputs/FixedPointConversion.swift.gyb | ../../../utils/split_file.py
+%
+% from SwiftIntTypes import all_integer_types, int_max
+% from SwiftFloatingPointTypes import all_floating_point_types
+% from decimal import Decimal
+% from itertools import product
+%
+% # Generate a test-suite file for each integer type.
+% for (configuration, ptrsize) in product(['Debug', 'Release'], [32, 64]):
+%   long_test = ', long_test' if (configuration, ptrsize) == ('Release', 32) else ''
+%   optimizations = '-Onone' if configuration == 'Debug' else '-O'
+%
+%   for self_type in all_integer_types(ptrsize):
+%     SelfName = self_type.stdlib_name
+%     selfMin = self_type.min
+%     selfMax = self_type.max
+%
+%     test_suite = 'FixedPointConversion_' + configuration + str(ptrsize) + '_To' + SelfName
+%
+// BEGIN ${test_suite}.swift
+//===----------------------------------------------------------------------===//
+//
+// Automatically Generated From ./Inputs/FixedPointConversion.swift.gyb
+// Do Not Edit Directly!
+//
+//===----------------------------------------------------------------------===//
+//
+// REQUIRES: executable_test${long_test}
+// REQUIRES: PTRSIZE=${str(ptrsize)}
+// RUN: %target-run-simple-swift(${optimizations})
+// END.
+//
+//===----------------------------------------------------------------------===//
+
+import StdlibUnittest
+
+let ${test_suite} = TestSuite("${test_suite}")
+
+%     # Test conversion behaviors for all integer types.
+%     for other_type in all_integer_types(ptrsize):
+%       OtherName = other_type.stdlib_name
+%       otherMin = other_type.min
+%       otherMax = other_type.max
+%
+//===----------------------------------------------------------------------===//
+// MARK: ${OtherName}: (${str(otherMin)})...(${str(otherMax)})
+//===----------------------------------------------------------------------===//
+
+%       intValues = [
+%         selfMin,
+%         selfMax,
+%         selfMin - 1,
+%         selfMax + 1,
+%         otherMin,
+%         otherMax,
+%         0,
+%       ]
+%       for intValue in sorted(set(intValues)):
+%         if otherMin <= intValue <= otherMax:
+%
+%           intLiteral = str(intValue)
+%
+%           if selfMin <= intValue <= selfMax:
+%
+${test_suite}.test("From${OtherName}(${intLiteral})_NeverTraps") {
+  let input = get${OtherName}(${intLiteral})
+  let actual = ${SelfName}(input)
+  expectEqual(${intLiteral}, actual)
+}
+
+${test_suite}.test("From${OtherName}(${intLiteral})_NeverFails") {
+  let input = get${OtherName}(${intLiteral})
+  let actual = ${SelfName}(exactly: input)
+  expectEqual(${intLiteral}, actual)
+}
+
+%           else:
+%
+${test_suite}.test("From${OtherName}(${intLiteral})_AlwaysTraps") {
+  let input = get${OtherName}(${intLiteral})
+  expectCrash {
+    let actual = ${SelfName}(input)
+    _blackHole(actual)
+  }
+}
+
+${test_suite}.test("From${OtherName}(${intLiteral})_AlwaysFails") {
+  let input = get${OtherName}(${intLiteral})
+  let actual = ${SelfName}(exactly: input)
+  expectNil(actual)
+}
+
+%           end # if
+%         end # if
+%       end # for intValue in ...
+%     end # for other_type in ...
+%
+%     # Test conversion behaviors for all floating-point types.
+%     for float_type in all_floating_point_types():
+%       FloatName = "Float" + str(float_type.bits)
+%       floatMax = int_max(bits=float_type.explicit_significand_bits, signed=False)
+%       floatMin = -floatMax
+%
+//===----------------------------------------------------------------------===//
+// MARK: ${FloatName}: (${str(floatMin)})...(${str(floatMax)})
+//===----------------------------------------------------------------------===//
+
+%       if FloatName == 'Float16':
+%
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+
+%       elif FloatName == 'Float80':
+%
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+
+%       end # if
+%
+%       floatValues = [
+%         Decimal(selfMin),
+%         Decimal(selfMax),
+%         Decimal(selfMin - 1),
+%         Decimal(selfMax + 1),
+%         Decimal(floatMin),
+%         Decimal(floatMax),
+%         Decimal('-0.0'),
+%         Decimal('+0.0'),
+%         Decimal('-0.5'),
+%         Decimal('+0.5'),
+%         Decimal('-128.5'),
+%         Decimal('+127.5'),
+%         Decimal('+255.5'),
+%         Decimal('-32768.5'),
+%         Decimal('+32767.5'),
+%         Decimal('+65535.5'),
+%       ]
+%       for floatValue in sorted(floatValues):
+%         if floatMin <= floatValue <= floatMax:
+%
+%           intValue = int(floatValue)
+%           intLiteral = str(intValue)
+%           floatLiteral = str(floatValue)
+%
+%           if selfMin <= intValue <= selfMax:
+%
+${test_suite}.test("From${FloatName}(${floatLiteral})_NeverTraps") {
+  let input = get${FloatName}(${floatLiteral})
+  let actual = ${SelfName}(input)
+  expectEqual(${intLiteral}, actual)
+}
+
+%             if floatValue == intValue:
+%
+${test_suite}.test("From${FloatName}(${floatLiteral})_NeverFails") {
+  let input = get${FloatName}(${floatLiteral})
+  let actual = ${SelfName}(exactly: input)
+  expectEqual(${intLiteral}, actual)
+}
+
+%             else:
+%
+${test_suite}.test("From${FloatName}(${floatLiteral})_AlwaysFails") {
+  let input = get${FloatName}(${floatLiteral})
+  let actual = ${SelfName}(exactly: input)
+  expectNil(actual)
+}
+
+%             end # if
+%           else:
+%
+${test_suite}.test("From${FloatName}(${floatLiteral})_AlwaysTraps") {
+  let input = get${FloatName}(${floatLiteral})
+  expectCrash {
+    let actual = ${SelfName}(input)
+    _blackHole(actual)
+  }
+}
+
+${test_suite}.test("From${FloatName}(${floatLiteral})_AlwaysFails") {
+  let input = get${FloatName}(${floatLiteral})
+  let actual = ${SelfName}(exactly: input)
+  expectNil(actual)
+}
+
+%           end # if
+%         end # if
+%       end # for floatValue in ...
+%
+%       nonFinites = [
+%         '-.infinity',
+%         '+.infinity',
+%         '-.nan',
+%         '+.nan',
+%         '-.signalingNaN',
+%         '+.signalingNaN',
+%       ]
+%       for nonFinite in nonFinites:
+%
+${test_suite}.test("From${FloatName}(${nonFinite})_AlwaysTraps") {
+  let input = get${FloatName}(${nonFinite})
+  expectCrash {
+    let actual = ${SelfName}(input)
+    _blackHole(actual)
+  }
+}
+
+${test_suite}.test("From${FloatName}(${nonFinite})_AlwaysFails") {
+  let input = get${FloatName}(${nonFinite})
+  let actual = ${SelfName}(exactly: input)
+  expectNil(actual)
+}
+
+%       end # for nonFinite in ...
+%
+%       if FloatName == 'Float16':
+}
+#endif // Float16
+
+%       elif FloatName == 'Float80':
+%
+#endif // Float80
+
+%       end # if
+%     end # for float_type in ...
+%
+runAllTests()
+
+%   end # for self_type in ...
+% end # for (configuration, ptrsize) in ...
