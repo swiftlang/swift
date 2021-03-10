@@ -733,7 +733,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   }
 
   // Not all apply sites can be inlined, even if they're direct.
-  if (!SILInliner::canInlineApplySite(AI))
+  if (!SILInliner::canInlineApplySite(AI, Callee))
     return nullptr;
 
   // If our inline selection is only always inline, do a quick check if we have

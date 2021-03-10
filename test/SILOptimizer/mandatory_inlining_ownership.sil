@@ -578,6 +578,22 @@ bb3:
   return %9999 : $()
 }
 
+sil [transparent] @do_not_inline_me : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  // Unqualified load is OK *only* in non-ossa.
+  load %0 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// If @do_not_inline_me is inlined the verifier will assert so, we don't need a filecheck.
+sil [ossa] @do_not_inline_non_ossa_into_me : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = function_ref @do_not_inline_me : $@convention(thin) (@in Builtin.NativeObject) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@in Builtin.NativeObject) -> ()
+  return %2 : $()
+}
+
 
 sil_vtable C2 {
   #C2.i!modify: (C2) -> () -> () : @devirt_callee

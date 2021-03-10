@@ -925,7 +925,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SILFunction *F,
 
       SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
                          Subs, OpenedArchetypesTracker);
-      if (!Inliner.canInlineApplySite(InnerAI))
+      if (!Inliner.canInlineApplySite(InnerAI, CalleeFunction))
         continue;
 
       // Inline function at I, which also changes I to refer to the first

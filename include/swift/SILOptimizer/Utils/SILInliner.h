@@ -64,7 +64,7 @@ public:
   ///
   /// *NOTE* This must be checked before attempting to inline \arg AI. If one
   /// attempts to inline \arg AI and this returns false, an assert will fire.
-  static bool canInlineApplySite(FullApplySite apply);
+  static bool canInlineApplySite(FullApplySite apply, SILFunction *callee);
 
   /// Returns true if inlining \arg apply can result in improperly nested stack
   /// allocations.
