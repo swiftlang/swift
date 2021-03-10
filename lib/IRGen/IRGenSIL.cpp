@@ -794,7 +794,7 @@ public:
 #ifndef NDEBUG
   /// Check if \p Val can be stored into \p Alloca, and emit some diagnostic
   /// info if it can't.
-  bool canAllocaStoreValue(Address Alloca, llvm::Value *Val,
+  bool canAllocaStoreValue(llvm::Value *Alloca, llvm::Value *Val,
                            SILDebugVariable VarInfo,
                            const SILDebugScope *Scope) {
     bool canStore =
@@ -804,7 +804,7 @@ public:
       return true;
     llvm::errs() << "Invalid shadow copy:\n"
                  << "  Value : " << *Val << "\n"
-                 << "  Alloca: " << *Alloca.getAddress() << "\n"
+                 << "  Alloca: " << *Alloca << "\n"
                  << "---\n"
                  << "Previous shadow copy into " << VarInfo.Name
                  << " in the same scope!\n"
@@ -889,13 +889,21 @@ public:
     return Addr;
   }
 
+  // This returns shadow alloca when \p init is false or the shadowed value
+  // derived from that alloca with \p init is true.
   llvm::Value *emitTaskAllocShadowCopy(llvm::Value *Storage,
-                                       const SILDebugScope *Scope) {
+                                       const SILDebugScope *Scope,
+                                       bool Init) {
     auto getRec = [&](llvm::Instruction *Orig) {
+      llvm::Value *Inner =
+        emitTaskAllocShadowCopy(Orig->getOperand(0), Scope, Init);
+      if (!Init)
+        return Inner;
+
       llvm::Instruction *Cloned = Orig->clone();
-      Cloned->setOperand(0, emitTaskAllocShadowCopy(Orig->getOperand(0), Scope));
+      Cloned->setOperand(0, Inner);
       Cloned->insertBefore(Orig);
-      return Cloned;
+      return static_cast<llvm::Value *>(Cloned);
     };
     if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
       return getRec(LdInst);
@@ -909,11 +917,13 @@ public:
       auto &Alloca = TaskAllocStackSlots[CallInst];
       if (!Alloca.isValid())
         Alloca = createAlloca(Storage->getType(), Align, "taskalloc.debug");
-      zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
-      ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
-      auto *Store =
+      if (Init) {
+        zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
+        ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
+        auto *Store =
           Builder.CreateStore(Storage, Alloca.getAddress(), Align);
-      Store->moveAfter(CallInst);
+        Store->moveAfter(CallInst);
+      }
       return Alloca.getAddress();
     }
     return Storage;
@@ -922,21 +932,37 @@ public:
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo,
-                              llvm::Optional<Alignment> _Align) {
+                              llvm::Optional<Alignment> _Align, bool Init) {
     if (CurSILFn->isAsync())
       if (isTaskAlloc(Storage))
-        return emitTaskAllocShadowCopy(Storage, Scope);
+        return emitTaskAllocShadowCopy(Storage, Scope, Init);
+
     auto Align = _Align.getValueOr(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
     if (!Alloca.isValid())
       Alloca = createAlloca(Storage->getType(), Align, VarInfo.Name + ".debug");
-    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
-    assert(canAllocaStoreValue(Alloca, Storage, VarInfo, Scope) &&
+    assert(canAllocaStoreValue(Alloca.getAddress(), Storage, VarInfo, Scope) &&
            "bad scope?");
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
-    Builder.CreateStore(Storage, Alloca.getAddress(), Align);
+    if (Init) {
+      zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
+      ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
+      Builder.CreateStore(Storage, Alloca.getAddress(), Align);
+    }
     return Alloca.getAddress();
+  }
+
+  bool shouldShadowVariable(SILDebugVariable varInfo, bool isAnonymous) {
+    return !IGM.IRGen.Opts.DisableDebuggerShadowCopies
+      && !IGM.IRGen.Opts.shouldOptimize()
+      && !isAnonymous
+      && !CurSILFn->isAsync();
+  }
+
+  bool shouldShadowStorage(llvm::Value *Storage) {
+    return !isa<llvm::AllocaInst>(Storage)
+      && !isa<llvm::UndefValue>(Storage)
+      && needsShadowCopy(Storage);
   }
 
   /// At -Onone, emit a shadow copy of an Address in an alloca, so the
@@ -961,14 +987,14 @@ public:
         if (emitLifetimeExtendingUse(Value))
           if (ValueVariables.insert(Value).second)
             ValueDomPoints.push_back({Value, getActiveDominancePoint()});
-    if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
-        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous || CurSILFn->isAsync() ||
-        isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
-        !needsShadowCopy(Storage))
+    // This condition must be consistent with emitPoisonDebugValueInst to avoid
+    // generating extra shadow copies for debug_value [poison].
+    if (!shouldShadowVariable(VarInfo, IsAnonymous)
+        || !shouldShadowStorage(Storage)) {
       return Storage;
-
+    }
     // Emit a shadow copy.
-    return emitShadowCopy(Storage, Scope, VarInfo, Align);
+    return emitShadowCopy(Storage, Scope, VarInfo, Align, true);
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an \c Address instead of an
@@ -988,9 +1014,7 @@ public:
     Explosion e = getLoweredExplosion(SILVal);
 
     // Only do this at -O0.
-    if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
-        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
-        (CurSILFn->isAsync())) {
+    if (!shouldShadowVariable(VarInfo, IsAnonymous)) {
       auto vals = e.claimAll();
       copy.append(vals.begin(), vals.end());
 
@@ -1006,21 +1030,29 @@ public:
     }
 
     // Single or empty values.
-    if (e.size() <= 1) {
-      auto vals = e.claimAll();
-      for (auto val : vals)
-        copy.push_back(
-            emitShadowCopyIfNeeded(val, Scope, VarInfo, IsAnonymous));
+    if (e.empty())
+      return;
+    
+    if (e.size() == 1) {
+      copy.push_back(
+        emitShadowCopyIfNeeded(e.claimNext(), Scope, VarInfo, IsAnonymous));
       return;
     }
 
-    SILType Type = SILVal->getType();
-    auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
-    auto Alloca = LTI.allocateStack(*this, Type, VarInfo.Name + ".debug");
-    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress().getAddress()));
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
-    LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
-    copy.push_back(Alloca.getAddressPointer());
+    unsigned ArgNo = VarInfo.ArgNo;
+    auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
+    if (Alloca.isValid()) {
+      (void)e.claimAll();
+    } else {
+      SILType Type = SILVal->getType();
+      auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
+      Alloca =
+        LTI.allocateStack(*this, Type, VarInfo.Name + ".debug").getAddress();
+      zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
+      ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
+      LTI.initialize(*this, e, Alloca, false /* isOutlined */);
+    }
+    copy.push_back(Alloca.getAddress());
   }
 
   /// Force all archetypes referenced by the type to be bound by this point.
@@ -1081,6 +1113,7 @@ public:
   void emitErrorResultVar(CanSILFunctionType FnTy,
                           SILResultInfo ErrorInfo,
                           DebugValueInst *DbgValue);
+  void emitPoisonDebugValueInst(DebugValueInst *i);
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
@@ -4524,7 +4557,112 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
                                          IndirectValue, ArtificialValue);
 }
 
+void IRGenSILFunction::emitPoisonDebugValueInst(DebugValueInst *i) {
+  auto varInfo = i->getVarInfo();
+  assert(varInfo && "debug_value without debug info");
+
+  bool isAnonymous = false;
+  varInfo->Name = getVarName(i, isAnonymous);
+
+  SILValue silVal = i->getOperand();
+  SILType silTy = silVal->getType();
+  SILType unwrappedTy = silTy.unwrapOptionalType();
+  CanType refTy = unwrappedTy.getASTType();
+  // TODO: Handling nontrivial aggregates requires implementing poisonRefs
+  // within TypeInfo. However, this could inflate code size for large types.
+  assert(refTy->isAnyClassReferenceType() && "type can't handle poison");
+
+  Explosion e = getLoweredExplosion(silVal);
+  llvm::Value *storage = e.claimNext();
+  auto storageTy = storage->getType();
+  // Safeguard: don't try to poison an non-word sized value. Not sure how this
+  // could ever happen.
+  if (!storageTy->isPointerTy() && storageTy != IGM.SizeTy)
+    return;
+
+  // Only the first word of the value is poisoned.
+  //
+  // TODO: This assumes that only class references are poisoned (as guaranteed
+  // by MandatoryCopyPropagation). And it assumes the reference is the first
+  // value (class existential witnesses are laid out after the class reference).
+  bool singleValueExplosion = e.empty();
+  (void)e.claimAll();
+
+  // Only poison shadow references if this storage is purely used as a shadow
+  // copy--poison should never affect program behavior. Also filter everything
+  // not handled by emitShadowCopyIfNeeded to avoid extra shadow copies.
+  if (!shouldShadowVariable(*varInfo, isAnonymous)
+      || !shouldShadowStorage(storage)) {
+    return;
+  }
+
+  // The original decl scope.
+  const SILDebugScope *scope = i->getDebugScope();
+
+  // Shadow allocas are pointer aligned.
+  auto ptrAlign = IGM.getPointerAlignment();
+
+  // Emit or recover the unique shadow copy.
+  //
+  // FIXME: To limit perturbing original source, this follows the strange
+  // emitShadowCopyIfNeeded logic that has separate paths for single-value
+  // vs. multi-value explosions.
+  llvm::Value *shadowAddress;
+  if (singleValueExplosion) {
+    shadowAddress = emitShadowCopy(storage, scope, *varInfo, ptrAlign, false);
+  } else {
+    assert(refTy->isClassExistentialType() && "unknown multi-value explosion");
+    // FIXME: Handling Optional existentials requires TypeInfo
+    // support. Otherwise we would need to assume the layout of the reference
+    // and bitcast everything below to scalar integers.
+    if (silTy != unwrappedTy)
+      return;
+
+    unsigned argNo = varInfo->ArgNo;
+    auto &alloca = ShadowStackSlots[{argNo, {scope, varInfo->Name}}];
+    if (!alloca.isValid()) {
+      auto &lti = cast<LoadableTypeInfo>(IGM.getTypeInfo(silTy));
+      alloca =
+        lti.allocateStack(*this, silTy, varInfo->Name + ".debug").getAddress();
+    }
+    shadowAddress =
+      emitClassExistentialValueAddress(*this, alloca, silTy).getAddress();
+  }
+  Size::int_type poisonInt = IGM.TargetInfo.ReferencePoisonDebugValue;
+  assert((poisonInt & IGM.TargetInfo.PointerSpareBits.asAPInt()) == 0);
+  llvm::Value *poisonedVal = llvm::ConstantInt::get(IGM.SizeTy, poisonInt);
+
+  // If the current value is nil (Optional's extra inhabitant), then don't
+  // overwrite it with poison. This way, lldb will correctly display
+  // Optional.None rather than telling the user that an object was
+  // deinitialized, when there was no object to begin with. This could also be
+  // done with a spare-bits mask to handle arbitrary enums but extra inhabitants
+  // are tricky.
+  if (!storageTy->isPointerTy()) {
+    assert(storageTy == IGM.SizeTy && "can't handle non-word values");
+    llvm::Value *currentBits =
+      Builder.CreateBitOrPointerCast(storage, IGM.SizeTy);
+    llvm::Value *zeroWord = llvm::ConstantInt::get(IGM.SizeTy, 0);
+    llvm::Value *isNil = Builder.CreateICmpEQ(currentBits, zeroWord);
+    poisonedVal = Builder.CreateSelect(isNil, currentBits, poisonedVal);
+  }
+  llvm::Value *newShadowVal =
+    Builder.CreateBitOrPointerCast(poisonedVal, storageTy);
+
+  assert(canAllocaStoreValue(shadowAddress, newShadowVal, *varInfo, scope) &&
+         "shadow copy can't handle poison");
+    
+  // The poison stores have an artificial location within the original variable
+  // declaration's scope.
+  ArtificialLocation autoRestore(scope, IGM.DebugInfo.get(), Builder);
+  Builder.CreateStore(newShadowVal, shadowAddress, ptrAlign);
+}
+
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
+  if (i->poisonRefs()) {
+    emitPoisonDebugValueInst(i);
+    return;
+  }
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
   
@@ -4943,7 +5081,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))
       if (!Alloca->isStaticAlloca()) {
         // Store the address of the dynamic alloca on the stack.
-        addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment());
+        addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
+                              /*init*/ true);
         Indirection = IndirectValue;
       }
 

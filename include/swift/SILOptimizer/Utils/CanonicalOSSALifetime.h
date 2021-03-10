@@ -263,11 +263,11 @@ private:
 
   /// remnantLiveOutBlocks are part of the original extended lifetime that are
   /// not in canonical pruned liveness. There is a path from a PrunedLiveness
-  /// boundary to an original destroy that passes through this block.
+  /// boundary to an original destroy that passes through a remnant block.
   ///
   /// These blocks would be equivalent to PrunedLiveness::LiveOut if
   /// PrunedLiveness were recomputed using all original destroys as interesting
-  /// uses, minus blocks already marked PrunedLiveness::LiveOut. (These blocks
+  /// uses, minus blocks already marked PrunedLiveness::LiveOut. (Remnant blocks
   /// may be in PrunedLiveness::LiveWithin).
   SmallSetVector<SILBasicBlock *, 8> remnantLiveOutBlocks;
 

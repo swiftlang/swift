@@ -17,7 +17,8 @@ func testDoStmt() throws -> Void {
   do {
     let obj = Obj()
     _blackHole(obj)
-    // CHECK-CP:  destroy_value [poison] %{{.*}} : $Obj{{.*}} line:[[@LINE+1]]:13:auto_gen
+    // The poison debug_value takes the location of the original decl.
+    // CHECK-CP:  debug_value [poison] %{{.*}} : $Obj{{.*}} line:[[@LINE-3]]:9:in_prologue
     try foo(100)
     // CHECK-SIL: bb{{.*}}(%{{[0-9]+}} : $()):
     // CHECK-NCP-NEXT: strong_release {{.*}}: $Obj{{.*}} line:[[@LINE+1]]:3:cleanup

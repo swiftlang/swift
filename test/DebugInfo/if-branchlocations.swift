@@ -27,7 +27,8 @@ class AppDelegate {
         // Verify that the branch's location is >= the cleanup's location.
         // (The implicit false block of the conditional
         //  below inherits the location from the condition.)
-        // CHECK-CP: destroy_value [poison] {{.*}}$NSPathControlItem{{.*}}line:[[@LINE+2]]
+        // CHECK-CP: strong_release{{.*}}$NSPathControlItem{{.*}}line:[[@LINE+3]]
+        // CHECK-CP: debug_value [poison] {{.*}}$NSPathControlItem, let, name "item"{{.*}}line:[[@LINE-7]]:14:in_prologue
         // CHECK: br{{.*}}line:[[@LINE+1]]
         if let url = item.URL
         {
