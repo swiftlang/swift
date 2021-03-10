@@ -144,6 +144,26 @@ static bool shouldDisallowNewDriver(StringRef ExecName,
   return false;
 }
 
+static bool appendSwiftDriverName(SmallString<256> &buffer) {
+  assert(llvm::sys::fs::exists(buffer));
+  if (auto driverNameOp = llvm::sys::Process::GetEnv("SWIFT_USE_NEW_DRIVER")) {
+    llvm::sys::path::append(buffer, *driverNameOp);
+    return true;
+  }
+#ifdef __APPLE__
+  // FIXME: use swift-driver as the default driver for all platforms.
+  llvm::sys::path::append(buffer, "swift-driver");
+  if (llvm::sys::fs::exists(buffer)) {
+    return true;
+  }
+  llvm::sys::path::remove_filename(buffer);
+  llvm::sys::path::append(buffer, "swift-driver-new");
+  return true;
+#else
+  return false;
+#endif
+}
+
 static int run_driver(StringRef ExecName,
                        const ArrayRef<const char *> argv) {
   // Handle integrated tools.
@@ -178,16 +198,12 @@ static int run_driver(StringRef ExecName,
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  std::string newDriverName = "swift-driver-new";
-  if (auto driverNameOp = llvm::sys::Process::GetEnv("SWIFT_USE_NEW_DRIVER")) {
-    newDriverName = driverNameOp.getValue();
-  }
   // Forwarding calls to the swift driver if the C++ driver is invoked as `swift`
   // or `swiftc`, and an environment variable SWIFT_USE_NEW_DRIVER is defined.
   if (!shouldDisallowNewDriver(ExecName, argv)) {
     SmallString<256> NewDriverPath(llvm::sys::path::parent_path(Path));
-    llvm::sys::path::append(NewDriverPath, newDriverName);
-    if (llvm::sys::fs::exists(NewDriverPath)) {
+    if (appendSwiftDriverName(NewDriverPath) &&
+        llvm::sys::fs::exists(NewDriverPath)) {
       SmallVector<const char *, 256> subCommandArgs;
       // Rewrite the program argument.
       subCommandArgs.push_back(NewDriverPath.c_str());
