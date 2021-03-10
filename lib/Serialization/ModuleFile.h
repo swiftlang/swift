@@ -486,10 +486,14 @@ public:
   /// This does not include diagnostics about \e this file failing to load,
   /// but rather other things that might be imported as part of bringing the
   /// file into the AST.
+  /// \param recoverFromIncompatibility Whether to associate the file
+  /// regardless of the compatibility with the AST module. Still returns the
+  /// underlying error for diagnostic purposes but does not set the error bit.
   ///
   /// \returns any error that occurred during association, such as being
   /// compiled for a different OS.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                  bool recoverFromIncompatibility);
 
   /// Returns `true` if there is a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to indicate

@@ -132,7 +132,7 @@ namespace swift {
     bool SerializeAllSIL = false;
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;
-    bool ExperimentalCrossModuleIncrementalInfo = false;
+    bool DisableCrossModuleIncrementalInfo = false;
   };
 
 } // end namespace swift

@@ -23,7 +23,7 @@
 
 namespace swift {
 
-class NominalTypeDecl;
+class DeclContext;
 
 namespace evaluator {
 
@@ -50,31 +50,31 @@ struct DependencyCollector {
       Dynamic,
     } kind;
 
-    NominalTypeDecl *subject;
+    DeclContext *subject;
     DeclBaseName name;
 
   private:
-    Reference(Kind kind, NominalTypeDecl *subject, DeclBaseName name)
+    Reference(Kind kind, DeclContext *subject, DeclBaseName name)
         : kind(kind), subject(subject), name(name) {}
 
   public:
     static Reference empty() {
-      return {Kind::Empty, llvm::DenseMapInfo<NominalTypeDecl *>::getEmptyKey(),
+      return {Kind::Empty, llvm::DenseMapInfo<DeclContext *>::getEmptyKey(),
               llvm::DenseMapInfo<DeclBaseName>::getEmptyKey()};
     }
 
     static Reference tombstone() {
       return {Kind::Tombstone,
-              llvm::DenseMapInfo<NominalTypeDecl *>::getTombstoneKey(),
+              llvm::DenseMapInfo<DeclContext *>::getTombstoneKey(),
               llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey()};
     }
 
   public:
-    static Reference usedMember(NominalTypeDecl *subject, DeclBaseName name) {
+    static Reference usedMember(DeclContext *subject, DeclBaseName name) {
       return {Kind::UsedMember, subject, name};
     }
 
-    static Reference potentialMember(NominalTypeDecl *subject) {
+    static Reference potentialMember(DeclContext *subject) {
       return {Kind::PotentialMember, subject, DeclBaseName()};
     }
 
@@ -119,7 +119,7 @@ public:
   /// up front. A used member dependency causes the file to be rebuilt if the
   /// definition of that member changes in any way - via
   /// deletion, addition, or mutation of a member with that same name.
-  void addUsedMember(NominalTypeDecl *subject, DeclBaseName name);
+  void addUsedMember(DeclContext *subject, DeclBaseName name);
   /// Registers a reference from the current dependency scope to a
   /// "potential member" of the given \p subject type.
   ///
@@ -133,7 +133,7 @@ public:
   ///
   /// These dependencies are most appropriate for protocol conformances,
   /// superclass constraints, and other requirements involving entire types.
-  void addPotentialMember(NominalTypeDecl *subject);
+  void addPotentialMember(DeclContext *subject);
   /// Registers a reference from the current dependency scope to a given
   /// top-level \p name.
   ///

@@ -1663,6 +1663,7 @@ class CustomAttr final : public DeclAttribute,
 
   unsigned hasArgLabelLocs : 1;
   unsigned numArgLabels : 16;
+  mutable unsigned isArgUnsafeBit : 1;
 
   CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
              PatternBindingInitializer *initContext, Expr *arg,
@@ -1689,11 +1690,17 @@ public:
   unsigned getNumArguments() const { return numArgLabels; }
   bool hasArgumentLabelLocs() const { return hasArgLabelLocs; }
 
+  TypeExpr *getTypeExpr() const { return typeExpr; }
   TypeRepr *getTypeRepr() const;
   Type getType() const;
 
   Expr *getArg() const { return arg; }
   void setArg(Expr *newArg) { arg = newArg; }
+
+  /// Determine whether the argument is '(unsafe)', a special subexpression
+  /// used by global actors.
+  bool isArgUnsafe() const;
+  void setArgIsUnsafe(bool unsafe) { isArgUnsafeBit = unsafe; }
 
   Expr *getSemanticInit() const { return semanticInit; }
   void setSemanticInit(Expr *expr) { semanticInit = expr; }

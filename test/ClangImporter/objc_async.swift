@@ -77,7 +77,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 func globalAsync() async { }
 
 actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
-  func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
+  func syncMethod() { } // expected-note {{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   func independentMethod() {
     syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from an '@actorIndependent' context}}
@@ -88,8 +88,41 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   }
 
   func mainActorMethod() {
-    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from context of global actor 'MainActor'}}
+    syncMethod()
   }
 
   func uiActorMethod() { }
+}
+
+// ConcurrentValue conformance inference for imported types.
+func acceptCV<T: ConcurrentValue>(_: T) { }
+func testCV(r: NSRange) {
+  acceptCV(r)
+}
+
+// Global actor (unsafe) isolation.
+
+actor SomeActor { }
+
+@globalActor
+struct SomeGlobalActor {
+  static let shared = SomeActor()
+}
+
+class MyButton : NXButton {
+  @MainActor func testMain() {
+    onButtonPress() // okay
+  }
+
+  @SomeGlobalActor func testOther() {
+    onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
+  }
+
+  func test() {
+    onButtonPress() // okay
+  }
+}
+
+func testButtons(mb: MyButton) {
+  mb.onButtonPress()
 }

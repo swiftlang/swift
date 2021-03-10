@@ -5,7 +5,6 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
-
 struct OtherStruct {
   mutating
   func mutableTakingClosure(_ c: () -> Void) { }

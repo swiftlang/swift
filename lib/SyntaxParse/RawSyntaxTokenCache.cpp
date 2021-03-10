@@ -39,10 +39,11 @@ static bool shouldCacheNode(tok TokKind, size_t TextSize,
   return true;
 }
 
-RC<RawSyntax> RawSyntaxTokenCache::getToken(RC<SyntaxArena> &Arena, tok TokKind,
-                                            size_t TextLength, StringRef Text,
-                                            StringRef LeadingTrivia,
-                                            StringRef TrailingTrivia) {
+const RawSyntax *RawSyntaxTokenCache::getToken(RC<SyntaxArena> &Arena,
+                                               tok TokKind, size_t TextLength,
+                                               StringRef Text,
+                                               StringRef LeadingTrivia,
+                                               StringRef TrailingTrivia) {
   // Determine whether this token is worth to cache.
   if (!shouldCacheNode(TokKind, Text.size(), LeadingTrivia, TrailingTrivia)) {
     // Do not use cache.

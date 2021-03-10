@@ -1948,7 +1948,7 @@ static void installGetClassHook() {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunguarded-availability"
-  if (objc_setHook_getClass) {
+  if (&objc_setHook_getClass) {
     objc_setHook_getClass(getObjCClassByMangledName, &OldGetClassHook);
   }
 #pragma clang diagnostic pop

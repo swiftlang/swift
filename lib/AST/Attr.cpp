@@ -1020,6 +1020,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       type.print(Printer, Options);
     else
       attr->getTypeRepr()->print(Printer, Options);
+    if (attr->isArgUnsafe())
+      Printer << "(unsafe)";
     Printer.printNamePost(PrintNameContext::Attribute);
     break;
   }
@@ -1933,6 +1935,7 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
   assert(type);
   hasArgLabelLocs = !argLabelLocs.empty();
   numArgLabels = argLabels.size();
+  isArgUnsafeBit = false;
   initializeCallArguments(argLabels, argLabelLocs);
 }
 
@@ -1973,6 +1976,26 @@ void CustomAttr::resetTypeInformation(TypeExpr *info) { typeExpr = info; }
 void CustomAttr::setType(Type ty) {
   assert(ty);
   typeExpr->setType(MetatypeType::get(ty));
+}
+
+bool CustomAttr::isArgUnsafe() const {
+  if (isArgUnsafeBit)
+    return true;
+
+  auto arg = getArg();
+  if (!arg)
+    return false;
+
+  if (auto parenExpr = dyn_cast<ParenExpr>(arg)) {
+    if (auto declRef =
+            dyn_cast<UnresolvedDeclRefExpr>(parenExpr->getSubExpr())) {
+      if (declRef->getName().isSimpleName("unsafe")) {
+        isArgUnsafeBit = true;
+      }
+    }
+  }
+
+  return isArgUnsafeBit;
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

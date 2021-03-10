@@ -42,8 +42,8 @@ extension ${Self}: Differentiable {
   public typealias TangentVector = ${Self}
 
   ${Availability(bits)}
-  public mutating func move(along direction: TangentVector) {
-    self += direction
+  public mutating func move(by offset: TangentVector) {
+    self += offset
   }
 }
 

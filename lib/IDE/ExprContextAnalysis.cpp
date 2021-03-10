@@ -315,10 +315,6 @@ void swift::ide::collectPossibleReturnTypesFromContext(
   }
 
   if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
-    // Try type checking the closure signature if it hasn't.
-    if (!ACE->getType())
-      swift::typeCheckASTNodeAtLoc(ACE->getParent(), ACE->getLoc());
-
     // Use the type checked type if it has.
     if (ACE->getType() && !ACE->getType()->hasError() &&
         !ACE->getResultType()->hasUnresolvedType()) {
@@ -1098,6 +1094,15 @@ class ExprContextAnalyzer {
       if (!AFD)
         return;
       auto param = AFD->getParameters()->get(initDC->getIndex());
+      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      break;
+    }
+    case InitializerKind::PropertyWrapper: {
+      auto initDC = cast<PropertyWrapperInitializer>(DC);
+      auto AFD = dyn_cast<AbstractFunctionDecl>(initDC->getParent());
+      if (!AFD)
+        return;
+      auto *param = initDC->getParam();
       recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
       break;
     }

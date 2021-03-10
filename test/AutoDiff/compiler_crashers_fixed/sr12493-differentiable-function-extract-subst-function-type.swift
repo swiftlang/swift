@@ -17,6 +17,6 @@ func exampleVJP_1(_ x0: Float) -> (Float, (Float) -> (Float)) {
 
 func bar() {
   let f = differentiableFunction(from: exampleVJP_1)
-  let pb = pullback(at: 10, in: f)
+  let pb = pullback(at: 10, of: f)
   _ = pb(1)
 }

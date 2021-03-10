@@ -2532,7 +2532,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
-                                       S.addTypeRef(theAttr->getType()));
+                                       S.addTypeRef(theAttr->getType()),
+                                       theAttr->isArgUnsafe());
       return;
     }
 
@@ -3000,6 +3001,9 @@ public:
   }
 
   void visit(const Decl *D) {
+    if (D->isInvalid())
+      writeDeclErrorFlag();
+
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(D, Attr);
@@ -3012,6 +3016,12 @@ public:
     }
 
     DeclVisitor<DeclSerializer>::visit(const_cast<Decl *>(D));
+  }
+
+  void writeDeclErrorFlag() {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorFlagLayout::Code];
+    ErrorFlagLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
   }
 
   void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
@@ -4127,8 +4137,8 @@ public:
     llvm_unreachable("should not serialize an UnresolvedType");
   }
 
-  void visitHoleType(const HoleType *) {
-    llvm_unreachable("should not serialize a HoleType");
+  void visitPlaceholderType(const PlaceholderType *) {
+    llvm_unreachable("should not serialize a PlaceholderType");
   }
 
   void visitModuleType(const ModuleType *) {
@@ -4674,6 +4684,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+
+  registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
@@ -5481,7 +5493,7 @@ void Serializer::writeToStream(
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
-    if (options.ExperimentalCrossModuleIncrementalInfo && DepGraph) {
+    if (!options.DisableCrossModuleIncrementalInfo && DepGraph) {
       fine_grained_dependencies::writeFineGrainedDependencyGraph(
           S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
     }

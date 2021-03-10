@@ -308,7 +308,7 @@ getTypeRefImpl(IRGenModule &IGM,
   }
 
   IRGenMangler Mangler;
-  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, type);
+  auto SymbolicName = Mangler.mangleTypeForReflection(IGM, sig, type);
   return {IGM.getAddrOfStringForTypeRef(SymbolicName, role),
           SymbolicName.runtimeSizeInBytes()};
 }
@@ -628,25 +628,21 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   ArrayRef<std::pair<StringRef, CanType>> AssociatedTypes;
 
   void layout() override {
-    // If the conforming type is generic, we just want to emit the
-    // unbound generic type here.
-    auto *Nominal = Conformance->getType()->getAnyNominal();
-    assert(Nominal && "Structural conformance?");
+    PrettyStackTraceConformance DebugStack("emitting associated type metadata",
+                                           Conformance);
 
-    PrettyStackTraceDecl DebugStack("emitting associated type metadata",
-                                    Nominal);
-
-    addNominalRef(Nominal);
+    auto *DC = Conformance->getDeclContext();
+    addNominalRef(DC->getSelfNominalTypeDecl());
     addNominalRef(Conformance->getProtocol());
 
     B.addInt32(AssociatedTypes.size());
     B.addInt32(AssociatedTypeRecordSize);
 
+    auto genericSig = DC->getGenericSignatureOfContext().getCanonicalSignature();
     for (auto AssocTy : AssociatedTypes) {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
-      addTypeRef(AssocTy.second,
-                 Nominal->getGenericSignature().getCanonicalSignature());
+      addTypeRef(AssocTy.second, genericSig);
     }
   }
 

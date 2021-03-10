@@ -349,8 +349,9 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
                                  /*locked*/ false);
       if (task->Status.compare_exchange_weak(oldStatus, newStatus,
              /*success*/ std::memory_order_release,
-             /*failure*/ std::memory_order_relaxed))
+             /*failure*/ std::memory_order_relaxed)) {
         return !oldStatus.isCancelled();
+      }
 
       // Otherwise, restart.
       continue;
@@ -393,6 +394,24 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 }
 
 /**************************************************************************/
+/************************** CHILD TASK MANAGEMENT *************************/
+/**************************************************************************/
+
+// ==== Child tasks ------------------------------------------------------------
+
+ChildTaskStatusRecord*
+swift::swift_task_attachChild(AsyncTask *parent, AsyncTask *child) {
+  void *allocation = malloc(sizeof(swift::ChildTaskStatusRecord));
+  auto record = new (allocation) swift::ChildTaskStatusRecord(child);
+  swift_task_addStatusRecord(parent, record);
+  return record;
+}
+
+void
+swift::swift_task_detachChild(AsyncTask *parent, ChildTaskStatusRecord *record) {
+  swift_task_removeStatusRecord(parent, record);
+}
+
 /****************************** CANCELLATION ******************************/
 /**************************************************************************/
 
@@ -406,6 +425,13 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // Child tasks need to be recursively cancelled.
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_cancel(child);
+    return;
+  }
+
+  case TaskStatusRecordKind::TaskGroup: {
+    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_cancel(child);
     return;
@@ -433,6 +459,41 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // FIXME: allow dynamic extension/correction?
 }
 
+/// Perform any cancellation actions required by the given record.
+static void performGroupCancellationAction(TaskStatusRecord *record) {
+  switch (record->getKind()) {
+  // We only need to cancel specific GroupChildTasks, not arbitrary child tasks.
+  // A task may be parent to many tasks which are not part of a group after all.
+  case TaskStatusRecordKind::ChildTask:
+    return;
+
+  case TaskStatusRecordKind::TaskGroup: {
+    auto groupChildRecord = cast<TaskGroupTaskStatusRecord>(record);
+    // Since a task can only be running a single task group at the same time,
+    // we can always assume that the group record which we found is the one
+    // we're intended to cancel child tasks for.
+    //
+    // A group enforces that tasks can not "escape" it, and as such once the group
+    // returns, all its task have been completed.
+    for (AsyncTask *child: groupChildRecord->children()) {
+      swift_task_cancel(child);
+    }
+    return;
+  }
+
+  // All other kinds of records we handle the same way as in a normal cancellation
+  case TaskStatusRecordKind::Deadline:
+  case TaskStatusRecordKind::CancellationNotification:
+  case TaskStatusRecordKind::EscalationNotification:
+  case TaskStatusRecordKind::Private_RecordLock:
+    performCancellationAction(record);
+    return;
+}
+
+  // Other cases can fall through here and be ignored.
+  // FIXME: allow dynamic extension/correction?
+}
+
 void swift::swift_task_cancel(AsyncTask *task) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
@@ -443,8 +504,9 @@ void swift::swift_task_cancel(AsyncTask *task) {
 
   // If we were already cancelled or were able to cancel without acquiring
   // the lock, there's nothing else to do.
-  if (oldStatus.isCancelled())
+  if (oldStatus.isCancelled()) {
     return;
+  }
 
   // Otherwise, we've installed the lock record and are now the
   // locking thread.
@@ -459,6 +521,30 @@ void swift::swift_task_cancel(AsyncTask *task) {
   // the task is now cancelled.
   ActiveTaskStatus cancelledStatus(oldStatus.getInnermostRecord(),
                                    /*cancelled*/ true,
+                                   /*locked*/ false);
+  releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
+}
+
+void swift::swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *group) {
+  Optional<StatusRecordLockRecord> recordLockRecord;
+
+  // Acquire the status record lock.
+  //
+  // We purposefully DO NOT make this a cancellation by itself.
+  // We are cancelling the task group, and all tasks it contains.
+  // We are NOT cancelling the entire parent task though.
+  auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
+                                           /*forCancellation*/ false);
+  // Carry out the cancellation operations associated with all
+  // the active records.
+  for (auto cur: oldStatus.records()) {
+    performGroupCancellationAction(cur);
+  }
+
+  // Release the status record lock, being sure to flag that
+  // the task is now cancelled.
+  ActiveTaskStatus cancelledStatus(oldStatus.getInnermostRecord(),
+                                   /*cancelled*/ oldStatus.isCancelled(),
                                    /*locked*/ false);
   releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
 }
@@ -478,6 +564,12 @@ static void performEscalationAction(TaskStatusRecord *record,
   // Child tasks need to be recursively escalated.
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
+    for (AsyncTask *child: childRecord->children())
+      swift_task_escalate(child, newPriority);
+    return;
+  }
+  case TaskStatusRecordKind::TaskGroup: {
+    auto childRecord = cast<TaskGroupTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
       swift_task_escalate(child, newPriority);
     return;

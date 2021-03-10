@@ -40,6 +40,7 @@ from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support.toolchain import host_toolchain
 
 isDarwin = platform.system() == "Darwin"
+isSwiftContainedInLLVMProject = os.path.exists(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
 
 
 class Builder(object):
@@ -227,7 +228,10 @@ class Builder(object):
             "-DLLVM_ENABLE_PROJECTS=clang;swift",
             "-DLLVM_EXTERNAL_PROJECTS=swift",
         ]
-        cmake_args += ["-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE"]
+        cmake_args += [
+            "-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE",
+            "-DSWIFT_BUILD_SYNTAXPARSERTEST=TRUE",
+        ]
         cmake_args += ["-DSWIFT_BUILD_PERF_TESTSUITE=NO", "-DSWIFT_INCLUDE_DOCS=NO"]
         cmake_args += [
             "-DSWIFT_BUILD_REMOTE_MIRROR=FALSE",
@@ -253,7 +257,10 @@ class Builder(object):
             "-DCLANG_INCLUDE_TESTS=FALSE",
             "-DSWIFT_INCLUDE_TESTS=FALSE",
         ]
-        cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "llvm")]
+        llvm_src_path = os.path.join(SWIFT_SOURCE_ROOT, "llvm") \
+            if isSwiftContainedInLLVMProject \
+            else os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "llvm")
+        cmake_args += [llvm_src_path]
         self.call(cmake_args, env=environment)
 
     def build_target(self, build_dir, target, env=None):
@@ -473,16 +480,17 @@ Example invocations:
     if not args.install_destdir and not args.no_install:
         args.install_destdir = os.path.join(args.build_dir, "install")
 
-    swift_src_path = os.path.join(SWIFT_SOURCE_ROOT, "swift")
-    swift_src_in_llvm_project_path = \
-        os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "swift")
-    # Need to symlink 'swift' into 'llvm-project' since we will be doing
-    # a unified configure with 'swift' as an external project.
-    if not os.path.exists(swift_src_in_llvm_project_path):
-        print("Symlinking '%s' to '%s'" %
-              (swift_src_path, swift_src_in_llvm_project_path), file=sys.stderr)
-        shell.symlink(swift_src_path, swift_src_in_llvm_project_path,
-                      dry_run=args.dry_run, echo=args.verbose)
+    if not isSwiftContainedInLLVMProject:
+        swift_src_path = os.path.join(SWIFT_SOURCE_ROOT, "swift")
+        swift_src_in_llvm_project_path = \
+            os.path.join(SWIFT_SOURCE_ROOT, "llvm-project", "swift")
+        # Need to symlink 'swift' into 'llvm-project' since we will be doing
+        # a unified configure with 'swift' as an external project.
+        if not os.path.exists(swift_src_in_llvm_project_path):
+            print("Symlinking '%s' to '%s'" %
+                  (swift_src_path, swift_src_in_llvm_project_path), file=sys.stderr)
+            shell.symlink(swift_src_path, swift_src_in_llvm_project_path,
+                          dry_run=args.dry_run, echo=args.verbose)
 
     architectures = args.architectures.split(" ")
     architectures = [arch for arch in architectures if arch != ""]

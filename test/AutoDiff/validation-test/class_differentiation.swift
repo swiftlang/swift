@@ -49,13 +49,13 @@ ClassTests.test("TrivialMember") {
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C($0) })(.init(float: 10)))
-  expectEqual(10, pullback(at: 3, in: { C(convenience: $0) })(.init(float: 10)))
+  expectEqual(10, pullback(at: 3, of: { C($0) })(.init(float: 10)))
+  expectEqual(10, pullback(at: 3, of: { C(convenience: $0) })(.init(float: 10)))
   // Test class method differentiation.
-  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
-  expectEqual(.init(float: 0), gradient(at: C(10), in: { c in c.testNoDerivative() }))
+  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, of: { c, x in c.method(x) }))
+  expectEqual(.init(float: 0), gradient(at: C(10), of: { c in c.testNoDerivative() }))
   expectEqual((.init(float: 20), .init(float: 10)),
-              gradient(at: C(10), C(20), in: { c1, c2 in C.controlFlow(c1, c2, true) }))
+              gradient(at: C(10), C(20), of: { c1, c2 in C.controlFlow(c1, c2, true) }))
 }
 
 ClassTests.test("NontrivialMember") {
@@ -85,11 +85,11 @@ ClassTests.test("NontrivialMember") {
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C($0) })(.init(float: 10)))
+  expectEqual(10, pullback(at: 3, of: { C($0) })(.init(float: 10)))
   // Test class method differentiation.
-  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, in: { c, x in c.method(x) }))
+  expectEqual((.init(float: 3), 10), gradient(at: C(10), 3, of: { c, x in c.method(x) }))
   expectEqual((.init(float: 20), .init(float: 10)),
-              gradient(at: C(10), C(20), in: { c1, c2 in C.controlFlow(c1, c2, true) }))
+              gradient(at: C(10), C(20), of: { c1, c2 in C.controlFlow(c1, c2, true) }))
 }
 
 ClassTests.test("GenericNontrivialMember") {
@@ -108,8 +108,8 @@ ClassTests.test("GenericNontrivialMember") {
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C<Float>($0) })(.init(x: 10)))
-  expectEqual(10, pullback(at: 3, in: { C<Float>(convenience: $0) })(.init(x: 10)))
+  expectEqual(10, pullback(at: 3, of: { C<Float>($0) })(.init(x: 10)))
+  expectEqual(10, pullback(at: 3, of: { C<Float>(convenience: $0) })(.init(x: 10)))
 }
 
 // TF-1149: Test class with loadable type but address-only `TangentVector` type.
@@ -129,10 +129,10 @@ ClassTests.test("AddressOnlyTangentVector") {
     }
   }
   // Test class initializer differentiation.
-  expectEqual(10, pullback(at: 3, in: { C<Float>($0) })(.init(stored: 10)))
+  expectEqual(10, pullback(at: 3, of: { C<Float>($0) })(.init(stored: 10)))
   // Test class method differentiation.
   expectEqual((.init(stored: Float(1)), 0),
-              gradient(at: C<Float>(3), 3, in: { c, x in c.method(x) }))
+              gradient(at: C<Float>(3), 3, of: { c, x in c.method(x) }))
 }
 
 // TF-1175: Test whether class-typed arguments are not marked active.
@@ -159,8 +159,8 @@ ClassTests.test("ClassArgumentActivity") {
     return c.x
   }
   // FIXME(TF-1175): Find a robust solution so that derivatives are correct.
-  // expectEqual((100, 20), valueWithGradient(at: 10, in: squared))
-  expectEqual((100, 1), valueWithGradient(at: 10, in: squared))
+  // expectEqual((100, 20), valueWithGradient(at: 10, of: squared))
+  expectEqual((100, 1), valueWithGradient(at: 10, of: squared))
 }
 
 ClassTests.test("FinalClassMethods") {
@@ -414,7 +414,7 @@ ClassTests.test("ClassMethods - generic") {
   func classValueWithGradient<T: Differentiable & FloatingPoint>(
     _ c: Super<T>
   ) -> (T, T) where T == T.TangentVector {
-    let (x,y) =  valueWithGradient(at: Tracked<T>(1), in: {
+    let (x,y) =  valueWithGradient(at: Tracked<T>(1), of: {
         c.f($0) })
     return (x.value, y.value)
   }
@@ -474,7 +474,7 @@ ClassTests.test("ClassMethods - closure captures") {
     m.coefficient += 1
     return result
   }
-  expectEqual(10, gradient(at: 1, in: f1))
+  expectEqual(10, gradient(at: 1, of: f1))
 
   func f2(_ x: Tracked<Float>) -> Tracked<Float> {
     let m = Multiplier(10)
@@ -482,7 +482,7 @@ ClassTests.test("ClassMethods - closure captures") {
     m.coefficient += 1
     return result
   }
-  expectEqual(11, gradient(at: 1, in: f2))
+  expectEqual(11, gradient(at: 1, of: f2))
 
   func f3(_ x: Tracked<Float>) -> Tracked<Float> {
     let m = Multiplier(10)
@@ -490,7 +490,7 @@ ClassTests.test("ClassMethods - closure captures") {
     m.coefficient += 1
     return result
   }
-  expectEqual(10, gradient(at: 1, in: f3))
+  expectEqual(10, gradient(at: 1, of: f3))
 }
 
 ClassTests.test("ClassProperties") {
@@ -535,7 +535,7 @@ ClassTests.test("LetProperties") {
   let bar = Bar()
   let grad = gradient(at: bar) { bar in (bar.x.x * bar.x.x).value }
   expectEqual(Bar.TangentVector(x: .init(x: 6.0)), grad)
-  bar.move(along: grad)
+  bar.move(by: grad)
   expectEqual(8.0, bar.x.x)
 }
 

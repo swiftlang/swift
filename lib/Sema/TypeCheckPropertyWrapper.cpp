@@ -25,17 +25,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 using namespace swift;
 
-/// The kind of property initializer to look for
-enum class PropertyWrapperInitKind {
-  /// An initial-value initializer (i.e. `init(initialValue:)`), which is
-  /// deprecated.
-  InitialValue,
-  /// An wrapped-value initializer (i.e. `init(wrappedValue:)`)
-  WrappedValue,
-  /// An default-value initializer (i.e. `init()` or `init(defaultArgs...)`)
-  Default
-};
-
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
                                           NominalTypeDecl *parent) {
   return decl->getFormalAccess() <
@@ -93,6 +82,22 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     return nullptr;
   }
 
+  // The property must not be isolated to an actor instance.
+  switch (auto isolation = getActorIsolation(var)) {
+  case ActorIsolation::ActorInstance:
+    var->diagnose(
+        diag::actor_instance_property_wrapper, var->getName(),
+        nominal->getName());
+    return nullptr;
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+  case ActorIsolation::Independent:
+  case ActorIsolation::IndependentUnsafe:
+  case ActorIsolation::Unspecified:
+    break;
+  }
+
   return var;
 }
 
@@ -119,6 +124,9 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
   case PropertyWrapperInitKind::WrappedValue:
     argumentLabel = ctx.Id_wrappedValue;
+    break;
+  case PropertyWrapperInitKind::ProjectedValue:
+    argumentLabel = ctx.Id_projectedValue;
     break;
   case PropertyWrapperInitKind::Default:
     break;
@@ -176,7 +184,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     }
 
     // Additional checks for initial-value and wrapped-value initializers
-    if (initKind != PropertyWrapperInitKind::Default) {
+    if (initKind == PropertyWrapperInitKind::WrappedValue ||
+        initKind == PropertyWrapperInitKind::InitialValue) {
       auto paramType = argumentParam->getInterfaceType();
       if (paramType->is<ErrorType>())
         continue;
@@ -346,6 +355,12 @@ PropertyWrapperTypeInfoRequest::evaluate(
   result.projectedValueVar =
     findValueProperty(ctx, nominal, ctx.Id_projectedValue,
                       /*allowMissing=*/true);
+  if (result.projectedValueVar &&
+      findSuitableWrapperInit(ctx, nominal, result.projectedValueVar,
+                              PropertyWrapperInitKind::ProjectedValue, decls)) {
+    result.hasProjectedValueInit = true;
+  }
+
   result.enclosingInstanceWrappedSubscript =
     findEnclosingSelfSubscript(ctx, nominal, ctx.Id_wrapped);
   result.enclosingInstanceProjectedSubscript =
@@ -421,14 +436,14 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
 
     // Check that the variable is part of a single-variable pattern.
     auto binding = var->getParentPatternBinding();
-    if (!binding || binding->getSingleVar() != var) {
+    if (binding && binding->getSingleVar() != var) {
       ctx.Diags.diagnose(attr->getLocation(),
                          diag::property_wrapper_not_single_var);
       continue;
     }
 
     // A property wrapper cannot be attached to a 'let'.
-    if (var->isLet()) {
+    if (!isa<ParamDecl>(var) && var->isLet()) {
       ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_let);
       continue;
     }
@@ -456,6 +471,10 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
+    if (isa<ParamDecl>(var) && isa<AbstractFunctionDecl>(dc)) {
+      dc = dc->getAsDecl()->getDeclContext();
+    }
+
     // A property with a wrapper cannot be declared in a protocol, enum, or
     // an extension.
     if (isa<ProtocolDecl>(dc) ||
@@ -469,7 +488,7 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       else
         whichKind = 2;
       var->diagnose(diag::property_with_wrapper_in_bad_context,
-                    var->getName(), whichKind)
+                    var->getName(), whichKind, var->getDescriptiveKind())
         .highlight(attr->getRange());
 
       continue;
@@ -523,6 +542,9 @@ Type AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
 Type
 PropertyWrapperBackingPropertyTypeRequest::evaluate(
     Evaluator &evaluator, VarDecl *var) const {
+  if (var->hasImplicitPropertyWrapper())
+    return var->getInterfaceType();
+
   Type rawType =
       evaluateOrDefault(evaluator,
                         AttachedPropertyWrapperTypeRequest{var, 0}, Type());
@@ -530,14 +552,15 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!rawType || rawType->hasError())
     return Type();
 
-  auto binding = var->getParentPatternBinding();
-  if (!binding)
+  // The constraint system will infer closure parameter types
+  if (isa<ParamDecl>(var) && var->getInterfaceType()->hasError())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
-  unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  if (binding->isInitialized(index)) {
+  auto binding = var->getParentPatternBinding();
+  unsigned index = binding ? binding->getPatternEntryIndexForVarDecl(var) : 0;
+  if (binding && binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
@@ -561,18 +584,22 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   return type;
 }
 
-Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
+Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                                     Optional<unsigned> limit) {
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  unsigned realLimit = wrapperAttrs.size();
+  unsigned realLimit = var->hasImplicitPropertyWrapper() ? 1 : wrapperAttrs.size();
   if (limit)
     realLimit = std::min(*limit, realLimit);
                                     
   // Follow the chain of wrapped value properties.
   Type wrappedValueType = backingStorageType;
   DeclContext *dc = var->getDeclContext();
-  for (unsigned i : range(realLimit)) {
-    auto wrappedInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+  while (realLimit--) {
+    auto *nominal = wrappedValueType->getDesugaredType()->getAnyNominal();
+    if (!nominal)
+      return Type();
+
+    auto wrappedInfo = nominal->getPropertyWrapperTypeInfo();
     if (!wrappedInfo)
       return wrappedValueType;
 
@@ -587,14 +614,40 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
   return wrappedValueType;
 }
 
-Expr *swift::buildPropertyWrapperWrappedValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+Type swift::computeProjectedValueType(const VarDecl *var, Type backingStorageType) {
+  if (!var->hasAttachedPropertyWrapper())
+    return Type();
+
+  if (var->hasImplicitPropertyWrapper())
+    return backingStorageType;
+
+  DeclContext *dc = var->getDeclContext();
+  auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
+  return backingStorageType->getTypeOfMember(dc->getParentModule(),
+                                             wrapperInfo.projectedValueVar);
+}
+
+Expr *swift::buildPropertyWrapperInitCall(
+    const VarDecl *var, Type backingStorageType, Expr *value,
+    PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> innermostInitCallback) {
   // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
   ApplyExpr *innermostInit = nullptr;
+
+  // Projected-value initializers don't compose, so no need to iterate
+  // over the wrapper attributes.
+  if (initKind == PropertyWrapperInitKind::ProjectedValue) {
+    auto typeExpr = TypeExpr::createImplicit(backingStorageType, ctx);
+    auto argName = ctx.Id_projectedValue;
+    auto *init =
+        CallExpr::createImplicit(ctx, typeExpr, { initializer }, { argName });
+
+    innermostInitCallback(init);
+    return init;
+  }
 
   for (unsigned i : llvm::reverse(indices(wrapperAttrs))) {
     Type wrapperType =
@@ -616,8 +669,9 @@ Expr *swift::buildPropertyWrapperWrappedValueCall(
     // If there were no arguments provided for the attribute at this level,
     // call `init(wrappedValue:)` directly.
     auto attr = wrapperAttrs[i];
-    if (!attr->getArg() || ignoreAttributeArgs) {
+    if (!attr->getArg()) {
       Identifier argName;
+      assert(initKind == PropertyWrapperInitKind::WrappedValue);
       switch (var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
       case PropertyWrapperTypeInfo::HasInitialValueInit:
         argName = ctx.Id_initialValue;

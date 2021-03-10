@@ -385,10 +385,15 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
-  Opts.EnableExperimentalConcurrentValueChecking |=
-    Args.hasArg(OPT_enable_experimental_concurrent_value_checking);
+  Opts.EnableInferPublicConcurrentValue |=
+    Args.hasFlag(OPT_enable_infer_public_concurrent_value,
+                 OPT_disable_infer_public_concurrent_value,
+                 false);
   Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
     Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
+
+  Opts.EnableExperimentalEnumCodableDerivation |=
+      Args.hasArg(OPT_enable_experimental_enum_codable_derivation);
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
@@ -543,6 +548,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
     }
   }
+
+  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
 
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
@@ -714,9 +721,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
           "Should have found one of enable/disable ast verifier?!");
     }
   }
-
-  Opts.EnableExperimentalHasAsyncAlternative |=
-      Args.hasArg(OPT_experimental_has_async_alternative_attribute);
 
   return HadError || UnsupportedOS || UnsupportedArch;
 }
@@ -1187,7 +1191,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
+  Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
+  Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
+  Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);

@@ -238,17 +238,26 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
+    /// Provide additional warnings about code that is unsafe in the
+    /// eventual Swift concurrency model, and will eventually become errors
+    /// in a future Swift language version, but are too noisy for existing
+    /// language modes.
+    bool WarnConcurrency = false;
+
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental ConcurrentValue checking.
-    bool EnableExperimentalConcurrentValueChecking = false;
-
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
+
+    /// Enable inference of ConcurrentValue conformances for public types.
+    bool EnableInferPublicConcurrentValue = false;
+
+    /// Enable experimental derivation of `Codable` for enums.
+    bool EnableExperimentalEnumCodableDerivation = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
@@ -386,9 +395,6 @@ namespace swift {
     };
     ASTVerifierOverrideKind ASTVerifierOverride =
         ASTVerifierOverrideKind::NoOverride;
-
-    /// Allow @hasAsyncAlternative attribute
-    bool EnableExperimentalHasAsyncAlternative = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

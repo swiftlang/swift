@@ -2694,12 +2694,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    if (!DiscardAttribute) {
-      if (Context.LangOpts.EnableExperimentalHasAsyncAlternative)
-        Attributes.add(attr);
-      else
-        diagnose(Loc, diag::requires_has_async_alternative, AttrName);
-    }
+    if (!DiscardAttribute)
+      Attributes.add(attr);
     break;
   }
   }
@@ -6075,9 +6071,14 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                                  existingAccessor);
     }
 
-    // There's no body in the limited syntax.
-    if (parsingLimitedSyntax)
+    // There should be no body in the limited syntax; diagnose unexpected
+    // accessor implementations.
+    if (parsingLimitedSyntax) {
+      if (Tok.is(tok::l_brace))
+        diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
+                 getAccessorNameForDiagnostic(Kind, /*article*/ false));
       continue;
+    }
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {

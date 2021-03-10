@@ -46,6 +46,9 @@ enum {
   /// The number of words (in addition to the heap-object header)
   /// in a default actor.
   NumWords_DefaultActor = 10,
+
+  /// The number of words in a task group.
+  NumWords_TaskGroup = 32,
 };
 
 struct InProcess;
@@ -120,6 +123,9 @@ const size_t MaximumAlignment = 16;
 
 /// The alignment of a DefaultActor.
 const size_t Alignment_DefaultActor = MaximumAlignment;
+
+/// The alignment of a TaskGroup.
+const size_t Alignment_TaskGroup = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -1167,9 +1173,6 @@ namespace SpecialPointerAuthDiscriminators {
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
 
-  /// Actor enqueue(partialTask:).
-  const uint16_t ActorEnqueuePartialTask = 0x8f3d;
-
   /// Jobs, tasks, and continuations.
   const uint16_t JobInvokeFunction = 0xcc64; // = 52324
   const uint16_t TaskResumeFunction = 0x2c42; // = 11330
@@ -1936,9 +1939,9 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask    = 24,
-    Task_IsFuture       = 25,
-    Task_IsTaskGroup    = 26
+    Task_IsChildTask      = 24,
+    Task_IsFuture         = 25,
+    Task_IsGroupChildTask = 26,
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
@@ -1965,9 +1968,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsFuture,
                                 task_isFuture,
                                 task_setIsFuture)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskGroup,
-                                task_isTaskGroup,
-                                task_setIsTaskGroup)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsGroupChildTask,
+                                task_isGroupChildTask,
+                                task_setIsGroupChildTask)
 };
 
 /// Kinds of task status record.
@@ -1979,14 +1982,18 @@ enum class TaskStatusRecordKind : uint8_t {
   /// active child tasks.
   ChildTask = 1,
 
+  /// A TaskGroupTaskStatusRecord, which represents a task group
+  /// and child tasks spawned within it.
+  TaskGroup = 2,
+
   /// A CancellationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task is cancelled.
-  CancellationNotification = 2,
+  CancellationNotification = 3,
 
   /// An EscalationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task's priority is
   /// escalated.
-  EscalationNotification = 3,
+  EscalationNotification = 4,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,

@@ -96,7 +96,7 @@ public:
                    bool wantRValue = true) const {
     auto &cs = getConstraintSystem();
 
-    if (rawType->hasTypeVariable() || rawType->hasHole()) {
+    if (rawType->hasTypeVariable() || rawType->hasPlaceholder()) {
       rawType = rawType.transform([&](Type type) {
         if (auto *typeVar = type->getAs<TypeVariableType>()) {
           auto resolvedType = S.simplifyType(typeVar);
@@ -106,8 +106,9 @@ public:
                      : resolvedType;
         }
 
-        return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType)
-                              : type;
+        return type->isPlaceholder()
+                   ? Type(cs.getASTContext().TheUnresolvedType)
+                   : type;
       });
     }
 
@@ -1063,6 +1064,28 @@ public:
                                       Type wrapper, ConstraintLocator *locator)
       : PropertyWrapperReferenceFailure(solution, property, usingStorageWrapper,
                                         base, wrapper, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class MissingProjectedValueFailure final : public FailureDiagnostic {
+  Type wrapperType;
+
+public:
+  MissingProjectedValueFailure(const Solution &solution, Type wrapper,
+                               ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
+
+  bool diagnoseAsError() override;
+};
+
+class MissingPropertyWrapperAttributeFailure final : public FailureDiagnostic {
+  Type wrapperType;
+
+public:
+  MissingPropertyWrapperAttributeFailure(const Solution &solution, Type wrapper,
+                                         ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
 
   bool diagnoseAsError() override;
 };
@@ -2467,6 +2490,28 @@ public:
                                        Type toType, CheckedCastKind kind,
                                        ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when static member reference has invalid result
+/// type which disqualifies it from being used on a protocol metatype base.
+///
+/// \code
+/// protocol Foo {
+///   static var bar: Int
+/// }
+///
+/// _ = Foo.bar
+/// \endcode
+///
+/// `bar` can't be referenced from `P.Protocol` base because its result type
+/// `Int` doesn't conform to `Foo`.
+class InvalidMemberRefOnProtocolMetatype final : public FailureDiagnostic {
+public:
+  InvalidMemberRefOnProtocolMetatype(const Solution &solution,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
 };

@@ -2,7 +2,7 @@
 ////
 //// This source file is part of the Swift.org open source project
 ////
-//// Copyright (c) 2020 Apple Inc. and the Swift project authors
+//// Copyright (c) 2020-2021 Apple Inc. and the Swift project authors
 //// Licensed under Apache License v2.0 with Runtime Library Exception
 ////
 //// See https://swift.org/LICENSE.txt for license information
@@ -70,10 +70,13 @@ extension Task {
   /// - Returns: the value bound to the key, or its default value it if was not
   ///            bound in the current (or any parent) tasks.
   public static func local<Key>(_ keyPath: KeyPath<TaskLocalValues, Key>)
-    async -> Key.Value where Key: TaskLocalKey {
-    let task = Builtin.getCurrentAsyncTask()
+    -> Key.Value where Key: TaskLocalKey {
+    guard let unsafeTask = Task.unsafeCurrent else {
+      return Key.defaultValue
+    }
 
-    let value = _taskLocalValueGet(task, keyType: Key.self, inheritance: Key.inherit.rawValue)
+    let value = _taskLocalValueGet(
+      unsafeTask._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
     guard let rawValue = value else {
       return Key.defaultValue
     }
@@ -97,37 +100,14 @@ extension Task {
     boundTo value: Key.Value,
     operation: () async throws -> BodyResult
   ) async rethrows -> BodyResult where Key: TaskLocalKey {
-    let task = Builtin.getCurrentAsyncTask()
+    let _task = Task.unsafeCurrent!._task // !-safe, guaranteed to have task available inside async function
 
-    _taskLocalValuePush(task, keyType: Key.self, value: value)
-    defer { _taskLocalValuePop(task) }
+    _taskLocalValuePush(_task, keyType: Key.self, value: value)
+    defer { _taskLocalValuePop(_task) }
 
     return try await operation()
   }
 
-}
-
-// ==== ------------------------------------------------------------------------
-
-/// A type-erased `TaskLocalKey` used when iterating through the `Baggage` using its `forEach` method.
-struct AnyTaskLocalKey {
-  let keyType: Any.Type
-  let valueType: Any.Type
-
-  init<Key>(_: Key.Type) where Key: TaskLocalKey {
-    self.keyType = Key.self
-    self.valueType = Key.Value.self
-  }
-}
-
-extension AnyTaskLocalKey: Hashable {
-  static func ==(lhs: AnyTaskLocalKey, rhs: AnyTaskLocalKey) -> Bool {
-    return ObjectIdentifier(lhs.keyType) == ObjectIdentifier(rhs.keyType)
-  }
-
-  func hash(into hasher: inout Hasher) {
-    hasher.combine(ObjectIdentifier(self.keyType))
-  }
 }
 
 // ==== ------------------------------------------------------------------------

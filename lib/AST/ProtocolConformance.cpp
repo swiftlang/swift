@@ -572,8 +572,7 @@ void NormalProtocolConformance::setSignatureConformances(
              "Should have interface types here");
       assert(idx < conformances.size());
       assert(conformances[idx].isInvalid() ||
-             conformances[idx].getRequirement() ==
-               req.getSecondType()->castTo<ProtocolType>()->getDecl());
+             conformances[idx].getRequirement() == req.getProtocolDecl());
       ++idx;
     }
   }
@@ -772,7 +771,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
     if (reqt.getKind() == RequirementKind::Conformance) {
       // Is this the conformance we're looking for?
       if (reqt.getFirstType()->isEqual(assocType) &&
-          reqt.getSecondType()->castTo<ProtocolType>()->getDecl() == protocol)
+          reqt.getProtocolDecl() == protocol)
         return getSignatureConformances()[conformanceIndex];
 
       ++conformanceIndex;
@@ -840,7 +839,7 @@ void NormalProtocolConformance::finishSignatureConformances() {
       auto *depMemTy = origTy->castTo<DependentMemberType>();
       substTy = recursivelySubstituteBaseType(module, this, depMemTy);
     }
-    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto reqProto = req.getProtocolDecl();
 
     // Looking up a conformance for a contextual type and mapping the
     // conformance context produces a more accurate result than looking
@@ -1322,58 +1321,135 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 SmallVector<ProtocolDecl *, 2>
 IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   SmallVector<ProtocolDecl *, 2> result;
-
-  // Dig out the nominal type.
-  const auto dc = getAsGenericContext();
-  const auto nominal = dc->getSelfNominalTypeDecl();
-  if (!nominal) {
-    return result;
-  }
-
-  // Update to record all potential conformances.
-  nominal->prepareConformanceTable();
-  nominal->ConformanceTable->lookupConformances(
-    nominal,
-    const_cast<GenericContext *>(dc),
-    lookupKind,
-    &result,
-    nullptr,
-    nullptr);
-
+  for (auto conformance : getLocalConformances(lookupKind))
+    result.push_back(conformance->getProtocol());
   return result;
 }
 
-SmallVector<ProtocolConformance *, 2>
-IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
-    const {
-  SmallVector<ProtocolConformance *, 2> result;
+/// Find a synthesized ConcurrentValue conformance in this declaration context,
+/// if there is one.
+static ProtocolConformance *findSynthesizedConcurrentValueConformance(
+    const DeclContext *dc) {
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return nullptr;
 
+  if (isa<ProtocolDecl>(nominal))
+    return nullptr;
+
+  if (dc->getParentModule() != nominal->getParentModule())
+    return nullptr;
+
+  auto cvProto = nominal->getASTContext().getProtocol(
+      KnownProtocolKind::ConcurrentValue);
+  if (!cvProto)
+    return nullptr;
+
+  auto conformance = dc->getParentModule()->lookupConformance(
+      nominal->getDeclaredInterfaceType(), cvProto);
+  if (!conformance || !conformance.isConcrete())
+    return nullptr;
+
+  auto concrete = conformance.getConcrete();
+  if (concrete->getDeclContext() != dc)
+    return nullptr;
+
+  auto normal = concrete->getRootNormalConformance();
+  if (!normal || normal->getSourceKind() != ConformanceEntryKind::Synthesized)
+    return nullptr;
+
+  return normal;
+}
+
+std::vector<ProtocolConformance *>
+LookupAllConformancesInContextRequest::evaluate(
+    Evaluator &eval, const IterableDeclContext *IDC) const {
   // Dig out the nominal type.
-  const auto dc = getAsGenericContext();
+  const auto dc = IDC->getAsGenericContext();
   const auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
-    return result;
+    return { };
   }
 
   // Protocols only have self-conformances.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     if (protocol->requiresSelfConformanceWitnessTable()) {
-      return SmallVector<ProtocolConformance *, 2>{
-        protocol->getASTContext().getSelfConformance(protocol)
-      };
+      return { protocol->getASTContext().getSelfConformance(protocol) };
     }
-    return SmallVector<ProtocolConformance *, 2>();
+
+    return { };
   }
 
-  // Update to record all potential conformances.
+  // Record all potential conformances.
   nominal->prepareConformanceTable();
+  std::vector<ProtocolConformance *> conformances;
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<GenericContext *>(dc),
-    lookupKind,
-    nullptr,
-    &result,
+    &conformances,
     nullptr);
+
+  return conformances;
+}
+
+SmallVector<ProtocolConformance *, 2>
+IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
+    const {
+  // Look up the cached set of all of the conformances.
+  std::vector<ProtocolConformance *> conformances =
+      evaluateOrDefault(
+        getASTContext().evaluator, LookupAllConformancesInContextRequest{this},
+        { });
+
+  // Copy all of the conformances we want.
+  SmallVector<ProtocolConformance *, 2> result;
+  std::copy_if(
+      conformances.begin(), conformances.end(), std::back_inserter(result),
+      [&](ProtocolConformance *conformance) {
+         // If we are to filter out this result, do so now.
+         switch (lookupKind) {
+         case ConformanceLookupKind::OnlyExplicit:
+           switch (conformance->getSourceKind()) {
+           case ConformanceEntryKind::Explicit:
+           case ConformanceEntryKind::Synthesized:
+             return true;
+           case ConformanceEntryKind::Implied:
+           case ConformanceEntryKind::Inherited:
+             return false;
+           }
+
+         case ConformanceLookupKind::NonInherited:
+           switch (conformance->getSourceKind()) {
+           case ConformanceEntryKind::Explicit:
+           case ConformanceEntryKind::Synthesized:
+           case ConformanceEntryKind::Implied:
+             return true;
+           case ConformanceEntryKind::Inherited:
+             return false;
+           }
+
+         case ConformanceLookupKind::All:
+         case ConformanceLookupKind::NonStructural:
+           return true;
+         }
+      });
+
+  // If we want to add structural conformances, do so now.
+  switch (lookupKind) {
+    case ConformanceLookupKind::All:
+    case ConformanceLookupKind::NonInherited: {
+      // Look for a ConcurrentValue conformance globally. If it is synthesized
+      // and matches this declaration context, use it.
+      auto dc = getAsGenericContext();
+      if (auto conformance = findSynthesizedConcurrentValueConformance(dc))
+        result.push_back(conformance);
+      break;
+    }
+
+    case ConformanceLookupKind::NonStructural:
+    case ConformanceLookupKind::OnlyExplicit:
+      break;
+  }
 
   return result;
 }
@@ -1400,8 +1476,6 @@ IterableDeclContext::takeConformanceDiagnostics() const {
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<GenericContext *>(dc),
-    ConformanceLookupKind::All,
-    nullptr,
     nullptr,
     &result);
 

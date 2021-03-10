@@ -1021,7 +1021,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
                              SILAbbrCodes[SILInstApplyLayout::Code],
-                             SIL_BUILTIN,
+                             SIL_BUILTIN, 0,
                              S.addSubstitutionMapRef(BI->getSubstitutions()),
                              S.addTypeRef(BI->getType().getASTType()),
                              (unsigned)BI->getType().getCategory(),
@@ -1042,7 +1042,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code],
-        AI->isNonThrowing() ? SIL_NON_THROWING_APPLY : SIL_APPLY,
+        SIL_APPLY,
+        unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -1062,8 +1063,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(addValueRef(Arg));
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code],
-        AI->isNonThrowing() ? SIL_NON_THROWING_BEGIN_APPLY : SIL_BEGIN_APPLY,
+        SILAbbrCodes[SILInstApplyLayout::Code], SIL_BEGIN_APPLY,
+        unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -1087,6 +1088,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_TRY_APPLY,
+        unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -1102,6 +1104,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_PARTIAL_APPLY,
+        0,
         S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
         S.addTypeRef(PAI->getCallee()->getType().getASTType()),
         S.addTypeRef(PAI->getType().getASTType()),
@@ -1399,6 +1402,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
       Attr = IEC->getVerificationType();
+    } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
+      Attr = DVI->poisonRefs();
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {

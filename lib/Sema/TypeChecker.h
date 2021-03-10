@@ -26,6 +26,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
@@ -689,8 +690,7 @@ bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC, Type type);
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.
-void coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
-                               AnyFunctionType *FN);
+void coerceParameterListToType(ParameterList *P, AnyFunctionType *FN);
 
 /// Type-check an initialized variable pattern declaration.
 bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
@@ -1245,15 +1245,22 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
 /// \param limit How many levels of unwrapping to perform, where 0 means to return the
 /// \c backingStorageType directly and the maximum is the number of attached property wrappers
 /// (which will produce the original property type). If not specified, defaults to the maximum.
-Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
+Type computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
 
-/// Build a call to the init(wrappedValue:) initializers of the property
-/// wrappers, filling in the given \c value as the original value. Optionally
-/// pass a callback that will get invoked with the innermost init(wrappedValue:)
-/// call.
-Expr *buildPropertyWrapperWrappedValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value, bool ignoreAttributeArgs,
+/// Compute the projected value type for the given property that has attached
+/// property wrappers when the backing storage is known to have the given type.
+Type computeProjectedValueType(const VarDecl *var, Type backingStorageType);
+
+/// Build a call to the init(wrappedValue:) or init(projectedValue:)
+/// initializer of the property wrapper, filling in the given \c value
+/// as the wrapped or projected value argument.
+///
+/// Optionally pass a callback that will get invoked with the innermost init
+/// apply expression.
+Expr *buildPropertyWrapperInitCall(
+    const VarDecl *var, Type backingStorageType, Expr *value,
+    PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
 
 /// Whether an overriding declaration requires the 'override' keyword.

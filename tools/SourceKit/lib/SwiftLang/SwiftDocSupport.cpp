@@ -318,7 +318,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
     if (Proto &&
         Req.getKind() == RequirementKind::Conformance &&
         Req.getFirstType()->isEqual(Proto->getSelfInterfaceType()) &&
-        Req.getSecondType()->getAnyNominal() == Proto)
+        Req.getProtocolDecl() == Proto)
       continue;
 
     auto First = Req.getFirstType();

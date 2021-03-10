@@ -1540,6 +1540,7 @@ namespace  {
     UNINTERESTING_ATTR(Marker)
 
     UNINTERESTING_ATTR(AtReasync)
+    UNINTERESTING_ATTR(Nonisolated)
 
 #undef UNINTERESTING_ATTR
 

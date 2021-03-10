@@ -14,9 +14,21 @@ struct IntWrapper {
 
 template<class T>
 struct CannotBeInstantianted {
-  void willFailInstantiating(T t) {
-    t.doesNotExist();
-  }
+  T value;
+
+  CannotBeInstantianted(char, T value) { value.doesNotExist(); }
+  CannotBeInstantianted(char, char) { memberWrongType(); }
+  CannotBeInstantianted(T value) : value(value) {}
+
+  void callsMethodWithError() { memberWrongType(); }
+
+  void memberWrongType() { value.doesNotExist(); }
+
+  void argWrongType(T t) { t.doesNotExist(); }
+
+  int getOne() { return 1; }
+  int incValue() { return value.value + getOne(); }
+  int incValue(T t) { return t.value + getOne(); }
 };
 
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_INSTANTIATION_ERRORS_H

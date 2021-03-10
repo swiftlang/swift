@@ -460,6 +460,11 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(Base, Printer, Opts);
 }
 
+void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,
+                                    const PrintOptions &Opts) const {
+  Printer.printText("_");
+}
+
 void FixedTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   getType().print(Printer, Opts);

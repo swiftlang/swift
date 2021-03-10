@@ -16,6 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 
 STATISTIC(numAssignRewritten, "Number of assigns rewritten");
@@ -166,10 +167,8 @@ static void getAssignByWrapperArgs(SmallVectorImpl<SILValue> &args,
 
 static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
                                              AssignByWrapperInst *inst,
-                            SmallVectorImpl<BeginAccessInst *> &accessMarkers) {
-  LLVM_DEBUG(llvm::dbgs() << "  *** Lowering [isInit="
-             << unsigned(inst->getOwnershipQualifier())
-             << "]: " << *inst << "\n");
+                                        SmallSetVector<SILValue, 8> &toDelete) {
+  LLVM_DEBUG(llvm::dbgs() << "  *** Lowering " << *inst << "\n");
 
   ++numAssignRewritten;
 
@@ -177,14 +176,21 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   SILValue dest = inst->getDest();
   SILLocation loc = inst->getLoc();
   SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
+  
+  switch (inst->getMode()) {
+    case AssignByWrapperInst::Unknown:
+      llvm_unreachable("assign_by_wrapper must have a valid mode");
 
-  switch (inst->getAssignDestination()) {
-    case AssignByWrapperInst::Destination::BackingWrapper: {
+    case AssignByWrapperInst::Initialization:
+    case AssignByWrapperInst::Assign: {
       SILValue initFn = inst->getInitializer();
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
       SmallVector<SILValue, 4> args;
       if (convention.hasIndirectSILResults()) {
+        if (inst->getMode() == AssignByWrapperInst::Assign)
+          b.createDestroyAddr(loc, dest);
+
         args.push_back(dest);
         getAssignByWrapperArgs(args, src, convention, b, forCleanup);
         b.createApply(loc, initFn, SubstitutionMap(), args);
@@ -192,18 +198,21 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
         getAssignByWrapperArgs(args, src, convention, b, forCleanup);
         SILValue wrappedSrc = b.createApply(loc, initFn, SubstitutionMap(),
                                             args);
-        if (inst->getOwnershipQualifier() == AssignOwnershipQualifier::Init ||
+        if (inst->getMode() == AssignByWrapperInst::Initialization ||
             inst->getDest()->getType().isTrivial(*inst->getFunction())) {
-          b.createTrivialStoreOr(loc, wrappedSrc, dest, StoreOwnershipQualifier::Init);
+          b.createTrivialStoreOr(loc, wrappedSrc, dest,
+                                 StoreOwnershipQualifier::Init);
         } else {
           b.createStore(loc, wrappedSrc, dest, StoreOwnershipQualifier::Assign);
         }
       }
-      // TODO: remove the unused setter function, which usually is a dead
-      // partial_apply.
+      // The unused partial_apply violates memory lifetime rules in case "self"
+      // is an inout. Therefore we cannot keep it as a dead closure to be
+      // cleaned up later. We have to delete it in this pass.
+      toDelete.insert(inst->getSetter());
       break;
     }
-    case AssignByWrapperInst::Destination::WrappedValue: {
+    case AssignByWrapperInst::AssignWrappedValue: {
       SILValue setterFn = inst->getSetter();
       CanSILFunctionType fTy = setterFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
@@ -216,10 +225,11 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       // marker. This is important, because also the setter function contains
       // access marker. In case those markers are dynamic it would cause a
       // nested access violation.
-      if (auto *BA = dyn_cast<BeginAccessInst>(dest))
-        accessMarkers.push_back(BA);
-      // TODO: remove the unused init function, which usually is a dead
-      // partial_apply.
+      if (isa<BeginAccessInst>(dest))
+        toDelete.insert(dest);
+        
+      // Again, we have to delete the unused dead closure.
+      toDelete.insert(inst->getInitializer());
       break;
     }
   }
@@ -248,7 +258,7 @@ static bool lowerRawSILOperations(SILFunction &fn) {
   bool changed = false;
 
   for (auto &bb : fn) {
-    SmallVector<BeginAccessInst *, 8> accessMarkers;
+    SmallSetVector<SILValue, 8> toDelete;
 
     auto i = bb.begin(), e = bb.end();
     while (i != e) {
@@ -278,7 +288,7 @@ static bool lowerRawSILOperations(SILFunction &fn) {
 
       if (auto *ai = dyn_cast<AssignByWrapperInst>(inst)) {
         SILBuilderWithScope b(ai);
-        lowerAssignByWrapperInstruction(b, ai, accessMarkers);
+        lowerAssignByWrapperInstruction(b, ai, toDelete);
         changed = true;
         continue;
       }
@@ -298,8 +308,12 @@ static bool lowerRawSILOperations(SILFunction &fn) {
         continue;
       }
     }
-    for (BeginAccessInst *BA : accessMarkers) {
-      deleteDeadAccessMarker(BA);
+    for (SILValue deadVal : toDelete) {
+      if (auto *beginAccess = dyn_cast<BeginAccessInst>(deadVal)) {
+        deleteDeadAccessMarker(beginAccess);
+      } else if (auto *svi = dyn_cast<SingleValueInstruction>(deadVal)) {
+        tryDeleteDeadClosure(svi);
+      }
     }
   }
   return changed;

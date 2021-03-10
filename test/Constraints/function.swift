@@ -223,3 +223,25 @@ func test_passing_nonescaping_to_escaping_function() {
     bar(handler) // expected-error {{passing non-escaping parameter 'handler' to function expecting an @escaping closure}}
   }
 }
+
+func test_passing_noescape_function_ref_to_generic_parameter() {
+  func cast<T, U>(_ t: T) -> U {
+    return t as! U
+  }
+
+  class A {
+    required init(factory: () -> Self) {
+      fatalError()
+    }
+  }
+
+  struct S {
+    func converter() -> B { fatalError() }
+  }
+
+  class B : A {
+    class func test(value: S) {
+      _ = self.init(factory: cast(value.converter)) // Ok
+    }
+  }
+}

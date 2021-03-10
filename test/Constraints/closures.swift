@@ -475,7 +475,8 @@ func g_2994(arg: Int) -> Double {
 C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}
 
 let _ = { $0[$1] }(1, 1) // expected-error {{value of type 'Int' has no subscripts}}
-let _ = { $0 = ($0 = {}) } // expected-error {{assigning a variable to itself}}
+// FIXME: Better diagnostic here would be `assigning a variable to itself` but binding ordering change exposed a but in diagnostics
+let _ = { $0 = ($0 = {}) } // expected-error {{function produces expected type '()'; did you mean to call it with '()'?}}
 let _ = { $0 = $0 = 42 } // expected-error {{assigning a variable to itself}}
 
 // https://bugs.swift.org/browse/SR-403
@@ -1067,3 +1068,12 @@ func rdar_74435602(error: Error?) {
     }
   })
 }
+
+// SR-14280
+let _: (@convention(block) () -> Void)? = Bool.random() ? nil : {} // OK
+let _: (@convention(thin) () -> Void)? = Bool.random() ? nil : {} // OK
+let _: (@convention(c) () -> Void)? = Bool.random() ? nil : {} // OK on type checking, diagnostics are deffered to SIL
+
+let _: (@convention(block) () -> Void)? = Bool.random() ? {} : {} // OK
+let _: (@convention(thin) () -> Void)? = Bool.random() ? {} : {} // OK
+let _: (@convention(c) () -> Void)? = Bool.random() ? {} : {} // OK on type checking, diagnostics are deffered to SIL

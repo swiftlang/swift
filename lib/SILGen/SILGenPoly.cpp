@@ -3836,7 +3836,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 
   auto *linearMapArg = thunk->getArgumentsWithoutIndirectResults().back();
   auto *apply = thunkSGF.B.createApply(loc, linearMapArg, SubstitutionMap(),
-                                       arguments, /*isNonThrowing*/ false);
+                                       arguments);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;

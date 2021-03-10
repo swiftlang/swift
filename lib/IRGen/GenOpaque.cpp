@@ -431,7 +431,7 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
                                     IGF.getOptions().PointerAuth.ValueWitnesses,
                                         slot, index);
 
-  return FunctionPointer(FunctionPointer::KindTy::Function, witness, authInfo,
+  return FunctionPointer(FunctionPointer::Kind::Function, witness, authInfo,
                          signature);
 }
 
@@ -478,7 +478,7 @@ IRGenFunction::emitValueWitnessFunctionRef(SILType type,
       assert(discriminator && "no saved discriminator for value witness fn!");
       authInfo = PointerAuthInfo(schema.getKey(), discriminator);
     }
-    return FunctionPointer(FunctionPointer::KindTy::Function, witness, authInfo,
+    return FunctionPointer(FunctionPointer::Kind::Function, witness, authInfo,
                            signature);
   }
   

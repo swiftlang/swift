@@ -547,9 +547,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
-  // TODO: Once clang support is merged this should also use
-  //  clangASTContext.getTargetInfo().isSwiftAsyncCCSupported()
-  SwiftAsyncCC = opts.UseAsyncLowering ? llvm::CallingConv::SwiftTail : SwiftCC;
+
+  bool isAsynCCSupported =
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
+    == clang::TargetInfo::CCCR_OK;
+  SwiftAsyncCC = (opts.UseAsyncLowering && isAsynCCSupported)
+                     ? llvm::CallingConv::SwiftTail
+                     : SwiftCC;
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
@@ -620,6 +624,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
   SwiftJobTy = createStructType(*this, "swift.job", {
     SizeTy,               // flags

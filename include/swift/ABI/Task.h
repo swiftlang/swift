@@ -17,7 +17,7 @@
 #ifndef SWIFT_ABI_TASK_H
 #define SWIFT_ABI_TASK_H
 
-#include "swift/Basic/RelativePointer.h"
+#include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
@@ -25,8 +25,7 @@
 #include "swift/Runtime/Config.h"
 #include "swift/Basic/STLExtras.h"
 #include "bitset"
-#include "string"
-#include "queue"
+#include "queue" // TODO: remove and replace with our own mpsc
 
 namespace swift {
 class AsyncTask;
@@ -35,6 +34,7 @@ class Job;
 struct OpaqueValue;
 struct SwiftError;
 class TaskStatusRecord;
+class TaskGroup;
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job {
@@ -80,8 +80,17 @@ public:
     return Flags.getPriority();
   }
 
-  /// Run this job.
-  void run(ExecutorRef currentExecutor);
+  /// Given that we've fully established the job context in the current
+  /// thread, actually start running this job.  To establish the context
+  /// correctly, call swift_job_run or runJobInExecutorContext.
+  void runInFullyEstablishedContext(ExecutorRef currentExecutor);
+
+  /// Given that we've fully established the job context in the
+  /// current thread, and that the job is a simple (non-task) job,
+  /// actually start running this job.
+  void runSimpleInFullyEstablishedContext(ExecutorRef currentExecutor) {
+    RunJob(this, currentExecutor);
+  }
 };
 
 // The compiler will eventually assume these.
@@ -139,8 +148,7 @@ public:
 ///
 ///    +--------------------------+
 ///    | childFragment?           |
-///    | taskLocalValuesFragment? |
-///    | groupFragment?           |
+///    | groupChildFragment?      |
 ///    | futureFragment?          |*
 ///    +--------------------------+
 ///
@@ -164,16 +172,24 @@ public:
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
 
+  /// Task local values storage container.
+  TaskLocal::Storage Local;
+
   AsyncTask(const HeapMetadata *metadata, JobFlags flags,
             TaskContinuationFunction *run,
             AsyncContext *initialContext)
     : HeapObject(metadata), Job(flags, run),
       ResumeContext(initialContext),
-      Status(ActiveTaskStatus()) {
+      Status(ActiveTaskStatus()),
+      Local(TaskLocal::Storage()) {
     assert(flags.isAsyncTask());
   }
 
-  void run(ExecutorRef currentExecutor) {
+  /// Given that we've already fully established the job context
+  /// in the current thread, start running this task.  To establish
+  /// the job context correctly, call swift_job_run or
+  /// runInExecutorContext.
+  void runInFullyEstablishedContext(ExecutorRef currentExecutor) {
     ResumeTask(this, currentExecutor, ResumeContext);
   }
   
@@ -183,6 +199,22 @@ public:
     return Status.load(std::memory_order_relaxed).isCancelled();
   }
 
+  // ==== Task Local Values ----------------------------------------------------
+
+  void localValuePush(const Metadata *keyType,
+                      /* +1 */ OpaqueValue *value, const Metadata *valueType) {
+    Local.pushValue(this, keyType, value, valueType);
+  }
+
+  OpaqueValue* localValueGet(const Metadata *keyType,
+                             TaskLocal::TaskLocalInheritance inherit) {
+    return Local.getValue(this, keyType, inherit);
+  }
+
+  void localValuePop() {
+    Local.popValue(this);
+  }
+
   // ==== Child Fragment -------------------------------------------------------
 
   /// A fragment of an async task structure that happens to be a child task.
@@ -190,10 +222,15 @@ public:
     /// The parent task of this task.
     AsyncTask *Parent;
 
+    // TODO: Document more how this is used from the `TaskGroupTaskStatusRecord`
+
     /// The next task in the singly-linked list of child tasks.
     /// The list must start in a `ChildTaskStatusRecord` registered
     /// with the parent task.
+    ///
     /// Note that the parent task may have multiple such records.
+    ///
+    /// WARNING: Access can only be performed by the `Parent` of this task.
     AsyncTask *NextChild = nullptr;
 
   public:
@@ -206,6 +243,14 @@ public:
     AsyncTask *getNextChild() const {
       return NextChild;
     }
+
+    /// Set the `NextChild` to to the passed task.
+    ///
+    /// WARNING: This must ONLY be invoked from the parent of both
+    /// (this and the passed-in) tasks for thread-safety reasons.
+    void setNextChild(AsyncTask *task) {
+      NextChild = task;
+    }
   };
 
   bool hasChildFragment() const {
@@ -214,582 +259,52 @@ public:
 
   ChildFragment *childFragment() {
     assert(hasChildFragment());
-    return reinterpret_cast<ChildFragment*>(this + 1);
-  }
-
-  // ==== Task Locals Values ---------------------------------------------------
-
-  class TaskLocalValuesFragment {
-  public:
-    /// Type of the pointed at `next` task local item.
-    enum class NextLinkType : uintptr_t {
-      /// This task is known to be a "terminal" node in the lookup of task locals.
-      /// In other words, even if it had a parent, the parent (and its parents)
-      /// are known to not contain any any more task locals, and thus any further
-      /// search beyond this task.
-      IsTerminal = 0b00,
-      /// The storage pointer points at the next TaskLocalChainItem in this task.
-      IsNext     = 0b01,
-      /// The storage pointer points at a parent AsyncTask, in which we should
-      /// continue the lookup.
-      ///
-      /// Note that this may not necessarily be the same as the task's parent
-      /// task -- we may point to a super-parent if we know / that the parent
-      /// does not "contribute" any task local values. This is to speed up
-      /// lookups by skipping empty parent tasks during get(), and explained
-      /// in depth in `createParentLink`.
-      IsParent   = 0b11
-    };
-
-    /// Values must match `TaskLocalInheritance` declared in `TaskLocal.swift`.
-    enum class TaskLocalInheritance : uint8_t {
-      Default = 0,
-      Never   = 1
-    };
-
-    class TaskLocalItem {
-    private:
-      /// Mask used for the low status bits in a task local chain item.
-      static const uintptr_t statusMask = 0x03;
-
-      /// Pointer to the next task local item; be it in this task or in a parent.
-      /// Low bits encode `NextLinkType`.
-      /// TaskLocalItem *next = nullptr;
-      uintptr_t next;
-
-    public:
-      /// The type of the key with which this value is associated.
-      const Metadata *keyType;
-      /// The type of the value stored by this item.
-      const Metadata *valueType;
-
-      // Trailing storage for the value itself. The storage will be
-      // uninitialized or contain an instance of \c valueType.
-
-    private:
-      explicit TaskLocalItem(const Metadata *keyType, const Metadata *valueType)
-          : keyType(keyType),
-            valueType(valueType),
-            next(0) { }
-
-    public:
-      /// TaskLocalItem which does not by itself store any value, but only points
-      /// to the nearest task-local-value containing parent's first task item.
-      ///
-      /// This item type is used to link to the appropriate parent task's item,
-      /// when the current task itself does not have any task local values itself.
-      ///
-      /// When a task actually has its own task locals, it should rather point
-      /// to the parent's *first* task-local item in its *last* item, extending
-      /// the TaskLocalItem linked list into the appropriate parent.
-      static TaskLocalItem* createParentLink(AsyncTask *task, AsyncTask *parent) {
-        assert(parent);
-        size_t amountToAllocate = TaskLocalItem::itemSize(/*valueType*/nullptr);
-        // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-        void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator
-
-        TaskLocalItem *item =
-            new(allocation) TaskLocalItem(nullptr, nullptr);
-
-        auto parentHead = parent->localValuesFragment()->head;
-        if (parentHead) {
-          if (parentHead->isEmpty()) {
-            switch (parentHead->getNextLinkType()) {
-              case NextLinkType::IsParent:
-                // it has no values, and just points to its parent,
-                // therefore skip also skip pointing to that parent and point
-                // to whichever parent it was pointing to as well, it may be its
-                // immediate parent, or some super-parent.
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) |
-                                  static_cast<uintptr_t>(NextLinkType::IsParent);
-                break;
-              case NextLinkType::IsNext:
-                assert(false && "empty taskValue head in parent task, yet parent's 'head' is `IsNext`, "
-                                "this should not happen, as it implies the parent must have stored some value.");
-                break;
-              case NextLinkType::IsTerminal:
-                item->next = reinterpret_cast<uintptr_t>(parentHead->getNext()) | 
-                                  static_cast<uintptr_t>(NextLinkType::IsTerminal);
-                break;
-            }
-          } else {
-            item->next = reinterpret_cast<uintptr_t>(parentHead) |
-                         static_cast<uintptr_t>(NextLinkType::IsParent);
-          }
-        } else {
-          item->next = reinterpret_cast<uintptr_t>(parentHead) |
-                            static_cast<uintptr_t>(NextLinkType::IsTerminal);
-        }
-
-        return item;
-      }
-
-      static TaskLocalItem* createLink(AsyncTask *task,
-                                       const Metadata *keyType,
-                                       const Metadata *valueType) {
-        assert(task);
-        size_t amountToAllocate = TaskLocalItem::itemSize(valueType);
-        // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-        void *allocation = malloc(amountToAllocate); // TODO: use task-local allocator
-        TaskLocalItem *item =
-            new(allocation) TaskLocalItem(keyType, valueType);
-
-        auto next = task->localValuesFragment()->head;
-        auto nextLinkType = next ? NextLinkType::IsNext : NextLinkType::IsTerminal;
-        item->next = reinterpret_cast<uintptr_t>(next) |
-            static_cast<uintptr_t>(nextLinkType);
-
-        return item;
-      }
-
-      void destroy() {
-        if (valueType) {
-          valueType->vw_destroy(getStoragePtr());
-        }
-      }
-
-      TaskLocalItem *getNext() {
-        return reinterpret_cast<TaskLocalItem *>(next & ~statusMask);
-      }
-
-      NextLinkType getNextLinkType() {
-        return static_cast<NextLinkType>(next & statusMask);
-      }
-
-      /// Item does not contain any actual value, and is only used to point at
-      /// a specific parent item.
-      bool isEmpty() {
-        return !valueType;
-      }
-
-      /// Retrieve a pointer to the storage of the value.
-      OpaqueValue *getStoragePtr() {
-        return reinterpret_cast<OpaqueValue *>(
-            reinterpret_cast<char *>(this) + storageOffset(valueType));
-      }
-
-      /// Compute the offset of the storage from the base of the item.
-      static size_t storageOffset(const Metadata *valueType) {
-        size_t offset = sizeof(TaskLocalItem);
-        if (valueType) {
-          size_t alignment = valueType->vw_alignment();
-          return (offset + alignment - 1) & ~(alignment - 1);
-        } else {
-          return offset;
-        }
-      }
-
-      /// Determine the size of the item given a particular value type.
-      static size_t itemSize(const Metadata *valueType) {
-        size_t offset = storageOffset(valueType);
-        if (valueType) {
-          offset += valueType->vw_size();
-        }
-        return offset;
-      }
-    };
-
-  private:
-    /// A stack (single-linked list) of task local values.
-    ///
-    /// Once task local values within this task are traversed, the list continues
-    /// to the "next parent that contributes task local values," or if no such
-    /// parent exists it terminates with null.
-    ///
-    /// If the TaskLocalValuesFragment was allocated, it is expected that this
-    /// value should be NOT null; it either has own values, or at least one
-    /// parent that has values. If this task does not have any values, the head
-    /// pointer MAY immediately point at this task's parent task which has values.
-    ///
-    /// ### Concurrency
-    /// Access to the head is only performed from the task itself, when it
-    /// creates child tasks, the child during creation will inspect its parent's
-    /// task local value stack head, and point to it. This is done on the calling
-    /// task, and thus needs not to be synchronized. Subsequent traversal is
-    /// performed by child tasks concurrently, however they use their own
-    /// pointers/stack and can never mutate the parent's stack.
-    ///
-    /// The stack is only pushed/popped by the owning task, at the beginning and
-    /// end a `body` block of `withLocal(_:boundTo:body:)` respectively.
-    ///
-    /// Correctness of the stack strongly relies on the guarantee that tasks
-    /// never outline a scope in which they are created. Thanks to this, if
-    /// tasks are created inside the `body` of `withLocal(_:,boundTo:body:)`
-    /// all tasks created inside the `withLocal` body must complete before it
-    /// returns, as such, any child tasks potentially accessing the value stack
-    /// are guaranteed to be completed by the time we pop values off the stack
-    /// (after the body has completed).
-    TaskLocalItem *head = nullptr;
-
-  public:
-    TaskLocalValuesFragment() {}
-
-    void destroy();
-
-    /// If the parent task has task local values defined, point to in
-    /// the task local values chain.
-    void initializeLinkParent(AsyncTask* task, AsyncTask* parent);
-
-    void pushValue(AsyncTask *task, const Metadata *keyType,
-                   /* +1 */ OpaqueValue *value, const Metadata *valueType);
-
-    void popValue(AsyncTask *task);
-
-    OpaqueValue* get(const Metadata *keType, TaskLocalInheritance inheritance);
-  };
-
-  TaskLocalValuesFragment *localValuesFragment() {
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-
-    if (hasChildFragment()) {
-      offset += sizeof(ChildFragment);
-    }
-
-    return reinterpret_cast<TaskLocalValuesFragment*>(offset);
-  }
-
-  OpaqueValue* localValueGet(const Metadata *keyType,
-                    TaskLocalValuesFragment::TaskLocalInheritance inheritance) {
-    return localValuesFragment()->get(keyType, inheritance);
-  }
-
-  // ==== TaskGroup ------------------------------------------------------------
-
-  class GroupFragment {
-  public:
-    /// Describes the status of the channel.
-    enum class ReadyStatus : uintptr_t {
-        /// The channel is empty, no tasks are pending.
-        /// Return immediately, there is no point in suspending.
-        ///
-        /// The storage is not accessible.
-        Empty = 0b00,
-
-        /// The future has completed with result (of type \c resultType).
-        Success = 0b10,
-
-        /// The future has completed by throwing an error (an \c Error
-        /// existential).
-        Error = 0b11,
-    };
-
-    /// Describes the status of the waiting task that is suspended on `next()`.
-    enum class WaitStatus : uintptr_t {
-        Waiting = 0,
-    };
-
-    enum class GroupPollStatus : uintptr_t {
-        /// The channel is known to be empty and we can immediately return nil.
-        Empty = 0,
-
-        /// The task has been enqueued to the channels wait queue.
-        Waiting = 1,
-
-        /// The task has completed with result (of type \c resultType).
-        Success = 2,
-
-        /// The task has completed by throwing an error (an \c Error
-        /// existential).
-        Error = 3,
-    };
-
-    /// The result of waiting on a Channel (TaskGroup).
-    struct GroupPollResult {
-        GroupPollStatus status; // TODO: pack it into storage pointer or not worth it?
-
-        /// Storage for the result of the future.
-        ///
-        /// When the future completed normally, this is a pointer to the storage
-        /// of the result value, which lives inside the future task itself.
-        ///
-        /// When the future completed by throwing an error, this is the error
-        /// object itself.
-        OpaqueValue *storage;
-
-        /// Optional, the completed task that was polled out of the ready queue.
-        ///
-        /// # Important: swift_release
-        /// If if a task is returned here, the task MUST be swift_release'd
-        /// once we are done with it, to balance out the retain made before
-        /// when the task was enqueued into the ready queue to keep it alive
-        /// until a next() call eventually picks it up.
-        AsyncTask *retainedTask;
-
-        bool isStorageAccessible() {
-          return status == GroupPollStatus::Success ||
-              status == GroupPollStatus::Error ||
-              status == GroupPollStatus::Empty;
-        }
-
-        static GroupPollResult get(AsyncTask *asyncTask, bool hadErrorResult,
-                                   bool needsSwiftRelease) {
-          auto fragment = asyncTask->futureFragment();
-          return GroupPollResult{
-              /*status*/ hadErrorResult ?
-                  GroupFragment::GroupPollStatus::Error :
-                  GroupFragment::GroupPollStatus::Success,
-              /*storage*/ hadErrorResult ?
-                  reinterpret_cast<OpaqueValue *>(fragment->getError()) :
-                  fragment->getStoragePtr(),
-              /*task*/ needsSwiftRelease ?
-                  asyncTask :
-                  nullptr
-          };
-        }
-    };
-
-    /// An item within the message queue of a channel.
-    struct ReadyQueueItem {
-        /// Mask used for the low status bits in a message queue item.
-        static const uintptr_t statusMask = 0x03;
-
-        uintptr_t storage;
-
-        ReadyStatus getStatus() const {
-          return static_cast<ReadyStatus>(storage & statusMask);
-        }
-
-        AsyncTask *getTask() const {
-          return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
-        }
-
-        static ReadyQueueItem get(ReadyStatus status, AsyncTask *task) {
-          assert(task == nullptr || task->isFuture());
-          return ReadyQueueItem{
-              reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
-        }
-    };
-
-    /// An item within the wait queue, which includes the status and the
-    /// head of the list of tasks.
-    struct WaitQueueItem { // TODO: reuse the future's wait queue instead?
-        /// Mask used for the low status bits in a wait queue item.
-        static const uintptr_t statusMask = 0x03;
-
-        uintptr_t storage;
-
-        WaitStatus getStatus() const {
-          return static_cast<WaitStatus>(storage & statusMask);
-        }
-
-        AsyncTask *getTask() const {
-          return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
-        }
-
-        static WaitQueueItem get(WaitStatus status, AsyncTask *task) {
-          return WaitQueueItem{
-              reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
-        }
-    };
-
-    struct GroupStatus {
-        static const uint64_t maskReady      = 0x00FFFFF0000000000ll;
-        static const uint64_t oneReadyTask   = 0x00000010000000000ll;
-
-        static const uint64_t maskPending    = 0x0000000FFFFF00000ll;
-        static const uint64_t onePendingTask = 0x00000000000100000ll;
-
-        static const uint64_t maskWaiting    = 0x000000000000FFFFFll;
-        static const uint64_t oneWaitingTask = 0x00000000000000001ll;
-
-        uint64_t status;
-
-        unsigned int readyTasks() {
-          return (status & maskReady) >> 40;
-        }
-
-        unsigned int pendingTasks() {
-          return (status & maskPending) >> 20;
-        }
-
-        unsigned int waitingTasks() {
-          return status & maskWaiting;
-        }
-
-        bool isEmpty() {
-          return pendingTasks() == 0;
-        }
-
-        /// Status value decrementing the Ready, Pending and Waiting counters by one.
-        GroupStatus completingReadyPendingWaitingTask() {
-          assert(pendingTasks() > 0 && "can only complete waiting tasks when pending tasks available");
-          assert(readyTasks() > 0 && "can only complete waiting tasks when ready tasks available");
-          assert(waitingTasks() > 0 && "can only complete waiting tasks when waiting tasks available");
-          return GroupStatus { status - oneReadyTask - oneWaitingTask - onePendingTask };
-        }
-
-        /// Pretty prints the status, as follows:
-        /// GroupStatus{ P:{pending tasks} W:{waiting tasks} {binary repr} }
-        std::string to_string() {
-          std::string str;
-          str.append("GroupStatus{ ");
-          str.append("R:");
-          str.append(std::to_string(readyTasks()));
-          str.append(" P:");
-          str.append(std::to_string(pendingTasks()));
-          str.append(" W:");
-          str.append(std::to_string(waitingTasks()));
-          str.append(" " + std::bitset<64>(status).to_string());
-          str.append(" }");
-          return str;
-        }
-
-        /// Initially there are no waiting and no pending tasks.
-        static const GroupStatus initial() {
-          return GroupStatus { 0 };
-        };
-    };
-
-    template<typename T>
-    class NaiveQueue {
-        std::queue<T> queue;
-
-    public:
-        NaiveQueue() = default;
-        NaiveQueue(const NaiveQueue<T> &) = delete ;
-        NaiveQueue& operator=(const NaiveQueue<T> &) = delete ;
-
-        NaiveQueue(NaiveQueue<T>&& other) {
-          queue = std::move(other.queue);
-        }
-
-        virtual ~NaiveQueue() { }
-
-        bool dequeue(T &output) {
-          if (queue.empty()) {
-            return false;
-          }
-          output = queue.front();
-          queue.pop();
-          return true;
-        }
-
-        void enqueue(const T item) {
-          queue.push(item);
-        }
-
-    };
-
-  private:
-
-    // TODO: move to lockless via the status atomic
-    mutable std::mutex mutex;
-
-    /// Used for queue management, counting number of waiting and ready tasks
-    std::atomic<uint64_t> status;
-
-    /// Queue containing completed tasks offered into this channel.
-    ///
-    /// The low bits contain the status, the rest of the pointer is the
-    /// AsyncTask.
-    NaiveQueue<ReadyQueueItem> readyQueue;
-//     mpsc_queue_t<ReadyQueueItem> readyQueue; // TODO: can we get away with an MPSC queue here once actor executors land?
-
-    /// Queue containing all of the tasks that are waiting in `get()`.
-    ///
-    /// A task group is also a future, and awaits on the group's result *itself*
-    /// are enqueued on its future fragment.
-    ///
-    /// The low bits contain the status, the rest of the pointer is the
-    /// AsyncTask.
-    std::atomic<WaitQueueItem> waitQueue;
-
-    friend class AsyncTask;
-
-  public:
-    explicit GroupFragment()
-        : status(GroupStatus::initial().status),
-          readyQueue(),
-//          readyQueue(ReadyQueueItem::get(ReadyStatus::Empty, nullptr)),
-          waitQueue(WaitQueueItem::get(WaitStatus::Waiting, nullptr)) {}
-
-    /// Destroy the storage associated with the channel.
-    void destroy();
-
-    bool isEmpty() {
-      auto oldStatus = GroupStatus { status.load(std::memory_order_relaxed) };
-      return oldStatus.pendingTasks() == 0;
-    }
-
-    /// Returns *assumed* new status, including the just performed +1.
-    GroupStatus statusAddReadyTaskAcquire() {
-      auto old = status.fetch_add(GroupStatus::oneReadyTask, std::memory_order_acquire);
-      auto s = GroupStatus {old + GroupStatus::oneReadyTask };
-      assert(s.readyTasks() <= s.pendingTasks());
-      return s;
-    }
-
-    /// Returns *assumed* new status, including the just performed +1.
-    GroupStatus statusAddPendingTaskRelaxed() {
-      auto old = status.fetch_add(GroupStatus::onePendingTask, std::memory_order_relaxed);
-      return GroupStatus {old + GroupStatus::onePendingTask };
-    }
-
-    /// Returns *assumed* new status, including the just performed +1.
-    GroupStatus statusAddWaitingTaskAcquire() {
-      auto old = status.fetch_add(GroupStatus::oneWaitingTask, std::memory_order_acquire);
-      return GroupStatus { old + GroupStatus::oneWaitingTask };
-    }
-
-    /// Remove waiting task, without taking any pending task.
-    GroupStatus statusRemoveWaitingTask() {
-      return GroupStatus {
-          status.fetch_sub(GroupStatus::oneWaitingTask, std::memory_order_relaxed)
-      };
-    }
-
-    /// Compare-and-set old status to a status derived from the old one,
-    /// by simultaneously decrementing one Pending and one Waiting tasks.
-    ///
-    /// This is used to atomically perform a waiting task completion.
-    bool statusCompleteReadyPendingWaitingTasks(GroupStatus& old) {
-      return status.compare_exchange_weak(
-          old.status, old.completingReadyPendingWaitingTask().status,
-          /*success*/ std::memory_order_relaxed,
-          /*failure*/ std::memory_order_relaxed);
-    }
-
-  };
-
-  bool isTaskGroup() const { return Flags.task_isTaskGroup(); }
-
-  GroupFragment *groupFragment() {
-    assert(isTaskGroup());
 
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
 
-    if (hasChildFragment()) {
-      offset += sizeof(ChildFragment);
-    }
-
-    offset += sizeof(TaskLocalValuesFragment);
-
-    return reinterpret_cast<GroupFragment *>(offset);
+    return reinterpret_cast<ChildFragment*>(offset);
   }
-
-  /// Offer result of a task into this channel.
-  /// The value is enqueued at the end of the channel.
-  void groupOffer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
-
-  /// Attempt to dequeue ready tasks and complete the waitingTask.
-  ///
-  /// If unable to complete the waiting task immediately (with an readily
-  /// available completed task), either returns an `GroupPollStatus::Empty`
-  /// result if it is known that no pending tasks in the group,
-  /// or a `GroupPollStatus::Waiting` result if there are tasks in flight
-  /// and the waitingTask eventually be woken up by a completion.
-  GroupFragment::GroupPollResult groupPoll(AsyncTask *waitingTask);
 
   // ==== TaskGroup Child ------------------------------------------------------
+
+  /// A child task created by `group.add` is called a "task group child."
+  /// Upon completion, in addition to the usual future notifying all its waiters,
+  /// it must also `group->offer` itself to the group.
+  ///
+  /// This signalling is necessary to correctly implement the group's `next()`.
+  class GroupChildFragment {
+  private:
+    TaskGroup* Group;
+
+    friend class AsyncTask;
+    friend class TaskGroup;
+
+  public:
+    explicit GroupChildFragment(TaskGroup *group)
+        : Group(group) {}
+
+    /// Return the group this task should offer into when it completes.
+    TaskGroup* getGroup() {
+      return Group;
+    }
+  };
 
   // Checks if task is a child of a TaskGroup task.
   //
   // A child task that is a group child knows that it's parent is a group
   // and therefore may `groupOffer` to it upon completion.
-  bool isTaskGroupChild() {
-    return hasChildFragment() && childFragment()->getParent()->isTaskGroup();
+  bool hasGroupChildFragment() const { return Flags.task_isGroupChildTask(); }
+
+  GroupChildFragment *groupChildFragment() {
+    assert(hasGroupChildFragment());
+
+    auto offset = reinterpret_cast<char*>(this);
+    offset += sizeof(AsyncTask);
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
+
+    return reinterpret_cast<GroupChildFragment *>(offset);
   }
 
   // ==== Future ---------------------------------------------------------------
@@ -860,6 +375,10 @@ public:
     /// Destroy the storage associated with the future.
     void destroy();
 
+    const Metadata *getResultType() const {
+      return resultType;
+    }
+
     /// Retrieve a pointer to the storage of result.
     OpaqueValue *getStoragePtr() {
       return reinterpret_cast<OpaqueValue *>(
@@ -888,19 +407,12 @@ public:
 
   FutureFragment *futureFragment() {
     assert(isFuture());
-
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
-
-    if (hasChildFragment()) {
+    if (hasChildFragment())
       offset += sizeof(ChildFragment);
-    }
-
-    offset += sizeof(TaskLocalValuesFragment);
-
-    if (isTaskGroup()) {
-      offset += sizeof(GroupFragment);
-    }
+    if (hasGroupChildFragment())
+      offset += sizeof(GroupChildFragment);
 
     return reinterpret_cast<FutureFragment *>(offset);
   }
@@ -936,16 +448,16 @@ private:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(AsyncTask) == 12 * sizeof(void*),
+static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
 
-inline void Job::run(ExecutorRef currentExecutor) {
+inline void Job::runInFullyEstablishedContext(ExecutorRef currentExecutor) {
   if (auto task = dyn_cast<AsyncTask>(this))
-    task->run(currentExecutor);
+    task->runInFullyEstablishedContext(currentExecutor);
   else
-    RunJob(this, currentExecutor);
+    runSimpleInFullyEstablishedContext(currentExecutor);
 }
 
 /// An asynchronous context within a task.  Generally contexts are

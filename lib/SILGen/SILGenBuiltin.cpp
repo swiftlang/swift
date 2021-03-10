@@ -1127,7 +1127,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     for (auto origFnArgVal : origFnArgVals)
       applyArgs.push_back(origFnArgVal);
     auto differential = SGF.B.createApply(loc, derivativeFn, SubstitutionMap(),
-                                          applyArgs, /*isNonThrowing*/ false);
+                                          applyArgs);
 
     derivativeFn = SILValue();
 
@@ -1140,8 +1140,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
 
   // Do the apply for the direct result case.
   auto resultTuple = SGF.B.createApply(
-      loc, derivativeFn, SubstitutionMap(), origFnArgVals,
-      /*isNonThrowing*/ false);
+      loc, derivativeFn, SubstitutionMap(), origFnArgVals);
 
   derivativeFn = SILValue();
 
@@ -1424,6 +1423,41 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
           getBuiltinName(BuiltinValueKind::CreateAsyncTaskFuture)),
       SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
       { flags, parentTask, futureResultMetadata, function });
+  return SGF.emitManagedRValueWithCleanup(apply);
+}
+
+// Emit SIL for the named builtin: createAsyncTaskGroupFuture.
+static ManagedValue emitBuiltinCreateAsyncTaskGroupFuture(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto flags = args[0].forward(SGF);
+  auto parentTask = args[1].borrow(SGF, loc).forward(SGF);
+  auto group = args[2].borrow(SGF, loc).forward(SGF);
+
+  // Form the metatype of the result type.
+  CanType futureResultType =
+      Type(
+        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
+          .subst(subs)->getCanonicalType();
+  CanType anyTypeType = ExistentialMetatypeType::get(
+      ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
+  auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
+  auto &futureResultTL = SGF.getTypeLowering(futureResultType);
+  auto futureResultMetadata = SGF.emitExistentialErasure(
+      loc, futureResultType, futureResultTL, anyTypeTL, { }, C,
+      [&](SGFContext C) -> ManagedValue {
+    return ManagedValue::forTrivialObjectRValue(
+      SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
+  }).borrow(SGF, loc).forward(SGF);
+
+  auto function = args[3].borrow(SGF, loc).forward(SGF);
+  auto apply = SGF.B.createBuiltin(
+      loc,
+      ctx.getIdentifier(
+          getBuiltinName(BuiltinValueKind::CreateAsyncTaskGroupFuture)),
+      SGF.getLoweredType(getAsyncTaskAndContextType(ctx)), subs,
+      { flags, parentTask, group, futureResultMetadata, function });
   return SGF.emitManagedRValueWithCleanup(apply);
 }
 

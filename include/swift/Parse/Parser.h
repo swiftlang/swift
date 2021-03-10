@@ -87,7 +87,7 @@ namespace swift {
 class ConsumeTokenReceiver {
 public:
   /// This is called when a token is consumed.
-  virtual void receive(Token Tok) {}
+  virtual void receive(const Token &Tok) {}
 
   /// This is called to update the kind of a token whose start location is Loc.
   virtual void registerTokenKindChange(SourceLoc Loc, tok NewKind) {};
@@ -488,9 +488,7 @@ public:
       std::vector<Token> delayedTokens;
       DelayedTokenReceiver(ConsumeTokenReceiver *&receiver):
         savedConsumer(receiver, this) {}
-      void receive(Token tok) override {
-        delayedTokens.push_back(tok);
-      }
+      void receive(const Token &tok) override { delayedTokens.push_back(tok); }
       Optional<std::vector<Token>> finalize() override {
         llvm_unreachable("Cannot finalize a DelayedTokenReciever");
       }
@@ -563,7 +561,8 @@ public:
     return consumeToken();
   }
 
-  SourceLoc consumeArgumentLabel(Identifier &Result) {
+  SourceLoc consumeArgumentLabel(Identifier &Result,
+                                 bool diagnoseDollarPrefix) {
     assert(Tok.canBeArgumentLabel());
     assert(Result.empty());
     if (!Tok.is(tok::kw__)) {
@@ -571,7 +570,7 @@ public:
       Result = Context.getIdentifier(Tok.getText());
 
       if (Tok.getText()[0] == '$')
-        diagnoseDollarIdentifier(Tok, /*diagnoseDollarPrefix=*/true);
+        diagnoseDollarIdentifier(Tok, diagnoseDollarPrefix);
     }
     return consumeToken();
   }
@@ -1825,10 +1824,12 @@ bool isKeywordPossibleDeclStart(const Token &Tok);
 
 /// Lex and return a vector of `TokenSyntax` tokens, which include
 /// leading and trailing trivia.
-std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+std::vector<
+    std::pair<const syntax::RawSyntax *, syntax::AbsoluteOffsetPosition>>
 tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
-                   unsigned BufferID, unsigned Offset = 0,
-                   unsigned EndOffset = 0, DiagnosticEngine *Diags = nullptr);
+                   unsigned BufferID, const RC<SyntaxArena> &Arena,
+                   unsigned Offset = 0, unsigned EndOffset = 0,
+                   DiagnosticEngine *Diags = nullptr);
 } // end namespace swift
 
 #endif

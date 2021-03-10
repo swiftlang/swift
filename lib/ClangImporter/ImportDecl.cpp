@@ -3738,13 +3738,6 @@ namespace {
       if (isSpecializationDepthGreaterThan(def, 8))
         return nullptr;
 
-      // FIXME: This will instantiate all members of the specialization (and detect
-      // instantiation failures in them), which can be more than is necessary
-      // and is more than what Clang does. As a result we reject some C++
-      // programs that Clang accepts.
-      Impl.getClangSema().InstantiateClassTemplateSpecializationMembers(
-          def->getLocation(), def, clang::TSK_ExplicitInstantiationDefinition);
-
       return VisitCXXRecordDecl(def);
     }
 
@@ -4052,8 +4045,9 @@ namespace {
               // functions get imported into Swift as static member functions
               // that use an additional parameter for the left-hand side operand
               // instead of the receiver object.
-              mdecl->getDeclName().getNameKind() ==
-                  clang::DeclarationName::CXXOperatorName) {
+              (mdecl->getDeclName().getNameKind() ==
+                  clang::DeclarationName::CXXOperatorName &&
+                  isImportedAsStatic(mdecl->getOverloadedOperator()))) {
             selfIdx = None;
           } else {
             selfIdx = 0;
@@ -4464,8 +4458,10 @@ namespace {
         return nullptr;
       
       Decl *SwiftDecl = Impl.importDecl(decl->getUnderlyingDecl(), getActiveSwiftVersion());
+      if (!SwiftDecl)
+        return nullptr;
+
       const TypeDecl *SwiftTypeDecl = dyn_cast<TypeDecl>(SwiftDecl);
-      
       if (!SwiftTypeDecl)
         return nullptr;
       
@@ -7700,8 +7696,7 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
           members.push_back(alternate);
       }
 
-      if (Impl.SwiftContext.LangOpts.EnableExperimentalConcurrency &&
-          !getVersion().supportsConcurrency()) {
+      if (!getVersion().supportsConcurrency()) {
         auto asyncVersion = getVersion().withConcurrency(true);
         if (auto asyncImport = Impl.importMirroredDecl(
                 objcMethod, dc, asyncVersion, proto)) {
@@ -7935,6 +7930,16 @@ bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
   return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
 }
 
+bool importer::isImportedAsStatic(const clang::OverloadedOperatorKind op) {
+  switch (op) {
+#define OVERLOADED_OPERATOR(Name,Spelling,Token,Unary,Binary,MemberOnly) \
+  case clang::OO_##Name: return !MemberOnly;
+#include "clang/Basic/OperatorKinds.def"
+  default:
+    llvm_unreachable("not an operator");
+  }
+}
+
 Type ClangImporter::Implementation::getMainActorType() {
   if (MainActorType)
     return *MainActorType;
@@ -8160,10 +8165,16 @@ void ClangImporter::Implementation::importAttributes(
       // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
       if (swiftAttr->getAttribute() == "@MainActor" ||
+          swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
           swiftAttr->getAttribute() == "@UIActor") {
+        bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
+            !C.LangOpts.isSwiftVersionAtLeast(6);
         if (Type mainActorType = getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
+          attr->setArgIsUnsafe(isUnsafe);
+          if (isUnsafe)
+            attr->setImplicit();
           MappedDecl->getAttrs().add(attr);
         }
 
@@ -8530,8 +8541,7 @@ void ClangImporter::Implementation::finishNormalConformance(
   (void)unused;
 
   auto *proto = conformance->getProtocol();
-  PrettyStackTraceConformance trace(SwiftContext, "completing import of",
-                                    conformance);
+  PrettyStackTraceConformance trace("completing import of", conformance);
 
   finishTypeWitnesses(conformance);
   conformance->finishSignatureConformances();
@@ -9090,12 +9100,10 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  // If we're in concurrency mode, mark the constant as @actorIndependent
-  if (SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    auto actorIndependentAttr = new (C) ActorIndependentAttr(
-        ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
-    var->getAttrs().add(actorIndependentAttr);
-  }
+  auto actorIndependentAttr = new (C) ActorIndependentAttr(
+      ActorIndependentKind::Unsafe, /*IsImplicit=*/true);
+  var->getAttrs().add(actorIndependentAttr);
+
   // Set the function up as the getter.
   makeComputed(var, func, nullptr);
 

@@ -678,6 +678,7 @@ protected:
   friend class DeclIterator;
   friend class IterableDeclContext;
   friend class MemberLookupTable;
+  friend class DeclDeserializer;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -694,6 +695,10 @@ private:
   };
   mutable CachedExternalSourceLocs const *CachedSerializedLocs = nullptr;
   const CachedExternalSourceLocs *getSerializedLocs() const;
+
+  /// Directly set the invalid bit
+  void setInvalidBit();
+
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
@@ -872,7 +877,7 @@ public:
   }
 
   /// \returns the unparsed comment attached to this declaration.
-  RawComment getRawComment(bool SerializedOK = true) const;
+  RawComment getRawComment(bool SerializedOK = false) const;
 
   Optional<StringRef> getGroupName() const;
 
@@ -3004,6 +3009,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DeclContext;
   friend class IterableDeclContext;
   friend class DirectLookupRequest;
+  friend class LookupAllConformancesInContextRequest;
   friend ArrayRef<ValueDecl *>
   ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
@@ -3934,7 +3940,6 @@ enum class KnownDerivableProtocolKind : uint8_t {
   Decodable,
   AdditiveArithmetic,
   Differentiable,
-  Actor,
 };
 
 /// ProtocolDecl - A declaration of a protocol, for example:
@@ -4917,7 +4922,10 @@ public:
 
   /// Whether this property has any attached property wrappers.
   bool hasAttachedPropertyWrapper() const;
-  
+
+  /// Whether this var has an implicit property wrapper attribute.
+  bool hasImplicitPropertyWrapper() const;
+
   /// Whether all of the attached property wrappers have an init(wrappedValue:)
   /// initializer.
   bool allAttachedPropertyWrappersHaveWrappedValueInit() const;
@@ -4977,6 +4985,10 @@ public:
   /// Retreive the projection var for a property that has an attached
   /// property wrapper with a \c projectedValue .
   VarDecl *getPropertyWrapperProjectionVar() const;
+
+  /// Retrieve the local wrapped value var for for a parameter that has
+  /// an attached property wrapper.
+  VarDecl *getPropertyWrapperWrappedValueVar() const;
 
   /// Visit all auxiliary declarations to this VarDecl.
   ///
@@ -6146,14 +6158,6 @@ public:
 
   bool isMainTypeMainMethod() const;
 
-  /// Whether the given name is enqueue(partialTask:), which is used for
-  /// actors.
-  static bool isEnqueuePartialTaskName(ASTContext &ctx, DeclName name);
-
-  /// Determine whether this function is the witness to the Actor protocol's
-  /// enqueue(partialTask:) operation within an actor.
-  bool isActorEnqueuePartialTaskWitness() const;
-
   SelfAccessKind getSelfAccessKind() const;
 
   void setSelfAccessKind(SelfAccessKind mod) {
@@ -6524,7 +6528,7 @@ public:
   bool isIndirect() const {
     return getAttrs().hasAttribute<IndirectAttr>();
   }
-  
+
   /// Do not call this!
   /// It exists to let the AST walkers get the raw value without forcing a request.
   LiteralExpr *getRawValueUnchecked() const { return RawValueExpr; }

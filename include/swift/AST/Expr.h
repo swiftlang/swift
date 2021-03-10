@@ -166,8 +166,9 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(LiteralExpr, Expr);
   SWIFT_INLINE_BITFIELD_EMPTY(IdentityExpr, Expr);
-  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1,
-    IsSuper : 1
+  SWIFT_INLINE_BITFIELD(LookupExpr, Expr, 1+1,
+    IsSuper : 1,
+    IsImplicitlyAsync : 1
   );
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicLookupExpr, LookupExpr);
 
@@ -193,9 +194,10 @@ protected:
     LiteralCapacity : 32
   );
 
-  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2,
+  SWIFT_INLINE_BITFIELD(DeclRefExpr, Expr, 2+2+1,
     Semantics : 2, // an AccessSemantics
-    FunctionRefKind : 2
+    FunctionRefKind : 2,
+    IsImplicitlyAsync : 1
   );
 
   SWIFT_INLINE_BITFIELD(UnresolvedDeclRefExpr, Expr, 2+2,
@@ -335,10 +337,11 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1,
     ThrowsIsSet : 1,
     Throws : 1,
-    ImplicitlyAsync : 1
+    ImplicitlyAsync : 1,
+    NoAsync : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CallExpr, ApplyExpr, 1+1+16,
@@ -1190,6 +1193,7 @@ public:
     Bits.DeclRefExpr.FunctionRefKind =
       static_cast<unsigned>(Loc.isCompound() ? FunctionRefKind::Compound
                                              : FunctionRefKind::Unapplied);
+    Bits.DeclRefExpr.IsImplicitlyAsync = false;
   }
 
   /// Retrieve the declaration to which this expression refers.
@@ -1201,6 +1205,16 @@ public:
   /// getter or setter.
   AccessSemantics getAccessSemantics() const {
     return (AccessSemantics) Bits.DeclRefExpr.Semantics;
+  }
+
+  /// Determine whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  bool isImplicitlyAsync() const { return Bits.DeclRefExpr.IsImplicitlyAsync; }
+
+  /// Set whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  void setImplicitlyAsync(bool isImplicitlyAsync) {
+    Bits.DeclRefExpr.IsImplicitlyAsync = isImplicitlyAsync;
   }
 
   /// Retrieve the concrete declaration reference.
@@ -1518,6 +1532,7 @@ protected:
                           bool Implicit)
       : Expr(Kind, Implicit), Base(base), Member(member) {
     Bits.LookupExpr.IsSuper = false;
+    Bits.LookupExpr.IsImplicitlyAsync = false;
     assert(Base);
   }
 
@@ -1546,6 +1561,16 @@ public:
 
   /// Set whether this reference refers to the superclass's property.
   void setIsSuper(bool isSuper) { Bits.LookupExpr.IsSuper = isSuper; }
+
+  /// Determine whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  bool isImplicitlyAsync() const { return Bits.LookupExpr.IsImplicitlyAsync; }
+
+  /// Set whether this reference needs to happen asynchronously, i.e.,
+  /// guarded by hop_to_executor
+  void setImplicitlyAsync(bool isImplicitlyAsync) {
+    Bits.LookupExpr.IsImplicitlyAsync = isImplicitlyAsync;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_LookupExpr &&
@@ -3118,7 +3143,7 @@ public:
 class LoadExpr : public ImplicitConversionExpr {
 public:
   LoadExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::Load, subExpr, type) {}
+    : ImplicitConversionExpr(ExprKind::Load, subExpr, type) { }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Load; }
 };
@@ -4228,6 +4253,62 @@ public:
   }
 };
 
+/// An implicit applied property wrapper expression.
+class AppliedPropertyWrapperExpr final : public Expr {
+public:
+  enum class ValueKind {
+    WrappedValue,
+    ProjectedValue
+  };
+
+private:
+  /// The concrete callee which owns the property wrapper.
+  ConcreteDeclRef Callee;
+
+  /// The owning declaration.
+  const ParamDecl *Param;
+
+  /// The source location of the argument list.
+  SourceLoc Loc;
+
+  /// The value to which the property wrapper is applied for initialization.
+  Expr *Value;
+
+  /// The kind of value that the property wrapper is applied to.
+  ValueKind Kind;
+
+  AppliedPropertyWrapperExpr(ConcreteDeclRef callee, const ParamDecl *param, SourceLoc loc,
+                             Type Ty, Expr *value, ValueKind kind)
+      : Expr(ExprKind::AppliedPropertyWrapper, /*Implicit=*/true, Ty),
+        Callee(callee), Param(param), Loc(loc), Value(value), Kind(kind) {}
+
+public:
+  static AppliedPropertyWrapperExpr *
+  create(ASTContext &ctx, ConcreteDeclRef callee, const ParamDecl *param, SourceLoc loc,
+         Type Ty, Expr *value, ValueKind kind);
+
+  SourceRange getSourceRange() const { return Loc; }
+
+  ConcreteDeclRef getCallee() { return Callee; }
+
+  /// Returns the parameter declaration with the attached property wrapper.
+  const ParamDecl *getParamDecl() const { return Param; };
+
+  /// Returns the value that the property wrapper is applied to.
+  Expr *getValue() { return Value; }
+
+  /// Sets the value that the property wrapper is applied to.
+  void setValue(Expr *value) { Value = value; }
+
+  /// Returns the kind of value, between wrapped value and projected
+  /// value, the property wrapper is applied to.
+  ValueKind getValueKind() const { return Kind; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::AppliedPropertyWrapper;
+  }
+};
+
 /// An expression referring to a default argument left unspecified at the
 /// call site.
 ///
@@ -4303,6 +4384,7 @@ protected:
     assert(validateArg(Arg) && "Arg is not a permitted expr kind");
     Bits.ApplyExpr.ThrowsIsSet = false;
     Bits.ApplyExpr.ImplicitlyAsync = false;
+    Bits.ApplyExpr.NoAsync = false;
   }
 
 public:
@@ -4341,7 +4423,17 @@ public:
     Bits.ApplyExpr.Throws = throws;
   }
 
+  /// Is this a 'rethrows' function that is known not to throw?
+  bool isNoThrows() const { return !throws(); }
+
+  /// Is this a 'reasync' function that is known not to 'await'?
+  bool isNoAsync() const { return Bits.ApplyExpr.NoAsync; }
+  void setNoAsync(bool noAsync) {
+    Bits.ApplyExpr.NoAsync = noAsync;
+  }
+
   /// Is this application _implicitly_ required to be an async call?
+  /// That is, does it need to be guarded by hop_to_executor.
   /// Note that this is _not_ a check for whether the callee is async!
   /// Only meaningful after complete type-checking.
   ///

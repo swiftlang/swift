@@ -44,15 +44,15 @@ extension NoRawValueWithExplicitHashable : Hashable {
   public func foo() {}
 } // CHECK: {{^}$}}
 
-// CHECK: extension synthesized.HasRawValue : Swift.Equatable {}
-// CHECK: extension synthesized.HasRawValue : Swift.Hashable {}
-// CHECK: extension synthesized.HasRawValue : Swift.RawRepresentable {}
+// CHECK: extension HasRawValue : Swift.Equatable {}
+// CHECK: extension HasRawValue : Swift.Hashable {}
+// CHECK: extension HasRawValue : Swift.RawRepresentable {}
 
-// CHECK: extension synthesized.ObjCEnum : Swift.Equatable {}
-// CHECK: extension synthesized.ObjCEnum : Swift.Hashable {}
-// CHECK: extension synthesized.ObjCEnum : Swift.RawRepresentable {}
+// CHECK: extension ObjCEnum : Swift.Equatable {}
+// CHECK: extension ObjCEnum : Swift.Hashable {}
+// CHECK: extension ObjCEnum : Swift.RawRepresentable {}
 
-// CHECK: extension synthesized.NoRawValueWithExplicitEquatable : Swift.Hashable {}
+// CHECK: extension NoRawValueWithExplicitEquatable : Swift.Hashable {}
 // NEGATIVE-NOT: extension {{.+}}NoRawValueWithExplicitEquatable : Swift.Equatable
 
 // NEGATIVE-NOT: NoRawValueWithExplicitHashable : Swift.Equatable

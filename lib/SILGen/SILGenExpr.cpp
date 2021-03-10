@@ -15,7 +15,6 @@
 #include "Callee.h"
 #include "Condition.h"
 #include "Conversion.h"
-#include "ExitableFullExpr.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -517,6 +516,8 @@ namespace {
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
     RValue visitPropertyWrapperValuePlaceholderExpr(
         PropertyWrapperValuePlaceholderExpr *E, SGFContext C);
+    RValue visitAppliedPropertyWrapperExpr(
+        AppliedPropertyWrapperExpr *E, SGFContext C);
 
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
@@ -1021,13 +1022,13 @@ RValue RValueEmitter::visitLoadExpr(LoadExpr *E, SGFContext C) {
   return SGF.emitLoadOfLValue(E, std::move(lv), C.withFollowingSideEffects());
 }
 
-SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
-                                                 SILType ty) {
+SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc, SILType ty,
+                                                 bool hasDynamicLifetime) {
   ty = ty.getObjectType();
   Optional<SILDebugVariable> DbgVar;
   if (auto *VD = loc.getAsASTNode<VarDecl>())
     DbgVar = SILDebugVariable(VD->isLet(), 0);
-  auto alloc = B.createAllocStack(loc, ty, DbgVar);
+  auto alloc = B.createAllocStack(loc, ty, DbgVar, hasDynamicLifetime);
   enterDeallocStackCleanup(alloc);
   return alloc;
 }
@@ -2197,6 +2198,7 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
 
 RValue RValueEmitter::visitDynamicMemberRefExpr(DynamicMemberRefExpr *E,
                                                 SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   return SGF.emitDynamicMemberRefExpr(E, C);
 }
 
@@ -2218,6 +2220,7 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitDynamicSubscriptExpr(
                                       DynamicSubscriptExpr *E, SGFContext C) {
+  assert(!E->isImplicitlyAsync() && "an actor-isolated @objc member?");
   return SGF.emitDynamicSubscriptExpr(E, C);
 }
 
@@ -2267,7 +2270,7 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
                captures);
 
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, captures, calleeTypeInfo, ApplyOptions::None, C, None);
+                   subs, captures, calleeTypeInfo, ApplyOptions(), C, None);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2290,7 +2293,7 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C, None);
+                   subs, {}, calleeTypeInfo, ApplyOptions(), C, None);
 }
 
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
@@ -3228,7 +3231,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                      loc, ManagedValue::forUnmanaged(equalsWitness),
                      equatableSub,
                      {lhsArg, rhsArg, metatyValue},
-                     equalsInfo, ApplyOptions::None, SGFContext(), None)
+                     equalsInfo, ApplyOptions(), SGFContext(), None)
           .getUnmanagedSingleValue(subSGF, loc);
       }
       
@@ -5261,6 +5264,29 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
 RValue RValueEmitter::visitPropertyWrapperValuePlaceholderExpr(
     PropertyWrapperValuePlaceholderExpr *E, SGFContext C) {
   return visitOpaqueValueExpr(E->getOpaqueValuePlaceholder(), C);
+}
+
+RValue RValueEmitter::visitAppliedPropertyWrapperExpr(
+    AppliedPropertyWrapperExpr *E, SGFContext C) {
+  auto *param = const_cast<ParamDecl *>(E->getParamDecl());
+  auto argument = visit(E->getValue(), C);
+  SILDeclRef::Kind initKind;
+  switch (E->getValueKind()) {
+  case swift::AppliedPropertyWrapperExpr::ValueKind::WrappedValue:
+    initKind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
+    break;
+  case swift::AppliedPropertyWrapperExpr::ValueKind::ProjectedValue:
+    initKind = SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue;
+    break;
+  }
+
+  SubstitutionMap subs;
+  if (param->getDeclContext()->getAsDecl()) {
+    subs = E->getCallee().getSubstitutions();
+  }
+
+  return SGF.emitApplyOfPropertyWrapperBackingInitializer(
+      SILLocation(E), param, subs, std::move(argument), initKind);
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

@@ -75,6 +75,31 @@ Swift Next
   }
   ```
 
+* [SE-0297][]:
+
+  An Objective-C method that delivers its results asynchronously via a completion handler block will be translated into an `async` method that directly returns the result (or throws). For example, the following Objective-C method from [CloudKit](https://developer.apple.com/documentation/cloudkit/ckcontainer/1640387-fetchshareparticipantwithuserrec):
+
+  ```objc
+  - (void)fetchShareParticipantWithUserRecordID:(CKRecordID *)userRecordID
+      completionHandler:(void (^)(CKShareParticipant * _Nullable, NSError * _Nullable))completionHandler;
+  ```
+
+  will be translated into an `async throws` method that returns the participant instance:
+
+  ```swift
+  func fetchShareParticipant(
+      withUserRecordID userRecordID: CKRecord.ID
+  ) async throws -> CKShare.Participant
+  ```
+
+  Swift callers can invoke this `async` method within an `await` expression:
+
+  ```swift
+  guard let participant = try? await container.fetchShareParticipant(withUserRecordID: user) else {
+      return nil
+  }
+  ```
+
 * [SE-0298][]:
 
   The "for" loop can be used to traverse asynchronous sequences in asynchronous code:
@@ -8336,6 +8361,7 @@ Swift 1.0
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
+[SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>

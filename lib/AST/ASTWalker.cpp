@@ -217,9 +217,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
-    if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
+    if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody()))) {
       TLCD->setBody(S);
-    return false;
+      return false;
+    }
+    return true;
   }
 
   bool visitIfConfigDecl(IfConfigDecl *ICD) {
@@ -495,16 +497,30 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitPropertyWrapperValuePlaceholderExpr(
       PropertyWrapperValuePlaceholderExpr *E) {
-    if (auto *placeholder = doIt(E->getOpaqueValuePlaceholder()))
-      E->setOpaqueValuePlaceholder(dyn_cast<OpaqueValueExpr>(placeholder));
-    else
-      return nullptr;
-
-    if (E->getOriginalWrappedValue()) {
-      if (auto *newValue = doIt(E->getOriginalWrappedValue()))
-        E->setOriginalWrappedValue(newValue);
+    if (E->getOpaqueValuePlaceholder()) {
+      if (auto *placeholder = doIt(E->getOpaqueValuePlaceholder()))
+        E->setOpaqueValuePlaceholder(dyn_cast<OpaqueValueExpr>(placeholder));
       else
         return nullptr;
+    }
+
+    if (Walker.shouldWalkIntoPropertyWrapperPlaceholderValue()) {
+      if (E->getOriginalWrappedValue()) {
+        if (auto *newValue = doIt(E->getOriginalWrappedValue()))
+          E->setOriginalWrappedValue(newValue);
+        else
+          return nullptr;
+      }
+    }
+
+    return E;
+  }
+
+  Expr *visitAppliedPropertyWrapperExpr(AppliedPropertyWrapperExpr *E) {
+    if (auto *newValue = doIt(E->getValue())) {
+      E->setValue(newValue);
+    } else {
+      return nullptr;
     }
 
     return E;
@@ -1835,6 +1851,10 @@ bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
 
 bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
   return doIt(T->getConstraint());
+}
+
+bool Traversal::visitPlaceholderTypeRepr(PlaceholderTypeRepr *T) {
+  return false;
 }
 
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {

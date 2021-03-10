@@ -299,7 +299,8 @@ namespace irgen {
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
-                                           SubstitutionMap substitutionMap);
+                                           SubstitutionMap substitutionMap,
+                                           bool suppressGenerics);
 
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.
@@ -407,7 +408,8 @@ namespace irgen {
   /// When \c futureResultType is non-null, calls the future variant to create
   /// a future.
   llvm::Value *emitTaskCreate(
-    IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
+    IRGenFunction &IGF, llvm::Value *flags,
+    llvm::Value *parentTask, llvm::Value *taskGroup,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction, llvm::Value *localContextInfo,
     SubstitutionMap subs);

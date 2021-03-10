@@ -266,8 +266,7 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
 
       case RequirementKind::Conformance: {
         auto type = CanType(reqt.getFirstType());
-        auto protocol =
-          cast<ProtocolType>(CanType(reqt.getSecondType()))->getDecl();
+        auto protocol = reqt.getProtocolDecl();
         if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol)) {
           callback({type, protocol});
         }
@@ -926,7 +925,7 @@ static bool isDependentConformance(
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
-    auto assocProtocol = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto assocProtocol = req.getProtocolDecl();
     if (assocProtocol->isObjC())
       continue;
 
@@ -2148,7 +2147,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   IRGen.ensureRelativeSymbolCollocation(*wt);
 
   auto conf = wt->getConformance();
-  PrettyStackTraceConformance _st(Context, "emitting witness table for", conf);
+  PrettyStackTraceConformance _st("emitting witness table for", conf);
 
   unsigned tableSize = 0;
   llvm::GlobalVariable *global = nullptr;
@@ -2801,8 +2800,7 @@ void NecessaryBindings::addAbstractConditionalRequirements(
   for (auto req : condRequirements) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
-    auto *proto =
-        req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto *proto = req.getProtocolDecl();
     auto ty = req.getFirstType()->getCanonicalType();
     auto archetype = dyn_cast<ArchetypeType>(ty);
     if (!archetype)

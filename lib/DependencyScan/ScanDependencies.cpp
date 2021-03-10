@@ -40,6 +40,8 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <set>
+#include <string>
+#include <sstream>
 
 using namespace swift;
 using namespace swift::dependencies;
@@ -916,16 +918,30 @@ using CompilerArgInstanceCacheMap =
     llvm::StringMap<std::pair<std::unique_ptr<CompilerInstance>,
                               std::unique_ptr<ModuleDependenciesCache>>>;
 
-static void
-updateCachedInstanceSearchPaths(CompilerInstance &cachedInstance,
-                                const CompilerInstance &invocationInstance) {
+static void updateCachedInstanceOpts(CompilerInstance &cachedInstance,
+                                     const CompilerInstance &invocationInstance,
+                                     llvm::StringRef entryArguments) {
   cachedInstance.getASTContext().SearchPathOpts =
       invocationInstance.getASTContext().SearchPathOpts;
-  // The Clang Importer arguments must also match those of the current
-  // invocation instead of the cached one because they include search
-  // path directives for Clang.
+
+  // The Clang Importer arguments must consiste of a combination of
+  // Clang Importer arguments of the current invocation to inherit its Clang-specific
+  // search path options, followed by the options speicific to the given batch-entry,
+  // which may overload some of the invocation's options (e.g. target)
   cachedInstance.getASTContext().ClangImporterOpts =
       invocationInstance.getASTContext().ClangImporterOpts;
+  std::istringstream iss(entryArguments.str());
+  std::vector<std::string> splitArguments(
+      std::istream_iterator<std::string>{iss},
+      std::istream_iterator<std::string>());
+  for (auto it = splitArguments.begin(), end = splitArguments.end(); it != end;
+       ++it) {
+    if ((*it) == "-Xcc") {
+      assert((it + 1 != end) && "Expected option following '-Xcc'");
+      cachedInstance.getASTContext().ClangImporterOpts.ExtraArgs.push_back(
+          *(it + 1));
+    }
+  }
 }
 
 static bool
@@ -964,7 +980,7 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       pCache = (*subInstanceMap)[entry.arguments].second.get();
       // We must update the search paths of this instance to instead reflect
       // those of the current scanner invocation.
-      updateCachedInstanceSearchPaths(*pInstance, invocationInstance);
+      updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
     } else {
       // Create a new instance by the arguments and save it in the map.
       subInstanceMap->insert(

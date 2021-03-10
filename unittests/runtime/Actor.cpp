@@ -75,7 +75,7 @@ static void run(llvm::function_ref<void()> fn) {
     auto job = globalQueue.back();
     globalQueue.pop_back();
 
-    job->run(ExecutorRef::generic());
+    swift_job_run(job, ExecutorRef::generic());
   }
 
   EXPECT_EQ(FinishedIndex, progressIndex);

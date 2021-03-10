@@ -401,8 +401,8 @@ where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
   typealias TangentVector = Struct<T.TangentVector>
-  mutating func move(along direction: TangentVector) {
-    x.move(along: direction.x)
+  mutating func move(by offset: TangentVector) {
+    x.move(by: offset.x)
   }
 }
 
@@ -669,21 +669,6 @@ func jvpInvalid<T: Differentiable>(x: T) -> (
   return (x, { $0 })
 }
 
-// Test invalid derivative type context: instance vs static method mismatch.
-
-struct InvalidTypeContext<T: Differentiable> {
-  // expected-note @+1 {{candidate static method does not have type equal to or less constrained than '<T where T : Differentiable> (InvalidTypeContext<T>) -> (T) -> T'}}
-  static func staticMethod(_ x: T) -> T { x }
-
-  // expected-error @+1 {{referenced declaration 'staticMethod' could not be resolved}}
-  @derivative(of: staticMethod)
-  func jvpStatic(_ x: T) -> (
-    value: T, differential: (T.TangentVector) -> (T.TangentVector)
-  ) {
-    return (x, { $0 })
-  }
-}
-
 // Test stored property original declaration.
 
 struct HasStoredProperty {
@@ -740,7 +725,7 @@ func vjpMultipleSemanticResults(x: inout Float) -> (
 
 struct InoutParameters: Differentiable {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 }
 
 extension InoutParameters {
@@ -1165,3 +1150,41 @@ func opaqueResult(_ x: Float) -> some Differentiable { x }
 func vjpOpaqueResult(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
+
+// Test instance vs static method mismatch.
+
+struct StaticMismatch<T: Differentiable> {
+  // expected-note @+1 {{original function 'init(_:)' is a 'static' method}}
+  init(_ x: T) {}
+  // expected-note @+1 {{original function 'instanceMethod' is an instance method}}
+  func instanceMethod(_ x: T) -> T { x }
+  // expected-note @+1 {{original function 'staticMethod' is a 'static' method}}
+  static func staticMethod(_ x: T) -> T { x }
+
+  // expected-error @+1 {{unexpected derivative function declaration; 'init(_:)' requires the derivative function 'vjpInit' to be a 'static' method}}
+  @derivative(of: init)
+  // expected-note @+1 {{make derivative function 'vjpInit' a 'static' method}}{{3-3=static }}
+  func vjpInit(_ x: T) -> (value: Self, pullback: (T.TangentVector) -> T.TangentVector) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{unexpected derivative function declaration; 'instanceMethod' requires the derivative function 'jvpInstance' to be an instance method}}
+  @derivative(of: instanceMethod)
+  // expected-note @+1 {{make derivative function 'jvpInstance' an instance method}}{{3-10=}}
+  static func jvpInstance(_ x: T) -> (
+    value: T, differential: (T.TangentVector) -> (T.TangentVector)
+  ) {
+    return (x, { $0 })
+  }
+
+  // expected-error @+1 {{unexpected derivative function declaration; 'staticMethod' requires the derivative function 'jvpStatic' to be a 'static' method}}
+  @derivative(of: staticMethod)
+  // expected-note @+1 {{make derivative function 'jvpStatic' a 'static' method}}{{3-3=static }}
+  func jvpStatic(_ x: T) -> (
+    value: T, differential: (T.TangentVector) -> (T.TangentVector)
+  ) {
+    return (x, { $0 })
+  }
+}
+
+

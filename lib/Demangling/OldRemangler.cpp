@@ -843,6 +843,11 @@ void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
   mangleSimpleEntity(node, 'I', "P", ctx);
 }
 
+void Remangler::manglePropertyWrapperInitFromProjectedValue(Node *node,
+                                                            EntityContext &ctx) {
+  mangleSimpleEntity(node, 'I', "W", ctx);
+}
+
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
                                                  EntityContext &ctx) {
   mangleNamedEntity(node, 'I', "A", ctx);

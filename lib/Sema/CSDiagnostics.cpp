@@ -1331,10 +1331,12 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   assert(!baseType->hasTypeVariable() &&
          "Base type must not be a type variable");
-  assert(!baseType->isHole() && "Base type must not be a type hole");
+  assert(!baseType->isPlaceholder() &&
+         "Base type must not be a type placeholder");
   assert(!unwrappedType->hasTypeVariable() &&
          "Unwrapped type must not be a type variable");
-  assert(!unwrappedType->isHole() && "Unwrapped type must not be a type hole");
+  assert(!unwrappedType->isPlaceholder() &&
+         "Unwrapped type must not be a type placeholder");
 
   if (!baseType->getOptionalObjectType())
     return false;
@@ -3289,9 +3291,34 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
     return true;
   }
 
+  if (isa<ParamDecl>(getProperty())) {
+    auto wrapperType = getToType();
+    auto wrappedValueType = computeWrappedValueType(getProperty(), wrapperType);
+    emitDiagnostic(diag::property_wrapper_param_projection_invalid, wrappedValueType);
+    return true;
+  }
+
   emitDiagnostic(diag::incorrect_property_wrapper_reference, getPropertyName(),
                  getFromType(), getToType(), true)
       .fixItRemoveChars(getLoc(), endLoc);
+  return true;
+}
+
+bool MissingProjectedValueFailure::diagnoseAsError() {
+  emitDiagnostic(diag::property_wrapper_param_no_projection, wrapperType);
+  return true;
+}
+
+bool MissingPropertyWrapperAttributeFailure::diagnoseAsError() {
+  if (auto *param = getAsDecl<ParamDecl>(getAnchor())) {
+    emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
+
+    // FIXME: emit a note and fix-it to add '@propertyWrapper' if the
+    // type is a nominal and in the same module.
+  } else {
+    emitDiagnostic(diag::property_wrapper_param_no_wrapper);
+  }
+
   return true;
 }
 
@@ -7187,6 +7214,40 @@ bool MemberMissingExplicitBaseTypeFailure::diagnoseAsError() {
               .fixItInsert(UME->getDotLoc(), baseTypeName);
         });
   }
+
+  return true;
+}
+
+bool InvalidMemberRefOnProtocolMetatype::diagnoseAsError() {
+  auto *locator = getLocator();
+  auto overload = getOverloadChoiceIfAvailable(locator);
+  if (!overload)
+    return false;
+
+  auto *member = overload->choice.getDeclOrNull();
+  assert(member);
+
+  emitDiagnostic(
+      diag::contextual_member_ref_on_protocol_requires_self_requirement,
+      member->getDescriptiveKind(), member->getName());
+
+  auto *extension = dyn_cast<ExtensionDecl>(member->getDeclContext());
+
+  // If this was a protocol requirement we can't suggest a fix-it.
+  if (!extension)
+    return true;
+
+  auto note =
+      emitDiagnosticAt(extension, diag::missing_sametype_requirement_on_self);
+
+  if (auto *whereClause = extension->getTrailingWhereClause()) {
+    auto sourceRange = whereClause->getSourceRange();
+    note.fixItInsertAfter(sourceRange.End, ", Self == <#Type#> ");
+  } else {
+    auto nameRepr = extension->getExtendedTypeRepr();
+    note.fixItInsertAfter(nameRepr->getEndLoc(), " where Self == <#Type#>");
+  }
+
   return true;
 }
 

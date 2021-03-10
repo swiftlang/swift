@@ -2506,6 +2506,7 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
       return getSILFunctionTypeForConventions(
@@ -2902,8 +2903,8 @@ static CanSILFunctionType getSILFunctionTypeForClangDecl(
 
   if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
     AbstractionPattern origPattern = method->isOverloadedOperator() ?
-        AbstractionPattern::getCXXOperatorMethod(origType, method):
-        AbstractionPattern::getCXXMethod(origType, method);
+        AbstractionPattern::getCXXOperatorMethod(origType, method, foreignInfo.Self):
+        AbstractionPattern::getCXXMethod(origType, method, foreignInfo.Self);
     auto conventions = CXXMethodConventions(method);
     return getSILFunctionType(TC, TypeExpansionContext::minimal(), origPattern,
                               substInterfaceType, extInfoBuilder, conventions,
@@ -3038,6 +3039,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -3133,7 +3135,7 @@ static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
     return false;
 
   // Must be a type member.
-  if (constant.getParameterListCount() != 2)
+  if (!accessor->hasImplicitSelfDecl())
     return false;
 
   // Must be imported from a function.
@@ -3282,6 +3284,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
@@ -4121,6 +4124,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return nullptr;
@@ -4319,6 +4323,9 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 // match exactly.
 // TODO: More sophisticated param and return ABI compatibility rules could
 // diverge.
+//
+// Note: all cases recognized here must be handled in the SILOptimizer's
+// castValueToABICompatibleType().
 static bool areABICompatibleParamsOrReturns(SILType a, SILType b,
                                             SILFunction *inFunction) {
   // Address parameters are all ABI-compatible, though the referenced

@@ -185,7 +185,7 @@ struct SupplementaryOutputPaths {
     if (!LdAddCFilePath.empty())
       fn(LdAddCFilePath); 
     if (!ModuleSummaryOutputPath.empty())
-      fn(ModuleSummaryOutputPath); 
+      fn(ModuleSummaryOutputPath);
   }
 
   bool empty() const {

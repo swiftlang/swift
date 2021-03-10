@@ -123,7 +123,10 @@ class DestroyHoisting {
 
 public:
   DestroyHoisting(SILFunction *function, DominanceAnalysis *DA) :
-    function(function), DA(DA) { }
+    function(function),
+    // We currently don't handle enum and existential projections, because they
+    // cannot be re-created easily. We could support this in future.
+    locations(/*handleNonTrivialProjections*/ false), DA(DA) {}
 
   bool hoistDestroys();
 };
@@ -345,9 +348,20 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
       // ... or abort_apply.
       getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
       break;
+    case SILInstructionKind::SelectEnumAddrInst:
+    case SILInstructionKind::ExistentialMetatypeInst:
+    case SILInstructionKind::ValueMetatypeInst:
+    case SILInstructionKind::IsUniqueInst:
+    case SILInstructionKind::FixLifetimeInst:
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
+    case SILInstructionKind::StoreBorrowInst:
     case SILInstructionKind::CopyAddrInst:
+    case SILInstructionKind::InjectEnumAddrInst:
+    case SILInstructionKind::UncheckedRefCastAddrInst:
+    case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+    case SILInstructionKind::CheckedCastAddrBranchInst:
+    case SILInstructionKind::PartialApplyInst:
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::YieldInst:
@@ -503,7 +517,7 @@ void DestroyHoisting::insertDestroys(Bits &toInsert, Bits &activeDestroys,
   SILInstruction *insertionPoint =
     (afterInst ? &*std::next(afterInst->getIterator()) : &*inBlock->begin());
   SILBuilder builder(insertionPoint);
-  SILLocation loc = RegularLocation(insertionPoint->getLoc());
+  SILLocation loc = CleanupLocation(insertionPoint->getLoc());
 
   // Insert destroy_addr instructions for all bits in toInsert.
   for (int locIdx = toInsert.find_first(); locIdx >= 0;

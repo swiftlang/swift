@@ -86,7 +86,7 @@ func testCaseTrivialValue4() {
                     // expected-note @-8 {{capturing use}}
 }
 
-class Klass {
+class Klass: UnsafeConcurrentValue {
   var next: Klass? = nil
 }
 func inoutUserKlass(_ k: inout Klass) {}
@@ -130,7 +130,7 @@ func testCaseClassInoutField() {
 // Non Trivial Value Type //
 ////////////////////////////
 
-struct NonTrivialValueType {
+struct NonTrivialValueType: ConcurrentValue {
   var i: Int
   var k: Klass? = nil
 
@@ -182,7 +182,7 @@ protocol MyProt {
   var k: Klass? { get set }
 }
 
-func testCaseAddressOnlyAllocBoxToStackable<T : MyProt>(i : T) {
+func testCaseAddressOnlyAllocBoxToStackable<T : MyProt & ConcurrentValue>(i : T) {
   var i2 = i
   f {
     print(i2.i + 17)
@@ -199,7 +199,7 @@ func testCaseAddressOnlyAllocBoxToStackable<T : MyProt>(i : T) {
 
 // Alloc box to stack can't handle this test case, so show off a bit and make
 // sure we can emit a great diagnostic here!
-func testCaseAddressOnlyNoAllocBoxToStackable<T : MyProt>(i : T) {
+func testCaseAddressOnlyNoAllocBoxToStackable<T : MyProt & ConcurrentValue>(i : T) {
   let f2 = F()
   var i2 = i
   f2.useConcurrent {

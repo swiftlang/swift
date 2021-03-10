@@ -558,25 +558,39 @@ swift::matchWitness(
     if (!funcReq->isMutating() && funcWitness->isMutating())
       return RequirementMatch(witness, MatchKind::MutatingConflict);
 
-    // If the requirement is rethrows, the witness must either be
-    // rethrows or be non-throwing if the requirement is not by conformance
-    // else the witness can be by conformance, throwing or non throwing
-    if (reqAttrs.hasAttribute<RethrowsAttr>() &&
-        !witnessAttrs.hasAttribute<RethrowsAttr>()) {
+    // If the requirement has an explicit 'rethrows' argument, the witness
+    // must be 'rethrows', too.
+    if (reqAttrs.hasAttribute<RethrowsAttr>()) {
       auto reqRethrowingKind =
           funcReq->getPolymorphicEffectKind(EffectKind::Throws);
       auto witnessRethrowingKind =
           funcWitness->getPolymorphicEffectKind(EffectKind::Throws);
-      if (reqRethrowingKind == PolymorphicEffectKind::ByConformance) {
-        switch (witnessRethrowingKind) {
-        case PolymorphicEffectKind::ByConformance:
-        case PolymorphicEffectKind::Always:
-        case PolymorphicEffectKind::None:
+
+      assert(reqRethrowingKind != PolymorphicEffectKind::Always &&
+             reqRethrowingKind != PolymorphicEffectKind::None);
+
+      switch (witnessRethrowingKind) {
+      case PolymorphicEffectKind::None:
+      case PolymorphicEffectKind::Invalid:
+      case PolymorphicEffectKind::ByClosure:
+        break;
+
+      case PolymorphicEffectKind::ByConformance: {
+        // A by-conformance `rethrows` witness cannot witness a
+        // by-conformance `rethrows` requirement unless the protocol
+        // is @rethrows. Otherwise, we don't have enough information
+        // at the call site to assess if the conformance actually
+        // throws or not.
+        auto *proto = cast<ProtocolDecl>(req->getDeclContext());
+        if (reqRethrowingKind == PolymorphicEffectKind::ByConformance &&
+            proto->hasPolymorphicEffect(EffectKind::Throws))
           break;
-        default:
-          return RequirementMatch(witness, MatchKind::RethrowsConflict);
-        }
-      } else if (cast<AbstractFunctionDecl>(witness)->hasThrows()) {
+
+        return RequirementMatch(witness,
+                                MatchKind::RethrowsByConformanceConflict);
+      }
+
+      case PolymorphicEffectKind::Always:
         return RequirementMatch(witness, MatchKind::RethrowsConflict);
       }
     }
@@ -1799,8 +1813,7 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 ProtocolConformance *MultiConformanceChecker::
 checkIndividualConformance(NormalProtocolConformance *conformance,
                            bool issueFixit) {
-  PrettyStackTraceConformance trace(getASTContext(), "type-checking",
-                                    conformance);
+  PrettyStackTraceConformance trace("type-checking", conformance);
 
   std::vector<MissingWitness> revivedMissingWitnesses;
   switch (conformance->getState()) {
@@ -1942,12 +1955,11 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     if (!Proto->isMarkerProtocol()) {
       for (const auto &req : *conditionalReqs) {
         if (req.getKind() == RequirementKind::Conformance &&
-            req.getSecondType()->castTo<ProtocolType>()->getDecl()
-              ->isMarkerProtocol()) {
+            req.getProtocolDecl()->isMarkerProtocol()) {
           C.Diags.diagnose(
             ComplainLoc, diag::marker_protocol_conditional_conformance,
             Proto->getName(), req.getFirstType(),
-            req.getSecondType()->castTo<ProtocolType>()->getDecl()->getName());
+            req.getProtocolDecl()->getName());
           conformance->setInvalid();
         }
       }
@@ -2525,6 +2537,13 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     diag.fixItReplace(FD->getThrowsLoc(), getTokenText(tok::kw_rethrows));
     break;
   }
+  case MatchKind::RethrowsByConformanceConflict: {
+    auto witness = match.Witness;
+    auto diag =
+        diags.diagnose(witness,
+                       diag::protocol_witness_rethrows_by_conformance_conflict);
+    break;
+  }
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
@@ -2705,6 +2724,7 @@ bool ConformanceChecker::checkActorIsolation(
   // Ensure that the witness is not actor-isolated in a manner that makes it
   // unsuitable as a witness.
   bool isCrossActor = false;
+  bool witnessIsUnsafe = false;
   Type witnessGlobalActor;
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
@@ -2728,10 +2748,10 @@ bool ConformanceChecker::checkActorIsolation(
       auto witnessVar = dyn_cast<VarDecl>(witness);
       if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
         auto independentNote = witness->diagnose(
-            diag::note_add_actorindependent_to_decl,
+            diag::note_add_nonisolated_to_decl,
             witness->getName(), witness->getDescriptiveKind());
-        independentNote.fixItInsert(witness->getAttributeInsertionLoc(false),
-            "@actorIndependent ");
+        independentNote.fixItInsert(witness->getAttributeInsertionLoc(true),
+            "nonisolated ");
       }
     }
 
@@ -2742,20 +2762,20 @@ bool ConformanceChecker::checkActorIsolation(
     return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
 
-  case ActorIsolationRestriction::CrossGlobalActor:
-    isCrossActor = true;
+  case ActorIsolationRestriction::GlobalActorUnsafe:
+    witnessIsUnsafe = true;
     LLVM_FALLTHROUGH;
 
   case ActorIsolationRestriction::GlobalActor: {
     // Hang on to the global actor that's used for the witness. It will need
     // to match that of the requirement.
+    isCrossActor = witnessRestriction.isCrossActor;
     witnessGlobalActor = witness->getDeclContext()->mapTypeIntoContext(
         witnessRestriction.getGlobalActor());
     break;
   }
 
   case ActorIsolationRestriction::Unsafe:
-  case ActorIsolationRestriction::LocalCapture:
     break;
 
   case ActorIsolationRestriction::Unrestricted:
@@ -2766,9 +2786,14 @@ bool ConformanceChecker::checkActorIsolation(
 
   // Check whether the requirement requires some particular actor isolation.
   Type requirementGlobalActor;
+  bool requirementIsUnsafe = false;
   switch (auto requirementIsolation = getActorIsolation(requirement)) {
   case ActorIsolation::ActorInstance:
     llvm_unreachable("There are not actor protocols");
+
+  case ActorIsolation::GlobalActorUnsafe:
+    requirementIsUnsafe = true;
+    LLVM_FALLTHROUGH;
 
   case ActorIsolation::GlobalActor: {
     auto requirementSubs = SubstitutionMap::getProtocolSubstitutions(
@@ -2778,8 +2803,11 @@ bool ConformanceChecker::checkActorIsolation(
     break;
   }
 
-  case ActorIsolation::Independent:
   case ActorIsolation::IndependentUnsafe:
+    // The requirement is explicitly unsafe; allow it.
+    return false;
+
+  case ActorIsolation::Independent:
   case ActorIsolation::Unspecified:
     break;
   }
@@ -2815,6 +2843,10 @@ bool ConformanceChecker::checkActorIsolation(
     if (requirement->hasClangNode())
       return false;
 
+    // If the witness is "unsafe", allow the mismatch.
+    if (witnessIsUnsafe)
+      return false;
+
     witness->diagnose(
         diag::global_actor_isolated_witness, witness->getDescriptiveKind(),
         witness->getName(), witnessGlobalActor, Proto->getName());
@@ -2824,9 +2856,11 @@ bool ConformanceChecker::checkActorIsolation(
 
   // If the requirement has a global actor but the witness does not, we have
   // an isolation error.
-  //
-  // FIXME: Within a module, this will be an inference rule.
   if (requirementGlobalActor && !witnessGlobalActor) {
+    // If the requirement's global actor was "unsafe", we allow this.
+    if (requirementIsUnsafe)
+      return false;
+
     if (isCrossActor) {
       return diagnoseNonConcurrentTypesInReference(
         witness, DC, witness->getLoc(), ConcurrentReferenceKind::CrossActor);
@@ -4449,7 +4483,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
   for (auto req : proto->getRequirementSignature()) {
     if (req.getKind() == RequirementKind::Conformance) {
       auto depTy = req.getFirstType();
-      auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+      auto *proto = req.getProtocolDecl();
       auto conformance = Conformance->getAssociatedConformance(depTy, proto);
       if (conformance.isConcrete()) {
         auto *concrete = conformance.getConcrete();
@@ -4485,17 +4519,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       if (!witness) return;
 
       auto &C = witness->getASTContext();
-
-      // Ensure that Actor.enqueue(partialTask:) is implemented within the
-      // actor class itself.
-      if (FuncDecl::isEnqueuePartialTaskName(C, requirement->getName()) &&
-          Proto->isSpecificProtocol(KnownProtocolKind::Actor) &&
-          DC != witness->getDeclContext() &&
-          Adoptee->getClassOrBoundGenericClass() &&
-          Adoptee->getClassOrBoundGenericClass()->isActor()) {
-        witness->diagnose(diag::enqueue_partial_task_not_in_context, Adoptee);
-        return;
-      }
 
       if (checkActorIsolation(requirement, witness))
         return;
@@ -5628,13 +5651,6 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
   }
 }
 
-std::vector<ProtocolConformance *>
-LookupAllConformancesInContextRequest::evaluate(
-    Evaluator &eval, const IterableDeclContext *IDC) const {
-  auto result = IDC->getLocalConformances(ConformanceLookupKind::All);
-  return std::vector<ProtocolConformance *>(result.begin(), result.end());
-}
-
 void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto *const dc = idc->getAsGenericContext();
 
@@ -5650,9 +5666,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   const auto defaultAccess = nominal->getFormalAccess();
 
   // Check each of the conformances associated with this context.
-  auto conformances =
-      evaluateOrDefault(dc->getASTContext().evaluator,
-                        LookupAllConformancesInContextRequest{idc}, {});
+  auto conformances = idc->getLocalConformances();
 
   // The conformance checker bundle that checks all conformances in the context.
   auto &Context = dc->getASTContext();
@@ -5702,8 +5716,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
   // Check constraints of ConcurrentValue.
   if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
-    bool asWarning = errorConformance || codingKeyConformance;
-    checkConcurrentValueConformance(concurrentValueConformance, asWarning);
+    ConcurrentValueCheck check = ConcurrentValueCheck::Explicit;
+    if (errorConformance || codingKeyConformance)
+      check = ConcurrentValueCheck::ImpliedByStandardProtocol;
+    checkConcurrentValueConformance(concurrentValueConformance, check);
   }
 
   // Check all conformances.
@@ -6174,9 +6190,6 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownDerivableProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
-  case KnownDerivableProtocolKind::Actor:
-    return derived.deriveActor(Requirement);
-
   case KnownDerivableProtocolKind::OptionSet:
       llvm_unreachable(
           "When possible, OptionSet is derived via memberwise init synthesis");
@@ -6362,8 +6375,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
 
     Type defaultAssocTypeInContext =
       proto->mapTypeIntoContext(defaultAssocType);
-    auto requirementProto =
-      req.getSecondType()->castTo<ProtocolType>()->getDecl();
+    auto requirementProto = req.getProtocolDecl();
     auto conformance = conformsToProtocol(defaultAssocTypeInContext,
                                           requirementProto, proto);
     if (conformance.isInvalid()) {

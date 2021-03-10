@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-concurrent-value-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
 // REQUIRES: concurrency
 
 class NotConcurrent { }
@@ -215,21 +215,19 @@ enum E2<T> {
 
 extension E2: ConcurrentValue where T: ConcurrentValue { }
 
-class C1: ConcurrentValue {
+final class C1: ConcurrentValue {
   let nc: NotConcurrent? = nil // expected-error{{stored property 'nc' of 'ConcurrentValue'-conforming class 'C1' has non-concurrent-value type 'NotConcurrent?'}}
   var x: Int = 0 // expected-error{{stored property 'x' of 'ConcurrentValue'-conforming class 'C1' is mutable}}
   let i: Int = 0
 }
 
-class C2: ConcurrentValue {
+final class C2: ConcurrentValue {
   let x: Int = 0
 }
 
-class C3: C2 {
-  var y: Int = 0 // expected-error{{stored property 'y' of 'ConcurrentValue'-conforming class 'C3' is mutable}}
-}
+class C3 { }
 
-class C4: C2, UnsafeConcurrentValue {
+class C4: C3, UnsafeConcurrentValue {
   var y: Int = 0 // okay
 }
 
@@ -241,17 +239,9 @@ class C6: C5 {
   var y: Int = 0 // still okay, it's unsafe
 }
 
-class C7<T>: ConcurrentValue { }
+final class C7<T>: ConcurrentValue { }
 
-class C8: C7<Int> { } // okay
-
-open class C9: ConcurrentValue { } // expected-error{{open class 'C9' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
-
-public class C10: ConcurrentValue { }
-// expected-note@-1{{superclass is declared here}}
-open class C11: C10 { }
-// expected-error@-1{{superclass 'C10' of open class must be open}}
-// expected-error@-2{{open class 'C11' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
+class C9: ConcurrentValue { } // expected-error{{non-final class 'C9' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
 
 // ----------------------------------------------------------------------
 // UnsafeConcurrentValue disabling checking

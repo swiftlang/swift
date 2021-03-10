@@ -511,12 +511,14 @@ public:
   }
 };
 
-class LocatorPathElt::SynthesizedArgument final : public StoredIntegerElement<1> {
+class LocatorPathElt::SynthesizedArgument final : public StoredIntegerElement<2> {
 public:
-  SynthesizedArgument(unsigned index)
-      : StoredIntegerElement(ConstraintLocator::SynthesizedArgument, index) {}
+  SynthesizedArgument(unsigned index, bool afterCodeCompletionLoc = false)
+      : StoredIntegerElement(ConstraintLocator::SynthesizedArgument, index,
+                             afterCodeCompletionLoc) {}
 
-  unsigned getIndex() const { return getValue(); }
+  unsigned getIndex() const { return getValue<0>(); }
+  bool isAfterCodeCompletionLoc() const { return getValue<1>(); }
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::SynthesizedArgument;
@@ -778,6 +780,20 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::ConformanceRequirement;
+  }
+};
+
+class LocatorPathElt::PlaceholderType final
+    : public StoredPointerElement<PlaceholderTypeRepr> {
+public:
+  PlaceholderType(PlaceholderTypeRepr *placeholderRepr)
+      : StoredPointerElement(PathElementKind::PlaceholderType,
+                             placeholderRepr) {}
+
+  PlaceholderTypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::PlaceholderType;
   }
 };
 

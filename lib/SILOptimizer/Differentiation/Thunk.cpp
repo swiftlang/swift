@@ -76,7 +76,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   builder.addRequirement(newRequirement, source, nullptr);
 
   auto genericSig = std::move(builder).computeGenericSignature(
-      SourceLoc(), /*allowConcreteGenericParams=*/true);
+      /*allowConcreteGenericParams=*/true);
   genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype =
@@ -425,8 +425,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   }
 
   auto *fnArg = thunk->getArgumentsWithoutIndirectResults().back();
-  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments,
-                                    /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -735,8 +734,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   // Get the linear map thunk argument and apply it.
   auto *linearMap = thunk->getArguments().back();
-  auto *ai = builder.createApply(loc, linearMap, SubstitutionMap(), arguments,
-                                 /*isNonThrowing*/ false);
+  auto *ai = builder.createApply(loc, linearMap, SubstitutionMap(), arguments);
 
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result.
@@ -915,8 +913,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   assert(arguments.size() ==
          derivativeFnType->getNumParameters() +
              derivativeFnType->getNumIndirectFormalResults());
-  auto *apply = builder.createApply(loc, assocRef, assocSubstMap, arguments,
-                                    /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(loc, assocRef, assocSubstMap, arguments);
 
   // Extract all direct results.
   SmallVector<SILValue, 8> directResults;

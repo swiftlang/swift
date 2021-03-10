@@ -33,6 +33,9 @@ enum class InitializerKind : uint8_t {
 
   /// A function's default argument expression.
   DefaultArgument,
+
+  /// A property wrapper initialization expression.
+  PropertyWrapper,
 };
 
 /// An Initializer is a kind of DeclContext used for expressions that
@@ -41,9 +44,9 @@ enum class InitializerKind : uint8_t {
 /// Generally, Initializers are created lazily, as most initializers
 /// don't really require DeclContexts.
 class Initializer : public DeclContext {
-  unsigned Kind : 1;
+  unsigned Kind : 2;
 protected:
-  unsigned SpareBits : 31;
+  unsigned SpareBits : 30;
   
   Initializer(InitializerKind kind, DeclContext *parent)
     : DeclContext(DeclContextKind::Initializer, parent),
@@ -193,6 +196,39 @@ public:
       return LDC->getLocalDeclContextKind() ==
         LocalDeclContextKind::DefaultArgumentInitializer;
     return false;
+  }
+};
+
+/// A property wrapper initialization expression.  The parent context is the
+/// function or closure which owns the property wrapper.
+class PropertyWrapperInitializer : public Initializer {
+public:
+  enum class Kind {
+    WrappedValue,
+    ProjectedValue
+  };
+
+private:
+  ParamDecl *param;
+  Kind kind;
+
+public:
+  explicit PropertyWrapperInitializer(DeclContext *parent, ParamDecl *param, Kind kind)
+      : Initializer(InitializerKind::PropertyWrapper, parent),
+        param(param), kind(kind) {}
+
+  ParamDecl *getParam() const { return param; }
+
+  Kind getKind() const { return kind; }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto init = dyn_cast<Initializer>(DC))
+      return classof(init);
+    return false;
+  }
+
+  static bool classof(const Initializer *I) {
+    return I->getInitializerKind() == InitializerKind::PropertyWrapper;
   }
 };
   

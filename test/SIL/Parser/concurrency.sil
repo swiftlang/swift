@@ -17,4 +17,16 @@ bb0(%0 : $Actor):
   return %2 : $()
 }
 
+sil @some_async_function : $@convention(thin) @async () -> ()
+
+// CHECK-LABEL: sil @test_noasync_call
+sil @test_noasync_call : $@convention(thin) () -> () {
+bb0:
+  // CHECK: apply [noasync]
+  %fn = function_ref @some_async_function : $@convention(thin) @async () -> ()
+  %result = apply [noasync] %fn() : $@convention(thin) @async () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
 

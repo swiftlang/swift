@@ -68,6 +68,8 @@ func test(s: ValidStructInvalidMember) {
 // there were no errors)
 func other() -> Int {}
 // CHECK-VALID: allow-errors.swift:[[@LINE-1]]:22: error: missing return in a function expected to return 'Int'
+func other2() -> Bool {}
+// CHECK-VALID: allow-errors.swift:[[@LINE-1]]:24: error: missing return in a function expected to return 'Bool'
 #endif
 
 // All invalid uses should have no errors in the file itself, all referenced
@@ -82,7 +84,8 @@ func test() {
   invalidFunc()
 }
 // CHECK-INVALID-TOP-NOT: allow-errors.swift:{{.*}} error:
-// CHECK-INVALID-TOP: error: allowing deserialization of invalid declaration 'invalidFunc()' from module 'errors'
+// CHECK-INVALID-TOP: error: allowing deserialization of error type '<null>' in module 'errors'
+// CHECK-INVALID-TOP: error: allowing deserialization of invalid declaration 'invalidFunc()' (global function) in module 'errors'
 // CHECK-INVALID-TOP-NOT: allow-errors.swift:{{.*}} error:
 #endif
 
@@ -94,7 +97,9 @@ func test(s: ValidStructInvalidMember) {
   print(s.memberMissingType)
 }
 // CHECK-INVALID-MEMBER-NOT: allow-errors.swift:{{.*}} error:
-// CHECK-INVALID-MEMBER: error: allowing deserialization of invalid declaration 'memberMissingType' from module 'errors'
+// CHECK-INVALID-MEMBER: error: allowing deserialization of error type '<null>' in module 'errors'
+// CHECK-INVALID-MEMBER: error: allowing deserialization of invalid declaration '_' (getter) in module 'errors'
+// CHECK-INVALID-MEMBER: error: allowing deserialization of invalid declaration 'memberMissingType' (property) in module 'errors'
 // CHECK-INVALID-MEMBER-NOT: allow-errors.swift:{{.*}} error:
 #endif
 
@@ -106,6 +111,8 @@ func test(s: ValidStructInvalidMember) {
   s.funcBadArg()
 }
 // CHECK-INVALID-METHOD-NOT: allow-errors.swift:{{.*}} error:
-// CHECK-INVALID-METHOD: error: allowing deserialization of invalid declaration 'funcBadArg' from module 'errors'
+// CHECK-INVALID-METHOD: error: allowing deserialization of error type '<null>' in module 'errors'
+// CHECK-INVALID-METHOD: error: allowing deserialization of invalid declaration 'arg' (parameter) in module 'errors'
+// CHECK-INVALID-METHOD: error: allowing deserialization of invalid declaration 'funcBadArg' (instance method) in module 'errors'
 // CHECK-INVALID-METHOD-NOT: allow-errors.swift:{{.*}} error:
 #endif

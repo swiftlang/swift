@@ -19,6 +19,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -242,6 +243,14 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
+    if (auto wrapperInfo = PD->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.hasSynthesizedInitializers()) {
+        SGF.SGM.emitPropertyWrapperBackingInitializer(PD);
+      }
+
+      PD = cast<ParamDecl>(wrapperInfo.backingVar);
+    }
+
     auto type = PD->getType();
 
     assert(type->isMaterializable());
@@ -463,6 +472,7 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
       case ActorIsolation::Unspecified:
       case ActorIsolation::Independent:
       case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::GlobalActorUnsafe:
         break;
 
       case ActorIsolation::ActorInstance: {
@@ -532,7 +542,50 @@ SILValue SILGenFunction::emitLoadGlobalActorExecutor(Type globalActor) {
     actorType, /*isSuper*/ false, sharedInstanceDecl, PreparedArguments(),
     subs, AccessSemantics::Ordinary, instanceType, SGFContext());
   ManagedValue actorInstance = std::move(actorInstanceRV).getScalarValue();
-  return actorInstance.borrow(*this, loc).getValue();
+
+  if (isInFormalEvaluationScope())
+    return actorInstance.formalAccessBorrow(*this, loc).getValue();
+  else
+    return actorInstance.borrow(*this, loc).getValue();
+}
+
+
+HopToExecutorInst* SILGenFunction::emitHopToTargetActor(SILLocation loc,
+                                          Optional<ActorIsolation> maybeIso,
+                                          Optional<ManagedValue> maybeSelf) {
+  if (!maybeIso)
+    return nullptr;
+
+  auto actorIso = maybeIso.getValue();
+  Optional<SILValue> executor = None;
+
+  switch (actorIso.getKind()) {
+  case ActorIsolation::Unspecified:
+  case ActorIsolation::Independent:
+  case ActorIsolation::IndependentUnsafe:
+    break;
+
+  case ActorIsolation::ActorInstance: {
+    // "self" here means the actor instance's "self" value.
+    assert(maybeSelf.hasValue() && "actor-instance but no self provided?");
+    auto self = maybeSelf.getValue();
+    if (isInFormalEvaluationScope())
+      executor = self.formalAccessBorrow(*this, loc).getValue();
+    else
+      executor = self.borrow(*this, loc).getValue();
+    break;
+  }
+
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::GlobalActorUnsafe:
+    executor = emitLoadGlobalActorExecutor(actorIso.getGlobalActor());
+    break;
+  }
+
+  if (executor)
+    return B.createHopToExecutor(loc, executor.getValue());
+
+  return nullptr;
 }
 
 static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,

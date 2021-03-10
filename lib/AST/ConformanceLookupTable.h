@@ -437,9 +437,7 @@ public:
   /// Look for all of the conformances within the given declaration context.
   void lookupConformances(NominalTypeDecl *nominal,
                           DeclContext *dc,
-                          ConformanceLookupKind lookupKind,
-                          SmallVectorImpl<ProtocolDecl *> *protocols,
-                          SmallVectorImpl<ProtocolConformance *> *conformances,
+                          std::vector<ProtocolConformance *> *conformances,
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
   /// Retrieve the complete set of protocols to which this nominal

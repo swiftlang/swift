@@ -6,6 +6,33 @@ struct LoadableIntWrapper {
   LoadableIntWrapper operator-(LoadableIntWrapper rhs) {
     return LoadableIntWrapper{.value = value - rhs.value};
   }
+
+  int operator()() {
+    return value;
+  }
+  int operator()(int x) {
+    return value + x;
+  }
+  int operator()(int x, int y) {
+    return value + x * y;
+  }
+};
+
+struct AddressOnlyIntWrapper {
+  int value;
+
+  AddressOnlyIntWrapper(int value) : value(value) {}
+  AddressOnlyIntWrapper(const AddressOnlyIntWrapper &other) : value(other.value) {}
+
+  int operator()() {
+    return value;
+  }
+  int operator()(int x) {
+    return value + x;
+  }
+  int operator()(int x, int y) {
+    return value + x * y;
+  }
 };
 
 struct HasDeletedOperator {

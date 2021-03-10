@@ -15,15 +15,22 @@
 // These are the "backbone or "skeleton" of the Syntax tree, providing
 // the recursive structure, child relationships, kind of node, etc.
 //
-// They are reference-counted and strictly immutable, so can be shared freely
-// among Syntax nodes and have no specific identity. They could even in theory
-// be shared for expressions like 1 + 1 + 1 + 1 - you don't need 7 syntax nodes
-// to express that at this layer.
+// They are  strictly immutable, so can be shared freely among Syntax nodes and
+// have no specific identity. They could even in theory be shared for
+// expressions like 1 + 1 + 1 + 1 - you don't need 7 syntax nodes to express
+// that at this layer.
 //
 // These are internal implementation ONLY - do not expose anything involving
 // RawSyntax publicly. Clients of lib/Syntax should not be aware that they
 // exist.
 //
+// RawSyntax nodes always live in a SyntaxArena. The user of the RawSyntax nodes
+// is responsible to ensure that the SyntaxArena stays alive while the RawSyntax
+// nodes are being accessed. During tree cration this is done by the
+// SyntaxTreeCreator holding on to the arena. In lib/Syntax, the root SyntaxData
+// node retains the syntax arena. Should a RawSyntaxNode A reference a node B
+// from a different arena, it automatically adds B's arena as a child arena of
+// A's arena, thereby keeping B's arena alive as long as A's arena is alive.
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SYNTAX_RAWSYNTAX_H
@@ -51,7 +58,7 @@ using llvm::StringRef;
 #ifndef NDEBUG
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
   do {                                                                         \
-    if (auto &__Child = Raw->getChild(Cursor))                                 \
+    if (auto __Child = Raw->getChild(Cursor))                                  \
       assert(__Child->getKind() == ExpectedKind);                              \
   } while (false)
 #else
@@ -62,7 +69,7 @@ using llvm::StringRef;
 #define syntax_assert_child_token(Raw, CursorName, ...)                        \
   do {                                                                         \
     bool __Found = false;                                                      \
-    if (auto &__Token = Raw->getChild(Cursor::CursorName)) {                   \
+    if (auto __Token = Raw->getChild(Cursor::CursorName)) {                    \
       assert(__Token->isToken());                                              \
       if (__Token->isPresent()) {                                              \
         for (auto Token : {__VA_ARGS__}) {                                     \
@@ -84,7 +91,7 @@ using llvm::StringRef;
 #define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...)        \
   do {                                                                         \
     bool __Found = false;                                                      \
-    if (auto &__Child = Raw->getChild(Cursor::CursorName)) {                   \
+    if (auto __Child = Raw->getChild(Cursor::CursorName)) {                    \
       assert(__Child->isToken());                                              \
       if (__Child->isPresent()) {                                              \
         assert(__Child->getTokenKind() == TokenKind);                          \
@@ -150,7 +157,7 @@ typedef unsigned SyntaxNodeId;
 ///
 /// This is implementation detail - do not expose it in public API.
 class RawSyntax final
-    : private llvm::TrailingObjects<RawSyntax, RC<RawSyntax>> {
+    : private llvm::TrailingObjects<RawSyntax, const RawSyntax *> {
   friend TrailingObjects;
 
   /// The ID that shall be used for the next node that is created and does not
@@ -160,12 +167,8 @@ class RawSyntax final
   /// An ID of this node that is stable across incremental parses
   SyntaxNodeId NodeId;
 
-  mutable std::atomic<int> RefCount;
-
-  /// If this node was allocated using a \c SyntaxArena's bump allocator, a
-  /// reference to the arena to keep the underlying memory buffer of this node
-  /// alive. If this is a \c nullptr, the node owns its own memory buffer.
-  RC<SyntaxArena> Arena;
+  /// The \c SyntaxArena in which this node was allocated.
+  SyntaxArena *Arena;
 
   union {
     struct {
@@ -208,7 +211,7 @@ class RawSyntax final
     } Token;
   } Bits;
 
-  size_t numTrailingObjects(OverloadToken<RC<RawSyntax>>) const {
+  size_t numTrailingObjects(OverloadToken<const RawSyntax *>) const {
     return isToken() ? 0 : Bits.Layout.NumChildren;
   }
 
@@ -218,9 +221,9 @@ class RawSyntax final
   /// underlying storage.
   /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
   /// the caller needs to assure that the node ID has not been used yet.
-  RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout, size_t TextLength,
-            SourcePresence Presence, const RC<SyntaxArena> &Arena,
-            llvm::Optional<SyntaxNodeId> NodeId);
+  RawSyntax(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout,
+            size_t TextLength, SourcePresence Presence,
+            const RC<SyntaxArena> &Arena, llvm::Optional<SyntaxNodeId> NodeId);
   /// Constructor for creating token nodes
   /// \c SyntaxArena, that arena must be passed as \p Arena to retain the node's
   /// underlying storage.
@@ -235,7 +238,7 @@ class RawSyntax final
   size_t computeTextLength() {
     size_t TextLength = 0;
     for (size_t I = 0, NumChildren = getNumChildren(); I < NumChildren; ++I) {
-      auto &ChildNode = getChild(I);
+      auto ChildNode = getChild(I);
       if (ChildNode && !ChildNode->isMissing()) {
         TextLength += ChildNode->getTextLength();
       }
@@ -244,38 +247,18 @@ class RawSyntax final
   }
 
 public:
-  ~RawSyntax();
-
-  // This is a copy-pased implementation of llvm::ThreadSafeRefCountedBase with
-  // the difference that we do not delete the RawSyntax node's memory if the
-  // node was allocated within a SyntaxArena and thus doesn't own its memory.
-  void Retain() const { RefCount.fetch_add(1, std::memory_order_relaxed); }
-
-  void Release() const {
-    int NewRefCount = RefCount.fetch_sub(1, std::memory_order_acq_rel) - 1;
-    assert(NewRefCount >= 0 && "Reference count was already zero.");
-    if (NewRefCount == 0) {
-      // The node was allocated inside a SyntaxArena and thus doesn't own its
-      // own memory region. Hence we cannot free it. It will be deleted once
-      // the last RawSyntax node allocated with it will release its reference
-      // to the arena.
-      this->~RawSyntax();
-    }
-  }
-
   /// \name Factory methods.
   /// @{
 
   /// Make a raw "layout" syntax node.
-  static RC<RawSyntax> make(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                            size_t TextLength, SourcePresence Presence,
-                            const RC<SyntaxArena> &Arena = SyntaxArena::make(),
-                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
+  static const RawSyntax *
+  make(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout, size_t TextLength,
+       SourcePresence Presence, const RC<SyntaxArena> &Arena,
+       llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
-  static RC<RawSyntax>
-  makeAndCalcLength(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
-                    SourcePresence Presence,
-                    const RC<SyntaxArena> &Arena = SyntaxArena::make(),
+  static const RawSyntax *
+  makeAndCalcLength(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout,
+                    SourcePresence Presence, const RC<SyntaxArena> &Arena,
                     llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
     size_t TextLength = 0;
     for (auto Child : Layout) {
@@ -287,17 +270,17 @@ public:
   }
 
   /// Make a raw "token" syntax node.
-  static RC<RawSyntax> make(tok TokKind, StringRef Text, size_t TextLength,
-                            StringRef LeadingTrivia, StringRef TrailingTrivia,
-                            SourcePresence Presence,
-                            const RC<SyntaxArena> &Arena = SyntaxArena::make(),
-                            llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
+  static const RawSyntax *
+  make(tok TokKind, StringRef Text, size_t TextLength, StringRef LeadingTrivia,
+       StringRef TrailingTrivia, SourcePresence Presence,
+       const RC<SyntaxArena> &Arena,
+       llvm::Optional<SyntaxNodeId> NodeId = llvm::None);
 
   /// Make a raw "token" syntax node that was allocated in \p Arena.
-  static RC<RawSyntax>
+  static const RawSyntax *
   makeAndCalcLength(tok TokKind, StringRef Text, StringRef LeadingTrivia,
                     StringRef TrailingTrivia, SourcePresence Presence,
-                    const RC<SyntaxArena> &Arena = SyntaxArena::make(),
+                    const RC<SyntaxArena> &Arena,
                     llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
     size_t TextLength = 0;
     if (Presence != SourcePresence::Missing) {
@@ -310,20 +293,23 @@ public:
   }
 
   /// Make a missing raw "layout" syntax node.
-  static RC<RawSyntax>
-  missing(SyntaxKind Kind, const RC<SyntaxArena> &Arena = SyntaxArena::make()) {
+  static const RawSyntax *missing(SyntaxKind Kind,
+                                  const RC<SyntaxArena> &Arena) {
     return make(Kind, {}, /*TextLength=*/0, SourcePresence::Missing, Arena);
   }
 
   /// Make a missing raw "token" syntax node.
-  static RC<RawSyntax>
-  missing(tok TokKind, StringRef Text,
-          const RC<SyntaxArena> &Arena = SyntaxArena::make()) {
+  static const RawSyntax *missing(tok TokKind, StringRef Text,
+                                  const RC<SyntaxArena> &Arena) {
     return make(TokKind, Text, /*TextLength=*/0, {}, {},
                 SourcePresence::Missing, Arena);
   }
 
   /// @}
+
+  /// Return the arena in which this \c RawSyntax node has been allocated.
+  /// Keep in mind that the \c RawSyntax node *does not* retain the arena.
+  RC<SyntaxArena> getArena() const { return RC<SyntaxArena>(Arena); }
 
   SourcePresence getPresence() const {
     return static_cast<SourcePresence>(Bits.Common.Presence);
@@ -339,11 +325,11 @@ public:
 
   /// Get the number of nodes included in the subtree spanned by this node.
   /// This includes all transitive children and this node itself.
-  size_t getTotalNodes() { return getTotalSubNodeCount() + 1; }
+  size_t getTotalNodes() const { return getTotalSubNodeCount() + 1; }
 
   /// Get the number of transitive children of this node. This does not include
   /// the node itself.
-  size_t getTotalSubNodeCount() {
+  size_t getTotalSubNodeCount() const {
     if (isToken()) {
       return 0;
     } else {
@@ -431,16 +417,16 @@ public:
 
   /// Return a new token like this one, but with the given leading
   /// trivia instead.
-  RC<RawSyntax> withLeadingTrivia(StringRef NewLeadingTrivia) const {
+  const RawSyntax *withLeadingTrivia(StringRef NewLeadingTrivia) const {
     return makeAndCalcLength(getTokenKind(), getTokenText(), NewLeadingTrivia,
-                             getTrailingTrivia(), getPresence());
+                             getTrailingTrivia(), getPresence(), Arena);
   }
 
   /// Return a new token like this one, but with the given trailing
   /// trivia instead.
-  RC<RawSyntax> withTrailingTrivia(StringRef NewTrailingTrivia) const {
+  const RawSyntax *withTrailingTrivia(StringRef NewTrailingTrivia) const {
     return makeAndCalcLength(getTokenKind(), getTokenText(), getLeadingTrivia(),
-                             NewTrailingTrivia, getPresence());
+                             NewTrailingTrivia, getPresence(), Arena);
   }
 
   /// @}
@@ -449,10 +435,10 @@ public:
   /// @{
 
   /// Get the child nodes.
-  ArrayRef<RC<RawSyntax>> getLayout() const {
+  ArrayRef<const RawSyntax *> getLayout() const {
     if (isToken())
       return {};
-    return {getTrailingObjects<RC<RawSyntax>>(), Bits.Layout.NumChildren};
+    return {getTrailingObjects<const RawSyntax *>(), Bits.Layout.NumChildren};
   }
 
   size_t getNumChildren() const {
@@ -463,12 +449,13 @@ public:
 
   /// Get a child based on a particular node's "Cursor", indicating
   /// the position of the terms in the production of the Swift grammar.
-  const RC<RawSyntax> &getChild(CursorIndex Index) const {
+  const RawSyntax *getChild(CursorIndex Index) const {
     return getLayout()[Index];
   }
 
   /// Return the number of bytes this node takes when spelled out in the source
-  size_t getTextLength() { return Bits.Common.TextLength; }
+  /// including trivia.
+  size_t getTextLength() const { return Bits.Common.TextLength; }
 
   /// @}
 
@@ -477,12 +464,12 @@ public:
 
   /// Return a new raw syntax node with the given new layout element appended
   /// to the end of the node's layout.
-  RC<RawSyntax> append(RC<RawSyntax> NewLayoutElement) const;
+  const RawSyntax *append(const RawSyntax *NewLayoutElement) const;
 
   /// Return a new raw syntax node with the given new layout element replacing
   /// another at some cursor position.
-  RC<RawSyntax> replacingChild(CursorIndex Index,
-                               RC<RawSyntax> NewLayoutElement) const;
+  const RawSyntax *replacingChild(CursorIndex Index,
+                                  const RawSyntax *NewLayoutElement) const;
 
   /// @}
 

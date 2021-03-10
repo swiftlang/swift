@@ -36,7 +36,9 @@ func test1a() -> unionSearchFlags {
 
 func test1b(_ b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error {{cannot infer contextual base in reference to member 'description'}}
+  _ = .description == 1
+  // expected-error@-1 {{instance member 'description' cannot be used on type 'Int'}}
+  // expected-error@-2 {{member 'description' in 'Int' produces result of type 'String', but context expects 'Int'}}
 }
 
 enum MaybeInt {

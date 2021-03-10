@@ -28,7 +28,7 @@
 // Type descriptor.
 // CHECK-LABEL: @"$s11actor_class9ExchangerCMn" = {{.*}}constant
 //   superclass ref, negative bounds, positive bounds, num immediate members, num fields, field offset vector offset
-// CHECK-SAME: i32 0, i32 2, i32 [[#CLASS_METADATA_HEADER+9]], i32 9, i32 2, i32 [[#CLASS_METADATA_HEADER+1]],
+// CHECK-SAME: i32 0, i32 2, i32 [[#CLASS_METADATA_HEADER+8]], i32 8, i32 2, i32 [[#CLASS_METADATA_HEADER+1]],
 
 // Reflection field records.
 // CHECK-LABEL: @"$s11actor_class9ExchangerCMF" = internal constant
@@ -41,11 +41,6 @@ public actor MyClass {
   public var x: Int
   public init() { self.x = 0 }
 }
-
-// CHECK-LABEL: define {{.*}}void @"$s11actor_class7MyClassC7enqueue11partialTasky12_Concurrency012PartialAsyncG0V_tF"
-// CHECK:      swift_retain
-// CHECK:      [[T0:%.*]] = bitcast %T11actor_class7MyClassC* %1 to {{.*}}*
-// CHECK-NEXT: call swiftcc void @swift_defaultActor_enqueue(%swift.job* %0, {{.*}}* [[T0]])
 
 // CHECK-LABEL: define {{.*}}@"$s11actor_class7MyClassC1xSivg"
 // CHECK: [[T0:%.*]] = getelementptr inbounds %T11actor_class7MyClassC, %T11actor_class7MyClassC* %0, i32 0, i32 2

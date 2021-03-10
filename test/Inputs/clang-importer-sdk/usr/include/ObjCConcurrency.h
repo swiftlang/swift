@@ -60,7 +60,12 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 
 // Property & async method overloading
 -(void)getOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))handler;
+
 @property (readonly, nonatomic) NSArray<NSString *> *operations;
+
+-(void)doSomethingFlaggyWithCompletionHandler:(void (^)(BOOL, NSString *_Nullable, NSError *_Nullable))completionHandler __attribute__((swift_async_error(nonzero_argument, 1)));
+-(void)doSomethingZeroFlaggyWithCompletionHandler:(void (^)(NSString *_Nullable, BOOL, NSError *_Nullable))completionHandler __attribute__((swift_async_error(zero_argument, 2)));
+-(void)doSomethingMultiResultFlaggyWithCompletionHandler:(void (^)(BOOL, NSString *_Nullable, NSError *_Nullable, NSString *_Nullable))completionHandler __attribute__((swift_async_error(zero_argument, 1)));
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -123,5 +128,15 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
 @end
 
 #define MAGIC_NUMBER 42
+
+
+__attribute__((__swift_attr__("@MainActor(unsafe)")))
+@interface NXView : NSObject
+-(void)onDisplay;
+@end
+
+@interface NXButton: NXView
+-(void)onButtonPress;
+@end
 
 #pragma clang assume_nonnull end

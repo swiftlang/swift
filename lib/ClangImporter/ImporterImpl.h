@@ -1462,12 +1462,20 @@ public:
 
 namespace importer {
 
+/// Whether this is a forward declaration of a type. We ignore forward
+/// declarations in certain cases, and instead process the real declarations.
+bool isForwardDeclOfType(const clang::Decl *decl);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// \returns true if this operator should be made a static function
+/// even if imported as a non-static member function.
+bool isImportedAsStatic(clang::OverloadedOperatorKind op);
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,

@@ -646,7 +646,7 @@ public:
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
     auto *vjpCall = getBuilder().createApply(loc, vjpValue, SubstitutionMap(),
-                                             vjpArgs, ai->isNonThrowing());
+                                             vjpArgs, ai->getApplyOptions());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
     builder.emitDestroyValueOperation(loc, vjpValue);
 
@@ -715,7 +715,8 @@ public:
         tai->getLoc(), getOpValue(tai->getCallee()),
         getOpSubstitutionMap(tai->getSubstitutionMap()), args,
         createTrampolineBasicBlock(tai, pbStructVal, tai->getNormalBB()),
-        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()));
+        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()),
+        tai->getApplyOptions());
   }
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {

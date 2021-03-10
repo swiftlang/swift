@@ -5,7 +5,10 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
-// REQUIRES: PTRSIZE=64
+
+// Test needs to be updated for 32bit.
+// rdar://74810823
+// UNSUPPORTED: PTRSIZE=32
 
 #if _runtime(_ObjC)
 import Foundation

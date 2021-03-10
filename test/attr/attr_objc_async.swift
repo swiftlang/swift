@@ -34,6 +34,7 @@ actor MyActor {
   // CHECK: @objc func doBigJobOrFail(_: Int) async throws -> (AnyObject, Int)
   // CHECK-DUMP: func_decl{{.*}}doBigJobOrFail{{.*}}foreign_async=@convention(block) (Optional<AnyObject>, Int, Optional<Error>) -> (),completion_handler_param=1,error_param=2
   @objc func doBigJobOrFail(_: Int) async throws -> (AnyObject, Int) { return (self, 0) }
+  // expected-warning@-1{{cannot call function returning non-concurrent-value type '(AnyObject, Int)' across actors}}
 
   // Actor-isolated entities cannot be exposed to Objective-C.
   @objc func synchronousBad() { } // expected-error{{actor-isolated instance method 'synchronousBad()' cannot be @objc}}
@@ -43,8 +44,8 @@ actor MyActor {
   @objc var badProp: AnyObject { self } // expected-error{{actor-isolated property 'badProp' cannot be @objc}}
   @objc subscript(index: Int) -> AnyObject { self } // expected-error{{actor-isolated subscript 'subscript(_:)' cannot be @objc}}
 
-  // CHECK: @objc @actorIndependent func synchronousGood()
-  @objc @actorIndependent func synchronousGood() { }
+  // CHECK: @objc nonisolated func synchronousGood()
+  @objc nonisolated func synchronousGood() { }
 }
 
 // CHECK: actor class MyActor2

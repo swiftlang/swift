@@ -14,7 +14,6 @@
 // look for correct annotation after first deserialization's module print:
 
 // MODULE-CHECK:      actor UnsafeCounter {
-// MODULE-CHECK-NEXT:   @actorIndependent(unsafe) func enqueue(partialTask: PartialAsyncTask)
 // MODULE-CHECK-NEXT:   @actorIndependent(unsafe) var storage: Int
 // MODULE-CHECK-NEXT:   @actorIndependent var count: Int
 // MODULE-CHECK-NEXT:   var actorCount: Int

@@ -577,6 +577,15 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
         if (BIT->isFixedWidth() && BIT->getFixedWidth() == BFT->getBitWidth())
           break;
+      
+    // Support VecNxInt1 -> IntN bitcast for SIMD comparison results.
+    if (auto *Vec = CheckInput->getAs<BuiltinVectorType>())
+      if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
+        if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
+          if (Element->getFixedWidth() == 1 &&
+              BIT->isFixedWidth() &&
+              BIT->getFixedWidth() == Vec->getNumElements())
+            break;
 
     // FIXME: Implement bitcast typechecking.
     llvm_unreachable("Bitcast not supported yet!");
@@ -1371,6 +1380,22 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder);
+  builder.addParameter(
+      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheNativeObjectType))); // parent
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  builder.addParameter(
+     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+  builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+  return builder.build(id);
+}
+
 static ValueDecl *getConvertTaskToJob(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id,
                             _thin,
@@ -1848,7 +1873,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
-  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
   case IITDescriptor::VecOfBitcastsToInt:
   case IITDescriptor::Subdivide2Argument:
@@ -1875,6 +1899,15 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
     return makeVector(eltType, D.Vector_Width.getKnownMinValue());
+  }
+  
+  // The element type of a vector type.
+  case IITDescriptor::VecElementArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    auto vecType = argType->getAs<BuiltinVectorType>();
+    if (!vecType) return Type();
+    return vecType->getElementType();
   }
 
   // A pointer to an immediate type.
@@ -2547,6 +2580,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateAsyncTaskFuture:
     return getCreateAsyncTaskFuture(Context, Id);
+
+  case BuiltinValueKind::CreateAsyncTaskGroupFuture:
+    return getCreateAsyncTaskGroupFuture(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);

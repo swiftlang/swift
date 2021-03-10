@@ -115,3 +115,26 @@ struct FunctionTypes {
     asyncNonThrowing = syncThrowing    // expected-error{{invalid conversion}}
   }
 }
+
+// Overloading when there is conversion from sync to async.
+func bar(_ f: (Int) -> Int) -> Int {
+  return f(2)
+}
+
+func bar(_ f: (Int) async -> Int) async -> Int {
+  return await f(2)
+}
+
+func incrementSync(_ x: Int) -> Int {
+  return x + 1
+}
+
+func incrementAsync(_ x: Int) async -> Int {
+  return x + 1
+}
+
+func testAsyncWithConversions() async {
+  _ = bar(incrementSync)
+  _ = bar { -$0 }
+  _ = bar(incrementAsync) // expected-error{{call is 'async' but is not marked with 'await'}}
+}
