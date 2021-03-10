@@ -287,6 +287,8 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Dem; }
 
+  void clearNodeFactory() { Dem.clear(); }
+
   BuiltType decodeMangledType(Node *node);
   
   ///
