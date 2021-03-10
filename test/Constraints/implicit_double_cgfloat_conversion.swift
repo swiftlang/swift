@@ -124,3 +124,52 @@ func test_static_members_are_contextually_convertible() {
     return S.testFunc() // Ok
   }
 }
+
+func test_narrowing_is_delayed(x: Double, y: CGFloat) {
+  func test(_: CGFloat) {}
+
+  func overloaded(_: Double, _: Double) -> Double {}
+  func overloaded(_: CGFloat, _: CGFloat) -> CGFloat {}
+
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
+  let _: CGFloat = x / y // CGFloat.init(x / Double.init(y))
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
+  // CHECK: function_ref @$sSd22_builtinIntegerLiteralSdBI_tcfC
+  // CHECK: function_ref @$sSd1poiyS2d_SdtFZ
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
+  let _: CGFloat = x / y + 1 // CGFloat.init(x / Double(y) + 1 as Double)
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
+  let _: CGFloat = overloaded(x, y) // Prefers `overloaded(Double, Double) -> Double`
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
+  // CHECK: @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
+  let _: CGFloat = overloaded(x, overloaded(x, y)) // Prefers `overloaded(Double, Double) -> Double` in both occurances.
+
+  // Calls should behave exactly the same as contextual conversions.
+
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
+  test(x / y)
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$sSd1doiyS2d_SdtFZ
+  // CHECK: function_ref @$sSd22_builtinIntegerLiteralSdBI_tcfC
+  // CHECK: function_ref @$sSd1poiyS2d_SdtFZ
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC
+  test(x / y + 1)
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
+  test(overloaded(x, y))
+  // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
+  // CHECK: @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF10overloadedL_yS2d_SdtF
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
+  test(overloaded(x, overloaded(x, y)))
+}

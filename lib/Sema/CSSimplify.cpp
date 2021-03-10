@@ -10552,20 +10552,17 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::DoubleToCGFloat:
   case ConversionRestrictionKind::CGFloatToDouble: {
     // Prefer CGFloat -> Double over other way araund.
-    auto defaultImpact =
-        restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 2;
+    auto impact =
+        restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 10;
 
-    // Consider conversion with context to be worse
-    // by default because it means that expression
-    // as a whole couldn't get to the expected type.
-    if (auto last = locator.last()) {
-      if (last->is<LocatorPathElt::ContextualType>())
-        ++defaultImpact;
+    if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
+      if (auto *anchor = locator.trySimplifyToExpr()) {
+        if (auto depth = getExprDepth(anchor))
+          impact = (*depth + 1) * impact;
+      }
     }
 
-    auto numConversions = ImplicitValueConversions.size();
-    increaseScore(SK_ImplicitValueConversion,
-                  defaultImpact * (numConversions + 1));
+    increaseScore(SK_ImplicitValueConversion, impact);
 
     if (worseThanBestSolution())
       return SolutionKind::Error;
