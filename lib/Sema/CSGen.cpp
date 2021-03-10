@@ -381,9 +381,13 @@ namespace {
     if (paramTy->isEqual(argTy))
       return true;
 
-    // Double and CGFloat types could be used interchangeably
-    if ((argTy->isCGFloatType() || argTy->isDoubleType()) &&
-        (paramTy->isDoubleType() || paramTy->isCGFloatType()))
+    // Don't favor narrowing conversions.
+    if (argTy->isDoubleType() && paramTy->isCGFloatType())
+      return false;
+
+    // CGFloat could be passed to a Double parameter and that's
+    // is either equivalent of widening conversion.
+    if (argTy->isCGFloatType() && paramTy->isDoubleType())
       return true;
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
@@ -549,9 +553,9 @@ namespace {
     if (contextualTy->isEqual(resultTy))
       return true;
 
-    // Double and CGFloat could be used interchangeably.
-    return (resultTy->isDoubleType() || resultTy->isCGFloatType()) &&
-           (contextualTy->isDoubleType() || contextualTy->isCGFloatType());
+    // Double and CGFloat could be used interchangeably, so let's
+    // favor widening conversion going from CGFloat to Double.
+    return resultTy->isCGFloatType() && contextualTy->isDoubleType();
   }
 
   /// Favor unary operator constraints where we have exact matches
@@ -566,8 +570,19 @@ namespace {
       
       Type paramTy = FunctionType::composeInput(CS.getASTContext(),
                                                 fnTy->getParams(), false);
-      return isFavoredParamAndArg(
-                 CS, paramTy, CS.getType(expr->getArg())->getWithoutParens()) &&
+
+      auto argTy = CS.getType(expr->getArg())
+                       ->getWithoutParens()
+                       ->getWithoutSpecifierType();
+
+      // There is no CGFloat overloads on some of the unary operators, so
+      // in order to preserve current behavior let's not favor overloads
+      // which would result in conversion from CGFloat to Double otherwise
+      // it would lead to ambiguities.
+      if (argTy->isCGFloatType() && paramTy->isDoubleType())
+        return false;
+
+      return isFavoredParamAndArg(CS, paramTy, argTy) &&
              hasContextuallyFavorableResultType(fnTy,
                                                 CS.getContextualType(expr));
     };
@@ -723,6 +738,16 @@ namespace {
       auto secondParamTy = params[1].getOldType();
 
       auto contextualTy = CS.getContextualType(expr);
+
+      // Avoid favoring overloads that would require narrowing conversion
+      // to match the arguments.
+      {
+        if (firstArgTy->isDoubleType() && firstParamTy->isCGFloatType())
+          return false;
+
+        if (secondArgTy->isDoubleType() && secondParamTy->isCGFloatType())
+          return false;
+      }
 
       return (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
               isFavoredParamAndArg(CS, secondParamTy, secondArgTy,

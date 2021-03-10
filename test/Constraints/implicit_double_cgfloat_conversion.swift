@@ -173,3 +173,22 @@ func test_narrowing_is_delayed(x: Double, y: CGFloat) {
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcf
   test(overloaded(x, overloaded(x, y)))
 }
+
+extension CGFloat {
+  static func /(_: CGFloat, _: CGFloat) -> CGFloat { fatalError() }
+
+  static prefix func -(_: Self) -> Self { fatalError() }
+}
+
+// Make sure that solution with no Double/CGFloat conversions is preferred
+func test_no_ambiguity_with_unary_operators(width: CGFloat, height: CGFloat) {
+  struct R {
+    init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {}
+    init(x: Double,  y: Double,  width: Double,  height: Double) {}
+    init(x: Int,     y: Int,     width: Int,     height: Int) {}
+  }
+
+  // CHECK: function_ref @$s12CoreGraphics7CGFloatV34implicit_double_cgfloat_conversionE1doiyA2C_ACtFZ
+  // CHECK: function_ref @$s34implicit_double_cgfloat_conversion38test_no_ambiguity_with_unary_operators5width6heighty12CoreGraphics7CGFloatV_AGtF1RL_V1x1yAcdiG_A3GtcfC
+  _ = R(x: width / 4, y: -height / 2, width: width, height: height)
+}
