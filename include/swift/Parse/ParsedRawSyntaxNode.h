@@ -21,6 +21,16 @@
 #include "swift/Syntax/SyntaxKind.h"
 #include "llvm/Support/Debug.h"
 
+#ifndef NDEBUG
+/// Whether \c ParsedRawSyntaxNode should keep track of its range and verify
+/// that the children of layout nodes have consecutive ranges.
+/// Because this significantly changes the way, \c ParsedRawSyntaxNode and
+/// \c ParsedRawSyntaxNodeRecorder are being compiled, this is a separate
+/// constant from \c NDEBUG, so that it can be toggled independently to \c
+/// NDEBUG during development.
+#define PARSEDRAWSYNTAXNODE_VERIFY_RANGES 1
+#endif
+
 namespace swift {
 
 typedef const void *OpaqueSyntaxNode;
@@ -48,8 +58,13 @@ class ParsedRawSyntaxNode {
   /// SyntaxParseActions, which created it.
   RecordedOrDeferredNode Data;
 
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
   /// The range of this node, including trivia.
+  /// Only store this as a member when it's actually needed to keep \c
+  /// ParsedRawSyntaxNode as small as possible, which improves performance
+  /// when it is being passed around.
   CharSourceRange Range;
+#endif
   uint16_t SynKind;
   uint16_t TokKind;
   /// Primary used for capturing a deferred missing token.
@@ -62,24 +77,46 @@ public:
   // MARK: - Constructors
 
   ParsedRawSyntaxNode()
-      : Data(nullptr, DataKind::Null), Range(),
+      : Data(nullptr, DataKind::Null),
         SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
         TokKind(uint16_t(tok::unknown)) {}
 
-  ParsedRawSyntaxNode(OpaqueSyntaxNode Opaque, CharSourceRange Range,
-                      syntax::SyntaxKind SynKind, tok TokKind, DataKind DK,
-                      bool IsMissing)
-      : Data(Opaque, DK), Range(Range), SynKind(uint16_t(SynKind)),
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
+  ParsedRawSyntaxNode(RecordedOrDeferredNode Data, syntax::SyntaxKind SynKind,
+                      tok TokKind, bool IsMissing, CharSourceRange Range)
+      : Data(Data), Range(Range), SynKind(uint16_t(SynKind)),
         TokKind(uint16_t(TokKind)), IsMissing(IsMissing) {
     assert(getKind() == SynKind && "Syntax kind with too large value!");
     assert(getTokenKind() == TokKind && "Token kind with too large value!");
   }
 
+  ParsedRawSyntaxNode(OpaqueSyntaxNode Opaque, syntax::SyntaxKind SynKind,
+                      tok TokKind, DataKind DK, bool IsMissing,
+                      CharSourceRange Range)
+      : ParsedRawSyntaxNode(RecordedOrDeferredNode(Opaque, DK), SynKind,
+                            TokKind, IsMissing, Range) {}
+#else
+  ParsedRawSyntaxNode(RecordedOrDeferredNode Data, syntax::SyntaxKind SynKind,
+                      tok TokKind, bool IsMissing)
+      : Data(Data), SynKind(uint16_t(SynKind)), TokKind(uint16_t(TokKind)),
+        IsMissing(IsMissing) {
+    assert(getKind() == SynKind && "Syntax kind with too large value!");
+    assert(getTokenKind() == TokKind && "Token kind with too large value!");
+  }
+
+  ParsedRawSyntaxNode(OpaqueSyntaxNode Opaque, syntax::SyntaxKind SynKind,
+                      tok TokKind, DataKind DK, bool IsMissing)
+      : ParsedRawSyntaxNode(RecordedOrDeferredNode(Opaque, DK), SynKind,
+                            TokKind, IsMissing) {}
+#endif
+
   ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &&other) {
     assert(ensureDataIsNotRecorded() &&
            "recorded data is being destroyed by assignment");
     Data = std::move(other.Data);
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
     Range = std::move(other.Range);
+#endif
     SynKind = std::move(other.SynKind);
     TokKind = std::move(other.TokKind);
     IsMissing = std::move(other.IsMissing);
@@ -91,9 +128,7 @@ public:
     *this = std::move(other);
   }
 
-  static ParsedRawSyntaxNode null() {
-    return ParsedRawSyntaxNode{};
-  }
+  static ParsedRawSyntaxNode null() { return ParsedRawSyntaxNode(); }
 
   ~ParsedRawSyntaxNode() {
     assert(ensureDataIsNotRecorded() && "recorded data is being destructed");
@@ -152,8 +187,13 @@ public:
   }
   bool isMissing() const { return IsMissing; }
 
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
   /// Returns the range of this node including leading and trailing trivia.
+  ///
+  /// This method is only present if \c ParsedRawSyntaxNode is keeping track
+  /// of its range to verify element ranges.
   CharSourceRange getRange() const { return Range; }
+#endif
 
   size_t
   getDeferredNumChildren(const SyntaxParsingContext *SyntaxContext) const;
@@ -174,13 +214,17 @@ public:
     SynKind = uint16_t(syntax::SyntaxKind::Unknown);
     TokKind = uint16_t(tok::unknown);
     IsMissing = false;
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
     Range = CharSourceRange();
+#endif
   }
 
   ParsedRawSyntaxNode unsafeCopy() const {
     ParsedRawSyntaxNode copy;
     copy.Data = Data;
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
     copy.Range = Range;
+#endif
     copy.SynKind = SynKind;
     copy.TokKind = TokKind;
     copy.IsMissing = IsMissing;

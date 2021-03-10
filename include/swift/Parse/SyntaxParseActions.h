@@ -71,12 +71,11 @@ struct DeferredNodeInfo {
   syntax::SyntaxKind SyntaxKind;
   tok TokenKind;
   bool IsMissing;
-  CharSourceRange Range;
 
   DeferredNodeInfo(RecordedOrDeferredNode Data, syntax::SyntaxKind SyntaxKind,
-                   tok TokenKind, bool IsMissing, CharSourceRange Range)
+                   tok TokenKind, bool IsMissing)
       : Data(Data), SyntaxKind(SyntaxKind), TokenKind(TokenKind),
-        IsMissing(IsMissing), Range(Range) {}
+        IsMissing(IsMissing) {}
 };
 
 // MARK: - SyntaxParseActions
@@ -133,12 +132,24 @@ public:
   /// which created it, to retrieve children.
   /// This method assumes that \p node represents a *deferred* layout node.
   /// This methods returns all information needed to construct a \c
-  /// ParsedRawSyntaxNode of a child node. \p node is the parent node for which
-  /// the child at position \p ChildIndex should be retrieved. Furthmore, \p
-  /// node starts at \p StartLoc.
+  /// ParsedRawSyntaxNode of a child node, except for the range which can be
+  /// retrieved using \c getDeferredChildRange if element ranges should be
+  /// verified
+  /// \p node is the parent node for which the child at position \p ChildIndex
+  /// should be retrieved. Furthmore, \p node starts at \p StartLoc.
   virtual DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
-                                            size_t childIndex,
-                                            SourceLoc startLoc) = 0;
+                                            size_t childIndex) const = 0;
+
+  /// To verify \c ParsedRawSyntaxNode element ranges, the range of child nodes
+  /// returend by \c getDeferredChild needs to be determined. That's what this
+  /// method does.
+  /// It assumes that \p node is a deferred layout node starting at \p startLoc
+  /// and returns the range of the child node at \p childIndex.
+  /// This method is not designed with performance in mind. Do not use in
+  /// performance-critical code.
+  virtual CharSourceRange getDeferredChildRange(OpaqueSyntaxNode node,
+                                                size_t childIndex,
+                                                SourceLoc startLoc) const = 0;
 
   /// Return the number of children, \p node has. These can be retrieved using
   /// \c getDeferredChild.

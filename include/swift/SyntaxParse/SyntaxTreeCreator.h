@@ -85,8 +85,12 @@ private:
   OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) override;
   OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override;
 
-  DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node, size_t ChildIndex,
-                                    SourceLoc StartLoc) override;
+  DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
+                                    size_t ChildIndex) const override;
+
+  CharSourceRange getDeferredChildRange(OpaqueSyntaxNode node,
+                                        size_t ChildIndex,
+                                        SourceLoc StartLoc) const override;
 
   size_t getDeferredNumChildren(OpaqueSyntaxNode node) override;
 };

@@ -20,12 +20,12 @@
 #define SWIFT_PARSE_PARSEDRAWSYNTAXRECORDER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Parse/ParsedRawSyntaxNode.h"
 #include <memory>
 
 namespace swift {
 
 class CharSourceRange;
-class ParsedRawSyntaxNode;
 struct ParsedTrivia;
 class ParsedTriviaPiece;
 class SyntaxParseActions;
@@ -37,6 +37,18 @@ enum class tok;
 namespace syntax {
   enum class SyntaxKind;
 }
+
+/// The information returned from the \c lookupNode method in \c
+/// SyntaxParseActions.
+struct ParseLookupResult {
+  ParsedRawSyntaxNode Node;
+
+  /// The length of \c Node spelled out in source, including trivia.
+  size_t Length;
+
+  ParseLookupResult(ParsedRawSyntaxNode &&Node, size_t Length)
+      : Node(std::move(Node)), Length(Length) {}
+};
 
 class ParsedRawSyntaxRecorder final {
   std::shared_ptr<SyntaxParseActions> SPActions;
@@ -92,8 +104,8 @@ public:
   ParsedRawSyntaxNode makeDeferredMissing(tok tokKind, SourceLoc loc);
 
   /// Used for incremental re-parsing.
-  ParsedRawSyntaxNode lookupNode(size_t lexerOffset, SourceLoc loc,
-                                 syntax::SyntaxKind kind);
+  ParseLookupResult lookupNode(size_t lexerOffset, SourceLoc loc,
+                               syntax::SyntaxKind kind);
 
   /// For a deferred layout node \p parent, retrieve the deferred child node
   /// at \p ChildIndex.
@@ -103,8 +115,11 @@ public:
   /// For a deferred layout node \p node, retrieve the number of children.
   size_t getDeferredNumChildren(const ParsedRawSyntaxNode &node) const;
 
-#ifndef NDEBUG
-  static void verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements);
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
+  /// Verify that the ranges of \p elements are all consecutive and return the
+  /// range spanned by all \p elements.
+  static CharSourceRange
+  verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements);
 #endif
 };
 
