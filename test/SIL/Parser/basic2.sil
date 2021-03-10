@@ -32,12 +32,12 @@ bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [ossa] @test_poison
+// CHECK-LABEL: sil [ossa] @test_destroy_poison
 // CHECK: bb0([[T0:%[0-9]+]] : @owned $Builtin.NativeObject):
 // CHECK-NEXT: destroy_value [poison] [[T0]] : $Builtin.NativeObject
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil [ossa] @test_poison : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test_destroy_poison : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value [poison] %0 : $Builtin.NativeObject
   %2 = tuple ()
