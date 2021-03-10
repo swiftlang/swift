@@ -1420,11 +1420,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
             cs, cs.getConstraintLocator(loc)));
       }
 
-      auto *wrappedParam = paramInfo.getPropertyWrapperParam(argIdx);
       auto argLabel = argument.getLabel();
-      if (wrappedParam || argLabel.hasDollarPrefix()) {
-        if (cs.applyPropertyWrapperToParameter(paramTy, argTy, const_cast<ParamDecl *>(wrappedParam),
-                                               argLabel, subKind, locator).isFailure()) {
+      if (paramInfo.hasExternalPropertyWrapper(argIdx) || argLabel.hasDollarPrefix()) {
+        auto *param = getParameterAt(callee, argIdx);
+        if (cs.applyPropertyWrapperToParameter(paramTy, argTy, const_cast<ParamDecl *>(param),
+                                               argLabel, subKind, loc).isFailure()) {
           return cs.getTypeMatchFailure(loc);
         }
         continue;
@@ -8288,8 +8288,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
             var->setInvalid();
           });
 
-          auto *fix = AddPropertyWrapperAttribute::create(*this, backingType,
-                                                          getConstraintLocator(paramDecl));
+          auto *fix = RemoveProjectedValueArgument::create(*this, backingType, paramDecl,
+                                                           getConstraintLocator(paramDecl));
           recordFix(fix);
           hasError = true;
         }
@@ -10792,8 +10792,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipUnhandledConstructInResultBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
-  case FixKind::AddProjectedValue:
-  case FixKind::AddPropertyWrapperAttribute:
+  case FixKind::RemoveProjectedValueArgument:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
   case FixKind::SpecifyBaseTypeForContextualMember:

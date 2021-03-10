@@ -122,12 +122,8 @@ enum class FixKind : uint8_t {
   /// the storage or property wrapper.
   UseWrappedValue,
 
-  /// Add 'var projectedValue' to the property wrapper type to allow passing
-  /// a projection argument.
-  AddProjectedValue,
-
-  /// Add '@propertyWrapper' to a nominal type declaration.
-  AddPropertyWrapperAttribute,
+  /// Remove the '$' prefix from an argument label or parameter name.
+  RemoveProjectedValueArgument,
 
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
@@ -984,37 +980,21 @@ public:
                                  ConstraintLocator *locator);
 };
 
-class AddProjectedValue final : public ConstraintFix {
+class RemoveProjectedValueArgument final : public ConstraintFix {
   Type wrapperType;
+  ParamDecl *param;
 
-  AddProjectedValue(ConstraintSystem &cs, Type wrapper,
-                    ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddProjectedValue, locator), wrapperType(wrapper) {}
+  RemoveProjectedValueArgument(ConstraintSystem &cs, Type wrapper,
+                               ParamDecl *param, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveProjectedValueArgument, locator),
+        wrapperType(wrapper), param(param) {}
 
 public:
-  static AddProjectedValue *create(ConstraintSystem &cs, Type wrapper,
-                                   ConstraintLocator *locator);
+  static RemoveProjectedValueArgument *create(ConstraintSystem &cs, Type wrapper,
+                                              ParamDecl *param, ConstraintLocator *locator);
 
   std::string getName() const override {
-    return "add 'var projectedValue' to pass a projection argument";
-  }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
-};
-
-class AddPropertyWrapperAttribute final : public ConstraintFix {
-  Type wrapperType;
-
-  AddPropertyWrapperAttribute(ConstraintSystem &cs, Type wrapper,
-                              ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddPropertyWrapperAttribute, locator), wrapperType(wrapper) {}
-
-public:
-  static AddPropertyWrapperAttribute *create(ConstraintSystem &cs, Type wrapper,
-                                             ConstraintLocator *locator);
-
-  std::string getName() const override {
-    return "add '@propertyWrapper'";
+    return "remove '$' from argument label";
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;

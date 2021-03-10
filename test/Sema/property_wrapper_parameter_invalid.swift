@@ -33,12 +33,13 @@ struct NoProjection<T> {
   var wrappedValue: T
 }
 
+// expected-note@+1 {{property wrapper type 'NoProjection<String>' does not support initialization from a projected value}}
 func takesNoProjectionWrapper(@NoProjection value: String) {}
 
 func testNoProjection(message: String) {
   takesNoProjectionWrapper(value: message) // okay
 
-  // expected-error@+1 {{cannot use property wrapper projection parameter; wrapper 'NoProjection<String>' does not have a 'projectedValue'}}
+  // expected-error@+1 {{cannot use property wrapper projection argument}}
   takesNoProjectionWrapper($value: message)
 }
 
@@ -60,12 +61,15 @@ struct Wrapper<T> {
   var projectedValue: Projection<T> { Projection(value: wrappedValue) }
 }
 
+// expected-note@+2 {{property wrapper has arguments in the wrapper attribute}}
+// expected-note@+1 {{in call to function 'hasWrapperAttributeArg(value:)'}}
 func hasWrapperAttributeArg<T>(@Wrapper() value: T) {}
 
 func testWrapperAttributeArg(projection: Projection<Int>) {
   hasWrapperAttributeArg(value: projection.value)
 
-  // expected-error@+1 {{cannot use property wrapper projection argument; pass wrapped value type 'Int' instead}}
+  // expected-error@+2 {{cannot use property wrapper projection argument}}
+  // expected-error@+1 {{generic parameter 'T' could not be inferred}}
   hasWrapperAttributeArg($value: projection)
 }
 
@@ -75,12 +79,13 @@ struct S {
 }
 
 func testInvalidArgLabel() {
+  // expected-note@+1 2 {{parameter 'argLabel' does not have an attached property wrapper}}
   func noWrappers(argLabel: Int) {}
 
-  // expected-error@+1 {{cannot use property wrapper projection argument; parameter does not have an attached property wrapper}}
+  // expected-error@+1 {{cannot use property wrapper projection argument}}
   let ref = noWrappers($argLabel:)
 
-  // expected-error@+1 {{cannot use property wrapper projection argument; parameter does not have an attached property wrapper}}
+  // expected-error@+1 {{cannot use property wrapper projection argument}}
   noWrappers($argLabel: 10)
 }
 

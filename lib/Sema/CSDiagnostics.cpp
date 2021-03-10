@@ -3306,32 +3306,26 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
     return true;
   }
 
-  if (isa<ParamDecl>(getProperty())) {
-    auto wrapperType = getToType();
-    auto wrappedValueType = computeWrappedValueType(getProperty(), wrapperType);
-    emitDiagnostic(diag::property_wrapper_param_projection_invalid, wrappedValueType);
-    return true;
-  }
-
   emitDiagnostic(diag::incorrect_property_wrapper_reference, getPropertyName(),
                  getFromType(), getToType(), true)
       .fixItRemoveChars(getLoc(), endLoc);
   return true;
 }
 
-bool MissingProjectedValueFailure::diagnoseAsError() {
-  emitDiagnostic(diag::property_wrapper_param_no_projection, wrapperType);
-  return true;
-}
-
-bool MissingPropertyWrapperAttributeFailure::diagnoseAsError() {
-  if (auto *param = getAsDecl<ParamDecl>(getAnchor())) {
+bool InvalidProjectedValueArgument::diagnoseAsError() {
+  if (param->hasImplicitPropertyWrapper()) {
     emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
-
-    // FIXME: emit a note and fix-it to add '@propertyWrapper' if the
-    // type is a nominal and in the same module.
   } else {
-    emitDiagnostic(diag::property_wrapper_param_no_wrapper);
+    emitDiagnostic(diag::invalid_projection_argument);
+
+    if (!param->hasAttachedPropertyWrapper()) {
+      param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
+    } else if (param->getAttachedPropertyWrappers().front()->getArg()) {
+      param->diagnose(diag::property_wrapper_param_attr_arg);
+    } else {
+      auto backingType = param->getPropertyWrapperBackingPropertyType();
+      param->diagnose(diag::property_wrapper_no_init_projected_value, backingType);
+    }
   }
 
   return true;
