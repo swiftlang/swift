@@ -127,7 +127,9 @@ public:
     function(function),
     // We currently don't handle enum and existential projections, because they
     // cannot be re-created easily. We could support this in future.
-    locations(/*handleNonTrivialProjections*/ false), DA(DA) {}
+    locations(/*handleNonTrivialProjections*/ false,
+              /*handleTrivialLocations*/ false),
+    DA(DA) {}
 
   bool hoistDestroys();
 };

@@ -401,8 +401,8 @@ bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
 // CHECK-NEXT: alloc_stack $Builtin.Int64
 // CHECK-NEXT: alloc_stack $Builtin.Int64
 // CHECK-NEXT: store
+// CHECK-NEXT: store
 // CHECK-NEXT: alloc_stack $Builtin.Int64
-// CHECK-NEXT: = load
 // CHECK: dealloc_stack
 // CHECK-NOT: = load
 // CHECK-LABEL: } // end sil function 'load_store_forwarding_over_dealloc_stack'
@@ -411,6 +411,7 @@ bb0(%0 : $Builtin.Int64):
   %1 = alloc_stack $Builtin.Int64
   %2 = alloc_stack $Builtin.Int64
   store %0 to [trivial] %1 : $*Builtin.Int64
+  store %0 to [trivial] %2 : $*Builtin.Int64
   %3 = alloc_stack $Builtin.Int64
   %5 = load [trivial] %2 : $*Builtin.Int64
   %22 = function_ref @use_64 : $@convention(thin) (Builtin.Int64) -> ()
@@ -722,10 +723,12 @@ bb2:
 // CHECK: bb2:
 // CHECK-NOT: load
 // CHECK-LABEL: } // end sil function 'load_to_load_loop'
-sil [ossa] @load_to_load_loop : $@convention(thin) () -> () {
-bb0:
+sil [ossa] @load_to_load_loop : $@convention(thin) (Int32) -> () {
+bb0(%a : $Int32):
   %101 = alloc_stack $Int32
   %102 = alloc_stack $Int32
+  store %a to [trivial] %101 : $*Int32
+  store %a to [trivial] %102 : $*Int32
   %0 = struct_element_addr %101 : $*Int32, #Int32.value
   %1 = struct_element_addr %102 : $*Int32, #Int32.value
   %2 = load [trivial] %0 : $*Builtin.Int32
@@ -1159,10 +1162,12 @@ bb3:
 // CHECK: = load
 // CHECK: cond_br
 // CHECK-LABEL: } // end sil function 'load_to_load_loop_with_unreachable_block'
-sil [ossa] @load_to_load_loop_with_unreachable_block : $@convention(thin) () -> () {
-bb0:
+sil [ossa] @load_to_load_loop_with_unreachable_block : $@convention(thin) (Int32) -> () {
+bb0(%a : $Int32):
   %101 = alloc_stack $Int32
   %102 = alloc_stack $Int32
+  store %a to [trivial] %101 : $*Int32
+  store %a to [trivial] %102 : $*Int32
   %0 = struct_element_addr %101 : $*Int32, #Int32.value
   %1 = struct_element_addr %102 : $*Int32, #Int32.value
   %2 = load [trivial] %0 : $*Builtin.Int32

@@ -22,6 +22,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : @owned $Builtin.NativeObject, %2 : $Builtin.I
   %14 = builtin "once"(%11 : $Builtin.RawPointer, %12 : $@convention(thin) () -> ()) : $()
   %15 = alloc_stack $Int32                        // users: %38, %40, %41
   %16 = struct_element_addr %15 : $*Int32, #Int32._value // users: %28, %17
+  store %2 to [trivial] %16 : $*Builtin.Int32
   %17 = load [trivial] %16 : $*Builtin.Int32                // user: %20
   %18 = integer_literal $Builtin.Int32, -1         // user: %20
   %20 = builtin "xor_Int32"(%17 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int32 // user: %22

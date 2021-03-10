@@ -198,9 +198,13 @@ private:
   /// init_existential_addr and open_existential_addr.
   bool handleNonTrivialProjections;
 
+  /// If true, also analyze trivial memory locations.
+  bool handleTrivialLocations;
+
 public:
-  MemoryLocations(bool handleNonTrivialProjections) :
-    handleNonTrivialProjections(handleNonTrivialProjections) {}
+  MemoryLocations(bool handleNonTrivialProjections, bool handleTrivialLocations) :
+    handleNonTrivialProjections(handleNonTrivialProjections),
+    handleTrivialLocations(handleTrivialLocations) {}
 
   MemoryLocations(const MemoryLocations &) = delete;
   MemoryLocations &operator=(const MemoryLocations &) = delete;
@@ -286,9 +290,6 @@ public:
 
   /// Debug dump the MemoryLifetime internals.
   void dump() const;
-
-  /// Debug dump a bit set .
-  static void dumpBits(const Bits &bits);
 
 private:
   /// Clears all datastructures, except singleBlockLocations;

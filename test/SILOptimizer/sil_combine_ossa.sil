@@ -2031,16 +2031,18 @@ sil [ossa] @generic_call_with_indirect_result : $@convention(thin) <T> (@in T) -
 sil [ossa] @generic_call_without_indirect_result : $@convention(thin) <T> (@in T) -> Bool
 sil [ossa] @generic_call_with_direct_result : $@convention(thin) <T> (T) -> T
 
-// CHECK-LABEL: sil [ossa] @generic_partialapply : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @generic_partialapply : $@convention(thin)
 // CHECK-NOT: partial_apply
 // CHECK: } // end sil function 'generic_partialapply'
-sil [ossa] @generic_partialapply : $@convention(thin) () -> () {
-bb0:
+sil [ossa] @generic_partialapply : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%a : $Builtin.Int32):
   %0 = function_ref @generic_call_with_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %1 = function_ref @generic_call_without_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
   %2 = partial_apply %0<Builtin.Int32>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %3 = alloc_stack $Builtin.Int32
   %4 = alloc_stack $Builtin.Int32
+  store %a to [trivial] %3 : $*Builtin.Int32
+  store %a to [trivial] %4 : $*Builtin.Int32
   %5 = apply %2(%3, %4) : $@callee_owned (@in Builtin.Int32) -> @out Builtin.Int32
   %6 = partial_apply %1<Builtin.Int32>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
   %7 = apply %6(%3) : $@callee_owned (@in Builtin.Int32) -> Bool
@@ -4418,12 +4420,12 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> @out ()):
 // CHECK-LABEL: sil [ossa] @convert_function_substitution_pa :
 // CHECK-NOT: convert_function
 // CHECK: } // end sil function 'convert_function_substitution_pa'
-sil [ossa] @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int) -> @owned @callee_guaranteed () -> @out () {
-bb0(%0 : @guaranteed $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
+sil [ossa] @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int, @in Int) -> @owned @callee_guaranteed () -> @out () {
+bb0(%0 : @guaranteed $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int, %1b : $*Int):
   %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
   %2a = copy_value %2 : $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
   %3 = partial_apply [callee_guaranteed] %2a(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
-  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A) -> @out C for <Int, Int, ()>
+  %4 = partial_apply [callee_guaranteed] %3(%1b) : $@callee_guaranteed @substituted <A, B, C> (@in A) -> @out C for <Int, Int, ()>
   %5 = convert_function %4 : $@callee_guaranteed @substituted <A, B, C> () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
   return %5 : $@callee_guaranteed () -> @out ()
 

@@ -133,7 +133,8 @@ class MemoryLifetimeVerifier {
 
 public:
   MemoryLifetimeVerifier(SILFunction *function) :
-    function(function), locations(/*handleNonTrivialProjections*/ true) {}
+    function(function), locations(/*handleNonTrivialProjections*/ true,
+                                  /*handleTrivialLocations*/ true) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.
@@ -593,7 +594,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InitExistentialAddrInst:
       case SILInstructionKind::InitEnumDataAddrInst: {
         SILValue addr = I.getOperand(0);
-        requireBitsClear(bits, addr, &I);
+        requireBitsClear(bits & nonTrivialLocations, addr, &I);
         requireNoStoreBorrowLocation(addr, &I);
         break;
       }
@@ -701,8 +702,16 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_InoutAliasable:
       requireBitsSet(bits, argumentOp.get(), applyInst);
+      break;
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      // We don't require any locations to be initialized for a partial_apply
+      // which takes an inout_aliasable argument. This is used for implicit
+      // closures (e.g. for the Bool '||' and '&&' operator arguments). Such
+      // closures capture the whole "self". When this is done in an initializer
+      // it can happen that not all fields of "self" are initialized, yet.
+      if (!isa<PartialApplyInst>(applyInst))
+        requireBitsSet(bits, argumentOp.get(), applyInst);
       break;
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:

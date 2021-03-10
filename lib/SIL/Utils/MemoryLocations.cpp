@@ -212,7 +212,7 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   // Ignore trivial types to keep the number of locations small. Trivial types
   // are not interesting anyway, because such memory locations are not
   // destroyed.
-  if (loc->getType().isTrivial(*function))
+  if (!handleTrivialLocations && loc->getType().isTrivial(*function))
     return;
 
   if (isEmptyType(loc->getType(), function))

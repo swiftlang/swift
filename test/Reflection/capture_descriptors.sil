@@ -71,10 +71,11 @@ bb0(%i : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <U>):
   return %12 : $()
 }
 
-sil [ossa] @concrete_caller2 : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
-bb0:
+sil [ossa] @concrete_caller2 : $@convention(thin) (Int) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : $Int):
   %f = function_ref @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   %i = alloc_stack $Int
+  store %0 to [trivial] %i : $*Int
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <String>
   %c = partial_apply [callee_guaranteed] %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   dealloc_stack %i : $*Int
