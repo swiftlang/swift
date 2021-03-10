@@ -146,8 +146,54 @@ public protocol Strideable: Comparable {
 
   /// Returns the next result of striding by a specified distance.
   ///
-  /// `_step` is an implementation detail of `Strideable`; do not use it
+  /// This method is an implementation detail of `Strideable`; do not call it
   /// directly.
+  ///
+  /// While striding, `_step(after:from:by:)` is called at each step to
+  /// determine the next result. At the first step, the value of `current` is
+  /// `(index: 0, value: start)`. At each subsequent step, the value of
+  /// `current` is the result returned by this method in the immediately
+  /// preceding step.
+  ///
+  /// If the result of advancing by a given `distance` is not representable as a
+  /// value of this type, then a runtime error may occur.
+  ///
+  /// Implementing `_step(after:from:by:)` to Customize Striding Behavior
+  /// ===================================================================
+  ///
+  /// The default implementation of this method calls `advanced(by:)` to offset
+  /// `current.value` by a specified `distance`. No attempt is made to count the
+  /// number of prior steps, and the result's `index` is always `nil`.
+  ///
+  /// To avoid incurring runtime errors that arise from advancing past
+  /// representable bounds, a conforming type can signal that the result of
+  /// advancing by a given `distance` is not representable by using `Int.min` as
+  /// a sentinel value for the result's `index`. In that case, the result's
+  /// `value` must be either the minimum representable value of this type if
+  /// `distance` is less than zero or the maximum representable value of this
+  /// type otherwise. Fixed-width integer types make use of arithmetic
+  /// operations reporting overflow to implement this customization.
+  ///
+  /// A conforming type may use any positive value for the result's `index` as
+  /// an opaque state that is private to that type. For example, floating-point
+  /// types increment `index` with each step so that the corresponding `value`
+  /// can be computed by multiplying the number of steps by the specified
+  /// `distance`. Serially calling `advanced(by:)` would accumulate
+  /// floating-point rounding error at each step, which is avoided by this
+  /// customization.
+  ///
+  /// - Parameters:
+  ///   - current: The result returned by this method in the immediately
+  ///     preceding step while striding, or `(index: 0, value: start)` if there
+  ///     have been no preceding steps.
+  ///   - start: The starting value used for the striding sequence.
+  ///   - distance: The amount to step by with each iteration of the striding
+  ///     sequence.
+  /// - Returns: A tuple of `index` and `value`; `index` may be `nil`, any
+  ///   positive value as an opaque state private to the conforming type, or
+  ///   `Int.min` to signal that the notional result of advancing by `distance`
+  ///   is unrepresentable, and `value` is the next result after `current.value`
+  ///   while striding from `start` by `distance`.
   ///
   /// - Complexity: O(1)
   static func _step(
