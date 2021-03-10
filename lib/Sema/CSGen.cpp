@@ -381,6 +381,11 @@ namespace {
     if (paramTy->isEqual(argTy))
       return true;
 
+    // Double and CGFloat types could be used interchangeably
+    if ((argTy->isCGFloatType() || argTy->isDoubleType()) &&
+        (paramTy->isDoubleType() || paramTy->isCGFloatType()))
+      return true;
+
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
     if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
       auto constraints = CS.getConstraintGraph().gatherConstraints(
@@ -532,7 +537,23 @@ namespace {
     
     return { nOperands, nNoDefault };
   }
-  
+
+  bool hasContextuallyFavorableResultType(AnyFunctionType *choice,
+                                          Type contextualTy) {
+    // No restrictions of what result could be.
+    if (!contextualTy)
+      return true;
+
+    auto resultTy = choice->getResult();
+    // Result type of the call matches expected contextual type.
+    if (contextualTy->isEqual(resultTy))
+      return true;
+
+    // Double and CGFloat could be used interchangeably.
+    return (resultTy->isDoubleType() || resultTy->isCGFloatType()) &&
+           (contextualTy->isDoubleType() || contextualTy->isCGFloatType());
+  }
+
   /// Favor unary operator constraints where we have exact matches
   /// for the operand and contextual type.
   void favorMatchingUnaryOperators(ApplyExpr *expr,
@@ -545,15 +566,12 @@ namespace {
       
       Type paramTy = FunctionType::composeInput(CS.getASTContext(),
                                                 fnTy->getParams(), false);
-      auto resultTy = fnTy->getResult();
-      auto contextualTy = CS.getContextualType(expr);
-
       return isFavoredParamAndArg(
-                 CS, paramTy,
-                 CS.getType(expr->getArg())->getWithoutParens()) &&
-             (!contextualTy || contextualTy->isEqual(resultTy));
+                 CS, paramTy, CS.getType(expr->getArg())->getWithoutParens()) &&
+             hasContextuallyFavorableResultType(fnTy,
+                                                CS.getContextualType(expr));
     };
-    
+
     favorCallOverloads(expr, CS, isFavoredDecl);
   }
   
@@ -704,7 +722,6 @@ namespace {
       auto firstParamTy = params[0].getOldType();
       auto secondParamTy = params[1].getOldType();
 
-      auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);
 
       return (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
@@ -712,7 +729,7 @@ namespace {
                                    firstArgTy)) &&
              firstParamTy->isEqual(secondParamTy) &&
              !isPotentialForcingOpportunity(firstArgTy, secondArgTy) &&
-             (!contextualTy || contextualTy->isEqual(resultTy));
+             hasContextuallyFavorableResultType(fnTy, contextualTy);
     };
     
     favorCallOverloads(expr, CS, isFavoredDecl);
