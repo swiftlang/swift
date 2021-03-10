@@ -3763,6 +3763,14 @@ PropertyWrapperTypeInfo NominalTypeDecl::getPropertyWrapperTypeInfo() const {
                            PropertyWrapperTypeInfo());
 }
 
+bool NominalTypeDecl::isActor() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsActorRequest{mutableThis},
+                           false);
+}
+
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<TypeLoc> inherited,
@@ -4201,13 +4209,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->setSynthesized(true);
 
   return DD;
-}
-
-bool ClassDecl::isActor() const {
-  auto mutableThis = const_cast<ClassDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsActorRequest{mutableThis},
-                           false);
 }
 
 bool ClassDecl::isDefaultActor() const {

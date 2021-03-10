@@ -917,10 +917,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether the given class is an actor.
+/// Determine whether the given nominal type is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,
-                         bool(ClassDecl *),
+                         bool(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -928,7 +928,7 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
   // Caching
