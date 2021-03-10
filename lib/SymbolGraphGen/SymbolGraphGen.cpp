@@ -115,11 +115,7 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
       : nullptr;
 
   Symbol MySym(&Graph, D, NTD, BaseTy);
-
   MySym.getPathComponents(ParentContexts);
-  assert(!ParentContexts.empty() && "doesn't have node for MySym?");
-  ParentContexts.pop_back();
-
   Graph.recordNode(MySym);
   Graph.serialize(JOS);
   return EXIT_SUCCESS;

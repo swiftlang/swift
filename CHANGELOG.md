@@ -28,6 +28,26 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SE-0299][]:
+
+  It is now possible to use leading-dot syntax in generic contexts to access static members of protocol extensions where `Self` is constrained to a fully concrete type:
+
+  ```swift
+  public protocol ToggleStyle { ... }
+
+  public struct DefaultToggleStyle: ToggleStyle { ... }
+
+  extension ToggleStyle where Self == DefaultToggleStyle {
+    public static var `default`: Self { .init() }
+  }
+
+  struct Toggle {
+    func applyToggle<T: ToggleStyle>(_ style: T) { ... }
+  }
+
+  Toggle(...).applyToggle(.default)
+  ```
+
 * Whenever a reference to `Self` does not impede the usage of a protocol as a value type, or a protocol member on a value of protocol type, the same is now true for references to `[Self]` and `[Key : Self]`:
 
   ```swift
