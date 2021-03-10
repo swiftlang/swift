@@ -33,7 +33,7 @@ class SourceFileSyntax;
 ///
 /// It also handles caching re-usable RawSyntax objects and skipping parsed
 /// nodes via consulting a \c SyntaxParsingCache.
-class SyntaxTreeCreator: public SyntaxParseActions {
+class SyntaxTreeCreator final : public SyntaxParseActions {
   SourceManager &SM;
   unsigned BufferID;
   RC<syntax::SyntaxArena> Arena;
@@ -47,6 +47,8 @@ class SyntaxTreeCreator: public SyntaxParseActions {
   /// A cache of nodes that can be reused when creating the current syntax
   /// tree.
   SyntaxParsingCache *SyntaxCache;
+
+  llvm::BumpPtrAllocator ScratchAlloc;
 
 public:
   SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
@@ -70,6 +72,23 @@ private:
 
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;
+
+  OpaqueSyntaxNode makeDeferredToken(tok tokenKind, StringRef leadingTrivia,
+                                     StringRef trailingTrivia,
+                                     CharSourceRange range,
+                                     bool isMissing) override;
+
+  OpaqueSyntaxNode
+  makeDeferredLayout(syntax::SyntaxKind k, bool IsMissing,
+                     const ArrayRef<RecordedOrDeferredNode> &children) override;
+
+  OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) override;
+  OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override;
+
+  DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node, size_t ChildIndex,
+                                    SourceLoc StartLoc) override;
+
+  size_t getDeferredNumChildren(OpaqueSyntaxNode node) override;
 };
 
 } // end namespace swift
