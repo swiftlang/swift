@@ -630,3 +630,12 @@ bb0(%0 : $*T):
   return %5 : $()
 }
 
+sil [ossa] @test_ignore_empty_types : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed (Int, ((), ()))) -> Int) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed (Int, ((), ()))) -> Int):
+  %2 = alloc_stack $(Int, ((), ()))
+  %3 = tuple_element_addr %2 : $*(Int, ((), ())), 0
+  store %0 to [trivial] %3 : $*Int
+  %5 = apply %1(%2) : $@callee_guaranteed (@in_guaranteed (Int, ((), ()))) -> Int
+  dealloc_stack %2 : $*(Int, ((), ()))
+  return %5 : $Int
+}

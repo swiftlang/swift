@@ -67,15 +67,32 @@ static bool allUsesInSameBlock(AllocStackInst *ASI) {
   return numDeallocStacks == 1;
 }
 
-static bool shouldTrackLocation(SILType ty, SILFunction *function) {
-  // Ignore empty tuples and empty structs.
+/// We don't handle empty tuples and empty structs.
+///
+/// Locations with empty types don't even need a store to count as
+/// "initialized". We don't handle such cases.
+static bool isEmptyType(SILType ty, SILFunction *function) {
   if (auto tupleTy = ty.getAs<TupleType>()) {
-    return tupleTy->getNumElements() != 0;
+    // A tuple is empty if it either has no elements or if all elements are
+    // empty.
+    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
+      if (!isEmptyType(ty.getTupleElementType(idx), function))
+        return false;
+    }
+    return true;
   }
-  if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
-    return decl->getStoredProperties().size() != 0;
+  if (StructDecl *structDecl = ty.getStructOrBoundGenericStruct()) {
+    // Also, a struct is empty if it either has no fields or if all fields are
+    // empty.
+    SILModule &module = function->getModule();
+    TypeExpansionContext typeEx = function->getTypeExpansionContext();
+    for (VarDecl *field : structDecl->getStoredProperties()) {
+      if (!isEmptyType(ty.getFieldType(field, module, typeEx), function))
+        return false;
+    }
+    return true;
   }
-  return true;
+  return false;
 }
 
 } // anonymous namespace
@@ -100,7 +117,7 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
 
 void MemoryLocations::Location::updateFieldCounters(SILType ty, int increment) {
   SILFunction *function = representativeValue->getFunction();
-  if (shouldTrackLocation(ty, function)) {
+  if (!isEmptyType(ty, function)) {
     numFieldsNotCoveredBySubfields += increment;
     if (!ty.isTrivial(*function))
       numNonTrivialFieldsNotCovered += increment;
@@ -198,7 +215,7 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   if (loc->getType().isTrivial(*function))
     return;
 
-  if (!shouldTrackLocation(loc->getType(), function))
+  if (isEmptyType(loc->getType(), function))
     return;
 
   unsigned currentLocIdx = locations.size();
@@ -376,7 +393,7 @@ bool MemoryLocations::analyzeAddrProjection(
     SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap) {
 
-  if (!shouldTrackLocation(projection->getType(), projection->getFunction()))
+  if (isEmptyType(projection->getType(), projection->getFunction()))
     return false;
 
   unsigned &subLocIdx = subLocationMap[std::make_pair(parentLocIdx, fieldNr)];
