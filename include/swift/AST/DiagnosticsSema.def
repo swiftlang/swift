@@ -4331,6 +4331,9 @@ ERROR(actor_isolated_from_async_let,none,
 ERROR(actor_isolated_from_escaping_closure,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from an '@escaping' closure",
         (DescriptiveDeclKind, DeclName, unsigned))
+ERROR(actor_isolated_keypath_component,none,
+      "cannot form key path to actor-isolated %0 %1",
+      (DescriptiveDeclKind, DeclName))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@concurrent'",
       (DescriptiveDeclKind, DeclName))
@@ -4376,6 +4379,9 @@ WARNING(non_concurrent_property_type,none,
         (DescriptiveDeclKind, DeclName, Type, bool))
 WARNING(non_concurrent_keypath_capture,none,
         "cannot form key path that captures non-concurrent-value type %0",
+        (Type))
+WARNING(non_concurrent_keypath_access,none,
+        "cannot form key path that accesses non-concurrent-value type %0",
         (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
