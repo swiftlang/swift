@@ -21,9 +21,10 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Subsystems.h"
+#include "swift/Syntax/Serialization/SyntaxDeserialization.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
-#include "swift/Subsystems.h"
 #include <Block.h>
 
 using namespace swift;
@@ -55,6 +56,9 @@ static void initCRange(CRange &c_range, CharSourceRange range, SourceManager &SM
 
 class SynParser {
   swiftparse_node_handler_t NodeHandler = nullptr;
+  swiftparse_get_syntaxkind_t GetSyntaxKind = nullptr;
+  swiftparse_get_tokenkind_t GetTokenKind = nullptr;
+  swiftparse_is_present_t IsPresent = nullptr;
   swiftparse_node_lookup_t NodeLookup = nullptr;
   swiftparse_diagnostic_handler_t DiagHandler = nullptr;
 
@@ -62,6 +66,16 @@ public:
   swiftparse_node_handler_t getNodeHandler() const {
     return NodeHandler;
   }
+
+  swiftparse_syntax_kind_t getSyntaxKind(swiftparse_client_node_t node) {
+    return GetSyntaxKind(node);
+  }
+
+  swiftparse_token_kind_t getTokenKind(swiftparse_client_node_t node) {
+    return GetTokenKind(node);
+  }
+
+  bool isPresent(swiftparse_client_node_t node) { return IsPresent(node); }
 
   swiftparse_node_lookup_t getNodeLookup() const {
     return NodeLookup;
@@ -71,10 +85,18 @@ public:
     return DiagHandler;
   }
 
-  void setNodeHandler(swiftparse_node_handler_t hdl) {
-    auto prevBlk = NodeHandler;
-    NodeHandler = Block_copy(hdl);
-    Block_release(prevBlk);
+  void setRequiredCallbacks(swiftparse_node_handler_t node_handler,
+                            swiftparse_get_syntaxkind_t get_syntaxkind,
+                            swiftparse_get_tokenkind_t get_tokenkind,
+                            swiftparse_is_present_t is_present) {
+    Block_release(NodeHandler);
+    Block_release(GetSyntaxKind);
+    Block_release(GetTokenKind);
+    Block_release(IsPresent);
+    NodeHandler = Block_copy(node_handler);
+    GetSyntaxKind = Block_copy(get_syntaxkind);
+    GetTokenKind = Block_copy(get_tokenkind);
+    IsPresent = Block_copy(is_present);
   }
 
   void setNodeLookup(swiftparse_node_lookup_t lookupBlk) {
@@ -90,7 +112,7 @@ public:
   }
 
   ~SynParser() {
-    setNodeHandler(nullptr);
+    setRequiredCallbacks(nullptr, nullptr, nullptr, nullptr);
     setNodeLookup(nullptr);
     setDiagnosticHandler(nullptr);
   }
@@ -123,7 +145,7 @@ struct DeferredLayoutNode {
       : Kind(Kind), Children(Children), Length(Length) {}
 };
 
-class CLibParseActions : public SyntaxParseActions {
+class CLibParseActions final : public SyntaxParseActions {
   SynParser &SynParse;
   SourceManager &SM;
   unsigned BufferID;
@@ -310,7 +332,7 @@ private:
   }
 
   DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node, size_t ChildIndex,
-                                    SourceLoc StartLoc) override {
+                                    SourceLoc StartLoc) const override {
     auto Data = static_cast<const DeferredLayoutNode *>(node);
 
     // Compute the start offset of the child node by advancing StartLoc by the
@@ -339,8 +361,7 @@ private:
     case RecordedOrDeferredNode::Kind::Null:
       return DeferredNodeInfo(
           RecordedOrDeferredNode(nullptr, RecordedOrDeferredNode::Kind::Null),
-          syntax::SyntaxKind::Unknown, tok::NUM_TOKENS,
-          /*IsMissing=*/false, CharSourceRange(StartLoc, /*Length=*/0));
+          CharSourceRange(StartLoc, /*Length=*/0));
     case RecordedOrDeferredNode::Kind::Recorded:
       llvm_unreachable("Children of deferred nodes must also be deferred");
       break;
@@ -349,23 +370,67 @@ private:
       return DeferredNodeInfo(
           RecordedOrDeferredNode(ChildData,
                                  RecordedOrDeferredNode::Kind::DeferredLayout),
-          ChildData->Kind, tok::NUM_TOKENS,
-          /*IsMissing=*/false, CharSourceRange(StartLoc, ChildData->Length));
+          CharSourceRange(StartLoc, ChildData->Length));
     }
     case RecordedOrDeferredNode::Kind::DeferredToken: {
       auto ChildData = static_cast<const DeferredTokenNode *>(Child.getOpaque());
       return DeferredNodeInfo(
           RecordedOrDeferredNode(ChildData,
                                  RecordedOrDeferredNode::Kind::DeferredToken),
-          syntax::SyntaxKind::Token, ChildData->TokenKind, ChildData->IsMissing,
           ChildData->Range);
     }
     }
   }
 
-  size_t getDeferredNumChildren(OpaqueSyntaxNode node) override {
+  size_t getDeferredNumChildren(OpaqueSyntaxNode node) const override {
     auto Data = static_cast<const DeferredLayoutNode *>(node);
     return Data->Children.size();
+  }
+
+  syntax::SyntaxKind getSyntaxKind(RecordedOrDeferredNode node) const override {
+    switch (node.getKind()) {
+    case RecordedOrDeferredNode::Kind::Null:
+      llvm_unreachable("Null nodes don't have a syntax kind");
+    case RecordedOrDeferredNode::Kind::Recorded:
+      return serialization::getSyntaxKindFromNumericValue(
+          SynParse.getSyntaxKind(
+              const_cast<swiftparse_client_node_t>(node.getOpaque())));
+    case RecordedOrDeferredNode::Kind::DeferredLayout:
+      return static_cast<const DeferredLayoutNode *>(node.getOpaque())->Kind;
+    case RecordedOrDeferredNode::Kind::DeferredToken:
+      return syntax::SyntaxKind::Token;
+    }
+  }
+
+  tok getTokenKind(RecordedOrDeferredNode node) const override {
+    switch (node.getKind()) {
+    case RecordedOrDeferredNode::Kind::Null:
+      llvm_unreachable("Null nodes don't have a token kind");
+    case RecordedOrDeferredNode::Kind::Recorded:
+      return serialization::getTokFromNumericValue(SynParse.getTokenKind(
+          const_cast<swiftparse_client_node_t>(node.getOpaque())));
+    case RecordedOrDeferredNode::Kind::DeferredLayout:
+      llvm_unreachable("Layout nodes don't hava a token kind");
+    case RecordedOrDeferredNode::Kind::DeferredToken:
+      return static_cast<const DeferredTokenNode *>(node.getOpaque())
+          ->TokenKind;
+    }
+  }
+
+  bool isMissing(RecordedOrDeferredNode node) const override {
+    switch (node.getKind()) {
+    case RecordedOrDeferredNode::Kind::Null:
+      llvm_unreachable("Null nodes don't have a 'missing' flag");
+    case RecordedOrDeferredNode::Kind::Recorded:
+      return !SynParse.isPresent(
+          const_cast<swiftparse_client_node_t>(node.getOpaque()));
+    case RecordedOrDeferredNode::Kind::DeferredLayout:
+      // Missing layout nodes are not implemented, they are implicitly present
+      return false;
+    case RecordedOrDeferredNode::Kind::DeferredToken:
+      return static_cast<const DeferredTokenNode *>(node.getOpaque())
+          ->IsMissing;
+    }
   }
 };
 
@@ -473,11 +538,14 @@ swiftparse_parser_dispose(swiftparse_parser_t c_parser) {
   delete parser;
 }
 
-void
-swiftparse_parser_set_node_handler(swiftparse_parser_t c_parser,
-                                   swiftparse_node_handler_t hdl) {
+void swiftparse_parser_set_required_callbacks(
+    swiftparse_parser_t c_parser, swiftparse_node_handler_t node_handler,
+    swiftparse_get_syntaxkind_t get_syntaxkind,
+    swiftparse_get_tokenkind_t get_tokenkind,
+    swiftparse_is_present_t is_present) {
   SynParser *parser = static_cast<SynParser*>(c_parser);
-  parser->setNodeHandler(hdl);
+  parser->setRequiredCallbacks(node_handler, get_syntaxkind, get_tokenkind,
+                               is_present);
 }
 
 void

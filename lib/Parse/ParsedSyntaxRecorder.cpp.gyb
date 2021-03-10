@@ -25,7 +25,8 @@
 using namespace swift;
 using namespace swift::syntax;
 
-bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
+bool ParsedSyntaxRecorder::formExactLayoutFor(const SyntaxParseActions *Actions,
+        syntax::SyntaxKind Kind,
         MutableArrayRef<ParsedRawSyntaxNode> Elements,
         function_ref<void(syntax::SyntaxKind, MutableArrayRef<ParsedRawSyntaxNode>)> receiver) {
   switch (Kind) {
@@ -38,7 +39,7 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
 %   for (child_idx, child) in enumerate(node.children):
     // child[${child_idx}] ${child.name}
     if (I == Elements.size() ||
-        !${check_parsed_child_condition_raw(child)}(Elements[I])) {
+        !${check_parsed_child_condition_raw(child)}(Elements[I], Actions)) {
 %     if child.is_optional:
       Layout[${child_idx}] = ParsedRawSyntaxNode::null();
 %     else:
@@ -62,7 +63,7 @@ bool ParsedSyntaxRecorder::formExactLayoutFor(syntax::SyntaxKind Kind,
     return true;
 % elif node.is_syntax_collection():
     for (auto &E : Elements) {
-      if (!SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E.getKind()))
+      if (!SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E.getKind(Actions)))
         return false;
     }
     receiver(Kind, Elements);

@@ -51,6 +51,8 @@ public:
   explicit ParsedRawSyntaxRecorder(std::shared_ptr<SyntaxParseActions> spActions)
     : SPActions(std::move(spActions)) {}
 
+  const SyntaxParseActions *getActions() const { return SPActions.get(); }
+
   ParsedRawSyntaxNode recordToken(const Token &tok, StringRef leadingTrivia,
                                   StringRef trailingTrivia);
 
@@ -104,7 +106,7 @@ public:
   size_t getDeferredNumChildren(const ParsedRawSyntaxNode &node) const;
 
 #ifndef NDEBUG
-  static void verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements);
+  void verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements) const;
 #endif
 };
 

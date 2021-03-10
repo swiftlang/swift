@@ -14,6 +14,7 @@
 #define SWIFT_SYNTAX_PARSE_SYNTAXTREECREATOR_H
 
 #include "swift/Parse/SyntaxParseActions.h"
+#include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/References.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -86,9 +87,24 @@ private:
   OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override;
 
   DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node, size_t ChildIndex,
-                                    SourceLoc StartLoc) override;
+                                    SourceLoc StartLoc) const override;
 
-  size_t getDeferredNumChildren(OpaqueSyntaxNode node) override;
+  size_t getDeferredNumChildren(OpaqueSyntaxNode node) const override;
+
+  syntax::SyntaxKind getSyntaxKind(RecordedOrDeferredNode node) const override {
+    auto raw = static_cast<const syntax::RawSyntax *>(node.getOpaque());
+    return raw->getKind();
+  }
+
+  tok getTokenKind(RecordedOrDeferredNode node) const override {
+    auto raw = static_cast<const syntax::RawSyntax *>(node.getOpaque());
+    return raw->getTokenKind();
+  }
+
+  bool isMissing(RecordedOrDeferredNode node) const override {
+    auto raw = static_cast<const syntax::RawSyntax *>(node.getOpaque());
+    return raw->isMissing();
+  }
 };
 
 } // end namespace swift

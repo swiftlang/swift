@@ -12,10 +12,11 @@
 
 #include "swift-c/SyntaxParser/SwiftSyntaxParser.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/StringRef.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
-#include <vector>
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Allocator.h"
 #include "gtest/gtest.h"
+#include <vector>
 
 using namespace swift;
 using namespace swift::syntax;
@@ -23,9 +24,13 @@ using namespace serialization;
 
 static swiftparse_client_node_t
 parse(StringRef source, swiftparse_node_handler_t node_handler,
+      swiftparse_get_syntaxkind_t get_syntaxkind,
+      swiftparse_get_tokenkind_t get_tokenkind,
+      swiftparse_is_present_t is_present,
       swiftparse_node_lookup_t node_lookup) {
   swiftparse_parser_t parser = swiftparse_parser_create();
-  swiftparse_parser_set_node_handler(parser, node_handler);
+  swiftparse_parser_set_required_callbacks(parser, node_handler, get_syntaxkind,
+                                           get_tokenkind, is_present);
   swiftparse_parser_set_node_lookup(parser, node_lookup);
   swiftparse_client_node_t top = swiftparse_parse_string(parser, source.data(), source.size());
   swiftparse_parser_dispose(parser);
@@ -40,6 +45,12 @@ static bool containsChild(swiftparse_layout_data_t layout_data, void *child) {
   }
   return false;
 }
+
+struct SyntaxNode {
+  swiftparse_syntax_kind_t SyntaxKind;
+  swiftparse_token_kind_t TokenKind;
+  bool IsPresent;
+};
 
 TEST(SwiftSyntaxParserTests, IncrementalParsing) {
   StringRef source1 =
@@ -57,16 +68,21 @@ TEST(SwiftSyntaxParserTests, IncrementalParsing) {
   swiftparse_syntax_kind_t codeBlockItem = getNumericValue(SyntaxKind::CodeBlockItem);
   swiftparse_syntax_kind_t codeBlockItemList = getNumericValue(SyntaxKind::CodeBlockItemList);
 
-  // Set up a bunch of node ids that we can later use.
-  void *t1Token = &t1Token;
-  void *t1Func = &t1Func;
-  void *t1CodeBlockItem = &t1CodeBlockItem;
-  void *t2Token = &t2Token;
-  void *t2Func = &t2Func;
-  void *t2CodeBlockItem = &t2CodeBlockItem;
-  void *t3Token = &t3Token;
-  void *t3Func = &t3Func;
-  void *t3CodeBlockItem = &t3CodeBlockItem;
+  // Allocate all SyntaxNodes in a bump allocator so we can free them when the
+  // test finished running.
+  __block llvm::BumpPtrAllocator NodeAllocator;
+
+  // As we parse the nodes, these pointer are pouplated to point to the
+  // corresponding SyntaxNodes
+  __block SyntaxNode *t1Token = nullptr;
+  __block SyntaxNode *t1Func = nullptr;
+  __block SyntaxNode *t1CodeBlockItem = nullptr;
+  __block SyntaxNode *t2Token = nullptr;
+  __block SyntaxNode *t2Func = nullptr;
+  __block SyntaxNode *t2CodeBlockItem = nullptr;
+  __block SyntaxNode *t3Token = nullptr;
+  __block SyntaxNode *t3Func = nullptr;
+  __block SyntaxNode *t3CodeBlockItem = nullptr;
 
   // Find the t1/t2/t3 tokens in the source
   size_t t1TokenOffset = StringRef(source1).find("t1");
@@ -81,31 +97,42 @@ TEST(SwiftSyntaxParserTests, IncrementalParsing) {
   // t2 and t3 get reused after the edit from source1 to source2.
   __block std::vector<void *> codeBlockItemIds;
 
-  swiftparse_node_handler_t nodeHandler =
-    ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
+  swiftparse_node_handler_t nodeHandler = ^swiftparse_client_node_t(
+      const swiftparse_syntax_node_t *raw_node) {
+      // Create a SyntaxNode
+      SyntaxNode *node;
+      if (raw_node->kind == token) {
+        node = new (NodeAllocator) SyntaxNode{
+            raw_node->kind, raw_node->token_data.kind, raw_node->present};
+      } else {
+        node = new (NodeAllocator)
+            SyntaxNode{raw_node->kind, /*token_kind=*/0, raw_node->present};
+      }
+
+      // Check if it's a node we care about and update the corresponding pointer
       if (raw_node->kind == token) {
         if (raw_node->token_data.range.offset == t1TokenOffset) {
-          return t1Token;
+          t1Token = node;
         } else if (raw_node->token_data.range.offset == t2TokenOffset) {
-          return t2Token;
+          t2Token = node;
         } else if (raw_node->token_data.range.offset == t3TokenOffset) {
-          return t3Token;
+          t3Token = node;
         }
       } else if (raw_node->kind == functionDecl) {
         if (containsChild(raw_node->layout_data, t1Token)) {
-          return t1Func;
+          t1Func = node;
         } else if (containsChild(raw_node->layout_data, t2Token)) {
-          return t2Func;
+          t2Func = node;
         } else if (containsChild(raw_node->layout_data, t3Token)) {
-          return t3Func;
+          t3Func = node;
         }
       } else if (raw_node->kind == codeBlockItem) {
         if (containsChild(raw_node->layout_data, t1Func)) {
-          return t1CodeBlockItem;
+          t1CodeBlockItem = node;
         } else if (containsChild(raw_node->layout_data, t2Func)) {
-          return t2CodeBlockItem;
+          t2CodeBlockItem = node;
         } else if (containsChild(raw_node->layout_data, t3Func)) {
-          return t3CodeBlockItem;
+          t3CodeBlockItem = node;
         }
       } else if (raw_node->kind == codeBlockItemList) {
         for (unsigned i = 0, e = raw_node->layout_data.nodes_count;
@@ -113,9 +140,23 @@ TEST(SwiftSyntaxParserTests, IncrementalParsing) {
           codeBlockItemIds.push_back(raw_node->layout_data.nodes[i]);
         }
       }
-      return nullptr;
+      return node;
     };
-  parse(source1, nodeHandler, /*node_lookup=*/nullptr);
+  swiftparse_get_syntaxkind_t getSyntaxKind =
+      ^swiftparse_syntax_kind_t(swiftparse_client_node_t node) {
+        return static_cast<SyntaxNode *>(node)->SyntaxKind;
+      };
+  swiftparse_get_tokenkind_t getTokenKind =
+      ^swiftparse_token_kind_t(swiftparse_client_node_t node) {
+        auto synNode = static_cast<SyntaxNode *>(node);
+        assert(synNode->SyntaxKind == token);
+        return synNode->TokenKind;
+      };
+  swiftparse_is_present_t isPresent = ^bool(swiftparse_client_node_t node) {
+    return static_cast<SyntaxNode *>(node)->IsPresent;
+  };
+  parse(source1, nodeHandler, getSyntaxKind, getTokenKind, isPresent,
+        /*node_lookup=*/nullptr);
   ASSERT_NE(t2CodeBlockItemLength, size_t(0));
   EXPECT_EQ(codeBlockItemIds, (std::vector<void *>{t1CodeBlockItem, t2CodeBlockItem, t3CodeBlockItem}));
 
@@ -134,7 +175,8 @@ TEST(SwiftSyntaxParserTests, IncrementalParsing) {
       return {0, nullptr};
     };
 
-  parse(source2, nodeHandler, nodeLookup);
+  parse(source2, nodeHandler, getSyntaxKind, getTokenKind, isPresent,
+        nodeLookup);
   // Assert that t2 and t3 get reused.
   EXPECT_EQ(codeBlockItemIds[1], t2CodeBlockItem);
   EXPECT_EQ(codeBlockItemIds[2], t3CodeBlockItem);

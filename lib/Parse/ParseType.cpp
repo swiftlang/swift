@@ -403,8 +403,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         Builder.useAsyncKeyword(SyntaxContext->popToken());
 
       auto InputNode(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      if (InputNode.is<ParsedTupleTypeSyntax>()) {
-        auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>();
+      if (InputNode.is<ParsedTupleTypeSyntax>(SyntaxContext->getActions())) {
+        auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>(
+            SyntaxContext->getActions());
         // Decompose TupleTypeSyntax and repack into FunctionType.
         auto LeftParen = TupleTypeNode.getDeferredLeftParen(SyntaxContext);
         auto Arguments = TupleTypeNode.getDeferredElements(SyntaxContext);

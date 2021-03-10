@@ -117,7 +117,8 @@ SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
       rawNode = rec.recordRawSyntax(kind, layout);
     }
   };
-  if (ParsedSyntaxRecorder::formExactLayoutFor(Kind, Parts, formNode))
+  if (ParsedSyntaxRecorder::formExactLayoutFor(getActions(), Kind, Parts,
+                                               formNode))
     return rawNode;
 
   // Fallback to unknown syntax for the category.
@@ -129,7 +130,7 @@ SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
                                MutableArrayRef<ParsedRawSyntaxNode> Parts) {
   if (Parts.size() == 1) {
     auto &RawNode = Parts.front();
-    SyntaxKind RawNodeKind = RawNode.getKind();
+    SyntaxKind RawNodeKind = RawNode.getKind(getActions());
     switch (Kind) {
     case SyntaxContextKind::Stmt:
       if (!isStmtKind(RawNodeKind))
@@ -285,7 +286,8 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind,
   auto Parts = getParts();
   auto Count = 0;
   for (auto I = Parts.rbegin(), End = Parts.rend(); I != End; ++I) {
-    if (!SyntaxFactory::canServeAsCollectionMemberRaw(ColletionKind, I->getKind()))
+    if (!SyntaxFactory::canServeAsCollectionMemberRaw(ColletionKind,
+                                                      I->getKind(getActions())))
       break;
     ++Count;
   }
@@ -293,18 +295,20 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind,
     createNodeInPlace(ColletionKind, Count, nodeCreateK);
 }
 
-static ParsedRawSyntaxNode finalizeSourceFile(RootContextData &RootData,
-                                           MutableArrayRef<ParsedRawSyntaxNode> Parts) {
+static ParsedRawSyntaxNode
+finalizeSourceFile(RootContextData &RootData,
+                   MutableArrayRef<ParsedRawSyntaxNode> Parts,
+                   const SyntaxParseActions *Actions) {
   ParsedRawSyntaxRecorder &Recorder = RootData.Recorder;
   ParsedRawSyntaxNode Layout[2];
 
-  assert(!Parts.empty() && Parts.back().isToken(tok::eof));
+  assert(!Parts.empty() && Parts.back().isToken(tok::eof, Actions));
   Layout[1] = std::move(Parts.back());
   Parts = Parts.drop_back();
 
 
-  assert(llvm::all_of(Parts, [](const ParsedRawSyntaxNode& node) {
-    return node.getKind() == SyntaxKind::CodeBlockItem;
+  assert(llvm::all_of(Parts, [&Actions](const ParsedRawSyntaxNode& node) {
+    return node.getKind(Actions) == SyntaxKind::CodeBlockItem;
   }) && "all top level element must be 'CodeBlockItem'");
 
   Layout[0] = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList, Parts);
@@ -323,7 +327,8 @@ OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
   if (parts.empty()) {
     return nullptr; // already finalized.
   }
-  ParsedRawSyntaxNode root = finalizeSourceFile(*getRootData(), parts);
+  ParsedRawSyntaxNode root =
+      finalizeSourceFile(*getRootData(), parts, getActions());
 
   // Clear the parts because we will call this function again when destroying
   // the root context.

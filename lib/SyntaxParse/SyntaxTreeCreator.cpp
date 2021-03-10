@@ -216,7 +216,7 @@ SyntaxTreeCreator::recordDeferredLayout(OpaqueSyntaxNode deferred) {
 
 DeferredNodeInfo SyntaxTreeCreator::getDeferredChild(OpaqueSyntaxNode node,
                                                      size_t ChildIndex,
-                                                     SourceLoc StartLoc) {
+                                                     SourceLoc StartLoc) const {
   const RawSyntax *raw = static_cast<const RawSyntax *>(node);
 
   // Compute the start offset of the child node by advancing StartLoc by the
@@ -232,24 +232,21 @@ DeferredNodeInfo SyntaxTreeCreator::getDeferredChild(OpaqueSyntaxNode node,
   if (Child == nullptr) {
     return DeferredNodeInfo(
         RecordedOrDeferredNode(nullptr, RecordedOrDeferredNode::Kind::Null),
-        syntax::SyntaxKind::Unknown, tok::NUM_TOKENS, /*IsMissing=*/false,
         CharSourceRange(StartLoc, /*Length=*/0));
   } else if (Child->isToken()) {
     return DeferredNodeInfo(
         RecordedOrDeferredNode(Child,
                                RecordedOrDeferredNode::Kind::DeferredToken),
-        syntax::SyntaxKind::Token, Child->getTokenKind(), Child->isMissing(),
         CharSourceRange(StartLoc, Child->getTextLength()));
   } else {
     return DeferredNodeInfo(
         RecordedOrDeferredNode(Child,
                                RecordedOrDeferredNode::Kind::DeferredLayout),
-        Child->getKind(), tok::NUM_TOKENS,
-        /*IsMissing=*/false, CharSourceRange(StartLoc, Child->getTextLength()));
+        CharSourceRange(StartLoc, Child->getTextLength()));
   }
 }
 
-size_t SyntaxTreeCreator::getDeferredNumChildren(OpaqueSyntaxNode node) {
+size_t SyntaxTreeCreator::getDeferredNumChildren(OpaqueSyntaxNode node) const {
   const syntax::RawSyntax *raw = static_cast<const syntax::RawSyntax *>(node);
   return raw->getNumChildren();
 }

@@ -143,14 +143,31 @@ swiftparse_parser_dispose(swiftparse_parser_t);
 typedef swiftparse_client_node_t
     (^swiftparse_node_handler_t)(const swiftparse_syntax_node_t *);
 
-/// Set the \c swiftparse_node_handler_t block to be used by the parser.
+/// Invoked by the parser to retrieve the syntax kind of a syntax node created
+/// and maintained by the client.
+typedef swiftparse_syntax_kind_t (^swiftparse_get_syntaxkind_t)(
+    swiftparse_client_node_t);
+
+/// Invoked by the parser to retrieve the token kind of a syntax node created
+/// and maintained by the client.
+typedef swiftparse_token_kind_t (^swiftparse_get_tokenkind_t)(
+    swiftparse_client_node_t);
+
+/// Invoked by the parser to query whether the given syntax node is present or
+/// missing.
+typedef bool (^swiftparse_is_present_t)(swiftparse_client_node_t);
+
+/// Set the required \c swiftparse_required_callbacks_t callbacks to be used
+/// by the parser.
 ///
-/// It is required to set a \c swiftparse_node_handler_t block before any calls
-/// to \c swiftparse_parse_string. \c swiftparse_parser_set_node_handler can be
-/// called multiple times to change the block before subsequent parses.
-SWIFTPARSE_PUBLIC void
-swiftparse_parser_set_node_handler(swiftparse_parser_t,
-                                   swiftparse_node_handler_t);
+/// It is required to set a these callbacks before any calls to \c
+/// swiftparse_parse_string. \c swiftparse_parser_set_required_callbacks can be
+/// called multiple times to change the callbacks before subsequent parses.
+SWIFTPARSE_PUBLIC void swiftparse_parser_set_required_callbacks(
+    swiftparse_parser_t c_parser, swiftparse_node_handler_t node_handler,
+    swiftparse_get_syntaxkind_t get_syntaxkind,
+    swiftparse_get_tokenkind_t get_tokenkind,
+    swiftparse_is_present_t is_present);
 
 typedef struct {
   /// Length of the source region in UTF8 bytes that the parser should skip.
@@ -179,7 +196,7 @@ swiftparse_parser_set_node_lookup(swiftparse_parser_t,
                                   swiftparse_node_lookup_t);
 
 /// Parse the provided \p source and invoke the callback that was set via
-/// \c swiftparse_parser_set_node_handler as each syntax node is parsed.
+/// \c swiftparse_parser_set_required_callbacks as each syntax node is parsed.
 ///
 /// Syntax nodes are provided in a depth-first, source order. For example,
 /// token nodes will be provided ahead of the syntax node whose layout they are

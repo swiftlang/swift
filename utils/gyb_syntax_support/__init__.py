@@ -85,25 +85,25 @@ def check_parsed_child_condition_raw(child):
     Generates a C++ closure to check whether a given raw syntax node can
     satisfy the requirements of child.
     """
-    result = '[](const ParsedRawSyntaxNode &Raw) {\n'
+    result = '[](const ParsedRawSyntaxNode &Raw, const SyntaxParseActions *Actions) {\n'
     result += ' // check %s\n' % child.name
     if child.token_choices:
-        result += 'if (!Raw.isToken()) return false;\n'
-        result += 'auto TokKind = Raw.getTokenKind();\n'
+        result += 'if (!Raw.isToken(Actions)) return false;\n'
+        result += 'auto TokKind = Raw.getTokenKind(Actions);\n'
         tok_checks = []
         for choice in child.token_choices:
             tok_checks.append("TokKind == tok::%s" % choice.kind)
         result += 'return %s;\n' % (' || '.join(tok_checks))
     elif child.text_choices:
-        result += 'return Raw.isToken();\n'
+        result += 'return Raw.isToken(Actions);\n'
     elif child.node_choices:
         node_checks = []
         for choice in child.node_choices:
             node_checks.append(
-                check_parsed_child_condition_raw(choice) + '(Raw)')
+                check_parsed_child_condition_raw(choice) + '(Raw, Actions)')
         result += 'return %s;\n' % ((' || ').join(node_checks))
     else:
-        result += 'return Parsed%s::kindof(Raw.getKind());' % child.type_name
+        result += 'return Parsed%s::kindof(Raw.getKind(Actions));' % child.type_name
     result += '}'
     return result
 

@@ -66,6 +66,8 @@ struct SPNode {
 
   std::vector<std::unique_ptr<SPNode>> members;
 
+  bool isPresent;
+
   LLVM_DUMP_METHOD void dump() {
     dump(errs());
   }
@@ -110,6 +112,7 @@ static swiftparse_client_node_t
 makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
   SPNode *node = new SPNode();
   node->kind = raw_node->kind;
+  node->isPresent = raw_node->present;
   if (raw_node->kind == 0) {
     auto range = raw_node->token_data.range;
     auto nodeText = source.substr(range.offset, range.length);
@@ -134,10 +137,27 @@ makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
 }
 
 static swiftparse_client_node_t
-parse(StringRef source, swiftparse_node_handler_t node_handler,
+parse(StringRef source,
       swiftparse_diagnostic_handler_t diag_handler = nullptr) {
+  swiftparse_node_handler_t nodeHandler =
+      ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
+        return makeNode(raw_node, source);
+      };
+  swiftparse_get_syntaxkind_t getSyntaxKind =
+      ^swiftparse_syntax_kind_t(swiftparse_client_node_t node) {
+        return static_cast<SPNode *>(node)->kind;
+      };
+  swiftparse_get_tokenkind_t getTokenKind =
+      ^swiftparse_token_kind_t(swiftparse_client_node_t node) {
+        return static_cast<SPNode *>(node)->tokKind.getValue();
+      };
+  swiftparse_is_present_t isPresent = ^bool(swiftparse_client_node_t node) {
+    return static_cast<SPNode *>(node)->isPresent;
+  };
+
   swiftparse_parser_t parser = swiftparse_parser_create();
-  swiftparse_parser_set_node_handler(parser, node_handler);
+  swiftparse_parser_set_required_callbacks(parser, nodeHandler, getSyntaxKind,
+                                           getTokenKind, isPresent);
   swiftparse_parser_set_diagnostic_handler(parser, diag_handler);
   swiftparse_client_node_t top =
       swiftparse_parse_string(parser, source.data(), source.size());
@@ -146,12 +166,7 @@ parse(StringRef source, swiftparse_node_handler_t node_handler,
 }
 
 static int dumpTree(StringRef source) {
-  swiftparse_node_handler_t nodeHandler =
-    ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
-      return makeNode(raw_node, source);
-    };
-
-  std::unique_ptr<SPNode> top = convertClientNode(parse(source, nodeHandler));
+  std::unique_ptr<SPNode> top = convertClientNode(parse(source));
   top->dump(outs());
 
   return 0;
@@ -217,13 +232,8 @@ static void printDiagInfo(const swiftparser_diagnostic_t diag,
 
 static int dumpDiagnostics(StringRef source, llvm::SourceMgr &SM,
                            unsigned BufferId) {
-  swiftparse_node_handler_t nodeHandler =
-  ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
-    return makeNode(raw_node, source);
-  };
   std::shared_ptr<PrintDiagData> pData = std::make_shared<PrintDiagData>();
-  convertClientNode(parse(source, nodeHandler,
-      ^(const swiftparser_diagnostic_t diag) {
+  convertClientNode(parse(source, ^(const swiftparser_diagnostic_t diag) {
     printDiagInfo(diag, SM, BufferId, const_cast<PrintDiagData&>(*pData));
   }));
   return 0;
@@ -255,15 +265,10 @@ static void printTimeRecord(unsigned numInvoks, const TimeRecord &total,
 }
 
 static int timeParsing(StringRef source, unsigned numInvoks) {
-  swiftparse_node_handler_t nodeHandler =
-    ^swiftparse_client_node_t(const swiftparse_syntax_node_t *raw_node) {
-      return nullptr;
-    };
-
   Timer timer;
   timer.startTimer();
   for (unsigned i = 0; i != numInvoks; ++i) {
-    parse(source, nodeHandler);
+    parse(source);
   }
   timer.stopTimer();
 

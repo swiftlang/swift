@@ -28,6 +28,8 @@
 namespace swift {
 namespace json {
 
+using namespace swift::syntax;
+
 /// Input to the llvm::yaml / json parser that deserialises to a \c RawSyntax
 /// tree. Contains a \c SyntaxArena in which the tree shall be created.
 class SyntaxInput : public llvm::yaml::Input {
@@ -46,12 +48,13 @@ namespace llvm {
 namespace yaml {
 
 using swift::json::SyntaxInput;
+using namespace swift::syntax;
 
 /// Deserialization traits for SourcePresence.
-template <> struct ScalarEnumerationTraits<swift::SourcePresence> {
-  static void enumeration(IO &in, swift::SourcePresence &value) {
-    in.enumCase(value, "Present", swift::SourcePresence::Present);
-    in.enumCase(value, "Missing", swift::SourcePresence::Missing);
+template <> struct ScalarEnumerationTraits<SourcePresence> {
+  static void enumeration(IO &in, SourcePresence &value) {
+    in.enumCase(value, "Present", SourcePresence::Present);
+    in.enumCase(value, "Missing", SourcePresence::Missing);
   }
 };
 
@@ -65,15 +68,15 @@ template <> struct ScalarEnumerationTraits<swift::tok> {
 
 /// Deserialization traits for Trivia.
 /// An array of the underlying TriviaPieces will be deserialized as Trivia.
-template <typename Context> swift::TriviaPiece yamlize(IO &io, Context &Ctx) {
+template <typename Context> TriviaPiece yamlize(IO &io, Context &Ctx) {
   io.beginMapping();
-  auto ret = MappingTraits<swift::TriviaPiece>::mapping(io);
+  auto ret = MappingTraits<TriviaPiece>::mapping(io);
   io.endMapping();
   return ret;
 }
 
 template <typename Context>
-void yamlize(IO &io, std::vector<swift::TriviaPiece> &Seq, bool, Context &Ctx) {
+void yamlize(IO &io, std::vector<TriviaPiece> &Seq, bool, Context &Ctx) {
   unsigned incnt = io.beginSequence();
   for (unsigned i = 0; i < incnt; ++i) {
     void *SaveInfo;
@@ -85,23 +88,23 @@ void yamlize(IO &io, std::vector<swift::TriviaPiece> &Seq, bool, Context &Ctx) {
   io.endSequence();
 }
 
-template <> struct SequenceTraits<std::vector<swift::TriviaPiece>> {
-  static size_t size(IO &in, std::vector<swift::TriviaPiece> &seq) {
+template <> struct SequenceTraits<std::vector<TriviaPiece>> {
+  static size_t size(IO &in, std::vector<TriviaPiece> &seq) {
     return seq.size();
   }
 };
 
 /// Deserialization traits for RawSyntax list.
-template <> struct SequenceTraits<std::vector<const swift::RawSyntax *>> {
-  static size_t size(IO &in, std::vector<const swift::RawSyntax *> &seq) {
+template <> struct SequenceTraits<std::vector<const RawSyntax *>> {
+  static size_t size(IO &in, std::vector<const RawSyntax *> &seq) {
     return seq.size();
   }
-  static const swift::RawSyntax *&
-  element(IO &in, std::vector<const swift::RawSyntax *> &seq, size_t index) {
+  static const RawSyntax *&
+  element(IO &in, std::vector<const RawSyntax *> &seq, size_t index) {
     if (seq.size() <= index) {
       seq.resize(index + 1);
     }
-    return const_cast<const swift::RawSyntax *&>(seq[index]);
+    return const_cast<const RawSyntax *&>(seq[index]);
   }
 };
 
@@ -157,8 +160,8 @@ template <> struct MappingTraits<TokenDescription> {
 /// }
 /// ```
 
-template <> struct MappingTraits<const swift::RawSyntax *> {
-  static void mapping(IO &in, const swift::RawSyntax *&value) {
+template <> struct MappingTraits<const RawSyntax *> {
+  static void mapping(IO &in, const RawSyntax *&value) {
     TokenDescription description;
     // RawSyntax trees must always be generated from a SyntaxInput. Otherwise
     // we don't have an arena to create the nodes in.
@@ -175,7 +178,7 @@ template <> struct MappingTraits<const swift::RawSyntax *> {
       in.mapRequired("leadingTrivia", leadingTrivia);
       StringRef trailingTrivia;
       in.mapRequired("trailingTrivia", trailingTrivia);
-      swift::SourcePresence presence;
+      SourcePresence presence;
       in.mapRequired("presence", presence);
       /// FIXME: This is a workaround for existing bug from llvm yaml parser
       /// which would raise error when deserializing number with trailing
@@ -183,15 +186,15 @@ template <> struct MappingTraits<const swift::RawSyntax *> {
       StringRef nodeIdString;
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::makeAndCalcLength(
+      value = RawSyntax::makeAndCalcLength(
           tokenKind, text, leadingTrivia, trailingTrivia, presence,
           input->Arena, nodeId);
     } else {
-      swift::SyntaxKind kind;
+      SyntaxKind kind;
       in.mapRequired("kind", kind);
-      std::vector<const swift::RawSyntax *> layout;
+      std::vector<const RawSyntax *> layout;
       in.mapRequired("layout", layout);
-      swift::SourcePresence presence;
+      SourcePresence presence;
       in.mapRequired("presence", presence);
       /// FIXME: This is a workaround for existing bug from llvm yaml parser
       /// which would raise error when deserializing number with trailing
@@ -199,7 +202,7 @@ template <> struct MappingTraits<const swift::RawSyntax *> {
       StringRef nodeIdString;
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::makeAndCalcLength(kind, layout, presence,
+      value = RawSyntax::makeAndCalcLength(kind, layout, presence,
                                                   input->Arena, nodeId);
     }
   }
@@ -220,13 +223,29 @@ public:
   SyntaxDeserializer(llvm::MemoryBufferRef buffer,
                      RC<SyntaxArena> Arena = SyntaxArena::make())
       : Input(buffer, Arena) {}
-  llvm::Optional<swift::SourceFileSyntax> getSourceFileSyntax() {
-    const swift::RawSyntax *raw;
+  llvm::Optional<SourceFileSyntax> getSourceFileSyntax() {
+    const RawSyntax *raw;
     Input >> raw;
-    return swift::makeRoot<swift::SourceFileSyntax>(raw);
+    return makeRoot<SourceFileSyntax>(raw);
   }
 };
 } // namespace json
 } // namespace swift
+
+namespace swift {
+namespace serialization {
+
+using namespace swift::syntax;
+
+/// Return the \c SyntaxKind corresponding to the numeric value produced by
+/// \c serialization::getNumericValue(SyntaxKind).
+SyntaxKind getSyntaxKindFromNumericValue(uint16_t Value);
+
+/// Return the \c tok kind corresponding to the numeric value produced by
+/// \c serialization::getNumericValue(tok).
+tok getTokFromNumericValue(uint8_t Value);
+
+} // end namespace serialization
+} // end namespace swift
 
 #endif // SWIFT_SYNTAX_SERIALIZATION_SYNTAXDESERIALIZATION_H

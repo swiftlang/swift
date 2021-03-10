@@ -259,6 +259,10 @@ public:
     return getRootData()->Recorder;
   }
 
+  const SyntaxParseActions *getActions() const {
+    return getRecorder().getActions();
+  }
+
   llvm::BumpPtrAllocator &getScratchAlloc() {
     return getRootData()->ScratchAlloc;
   }
@@ -277,7 +281,7 @@ public:
     auto &Storage = getStorage();
     if (Storage.size() <= Offset)
       return llvm::None;
-    if (!SyntaxNode::kindof(Storage.back().getKind()))
+    if (!SyntaxNode::kindof(Storage.back().getKind(getActions())))
       return llvm::None;
     auto rawNode = std::move(Storage.back());
     Storage.pop_back();

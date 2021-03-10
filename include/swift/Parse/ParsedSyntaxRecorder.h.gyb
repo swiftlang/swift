@@ -29,7 +29,7 @@ namespace swift {
 class ParsedRawSyntaxRecorder;
 class SyntaxParsingContext;
 
-struct ParsedSyntaxRecorder {
+struct ParsedSyntaxRecorder final {
 
 % for node in SYNTAX_NODES:
 %   if node.children:
@@ -84,7 +84,8 @@ public:
   ///
   /// \returns true if the layout could be formed, false otherwise.
   static bool
-  formExactLayoutFor(syntax::SyntaxKind kind,
+  formExactLayoutFor(const SyntaxParseActions *Actions,
+                     syntax::SyntaxKind kind,
                      MutableArrayRef<ParsedRawSyntaxNode> elements,
                      function_ref<void(syntax::SyntaxKind,
                                        MutableArrayRef<ParsedRawSyntaxNode>)>

@@ -50,45 +50,29 @@ class ParsedRawSyntaxNode {
 
   /// The range of this node, including trivia.
   CharSourceRange Range;
-  uint16_t SynKind;
-  uint16_t TokKind;
-  /// Primary used for capturing a deferred missing token.
-  bool IsMissing = false;
-
   ParsedRawSyntaxNode(const ParsedRawSyntaxNode &other) = delete;
   ParsedRawSyntaxNode &operator=(const ParsedRawSyntaxNode &other) = delete;
 
 public:
   // MARK: - Constructors
 
-  ParsedRawSyntaxNode()
-      : Data(nullptr, DataKind::Null), Range(),
-        SynKind(uint16_t(syntax::SyntaxKind::Unknown)),
-        TokKind(uint16_t(tok::unknown)) {}
+  ParsedRawSyntaxNode() : Data(nullptr, DataKind::Null), Range() {}
 
-  ParsedRawSyntaxNode(OpaqueSyntaxNode Opaque, CharSourceRange Range,
-                      syntax::SyntaxKind SynKind, tok TokKind, DataKind DK,
-                      bool IsMissing)
-      : Data(Opaque, DK), Range(Range), SynKind(uint16_t(SynKind)),
-        TokKind(uint16_t(TokKind)), IsMissing(IsMissing) {
-    assert(getKind() == SynKind && "Syntax kind with too large value!");
-    assert(getTokenKind() == TokKind && "Token kind with too large value!");
-  }
+  /// Create an arbitrary syntax node.
+  ParsedRawSyntaxNode(OpaqueSyntaxNode n, DataKind DK, CharSourceRange Range)
+      : Data(n, DK), Range(Range) {}
 
   ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &&other) {
     assert(ensureDataIsNotRecorded() &&
            "recorded data is being destroyed by assignment");
     Data = std::move(other.Data);
     Range = std::move(other.Range);
-    SynKind = std::move(other.SynKind);
-    TokKind = std::move(other.TokKind);
-    IsMissing = std::move(other.IsMissing);
     other.reset();
     return *this;
   }
-
-  ParsedRawSyntaxNode(ParsedRawSyntaxNode &&other) : ParsedRawSyntaxNode() {
-    *this = std::move(other);
+  ParsedRawSyntaxNode(ParsedRawSyntaxNode &&other)
+      : Data(std::move(other.Data)), Range(std::move(other.Range)) {
+    other.reset();
   }
 
   static ParsedRawSyntaxNode null() {
@@ -116,14 +100,13 @@ public:
 
   // MARK: - Retrieving opaque data
 
-  /// Returns the opaque data of this node, assuming that it is deferred. This
-  /// must be interpreted by the \c SyntaxParseAction, which likely also needs
-  /// the node type (layout or token) to interpret the data.
-  /// The data opaque data returned by this function *must not* be used to
-  /// record the node, only to insepect it.
-  OpaqueSyntaxNode getUnsafeDeferredOpaqueData() const {
-    assert(isDeferredLayout() || isDeferredToken());
-    return Data.getOpaque();
+  /// Returns the opaque data of this node. This must be interpreted by the \c
+  /// SyntaxParseAction, which likely also needs the node type (layout or token)
+  /// to interpret the data. The data opaque data returned by this function
+  /// *must not* be used to record the node, only to insepect it.
+  OpaqueSyntaxNode getUnsafeOpaqueData() const { return Data.getOpaque(); }
+  RecordedOrDeferredNode getUnsafeRecordedOrDeferredNode() const {
+    return Data;
   }
 
   /// Return the opaque data of this node and reset it.
@@ -141,16 +124,16 @@ public:
 
   // MARK: - Retrieving additional node info
 
-  syntax::SyntaxKind getKind() const { return syntax::SyntaxKind(SynKind); }
-  tok getTokenKind() const { return tok(TokKind); }
+  syntax::SyntaxKind getKind(const SyntaxParseActions *Actions) const;
+  tok getTokenKind(const SyntaxParseActions *Actions) const;
 
-  bool isToken() const {
-    return getKind() == syntax::SyntaxKind::Token;
+  bool isToken(const SyntaxParseActions *Actions) const {
+    return getKind(Actions) == syntax::SyntaxKind::Token;
   }
-  bool isToken(tok tokKind) const {
-    return getTokenKind() == tokKind;
+  bool isToken(tok tokKind, const SyntaxParseActions *Actions) const {
+    return getTokenKind(Actions) == tokKind;
   }
-  bool isMissing() const { return IsMissing; }
+  bool isMissing(const SyntaxParseActions *Actions) const;
 
   /// Returns the range of this node including leading and trailing trivia.
   CharSourceRange getRange() const { return Range; }
@@ -171,9 +154,6 @@ public:
 
   void reset() {
     Data = RecordedOrDeferredNode(nullptr, DataKind::Null);
-    SynKind = uint16_t(syntax::SyntaxKind::Unknown);
-    TokKind = uint16_t(tok::unknown);
-    IsMissing = false;
     Range = CharSourceRange();
   }
 
@@ -181,9 +161,6 @@ public:
     ParsedRawSyntaxNode copy;
     copy.Data = Data;
     copy.Range = Range;
-    copy.SynKind = SynKind;
-    copy.TokKind = TokKind;
-    copy.IsMissing = IsMissing;
     return copy;
   }
 

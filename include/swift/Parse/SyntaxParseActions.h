@@ -68,15 +68,10 @@ public:
 /// \c ParsedRawSyntaxNode being on a higher level than \c SyntaxParseActions.
 struct DeferredNodeInfo {
   RecordedOrDeferredNode Data;
-  syntax::SyntaxKind SyntaxKind;
-  tok TokenKind;
-  bool IsMissing;
   CharSourceRange Range;
 
-  DeferredNodeInfo(RecordedOrDeferredNode Data, syntax::SyntaxKind SyntaxKind,
-                   tok TokenKind, bool IsMissing, CharSourceRange Range)
-      : Data(Data), SyntaxKind(SyntaxKind), TokenKind(TokenKind),
-        IsMissing(IsMissing), Range(Range) {}
+  DeferredNodeInfo(RecordedOrDeferredNode Data, CharSourceRange Range)
+      : Data(Data), Range(Range) {}
 };
 
 // MARK: - SyntaxParseActions
@@ -138,11 +133,21 @@ public:
   /// node starts at \p StartLoc.
   virtual DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
                                             size_t childIndex,
-                                            SourceLoc startLoc) = 0;
+                                            SourceLoc startLoc) const = 0;
 
   /// Return the number of children, \p node has. These can be retrieved using
   /// \c getDeferredChild.
-  virtual size_t getDeferredNumChildren(OpaqueSyntaxNode node) = 0;
+  virtual size_t getDeferredNumChildren(OpaqueSyntaxNode node) const = 0;
+
+  /// Interpret the contents of \p node and retrieve its syntax kind.
+  virtual syntax::SyntaxKind
+  getSyntaxKind(RecordedOrDeferredNode node) const = 0;
+
+  /// Interpret the contents of \p node and retrieve its token kind.
+  virtual tok getTokenKind(RecordedOrDeferredNode node) const = 0;
+
+  /// Interpret the contents of \p node and return whether it's missing or not.
+  virtual bool isMissing(RecordedOrDeferredNode node) const = 0;
 
   /// Attempt to realize an opaque raw syntax node for a source file into a
   /// SourceFileSyntax node. This will return \c None if the parsing action

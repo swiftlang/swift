@@ -17,6 +17,19 @@ using namespace swift;
 using namespace swift::syntax;
 using namespace llvm;
 
+tok ParsedRawSyntaxNode::getTokenKind(const SyntaxParseActions *Actions) const {
+  return Actions->getTokenKind(getUnsafeRecordedOrDeferredNode());
+}
+
+syntax::SyntaxKind
+ParsedRawSyntaxNode::getKind(const SyntaxParseActions *Actions) const {
+  return Actions->getSyntaxKind(getUnsafeRecordedOrDeferredNode());
+}
+
+bool ParsedRawSyntaxNode::isMissing(const SyntaxParseActions *Actions) const {
+  return Actions->isMissing(getUnsafeRecordedOrDeferredNode());
+}
+
 ParsedRawSyntaxNode ParsedRawSyntaxNode::getDeferredChild(
     size_t ChildIndex, const SyntaxParsingContext *SyntaxContext) const {
   assert(isDeferredLayout());
@@ -41,38 +54,53 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS,
     OS << ' ';
   OS << '(';
 
-  switch (getDataKind()) {
+  if (Context) {
+    const SyntaxParseActions *Actions = Context->getActions();
+    switch (getDataKind()) {
     case DataKind::Null:
       OS << "<NULL>";
       break;
     case DataKind::Recorded:
-      dumpSyntaxKind(OS, getKind());
+      dumpSyntaxKind(OS, getKind(Actions));
       OS << " [recorded] ";
-      if (isToken()) {
-        dumpTokenKind(OS, getTokenKind());
+      if (isToken(Actions)) {
+        dumpTokenKind(OS, getTokenKind(Actions));
       } else {
         OS << "<layout>";
       }
       break;
-    case DataKind::DeferredLayout:
-      dumpSyntaxKind(OS, getKind());
+    case DataKind::DeferredLayout: {
+      dumpSyntaxKind(OS, getKind(Actions));
       OS << " [deferred]";
-      if (Context) {
-        size_t numChildren = getDeferredNumChildren(Context);
-        for (size_t i = 0; i < numChildren; ++i) {
-          auto child = getDeferredChild(i, Context);
-          OS << "\n";
-          child.dump(OS, Context, Indent + 2);
-        }
-      } else {
-        OS << " (unknown children)";
+      size_t numChildren = getDeferredNumChildren(Context);
+      for (size_t i = 0; i < numChildren; ++i) {
+        auto child = getDeferredChild(i, Context);
+        OS << "\n";
+        child.dump(OS, Context, Indent + 2);
       }
       break;
+    }
     case DataKind::DeferredToken:
-      dumpSyntaxKind(OS, getKind());
+      dumpSyntaxKind(OS, getKind(Actions));
       OS << " [deferred] ";
-      dumpTokenKind(OS, getTokenKind());
+      dumpTokenKind(OS, getTokenKind(Actions));
       break;
+    }
+  } else {
+    switch (getDataKind()) {
+    case DataKind::Null:
+      OS << "<NULL>";
+      break;
+    case DataKind::Recorded:
+      OS << " [recorded] <unknown type>";
+      break;
+    case DataKind::DeferredLayout:
+      OS << " [deferred layout] <unknown children>";
+      break;
+    case DataKind::DeferredToken:
+      OS << " [deferred token] <unknown kind>";
+      break;
+    }
   }
   OS << ')';
 }
