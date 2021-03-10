@@ -2729,7 +2729,11 @@ bool ConformanceChecker::checkActorIsolation(
   switch (auto witnessRestriction =
               ActorIsolationRestriction::forDeclaration(witness)) {
   case ActorIsolationRestriction::ActorSelf: {
-    // Actor-isolated witnesses cannot conform to protocol requirements.
+    // An actor-isolated witness can only conform to an actor-isolated
+    // requirement.
+    if (getActorIsolation(requirement) == ActorIsolation::ActorInstance)
+      return false;
+
     witness->diagnose(diag::actor_isolated_witness,
                       witness->getDescriptiveKind(),
                       witness->getName());

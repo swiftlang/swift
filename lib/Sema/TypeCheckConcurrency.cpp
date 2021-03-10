@@ -236,7 +236,31 @@ bool CanBeAsyncHandlerRequest::evaluate(
 }
 
 bool IsActorRequest::evaluate(
-    Evaluator &evaluator, ClassDecl *classDecl) const {
+    Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  // Protocols are actors if their `Self` type conforms to `Actor`.
+  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+    // Simple case: we have the Actor protocol itself.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Actor))
+      return true;
+
+    auto actorProto = nominal->getASTContext().getProtocol(
+        KnownProtocolKind::Actor);
+    if (!actorProto)
+      return false;
+
+    auto selfType = Type(protocol->getProtocolSelfType());
+    auto genericSig = protocol->getGenericSignature();
+    if (!genericSig)
+      return false;
+
+    return genericSig->requiresProtocol(selfType, actorProto);
+  }
+
+  // Class declarations are actors if they were declared with "actor".
+  auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if (!classDecl)
+    return false;
+
   bool isExplicitActor = classDecl->isExplicitActor() ||
     classDecl->getAttrs().getAttribute<ActorAttr>();
 
@@ -1362,12 +1386,14 @@ namespace {
     }
 
     // Retrieve the nearest enclosing actor context.
-    static ClassDecl *getNearestEnclosingActorContext(const DeclContext *dc) {
+    static NominalTypeDecl *getNearestEnclosingActorContext(
+        const DeclContext *dc) {
       while (!dc->isModuleScopeContext()) {
         if (dc->isTypeContext()) {
-          if (auto classDecl = dc->getSelfClassDecl()) {
-            if (classDecl->isActor())
-              return classDecl;
+          // FIXME: Protocol extensions need specific handling here.
+          if (auto nominal = dc->getSelfNominalTypeDecl()) {
+            if (nominal->isActor())
+              return nominal;
           }
         }
 
@@ -1962,7 +1988,7 @@ namespace {
               memberLoc, diag::actor_isolated_non_self_reference,
               member->getDescriptiveKind(),
               member->getName(),
-              isolation.getActorClass() ==
+              isolation.getActorType() ==
                 getNearestEnclosingActorContext(getDeclContext()),
               useKind
               );
@@ -2326,8 +2352,17 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
         continue;
 
       auto requirementIsolation = getActorIsolation(requirement);
-      if (requirementIsolation.isUnspecified())
+      switch (requirementIsolation) {
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::Unspecified:
         continue;
+
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+        break;
+      }
 
       auto witness = conformance->getWitnessDecl(requirement);
       if (witness != value)
@@ -2417,12 +2452,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Check for instance members and initializers of actor classes,
+  // Check for instance members and initializers of actor types,
   // which are part of actor-isolated state.
-  auto classDecl = value->getDeclContext()->getSelfClassDecl();
-  if (classDecl && classDecl->isActor() &&
-      (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
-    defaultIsolation = ActorIsolation::forActorInstance(classDecl);
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
+    if (nominal->isActor() &&
+        (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
+      defaultIsolation = ActorIsolation::forActorInstance(nominal);
+    }
   }
 
   // Function used when returning an inferred isolation.

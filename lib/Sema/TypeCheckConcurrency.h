@@ -103,8 +103,8 @@ private:
     /// The local context that an entity is tied to.
     DeclContext *localContext;
 
-    /// The actor class that the entity is declared in.
-    ClassDecl *actorClass;
+    /// The actor that the entity is declared in.
+    NominalTypeDecl *actorType;
 
     /// The global actor type.
     TypeBase *globalActor;
@@ -123,10 +123,10 @@ public:
 
   Kind getKind() const { return kind; }
 
-  /// Retrieve the actor class that the declaration is within.
-  ClassDecl *getActorClass() const {
+  /// Retrieve the actor type that the declaration is within.
+  NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || kind == CrossActorSelf);
-    return data.actorClass;
+    return data.actorType;
   }
 
   /// Retrieve the actor class that the declaration is within.
@@ -148,10 +148,10 @@ public:
   /// Accesses to the given declaration can only be made via the 'self' of
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
-      ClassDecl *actorClass, bool isCrossActor) {
+      NominalTypeDecl *actor, bool isCrossActor) {
     ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
                                      isCrossActor);
-    result.data.actorClass = actorClass;
+    result.data.actorType = actor;
     return result;
   }
 
