@@ -167,7 +167,7 @@ class ModuleDecl : public DeclContext, public TypeDecl {
   friend class DirectPrecedenceGroupLookupRequest;
 
   /// The ABI name of the module, if it differs from the module name.
-  Identifier ModuleABIName;
+  mutable Identifier ModuleABIName;
 
 public:
   /// Produces the components of a given module's full name in reverse order.
@@ -348,9 +348,7 @@ public:
 
   /// Retrieve the ABI name of the module, which is used for metadata and
   /// mangling.
-  Identifier getABIName() const {
-    return ModuleABIName.empty() ? getName() : ModuleABIName;
-  }
+  Identifier getABIName() const;
 
   /// Set the ABI name of the module;
   void setABIName(Identifier name) {
