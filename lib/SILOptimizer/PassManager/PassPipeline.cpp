@@ -138,9 +138,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addSILSkippingChecker();
 #endif
 
-  if (Options.shouldOptimize() && !Options.EnableExperimentalLexicalLifetimes) {
-    P.addDestroyHoisting();
-  }
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
@@ -528,6 +525,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
+  if (!P.getOptions().EnableExperimentalLexicalLifetimes)
+    P.addDestroyHoisting();
 
   // Devirtualizes differentiability witnesses into functions that reference them.
   // This unblocks many other passes' optimizations (e.g. inlining) and this is
