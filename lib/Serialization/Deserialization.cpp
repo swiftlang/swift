@@ -4553,34 +4553,19 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 
       case decls_block::CompletionHandlerAsync_DECL_ATTR: {
-        bool isCompound;
-        ArrayRef<uint64_t> rawPieces;
         uint64_t handlerIndex;
         bool explicitHandlerIndex;
         uint64_t asyncFunctionDeclID;
         serialization::decls_block::CompletionHandlerAsyncDeclAttrLayout::
             readRecord(scratch, explicitHandlerIndex, handlerIndex,
-                       asyncFunctionDeclID, isCompound, rawPieces);
-
-        DeclNameRef asyncFunctionName;
-        if (!rawPieces.empty()) {
-          auto baseName = MF.getDeclBaseName(rawPieces[0]);
-          SmallVector<Identifier, 4> pieces;
-          for (auto rawPiece : rawPieces.drop_front())
-            pieces.push_back(MF.getIdentifier(rawPiece));
-          asyncFunctionName = !isCompound
-                                  ? DeclNameRef({baseName})
-                                  : DeclNameRef({ctx, baseName, pieces});
-        }
+                       asyncFunctionDeclID);
 
         auto mappedFunctionDecl =
             cast<AbstractFunctionDecl>(MF.getDecl(asyncFunctionDeclID));
         Attr = new (ctx) CompletionHandlerAsyncAttr(
-            asyncFunctionName, /*functionNameLoc*/ SourceLoc(),
-            explicitHandlerIndex, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
+            *mappedFunctionDecl, explicitHandlerIndex, handlerIndex,
+            /*handlerIndexLoc*/ SourceLoc(),
             /*atLoc*/ SourceLoc(), /*range*/ SourceRange());
-        static_cast<CompletionHandlerAsyncAttr *>(Attr)->AsyncFunctionDecl =
-            mappedFunctionDecl;
         break;
       }
 

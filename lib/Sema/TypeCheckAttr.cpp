@@ -5804,7 +5804,7 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     //  should return all of those types in a tuple
 
     SmallVector<ValueDecl *, 2> allCandidates;
-    lookupReplacedDecl(attr->AsyncFunctionName, attr, attachedFunctionDecl,
+    lookupReplacedDecl(attr->getAsyncFunctionName(), attr, attachedFunctionDecl,
                        allCandidates);
     SmallVector<AbstractFunctionDecl *, 2> candidates;
     candidates.reserve(allCandidates.size());
@@ -5821,12 +5821,12 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     if (candidates.empty()) {
       diagnose(attr->AsyncFunctionNameLoc,
                diag::attr_completion_handler_async_no_suitable_function,
-               attr->AsyncFunctionName);
+               attr->getAsyncFunctionName());
       return;
     } else if (candidates.size() > 1) {
       diagnose(attr->AsyncFunctionNameLoc,
                diag::attr_completion_handler_async_ambiguous_function, attr,
-               attr->AsyncFunctionName);
+               attr->getAsyncFunctionName());
 
       for (AbstractFunctionDecl *candidate : candidates) {
         diagnose(candidate->getLoc(), diag::decl_declared_here,

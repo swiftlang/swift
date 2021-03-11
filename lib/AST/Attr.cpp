@@ -2002,3 +2002,11 @@ void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
 }
+
+DeclNameRef CompletionHandlerAsyncAttr::getAsyncFunctionName() const {
+  if (AsyncFunctionDecl)
+    return DeclNameRef(AsyncFunctionDecl->getName());
+  if (AsyncFunctionName)
+    return AsyncFunctionName;
+  llvm_unreachable("completionHandlerAsync attr missing async function name");
+}

@@ -2151,18 +2151,26 @@ public:
 /// alternative, optionally providing a name (for cases when the alternative
 /// has a different name).
 class CompletionHandlerAsyncAttr final : public DeclAttribute {
+private:
+  /// DeclName of the async function in the attribute
+  const DeclNameRef AsyncFunctionName;
+
 public:
   /// Source location of the async function name in the attribute
   const SourceLoc AsyncFunctionNameLoc;
 
-  /// DeclName of the async function in the attribute
-  const DeclNameRef AsyncFunctionName;
-
-  /// Source location of the completion handler index passed to the index
-  const SourceLoc CompletionHandlerIndexLoc;
+  /// Get the name of the async function
+  ///
+  /// The name will come from the AsyncFunctionDecl if available, otherwise will
+  /// fall back on the user-provided name. If that is not defined, this function
+  /// will abort.
+  DeclNameRef getAsyncFunctionName() const;
 
   /// The index of the completion handler
   const size_t CompletionHandlerIndex;
+
+  /// Source location of the completion handler index passed to the index
+  const SourceLoc CompletionHandlerIndexLoc;
 
   /// True when the completion handler was specified explicitly
   const bool ExplicitCompletionHandlerIndex;
@@ -2177,11 +2185,25 @@ public:
                              SourceLoc atLoc, SourceRange range)
       : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
                       /*implicit*/ false),
-        AsyncFunctionNameLoc(asyncFunctionNameLoc),
         AsyncFunctionName(asyncFunctionName),
-        CompletionHandlerIndexLoc(completionHandlerIndexLoc),
+        AsyncFunctionNameLoc(asyncFunctionNameLoc),
         CompletionHandlerIndex(completionHandlerIndex),
+        CompletionHandlerIndexLoc(completionHandlerIndexLoc),
         ExplicitCompletionHandlerIndex(explicitCompletionHandlerIndex) {}
+
+  CompletionHandlerAsyncAttr(AbstractFunctionDecl &asyncFunctionDecl,
+                             bool explicitCompletionHandlerIndex,
+                             size_t completionHandlerIndex,
+                             SourceLoc completionHandlerIndexLoc,
+                             SourceLoc atLoc, SourceRange range)
+      : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
+                      /*implicit*/ false),
+        CompletionHandlerIndex(completionHandlerIndex),
+        CompletionHandlerIndexLoc(completionHandlerIndexLoc),
+        ExplicitCompletionHandlerIndex(explicitCompletionHandlerIndex),
+        AsyncFunctionDecl(&asyncFunctionDecl) {}
+
+
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_CompletionHandlerAsync;

@@ -1928,9 +1928,7 @@ namespace decls_block {
     CompletionHandlerAsync_DECL_ATTR,
     BCFixed<1>,                 // True if explicit handler index
     BCVBR<5>,                   // Completion handler index
-    DeclIDField,                // Mapped async function decl
-    BCFixed<1>,                 // True if compound name
-    BCArray<IdentifierIDField>  // Name and parameters
+    DeclIDField                 // Mapped async function decl
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
