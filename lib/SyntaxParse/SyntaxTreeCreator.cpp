@@ -11,17 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Syntax/RawSyntax.h"
-#include "swift/Syntax/SyntaxVisitor.h"
-#include "swift/Syntax/Trivia.h"
-#include "swift/Parse/ParsedTrivia.h"
-#include "swift/Parse/SyntaxParsingCache.h"
-#include "swift/Parse/Token.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/OwnedString.h"
+#include "swift/Parse/ParsedRawSyntaxNode.h"
+#include "swift/Parse/ParsedTrivia.h"
+#include "swift/Parse/SyntaxParsingCache.h"
+#include "swift/Parse/Token.h"
+#include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/SyntaxVisitor.h"
+#include "swift/Syntax/Trivia.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -188,12 +189,12 @@ OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredToken(tok tokenKind,
 
 OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredLayout(
     syntax::SyntaxKind k, bool IsMissing,
-    const ArrayRef<RecordedOrDeferredNode> &children) {
+    const MutableArrayRef<ParsedRawSyntaxNode> &children) {
   SmallVector<OpaqueSyntaxNode, 16> opaqueChildren;
   opaqueChildren.reserve(children.size());
 
   for (size_t i = 0; i < children.size(); ++i) {
-    opaqueChildren.push_back(children[i].getOpaque());
+    opaqueChildren.push_back(children[i].takeData());
   }
 
   // Also see comment in makeDeferredToken

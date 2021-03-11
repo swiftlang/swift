@@ -173,7 +173,21 @@ public:
   ParsedRawSyntaxNode
   makeDeferred(syntax::SyntaxKind k,
                MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
-               SyntaxParsingContext &ctx);
+               SyntaxParsingContext &ctx) {
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
+    auto range = ParsedRawSyntaxRecorder::verifyElementRanges(deferredNodes);
+#endif
+
+    assert(llvm::none_of(deferredNodes, [](const ParsedRawSyntaxNode &node) {
+      return node.isRecorded();
+    }) && "Cannot create a deferred layout node that has recorded children");
+
+    auto data =
+        SPActions->makeDeferredLayout(k, /*IsMissing=*/false, deferredNodes);
+    return makeParsedRawSyntaxNode(
+        data, k, tok::NUM_TOKENS, ParsedRawSyntaxNode::DataKind::DeferredLayout,
+        /*IsMissing=*/false, range);
+  }
 
   /// Form a deferred token node.
   ParsedRawSyntaxNode makeDeferred(Token tok, StringRef leadingTrivia,
