@@ -1649,6 +1649,7 @@ public:
     // when the VarDecl is merely used from another file.
 
     // Compute these requests in case they emit diagnostics.
+    TypeChecker::applyAccessNote(VD);
     (void) VD->getInterfaceType();
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();
