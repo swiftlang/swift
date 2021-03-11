@@ -402,9 +402,9 @@ public:
   llvm::SmallDenseMap<llvm::Value *, Address, 8> TaskAllocStackSlots;
   llvm::SmallDenseMap<Decl *, SmallString<4>, 8> AnonymousVariables;
   /// To avoid inserting elements into ValueDomPoints twice.
-  llvm::SmallDenseSet<llvm::Instruction *, 8> ValueVariables;
+  llvm::SmallDenseSet<llvm::Value *, 8> ValueVariables;
   /// Holds the DominancePoint of values that are storage for a source variable.
-  SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
+  SmallVector<std::pair<llvm::Value *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
@@ -742,7 +742,7 @@ public:
     if (IGM.IRGen.Opts.shouldOptimize())
       return;
     for (auto &Variable : ValueDomPoints) {
-      llvm::Instruction *Var = Variable.first;
+      llvm::Value *Var = Variable.first;
       DominancePoint VarDominancePoint = Variable.second;
       if (getActiveDominancePoint() == VarDominancePoint ||
           isActiveDominancePointDominatedBy(VarDominancePoint)) {
@@ -754,7 +754,10 @@ public:
         // that this shouldn't be necessary. LiveDebugValues should be doing
         // this but can't in general because it currently only tracks register
         // locations.
-        llvm::BasicBlock *BB = Var->getParent();
+        llvm::BasicBlock *BB =
+            isa<llvm::Instruction>(Var)
+                ? cast<llvm::Instruction>(Var)->getParent()
+                : &cast<llvm::Argument>(Var)->getParent()->getEntryBlock();
         llvm::BasicBlock *CurBB = Builder.GetInsertBlock();
         if (BB == CurBB)
           // The current basic block must be a successor of the dbg.value().
@@ -841,56 +844,6 @@ public:
     return false;
   }
 
-  /// Emit a direct path to an Argument.
-  llvm::Value *getDirectCoroutineArgument(llvm::Value *Addr) {
-    auto getDirect = [&](llvm::Instruction *Orig) {
-      llvm::Value *Buffered = Orig->getOperand(0);
-      llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
-      if (Buffered == Direct)
-        return Orig;
-      llvm::Instruction *Cloned = Orig->clone();
-      Cloned->setOperand(0, Direct);
-      Cloned->insertBefore(Orig);
-      return Cloned;
-    };
-    if (auto *LdInst = dyn_cast<llvm::LoadInst>(Addr))
-      return getDirect(LdInst);
-    if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Addr))
-      return getDirect(GEPInst);
-    if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Addr))
-      return getDirect(BCInst);
-    if (auto *CallInst = dyn_cast<llvm::CallInst>(Addr)) {
-      llvm::Value *Buffered = CallInst->getArgOperand(0);
-      if (CallInst->getCalledFunction() != IGM.getProjectBoxFn()) {
-        assert(false && "unhandled projection");
-        return CallInst;
-      }
-      llvm::Value *Direct = getDirectCoroutineArgument(Buffered);
-      if (Buffered == Direct)
-        return CallInst;
-      auto *Cloned = cast<llvm::CallInst>(CallInst->clone());
-      Cloned->setArgOperand(0, Direct);
-      Cloned->insertBefore(CallInst);
-      return Cloned;
-    }
-    if (auto *AllocaInst = dyn_cast<llvm::AllocaInst>(Addr)) {
-      llvm::Value *Direct = nullptr;
-      unsigned NumStores = 0;
-      for (auto &AIUse : AllocaInst->uses()) {
-        llvm::User *U = AIUse.getUser();
-        if (llvm::StoreInst *StInst = llvm::dyn_cast<llvm::StoreInst>(U)) {
-          ++NumStores;
-          Direct = StInst->getOperand(0);
-        }
-      }
-      if (NumStores == 1)
-        return Direct;
-    }
-    return Addr;
-  }
-
-  // This returns shadow alloca when \p init is false or the shadowed value
-  // derived from that alloca with \p init is true.
   llvm::Value *emitTaskAllocShadowCopy(llvm::Value *Storage,
                                        const SILDebugScope *Scope,
                                        bool Init) {
@@ -933,10 +886,6 @@ public:
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo,
                               llvm::Optional<Alignment> _Align, bool Init) {
-    if (CurSILFn->isAsync())
-      if (isTaskAlloc(Storage))
-        return emitTaskAllocShadowCopy(Storage, Scope, Init);
-
     auto Align = _Align.getValueOr(IGM.getPointerAlignment());
     unsigned ArgNo = VarInfo.ArgNo;
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
@@ -955,8 +904,7 @@ public:
   bool shouldShadowVariable(SILDebugVariable varInfo, bool isAnonymous) {
     return !IGM.IRGen.Opts.DisableDebuggerShadowCopies
       && !IGM.IRGen.Opts.shouldOptimize()
-      && !isAnonymous
-      && !CurSILFn->isAsync();
+      && !isAnonymous;
   }
 
   bool shouldShadowStorage(llvm::Value *Storage) {
@@ -975,26 +923,40 @@ public:
                                       bool IsAnonymous,
                                       llvm::Optional<Alignment> Align = None) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
-    // debug info is emitted for refcounts either.  Shadow copies are also
-    // turned off for async functions, because they make it impossible to track
-    // debug info during coroutine splitting. Instead we are relying on LLVM's
-    // CoroSplit.cpp to emit shadow copies.
+    // debug info is emitted for refcounts either
 
-    // Mark variables in async functions for lifetime extension, so they get
-    // spilled into the async context.
+    // Mark variables in async functions that don't generate a shadow copy for
+    // lifetime extension, so they get spilled into the async context.
     if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
-      if (auto *Value = dyn_cast<llvm::Instruction>(Storage))
-        if (emitLifetimeExtendingUse(Value))
-          if (ValueVariables.insert(Value).second)
-            ValueDomPoints.push_back({Value, getActiveDominancePoint()});
+      if (isa<llvm::AllocaInst>(Storage) || isa<llvm::Constant>(Storage)) {
+        if (emitLifetimeExtendingUse(Storage))
+          if (ValueVariables.insert(Storage).second)
+            ValueDomPoints.push_back({Storage, getActiveDominancePoint()});
+      }
+
     // This condition must be consistent with emitPoisonDebugValueInst to avoid
     // generating extra shadow copies for debug_value [poison].
     if (!shouldShadowVariable(VarInfo, IsAnonymous)
         || !shouldShadowStorage(Storage)) {
       return Storage;
     }
+
     // Emit a shadow copy.
-    return emitShadowCopy(Storage, Scope, VarInfo, Align, true);
+    auto shadow = emitShadowCopy(Storage, Scope, VarInfo, Align, true);
+
+    // Mark variables in async functions for lifetime extension, so they get
+    // spilled into the async context.
+    if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync()) {
+      if (emitLifetimeExtendingUse(shadow)) {
+        if (ValueVariables.insert(shadow).second)
+          ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
+      }
+      auto inst = cast<llvm::Instruction>(shadow);
+      llvm::IRBuilder<> builder(inst->getNextNode());
+      shadow = builder.CreateLoad(shadow);
+    }
+
+    return shadow;
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an \c Address instead of an
@@ -1021,11 +983,13 @@ public:
       // Mark variables in async functions for lifetime extension, so they get
       // spilled into the async context.
       if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
-        if (vals.begin() != vals.end())
-          if (auto *Value = dyn_cast<llvm::Instruction>(vals.front()))
+        if (vals.begin() != vals.end()) {
+          auto Value = vals.front();
+          if (isa<llvm::Instruction>(Value) || isa<llvm::Argument>(Value))
             if (emitLifetimeExtendingUse(Value))
               if (ValueVariables.insert(Value).second)
                 ValueDomPoints.push_back({Value, getActiveDominancePoint()});
+        }
       return;
     }
 
@@ -1043,6 +1007,15 @@ public:
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
     if (Alloca.isValid()) {
       (void)e.claimAll();
+      // Async functions use the value of the artificial address.
+      if (CurSILFn->isAsync()) {
+        auto shadow = Alloca.getAddress();
+        auto inst = cast<llvm::Instruction>(shadow);
+        llvm::IRBuilder<> builder(inst->getNextNode());
+        shadow = builder.CreateLoad(shadow);
+        copy.push_back(shadow);
+        return;
+      }
     } else {
       SILType Type = SILVal->getType();
       auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
@@ -1051,6 +1024,18 @@ public:
       zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
       ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
       LTI.initialize(*this, e, Alloca, false /* isOutlined */);
+      auto shadow = Alloca.getAddress();
+      // Async functions use the value of the artificial address.
+      if (CurSILFn->isAsync() && emitLifetimeExtendingUse(shadow)) {
+        if (ValueVariables.insert(shadow).second)
+          ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
+        auto inst = cast<llvm::Instruction>(shadow);
+        llvm::IRBuilder<> builder(inst->getNextNode());
+        shadow = builder.CreateLoad(shadow);
+        copy.push_back(shadow);
+        return;
+      }
+
     }
     copy.push_back(Alloca.getAddress());
   }
@@ -4661,7 +4646,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   }
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
-  
+
   auto VarInfo = i->getVarInfo();
   assert(VarInfo && "debug_value without debug info");
   auto SILVal = i->getOperand();
@@ -4701,12 +4686,6 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   IndirectionKind Indirection = DirectValue;
   if (CurSILFn->isAsync() &&
       !i->getDebugScope()->InlinedCallSite) {
-    if (VarInfo->ArgNo)
-      for (auto &Val : Copy) {
-        Val = getDirectCoroutineArgument(Val);
-        assert(IGM.DebugInfo->verifyCoroutineArgument(Val) &&
-               "arg expected to be load from inside %swift.context");
-      }
     Indirection = CoroDirectValue;
   }
 
@@ -4737,9 +4716,6 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
   if (CurSILFn->isAsync() && !i->getDebugScope()->InlinedCallSite) {
-    if (IGM.DebugInfo && VarInfo->ArgNo)
-      assert(IGM.DebugInfo->verifyCoroutineArgument(Addr) &&
-             "arg expected to be load from inside %swift.context");
     Indirection = CoroIndirectValue;
     if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
       // Usually debug info only ever describes the *result* of a projectBox
@@ -5094,6 +5070,16 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   SILType SILTy = i->getType();
   auto RealType = SILTy.getASTType();
   auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
+  // Async functions use the value of the artificial address.
+  auto shadow = addr;
+  if (CurSILFn->isAsync() && emitLifetimeExtendingUse(shadow) &&
+      !isa<llvm::UndefValue>(shadow)) {
+    if (ValueVariables.insert(shadow).second)
+      ValueDomPoints.push_back({shadow, getActiveDominancePoint()});
+    auto inst = cast<llvm::Instruction>(shadow);
+    llvm::IRBuilder<> builder(inst->getNextNode());
+    addr = builder.CreateLoad(shadow);
+  }
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo)
