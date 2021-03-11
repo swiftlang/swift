@@ -2,6 +2,7 @@
 // static library is not well supported yet on Windows
 
 // REQUIRES: lld_lto
+// REQUIRES: rdar75301449
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -emit-library -static -lto=llvm-full -emit-module %S/Inputs/lto/module1.swift -working-directory %t
