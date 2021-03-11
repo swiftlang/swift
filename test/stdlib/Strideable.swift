@@ -2,14 +2,14 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift -swift-version=3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 
@@ -201,6 +201,27 @@ StrideTestSuite.test("FloatingPointStride/rounding error") {
     let c = Array(stride(from: -0.2, through: 1, by: 0.2))
     expectEqual(7, c.count)
     expectEqual(1 as Double, c.last)
+  }
+  
+  if (1 as Float).addingProduct(0.9, 6) == 6.3999996 {
+    let d = Array(stride(from: 1 as Float, through: 6.3999996, by: 0.9))
+    expectEqual(7, d.count)
+    // The reason that `d` has seven elements and not six is that the fused
+    // multiply-add operation `(1 as Float).addingProduct(0.9, 6)` gives the
+    // result `6.3999996`. This is nonetheless the desired behavior because
+    // avoiding error accumulation and intermediate rounding error wherever
+    // possible will produce better results more often than not (see SR-6377).
+    //
+    // If checking of end bounds has been inadvertently modified such that we're
+    // computing the distance from the penultimate element to the end (in this
+    // case, `6.3999996 - (1 as Float).addingProduct(0.9, 5)`), then the last
+    // element will be omitted here.
+    //
+    // Therefore, if the test has failed, there may have been a regression in
+    // the bounds-checking logic of `Stride*Iterator`. Restore the expected
+    // behavior here by ensuring that floating-point strides are opted out of
+    // any bounds checking that performs arithmetic with values other than the
+    // bounds themselves and the stride.
   }
 }
 
