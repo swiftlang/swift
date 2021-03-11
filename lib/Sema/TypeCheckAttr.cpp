@@ -5710,7 +5710,7 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
              diag::attr_completion_handler_async_handler_not_func, attr);
     return;
   }
-  size_t completionHandlerIndex = attr->ExplicitCompletionHandlerIndex
+  size_t completionHandlerIndex = attr->CompletionHandlerIndexLoc.isValid()
                                       ? attr->CompletionHandlerIndex
                                       : attachedFunctionParams->size() - 1;
   if (attachedFunctionParams->size() < completionHandlerIndex) {

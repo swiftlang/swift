@@ -4554,17 +4554,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::CompletionHandlerAsync_DECL_ATTR: {
         uint64_t handlerIndex;
-        bool explicitHandlerIndex;
         uint64_t asyncFunctionDeclID;
         serialization::decls_block::CompletionHandlerAsyncDeclAttrLayout::
-            readRecord(scratch, explicitHandlerIndex, handlerIndex,
-                       asyncFunctionDeclID);
+            readRecord(scratch, handlerIndex, asyncFunctionDeclID);
 
         auto mappedFunctionDecl =
             cast<AbstractFunctionDecl>(MF.getDecl(asyncFunctionDeclID));
         Attr = new (ctx) CompletionHandlerAsyncAttr(
-            *mappedFunctionDecl, explicitHandlerIndex, handlerIndex,
-            /*handlerIndexLoc*/ SourceLoc(),
+            *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
             /*atLoc*/ SourceLoc(), /*range*/ SourceRange());
         break;
       }

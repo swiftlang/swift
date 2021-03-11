@@ -1926,7 +1926,6 @@ namespace decls_block {
 
   using CompletionHandlerAsyncDeclAttrLayout = BCRecordLayout<
     CompletionHandlerAsync_DECL_ATTR,
-    BCFixed<1>,                 // True if explicit handler index
     BCVBR<5>,                   // Completion handler index
     DeclIDField                 // Mapped async function decl
   >;

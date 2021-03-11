@@ -2632,8 +2632,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto asyncFuncDeclID = S.addDeclRef(attr->AsyncFunctionDecl);
 
       CompletionHandlerAsyncDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode,
-          attr->ExplicitCompletionHandlerIndex, attr->CompletionHandlerIndex,
+          S.Out, S.ScratchRecord, abbrCode, attr->CompletionHandlerIndex,
           asyncFuncDeclID);
       return;
     }

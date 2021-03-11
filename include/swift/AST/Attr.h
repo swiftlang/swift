@@ -2172,14 +2172,10 @@ public:
   /// Source location of the completion handler index passed to the index
   const SourceLoc CompletionHandlerIndexLoc;
 
-  /// True when the completion handler was specified explicitly
-  const bool ExplicitCompletionHandlerIndex;
-
   AbstractFunctionDecl *AsyncFunctionDecl = nullptr;
 
   CompletionHandlerAsyncAttr(DeclNameRef asyncFunctionName,
                              SourceLoc asyncFunctionNameLoc,
-                             bool explicitCompletionHandlerIndex,
                              size_t completionHandlerIndex,
                              SourceLoc completionHandlerIndexLoc,
                              SourceLoc atLoc, SourceRange range)
@@ -2188,11 +2184,9 @@ public:
         AsyncFunctionName(asyncFunctionName),
         AsyncFunctionNameLoc(asyncFunctionNameLoc),
         CompletionHandlerIndex(completionHandlerIndex),
-        CompletionHandlerIndexLoc(completionHandlerIndexLoc),
-        ExplicitCompletionHandlerIndex(explicitCompletionHandlerIndex) {}
+        CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
 
   CompletionHandlerAsyncAttr(AbstractFunctionDecl &asyncFunctionDecl,
-                             bool explicitCompletionHandlerIndex,
                              size_t completionHandlerIndex,
                              SourceLoc completionHandlerIndexLoc,
                              SourceLoc atLoc, SourceRange range)
@@ -2200,7 +2194,6 @@ public:
                       /*implicit*/ false),
         CompletionHandlerIndex(completionHandlerIndex),
         CompletionHandlerIndexLoc(completionHandlerIndexLoc),
-        ExplicitCompletionHandlerIndex(explicitCompletionHandlerIndex),
         AsyncFunctionDecl(&asyncFunctionDecl) {}
 
 

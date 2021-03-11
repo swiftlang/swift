@@ -1630,7 +1630,7 @@ parseCompletionHandlerAsyncAttribute(Parser &P, StringRef AttrName,
 
   return new (P.Context) CompletionHandlerAsyncAttr(
       parsedAsyncName.formDeclNameRef(P.Context), nameLoc,
-      handlerIndexLoc.isValid(), handlerIndex, handlerIndexLoc, AtLoc,
+      handlerIndex, handlerIndexLoc, AtLoc,
       AttrRange);
 }
 
