@@ -487,9 +487,7 @@ extension Task {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    // FIXME: This should be an empty closure instead. Returning `0` here is
-    //        a workaround for rdar://74957357
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, { return 0 })
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, {})
 
     // Enqueue the resulting job.
     _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))

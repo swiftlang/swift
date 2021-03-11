@@ -1397,9 +1397,11 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
 
   // Form the metatype of the result type.
   CanType futureResultType =
-      Type(
-        MetatypeType::get(GenericTypeParamType::get(0, 0, SGF.getASTContext()), MetatypeRepresentation::Thick))
-          .subst(subs)->getCanonicalType();
+      Type(MetatypeType::get(
+               GenericTypeParamType::get(0, 0, SGF.getASTContext()),
+               MetatypeRepresentation::Thick))
+          .subst(subs)
+          ->getCanonicalType();
   CanType anyTypeType = ExistentialMetatypeType::get(
       ProtocolCompositionType::get(ctx, { }, false))->getCanonicalType();
   auto &anyTypeTL = SGF.getTypeLowering(anyTypeType);
@@ -1411,8 +1413,27 @@ static ManagedValue emitBuiltinCreateAsyncTaskFuture(
       SGF.B.createMetatype(loc, SGF.getLoweredType(futureResultType)));
   }).borrow(SGF, loc).forward(SGF);
 
-  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(SGF, loc, args[2],
-                                                             futureResultType);
+  // Ensure that the closure has the appropriate type.
+  auto extInfo =
+      ASTExtInfoBuilder()
+          .withAsync()
+          .withThrows()
+          .withRepresentation(GenericFunctionType::Representation::Swift)
+          .build();
+  auto genericSig = subs.getGenericSignature().getCanonicalSignature();
+  auto genericResult = GenericTypeParamType::get(0, 0, ctx);
+  // <T> () async throws -> T
+  CanType functionTy =
+      GenericFunctionType::get(genericSig, {}, genericResult, extInfo)
+          ->getCanonicalType();
+  AbstractionPattern origParam(genericSig, functionTy);
+  CanType substParamType = functionTy.subst(subs)->getCanonicalType();
+  auto reabstractedFun =
+      SGF.emitSubstToOrigValue(loc, args[2], origParam, substParamType);
+
+  auto function = emitFunctionArgumentForAsyncTaskEntryPoint(
+      SGF, loc, reabstractedFun, futureResultType);
+
   auto apply = SGF.B.createBuiltin(
       loc,
       ctx.getIdentifier(
