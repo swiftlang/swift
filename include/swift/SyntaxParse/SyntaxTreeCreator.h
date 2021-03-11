@@ -48,8 +48,6 @@ class SyntaxTreeCreator final : public SyntaxParseActions {
   /// tree.
   SyntaxParsingCache *SyntaxCache;
 
-  llvm::BumpPtrAllocator ScratchAlloc;
-
 public:
   SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
                     SyntaxParsingCache *syntaxCache,
