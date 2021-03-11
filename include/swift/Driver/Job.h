@@ -13,6 +13,7 @@
 #ifndef SWIFT_DRIVER_JOB_H
 #define SWIFT_DRIVER_JOB_H
 
+#include "swift/Basic/BatchWeightHintFileMap.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
@@ -308,6 +309,9 @@ private:
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
+  /// BatchWeightHint per Job, for BatchMode balancing.
+  double BatchWeightHint;
+
 #ifndef NDEBUG
   /// The "wave" of incremental jobs that this \c Job was scheduled into.
   ///
@@ -336,7 +340,8 @@ public:
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
-        FilelistFileInfos(std::move(Infos)), ResponseFile(ResponseFile) {}
+        FilelistFileInfos(std::move(Infos)), ResponseFile(ResponseFile),
+        BatchWeightHint(0) {}
 
   /// For testing dependency graphs that use Jobs
   Job(OutputFileMap &OFM, StringRef dummyBaseName)
@@ -356,6 +361,11 @@ public:
     assert(hasResponseFile());
     return ResponseFile->argString;
   }
+
+  // Getter and Setter for BatchWeightHint.
+  double getBatchWeightHint() const { return BatchWeightHint; }
+  void setBatchWeightHint(double bw) { BatchWeightHint = bw; }
+
   ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
   ArrayRef<const char *> getArgumentsForTaskExecution() const;
 

@@ -18,6 +18,7 @@
 #define SWIFT_DRIVER_COMPILATION_H
 
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/BatchWeightHintFileMap.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/NullablePtr.h"
@@ -208,6 +209,10 @@ private:
   /// Overrides maximum batch size, if in batch-mode and not overridden
   /// by \c BatchCount.
   const Optional<unsigned> BatchSizeLimit;
+
+  /// BatchWeightHint map when batch-mode is selected, if any,
+  /// a map containing: InputFileName -> weight_in_double.
+  Optional<BatchWeightHintFileMap> BatchWeightHintsMap = None;
 
   /// True if temporary files should not be deleted.
   const bool SaveTemps;
@@ -436,6 +441,16 @@ public:
 
   Optional<unsigned> getBatchSizeLimit() const {
     return BatchSizeLimit;
+  }
+
+  /// Getter for BatchWeightHints.
+  Optional<BatchWeightHintFileMap> getBatchWeightHints() const {
+    return BatchWeightHintsMap;
+  }
+
+  /// Setter for BatchWeightHints.
+  void setBatchWeightHints(Optional<BatchWeightHintFileMap> BWM) {
+    BatchWeightHintsMap = BWM;
   }
 
   /// Requests the path to a file containing all input source files. This can

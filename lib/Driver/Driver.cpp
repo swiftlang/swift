@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/BatchWeightHintFileMap.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
@@ -929,6 +930,10 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
+  // Build batch weight file map from the input json file.
+  Optional<BatchWeightHintFileMap> BWM =
+      buildBatchWeightHintFileMap(*TranslatedArgList, workingDirectory);
+
   const bool ShowIncrementalBuildDecisions =
       ArgList->hasArg(options::OPT_driver_show_incremental);
   const bool Incremental =
@@ -1036,6 +1041,10 @@ Driver::buildCompilation(const ToolChain &TC,
         EnableCrossModuleDependencies);
     // clang-format on
   }
+
+  // Store the BatchWeights in Compilation instead of weaving through the
+  // arguments in multiple functions.
+  C->setBatchWeightHints(BWM);
 
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
@@ -2364,6 +2373,25 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
   return *OFM;
 }
 
+/// Build the batch-weight map supplied as part of the input args.
+Optional<BatchWeightHintFileMap>
+Driver::buildBatchWeightHintFileMap(const llvm::opt::DerivedArgList &Args,
+                                    StringRef workingDirectory) const {
+  const Arg *A = Args.getLastArg(options::OPT_driver_batch_weight_hint_file);
+  if (!A)
+    return None;
+
+  llvm::Expected<BatchWeightHintFileMap> BWFM =
+      BatchWeightHintFileMap::loadFromPath(A->getValue(), workingDirectory);
+  if (auto Err = BWFM.takeError()) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_unable_to_load_batch_weight_hint_file,
+                   llvm::toString(std::move(Err)), A->getValue());
+    return None;
+  }
+  return *BWFM;
+}
+
 void Driver::buildJobs(ArrayRef<const Action *> TopLevelActions,
                        const OutputInfo &OI, const OutputFileMap *OFM,
                        StringRef workingDirectory, const ToolChain &TC,
@@ -2836,6 +2864,23 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   }
 
   const OutputInfo &OI = C.getOutputInfo();
+
+  // Determine if BatchWeightHints are available for the the Job.
+  Optional<BatchWeightHintFileMap> BWM = C.getBatchWeightHints();
+  BatchWeightHintFileMap *BW = BWM ? BWM.getPointer() : nullptr;
+  double BatchWeightHint = 0;
+  if (BW) {
+    if (isa<CompileJobAction>(JA)) {
+      if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+        BatchWeightHint = BW->getBatchWeightHintsForSingleOutput();
+      } else {
+        BatchWeightHint = BW->getBatchWeightHintsForInput(BaseInput);
+      }
+    } else if (isa<BackendJobAction>(JA)) {
+      BatchWeightHint = BW->getBatchWeightHintsForInput(BaseInput);
+    }
+  }
+
   const TypeToPathMap *OutputMap = nullptr;
   if (OFM) {
     if (isa<CompileJobAction>(JA)) {
@@ -2945,6 +2990,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
   // 5. Add it to the JobCache, so we don't construct the same Job multiple
   // times.
   JobCache[Key] = J;
+
+  // Add BatchWeightHint for Job J.
+  J->setBatchWeightHint(BatchWeightHint);
 
   if (DriverPrintBindings) {
     llvm::outs() << "# \"" << TC.getTriple().str()

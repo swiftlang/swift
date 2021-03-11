@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
+#include "swift/Basic/BatchWeightHintFileMap.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/ParseableOutput.h"
 #include "swift/Basic/Program.h"
@@ -1119,6 +1120,73 @@ namespace driver {
         Batches.push_back(Comp.addJob(std::move(J)));
     }
 
+    /// The core of the BatchModeBalancer using weight hints.
+    /// The key idea is to assign the next job to the partition with lowest
+    /// current weight. This will ensure that each partition has equal weights.
+    std::vector<size_t>
+    assignJobsToPartitionsUsingBatchHints(size_t PartitionSize,
+                                          std::vector<const Job *> &Batchable) {
+      size_t NumJobs = Batchable.size();
+      std::vector<size_t> PartitionIndex;
+
+      // Sort the Batchable Vector.
+      std::sort(std::begin(Batchable), std::end(Batchable),
+                [](const Job *a, const Job *b) {
+                  return a->getBatchWeightHint() > b->getBatchWeightHint();
+                });
+
+      // Create a Vector of Partitions to track the current minimum partition.
+      struct PartitionInfo {
+        size_t Index;
+        double Weight;
+      };
+      auto comp = [](PartitionInfo a, PartitionInfo b) {
+        return a.Weight < b.Weight;
+      };
+      // Create the priority_queue.
+      std::priority_queue<PartitionInfo, std::vector<PartitionInfo>,
+                          decltype(comp)>
+          PInfoPQ(comp);
+      // Track the PartitionWeights for logging.
+      std::vector<double> PartitionWeight;
+      if (Comp.getShowJobLifecycle()) {
+        PartitionWeight.reserve(PartitionSize);
+      }
+      for (size_t P = 0; P < PartitionSize; ++P) {
+        PInfoPQ.push({P, 0});
+        if (Comp.getShowJobLifecycle()) {
+          PartitionWeight.push_back(0);
+        }
+      }
+      PartitionIndex.reserve(NumJobs);
+      int JobIndex = 0;
+      for (auto const J : Batchable) {
+        auto PInfo = PInfoPQ.top();
+        PInfoPQ.pop();
+        auto Weight = J->getBatchWeightHint();
+        PInfoPQ.push({PInfo.Index, PInfo.Weight - Weight});
+        PartitionIndex.push_back(PInfo.Index);
+        if (Comp.getShowJobLifecycle()) {
+          double oldWeight = PartitionWeight.at(PInfo.Index);
+          PartitionWeight.at(PInfo.Index) = oldWeight + Weight;
+          llvm::outs() << "BatchWeightHint:: Job=" << JobIndex
+                       << "  with Weight=" << Weight
+                       << " is assigned to Partition=" << PInfo.Index << "\n";
+        }
+        JobIndex++;
+      }
+      assert(PartitionIndex.size() == NumJobs);
+      if (Comp.getShowJobLifecycle()) {
+        llvm::outs() << "BatchWeightHint:: Summary of partition weights after "
+                        "assignment:\n";
+        for (size_t P = 0; P < PartitionSize; ++P) {
+          llvm::outs() << "BatchWeightHint:: PartitionWeight[" << P
+                       << "]=" << PartitionWeight.at(P) << "\n";
+        }
+      }
+      return PartitionIndex;
+    }
+
     /// Build a vector of partition indices, one per Job: the i'th index says
     /// which batch of the partition the i'th Job will be assigned to. If we are
     /// shuffling due to -driver-batch-seed, the returned indices will not be
@@ -1157,8 +1225,20 @@ namespace driver {
       }
 
       assert(!Partition.empty());
-      auto PartitionIndex = assignJobsToPartitions(Partition.size(),
-                                                   Batchable.size());
+      std::vector<size_t> PartitionIndex;
+
+      // Check if the batch_file_hint flag is supplied, if so, then use it.
+      Optional<BatchWeightHintFileMap> BWH = Comp.getBatchWeightHints();
+      const BatchWeightHintFileMap *BW = BWH ? BWH.getPointer() : nullptr;
+
+      if (BW && Batchable.size() > 0) {
+        PartitionIndex =
+            assignJobsToPartitionsUsingBatchHints(Partition.size(), Batchable);
+      } else {
+        PartitionIndex =
+            assignJobsToPartitions(Partition.size(), Batchable.size());
+      }
+
       assert(PartitionIndex.size() == Batchable.size());
       auto const &TC = Comp.getToolChain();
       for_each(Batchable, PartitionIndex, [&](const Job *Cmd, size_t Idx) {
