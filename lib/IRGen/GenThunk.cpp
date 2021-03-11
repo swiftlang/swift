@@ -354,7 +354,6 @@ void IRGenThunk::emit() {
 
   if (isAsync) {
     emitAsyncReturn(IGF, *asyncLayout, origTy, result);
-    IGF.emitCoroutineOrAsyncExit();
     return;
   }
 
