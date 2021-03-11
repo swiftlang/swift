@@ -3158,10 +3158,14 @@ public:
     auto associativity = getRawStableAssociativity(group->getAssociativity());
 
     SmallVector<DeclID, 8> relations;
-    for (auto &rel : group->getHigherThan())
+    for (auto &rel : group->getHigherThan()) {
+      assert(rel.Group && "Undiagnosed invalid precedence group!");
       relations.push_back(S.addDeclRef(rel.Group));
-    for (auto &rel : group->getLowerThan())
+    }
+    for (auto &rel : group->getLowerThan()) {
+      assert(rel.Group && "Undiagnosed invalid precedence group!");
       relations.push_back(S.addDeclRef(rel.Group));
+    }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[PrecedenceGroupLayout::Code];
     PrecedenceGroupLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,

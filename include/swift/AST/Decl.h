@@ -6977,6 +6977,11 @@ public:
     return HigherThanLoc;
   }
 
+  /// Retrieve the array of \c Relation objects containing those precedence
+  /// groups with higher precedence than this precedence group.
+  ///
+  /// The elements of this array may be invalid, in which case they will have
+  /// null \c PrecedenceGroupDecl elements.
   ArrayRef<Relation> getHigherThan() const {
     return { getHigherThanBuffer(), NumHigherThan };
   }
@@ -6994,6 +6999,11 @@ public:
     return LowerThanLoc;
   }
 
+  /// Retrieve the array of \c Relation objects containing those precedence
+  /// groups with lower precedence than this precedence group.
+  ///
+  /// The elements of this array may be invalid, in which case they will have
+  /// null \c PrecedenceGroupDecl elements.
   ArrayRef<Relation> getLowerThan() const {
     return { getLowerThanBuffer(), NumLowerThan };
   }
