@@ -1091,12 +1091,12 @@ public:
       : PartialApplicationForwarderEmission(
             IGM, subIGF, fwd, staticFnPtr, calleeHasContext, origSig, origType,
             substType, outType, subs, layout, conventions),
-        layout(getAsyncContextLayout(subIGF.IGM, origType, substType, subs,
-                                     staticFnPtr
-                                       ? staticFnPtr->suppressGenerics()
-                                       : false)),
-        currentArgumentIndex(outType->getNumParameters()) {
-    }
+        layout(getAsyncContextLayout(
+            subIGF.IGM, origType, substType, subs,
+            staticFnPtr ? staticFnPtr->suppressGenerics() : false,
+            FunctionPointer::Kind(
+                FunctionPointer::BasicKind::AsyncFunctionPointer))),
+        currentArgumentIndex(outType->getNumParameters()) {}
 
   void begin() override { super::begin(); }
 

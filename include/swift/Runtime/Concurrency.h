@@ -154,7 +154,10 @@ void swift_task_future_wait_throwing(OpaqueValue *, AsyncTask *, ExecutorRef,
                                      AsyncTask *, Metadata *);
 
 using TaskGroupFutureWaitThrowingSignature =
-  AsyncSignature<void(AsyncTask *, TaskGroup *, Metadata *), /*throws*/ true>;
+SWIFT_CC(swiftasync)
+  void(OpaqueValue *, AsyncTask *, ExecutorRef,
+       SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, TaskGroup *,
+       const Metadata *successType);
 
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
@@ -167,9 +170,10 @@ using TaskGroupFutureWaitThrowingSignature =
 /// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-  // FIXME: Use proper async convention.
-TaskGroupFutureWaitThrowingSignature::FunctionType
-swift_taskGroup_wait_next_throwing;
+void swift_taskGroup_wait_next_throwing(
+    OpaqueValue *resultPointer, AsyncTask *waitingTask, ExecutorRef executor,
+    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext, AsyncTask *_waitingTask,
+    TaskGroup *group, const Metadata *successType);
 
 /// Create a new `TaskGroup`.
 /// The caller is responsible for retaining and managing the group's lifecycle.

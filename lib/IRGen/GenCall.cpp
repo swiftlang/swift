@@ -87,9 +87,10 @@ AsyncContextLayout irgen::getAsyncContextLayout(IRGenModule &IGM,
   CanSILFunctionType substitutedType = originalType->substGenericArgs(
       IGM.getSILModule(), forwardingSubstitutionMap,
       IGM.getMaximalTypeExpansionContext());
-  auto layout = getAsyncContextLayout(IGM, originalType, substitutedType,
-                                      forwardingSubstitutionMap,
-                                      /*suppressGenerics*/false);
+  auto layout = getAsyncContextLayout(
+      IGM, originalType, substitutedType, forwardingSubstitutionMap,
+      /*suppressGenerics*/ false,
+      FunctionPointer::Kind(FunctionPointer::BasicKind::AsyncFunctionPointer));
   return layout;
 }
 
@@ -97,7 +98,8 @@ AsyncContextLayout
 irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
                              CanSILFunctionType substitutedType,
                              SubstitutionMap substitutionMap,
-                             bool suppressGenerics) {
+                             bool suppressGenerics,
+                             FunctionPointer::Kind kind) {
   SmallVector<const TypeInfo *, 4> typeInfos;
   SmallVector<SILType, 4> valTypes;
   SmallVector<AsyncContextLayout::ArgumentInfo, 4> paramInfos;
@@ -151,7 +153,38 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
       IGM.getTypeInfoForLowered(CanInOutType::get(errorCanType));
   typeInfos.push_back(&errorTypeInfo);
   valTypes.push_back(errorType);
-
+  // Add storage for data used by runtime entry points.
+  // See TaskFutureWaitAsyncContext.
+  if (kind.isSpecial()) {
+    switch (kind.getSpecialKind()) {
+    case FunctionPointer::SpecialKind::TaskFutureWait:
+    case FunctionPointer::SpecialKind::TaskFutureWaitThrowing: {
+      // Add storage for the waiting future's result pointer (OpaqueValue *).
+      auto ty = SILType();
+      auto &ti = IGM.getSwiftContextPtrTypeInfo();
+      // OpaqueValue *successResultPointer
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    } break;
+    case FunctionPointer::SpecialKind::TaskGroupWaitNext: {
+      // Add storage for the waiting future's result pointer (OpaqueValue *).
+      auto ty = SILType();
+      auto &ti = IGM.getSwiftContextPtrTypeInfo();
+      // OpaqueValue *successResultPointer
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      // AsyncTask *task;
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      // TaskGroup *group;
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      // const Metadata *successType;
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+    } break;
+    }
+  }
   bool canHaveValidError = substitutedType->hasErrorResult();
   return AsyncContextLayout(IGM, LayoutStrategy::Optimal, valTypes, typeInfos,
                             originalType, substitutedType, substitutionMap,
@@ -2231,7 +2264,8 @@ class AsyncCallEmission final : public CallEmission {
           IGF.IGM, getCallee().getOrigFunctionType(),
           getCallee().getSubstFunctionType(),
           getCallee().getSubstitutions(),
-          getCallee().suppressGenerics()));
+          getCallee().suppressGenerics(), 
+          getCallee().getFunctionPointer().getKind()));
     }
     return *asyncContextLayout;
   }

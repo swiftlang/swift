@@ -118,7 +118,9 @@ IRGenThunk::IRGenThunk(IRGenFunction &IGF, SILDeclRef declRef)
 
   if (isAsync) {
     asyncLayout.emplace(irgen::getAsyncContextLayout(
-        IGF.IGM, origTy, substTy, subMap, /*suppress generics*/ false));
+        IGF.IGM, origTy, substTy, subMap, /*suppress generics*/ false,
+        FunctionPointer::Kind(
+            FunctionPointer::BasicKind::AsyncFunctionPointer)));
   }
 }
 

@@ -72,10 +72,6 @@ public:
 
   OpaqueValue *successResultPointer;
 
-  // FIXME: Currently, this is always here, but it isn't technically
-  // necessary.
-  void* Self;
-
   // Arguments.
   AsyncTask *task;
 
@@ -86,8 +82,9 @@ public:
 
   using AsyncContext::AsyncContext;
 
-  void fillWithSuccess(AsyncTask::FutureFragment *future, OpaqueValue *result) {
-    fillWithSuccess(future->getStoragePtr(), future->getResultType(), result);
+  void fillWithSuccess(AsyncTask::FutureFragment *future) {
+    fillWithSuccess(future->getStoragePtr(), future->getResultType(),
+                    successResultPointer);
   }
   void fillWithSuccess(OpaqueValue *src, const Metadata *successType,
                        OpaqueValue *result) {

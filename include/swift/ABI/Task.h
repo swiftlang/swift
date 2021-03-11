@@ -169,14 +169,6 @@ public:
   /// The currently-active information about cancellation.
   std::atomic<ActiveTaskStatus> Status;
 
-  /// The result pointer for a task that is suspended waiting on a future.
-  /// FIXME: Can we store this somewhere else?
-  /// I think we only put a task in a waiting state from the runtime functions:
-  /// swift_task_future_wait and swift_task_future_wait_throwing. We should
-  /// use different AsyncContextLayouts for them that have the storage for the
-  /// result pointer.
-  OpaqueValue *futureResult = nullptr;
-
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
 

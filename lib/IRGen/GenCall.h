@@ -25,6 +25,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "llvm/IR/CallingConv.h"
 
+#include "Callee.h"
 #include "GenHeap.h"
 #include "IRGenModule.h"
 
@@ -139,7 +140,8 @@ namespace irgen {
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
                                            SubstitutionMap substitutionMap,
-                                           bool suppressGenerics);
+                                           bool suppressGenerics,
+                                           FunctionPointer::Kind kind);
 
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.
