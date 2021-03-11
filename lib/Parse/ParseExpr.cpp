@@ -2083,7 +2083,7 @@ static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
 
   // Try to parse a compound name.
   SyntaxParsingContext ArgsCtxt(P.SyntaxContext, SyntaxKind::DeclNameArguments);
-  Parser::BacktrackingScope backtrack(P);
+  Parser::CancellableBacktrackingScope backtrack(P);
 
   lparenLoc = P.consumeToken(tok::l_paren);
   while (P.Tok.isNot(tok::r_paren)) {

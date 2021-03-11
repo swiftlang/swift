@@ -214,14 +214,14 @@ void Parser::performCodeCompletionSecondPassImpl(
   State->restoreCodeCompletionDelayedDeclState(info);
 }
 
-swift::Parser::BacktrackingScope::~BacktrackingScope() {
+swift::Parser::BacktrackingScopeImpl::~BacktrackingScopeImpl() {
   if (Backtrack) {
     P.backtrackToPosition(PP);
     DT.abort();
   }
 }
 
-void swift::Parser::BacktrackingScope::cancelBacktrack() {
+void swift::Parser::CancellableBacktrackingScope::cancelBacktrack() {
   if (!Backtrack)
     return;
 
@@ -783,8 +783,8 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
         if (possibleDeclStartsLine && !hasDelimiter) {
           break;
         }
-        
-        Parser::BacktrackingScope backtrack(*this);
+
+        Parser::CancellableBacktrackingScope backtrack(*this);
         // Consume the let or var
         consumeToken();
         
