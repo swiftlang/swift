@@ -321,7 +321,7 @@ void IRGenThunk::emit() {
   }
 
   if (isAsync) {
-    emitAsyncReturn(IGF, *asyncLayout, origTy, result);
+    emitAsyncReturn(IGF, *asyncLayout, directResultType, origTy, result);
     return;
   }
 

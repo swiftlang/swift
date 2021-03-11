@@ -3456,20 +3456,20 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       return;
     }
   }
+  SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
+                              IGF.getSILModule());
+  auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
+      conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
   if (IGF.isAsync()) {
     // If we're generating an async function, store the result into the buffer.
     auto asyncLayout = getAsyncContextLayout(IGF);
-    emitAsyncReturn(IGF, asyncLayout, fnType, result);
+    emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
     assert(swiftCCReturn ||
            funcLang == SILFunctionLanguage::C && "Need to handle all cases");
-    SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
-                                IGF.getSILModule());
-    auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
-        conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
     IGF.emitScalarReturn(resultTy, funcResultType, result, swiftCCReturn,
                          false);
   }
@@ -3502,9 +3502,14 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   // Async functions just return to the continuation.
   if (isAsync()) {
     auto layout = getAsyncContextLayout(*this);
+    SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
+                                getSILModule());
+    auto funcResultType = CurSILFn->mapTypeIntoContext(
+        conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
+
     Explosion empty;
-    emitAsyncReturn(*this, layout, i->getFunction()->getLoweredFunctionType(),
-                    empty);
+    emitAsyncReturn(*this, layout, funcResultType,
+                    i->getFunction()->getLoweredFunctionType(), empty);
     return;
   }
 

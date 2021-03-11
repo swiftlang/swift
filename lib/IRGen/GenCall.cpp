@@ -4798,6 +4798,7 @@ void irgen::emitAsyncReturn(
 }
 
 void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
+                            SILType funcResultTypeInContext,
                             CanSILFunctionType fnType, Explosion &result) {
   auto &IGM = IGF.IGM;
 
@@ -4805,10 +4806,8 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   Optional<ArrayRef<llvm::Value *>> nativeResults = llvm::None;
   SmallVector<llvm::Value *, 16> nativeResultsStorage;
   SILFunctionConventions conv(fnType, IGF.getSILModule());
-  auto funcResultType =
-      conv.getSILResultType(IGM.getMaximalTypeExpansionContext());
   auto &nativeSchema =
-      IGM.getTypeInfo(funcResultType).nativeReturnValueSchema(IGM);
+      IGM.getTypeInfo(funcResultTypeInContext).nativeReturnValueSchema(IGM);
   if (result.empty() && !nativeSchema.empty()) {
     // When we throw, we set the return values to undef.
     nativeSchema.enumerateComponents([&](clang::CharUnits begin,
@@ -4821,7 +4820,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
     assert(!nativeSchema.empty());
     assert(!nativeSchema.requiresIndirect());
     Explosion native = nativeSchema.mapIntoNative(
-        IGM, IGF, result, funcResultType, false /*isOutlined*/);
+        IGM, IGF, result, funcResultTypeInContext, false /*isOutlined*/);
     while (!native.empty()) {
       nativeResultsStorage.push_back(native.claimNext());
     }

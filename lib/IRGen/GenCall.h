@@ -284,6 +284,7 @@ namespace irgen {
       Optional<ArrayRef<llvm::Value *>> nativeResultArgs = llvm::None);
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
+                       SILType funcResultTypeInContext,
                        CanSILFunctionType fnType, Explosion &result);
 
   Address emitAutoDiffCreateLinearMapContext(
