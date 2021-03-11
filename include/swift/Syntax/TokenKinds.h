@@ -21,7 +21,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
-enum class tok {
+enum class tok : uint8_t {
 #define TOKEN(X) X,
 #include "swift/Syntax/TokenKinds.def"
 

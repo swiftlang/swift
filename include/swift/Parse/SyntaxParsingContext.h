@@ -27,12 +27,12 @@ class ParsedSyntax;
 class ParsedTokenSyntax;
 struct ParsedTrivia;
 class SourceFile;
-enum class tok;
+enum class tok : uint8_t;
 class Token;
 class DiagnosticEngine;
 
 namespace syntax {
-  enum class SyntaxKind;
+enum class SyntaxKind : uint16_t;
 }
 
 enum class SyntaxContextKind {

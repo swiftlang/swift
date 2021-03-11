@@ -60,7 +60,7 @@ namespace swift {
   
   namespace syntax {
     class RawSyntax;
-    enum class SyntaxKind;
+    enum class SyntaxKind : uint16_t;
   }// end of syntax namespace
 
   /// Different contexts in which BraceItemList are parsed.
