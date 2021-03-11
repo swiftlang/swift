@@ -2,7 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: OS=windows
+// XFAIL: OS=windows-msvc
 
 struct Boom: Error {}
 struct IgnoredBoom: Error {}

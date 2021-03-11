@@ -3,7 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// XFAIL: OS=windows
+// XFAIL: OS=windows-msvc
 
 @main struct Main {
   static func main() async {
