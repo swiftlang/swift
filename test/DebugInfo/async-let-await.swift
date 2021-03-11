@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: CPU=arm64e
 
+// XFAIL: *
+
 public func getVegetables() async -> [String] {
   return ["leek", "carrot"]  
 }

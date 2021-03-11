@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: CPU=arm64e
 
+// XFAIL: *
+
 func use<T>(_ t: T) {}
 func forceSplit() async {
 }
