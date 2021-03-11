@@ -188,17 +188,25 @@ OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredToken(tok tokenKind,
 }
 
 OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredLayout(
-    syntax::SyntaxKind k, bool IsMissing,
-    const MutableArrayRef<ParsedRawSyntaxNode> &children) {
-  SmallVector<OpaqueSyntaxNode, 16> opaqueChildren;
-  opaqueChildren.reserve(children.size());
+    syntax::SyntaxKind kind, bool IsMissing,
+    const MutableArrayRef<ParsedRawSyntaxNode> &parsedChildren) {
+  assert(!IsMissing && "Missing layout nodes not implemented yet");
 
-  for (size_t i = 0; i < children.size(); ++i) {
-    opaqueChildren.push_back(children[i].takeData());
+  SmallVector<const RawSyntax *, 16> children;
+  children.reserve(parsedChildren.size());
+
+  size_t TextLength = 0;
+  for (size_t i = 0; i < parsedChildren.size(); ++i) {
+    auto Raw = static_cast<const RawSyntax *>(parsedChildren[i].takeData());
+    if (Raw) {
+      TextLength += Raw->getTextLength();
+    }
+    children.push_back(Raw);
   }
 
-  // Also see comment in makeDeferredToken
-  return recordRawSyntax(k, opaqueChildren);
+  auto raw = RawSyntax::make(kind, children, TextLength,
+                             SourcePresence::Present, Arena);
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 OpaqueSyntaxNode
