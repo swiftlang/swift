@@ -118,11 +118,12 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
 }
 
 SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
+                       bool isDistributed,
                        AutoDiffDerivativeFunctionIdentifier *derivativeId)
-    : loc(vd), kind(kind), isForeign(isForeign), defaultArgIndex(0),
-      pointer(derivativeId) {}
+    : loc(vd), kind(kind), isForeign(isForeign), isDistributed(isDistributed),
+      defaultArgIndex(0), pointer(derivativeId) {}
 
-SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
+SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign, bool asDistributed)
     : defaultArgIndex(0),
       pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
@@ -161,6 +162,7 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign)
   }
 
   isForeign = asForeign;
+  isDistributed = asDistributed;
 }
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
@@ -181,7 +183,7 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
 }
 
 bool SILDeclRef::isThunk() const {
-  return isForeignToNativeThunk() || isNativeToForeignThunk();
+  return isForeignToNativeThunk() || isNativeToForeignThunk() || isDistributedThunk();
 }
 
 bool SILDeclRef::isClangImported() const {
@@ -694,6 +696,14 @@ bool SILDeclRef::isNativeToForeignThunk() const {
          kind == Kind::Deallocator;
 }
 
+bool SILDeclRef::isDistributedThunk() const {
+  if (!isDistributed)
+    return false;
+  if (!hasDecl())
+    return false;
+  return kind == Kind::Func;
+}
+
 /// Use the Clang importer to mangle a Clang declaration.
 static void mangleClangDecl(raw_ostream &buffer,
                             const clang::NamedDecl *clangDecl,
@@ -772,6 +782,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         SKind = ASTMangler::SymbolKind::SwiftAsObjCThunk;
       } else if (isForeignToNativeThunk()) {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
+      } else if (isDistributedThunk()) {
+        SKind = ASTMangler::SymbolKind::DistributedThunk;
       }
       break;
     case SILDeclRef::ManglingKind::DynamicThunk:
@@ -792,7 +804,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     // point.
     if (auto NameA = getDecl()->getAttrs().getAttribute<SILGenNameAttr>())
       if (!NameA->Name.empty() &&
-          !isForeignToNativeThunk() && !isNativeToForeignThunk()) {
+          !isForeignToNativeThunk() && !isNativeToForeignThunk() &&
+          !isDistributedThunk()) {
         return NameA->Name.str();
       }
       

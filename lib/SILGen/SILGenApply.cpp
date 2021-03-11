@@ -1049,7 +1049,12 @@ public:
       return;
     }
 
-    auto constant = SILDeclRef(afd).asForeign(requiresForeignEntryPoint(afd));
+    SILDeclRef constant = SILDeclRef(afd);
+    if (afd->getAttrs().hasAttribute<DistributedActorAttr>()) {
+      constant = constant.asDistributed(true);
+    } else {
+      constant = constant.asForeign(requiresForeignEntryPoint(afd));
+    }
 
     auto subs = e->getDeclRef().getSubstitutions();
 
@@ -4956,6 +4961,11 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   // Form the reference to the method.
   auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
                      .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
+
+  if (call->getAttrs().hasAttribute<DistributedActorAttr>()) {
+    callRef = callRef.asDistributed(true);
+  }
+
   auto declRefConstant = getConstantInfo(getTypeExpansionContext(), callRef);
   auto subs = declRef.getSubstitutions();
   bool throws = false;
