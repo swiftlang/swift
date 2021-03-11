@@ -1362,11 +1362,13 @@ public:
   bool finalize();
 
   void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
+                                    bool disablePtrAuthReturns,
                                     OptimizationMode FuncOptMode =
                                       OptimizationMode::NotSet);
   void setHasNoFramePointer(llvm::AttrBuilder &Attrs);
   void setHasNoFramePointer(llvm::Function *F);
-  llvm::AttributeList constructInitialAttributes();
+  llvm::AttributeList
+  constructInitialAttributes(bool disablePtrAuthReturns = false);
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);

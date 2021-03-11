@@ -1112,10 +1112,17 @@ void IRGenModule::setHasNoFramePointer(llvm::Function *F) {
 }
 
 /// Construct initial function attributes from options.
-void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
-                                               OptimizationMode FuncOptMode) {
+void IRGenModule::constructInitialFnAttributes(
+    llvm::AttrBuilder &Attrs, bool disablePtrAuthReturns,
+    OptimizationMode FuncOptMode) {
   // Add the default attributes for the Clang configuration.
   clang::CodeGen::addDefaultFunctionDefinitionAttributes(getClangCGM(), Attrs);
+
+  // Disable `ptrauth-returns`. It does not work for swifttailcc lowering atm.
+  // The `autibsp` instruction executed before a tail call that adjust the stack
+  // will currently fail.
+  if (disablePtrAuthReturns)
+    Attrs.removeAttribute("ptrauth-returns");
 
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
@@ -1129,9 +1136,10 @@ void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
   }
 }
 
-llvm::AttributeList IRGenModule::constructInitialAttributes() {
+llvm::AttributeList
+IRGenModule::constructInitialAttributes(bool disablePtrAuthReturns) {
   llvm::AttrBuilder b;
-  constructInitialFnAttributes(b);
+  constructInitialFnAttributes(b, disablePtrAuthReturns);
   return llvm::AttributeList::get(getLLVMContext(),
                                   llvm::AttributeList::FunctionIndex, b);
 }
