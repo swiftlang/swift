@@ -3,6 +3,8 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// XFAIL: OS=windows
+
 @main struct Main {
   static func main() async {
     let handle = Task.runDetached {

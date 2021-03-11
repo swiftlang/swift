@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// XFAIL: OS=windows
 
 struct Boom: Error {}
 struct IgnoredBoom: Error {}

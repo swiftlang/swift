@@ -6,6 +6,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// XFAIL: OS=windows
 
 struct E : Error {}
 
