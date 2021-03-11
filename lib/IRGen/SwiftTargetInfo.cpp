@@ -158,6 +158,13 @@ SwiftTargetInfo::SwiftTargetInfo(
             SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK);
   setToMask(FunctionPointerSpareBits, numPointerBits,
             SWIFT_ABI_DEFAULT_FUNCTION_SPARE_BITS_MASK);
+  if (numPointerBits == 64) {
+    ReferencePoisonDebugValue =
+      SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_64;
+  } else {
+    ReferencePoisonDebugValue =
+      SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_32;
+  }
 }
 
 SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
