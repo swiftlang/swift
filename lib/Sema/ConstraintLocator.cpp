@@ -177,6 +177,10 @@ bool ConstraintLocator::isForKeyPathComponent() const {
   });
 }
 
+bool ConstraintLocator::isForKeyPathComponentResult() const {
+  return isLastElement<LocatorPathElt::KeyPathComponentResult>();
+}
+
 bool ConstraintLocator::isForGenericParameter() const {
   return isLastElement<LocatorPathElt::GenericParameter>();
 }

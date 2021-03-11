@@ -204,6 +204,10 @@ public:
   /// components.
   bool isForKeyPathComponent() const;
 
+  /// Determine whether this locator points to a result type of
+  /// a key path component.
+  bool isForKeyPathComponentResult() const;
+
   /// Determine whether this locator points to the generic parameter.
   bool isForGenericParameter() const;
 
