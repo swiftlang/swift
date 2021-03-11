@@ -1198,7 +1198,9 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setAttributes(outAttrs);
   // Merge initial attributes with outAttrs.
   llvm::AttrBuilder b;
-  IGM.constructInitialFnAttributes(b);
+  bool disablePtrAuthReturns =
+      outSig.getCallingConv() == llvm::CallingConv::SwiftTail;
+  IGM.constructInitialFnAttributes(b, disablePtrAuthReturns);
   fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
 
   IRGenFunction subIGF(IGM, fwd);
