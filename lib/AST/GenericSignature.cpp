@@ -776,9 +776,21 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
   auto conforms = equivClass->conformsTo.find(protocol);
   assert(conforms != equivClass->conformsTo.end());
 
-  // Look at every requirement source for this conformance. If all sources are
-  // explicit, leave these three values empty. Otherwise, they are computed
-  // from the 'best' derived requirement source for this conformance.
+  auto rootType = equivClass->getAnchor(builder, { });
+  if (hasConformanceInSignature(getRequirements(), rootType, protocol)) {
+    ConformanceAccessPath::Entry root(rootType, protocol);
+    ArrayRef<ConformanceAccessPath::Entry> path(root);
+
+    ConformanceAccessPath result(builder.getASTContext().AllocateCopy(path));
+    equivClass->conformanceAccessPathCache.insert({protocol, result});
+
+    return result;
+  }
+
+  // This conformance comes from a derived source.
+  //
+  // To recover this the conformance, we recursively recover the conformance
+  // of the shortest parent type to the parent protocol first.
   Type shortestParentType;
   Type shortestSubjectType;
   ProtocolDecl *shortestParentProto = nullptr;
@@ -823,28 +835,13 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
 
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement: {
-      if (source->parent->kind == RequirementSource::RequirementSignatureSelf) {
-        // This is a top-level requirement in the requirement signature that is
-        // currently being computed. This is not a derived source, so it
-        // contributes nothing to the "shortest parent type" computation.
-        break;
-      }
-
-      auto constraintType = constraint.getSubjectDependentType({ });
-
-      // Skip self-recursive sources.
-      bool derivedViaConcrete = false;
-      if (source->getMinimalConformanceSource(builder, constraintType, protocol,
-                                              derivedViaConcrete) != source)
-        break;
-
+      assert(source->parent->kind != RequirementSource::RequirementSignatureSelf);
 
       // If we have a derived conformance requirement like T[.P].X : Q, we can
       // recursively compute the conformance access path for T : P, and append
       // the path element (Self.X : Q).
       auto parentType = source->parent->getAffectedType()->getCanonicalType();
       auto subjectType = source->getStoredType()->getCanonicalType();
-
       auto *parentProto = source->getProtocolDecl();
 
       // We might have multiple candidate parent types and protocols for the
@@ -861,33 +858,22 @@ GenericSignatureImpl::getConformanceAccessPath(Type type,
     }
   }
 
+  assert(shortestParentType);
+
   SmallVector<ConformanceAccessPath::Entry, 2> path;
 
-  if (!shortestParentType) {
-    // All requirement sources were explicit. This means we can recover the
-    // conformance directly from the generic signature; canonicalize the
-    // dependent type and add it as an initial path element.
-    auto rootType = equivClass->getAnchor(builder, { });
-    assert(hasConformanceInSignature(getRequirements(), rootType, protocol));
-    path.emplace_back(rootType, protocol);
-  } else {
-    // This conformance comes from a derived source.
-    //
-    // To recover this the conformance, we recursively recover the conformance
-    // of the parent type to the parent protocol first.
-    auto parentPath = getConformanceAccessPath(
-        shortestParentType, shortestParentProto);
-    for (auto entry : parentPath)
-      path.push_back(entry);
+  auto parentPath = getConformanceAccessPath(
+      shortestParentType, shortestParentProto);
+  for (auto entry : parentPath)
+    path.push_back(entry);
 
-    // Then, we add the subject type from the parent protocol's requirement
-    // signature.
-    path.emplace_back(shortestSubjectType, protocol);
-  }
+  // Then, we add the subject type from the parent protocol's requirement
+  // signature.
+  path.emplace_back(shortestSubjectType, protocol);
 
-  ConformanceAccessPath result(getASTContext().AllocateCopy(path));
-
+  ConformanceAccessPath result(builder.getASTContext().AllocateCopy(path));
   equivClass->conformanceAccessPathCache.insert({protocol, result});
+
   return result;
 }
 
