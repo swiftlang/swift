@@ -26,14 +26,14 @@ public protocol MyAwaitable {
 // CHECK-LABEL: @"$s19protocol_resilience19ConformsToAwaitableVyxG010resilient_A00E0AAMc" = hidden constant
 // CHECK-SAME: %swift.async_func_pointer* @"$s19protocol_resilience19ConformsToAwaitableVyxG010resilient_A00E0AaeFP4wait6ResultQzyYFTWTu"
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience14callsAwaitabley6ResultQzxY010resilient_A00D0RzlF"(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience14callsAwaitabley6ResultQzxY010resilient_A00D0RzlF"(%swift.opaque* noalias nocapture %0, %swift.task* %1, %swift.executor* %2, %swift.context* swiftasync %3, %swift.opaque* noalias nocapture %4, %swift.type* %T, i8** %T.Awaitable)
 // CHECK: %swift.async_func_pointer* @"$s18resilient_protocol9AwaitableP4wait6ResultQzyYFTjTu"
 // CHECK: ret void
 public func callsAwaitable<T : Awaitable>(_ t: T) async -> T.Result {
   return await t.wait()
 }
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience11MyAwaitableP4wait6ResultQzyYFTj"(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s19protocol_resilience11MyAwaitableP4wait6ResultQzyYFTj"(%swift.opaque* noalias nocapture %0, %swift.task* %1, %swift.executor* %2, %swift.context* swiftasync %3, %swift.opaque* noalias nocapture swiftself %4, %swift.type* %5, i8** %6)
 
 struct ConformsToAwaitable<T> : Awaitable {
   var value: T
