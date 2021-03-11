@@ -27,11 +27,11 @@ namespace swift {
 class ParsedTriviaPiece;
 class SourceFile;
 class SourceLoc;
-enum class tok;
+enum class tok : uint8_t;
 
 namespace syntax {
 class SourceFileSyntax;
-enum class SyntaxKind;
+enum class SyntaxKind : uint16_t;
 }
 
 typedef const void *OpaqueSyntaxNode;

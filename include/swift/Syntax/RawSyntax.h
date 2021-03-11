@@ -136,7 +136,7 @@ template <typename CursorType> constexpr CursorIndex cursorIndex(CursorType C) {
 /// An indicator of whether a Syntax node was found or written in the source.
 ///
 /// This is not an 'implicit' bit.
-enum class SourcePresence {
+enum class SourcePresence : uint8_t {
   /// The syntax was authored by a human and found, or was generated.
   Present,
 
@@ -164,52 +164,54 @@ class RawSyntax final
   /// have a manually specified id
   static SyntaxNodeId NextFreeNodeId;
 
-  /// An ID of this node that is stable across incremental parses
-  SyntaxNodeId NodeId;
-
   /// The \c SyntaxArena in which this node was allocated.
   SyntaxArena *Arena;
 
-  union {
-    struct {
-      /// Number of bytes this node takes up spelled out in the source code.
-      /// Always 0 if the node is missing.
-      unsigned TextLength : 32;
-      /// Whether this piece of syntax was actually present in the source.
-      unsigned Presence : 1;
-      unsigned IsToken : 1;
-    } Common;
-    enum { NumRawSyntaxBits = 32 + 1 + 1 };
+  /// An ID of this node that is stable across incremental parses
+  SyntaxNodeId NodeId;
 
-    // For "layout" nodes.
-    struct {
-      static_assert(NumRawSyntaxBits <= 64,
-                    "Only 64 bits reserved for standard syntax bits");
-      uint64_t : bitmax(NumRawSyntaxBits, 64); // align to 32 bits
-      /// Number of children this "layout" node has.
-      unsigned NumChildren : 32;
-      /// Total number of sub nodes, i.e. number of transitive children of this
-      /// node. This does not include the node itself.
-      unsigned TotalSubNodeCount : 32;
-      /// The kind of syntax this node represents.
-      unsigned Kind : bitmax(NumSyntaxKindBits, 8);
-    } Layout;
+  /// Number of bytes this node takes up spelled out in the source code.
+  /// Always 0 if the node is missing.
+  uint32_t TextLength;
 
-    // For "token" nodes.
-    struct {
-      static_assert(NumRawSyntaxBits <= 64,
-                    "Only 64 bits reserved for standard syntax bits");
-      uint64_t : bitmax(NumRawSyntaxBits, 64); // align to 16 bits
-      /// The kind of token this "token" node represents.
-      const char *LeadingTrivia;
-      const char *TokenText;
-      const char *TrailingTrivia;
-      unsigned LeadingTriviaLength : 32;
-      unsigned TokenLength : 32;
-      unsigned TrailingTriviaLength : 32;
-      unsigned TokenKind : 16;
-    } Token;
-  } Bits;
+  /// Whether this piece of syntax was actually present in the source.
+  SourcePresence Presence;
+
+  /// Whether this node is a token or layout node. Determines if \c Bits should
+  /// be interpreted as \c LayoutData or \c TokenData.
+  bool IsToken;
+
+  struct LayoutData {
+    /// Number of children this "layout" node has.
+    uint32_t NumChildren;
+    /// Total number of sub nodes, i.e. number of transitive children of this
+    /// node. This does not include the node itself.
+    uint32_t TotalSubNodeCount;
+    /// The kind of syntax this node represents.
+    SyntaxKind Kind;
+  };
+
+  struct TokenData {
+    /// The pointers to the leading/trailing trivia and token texts. If their
+    /// lengths are greater than 0, these always reside in the node's \c Arena.
+    const char *LeadingTrivia;
+    const char *TokenText;
+    const char *TrailingTrivia;
+    uint32_t LeadingTriviaLength;
+    uint32_t TokenLength;
+    uint32_t TrailingTriviaLength;
+    /// The kind of token this "token" node represents.
+    tok TokenKind;
+  };
+
+  union BitsData {
+    LayoutData Layout;
+    TokenData Token;
+
+    BitsData(const LayoutData &Layout) : Layout(Layout) {}
+    BitsData(const TokenData &Token) : Token(Token) {}
+  };
+  BitsData Bits;
 
   size_t numTrailingObjects(OverloadToken<const RawSyntax *>) const {
     return isToken() ? 0 : Bits.Layout.NumChildren;
@@ -224,17 +226,19 @@ class RawSyntax final
   RawSyntax(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout,
             size_t TextLength, SourcePresence Presence,
             const RC<SyntaxArena> &Arena, llvm::Optional<SyntaxNodeId> NodeId)
-      : Arena(Arena.get()),
-        Bits({{unsigned(TextLength), unsigned(Presence), false}}) {
+      : Arena(Arena.get()), TextLength(uint32_t(TextLength)),
+        Presence(Presence), IsToken(false),
+        Bits(LayoutData{uint32_t(Layout.size()),
+                        /*TotalSubNodeCount=*/0, /*set in body*/
+                        Kind}) {
     assert(Arena && "RawSyntax nodes must always be allocated in an arena");
     assert(
         Kind != SyntaxKind::Token &&
         "'token' syntax node must be constructed with dedicated constructor");
 
-    size_t TotalSubNodeCount = 0;
     for (auto Child : Layout) {
       if (Child) {
-        TotalSubNodeCount += Child->getTotalSubNodeCount() + 1;
+        Bits.Layout.TotalSubNodeCount += Child->getTotalSubNodeCount() + 1;
         // If the child is stored in a different arena, it needs to stay alive
         // as long as this node's arena is alive.
         Arena->addChildArena(Child->Arena);
@@ -247,9 +251,6 @@ class RawSyntax final
     } else {
       this->NodeId = NextFreeNodeId++;
     }
-    Bits.Layout.NumChildren = Layout.size();
-    Bits.Layout.TotalSubNodeCount = TotalSubNodeCount;
-    Bits.Layout.Kind = unsigned(Kind);
 
     // Initialize layout data.
     std::uninitialized_copy(Layout.begin(), Layout.end(),
@@ -265,8 +266,11 @@ class RawSyntax final
             StringRef LeadingTrivia, StringRef TrailingTrivia,
             SourcePresence Presence, const RC<SyntaxArena> &Arena,
             llvm::Optional<SyntaxNodeId> NodeId)
-      : Arena(Arena.get()),
-        Bits({{unsigned(TextLength), unsigned(Presence), true}}) {
+      : Arena(Arena.get()), TextLength(uint32_t(TextLength)),
+        Presence(Presence), IsToken(true),
+        Bits(TokenData{LeadingTrivia.data(), Text.data(), TrailingTrivia.data(),
+                       uint32_t(LeadingTrivia.size()), uint32_t(Text.size()),
+                       uint32_t(TrailingTrivia.size()), TokKind}) {
     assert(Arena && "RawSyntax nodes must always be allocated in an arena");
 
     if (Presence == SourcePresence::Missing) {
@@ -282,14 +286,6 @@ class RawSyntax final
     } else {
       this->NodeId = NextFreeNodeId++;
     }
-    Bits.Token.LeadingTrivia = LeadingTrivia.data();
-    Bits.Token.TokenText = Text.data();
-    Bits.Token.TrailingTrivia = TrailingTrivia.data();
-    Bits.Token.LeadingTriviaLength = LeadingTrivia.size();
-    Bits.Token.TokenLength = Text.size();
-    Bits.Token.TrailingTriviaLength = TrailingTrivia.size();
-    Bits.Token.TokenKind = unsigned(TokKind);
-
     Arena->copyStringToArenaIfNecessary(Bits.Token.LeadingTrivia,
                                         Bits.Token.LeadingTriviaLength);
     Arena->copyStringToArenaIfNecessary(Bits.Token.TokenText,
@@ -388,11 +384,11 @@ public:
   RC<SyntaxArena> getArena() const { return RC<SyntaxArena>(Arena); }
 
   SourcePresence getPresence() const {
-    return static_cast<SourcePresence>(Bits.Common.Presence);
+    return static_cast<SourcePresence>(Presence);
   }
 
   SyntaxKind getKind() const {
-    if (Bits.Common.IsToken) {
+    if (isToken()) {
       return SyntaxKind::Token;
     } else {
       return static_cast<SyntaxKind>(Bits.Layout.Kind);
@@ -442,7 +438,7 @@ public:
   bool isUnknown() const { return isUnknownKind(getKind()); }
 
   /// Return true if this raw syntax node is a token.
-  bool isToken() const { return Bits.Common.IsToken; }
+  bool isToken() const { return IsToken; }
 
   /// \name Getter routines for SyntaxKind::Token.
   /// @{
@@ -532,7 +528,7 @@ public:
 
   /// Return the number of bytes this node takes when spelled out in the source
   /// including trivia.
-  size_t getTextLength() const { return Bits.Common.TextLength; }
+  size_t getTextLength() const { return TextLength; }
 
   /// @}
 
