@@ -48,8 +48,12 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// The name of the module which the frontend is building.
+  /// The name of the module that the frontend is building.
   std::string ModuleName;
+
+  /// The ABI name of the module that the frontend is building, to be used in
+  /// mangling and metadata.
+  std::string ModuleABIName;
 
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;

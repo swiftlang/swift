@@ -2143,13 +2143,15 @@ void ASTMangler::appendModule(const ModuleDecl *module,
                               StringRef useModuleName) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
+  StringRef ModName =
+      DWARFMangling ? module->getName().str() : module->getABIName().str();
+
   // Try the special 'swift' substitution.
-  if (module->isStdlibModule()) {
+  if (ModName == STDLIB_NAME) {
     assert(useModuleName.empty());
     return appendOperator("s");
   }
 
-  StringRef ModName = module->getName().str();
   if (ModName == MANGLING_MODULE_OBJC) {
     assert(useModuleName.empty());
     return appendOperator("So");

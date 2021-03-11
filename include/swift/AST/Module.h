@@ -166,6 +166,9 @@ class ModuleDecl : public DeclContext, public TypeDecl {
   friend class DirectOperatorLookupRequest;
   friend class DirectPrecedenceGroupLookupRequest;
 
+  /// The ABI name of the module, if it differs from the module name.
+  Identifier ModuleABIName;
+
 public:
   /// Produces the components of a given module's full name in reverse order.
   ///
@@ -342,6 +345,17 @@ public:
   /// Get the list of all modules this module declares a cross-import with.
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
+
+  /// Retrieve the ABI name of the module, which is used for metadata and
+  /// mangling.
+  Identifier getABIName() const {
+    return ModuleABIName.empty() ? getName() : ModuleABIName;
+  }
+
+  /// Set the ABI name of the module;
+  void setABIName(Identifier name) {
+    ModuleABIName = name;
+  }
 
 private:
   /// A cache of this module's underlying module and required bystander if it's

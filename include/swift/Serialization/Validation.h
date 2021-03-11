@@ -93,6 +93,7 @@ struct ValidationInfo {
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
+  StringRef ModuleABIName;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -145,6 +146,9 @@ public:
   void setAllowModuleWithCompilerErrorsEnabled(bool val) {
     Bits.IsAllowModuleWithCompilerErrorsEnabled = val;
   }
+
+  StringRef getModuleABIName() const { return ModuleABIName; }
+  void setModuleABIName(StringRef name) { ModuleABIName = name; }
 };
 
 /// Returns info about the serialized AST in the given data.
