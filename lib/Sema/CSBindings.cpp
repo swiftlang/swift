@@ -1251,6 +1251,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
+  case ConstraintKind::PropertyWrapper:
     // Constraints from which we can't do anything.
     break;
 

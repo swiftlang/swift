@@ -1568,6 +1568,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
+  case ConstraintKind::PropertyWrapper:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1706,6 +1707,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
+  case ConstraintKind::PropertyWrapper:
     return true;
   }
 
@@ -2096,6 +2098,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::OneWayBindParam:
   case ConstraintKind::DefaultClosureType:
   case ConstraintKind::UnresolvedMemberChainBase:
+  case ConstraintKind::PropertyWrapper:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -5002,6 +5005,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::OneWayBindParam:
     case ConstraintKind::DefaultClosureType:
     case ConstraintKind::UnresolvedMemberChainBase:
+    case ConstraintKind::PropertyWrapper:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -8105,6 +8109,58 @@ ConstraintSystem::simplifyDefaultClosureTypeConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyPropertyWrapperConstraint(
+    Type wrapperType, Type wrappedValueType, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  wrapperType = getFixedTypeRecursive(wrapperType, flags, /*wantRValue=*/true);
+  auto *loc = getConstraintLocator(locator);
+
+  if (wrapperType->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::create(
+          *this, ConstraintKind::PropertyWrapper, wrapperType, wrappedValueType, loc));
+
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  ConstraintFix *fix = nullptr;
+
+  // The wrapper type must be a property wrapper.
+  auto *nominal = wrapperType->getAnyNominal();
+  if (!(nominal && nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())) {
+    if (auto *paramDecl = getAsDecl<ParamDecl>(locator.getAnchor())) {
+      fix = RemoveProjectedValueArgument::create(*this, wrapperType, paramDecl,
+                                                 getConstraintLocator(paramDecl));
+    } else {
+      return SolutionKind::Error;
+    }
+  }
+
+  auto typeInfo = nominal->getPropertyWrapperTypeInfo();
+  if (!(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
+    if (auto *paramDecl = getAsDecl<ParamDecl>(locator.getAnchor())) {
+      fix = RemoveProjectedValueArgument::create(*this, wrapperType, paramDecl,
+                                                 getConstraintLocator(paramDecl));
+    }
+  }
+
+  if (fix) {
+    if (!shouldAttemptFixes() || recordFix(fix))
+      return SolutionKind::Error;
+
+    return SolutionKind::Solved;
+  }
+
+  auto resolvedType = wrapperType->getTypeOfMember(DC->getParentModule(), typeInfo.valueVar);
+  addConstraint(ConstraintKind::Equal, wrappedValueType, resolvedType, locator);
+
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyOneWayConstraint(
     ConstraintKind kind,
     Type first, Type second, TypeMatchOptions flags,
@@ -8272,51 +8328,36 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
 
     if (paramDecl->hasAttachedPropertyWrapper()) {
-      bool hasError = false;
       Type backingType;
+      Type wrappedValueType;
 
       if (paramDecl->hasImplicitPropertyWrapper()) {
         backingType = getContextualParamAt(i)->getPlainType();
-
-        // If the contextual type is not a property wrapper, record a fix.
-        auto *nominal = backingType->getAnyNominal();
-        if (!(nominal && nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())) {
-          if (!shouldAttemptFixes())
-            return false;
-
-          paramDecl->visitAuxiliaryDecls([](VarDecl *var) {
-            var->setInvalid();
-          });
-
-          auto *fix = RemoveProjectedValueArgument::create(*this, backingType, paramDecl,
-                                                           getConstraintLocator(paramDecl));
-          recordFix(fix);
-          hasError = true;
-        }
+        wrappedValueType = createTypeVariable(getConstraintLocator(locator), TVO_CanBindToHole);
       } else {
         auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
         auto wrapperType = paramDecl->getAttachedPropertyWrapperType(0);
         backingType = replaceInferableTypesWithTypeVars(
             wrapperType, getConstraintLocator(wrapperAttr->getTypeRepr()));
+        wrappedValueType = computeWrappedValueType(paramDecl, backingType);
       }
 
-      if (!hasError) {
-        auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
-                                                      paramDecl, paramDecl->getName(),
-                                                      ConstraintKind::Equal, locator);
-        if (result.isFailure())
-          return false;
+      auto *backingVar = paramDecl->getPropertyWrapperBackingProperty();
+      setType(backingVar, backingType);
 
-        auto *backingVar = paramDecl->getPropertyWrapperBackingProperty();
-        setType(backingVar, backingType);
+      auto *localWrappedVar = paramDecl->getPropertyWrapperWrappedValueVar();
+      setType(localWrappedVar, wrappedValueType);
 
-        auto *localWrappedVar = paramDecl->getPropertyWrapperWrappedValueVar();
-        setType(localWrappedVar, computeWrappedValueType(paramDecl, backingType));
-
-        if (auto *projection = paramDecl->getPropertyWrapperProjectionVar()) {
-          setType(projection, computeProjectedValueType(paramDecl, backingType));
-        }
+      if (auto *projection = paramDecl->getPropertyWrapperProjectionVar()) {
+        setType(projection, computeProjectedValueType(paramDecl, backingType));
       }
+
+      auto result = applyPropertyWrapperToParameter(backingType, param.getParameterType(),
+                                                    paramDecl, paramDecl->getName(),
+                                                    ConstraintKind::Equal,
+                                                    getConstraintLocator(closure));
+      if (result.isFailure())
+        return false;
     }
 
     Type internalType;
@@ -11049,6 +11090,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(first, second, subflags, locator);
 
+  case ConstraintKind::PropertyWrapper:
+    return simplifyPropertyWrapperConstraint(first, second, subflags, locator);
+
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
     return simplifyFunctionComponentConstraint(kind, first, second,
@@ -11562,6 +11606,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                                 constraint.getTypeVariables(),
                                                 /*flags*/ None,
                                                 constraint.getLocator());
+
+  case ConstraintKind::PropertyWrapper:
+    return simplifyPropertyWrapperConstraint(constraint.getFirstType(),
+                                             constraint.getSecondType(),
+                                             /*flags*/ None,
+                                             constraint.getLocator());
 
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:

@@ -4104,6 +4104,12 @@ ConstraintSystem::applyPropertyWrapperToParameter(
   if (argLabel.hasDollarPrefix()) {
     Type projectionType = computeProjectedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, projectionType, locator);
+    if (param->hasImplicitPropertyWrapper()) {
+      auto wrappedValueType = getType(param->getPropertyWrapperWrappedValueVar());
+      addConstraint(ConstraintKind::PropertyWrapper, projectionType, wrappedValueType,
+                    getConstraintLocator(param));
+    }
+
     initKind = PropertyWrapperInitKind::ProjectedValue;
   } else {
     generateWrappedPropertyTypeConstraints(*this, wrapperType, param, paramType);
