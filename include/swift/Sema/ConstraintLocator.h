@@ -199,9 +199,13 @@ public:
   /// via key path dynamic member lookup.
   bool isForKeyPathDynamicMemberLookup() const;
 
-  /// Determine whether this locator points to one of the key path
-  /// components.
-  bool isForKeyPathComponent() const;
+  /// Determine whether this locator points to element inside
+  /// of a key path component.
+  bool isInKeyPathComponent() const;
+
+  /// Determine whether this locator points to a result type of
+  /// a key path component.
+  bool isForKeyPathComponentResult() const;
 
   /// Determine whether this locator points to the generic parameter.
   bool isForGenericParameter() const;

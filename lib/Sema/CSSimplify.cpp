@@ -7371,8 +7371,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       // Record a hole for memberTy to make it possible to form solutions
       // when contextual result type cannot be deduced e.g. `let _ = x.foo`.
-      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
-        recordPotentialHole(memberTypeVar);
+      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>()) {
+        if (getFixedType(memberTypeVar)) {
+          // If member has been bound before the base and the base was
+          // incorrect at that (e.g. fallback to default `Any` type),
+          // then we need to re-activate all of the constraints
+          // associated with this member reference otherwise some of
+          // the constraints could be left unchecked in inactive state.
+          // This is especially important for key path expressions because
+          // `key path` constraint can't be retired until all components
+          // are simplified.
+          addTypeVariableConstraintsToWorkList(memberTypeVar);
+        } else {
+          recordPotentialHole(memberTypeVar);
+        }
+      }
 
       return SolutionKind::Solved;
     };
@@ -8395,15 +8408,28 @@ ConstraintSystem::simplifyKeyPathConstraint(
       return SolutionKind::Solved;
 
     // If we have e.g a missing member somewhere, a component type variable
-    // will have been marked as a potential hole.
-    // FIXME: This relies on the fact that we only mark an overload type
-    // variable as a potential hole once we've added a corresponding fix. We
-    // can't use 'isHole' instead, as that doesn't handle cases where the
-    // overload type variable gets bound to another type from the context rather
-    // than a hole. We need to come up with a better way of handling the
-    // relationship between key paths and overloads.
+    // would either be marked as a potential hole or would have a fix.
     if (llvm::any_of(componentTypeVars, [&](TypeVariableType *tv) {
-          return tv->getImpl().getLocator()->isForKeyPathComponent() &&
+          auto *locator = tv->getImpl().getLocator();
+
+          // Result type of a component could be bound to a contextual
+          // (concrete) type if it's the last component in the chain,
+          // so the only way to detect errors is to check for fixes.
+          if (locator->isForKeyPathComponentResult()) {
+            auto path = locator->getPath();
+            auto *componentLoc =
+                getConstraintLocator(locator->getAnchor(), path.drop_back());
+
+            if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse) ||
+                hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
+                hasFixFor(componentLoc,
+                          FixKind::UnwrapOptionalBaseWithOptionalResult))
+              return true;
+          }
+
+          // If something inside of a component is marked as a hole,
+          // let's consider while component to be invalid.
+          return locator->isInKeyPathComponent() &&
                  tv->getImpl().canBindToHole();
         })) {
       return SolutionKind::Solved;
