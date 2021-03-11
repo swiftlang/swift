@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
 // RUN:    -module-name M -enable-experimental-concurrency \
-// RUN:    -parse-as-library | %FileCheck %s
+// RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: concurrency
 // UNSUPPORTED: CPU=arm64e
 
