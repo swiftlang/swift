@@ -120,5 +120,7 @@ SEMANTICS_ATTR(LIFETIMEMANAGEMENT_COPY, "lifetimemanagement.copy")
 
 SEMANTICS_ATTR(NO_PERFORMANCE_ANALYSIS, "no_performance_analysis")
 
+SEMANTICS_ATTR(MUST_SPECIALIZE, "must_specialize")
+
 #undef SEMANTICS_ATTR
 

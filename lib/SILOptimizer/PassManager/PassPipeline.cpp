@@ -90,6 +90,7 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Debug Serialization");
   P.addAddressLowering();
   P.addOwnershipModelEliminator();
+  P.addMandatorySpecialization();
   P.addMandatoryInlining();
 }
 
@@ -181,6 +182,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   if (Options.shouldOptimize() && EnableDestroyHoisting) {
     P.addDestroyHoisting();
   }
+  P.addMandatorySpecialization();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
