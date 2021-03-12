@@ -2697,15 +2697,30 @@ static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
   if (features.empty())
     return features;
 
-  Decl *enclosingDecl;
-  if (auto accessor = dyn_cast<AccessorDecl>(decl))
-    enclosingDecl = accessor->getStorage();
-  else
-    enclosingDecl = decl->getDeclContext()->getAsDecl();
-  if (!enclosingDecl)
-    return features;
+  // Gather the features used by all enclosing declarations.
+  Decl *enclosingDecl = decl;
+  std::vector<Feature> enclosingFeatures;
+  while (true) {
+    // Find the next outermost enclosing declaration.
+    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+      enclosingDecl = accessor->getStorage();
+    else
+      enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();
+    if (!enclosingDecl)
+      break;
 
-  auto enclosingFeatures = getFeaturesUsed(enclosingDecl);
+    auto outerEnclosingFeatures = getFeaturesUsed(enclosingDecl);
+    if (outerEnclosingFeatures.empty())
+      continue;
+
+    auto currentEnclosingFeatures = std::move(enclosingFeatures);
+    enclosingFeatures.clear();
+    std::merge(outerEnclosingFeatures.begin(), outerEnclosingFeatures.end(),
+               currentEnclosingFeatures.begin(), currentEnclosingFeatures.end(),
+               std::back_inserter(enclosingFeatures));
+  }
+
+  // If there were no enclosing features, we're done.
   if (enclosingFeatures.empty())
     return features;
 

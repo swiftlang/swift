@@ -78,7 +78,7 @@ public class OldSchool2: MP {
 // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
 // CHECK-NEXT: @rethrows public protocol RP
 @rethrows public protocol RP {
-  func f() throws
+  func f() throws -> Bool
 }
 
 // CHECK: public struct UsesRP {
@@ -95,7 +95,15 @@ public struct UsesRP {
 // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
 // CHECK-NEXT: public struct IsRP
 public struct IsRP: RP {
-  public func f() { }
+  // CHECK-NEXT: public func f()
+  public func f() -> Bool { }
+
+  // CHECK-NOT: $RethrowsProtocol
+  // CHECK-NEXT: public var isF: 
+  // CHECK-NEXT: get
+  public var isF: Bool {
+    f()
+  }
 }
 
 // CHECK: #if compiler(>=5.3) && $RethrowsProtocol
