@@ -8879,7 +8879,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
     // than a hole. We need to come up with a better way of handling the
     // relationship between key paths and overloads.
     if (llvm::any_of(componentTypeVars, [&](TypeVariableType *tv) {
-          return tv->getImpl().getLocator()->isForKeyPathComponent() &&
+          return tv->getImpl().getLocator()->isInKeyPathComponent() &&
                  tv->getImpl().canBindToHole();
         })) {
       return SolutionKind::Solved;
