@@ -485,8 +485,10 @@ synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
   ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
   auto reinterpretCastRef
     = new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(rawTy)},
-                                                enumTy));
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
+  reinterpretCastRef->setType(
+      FunctionType::get({FunctionType::Param(rawTy)}, enumTy, info));
 
   auto reinterpreted = CallExpr::createImplicit(ctx, reinterpretCastRef,
                                                 { paramRef }, { Identifier() });
@@ -564,8 +566,10 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
 
   auto reinterpretCastRef
     = new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(enumTy)},
-                                                rawTy));
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
+  reinterpretCastRef->setType(
+      FunctionType::get({FunctionType::Param(enumTy)}, rawTy, info));
 
   auto reinterpreted = CallExpr::createImplicit(ctx, reinterpretCastRef,
                                                 { selfRef }, { Identifier() });
@@ -924,10 +928,11 @@ synthesizeUnionFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
   auto reinterpretCastRefExpr
     = new (ctx) DeclRefExpr(reinterpretCastRef, DeclNameLoc(),
                           /*implicit*/ true);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
   reinterpretCastRefExpr->setType(
-    FunctionType::get(
-      AnyFunctionType::Param(selfDecl->getInterfaceType()),
-      importedFieldDecl->getInterfaceType()));
+      FunctionType::get(AnyFunctionType::Param(selfDecl->getInterfaceType()),
+                        importedFieldDecl->getInterfaceType(), info));
 
   auto reinterpreted = CallExpr::createImplicit(ctx, reinterpretCastRefExpr,
                                                 { selfRef },
@@ -970,12 +975,12 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
                            ArrayRef<ProtocolConformanceRef>()));
   auto addressofFnRefExpr
     = new (ctx) DeclRefExpr(addressofFnRef, DeclNameLoc(), /*implicit*/ true);
-  addressofFnRefExpr->setType(
-    FunctionType::get(
-      AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(),
-                             Identifier(),
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo addressOfInfo;
+  addressofFnRefExpr->setType(FunctionType::get(
+      AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(), Identifier(),
                              ParameterTypeFlags().withInOut(true)),
-      ctx.TheRawPointerType));
+      ctx.TheRawPointerType, addressOfInfo));
   auto selfPointer = CallExpr::createImplicit(ctx, addressofFnRefExpr,
                                               { inoutSelf },
                                               { Identifier() });
@@ -990,10 +995,12 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
                            ArrayRef<ProtocolConformanceRef>()));
   auto initializeFnRefExpr
     = new (ctx) DeclRefExpr(initializeFnRef, DeclNameLoc(), /*implicit*/ true);
-  initializeFnRefExpr->setType(
-      FunctionType::get({AnyFunctionType::Param(newValueDecl->getInterfaceType()),
-                         AnyFunctionType::Param(ctx.TheRawPointerType)},
-                        TupleType::getEmpty(ctx)));
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo initializeInfo;
+  initializeFnRefExpr->setType(FunctionType::get(
+      {AnyFunctionType::Param(newValueDecl->getInterfaceType()),
+       AnyFunctionType::Param(ctx.TheRawPointerType)},
+      TupleType::getEmpty(ctx), initializeInfo));
   auto initialize = CallExpr::createImplicit(ctx, initializeFnRefExpr,
                                              { newValueRef, selfPointer },
                                              { Identifier(), Identifier() });
@@ -1261,7 +1268,9 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
   auto zeroInitializerRef =
     new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  zeroInitializerRef->setType(FunctionType::get({}, selfType));
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
+  zeroInitializerRef->setType(FunctionType::get({}, selfType, info));
 
   auto call = CallExpr::createImplicit(ctx, zeroInitializerRef, {}, {});
   call->setType(selfType);

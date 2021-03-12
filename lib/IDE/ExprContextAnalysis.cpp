@@ -569,8 +569,10 @@ static void collectPossibleCalleesByQualifiedLookup(
     Type kpValueTy = kpTy->castTo<BoundGenericType>()->getGenericArgs()[1];
     kpTy = BoundGenericType::get(kpDecl, Type(), {baseTy, kpValueTy});
 
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
     Type fnTy = FunctionType::get(
-        {AnyFunctionType::Param(kpTy, Ctx.Id_keyPath)}, kpValueTy);
+        {AnyFunctionType::Param(kpTy, Ctx.Id_keyPath)}, kpValueTy, info);
     candidates.emplace_back(fnTy->castTo<AnyFunctionType>(), nullptr);
   }
 }
