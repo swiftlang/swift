@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | not %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s
 
+// XFAIL: asserts
+
 // CHECK: Requirement signature: <Self where Self.Field : FieldAlgebra>
 public protocol VectorSpace {
     associatedtype Field: FieldAlgebra
