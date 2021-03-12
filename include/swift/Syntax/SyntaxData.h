@@ -89,9 +89,6 @@ protected:
   /// and released when \c this is destroyed.
   const SyntaxDataRef *Parent;
 
-  /// Creates an *uninitialized* \c SyntaxDataRef.
-  SyntaxDataRef() {}
-
   /// Creates a \c SyntaxDataRef. \p AbsoluteRaw must not be null. If \p Parent
   /// is a \c nullptr, this node represents the root of a tree.
   SyntaxDataRef(const AbsoluteRawSyntax &AbsoluteRaw,
@@ -101,15 +98,21 @@ protected:
 
 #ifndef NDEBUG
   virtual bool isRef() const { return true; }
-  virtual ~SyntaxDataRef() {}
 #endif
 
 public:
+  /// Creates an *uninitialized* \c SyntaxDataRef.
+  SyntaxDataRef() {}
+
   SyntaxDataRef(const SyntaxDataRef &DataRef) = default;
   SyntaxDataRef(SyntaxDataRef &&DataRef) = default;
 
   SyntaxDataRef &operator=(SyntaxDataRef const &other) = default;
   SyntaxDataRef &operator=(SyntaxDataRef &&other) = default;
+
+#ifndef NDEBUG
+  virtual ~SyntaxDataRef() {}
+#endif
 
   // MARK: - Retrieving underlying data
 
@@ -122,6 +125,7 @@ public:
 
   // MARK: - Retrieving related nodes
 
+  /// Return the parent \c SyntaxDataRef if it exists, otherwise \c nullptr.
   const SyntaxDataRef *getParentRef() const {
     return Parent;
   }
@@ -136,6 +140,50 @@ public:
   /// otherwise 0.
   AbsoluteSyntaxPosition::IndexInParentType getIndexInParent() const {
     return getAbsoluteRaw().getPosition().getIndexInParent();
+  }
+
+  /// If \c this node has a child at \p Cursor, write the child's \c
+  /// SyntaxDataRef to \p DataMem and return \c true.
+  /// If no child exists at \p Cursor, leave \p DataMem untouched and return \c
+  /// false.
+  template <typename CursorType>
+  bool getChildRef(CursorType Cursor, SyntaxDataRef *DataMem) const {
+    return getChildRef(
+        (AbsoluteSyntaxPosition::IndexInParentType)cursorIndex(Cursor),
+        DataMem);
+  }
+
+  /// If \c this node has a child at \p Index, write the child's \c
+  /// SyntaxDataRef to \p DataMem and return \c true. If no child exists at \p
+  /// Index, leave \p DataMem untouched and return \c false.
+  bool getChildRef(AbsoluteSyntaxPosition::IndexInParentType Index,
+                   SyntaxDataRef *DataMem) const {
+    auto AbsoluteRaw = getAbsoluteRaw().getChild(Index);
+    if (AbsoluteRaw) {
+      new (DataMem) SyntaxDataRef(*AbsoluteRaw,
+                                  /*Parent=*/const_cast<SyntaxDataRef *>(this));
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /// Assuming that the child at \p Cursor exists, write its \c SyntaxData to \p
+  /// DataMem.
+  template <typename CursorType>
+  void getPresentChildRef(CursorType Cursor, SyntaxDataRef *DataMem) const {
+    return getPresentChildRef(
+        (AbsoluteSyntaxPosition::IndexInParentType)cursorIndex(Cursor),
+        DataMem);
+  }
+
+  /// Assuming that the child at \p Index exists, write its \c SyntaxData to \p
+  /// DataMem.
+  void getPresentChildRef(AbsoluteSyntaxPosition::IndexInParentType Index,
+                          SyntaxDataRef *DataMem) const {
+    auto AbsoluteRaw = getAbsoluteRaw().getPresentChild(Index);
+    new (DataMem) SyntaxDataRef(AbsoluteRaw,
+                                /*Parent=*/const_cast<SyntaxDataRef *>(this));
   }
 
   // MARK: - Retrieving source locations

@@ -215,8 +215,30 @@ SyntaxTreeCreator::recordDeferredLayout(OpaqueSyntaxNode deferred) {
 }
 
 DeferredNodeInfo SyntaxTreeCreator::getDeferredChild(OpaqueSyntaxNode node,
-                                                     size_t ChildIndex,
-                                                     SourceLoc StartLoc) {
+                                                     size_t ChildIndex) const {
+  const RawSyntax *raw = static_cast<const RawSyntax *>(node);
+
+  const RawSyntax *Child = raw->getChild(ChildIndex);
+  if (Child == nullptr) {
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(nullptr, RecordedOrDeferredNode::Kind::Null),
+        syntax::SyntaxKind::Unknown, tok::NUM_TOKENS, /*IsMissing=*/false);
+  } else if (Child->isToken()) {
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(Child,
+                               RecordedOrDeferredNode::Kind::DeferredToken),
+        syntax::SyntaxKind::Token, Child->getTokenKind(), Child->isMissing());
+  } else {
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(Child,
+                               RecordedOrDeferredNode::Kind::DeferredLayout),
+        Child->getKind(), tok::NUM_TOKENS,
+        /*IsMissing=*/false);
+  }
+}
+
+CharSourceRange SyntaxTreeCreator::getDeferredChildRange(
+    OpaqueSyntaxNode node, size_t ChildIndex, SourceLoc StartLoc) const {
   const RawSyntax *raw = static_cast<const RawSyntax *>(node);
 
   // Compute the start offset of the child node by advancing StartLoc by the
@@ -230,22 +252,9 @@ DeferredNodeInfo SyntaxTreeCreator::getDeferredChild(OpaqueSyntaxNode node,
 
   const RawSyntax *Child = raw->getChild(ChildIndex);
   if (Child == nullptr) {
-    return DeferredNodeInfo(
-        RecordedOrDeferredNode(nullptr, RecordedOrDeferredNode::Kind::Null),
-        syntax::SyntaxKind::Unknown, tok::NUM_TOKENS, /*IsMissing=*/false,
-        CharSourceRange(StartLoc, /*Length=*/0));
-  } else if (Child->isToken()) {
-    return DeferredNodeInfo(
-        RecordedOrDeferredNode(Child,
-                               RecordedOrDeferredNode::Kind::DeferredToken),
-        syntax::SyntaxKind::Token, Child->getTokenKind(), Child->isMissing(),
-        CharSourceRange(StartLoc, Child->getTextLength()));
+    return CharSourceRange(StartLoc, /*Length=*/0);
   } else {
-    return DeferredNodeInfo(
-        RecordedOrDeferredNode(Child,
-                               RecordedOrDeferredNode::Kind::DeferredLayout),
-        Child->getKind(), tok::NUM_TOKENS,
-        /*IsMissing=*/false, CharSourceRange(StartLoc, Child->getTextLength()));
+    return CharSourceRange(StartLoc, Child->getTextLength());
   }
 }
 
