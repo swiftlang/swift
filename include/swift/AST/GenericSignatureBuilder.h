@@ -1434,9 +1434,8 @@ public:
   /// inferred.
   FloatingRequirementSource asInferred(const TypeRepr *typeRepr) const;
 
-  /// Whether this requirement source is recursive when composed with
-  /// the given type.
-  bool isRecursive(Type rootType, GenericSignatureBuilder &builder) const;
+  /// Whether this requirement source is recursive.
+  bool isRecursive(GenericSignatureBuilder &builder) const;
 };
 
 /// Describes a specific constraint on a particular type.

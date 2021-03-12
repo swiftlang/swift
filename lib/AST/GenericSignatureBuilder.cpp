@@ -1865,7 +1865,6 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
 }
 
 bool FloatingRequirementSource::isRecursive(
-                                    Type rootType,
                                     GenericSignatureBuilder &builder) const {
   llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 32> visitedAssocReqs;
   for (auto storedSource = storage.dyn_cast<const RequirementSource *>();
@@ -3983,12 +3982,12 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
     return ResolvedType(pa);
 
   // Determine what kind of resolution we want.
-  Type type = paOrT.get<Type>();
   ArchetypeResolutionKind resolutionKind =
     ArchetypeResolutionKind::WellFormed;
-  if (!source.isExplicit() && source.isRecursive(type, *this))
+  if (!source.isExplicit() && source.isRecursive(*this))
     resolutionKind = ArchetypeResolutionKind::AlreadyKnown;
 
+  Type type = paOrT.get<Type>();
   return maybeResolveEquivalenceClass(type, resolutionKind,
                                       /*wantExactPotentialArchetype=*/true);
 }
