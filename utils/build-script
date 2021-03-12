@@ -1008,6 +1008,11 @@ class BuildScriptInvocation(object):
         # Install...
         for host_target in all_hosts:
             for product_class in impl_product_classes:
+                # We cannot install libdispatch until after all builds are complete
+                # as that will cause the Dispatch module to be imported twice and
+                # fail to build.
+                if (product_class == products.LibDispatch):
+                  continue
                 self._execute_install_action(host_target, product_class)
 
         # Core Lipo...
@@ -1046,6 +1051,11 @@ class BuildScriptInvocation(object):
                    (self.install_all and product.should_build(host_target)):
                     print("--- Installing %s ---" % product_name)
                     product.install(host_target)
+
+        # Do not forget installing libDispatch
+        if products.LibDispatch in impl_product_classes:
+            for host_target in all_hosts:
+                self._execute_install_action(host_target, products.LibDispatch)
 
         # Extract symbols...
         for host_target in all_hosts:
