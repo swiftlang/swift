@@ -98,14 +98,6 @@ convertClientNode(swiftparse_client_node_t client_node) {
   return std::unique_ptr<SPNode>((SPNode*)client_node);
 }
 
-static size_t trivialLen(ArrayRef<swiftparse_trivia_piece_t> trivia) {
-  size_t len = 0;
-  for (const auto &piece : trivia) {
-    len += piece.length;
-  }
-  return len;
-}
-
 static swiftparse_client_node_t
 makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
   SPNode *node = new SPNode();
@@ -114,12 +106,8 @@ makeNode(const swiftparse_syntax_node_t *raw_node, StringRef source) {
     auto range = raw_node->token_data.range;
     auto nodeText = source.substr(range.offset, range.length);
     node->tokKind = raw_node->token_data.kind;
-    size_t leadingTriviaLen =
-      trivialLen(makeArrayRef(raw_node->token_data.leading_trivia,
-                              raw_node->token_data.leading_trivia_count));
-    size_t trailingTriviaLen =
-      trivialLen(makeArrayRef(raw_node->token_data.trailing_trivia,
-                              raw_node->token_data.trailing_trivia_count));
+    auto leadingTriviaLen = raw_node->token_data.leading_trivia_length;
+    auto trailingTriviaLen = raw_node->token_data.trailing_trivia_length;
     node->leadingTriviaText = nodeText.take_front(leadingTriviaLen);
     node->tokenText = nodeText.substr(
         leadingTriviaLen, range.length - leadingTriviaLen - trailingTriviaLen);

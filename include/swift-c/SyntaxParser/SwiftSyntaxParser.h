@@ -98,12 +98,19 @@ typedef struct {
 } swiftparse_trivia_piece_t;
 
 typedef struct {
-  const swiftparse_trivia_piece_t *leading_trivia;
-  const swiftparse_trivia_piece_t *trailing_trivia;
-  uint16_t leading_trivia_count;
-  uint16_t trailing_trivia_count;
+  // The length of the leading trivia in bytes.
+  uint32_t leading_trivia_length;
+  
+  // The length of the trailing trivia in bytes.
+  uint32_t trailing_trivia_length;
+
   swiftparse_token_kind_t kind;
+  
   /// Represents the range for the node, including trivia.
+  /// The length of the actual token is
+  /// \code
+  /// range.length - leading_trivia_length - trailing_trivia_length
+  /// \endcode
   swiftparse_range_t range;
 } swiftparse_token_data_t;
 
@@ -137,6 +144,18 @@ swiftparse_parser_create(void);
 
 SWIFTPARSE_PUBLIC void
 swiftparse_parser_dispose(swiftparse_parser_t);
+
+/// Callback with which \c swiftparse_parse_trivia returns the trivia pieces
+/// to the caller. \p pieces only points to valid memory while this block is 
+/// being executed and should not escape.
+typedef void
+    (^swiftparse_trivia_handler_t)(const swiftparse_trivia_piece_t *pieces, size_t len);
+
+/// Parse the given \p trivia into trivia pieces. \p callback will be invoked
+/// with a pointer to a list of \c swiftparse_trivia_piece_t structs that are
+/// only valid for the duration of the callback.
+SWIFTPARSE_PUBLIC void
+swiftparse_parse_trivia(const char *trivia, size_t len, swiftparse_trivia_handler_t callback);
 
 /// Invoked by the parser when a syntax node is parsed. The client should
 /// return a pointer to associate with that particular node.

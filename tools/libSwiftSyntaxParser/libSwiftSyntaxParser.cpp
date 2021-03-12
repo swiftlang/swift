@@ -161,21 +161,15 @@ private:
 
   void makeCRawToken(CRawSyntaxNode &node,
                      tok kind,
-                     ArrayRef<CTriviaPiece> leadingTrivia,
-                     ArrayRef<CTriviaPiece> trailingTrivia,
+                     uint32_t leadingTriviaLength,
+                     uint32_t trailingTriviaLength,
                      CharSourceRange range) {
     node.kind = serialization::getNumericValue(SyntaxKind::Token);
     auto numValue = serialization::getNumericValue(kind);
     node.token_data.kind = numValue;
     assert(node.token_data.kind == numValue && "token kind value is too large");
-    node.token_data.leading_trivia = leadingTrivia.data();
-    node.token_data.leading_trivia_count = leadingTrivia.size();
-    assert(node.token_data.leading_trivia_count == leadingTrivia.size() &&
-           "leading trivia count value is too large");
-    node.token_data.trailing_trivia = trailingTrivia.data();
-    node.token_data.trailing_trivia_count = trailingTrivia.size();
-    assert(node.token_data.trailing_trivia_count == trailingTrivia.size() &&
-           "trailing trivia count value is too large");
+    node.token_data.leading_trivia_length = leadingTriviaLength;
+    node.token_data.trailing_trivia_length = trailingTriviaLength;
     makeCRange(node.token_data.range, range);
     node.present = true;
   }
@@ -183,14 +177,8 @@ private:
   OpaqueSyntaxNode recordToken(tok tokenKind, StringRef leadingTrivia,
                                StringRef trailingTrivia,
                                CharSourceRange range) override {
-    auto leadingTriviaPieces = TriviaLexer::lexTrivia(leadingTrivia).Pieces;
-    auto trailingTriviaPieces = TriviaLexer::lexTrivia(trailingTrivia).Pieces;
-
-    SmallVector<CTriviaPiece, 8> c_leadingTrivia, c_trailingTrivia;
-    makeCTrivia(c_leadingTrivia, leadingTriviaPieces);
-    makeCTrivia(c_trailingTrivia, trailingTriviaPieces);
     CRawSyntaxNode node;
-    makeCRawToken(node, tokenKind, c_leadingTrivia, c_trailingTrivia,
+    makeCRawToken(node, tokenKind, leadingTrivia.size(), trailingTrivia.size(),
                   range);
     return getNodeHandler()(&node);
   }
@@ -497,6 +485,24 @@ void
 swiftparse_parser_dispose(swiftparse_parser_t c_parser) {
   SynParser *parser = static_cast<SynParser*>(c_parser);
   delete parser;
+}
+
+void
+swiftparse_parse_trivia(const char *trivia, size_t len, swiftparse_trivia_handler_t callback) {
+  auto pieces = TriviaLexer::lexTrivia(StringRef(trivia, len));
+  SmallVector<CTriviaPiece, 8> cTrivia;
+  cTrivia.reserve(pieces.size());
+  for (const auto &piece : pieces) {
+    CTriviaPiece c_piece;
+    auto numValue =
+      serialization::getNumericValue(piece.getKind());
+    c_piece.kind = numValue;
+    assert(c_piece.kind == numValue && "trivia kind value is too large");
+    c_piece.length = piece.getLength();
+    assert(c_piece.length == piece.getLength() && "length too large");
+    cTrivia.push_back(c_piece);
+  }
+  callback(cTrivia.data(), cTrivia.size());
 }
 
 void
