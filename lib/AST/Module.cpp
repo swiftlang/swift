@@ -2246,6 +2246,49 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
   return ctx.AllocateCopy(spiGroups.getArrayRef());
 }
 
+LibraryLevel ModuleDecl::getLibraryLevel() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ModuleLibraryLevelRequest{this},
+                           LibraryLevel::Other);
+}
+
+LibraryLevel
+ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
+                                    const ModuleDecl *module) const {
+  auto &ctx = module->getASTContext();
+
+  /// Is \p path from System/Library/PrivateFrameworks/?
+  auto fromPrivateFrameworks = [&](StringRef path) -> bool {
+    auto sep = llvm::sys::path::get_separator();
+    auto privateFrameworksPath = llvm::Twine(ctx.SearchPathOpts.SDKPath) +
+      sep + "System" + sep + "Library" + sep + "PrivateFrameworks" + sep;
+    return hasPrefix(path, privateFrameworksPath.str());
+  };
+
+  if (module->isNonSwiftModule()) {
+    if (auto *underlying = module->findUnderlyingClangModule()) {
+      // Imported clangmodules are SPI if they are defined by a private
+      // modulemap or from the PrivateFrameworks folder in the SDK.
+      bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
+                         (underlying->isPartOfFramework() &&
+                          fromPrivateFrameworks(underlying->PresumedModuleMapFile));
+      return moduleIsSPI ? LibraryLevel::SPI : LibraryLevel::API;
+    }
+    return LibraryLevel::Other;
+
+  } else if (module->isMainModule()) {
+    // The current compilation target.
+    return ctx.LangOpts.LibraryLevel;
+
+  } else {
+    // Other Swift modules are SPI if they are from the PrivateFrameworks
+    // folder in the SDK.
+    auto modulePath = module->getModuleFilename();
+    return fromPrivateFrameworks(modulePath) ?
+      LibraryLevel::SPI : LibraryLevel::API;
+  }
+}
+
 bool SourceFile::shouldCrossImport() const {
   return Kind != SourceFileKind::SIL && Kind != SourceFileKind::Interface &&
          getASTContext().LangOpts.EnableCrossImportOverlays;
