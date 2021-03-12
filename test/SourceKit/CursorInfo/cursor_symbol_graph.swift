@@ -745,7 +745,7 @@ enum MyEnum {
 // CHECKCASE:             "spelling": "someCase"
 // CHECKCASE:           }
 // CHECKCASE:         ],
-// CHECKCASE:         "title": "someCase"
+// CHECKCASE:         "title": "MyEnum.someCase"
 // CHECKCASE:       },
 // CHECKCASE:       "pathComponents": [
 // CHECKCASE:         "MyEnum",
