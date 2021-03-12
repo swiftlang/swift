@@ -1266,21 +1266,9 @@ namespace {
         }
       }
 
-      // Key paths require any captured values to be ConcurrentValue-conforming.
-      if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
-        for (const auto &component : keyPath->getComponents()) {
-          auto indexExpr = component.getIndexExpr();
-          if (!indexExpr || !indexExpr->getType())
-            continue;
 
-          if (shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts) &&
-              !isConcurrentValueType(getDeclContext(), indexExpr->getType())) {
-            ctx.Diags.diagnose(
-                component.getLoc(), diag::non_concurrent_keypath_capture,
-                indexExpr->getType());
-          }
-        }
-      }
+      if (auto keyPath = dyn_cast<KeyPathExpr>(expr))
+        checkKeyPathExpr(keyPath);
 
       // The children of #selector expressions are not evaluated, so we do not
       // need to do isolation checking there. This is convenient because such
@@ -1866,6 +1854,89 @@ namespace {
       value->diagnose(
           diag::kind_declared_here, value->getDescriptiveKind());
       return true;
+    }
+
+    ///
+    /// \return true iff a diagnostic was emitted
+    bool checkKeyPathExpr(KeyPathExpr *keyPath) {
+      bool diagnosed = false;
+
+      // returns None if it is not a 'let'-bound var decl. Otherwise,
+      // the bool indicates whether a diagnostic was emitted.
+      auto checkLetBoundVarDecl = [&](KeyPathExpr::Component const& component)
+                                                            -> Optional<bool> {
+        auto decl = component.getDeclRef().getDecl();
+        if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+          if (varDecl->isLet()) {
+            auto type = component.getComponentType();
+            if (shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts)
+                && !isConcurrentValueType(getDeclContext(), type)) {
+              ctx.Diags.diagnose(
+                  component.getLoc(), diag::non_concurrent_keypath_access,
+                  type);
+              return true;
+            }
+            return false;
+          }
+        }
+        return None;
+      };
+
+      // check the components of the keypath.
+      for (const auto &component : keyPath->getComponents()) {
+        // The decl referred to by the path component cannot be within an actor.
+        if (component.hasDeclRef()) {
+          auto concDecl = component.getDeclRef();
+          auto isolation = ActorIsolationRestriction::forDeclaration(concDecl);
+
+          switch (isolation.getKind()) {
+          case ActorIsolationRestriction::Unsafe:
+          case ActorIsolationRestriction::Unrestricted:
+            break; // OK. Does not refer to an actor-isolated member.
+
+          case ActorIsolationRestriction::GlobalActorUnsafe:
+            // Only check if we're in code that's adopted concurrency features.
+            if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
+              break; // do not check
+
+            LLVM_FALLTHROUGH; // otherwise, perform checking
+
+          case ActorIsolationRestriction::GlobalActor:
+          case ActorIsolationRestriction::CrossActorSelf:
+            // 'let'-bound decls with this isolation are OK, just check them.
+            if (auto wasLetBound = checkLetBoundVarDecl(component)) {
+              diagnosed = wasLetBound.getValue();
+              break;
+            }
+            LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
+
+          case ActorIsolationRestriction::ActorSelf: {
+            auto decl = concDecl.getDecl();
+            ctx.Diags.diagnose(component.getLoc(),
+                               diag::actor_isolated_keypath_component,
+                               decl->getDescriptiveKind(), decl->getName());
+            diagnosed = true;
+            break;
+          }
+          }; // end switch
+        }
+
+        // Captured values in a path component must conform to ConcurrentValue.
+        // These captured values appear in Subscript, aka "index" components,
+        // such as \Type.dict[k] where k is a captured dictionary key.
+        if (auto indexExpr = component.getIndexExpr()) {
+          auto type = indexExpr->getType();
+          if (type && shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts)
+              && !isConcurrentValueType(getDeclContext(), type)) {
+            ctx.Diags.diagnose(
+                component.getLoc(), diag::non_concurrent_keypath_capture,
+                indexExpr->getType());
+            diagnosed = true;
+          }
+        }
+      }
+
+      return diagnosed;
     }
 
     /// Check a reference to a local or global.
