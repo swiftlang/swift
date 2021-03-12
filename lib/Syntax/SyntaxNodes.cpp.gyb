@@ -25,32 +25,39 @@ using namespace swift;
 using namespace swift::syntax;
 
 % for node in SYNTAX_NODES:
-%   if node.requires_validation():
-void ${node.name}::validate() const {
+%   if not node.is_syntax_collection():
+void ${node.name}Ref::validate() const {
+%     if node.requires_validation():
 #ifndef NDEBUG
-  auto raw = getData()->getRaw();
+  auto raw = getDataRef()->getRaw();
   if (isMissing()) return;
   assert(raw->getLayout().size() == ${len(node.children)});
-%     for child in node.children:
-%       if child.token_choices:
-%         choices = ", ".join("tok::" + choice.kind
-%                             for choice in child.token_choices)
+%       for child in node.children:
+%         if child.token_choices:
+%           choices = ", ".join("tok::" + choice.kind
+%                               for choice in child.token_choices)
   syntax_assert_child_token(raw, ${child.name}, ${choices});
-%       end
-%       if child.main_token() and child.text_choices:
-%         token_kind = child.main_token().kind
-%         choices = ", ".join("\"%s\"" % choice
-%                             for choice in child.text_choices)
+%         end
+%         if child.main_token() and child.text_choices:
+%           token_kind = child.main_token().kind
+%           choices = ", ".join("\"%s\"" % choice
+%                               for choice in child.text_choices)
   syntax_assert_child_token_text(raw, ${child.name},
                                  tok::${token_kind}, ${choices});
-%       end
-%       if child.node_choices:
+%         end
+%         if child.node_choices:
   if (auto __Child = raw->getChild(Cursor::${child.name}))
     assert(${check_child_condition_raw(child)}(__Child));
+%         end
 %       end
-%     end
 #endif
+%     end
 }
+
+void ${node.name}::validate() const {
+  ${node.name}Ref(*this).validate();
+}
+
 %   end
 
 %   for child in node.children:
