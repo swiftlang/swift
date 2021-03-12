@@ -87,11 +87,15 @@ namespace {
   class SignatureExpansion;
 }
 
+class AsyncInfo {
+public:
+  unsigned AsyncContextIdx = 0;
+};
+
 /// A signature represents something which can actually be called.
 class Signature {
-  using ExtraData = SimpleExternalUnion<void,
-                                        ForeignFunctionInfo,
-                                        CoroutineInfo>;
+  using ExtraData =
+      SimpleExternalUnion<void, ForeignFunctionInfo, CoroutineInfo, AsyncInfo>;
 
   llvm::FunctionType *Type;
   llvm::AttributeList Attributes;
@@ -127,6 +131,13 @@ public:
   static Signature forCoroutineContinuation(IRGenModule &IGM,
                                             CanSILFunctionType coroType);
 
+  static Signature forAsyncReturn(IRGenModule &IGM,
+                                  CanSILFunctionType asyncType);
+  static Signature forAsyncAwait(IRGenModule &IGM,
+                                 CanSILFunctionType asyncType);
+  static Signature forAsyncEntry(IRGenModule &IGM,
+                                 CanSILFunctionType asyncType);
+
   llvm::FunctionType *getType() const {
     assert(isValid());
     return Type;
@@ -155,6 +166,17 @@ public:
     if (auto info = ExtraDataStorage.dyn_cast<CoroutineInfo>(ExtraDataKind))
       return *info;
     return CoroutineInfo();
+  }
+
+  AsyncInfo getAsyncInfo() const {
+    assert(isValid());
+    if (auto info = ExtraDataStorage.dyn_cast<AsyncInfo>(ExtraDataKind))
+      return *info;
+    return AsyncInfo();
+  }
+
+  unsigned getAsyncContextIndex() const {
+    return getAsyncInfo().AsyncContextIdx;
   }
 
   // The mutators below should generally only be used when building up

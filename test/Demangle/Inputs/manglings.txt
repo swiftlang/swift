@@ -388,3 +388,4 @@ $sS2f8mangling3FooV13TangentVectorVIegydd_SfAESfIegydd_TJOp ---> autodiff self-r
 $s13test_mangling3fooyS2f_S2ftFWJrSpSr ---> reverse-mode differentiability witness for test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {0} and results {0}
 $s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lWJrUSSpSr ---> reverse-mode differentiability witness for test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable>
 $s5async1hyyS2iJXEF ---> async.h(@concurrent (Swift.Int) -> Swift.Int) -> ()
+$s4main3fooyyFTw ---> thunk for non-constant partial apply in main.foo() -> ()

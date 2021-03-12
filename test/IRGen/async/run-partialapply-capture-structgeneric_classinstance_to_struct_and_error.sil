@@ -42,7 +42,7 @@ entry(%value : $A2<A3>):
 // CHECK-LL: @amethodTu =
 // CHECK-LL: @repoTu =
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @amethod(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @amethod(
 sil @amethod : $@async @convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error) {
 entry(%a2_at_a3_addr : $*A2<A3>):
   %a2_at_a3 = load %a2_at_a3_addr : $*A2<A3>
@@ -52,8 +52,8 @@ entry(%a2_at_a3_addr : $*A2<A3>):
   return %result : $A1
 }
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @repo(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s7amethodTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @repo(
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s7amethodTA"(
 sil @repo : $@async @convention(thin) (@in_guaranteed A2<A3>) -> @owned @async @callee_guaranteed () -> (@owned A1, @error Error) {
 bb0(%0 : $*A2<A3>):
   %1 = load %0 : $*A2<A3>

@@ -687,7 +687,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   {
     // Setup the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
-    arguments.push_back(IGM.getInt32(2)); // swiftasync context index
+    unsigned swiftAsyncContextIndex = 2;
+    arguments.push_back(IGM.getInt32(swiftAsyncContextIndex)); // context index
     arguments.push_back(AsyncCoroutineCurrentResume);
     auto resumeProjFn = getOrCreateResumePrjFn();
     arguments.push_back(
@@ -706,7 +707,9 @@ void IRGenFunction::emitAwaitAsyncContinuation(
         Builder.CreateBitOrPointerCast(getAsyncExecutor(), IGM.Int8PtrTy));
     arguments.push_back(Builder.CreateBitOrPointerCast(
         AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
-    emitSuspendAsyncCall(arguments);
+    auto resultTy = llvm::StructType::get(
+        IGM.getLLVMContext(), {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy});
+    emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
 
     auto results = Builder.CreateAtomicCmpXchg(
         contAwaitSyncAddr, null, one,

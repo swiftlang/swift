@@ -551,18 +551,41 @@ public:
 class FutureAsyncContext : public AsyncContext {
 public:
   SwiftError **errorResult = nullptr;
-  OpaqueValue *indirectResult;
 
   using AsyncContext::AsyncContext;
 };
 
-/// An asynchronous context within a task that describes a general "Future"
-/// task that was started with a closure context.
-class FutureClosureAsyncContext : public FutureAsyncContext {
-public:
-  HeapObject *closureContext;
+/// This matches the ABI of a closure `() async throws -> ()`
+using AsyncVoidClosureEntryPoint =
+  SWIFT_CC(swiftasync)
+  void (AsyncTask *, ExecutorRef, SWIFT_ASYNC_CONTEXT AsyncContext *,
+        SWIFT_CONTEXT HeapObject *);
 
-  using FutureAsyncContext::FutureAsyncContext;
+/// This matches the ABI of a closure `<T>() async throws -> T`
+using AsyncGenericClosureEntryPoint =
+    SWIFT_CC(swiftasync)
+    void(OpaqueValue *, AsyncTask *, ExecutorRef,
+         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+
+class AsyncContextPrefix {
+public:
+  // Async closure entry point adhering to compiler calling conv (e.g directly
+  // passing the closure context instead of via the async context)
+  AsyncVoidClosureEntryPoint *__ptrauth_swift_task_resume_function
+      asyncEntryPoint;
+  HeapObject *closureContext;
+};
+
+/// Storage that is allocated before the AsyncContext to be used by an adapter
+/// of Swift's async convention and the ResumeTask interface.
+class FutureAsyncContextPrefix {
+public:
+  OpaqueValue *indirectResult;
+  // Async closure entry point adhering to compiler calling conv (e.g directly
+  // passing the closure context instead of via the async context)
+  AsyncGenericClosureEntryPoint *__ptrauth_swift_task_resume_function
+      asyncEntryPoint;
+  HeapObject *closureContext;
 };
 
 } // end namespace swift

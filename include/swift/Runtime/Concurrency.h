@@ -117,8 +117,11 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority
 swift_task_escalate(AsyncTask *task, JobPriority newPriority);
 
+/// This matches the ABI of a closure `<T>(Builtin.NativeObject) async -> T`
 using TaskFutureWaitSignature =
-  AsyncSignature<void(AsyncTask *, OpaqueValue *), /*throws*/ false>;
+    SWIFT_CC(swiftasync)
+    void(OpaqueValue *, AsyncTask *, ExecutorRef,
+         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
 
 /// Wait for a non-throwing future task to complete.
 ///
@@ -129,11 +132,13 @@ using TaskFutureWaitSignature =
 ///     -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-TaskFutureWaitSignature::FunctionType
-swift_task_future_wait;
+void swift_task_future_wait(OpaqueValue *, AsyncTask *, ExecutorRef,
+         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
 
 using TaskFutureWaitThrowingSignature =
-  AsyncSignature<void(AsyncTask *, OpaqueValue *), /*throws*/ true>;
+    SWIFT_CC(swiftasync)
+    void(OpaqueValue *, AsyncTask *, ExecutorRef,
+         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
 
 /// Wait for a potentially-throwing future task to complete.
 ///
@@ -144,11 +149,15 @@ using TaskFutureWaitThrowingSignature =
 ///    async throws -> Success
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-TaskFutureWaitThrowingSignature::FunctionType
-swift_task_future_wait_throwing;
+void swift_task_future_wait_throwing(OpaqueValue *, AsyncTask *, ExecutorRef,
+                                     SWIFT_ASYNC_CONTEXT AsyncContext *,
+                                     AsyncTask *, Metadata *);
 
 using TaskGroupFutureWaitThrowingSignature =
-  AsyncSignature<void(AsyncTask *, TaskGroup *, Metadata *), /*throws*/ true>;
+SWIFT_CC(swiftasync)
+  void(OpaqueValue *, AsyncTask *, ExecutorRef,
+       SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, TaskGroup *,
+       const Metadata *successType);
 
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
@@ -161,8 +170,10 @@ using TaskGroupFutureWaitThrowingSignature =
 /// ) async -> T
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-TaskGroupFutureWaitThrowingSignature::FunctionType
-swift_taskGroup_wait_next_throwing;
+void swift_taskGroup_wait_next_throwing(
+    OpaqueValue *resultPointer, AsyncTask *waitingTask, ExecutorRef executor,
+    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext, AsyncTask *_waitingTask,
+    TaskGroup *group, const Metadata *successType);
 
 /// Create a new `TaskGroup`.
 /// The caller is responsible for retaining and managing the group's lifecycle.

@@ -316,6 +316,7 @@ NODE(AutoDiffSubsetParametersThunk)
 NODE(AutoDiffDerivativeVTableThunk)
 NODE(DifferentiabilityWitness)
 NODE(IndexSubset)
+NODE(AsyncNonconstantPartialApplyThunk)
 
 #undef CONTEXT_NODE
 #undef NODE
