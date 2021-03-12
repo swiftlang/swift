@@ -2092,7 +2092,6 @@ TypeDecl *EquivalenceClass::lookupNestedType(
 
   // Look for types with the given name in protocols that we know about.
   AssociatedTypeDecl *bestAssocType = nullptr;
-  llvm::SmallSetVector<AssociatedTypeDecl *, 4> assocTypeAnchors;
   SmallVector<TypeDecl *, 4> concreteDecls;
   for (const auto &conforms : conformsTo) {
     ProtocolDecl *proto = conforms.first;
@@ -2104,7 +2103,6 @@ TypeDecl *EquivalenceClass::lookupNestedType(
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
         // Retrieve the associated type anchor.
         assocType = assocType->getAssociatedTypeAnchor();
-        assocTypeAnchors.insert(assocType);
 
         if (!bestAssocType ||
              compareAssociatedTypes(assocType, bestAssocType) < 0)
@@ -2129,23 +2127,6 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     if (typeToSearch)
       if (auto *decl = typeToSearch->getAnyNominal())
         lookupConcreteNestedType(decl, name, concreteDecls);
-  }
-
-  // Infer same-type constraints among same-named associated type anchors.
-  if (assocTypeAnchors.size() > 1) {
-    auto anchorType = getAnchor(builder, builder.getGenericParams());
-    auto inferredSource =
-      FloatingRequirementSource::forNestedTypeNameMatch(
-        assocTypeAnchors.front()->getName());
-    for (auto assocType : assocTypeAnchors) {
-      if (assocType == bestAssocType) continue;
-
-      builder.addRequirement(
-        Requirement(RequirementKind::SameType,
-                    DependentMemberType::get(anchorType, bestAssocType),
-                    DependentMemberType::get(anchorType, assocType)),
-        nullptr, inferredSource, nullptr, nullptr);
-    }
   }
 
   // Form the new cache entry.
