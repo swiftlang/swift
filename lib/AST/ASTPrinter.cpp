@@ -2446,16 +2446,53 @@ static bool usesFeatureAsyncAwait(Decl *decl) {
 }
 
 static bool usesFeatureMarkerProtocol(Decl *decl) {
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          for (ProtocolType *protoTy : layout.getProtocols()) {
+            if (protoTy->getDecl()->isMarkerProtocol())
+              return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  // Check generic requirements for a marker protocol.
+  auto checkRequirements = [&](ArrayRef<Requirement> requirements) -> bool {
+    for (const auto &req: requirements) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl()
+              ->isMarkerProtocol())
+        return true;
+    }
+
+    return false;
+  };
+
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     if (proto->isMarkerProtocol())
+      return true;
+
+    if (checkInherited(proto->getInherited()))
+      return true;
+
+    if (checkRequirements(proto->getRequirementSignature()))
       return true;
   }
 
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto proto = ext->getSelfProtocolDecl())
-      if (proto->isMarkerProtocol())
-        return true;
-  }       
+    if (checkRequirements(ext->getGenericRequirements()))
+      return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
+  }
 
   return false;
 }
@@ -2524,15 +2561,40 @@ static bool usesFeatureRethrowsProtocol(
   if (!checked.insert(decl).second)
     return false;
 
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          for (ProtocolType *protoTy : layout.getProtocols()) {
+            if (usesFeatureRethrowsProtocol(protoTy->getDecl(), checked))
+              return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (checkInherited(nominal->getInherited()))
+      return true;
+  }
+
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     if (proto->getAttrs().hasAttribute<AtRethrowsAttr>())
       return true;
   }
 
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto proto = ext->getSelfProtocolDecl())
-      if (usesFeatureRethrowsProtocol(proto, checked))
+    if (auto nominal = ext->getSelfNominalTypeDecl())
+      if (usesFeatureRethrowsProtocol(nominal, checked))
         return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
   }
 
   if (auto genericSig = decl->getInnermostDeclContext()
