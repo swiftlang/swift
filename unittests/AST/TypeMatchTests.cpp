@@ -46,6 +46,8 @@ TEST(TypeMatch, IdenticalTypes) {
 }
 
 TEST(TypeMatch, UnrelatedTypes) {
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
   TestContext C;
 
   auto check = [](Type base, Type derived) {
@@ -56,11 +58,11 @@ TEST(TypeMatch, UnrelatedTypes) {
   EXPECT_FALSE(check(C.Ctx.TheEmptyTupleType, C.Ctx.TheRawPointerType));
   EXPECT_FALSE(check(C.Ctx.TheRawPointerType, C.Ctx.TheEmptyTupleType));
 
-  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType);
+  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType, info);
   EXPECT_FALSE(check(voidToVoidFn, C.Ctx.TheEmptyTupleType));
   EXPECT_FALSE(check(C.Ctx.TheEmptyTupleType, voidToVoidFn));
 
-  Type ptrToPtrFn = FunctionType::get({}, C.Ctx.TheRawPointerType);
+  Type ptrToPtrFn = FunctionType::get({}, C.Ctx.TheRawPointerType, info);
   EXPECT_FALSE(check(ptrToPtrFn, voidToVoidFn));
   EXPECT_FALSE(check(voidToVoidFn, ptrToPtrFn));
 
@@ -72,7 +74,7 @@ TEST(TypeMatch, UnrelatedTypes) {
   EXPECT_FALSE(check(voidToVoidFn, structTy));
 
   Type structToStructFn = FunctionType::get(
-      FunctionType::Param(structTy), structTy);
+      FunctionType::Param(structTy), structTy, info);
   EXPECT_FALSE(check(structToStructFn, structTy));
   EXPECT_FALSE(check(structTy, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, voidToVoidFn));
@@ -85,13 +87,13 @@ TEST(TypeMatch, UnrelatedTypes) {
 
   Type anotherStructToAnotherStructFn = FunctionType::get(
       FunctionType::Param(anotherStructTy),
-      anotherStructTy);
+      anotherStructTy, info);
   EXPECT_FALSE(check(anotherStructToAnotherStructFn, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, anotherStructToAnotherStructFn));
 
   Type S2ASFn = FunctionType::get(
       FunctionType::Param(structTy),
-      anotherStructTy);
+      anotherStructTy, info);
   EXPECT_FALSE(check(S2ASFn, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, S2ASFn));
   EXPECT_FALSE(check(S2ASFn, anotherStructToAnotherStructFn));
@@ -99,6 +101,8 @@ TEST(TypeMatch, UnrelatedTypes) {
 }
 
 TEST(TypeMatch, Classes) {
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
   TestContext C;
 
   auto check = [](Type base, Type derived) {
@@ -125,27 +129,29 @@ TEST(TypeMatch, Classes) {
 
   Type baseToVoid = FunctionType::get(
       FunctionType::Param(baseTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType, info);
   Type subToVoid = FunctionType::get(
       FunctionType::Param(subTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType, info);
   EXPECT_FALSE(check(baseToVoid, subToVoid));
   EXPECT_TRUE(check(subToVoid, baseToVoid));
 
-  Type voidToBase = FunctionType::get({}, baseTy);
-  Type voidToSub = FunctionType::get({}, subTy);
+  Type voidToBase = FunctionType::get({}, baseTy, info);
+  Type voidToSub = FunctionType::get({}, subTy, info);
   EXPECT_FALSE(check(voidToSub, voidToBase));
   EXPECT_TRUE(check(voidToBase, voidToSub));
 
   Type baseToBase = FunctionType::get(
-      FunctionType::Param(baseTy), baseTy);
+      FunctionType::Param(baseTy), baseTy, info);
   Type subToSub = FunctionType::get(
-      FunctionType::Param(subTy), subTy);
+      FunctionType::Param(subTy), subTy, info);
   EXPECT_FALSE(check(baseToBase, subToSub));
   EXPECT_FALSE(check(subToSub, baseToBase));
 }
 
 TEST(TypeMatch, Optionals) {
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
   TestContext C{DeclareOptionalTypes};
 
   auto check = [](Type base, Type derived) {
@@ -162,29 +168,31 @@ TEST(TypeMatch, Optionals) {
 
   Type baseToVoid = FunctionType::get(
       FunctionType::Param(baseTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType, info);
   Type optToVoid = FunctionType::get(
       FunctionType::Param(optTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType, info);
   EXPECT_TRUE(check(baseToVoid, optToVoid));
   EXPECT_FALSE(check(optToVoid, baseToVoid));
 
-  Type voidToBase = FunctionType::get({}, baseTy);
-  Type voidToOpt = FunctionType::get({}, optTy);
+  Type voidToBase = FunctionType::get({}, baseTy, info);
+  Type voidToOpt = FunctionType::get({}, optTy, info);
   EXPECT_FALSE(check(voidToBase, voidToOpt));
   EXPECT_TRUE(check(voidToOpt, voidToBase));
 
   Type baseToBase = FunctionType::get(
       FunctionType::Param(baseTy),
-      baseTy);
+      baseTy, info);
   Type optToOpt = FunctionType::get(
       FunctionType::Param(optTy),
-      optTy);
+      optTy, info);
   EXPECT_FALSE(check(baseToBase, optToOpt));
   EXPECT_FALSE(check(optToOpt, baseToBase));
 }
 
 TEST(TypeMatch, OptionalMismatch) {
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
   TestContext C{DeclareOptionalTypes};
 
   auto check = [](Type base, Type derived) {
@@ -207,10 +215,10 @@ TEST(TypeMatch, OptionalMismatch) {
 
   Type baseToVoid = FunctionType::get(
       FunctionType::Param(baseTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType, info);
   Type optToVoid = FunctionType::get(
       FunctionType::Param(optTy),
-      C.Ctx.TheEmptyTupleType);
+      C.Ctx.TheEmptyTupleType, info);
   EXPECT_TRUE(check(baseToVoid, optToVoid));
   EXPECT_TRUE(checkOpt(baseToVoid, optToVoid));
   EXPECT_TRUE(checkOptOverride(baseToVoid, optToVoid));
@@ -218,8 +226,8 @@ TEST(TypeMatch, OptionalMismatch) {
   EXPECT_TRUE(checkOpt(optToVoid, baseToVoid));
   EXPECT_TRUE(checkOptOverride(optToVoid, baseToVoid));
 
-  Type voidToBase = FunctionType::get({}, baseTy);
-  Type voidToOpt = FunctionType::get({}, optTy);
+  Type voidToBase = FunctionType::get({}, baseTy, info);
+  Type voidToOpt = FunctionType::get({}, optTy, info);
   EXPECT_FALSE(check(voidToBase, voidToOpt));
   EXPECT_TRUE(checkOpt(voidToBase, voidToOpt));
   EXPECT_TRUE(checkOptOverride(voidToBase, voidToOpt));
@@ -229,10 +237,10 @@ TEST(TypeMatch, OptionalMismatch) {
 
   Type baseToBase = FunctionType::get(
       FunctionType::Param(baseTy),
-      baseTy);
+      baseTy, info);
   Type optToOpt = FunctionType::get(
       FunctionType::Param(optTy),
-      optTy);
+      optTy, info);
   EXPECT_FALSE(check(baseToBase, optToOpt));
   EXPECT_TRUE(checkOpt(baseToBase, optToOpt));
   EXPECT_TRUE(checkOptOverride(baseToBase, optToOpt));
@@ -348,6 +356,8 @@ TEST(TypeMatch, OptionalMismatchFunctions) {
 }
 
 TEST(TypeMatch, NoEscapeMismatchFunctions) {
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  FunctionType::ExtInfo info;
   TestContext C{DeclareOptionalTypes};
 
   // Note the reversed names here: parameters must be contravariant for the
@@ -361,7 +371,7 @@ TEST(TypeMatch, NoEscapeMismatchFunctions) {
         TypeMatchFlags::IgnoreNonEscapingForOptionalFunctionParam);
   };
 
-  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType);
+  Type voidToVoidFn = FunctionType::get({}, C.Ctx.TheEmptyTupleType, info);
   Type nonescapingVoidToVoidFn =
       FunctionType::get({}, C.Ctx.TheEmptyTupleType,
                         FunctionType::ExtInfo().withNoEscape());

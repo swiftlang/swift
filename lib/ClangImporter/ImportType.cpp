@@ -663,7 +663,9 @@ namespace {
       if (!resultTy)
         return Type();
 
-      return FunctionType::get({}, resultTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      return FunctionType::get({}, resultTy, info);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {
