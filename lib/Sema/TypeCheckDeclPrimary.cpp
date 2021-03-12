@@ -2452,13 +2452,10 @@ public:
       requirementsSig->print(llvm::errs());
       llvm::errs() << "\n";
 
-      // Note: One cannot canonicalize a requirement signature, because
-      // requirement signatures are necessarily missing requirements.
       llvm::errs() << "Canonical requirement signature: ";
       auto canRequirementSig =
         CanGenericSignature::getCanonical(requirementsSig->getGenericParams(),
-                                          requirementsSig->getRequirements(),
-                                          /*skipValidation=*/true);
+                                          requirementsSig->getRequirements());
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
