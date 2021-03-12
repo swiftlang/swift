@@ -87,9 +87,6 @@ Trivia lexTrivia(StringRef TriviaStr) {
   return SyntaxTrivia;
 }
 
-// FIXME: If we want thread-safety for tree creation, this needs to be atomic.
-unsigned RawSyntax::NextFreeNodeId = 1;
-
 Trivia RawSyntax::getLeadingTriviaPieces() const {
   return lexTrivia(getLeadingTrivia());
 }

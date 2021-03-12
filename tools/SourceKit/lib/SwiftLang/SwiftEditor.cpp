@@ -2349,9 +2349,7 @@ void SwiftLangSupport::editorOpen(
 
   if (Consumer.syntaxTreeEnabled()) {
     assert(EditorDoc->getSyntaxTree().hasValue());
-    std::unordered_set<unsigned> ReusedNodeIds;
-    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(), 
-                              ReusedNodeIds);
+    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue());
   }
 }
 
@@ -2380,14 +2378,10 @@ void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
 void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
                             unsigned EditOffset, unsigned EditLength,
                             StringRef PreEditText, StringRef ReplaceText) {
-  swift::json::Output::UserInfoMap JsonUserInfo;
-  JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
-      reinterpret_cast<void *>(true);
-
   // Dump the incremental syntax tree
   std::string IncrTreeString;
   llvm::raw_string_ostream IncrTreeStream(IncrTreeString);
-  swift::json::Output IncrTreeOutput(IncrTreeStream, JsonUserInfo);
+  swift::json::Output IncrTreeOutput(IncrTreeStream);
   IncrTreeOutput << *EditorDoc->getSyntaxTree()->getRaw();
 
   // Reparse the file from scratch
@@ -2402,7 +2396,7 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
   // Dump the from-scratch syntax tree
   std::string FromScratchTreeString;
   llvm::raw_string_ostream ScratchTreeStream(FromScratchTreeString);
-  swift::json::Output ScratchTreeOutput(ScratchTreeStream, JsonUserInfo);
+  swift::json::Output ScratchTreeOutput(ScratchTreeStream);
   auto SyntaxRoot = ScratchSyntaxInfo.getSourceFile().getSyntaxRoot();
   ScratchTreeOutput << *SyntaxRoot.getRaw();
 
@@ -2539,14 +2533,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
     }
 
     if (Consumer.syntaxTreeEnabled()) {
-      std::unordered_set<unsigned> ReusedNodeIds;
-      if (SyntaxCache.hasValue()) {
-        auto &ReusedVector = SyntaxCache->getReusedNodeIds();
-        ReusedNodeIds = std::unordered_set<unsigned>(ReusedVector.begin(),
-                                                     ReusedVector.end());
-      }
-      Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(),
-                                ReusedNodeIds);
+      Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue());
     }
 
     if (ValidateSyntaxTree) {
