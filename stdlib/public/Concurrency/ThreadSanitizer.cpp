@@ -23,28 +23,35 @@
 #include <dlfcn.h>
 #endif
 
-using TSanFunc = void(void *);
-
 namespace {
-static TSanFunc *loadSymbol(const char *name) {
+using TSanFunc = void(void *);
+TSanFunc *tsan_acquire, *tsan_release;
+
+TSanFunc *loadSymbol(const char *name) {
 #if defined(_WIN32)
   return (TSanFunc *)GetProcAddress(GetModuleHandle(NULL), name);
 #else
   return (TSanFunc *)dlsym(RTLD_DEFAULT, name);
 #endif
 }
+
+swift::swift_once_t initOnceToken;
+void initializeThreadSanitizer(void *unused) {
+  tsan_acquire = loadSymbol("__tsan_acquire");
+  tsan_release = loadSymbol("__tsan_release");
 }
+} // anonymous namespace
 
 void swift::_swift_tsan_acquire(void *addr) {
-  static auto ptr = loadSymbol("__tsan_acquire");
-  if (ptr) {
-    ptr(addr);
+  swift_once(&initOnceToken, initializeThreadSanitizer, nullptr);
+  if (tsan_acquire) {
+    tsan_acquire(addr);
   }
 }
 
 void swift::_swift_tsan_release(void *addr) {
-  static auto ptr = loadSymbol("__tsan_release");
-  if (ptr) {
-    ptr(addr);
+  swift_once(&initOnceToken, initializeThreadSanitizer, nullptr);
+  if (tsan_release) {
+    tsan_release(addr);
   }
 }

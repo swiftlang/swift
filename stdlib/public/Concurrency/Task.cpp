@@ -92,8 +92,6 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
 
-  _swift_tsan_release(static_cast<Job *>(this));
-
   assert(isFuture());
   auto fragment = futureFragment();
 
@@ -104,6 +102,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     fragment->getError() = errorObject;
     hadErrorResult = true;
   }
+
+  _swift_tsan_release(static_cast<Job *>(this));
 
   // Update the status to signal completion.
   auto newQueueHead = WaitQueueItem::get(
@@ -125,8 +125,6 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   // Schedule every waiting task on the executor.
   auto waitingTask = queueHead.getTask();
   while (waitingTask) {
-    _swift_tsan_acquire(static_cast<Job *>(waitingTask));
-
     // Find the next waiting task before we invalidate it by resuming
     // the task.
     auto nextWaitingTask = waitingTask->getNextWaitingTask();
@@ -139,6 +137,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     } else {
       waitingContext->fillWithSuccess(fragment);
     }
+
+    _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
     // Enqueue the waiter on the global executor.
     // TODO: allow waiters to fill in a suggested executor
