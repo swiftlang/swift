@@ -148,6 +148,8 @@ Globals
   global ::= mangled-name 'TA'                     // partial application forwarder
   global ::= mangled-name 'Ta'                     // ObjC partial application forwarder
   global ::= mangled-name 'Tw' index               // async partial apply thunk for a non-constant function
+  global ::= mangled-name 'TQ' index               // Async await continuation partial function
+  global ::= mangled-name 'TY' index               // Async suspend continuation partial function
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 

@@ -574,6 +574,8 @@ private:
     case Node::Kind::DifferentiabilityWitness:
     case Node::Kind::IndexSubset:
     case Node::Kind::AsyncNonconstantPartialApplyThunk:
+    case Node::Kind::AsyncAwaitResumePartialFunction:
+    case Node::Kind::AsyncSuspendResumePartialFunction:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2781,7 +2783,20 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << ")";
     Printer << " thunk for non-constant partial apply in ";
     return nullptr;
+  case Node::Kind::AsyncAwaitResumePartialFunction:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
+    Printer << " await resume partial function for ";
+    return nullptr;
+  case Node::Kind::AsyncSuspendResumePartialFunction:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
+    Printer << " suspend resume partial function for ";
+    return nullptr;
   }
+
   printer_unreachable("bad node kind!");
 }
 
