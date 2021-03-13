@@ -433,6 +433,11 @@ public:
     return Core->Name;
   }
 
+  /// The ABI name of the module.
+  StringRef getModuleABIName() const {
+    return Core->ModuleABIName;
+  }
+
   /// The Swift compatibility version in use when this module was built.
   const version::Version &getCompatibilityVersion() const {
     return Core->CompatibilityVersion;

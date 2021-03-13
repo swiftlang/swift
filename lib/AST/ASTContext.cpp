@@ -164,6 +164,9 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
+  /// The set of top-level modules we have loaded, indexed by ABI name.
+  llvm::MapVector<Identifier, ModuleDecl *> LoadedModulesByABIName;
+
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
