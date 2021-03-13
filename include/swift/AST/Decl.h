@@ -6327,16 +6327,18 @@ class AccessorDecl final : public FuncDecl {
   AccessorDecl(SourceLoc declLoc, SourceLoc accessorKeywordLoc,
                AccessorKind accessorKind, AbstractStorageDecl *storage,
                SourceLoc staticLoc, StaticSpellingKind staticSpelling,
-               bool throws, SourceLoc throwsLoc,
+               bool async, SourceLoc asyncLoc, bool throws, SourceLoc throwsLoc,
                bool hasImplicitSelfDecl, GenericParamList *genericParams,
                DeclContext *parent)
     : FuncDecl(DeclKind::Accessor,
                staticLoc, staticSpelling, /*func loc*/ declLoc,
                /*name*/ Identifier(), /*name loc*/ declLoc,
-               /*Async=*/false, SourceLoc(), throws, throwsLoc,
+               async, asyncLoc, throws, throwsLoc,
                hasImplicitSelfDecl, genericParams, parent),
       AccessorKeywordLoc(accessorKeywordLoc),
       Storage(storage) {
+    assert(!async || accessorKind == AccessorKind::Get
+           && "only get accessors can be async");
     Bits.AccessorDecl.AccessorKind = unsigned(accessorKind);
   }
 
@@ -6347,6 +6349,7 @@ class AccessorDecl final : public FuncDecl {
                                   AbstractStorageDecl *storage,
                                   SourceLoc staticLoc,
                                   StaticSpellingKind staticSpelling,
+                                  bool async, SourceLoc asyncLoc,
                                   bool throws, SourceLoc throwsLoc,
                                   GenericParamList *genericParams,
                                   DeclContext *parent,
@@ -6365,7 +6368,7 @@ public:
                                           AccessorKind accessorKind,
                                           AbstractStorageDecl *storage,
                                           StaticSpellingKind staticSpelling,
-                                          bool throws,
+                                          bool async, bool throws,
                                           GenericParamList *genericParams,
                                           Type fnRetType, DeclContext *parent);
 
@@ -6375,6 +6378,7 @@ public:
                               AbstractStorageDecl *storage,
                               SourceLoc staticLoc,
                               StaticSpellingKind staticSpelling,
+                              bool async, SourceLoc asyncLoc,
                               bool throws, SourceLoc throwsLoc,
                               GenericParamList *genericParams,
                               ParameterList *parameterList,

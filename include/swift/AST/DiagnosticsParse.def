@@ -278,6 +278,12 @@ ERROR(expected_lbrace_accessor,PointsToFirstBadToken,
 ERROR(expected_accessor_kw,none,
       "expected 'get', 'set', 'willSet', or 'didSet' keyword to "
       "start an accessor definition",())
+ERROR(invalid_accessor_specifier,none,
+      "'%0' accessor cannot have specifier '%1'",
+      (StringRef, StringRef))
+ERROR(invalid_accessor_with_effectful_get,none,
+      "'%0' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'",
+      (StringRef))
 ERROR(missing_getter,none,
       "%select{variable|subscript}0 with %1 must also have a getter",
       (unsigned, StringRef))

@@ -1158,6 +1158,12 @@ public:
                                            bool hasInitializer,
                                            const DeclAttributes &Attributes,
                                            SmallVectorImpl<Decl *> &Decls);
+  ParserStatus parseGetEffectSpecifier(ParsedAccessors &accessors,
+                                       SourceLoc &asyncLoc,
+                                       SourceLoc &throwsLoc,
+                                       bool &hasEffectfulGet,
+                                       AccessorKind currentKind,
+                                       SourceLoc const& currentLoc);
   
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);

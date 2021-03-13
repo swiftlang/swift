@@ -2333,7 +2333,11 @@ private:
             Classification::forUnconditional(EffectKind::Async,
                                              PotentialEffectReason::forApply()),
                           lookupKind);
-    }
+
+    } /* else if (auto concMembDecl = E->getMember()) {
+      auto vd = concMembDecl.getDecl();
+      vd->dump();
+    }*/
 
     return ShouldRecurse;
   }
