@@ -3466,7 +3466,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value sil-operand (',' debug-var-attr)*
+  sil-instruction ::= debug_value '[poison]'? sil-operand (',' debug-var-attr)*
 
   debug_value %1 : $Int
 
@@ -3487,6 +3487,15 @@ There are a number of attributes that provide details about the source
 variable that is being described, including the name of the
 variable. For function and closure arguments ``argno`` is the number
 of the function argument starting with 1.
+
+If the '[poison]' flag is set, then all references within this debug
+value will be overwritten with a sentinel at this point in the
+program. This is used in debug builds when shortening non-trivial
+value lifetimes to ensure the debugger cannot inspect invalid
+memory. `debug_value` instructions with the poison flag are not
+generated until OSSA islowered. They are not expected to be serialized
+within the module, and the pipeline is not expected to do any
+significant code motion after lowering.
 
 debug_value_addr
 ````````````````

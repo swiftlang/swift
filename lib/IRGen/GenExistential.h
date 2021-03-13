@@ -99,6 +99,11 @@ namespace irgen {
       IRGenFunction &IGF, OpenedExistentialAccess accessKind, Address base,
       SILType existentialType, CanArchetypeType openedArchetype);
 
+  /// Return the address of the reference values within a class existential.
+  Address emitClassExistentialValueAddress(IRGenFunction &IGF,
+                                           Address existential,
+                                           SILType baseTy);
+
   /// Extract the instance pointer from a class existential value.
   ///
   /// \param openedArchetype If non-null, the archetype that will capture the

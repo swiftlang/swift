@@ -2501,8 +2501,7 @@ public:
             "Source value should be an object value");
     require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
             "Source value should be non-trivial");
-    require(I->poisonRefs() || !fnConv.useLoweredAddresses()
-            || F.hasOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
   }

@@ -4524,9 +4524,10 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var);
+                 SILDebugVariable Var, bool poisonRefs);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
-                                SILModule &M, SILDebugVariable Var);
+                                SILModule &M, SILDebugVariable Var,
+                                bool poisonRefs);
 
   size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
 
@@ -4537,6 +4538,21 @@ public:
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
     return VarInfo.get(getDecl(), getTrailingObjects<char>());
+  }
+
+  /// True if all references within this debug value will be overwritten with a
+  /// poison sentinel at this point in the program. This is used in debug builds
+  /// when shortening non-trivial value lifetimes to ensure the debugger cannot
+  /// inspect invalid memory. These are not generated until OSSA is
+  /// lowered. They are not expected to be serialized within the module, and the
+  /// debug pipeline is not expected to do any significant code motion after
+  /// OSSA lowering. It should not be necessary to model the poison operation as
+  /// a side effect, which would violate the rule that debug_values cannot
+  /// affect optimization.
+  bool poisonRefs() const { return SILNode::Bits.DebugValueInst.PoisonRefs; }
+
+  void setPoisonRefs(bool poisonRefs = true) {
+    SILNode::Bits.DebugValueInst.PoisonRefs = poisonRefs;
   }
 };
 
@@ -7142,6 +7158,14 @@ class DestroyValueInst
   }
 
 public:
+  /// If true, then all references within the destroyed value will be
+  /// overwritten with a sentinel. This is used in debug builds when shortening
+  /// non-trivial value lifetimes to ensure the debugger cannot inspect invalid
+  /// memory. These semantics are part of the destroy_value instruction to
+  /// avoid representing use-after-destroy in OSSA form and so that OSSA
+  /// transformations keep the poison operation associated with the destroy
+  /// point. After OSSA, these are lowered to 'debug_values [poison]'
+  /// instructions, after which the Onone pipeline should avoid code motion.
   bool poisonRefs() const { return SILNode::Bits.DestroyValueInst.PoisonRefs; }
 
   void setPoisonRefs(bool poisonRefs = true) {

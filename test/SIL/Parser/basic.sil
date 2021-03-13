@@ -1267,10 +1267,11 @@ bb0:
 }
 
 // CHECK-LABEL: sil @debug_value
-sil @debug_value : $@convention(thin) (Int, @in P) -> () {
-bb0(%0 : $Int, %1 : $*P):
-  debug_value %0 : $Int        // CHECK: debug_value %0 : $Int
-  debug_value_addr %1 : $*P    // CHECK: debug_value_addr %1 : $*P
+sil @debug_value : $@convention(thin) (Int, @in P, AnyObject) -> () {
+bb0(%0 : $Int, %1 : $*P, %2 : $AnyObject):
+  debug_value %0 : $Int         // CHECK: debug_value %0 : $Int
+  debug_value [poison] %2 : $AnyObject // CHECK: debug_value [poison] %2 : $AnyObject
+  debug_value_addr %1 : $*P     // CHECK: debug_value_addr %1 : $*P
   unreachable
 }
 
