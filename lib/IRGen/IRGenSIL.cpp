@@ -962,8 +962,7 @@ public:
           if (ValueVariables.insert(Value).second)
             ValueDomPoints.push_back({Value, getActiveDominancePoint()});
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
-        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
-        (CurSILFn->isAsync() && VarInfo.ArgNo) ||
+        IGM.IRGen.Opts.shouldOptimize() || IsAnonymous || CurSILFn->isAsync() ||
         isa<llvm::AllocaInst>(Storage) || isa<llvm::UndefValue>(Storage) ||
         !needsShadowCopy(Storage))
       return Storage;
@@ -991,7 +990,7 @@ public:
     // Only do this at -O0.
     if (IGM.IRGen.Opts.DisableDebuggerShadowCopies ||
         IGM.IRGen.Opts.shouldOptimize() || IsAnonymous ||
-        (CurSILFn->isAsync() && VarInfo.ArgNo)) {
+        (CurSILFn->isAsync())) {
       auto vals = e.claimAll();
       copy.append(vals.begin(), vals.end());
 
@@ -4566,13 +4565,14 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   IndirectionKind Indirection = DirectValue;
-  if (CurSILFn->isAsync() && VarInfo->ArgNo &&
+  if (CurSILFn->isAsync() &&
       !i->getDebugScope()->InlinedCallSite) {
-    for (auto &Val : Copy) {
-      Val = getDirectCoroutineArgument(Val);
-      assert(IGM.DebugInfo->verifyCoroutineArgument(Val) &&
-             "arg expected to be load from inside %swift.context");
-    }
+    if (VarInfo->ArgNo)
+      for (auto &Val : Copy) {
+        Val = getDirectCoroutineArgument(Val);
+        assert(IGM.DebugInfo->verifyCoroutineArgument(Val) &&
+               "arg expected to be load from inside %swift.context");
+      }
     Indirection = CoroDirectValue;
   }
 
@@ -4602,9 +4602,8 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto *Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
-  if (CurSILFn->isAsync() && VarInfo->ArgNo &&
-      !i->getDebugScope()->InlinedCallSite) {
-    if (IGM.DebugInfo)
+  if (CurSILFn->isAsync() && !i->getDebugScope()->InlinedCallSite) {
+    if (IGM.DebugInfo && VarInfo->ArgNo)
       assert(IGM.DebugInfo->verifyCoroutineArgument(Addr) &&
              "arg expected to be load from inside %swift.context");
     Indirection = CoroIndirectValue;

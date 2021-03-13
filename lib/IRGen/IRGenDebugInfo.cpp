@@ -2457,7 +2457,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // limited, so using a dbg.addr instead of a dbg.declare would be more
     // appropriate.
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-  } else if (InCoroContext && (Var->getArg() || Var->isArtificial())) {
+  } else if (InCoroContext) {
     // Function arguments in async functions are emitted without a shadow copy
     // (that would interfer with coroutine splitting) but with a dbg.declare to
     // give CoroSplit.cpp license to emit a shadow copy for them pointing inside
