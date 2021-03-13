@@ -222,12 +222,11 @@ public:
   }
 
   void print(raw_ostream &os, StringRef leading = "") const {
-    os << "Cross-reference to module '" << baseM.getName() << "'\n";
-    for (auto &piece : path) {
-      os << leading << "... ";
-      piece.print(os);
-      os << "\n";
-    }
+    os << "Cross-reference to '";
+    interleave(path,
+               [&](auto &piece) { piece.print(os); },
+               [&] { os << '.'; });
+    os << "' in module '" << baseM.getName() << "'\n";
   }
 };
 
@@ -369,9 +368,9 @@ public:
   }
 
   void log(raw_ostream &OS) const override {
-    OS << "could not deserialize type for '" << name << "'";
+    OS << "Could not deserialize type for '" << name << "'";
     if (underlyingReason) {
-      OS << ": ";
+      OS << "\nCaused by: ";
       underlyingReason->log(OS);
     }
   }
