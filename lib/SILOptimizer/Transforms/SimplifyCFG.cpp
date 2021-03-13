@@ -1058,10 +1058,13 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // given the duplication.
   int ThreadingBudget = 0;
 
-  for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+  for (unsigned i : indices(BI->getArgs())) {
+    SILValue Arg = BI->getArg(i);
+
     // If the value being substituted on is release there is a chance we could
     // remove the release after jump threading.
-    if (couldRemoveRelease(SrcBB, BI->getArg(i), DestBB,
+    if (!Arg->getType().isTrivial(*SrcBB->getParent()) &&
+        couldRemoveRelease(SrcBB, Arg, DestBB,
                            DestBB->getArgument(i))) {
         ThreadingBudget = 8;
         break;
@@ -1069,7 +1072,6 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
     // If the value being substituted is an enum, check to see if there are any
     // switches on it.
-    SILValue Arg = BI->getArg(i);
     if (!getEnumCase(Arg, BI->getParent()) &&
         !isa<IntegerLiteralInst>(Arg))
       continue;
