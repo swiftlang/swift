@@ -814,6 +814,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
   BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
+  BLOCK_RECORD(options_block, MODULE_ABI_NAME);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -999,6 +1000,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
             AllowErrors(Out);
         AllowErrors.emit(ScratchRecord);
+      }
+
+      if (M->getABIName() != M->getName()) {
+        options_block::ModuleABINameLayout ABIName(Out);
+        ABIName.emit(ScratchRecord, M->getABIName().str());
       }
 
       if (options.SerializeOptionsForDebugging) {

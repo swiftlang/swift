@@ -638,6 +638,7 @@ StringRef Decl::getAlternateModuleName() const {
       }
     }
   }
+  
   for (auto *DC = getDeclContext(); DC; DC = DC->getParent()) {
     if (auto decl = DC->getAsDecl()) {
       if (decl == this)

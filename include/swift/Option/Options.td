@@ -421,6 +421,9 @@ def module_link_name_EQ : Joined<["-"], "module-link-name=">,
 def autolink_force_load : Flag<["-"], "autolink-force-load">,
   Flags<[FrontendOption, ModuleInterfaceOption, HelpHidden]>,
   HelpText<"Force ld to link against this module even if no symbols are used">;
+def module_abi_name : Separate<["-"], "module-abi-name">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"ABI name to use for the contents of this module">;
 
 def emit_module : Flag<["-"], "emit-module">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
