@@ -341,6 +341,9 @@ protected:
   SWIFT_INLINE_BITFIELD(DestroyValueInst, NonValueInstruction, 1,
                         PoisonRefs : 1);
 
+  SWIFT_INLINE_BITFIELD(DebugValueInst, NonValueInstruction, 1,
+                        PoisonRefs : 1);
+
   SWIFT_INLINE_BITFIELD(EndCOWMutationInst, NonValueInstruction, 1,
     KeepUnique : 1
   );
