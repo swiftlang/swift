@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -I %t -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
+// REQUIRES: DNM
 
 import Builtin
 import Swift

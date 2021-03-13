@@ -4,6 +4,7 @@
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
+// REQUIRES: DNM
 
 import Builtin
 import Swift

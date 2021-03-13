@@ -211,7 +211,7 @@ PartialApplyLowerer::createThunkType(PartialApplyInst *instruction) {
   auto unadjusted =
       IGM.getLoweredType(ty).castTo<SILFunctionType>()->getWithExtInfo(
           SILExtInfoBuilder()
-              .withAsync()
+              .withAsync(calleeType->isAsync())
               .withRepresentation(SILFunctionTypeRepresentation::Thin)
               .build());
 
@@ -333,7 +333,7 @@ SILFunction *PartialApplyLowerer::createThunk(PartialApplyInst *instruction) {
 
 SILInstruction *
 PartialApplyLowerer::visitPartialApplyInst(PartialApplyInst *instruction) {
-  if (!instruction->getFunctionType()->isAsync()) {
+  if (instruction->getOrigCalleeType()->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     return nullptr;
   }
 
