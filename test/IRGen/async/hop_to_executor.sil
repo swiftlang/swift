@@ -39,7 +39,7 @@ bb0(%0 : $MyActor):
   return %3 : $()
 }
 
-// CHECK-LABEL: define internal swifttailcc void @__swift_suspend_point
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @__swift_suspend_point
 // CHECK-SAME:  (i8* %0, %swift.executor* %1, %swift.task* %2, %swift.executor* %3, %swift.context* [[CTXT:%[^,]+]])
 // CHECK:    [[RESUME_ADDR:%[0-9]+]] = getelementptr inbounds %swift.task, %swift.task* %2, i32 0, i32 4
 // CHECK:    store i8* %0, i8** [[RESUME_ADDR]]
