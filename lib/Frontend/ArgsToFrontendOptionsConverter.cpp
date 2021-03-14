@@ -220,6 +220,9 @@ bool ArgsToFrontendOptionsConverter::convert(
     return true;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_module_abi_name))
+    Opts.ModuleABIName = A->getValue();
+
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 

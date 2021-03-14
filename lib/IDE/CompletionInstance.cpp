@@ -464,6 +464,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
     auto &Ctx = oldM->getASTContext();
     auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
                                               oldM->getImplicitImportInfo());
+    newM->setABIName(oldM->getABIName());
     auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
                                        oldSF->getParsingOptions());
     newM->addFile(*newSF);

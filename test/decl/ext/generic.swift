@@ -149,7 +149,7 @@ extension Array where Element == String { }
 extension GenericClass : P3 where T : P3 { }
 
 extension GenericClass where Self : P3 { }
-// expected-error@-1{{covariant 'Self' can only appear as the possibly optional type of a property, subscript or method result; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
+// expected-error@-1{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
 // expected-error@-2{{'GenericClass<T>' in conformance requirement does not refer to a generic parameter or associated type}}
 
 protocol P4 {

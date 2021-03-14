@@ -3222,14 +3222,18 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
     // into a monomorphic function type.
     // FIXME: does this actually make sense, though?
     auto derivedInterfaceFuncTy = derivedInterfaceTy->castTo<AnyFunctionType>();
-    derivedInterfaceTy =
-        FunctionType::get(derivedInterfaceFuncTy->getParams(),
-                          derivedInterfaceFuncTy->getResult());
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo derivedInterfaceInfo;
+    derivedInterfaceTy = FunctionType::get(derivedInterfaceFuncTy->getParams(),
+                                           derivedInterfaceFuncTy->getResult(),
+                                           derivedInterfaceInfo);
     auto overrideInterfaceFuncTy =
         overrideInterfaceTy->castTo<AnyFunctionType>();
-    overrideInterfaceTy =
-        FunctionType::get(overrideInterfaceFuncTy->getParams(),
-                          overrideInterfaceFuncTy->getResult());
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo overrideInterfaceInfo;
+    overrideInterfaceTy = FunctionType::get(
+        overrideInterfaceFuncTy->getParams(),
+        overrideInterfaceFuncTy->getResult(), overrideInterfaceInfo);
   }
 
   if (!derivedInterfaceTy->isEqual(overrideInterfaceTy)) {
@@ -4062,9 +4066,14 @@ static bool checkFunctionSignature(
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
                  GenericSignature genericSignature) {
-  if (genericSignature)
-    return GenericFunctionType::get(genericSignature, parameters, resultType);
-  return FunctionType::get(parameters, resultType);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  if (genericSignature) {
+    GenericFunctionType::ExtInfo info;
+    return GenericFunctionType::get(genericSignature, parameters, resultType,
+                                    info);
+  }
+  FunctionType::ExtInfo info;
+  return FunctionType::get(parameters, resultType, info);
 }
 
 /// Computes the original function type corresponding to the given derivative

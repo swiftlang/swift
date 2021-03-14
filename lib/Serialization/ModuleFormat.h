@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 602; // noasync apply
+const uint16_t SWIFTMODULE_VERSION_MINOR = 603; // module ABI name
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -790,7 +790,8 @@ namespace options_block {
     RESILIENCE_STRATEGY,
     ARE_PRIVATE_IMPORTS_ENABLED,
     IS_IMPLICIT_DYNAMIC_ENABLED,
-    IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED
+    IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED,
+    MODULE_ABI_NAME,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -827,6 +828,11 @@ namespace options_block {
 
   using IsAllowModuleWithCompilerErrorsEnabledLayout = BCRecordLayout<
     IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED
+  >;
+
+  using ModuleABINameLayout = BCRecordLayout<
+    MODULE_ABI_NAME,
+    BCBlob
   >;
 }
 

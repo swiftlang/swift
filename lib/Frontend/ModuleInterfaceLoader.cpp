@@ -521,11 +521,11 @@ class ModuleInterfaceLoaderImpl {
     namespace path = llvm::sys::path;
     StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
 
-    // Check if the interface file comes from the SDK
-    if (sdkPath.empty() || !hasPrefix(path::begin(interfacePath),
-                                      path::end(interfacePath),
-                                      path::begin(sdkPath),
-                                      path::end(sdkPath)))
+    // Check if this is a public interface file from the SDK.
+    if (sdkPath.empty() ||
+        !hasPrefix(path::begin(interfacePath), path::end(interfacePath),
+                   path::begin(sdkPath), path::end(sdkPath)) ||
+        StringRef(interfacePath).endswith(".private.swiftinterface"))
       return None;
 
     // Assemble the expected path: $PREBUILT_CACHE/Foo.swiftmodule or
@@ -558,11 +558,11 @@ class ModuleInterfaceLoaderImpl {
     namespace path = llvm::sys::path;
     StringRef sdkPath = ctx.SearchPathOpts.SDKPath;
 
-    // Check if the interface file comes from the SDK
-    if (sdkPath.empty() || !hasPrefix(path::begin(interfacePath),
-                                      path::end(interfacePath),
-                                      path::begin(sdkPath),
-                                      path::end(sdkPath)))
+    // Check if this is a public interface file from the SDK.
+    if (sdkPath.empty() ||
+        !hasPrefix(path::begin(interfacePath), path::end(interfacePath),
+                   path::begin(sdkPath), path::end(sdkPath)) ||
+        StringRef(interfacePath).endswith(".private.swiftinterface"))
       return None;
 
     // If the module isn't target-specific, there's no fallback path.

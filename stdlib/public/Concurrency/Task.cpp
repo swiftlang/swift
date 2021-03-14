@@ -147,6 +147,11 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
 }
 
 SWIFT_CC(swift)
+static void destroyJob(SWIFT_CONTEXT HeapObject *obj) {
+  assert(false && "A non-task job should never be destroyed as heap metadata.");
+}
+
+SWIFT_CC(swift)
 static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   auto task = static_cast<AsyncTask*>(obj);
 
@@ -167,8 +172,27 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   free(task);
 }
 
+static void dummyVTableFunction(void) {
+  abort();
+}
+
+FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
+  {
+    {
+      &destroyJob
+    },
+    {
+      /*value witness table*/ nullptr
+    }
+  },
+  {
+    MetadataKind::Job,
+    dummyVTableFunction
+  }
+};
+
 /// Heap metadata for an asynchronous task.
-static FullMetadata<HeapMetadata> taskHeapMetadata = {
+static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   {
     {
       &destroyTask
@@ -178,7 +202,8 @@ static FullMetadata<HeapMetadata> taskHeapMetadata = {
     }
   },
   {
-    MetadataKind::Task
+    MetadataKind::Task,
+    dummyVTableFunction
   }
 };
 

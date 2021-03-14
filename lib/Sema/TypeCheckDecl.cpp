@@ -2400,10 +2400,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (hasSelf) {
       // Substitute in our own 'self' parameter.
       auto selfParam = computeSelfParam(AFD);
-      if (sig)
-        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy);
-      else
-        funcTy = FunctionType::get({selfParam}, funcTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      if (sig) {
+        GenericFunctionType::ExtInfo info;
+        funcTy = GenericFunctionType::get(sig, {selfParam}, funcTy, info);
+      } else {
+        FunctionType::ExtInfo info;
+        funcTy = FunctionType::get({selfParam}, funcTy, info);
+      }
     }
 
     return funcTy;
@@ -2418,10 +2422,14 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     SD->getIndices()->getParams(argTy);
 
     Type funcTy;
-    if (auto sig = SD->getGenericSignature())
-      funcTy = GenericFunctionType::get(sig, argTy, elementTy);
-    else
-      funcTy = FunctionType::get(argTy, elementTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    if (auto sig = SD->getGenericSignature()) {
+      GenericFunctionType::ExtInfo info;
+      funcTy = GenericFunctionType::get(sig, argTy, elementTy, info);
+    } else {
+      FunctionType::ExtInfo info;
+      funcTy = FunctionType::get(argTy, elementTy, info);
+    }
 
     return funcTy;
   }
@@ -2441,13 +2449,19 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       PL->getParams(argTy);
 
-      resultTy = FunctionType::get(argTy, resultTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      resultTy = FunctionType::get(argTy, resultTy, info);
     }
 
-    if (auto genericSig = ED->getGenericSignature())
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy);
-    else
-      resultTy = FunctionType::get({selfTy}, resultTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    if (auto genericSig = ED->getGenericSignature()) {
+      GenericFunctionType::ExtInfo info;
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy, info);
+    } else {
+      FunctionType::ExtInfo info;
+      resultTy = FunctionType::get({selfTy}, resultTy, info);
+    }
 
     return resultTy;
   }

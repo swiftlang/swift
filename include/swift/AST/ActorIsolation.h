@@ -65,12 +65,14 @@ public:
 private:
   Kind kind;
   union {
-    ClassDecl *actor;
+    NominalTypeDecl *actor;
     Type globalActor;
     void *pointer;
   };
 
-  ActorIsolation(Kind kind, ClassDecl *actor) : kind(kind), actor(actor) { }
+  ActorIsolation(Kind kind, NominalTypeDecl *actor)
+      : kind(kind), actor(actor) { }
+
   ActorIsolation(Kind kind, Type globalActor)
       : kind(kind), globalActor(globalActor) { }
 
@@ -93,7 +95,7 @@ public:
     return ActorIsolation(isoKind, nullptr);
   }
 
-  static ActorIsolation forActorInstance(ClassDecl *actor) {
+  static ActorIsolation forActorInstance(NominalTypeDecl *actor) {
     return ActorIsolation(ActorInstance, actor);
   }
 
@@ -108,7 +110,7 @@ public:
 
   bool isUnspecified() const { return kind == Unspecified; }
 
-  ClassDecl *getActor() const {
+  NominalTypeDecl *getActor() const {
     assert(getKind() == ActorInstance);
     return actor;
   }

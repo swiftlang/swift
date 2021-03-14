@@ -35,6 +35,7 @@ namespace syntax {
 % for node in SYNTAX_NODES:
 %   if not node.is_syntax_collection():
 class ${node.name};
+class ${node.name}Ref;
 %   end
 % end
 
@@ -43,6 +44,9 @@ class ${node.name};
 using ${node.name} =
   SyntaxCollection<SyntaxKind::${node.syntax_kind},
                    ${node.collection_element_type}>;
+using ${node.name}Ref =
+  SyntaxCollectionRef<SyntaxKind::${node.syntax_kind},
+                      ${node.collection_element_type}Ref>;
 %   end
 % end
 
@@ -56,9 +60,7 @@ class ${node.name} ${qualifier} : public ${node.base_type} {
 %     if node.is_buildable():
       friend class ${node.name}Builder;
 %     end
-%     if node.requires_validation():
   void validate() const;
-%     end
 
 public:
 %     if node.children:
@@ -70,10 +72,8 @@ public:
 %     end
 
   ${node.name}(const RC<const SyntaxData> &Data) : ${node.base_type}(Data) {
-%     if node.requires_validation():
-      this->validate();
-%     end
-    }
+    this->validate();
+  }
 
 %     for child in node.children:
 %       for line in dedented_lines(child.description):
@@ -124,12 +124,81 @@ public:
   }
 };
 
+/// See doc comment on \c SyntaxDataRef for more details.
+class ${node.name}Ref ${qualifier} : public ${node.base_type}Ref {
+  friend class ${node.name}; // Non-Ref node is a friend so it can call validate
+
+public:
+%     if node.children:
+  using Cursor = ${node.name}::Cursor; // Use same cursor as non-Ref node.
+%     end
+
+  explicit ${node.name}Ref(const SyntaxDataRef *Data) : ${node.base_type}Ref(Data) {
+    this->validate();
+  }
+
+  /// Create a \c ${node.name}Ref node, but don't validate it. Useful if the
+  /// underlying \c SyntaxDataRef is populated later.
+  /// \c validate should be called after \p Data has been populated.
+  ${node.name}Ref(const SyntaxDataRef *Data, no_validation_t) : ${node.base_type}Ref(Data) {}
+
+  /// Demote a \c ${node.name} node to a \c ${node.name}Ref node.
+  /// The \c ${node.name} node continues to hold the \c SyntaxData and must thus
+  /// outlive the \c ${node.name}Ref node.
+  ${node.name}Ref(const ${node.name} &Node) : ${node.base_type}Ref(Node.getData().get()) {}
+
+  /// Validate the syntax node. This is automatically done when creating a node
+  /// unless the \c no_validation_t marker is passed.
+  void validate() const;
+
+%     for child in node.children:
+%       for line in dedented_lines(child.description):
+  /// ${line}
+%       end
+%       if child.is_optional:
+  inline OptionalOwnedSyntaxRef<${child.type_name}Ref> get${child.name}() const;
+%       else:
+  inline OwnedSyntaxRef<${child.type_name}Ref> get${child.name}() const;
+%       end
+
+%     end
+  static bool kindof(SyntaxKind Kind) {
+%     if node.is_base():
+    return is${node.syntax_kind}Kind(Kind);
+%     else:
+    return Kind == SyntaxKind::${node.syntax_kind};
+%     end
+  }
+
+  static bool classof(const SyntaxRef *S) {
+    return kindof(S->getKind());
+  }
+};
 %   end
 % end
 
 /// Calculating an identifier for all syntax nodes' structures for verification
 /// purposes.
 const char* getSyntaxStructureVersioningIdentifier();
+
+% for node in SYNTAX_NODES:
+%   for child in node.children:
+%     if child.is_optional:
+OptionalOwnedSyntaxRef<${child.type_name}Ref> ${node.name}Ref::get${child.name}() const {
+  OptionalOwnedSyntaxRef<${child.type_name}Ref> Result;
+  getDataRef()->getChildRef(Cursor::${child.name}, Result.getDataPtr());
+  return Result;
+}
+%     else:
+OwnedSyntaxRef<${child.type_name}Ref> ${node.name}Ref::get${child.name}() const {
+  OwnedSyntaxRef<${child.type_name}Ref> Result;
+  getDataRef()->getPresentChildRef(Cursor::${child.name}, Result.getDataPtr());
+  return Result;
+}
+%     end
+%   end
+% end
+
 }
 }
 

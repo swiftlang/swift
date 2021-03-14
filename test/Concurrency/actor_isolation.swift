@@ -667,3 +667,27 @@ class SomeClassWithInits {
     }
   }
 }
+
+// ----------------------------------------------------------------------
+// Actor protocols.
+// ----------------------------------------------------------------------
+protocol P: Actor {
+  func f()
+}
+
+extension P {
+  func g() { f() }
+}
+
+actor MyActorP: P {
+  func f() { }
+
+  func h() { g() }
+}
+
+func testCrossActorProtocol<T: P>(t: T) async {
+  await t.f()
+  await t.g()
+  t.f() // expected-error{{call is 'async' but is not marked with 'await'}}
+  t.g() // expected-error{{call is 'async' but is not marked with 'await'}}
+}

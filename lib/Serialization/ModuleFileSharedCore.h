@@ -73,6 +73,9 @@ class ModuleFileSharedCore {
   /// include the version string of the compiler that built the module.
   StringRef MiscVersion;
 
+  /// The module ABI name.
+  StringRef ModuleABIName;
+
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
 

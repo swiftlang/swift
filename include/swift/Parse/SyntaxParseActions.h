@@ -27,11 +27,11 @@ namespace swift {
 class ParsedTriviaPiece;
 class SourceFile;
 class SourceLoc;
-enum class tok;
+enum class tok : uint8_t;
 
 namespace syntax {
 class SourceFileSyntax;
-enum class SyntaxKind;
+enum class SyntaxKind : uint16_t;
 }
 
 typedef const void *OpaqueSyntaxNode;
@@ -71,19 +71,16 @@ struct DeferredNodeInfo {
   syntax::SyntaxKind SyntaxKind;
   tok TokenKind;
   bool IsMissing;
-  CharSourceRange Range;
 
   DeferredNodeInfo(RecordedOrDeferredNode Data, syntax::SyntaxKind SyntaxKind,
-                   tok TokenKind, bool IsMissing, CharSourceRange Range)
+                   tok TokenKind, bool IsMissing)
       : Data(Data), SyntaxKind(SyntaxKind), TokenKind(TokenKind),
-        IsMissing(IsMissing), Range(Range) {}
+        IsMissing(IsMissing) {}
 };
 
 // MARK: - SyntaxParseActions
 
 class SyntaxParseActions {
-  llvm::BumpPtrAllocator DeferredNodeAllocator;
-
   virtual void _anchor();
 
 public:
@@ -111,40 +108,52 @@ public:
                                              StringRef leadingTrivia,
                                              StringRef trailingTrivia,
                                              CharSourceRange range,
-                                             bool isMissing);
+                                             bool isMissing) = 0;
 
   /// Create a deferred layout node that may or may not be recorded later using
   /// \c recordDeferredLayout. The \c SyntaxParseAction is responsible for
   /// keeping the deferred token alive until it is destructed.
   virtual OpaqueSyntaxNode
   makeDeferredLayout(syntax::SyntaxKind k, bool isMissing,
-                     const ArrayRef<RecordedOrDeferredNode> &children);
+                     const ArrayRef<RecordedOrDeferredNode> &children) = 0;
 
   /// Record a deferred token node that was previously created using \c
   /// makeDeferredToken. The deferred data will never be used again, so it can
   /// be destroyed by this method. Note that not all deferred nodes will be
   /// recorded and that pending deferred nodes need to be freed when the \c
   /// SyntaxParseActions is destructed.
-  virtual OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred);
+  virtual OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) = 0;
 
   /// Record a deferred layout node. See recordDeferredToken.
-  virtual OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred);
+  virtual OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) = 0;
 
   /// Since most data of \c ParsedRawSyntax is described as opaque data, the
   /// \c ParsedRawSyntax node needs to reach out to the \c SyntaxParseAction,
   /// which created it, to retrieve children.
   /// This method assumes that \p node represents a *deferred* layout node.
   /// This methods returns all information needed to construct a \c
-  /// ParsedRawSyntaxNode of a child node. \p node is the parent node for which
-  /// the child at position \p ChildIndex should be retrieved. Furthmore, \p
-  /// node starts at \p StartLoc.
+  /// ParsedRawSyntaxNode of a child node, except for the range which can be
+  /// retrieved using \c getDeferredChildRange if element ranges should be
+  /// verified
+  /// \p node is the parent node for which the child at position \p ChildIndex
+  /// should be retrieved. Furthmore, \p node starts at \p StartLoc.
   virtual DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
-                                            size_t childIndex,
-                                            SourceLoc startLoc);
+                                            size_t childIndex) const = 0;
+
+  /// To verify \c ParsedRawSyntaxNode element ranges, the range of child nodes
+  /// returend by \c getDeferredChild needs to be determined. That's what this
+  /// method does.
+  /// It assumes that \p node is a deferred layout node starting at \p startLoc
+  /// and returns the range of the child node at \p childIndex.
+  /// This method is not designed with performance in mind. Do not use in
+  /// performance-critical code.
+  virtual CharSourceRange getDeferredChildRange(OpaqueSyntaxNode node,
+                                                size_t childIndex,
+                                                SourceLoc startLoc) const = 0;
 
   /// Return the number of children, \p node has. These can be retrieved using
   /// \c getDeferredChild.
-  virtual size_t getDeferredNumChildren(OpaqueSyntaxNode node);
+  virtual size_t getDeferredNumChildren(OpaqueSyntaxNode node) = 0;
 
   /// Attempt to realize an opaque raw syntax node for a source file into a
   /// SourceFileSyntax node. This will return \c None if the parsing action

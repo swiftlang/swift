@@ -236,7 +236,31 @@ bool CanBeAsyncHandlerRequest::evaluate(
 }
 
 bool IsActorRequest::evaluate(
-    Evaluator &evaluator, ClassDecl *classDecl) const {
+    Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  // Protocols are actors if their `Self` type conforms to `Actor`.
+  if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
+    // Simple case: we have the Actor protocol itself.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Actor))
+      return true;
+
+    auto actorProto = nominal->getASTContext().getProtocol(
+        KnownProtocolKind::Actor);
+    if (!actorProto)
+      return false;
+
+    auto selfType = Type(protocol->getProtocolSelfType());
+    auto genericSig = protocol->getGenericSignature();
+    if (!genericSig)
+      return false;
+
+    return genericSig->requiresProtocol(selfType, actorProto);
+  }
+
+  // Class declarations are actors if they were declared with "actor".
+  auto classDecl = dyn_cast<ClassDecl>(nominal);
+  if (!classDecl)
+    return false;
+
   bool isExplicitActor = classDecl->isExplicitActor() ||
     classDecl->getAttrs().getAttribute<ActorAttr>();
 
@@ -1242,21 +1266,9 @@ namespace {
         }
       }
 
-      // Key paths require any captured values to be ConcurrentValue-conforming.
-      if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
-        for (const auto &component : keyPath->getComponents()) {
-          auto indexExpr = component.getIndexExpr();
-          if (!indexExpr || !indexExpr->getType())
-            continue;
 
-          if (shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts) &&
-              !isConcurrentValueType(getDeclContext(), indexExpr->getType())) {
-            ctx.Diags.diagnose(
-                component.getLoc(), diag::non_concurrent_keypath_capture,
-                indexExpr->getType());
-          }
-        }
-      }
+      if (auto keyPath = dyn_cast<KeyPathExpr>(expr))
+        checkKeyPathExpr(keyPath);
 
       // The children of #selector expressions are not evaluated, so we do not
       // need to do isolation checking there. This is convenient because such
@@ -1362,12 +1374,14 @@ namespace {
     }
 
     // Retrieve the nearest enclosing actor context.
-    static ClassDecl *getNearestEnclosingActorContext(const DeclContext *dc) {
+    static NominalTypeDecl *getNearestEnclosingActorContext(
+        const DeclContext *dc) {
       while (!dc->isModuleScopeContext()) {
         if (dc->isTypeContext()) {
-          if (auto classDecl = dc->getSelfClassDecl()) {
-            if (classDecl->isActor())
-              return classDecl;
+          // FIXME: Protocol extensions need specific handling here.
+          if (auto nominal = dc->getSelfNominalTypeDecl()) {
+            if (nominal->isActor())
+              return nominal;
           }
         }
 
@@ -1842,6 +1856,89 @@ namespace {
       return true;
     }
 
+    ///
+    /// \return true iff a diagnostic was emitted
+    bool checkKeyPathExpr(KeyPathExpr *keyPath) {
+      bool diagnosed = false;
+
+      // returns None if it is not a 'let'-bound var decl. Otherwise,
+      // the bool indicates whether a diagnostic was emitted.
+      auto checkLetBoundVarDecl = [&](KeyPathExpr::Component const& component)
+                                                            -> Optional<bool> {
+        auto decl = component.getDeclRef().getDecl();
+        if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+          if (varDecl->isLet()) {
+            auto type = component.getComponentType();
+            if (shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts)
+                && !isConcurrentValueType(getDeclContext(), type)) {
+              ctx.Diags.diagnose(
+                  component.getLoc(), diag::non_concurrent_keypath_access,
+                  type);
+              return true;
+            }
+            return false;
+          }
+        }
+        return None;
+      };
+
+      // check the components of the keypath.
+      for (const auto &component : keyPath->getComponents()) {
+        // The decl referred to by the path component cannot be within an actor.
+        if (component.hasDeclRef()) {
+          auto concDecl = component.getDeclRef();
+          auto isolation = ActorIsolationRestriction::forDeclaration(concDecl);
+
+          switch (isolation.getKind()) {
+          case ActorIsolationRestriction::Unsafe:
+          case ActorIsolationRestriction::Unrestricted:
+            break; // OK. Does not refer to an actor-isolated member.
+
+          case ActorIsolationRestriction::GlobalActorUnsafe:
+            // Only check if we're in code that's adopted concurrency features.
+            if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
+              break; // do not check
+
+            LLVM_FALLTHROUGH; // otherwise, perform checking
+
+          case ActorIsolationRestriction::GlobalActor:
+          case ActorIsolationRestriction::CrossActorSelf:
+            // 'let'-bound decls with this isolation are OK, just check them.
+            if (auto wasLetBound = checkLetBoundVarDecl(component)) {
+              diagnosed = wasLetBound.getValue();
+              break;
+            }
+            LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
+
+          case ActorIsolationRestriction::ActorSelf: {
+            auto decl = concDecl.getDecl();
+            ctx.Diags.diagnose(component.getLoc(),
+                               diag::actor_isolated_keypath_component,
+                               decl->getDescriptiveKind(), decl->getName());
+            diagnosed = true;
+            break;
+          }
+          }; // end switch
+        }
+
+        // Captured values in a path component must conform to ConcurrentValue.
+        // These captured values appear in Subscript, aka "index" components,
+        // such as \Type.dict[k] where k is a captured dictionary key.
+        if (auto indexExpr = component.getIndexExpr()) {
+          auto type = indexExpr->getType();
+          if (type && shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts)
+              && !isConcurrentValueType(getDeclContext(), type)) {
+            ctx.Diags.diagnose(
+                component.getLoc(), diag::non_concurrent_keypath_capture,
+                indexExpr->getType());
+            diagnosed = true;
+          }
+        }
+      }
+
+      return diagnosed;
+    }
+
     /// Check a reference to a local or global.
     bool checkNonMemberReference(
         ConcreteDeclRef valueRef, SourceLoc loc, DeclRefExpr *declRefExpr) {
@@ -1967,7 +2064,7 @@ namespace {
               memberLoc, diag::actor_isolated_non_self_reference,
               member->getDescriptiveKind(),
               member->getName(),
-              isolation.getActorClass() ==
+              isolation.getActorType() ==
                 getNearestEnclosingActorContext(getDeclContext()),
               useKind
               );
@@ -2331,8 +2428,17 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
         continue;
 
       auto requirementIsolation = getActorIsolation(requirement);
-      if (requirementIsolation.isUnspecified())
+      switch (requirementIsolation) {
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::Unspecified:
         continue;
+
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+        break;
+      }
 
       auto witness = conformance->getWitnessDecl(requirement);
       if (witness != value)
@@ -2422,12 +2528,13 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Check for instance members and initializers of actor classes,
+  // Check for instance members and initializers of actor types,
   // which are part of actor-isolated state.
-  auto classDecl = value->getDeclContext()->getSelfClassDecl();
-  if (classDecl && classDecl->isActor() &&
-      (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
-    defaultIsolation = ActorIsolation::forActorInstance(classDecl);
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
+    if (nominal->isActor() &&
+        (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
+      defaultIsolation = ActorIsolation::forActorInstance(nominal);
+    }
   }
 
   // Function used when returning an inferred isolation.

@@ -968,8 +968,8 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
       // Disable this tentative parse when in code-completion mode, otherwise
       // code-completion may enter the delayed-decl state twice.
       if (Tok.isFollowingLParen() && !L->isCodeCompletion()) {
-        BacktrackingScope backtrack(*this);
-        
+        CancellableBacktrackingScope backtrack(*this);
+
         // Create a local context if needed so we can parse trailing closures.
         LocalContext dummyContext;
         Optional<ContextChange> contextChange;

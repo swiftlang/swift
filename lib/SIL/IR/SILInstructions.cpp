@@ -291,15 +291,17 @@ SILType AllocBoxInst::getAddressType() const {
 }
 
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                               SILDebugVariable Var)
+                               SILDebugVariable Var, bool poisonRefs)
     : UnaryInstructionBase(DebugLoc, Operand),
-      VarInfo(Var, getTrailingObjects<char>()) {}
+      VarInfo(Var, getTrailingObjects<char>()) {
+    setPoisonRefs(poisonRefs);
+  }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
                                        SILValue Operand, SILModule &M,
-                                       SILDebugVariable Var) {
+                                       SILDebugVariable Var, bool poisonRefs) {
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
-  return ::new (buf) DebugValueInst(DebugLoc, Operand, Var);
+  return ::new (buf) DebugValueInst(DebugLoc, Operand, Var, poisonRefs);
 }
 
 DebugValueAddrInst::DebugValueAddrInst(SILDebugLocation DebugLoc,

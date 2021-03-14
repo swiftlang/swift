@@ -3047,15 +3047,15 @@ struct Pair<T : Comparable> : Comparable {
 
   var first: T
   var second: T
-}
 
-func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return lhs.first == rhs.first && lhs.second == rhs.second
-}
+  static func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+    return lhs.first == rhs.first && lhs.second == rhs.second
+  }
 
-func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
-  return [lhs.first, lhs.second].lexicographicallyPrecedes(
-    [rhs.first, rhs.second])
+  static func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+    return [lhs.first, lhs.second].lexicographicallyPrecedes(
+      [rhs.first, rhs.second])
+  }
 }
 
 public func expectEqualsUnordered<

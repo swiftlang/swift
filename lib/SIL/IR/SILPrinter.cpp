@@ -1502,6 +1502,8 @@ public:
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
+    if (DVI->poisonRefs())
+      *this << "[poison] ";
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo());
   }
