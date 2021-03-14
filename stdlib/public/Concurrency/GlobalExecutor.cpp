@@ -88,7 +88,7 @@ static DelayedJob *DelayedJobQueue = nullptr;
 
 /// Get the next-in-queue storage slot.
 static Job *&nextInQueue(Job *cur) {
-  return reinterpret_cast<Job*&>(&cur->SchedulerPrivate[NextWaitingTaskIndex]);
+  return reinterpret_cast<Job*&>(cur->SchedulerPrivate);
 }
 
 /// Insert a job into the cooperative global queue.
