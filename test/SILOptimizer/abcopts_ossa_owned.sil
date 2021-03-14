@@ -143,6 +143,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   // Not redundant same index and array but append in between.
   %17 = function_ref @append : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   %18 = alloc_stack $Int32
+  store %i2 to [trivial] %18 : $*Int32
   %19 = apply %17(%18, %0) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   %copy2_10 = copy_value %2 : $ArrayInt
   %20 = apply %func(%i1, %102, %copy2_10) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken
@@ -377,6 +378,7 @@ bb2:
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
   %117 = function_ref @append : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   %118 = alloc_stack $Int32
+  store %0 to [trivial] %118 : $*Int32
   %119 = apply %117(%118, %24) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   %121 = load [copy] %24 : $*ArrayInt
   %120 = apply %52(%37, %101, %121) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> _DependenceToken

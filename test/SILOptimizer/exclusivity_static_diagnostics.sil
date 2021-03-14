@@ -527,7 +527,7 @@ bb0(%0 : $*(Int, Int)):
 // This only happens when mandatory passes are applied repeatedly.
 //
 // CHECK-LABEL: sil hidden [ossa] @inlinedEnumValue
-sil hidden [ossa] @inlinedEnumValue : $@convention(thin) (Int) -> (@out Optional<Int>, Int) {
+sil hidden [ossa] @inlinedEnumValue : $@convention(thin) (@in Optional<Int>, Int) -> Int {
 bb0(%0 : $*Optional<Int>, %1 : $Int):
   %6 = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt
   %7 = begin_access [read] [static] %6 : $*Int

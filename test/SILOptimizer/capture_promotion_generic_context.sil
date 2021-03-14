@@ -96,6 +96,7 @@ bb1(%f : $@callee_guaranteed @substituted <A, B> (@in_guaranteed A) -> @out B fo
 
 bb2(%default : @guaranteed $E<(R<T>)->Int>):
   end_borrow %e : $E<(R<T>)->Int>
+  copy_addr %1 to %result : $*Int
   br exit
 
 exit:
@@ -113,7 +114,7 @@ exit:
 // CHECK-NEXT:    retain_value %3
 // CHECK-NEXT:    return [[CLOSURE]]
 // CHECK: } // end sil function 'call_generic_promotable_box_from_different_generic2'
-sil [ossa] @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in_guaranteed R<T>, @in_guaranteed E<(R<U>)->Int>, @in_guaranteed Int) -> @owned @callee_guaranteed (@in_guaranteed R<U>) -> @out Int {
+sil [ossa] @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in_guaranteed R<T>, @in_guaranteed E<(R<U>)->Int>, @in Int) -> @owned @callee_guaranteed (@in_guaranteed R<U>) -> @out Int {
 entry(%0 : $*R<T>, %1 : $*E<(R<U>)->Int>, %2 : $*Int):
   %f = function_ref @generic_promotable_box2 : $@convention(thin) <V> (@in_guaranteed R<V>, @in_guaranteed Int, @guaranteed <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> @out Int
   %b = alloc_box $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>
