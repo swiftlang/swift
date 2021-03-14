@@ -390,7 +390,7 @@ public:
     }
 
     /// Retrieve the error.
-    SwiftError *&getError() { return *&error; }
+    SwiftError *&getError() { return error; }
 
     /// Compute the offset of the storage from the base of the future
     /// fragment.
@@ -549,8 +549,6 @@ public:
 /// futures.
 class FutureAsyncContext : public AsyncContext {
 public:
-  SwiftError **errorResult = nullptr;
-
   using AsyncContext::AsyncContext;
 };
 
@@ -565,13 +563,20 @@ using AsyncGenericClosureEntryPoint =
     void(OpaqueValue *,
          SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
 
+/// This matches the ABI of the resume function of a closure
+///  `() async throws -> ()`.
+using AsyncVoidClosureResumeEntryPoint =
+  SWIFT_CC(swiftasync)
+  void(SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT SwiftError *);
+
 class AsyncContextPrefix {
 public:
   // Async closure entry point adhering to compiler calling conv (e.g directly
   // passing the closure context instead of via the async context)
   AsyncVoidClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
-  HeapObject *closureContext;
+   HeapObject *closureContext;
+  SwiftError *errorResult;
 };
 
 /// Storage that is allocated before the AsyncContext to be used by an adapter
@@ -584,6 +589,7 @@ public:
   AsyncGenericClosureEntryPoint *__ptrauth_swift_task_resume_function
       asyncEntryPoint;
   HeapObject *closureContext;
+  SwiftError *errorResult;
 };
 
 } // end namespace swift

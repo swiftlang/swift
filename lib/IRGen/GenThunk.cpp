@@ -138,13 +138,7 @@ void IRGenThunk::prepareArguments() {
 
   if (origTy->hasErrorResult()) {
     if (isAsync) {
-      auto context = asyncLayout->emitCastTo(IGF, IGF.getAsyncContext());
-      auto errorLayout = asyncLayout->getErrorLayout();
-      Address pointerToAddress =
-          errorLayout.project(IGF, context, /*offsets*/ llvm::None);
-      auto load = IGF.Builder.CreateLoad(pointerToAddress);
-      auto addr = Address(load, IGF.IGM.getPointerAlignment());
-      IGF.setCallerErrorResultSlot(addr.getAddress());
+      // nothing to do.
     } else {
       errorResult = original.takeLast();
       IGF.setCallerErrorResultSlot(errorResult);
@@ -316,12 +310,11 @@ void IRGenThunk::emit() {
 
   emission->end();
 
-  if (isAsync && errorValue) {
-    IGF.Builder.CreateStore(errorValue, IGF.getCallerErrorResultSlot());
-  }
-
   if (isAsync) {
-    emitAsyncReturn(IGF, *asyncLayout, directResultType, origTy, result);
+    Explosion error;
+    if (errorValue)
+      error.add(errorValue);
+    emitAsyncReturn(IGF, *asyncLayout, directResultType, origTy, result, error);
     return;
   }
 

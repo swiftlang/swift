@@ -37,7 +37,8 @@ using undeduced =
 
 template <class T>
 SWIFT_CC(swiftasync)
-static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context,
+                                     SWIFT_CONTEXT HeapObject *) {
   auto valueContext = static_cast<ValueContext<T>*>(context);
   valueContext->StoredInvokeFn(valueContext);
 
@@ -47,7 +48,7 @@ static void simpleTaskInvokeFunction(SWIFT_ASYNC_CONTEXT AsyncContext *context) 
   // Return to finish off the task.
   // In a normal situation we'd need to free the context, but here
   // we know we're at the top level.
-  valueContext->ResumeParent(valueContext->Parent);
+  valueContext->ResumeParent(valueContext);
 }
 
 template <class T>
@@ -55,8 +56,10 @@ static void withSimpleTask(JobFlags flags, T &&value,
                            undeduced<InvokeFunctionRef<T>> invokeFn,
                            BodyFunctionRef body) {
   auto taskAndContext =
-    swift_task_create_f(flags, &simpleTaskInvokeFunction<T>,
-                        sizeof(ValueContext<T>));
+      swift_task_create_f(flags,
+                          reinterpret_cast<TaskContinuationFunction *>(
+                              &simpleTaskInvokeFunction<T>),
+                          sizeof(ValueContext<T>));
 
   auto valueContext =
     static_cast<ValueContext<T>*>(taskAndContext.InitialContext);
