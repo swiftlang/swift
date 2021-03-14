@@ -15,9 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/APIDigester/ModuleDiagsConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
-#include "swift/APIDigester/ModuleDiagsConsumer.h"
+#include "swift/Basic/SourceManager.h"
 
 using namespace swift;
 
@@ -81,6 +82,81 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Others */";
   }
 }
+
+static StringRef getSerializedIdentifier(uint32_t ID) {
+  switch (ID) {
+  case LocalDiagID::removed_decl:
+    return "removedDecl";
+  case LocalDiagID::moved_decl:
+    return "movedDecl";
+  case LocalDiagID::decl_kind_changed:
+    return "declKindChanged";
+  case LocalDiagID::renamed_decl:
+    return "renamedDecl";
+  case LocalDiagID::objc_name_change:
+    return "objcNameChange";
+  case LocalDiagID::decl_attr_change:
+    return "declAttrChange";
+  case LocalDiagID::decl_new_attr:
+    return "declNewAttr";
+  case LocalDiagID::func_self_access_change:
+    return "funcSelfAccessChange";
+  case LocalDiagID::new_decl_without_intro:
+    return "newDeclWithoutIntro";
+  case LocalDiagID::default_arg_removed:
+    return "defaultArgRemoved";
+  case LocalDiagID::decl_type_change:
+    return "declTypeChange";
+  case LocalDiagID::func_type_escaping_changed:
+    return "funcTypeEscapingChanged";
+  case LocalDiagID::param_ownership_change:
+    return "paramOwnershipChange";
+  case LocalDiagID::type_witness_change:
+    return "typeWitnessChange";
+  case LocalDiagID::raw_type_change:
+    return "rawTypeChange";
+  case LocalDiagID::generic_sig_change:
+    return "genericSigChange";
+  case LocalDiagID::enum_case_added:
+    return "enumCaseAdded";
+  case LocalDiagID::decl_added:
+    return "declAdded";
+  case LocalDiagID::decl_reorder:
+    return "declReorder";
+  case LocalDiagID::var_has_fixed_order_change:
+    return "varHasFixedOrderChange";
+  case LocalDiagID::func_has_fixed_order_change:
+    return "funcHasFixedOrderChange";
+  case LocalDiagID::conformance_added:
+    return "conformanceAdded";
+  case LocalDiagID::conformance_removed:
+    return "conformanceRemoved";
+  case LocalDiagID::optional_req_changed:
+    return "optionalReqChanged";
+  case LocalDiagID::existing_conformance_added:
+    return "existingConformanceAdded";
+  case LocalDiagID::default_associated_type_removed:
+    return "defaultAssociatedTypeRemoved";
+  case LocalDiagID::protocol_req_added:
+    return "protocolReqAdded";
+  case LocalDiagID::decl_new_witness_table_entry:
+    return "declNewWitnessTableEntry";
+  case LocalDiagID::super_class_removed:
+    return "superClassRemoved";
+  case LocalDiagID::super_class_changed:
+    return "superClassChanged";
+  case LocalDiagID::no_longer_open:
+    return "noLongerOpen";
+  case LocalDiagID::desig_init_added:
+    return "desigInitAdded";
+  case LocalDiagID::added_invisible_designated_init:
+    return "addedInvisibleDesignatedInit";
+  case LocalDiagID::not_inheriting_convenience_inits:
+    return "notInheritingConvenienceInits";
+  default:
+    return "other";
+  }
+}
 }
 
 swift::ide::api::
@@ -121,6 +197,45 @@ swift::ide::api::ModuleDifferDiagsConsumer::~ModuleDifferDiagsConsumer() {
       OS << Item << "\n";
     }
   }
+}
+
+void swift::ide::api::ModuleDifferDiagnosticInfo::serialize(
+    llvm::json::OStream &JSON) {
+  JSON.object([&]() {
+    JSON.attribute("identifier", getSerializedIdentifier((uint32_t)ID));
+    JSON.attribute("text", Text);
+  });
+}
+
+void swift::ide::api::ModuleDifferDiagsJSONConsumer::handleDiagnostic(
+    SourceManager &SM, const DiagnosticInfo &Info) {
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
+  }
+
+  AllDiags.push_back(ModuleDifferDiagnosticInfo(Info.ID, Text));
+}
+
+swift::ide::api::ModuleDifferDiagsJSONConsumer::
+    ~ModuleDifferDiagsJSONConsumer() {
+  llvm::json::OStream JSON(OS, 2);
+
+  JSON.object([&]() {
+    JSON.attributeObject("version", [&]() {
+      JSON.attribute("major", 0);
+      JSON.attribute("minor", 1);
+    });
+    JSON.attributeArray("diagnostics", [&]() {
+      for (auto &Info : AllDiags) {
+        Info.serialize(JSON);
+      }
+    });
+  });
+
+  JSON.flush();
 }
 
 bool swift::ide::api::

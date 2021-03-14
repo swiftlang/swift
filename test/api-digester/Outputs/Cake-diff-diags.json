@@ -1,0 +1,220 @@
+{
+  "version": {
+    "major": 0,
+    "minor": 1
+  },
+  "diagnostics": [
+    {
+      "identifier": "declTypeChange",
+      "text": "cake: Constructor S1.init(_:) has parameter 0 type change from Swift.Int to Swift.Double"
+    },
+    {
+      "identifier": "funcSelfAccessChange",
+      "text": "cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating"
+    },
+    {
+      "identifier": "declNewAttr",
+      "text": "cake: Func S1.foo3() is now static"
+    },
+    {
+      "identifier": "declNewAttr",
+      "text": "cake: Func C1.foo1() is now not static"
+    },
+    {
+      "identifier": "declTypeChange",
+      "text": "cake: Func C1.foo2(_:) has parameter 0 type change from Swift.Int to () -> ()"
+    },
+    {
+      "identifier": "declAttrChange",
+      "text": "cake: Var C1.CIIns1 changes from weak to strong"
+    },
+    {
+      "identifier": "declAttrChange",
+      "text": "cake: Var C1.CIIns2 changes from strong to weak"
+    },
+    {
+      "identifier": "superClassChanged",
+      "text": "cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType"
+    },
+    {
+      "identifier": "declNewAttr",
+      "text": "cake: Enum IceKind is now without @frozen"
+    },
+    {
+      "identifier": "conformanceRemoved",
+      "text": "cake: Enum IceKind has removed conformance to Sendable"
+    },
+    {
+      "identifier": "genericSigChange",
+      "text": "cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>"
+    },
+    {
+      "identifier": "conformanceRemoved",
+      "text": "cake: Struct fixedLayoutStruct has removed conformance to P1"
+    },
+    {
+      "identifier": "enumCaseAdded",
+      "text": "cake: EnumElement FrozenKind.AddedCase has been added as a new enum case"
+    },
+    {
+      "identifier": "defaultArgRemoved",
+      "text": "cake: Func C7.foo(_:_:) has removed default argument from parameter 0"
+    },
+    {
+      "identifier": "defaultArgRemoved",
+      "text": "cake: Func C7.foo(_:_:) has removed default argument from parameter 1"
+    },
+    {
+      "identifier": "genericSigChange",
+      "text": "cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>"
+    },
+    {
+      "identifier": "conformanceRemoved",
+      "text": "cake: Protocol P3 has removed inherited protocol P2"
+    },
+    {
+      "identifier": "conformanceAdded",
+      "text": "cake: Protocol P3 has added inherited protocol P4"
+    },
+    {
+      "identifier": "defaultAssociatedTypeRemoved",
+      "text": "cake: AssociatedType AssociatedTypePro.T1 has removed default type Swift.Int"
+    },
+    {
+      "identifier": "declTypeChange",
+      "text": "cake: AssociatedType AssociatedTypePro.T3 has default type change from cake.C1 to cake.C6"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Accessor RemoveSetters.Value.Set() has been removed"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Accessor RemoveSetters.subscript(_:).Set() has been removed"
+    },
+    {
+      "identifier": "protocolReqAdded",
+      "text": "cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement"
+    },
+    {
+      "identifier": "protocolReqAdded",
+      "text": "cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement"
+    },
+    {
+      "identifier": "protocolReqAdded",
+      "text": "cake: Var RequiementChanges.addedVar has been added as a protocol requirement"
+    },
+    {
+      "identifier": "superClassRemoved",
+      "text": "cake: Class SuperClassRemoval has removed its super class cake.C3"
+    },
+    {
+      "identifier": "notInheritingConvenienceInits",
+      "text": "cake: Class SuperClassRemoval no longer inherits convenience inits from its superclass"
+    },
+    {
+      "identifier": "declKindChanged",
+      "text": "cake: Class ClassToStruct has been changed to a Struct"
+    },
+    {
+      "identifier": "desigInitAdded",
+      "text": "cake: Constructor ClassWithMissingDesignatedInits.init() has been added as a designated initializer to an open class"
+    },
+    {
+      "identifier": "declKindChanged",
+      "text": "cake: Protocol ProtocolToEnum has been changed to a Enum"
+    },
+    {
+      "identifier": "superClassChanged",
+      "text": "cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>"
+    },
+    {
+      "identifier": "optionalReqChanged",
+      "text": "cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Accessor GlobalVarChangedToLet.Set() has been removed"
+    },
+    {
+      "identifier": "noLongerOpen",
+      "text": "cake: Func ClassWithOpenMember.foo() is no longer open for subclassing"
+    },
+    {
+      "identifier": "noLongerOpen",
+      "text": "cake: Var ClassWithOpenMember.property is no longer open for subclassing"
+    },
+    {
+      "identifier": "noLongerOpen",
+      "text": "cake: Accessor ClassWithOpenMember.property.Get() is no longer open for subclassing"
+    },
+    {
+      "identifier": "noLongerOpen",
+      "text": "cake: Func ClassWithOpenMember.bar() is no longer open for subclassing"
+    },
+    {
+      "identifier": "declKindChanged",
+      "text": "cake: InfixOperator ..*.. has been changed to a PrefixOperator"
+    },
+    {
+      "identifier": "paramOwnershipChange",
+      "text": "cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default"
+    },
+    {
+      "identifier": "paramOwnershipChange",
+      "text": "cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned"
+    },
+    {
+      "identifier": "declTypeChange",
+      "text": "cake: TypeAlias TChangesFromIntToString.T has underlying type change from Swift.Int to Swift.String"
+    },
+    {
+      "identifier": "funcSelfAccessChange",
+      "text": "cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating"
+    },
+    {
+      "identifier": "objcNameChange",
+      "text": "cake: Class SwiftObjcClass has ObjC name change from OldObjCClass to NewObjCClass"
+    },
+    {
+      "identifier": "objcNameChange",
+      "text": "cake: Func SwiftObjcClass.foo(a:b:c:) has ObjC name change from OldObjCFool:OldObjCA:OldObjCB: to NewObjCFool:NewObjCA:NewObjCB:"
+    },
+    {
+      "identifier": "desigInitAdded",
+      "text": "cake: Constructor AddingNewDesignatedInit.init(_:) has been added as a designated initializer to an open class"
+    },
+    {
+      "identifier": "renamedDecl",
+      "text": "cake: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Constructor Somestruct2.init(_:) has been removed"
+    },
+    {
+      "identifier": "renamedDecl",
+      "text": "cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Func C4.foo() has been removed"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Func RequiementChanges.removedFunc() has been removed"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: AssociatedType RequiementChanges.removedType has been removed"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Var RequiementChanges.removedVar has been removed"
+    },
+    {
+      "identifier": "removedDecl",
+      "text": "cake: Func Int.IntEnhancer() has been removed"
+    }
+  ]
+}

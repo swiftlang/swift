@@ -23,6 +23,8 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/raw_ostream.h"
 #include <set>
 
@@ -39,6 +41,27 @@ public:
   ModuleDifferDiagsConsumer(bool DiagnoseModuleDiff,
                             llvm::raw_ostream &OS = llvm::errs());
   ~ModuleDifferDiagsConsumer();
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
+};
+
+struct ModuleDifferDiagnosticInfo {
+  DiagID ID;
+  llvm::SmallString<256> Text;
+
+  ModuleDifferDiagnosticInfo(DiagID ID, llvm::SmallString<256> Text)
+      : ID(ID), Text(Text) {}
+
+  void serialize(llvm::json::OStream &JSON);
+};
+
+/// Diagnostic consumer that outputs module differ diags as JSON.
+class ModuleDifferDiagsJSONConsumer : public DiagnosticConsumer {
+  llvm::raw_ostream &OS;
+  std::vector<ModuleDifferDiagnosticInfo> AllDiags;
+
+public:
+  ModuleDifferDiagsJSONConsumer(llvm::raw_ostream &OS) : OS(OS){};
+  ~ModuleDifferDiagsJSONConsumer();
   void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 };
 

@@ -2327,6 +2327,9 @@ createDiagConsumer(llvm::raw_ostream &OS, bool &FailOnError) {
   } else if (options::CompilerStyleDiags) {
     FailOnError = true;
     return std::make_unique<PrintingDiagnosticConsumer>();
+  } else if (options::OutputInJson) {
+    FailOnError = false;
+    return std::make_unique<ModuleDifferDiagsJSONConsumer>(OS);
   } else {
     FailOnError = false;
     return std::make_unique<ModuleDifferDiagsConsumer>(true, OS);
