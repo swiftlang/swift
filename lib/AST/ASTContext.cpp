@@ -164,6 +164,9 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
+  /// The set of top-level modules we have loaded, indexed by ABI name.
+  llvm::MapVector<Identifier, ModuleDecl *> LoadedModulesByABIName;
+
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
@@ -3245,18 +3248,19 @@ static void profileParams(llvm::FoldingSetNodeID &ID,
 }
 
 void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
-                           ArrayRef<AnyFunctionType::Param> params,
-                           Type result,
-                           ExtInfo info) {
+                           ArrayRef<AnyFunctionType::Param> params, Type result,
+                           Optional<ExtInfo> info) {
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  auto infoKey = info.getFuncAttrKey();
-  ID.AddInteger(infoKey.first);
-  ID.AddPointer(infoKey.second);
+  if (info.hasValue()) {
+    auto infoKey = info.getValue().getFuncAttrKey();
+    ID.AddInteger(infoKey.first);
+    ID.AddPointer(infoKey.second);
+  }
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, ExtInfo info) {
+                                Type result, Optional<ExtInfo> info) {
   auto properties = getFunctionRecursiveProperties(params, result);
   auto arena = getArena(properties);
 
@@ -3272,10 +3276,15 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  auto clangTypeInfo = info.getClangTypeInfo();
+  ClangTypeInfo clangTypeInfo;
+  if (info.hasValue())
+    clangTypeInfo = info.getValue().getClangTypeInfo();
+
+  bool hasClangInfo =
+      info.hasValue() && !info.getValue().getClangTypeInfo().empty();
 
   size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
-      params.size(), clangTypeInfo.empty() ? 0 : 1);
+      params.size(), hasClangInfo ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
@@ -3294,36 +3303,38 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 }
 
 // If the input and result types are canonical, then so is the result.
-FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
-                           Type output, ExtInfo info,
-                           const ASTContext *ctx,
+FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
+                           Optional<ExtInfo> info, const ASTContext *ctx,
                            RecursiveTypeProperties properties)
-    : AnyFunctionType(TypeKind::Function, ctx,
-                      output, properties, params.size(), info) {
+    : AnyFunctionType(TypeKind::Function, ctx, output, properties,
+                      params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
-  auto clangTypeInfo = info.getClangTypeInfo();
-  if (!clangTypeInfo.empty())
-    *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
+  if (info.hasValue()) {
+    auto clangTypeInfo = info.getValue().getClangTypeInfo();
+    if (!clangTypeInfo.empty())
+      *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
+  }
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature sig,
                                   ArrayRef<AnyFunctionType::Param> params,
-                                  Type result,
-                                  ExtInfo info) {
+                                  Type result, Optional<ExtInfo> info) {
   ID.AddPointer(sig.getPointer());
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  auto infoKey = info.getFuncAttrKey();
-  ID.AddInteger(infoKey.first);
-  ID.AddPointer(infoKey.second);
+  if (info.hasValue()) {
+    auto infoKey = info.getValue().getFuncAttrKey();
+    ID.AddInteger(infoKey.first);
+    ID.AddPointer(infoKey.second);
+  }
 }
 
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
                                               ArrayRef<Param> params,
                                               Type result,
-                                              ExtInfo info) {
+                                              Optional<ExtInfo> info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!result->hasTypeVariable());
   assert(!result->hasPlaceholder());
@@ -3346,7 +3357,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   // point.
   bool isCanonical = isGenericFunctionTypeCanonical(sig, params, result);
 
-  assert(info.getClangTypeInfo().empty() &&
+  assert((!info.hasValue() || info.getValue().getClangTypeInfo().empty()) &&
          "Generic functions do not have Clang types at the moment.");
 
   if (auto funcTy
@@ -3370,7 +3381,7 @@ GenericFunctionType::GenericFunctionType(
                        GenericSignature sig,
                        ArrayRef<AnyFunctionType::Param> params,
                        Type result,
-                       ExtInfo info,
+                       Optional<ExtInfo> info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, result,

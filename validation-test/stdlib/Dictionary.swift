@@ -3887,6 +3887,8 @@ func checkGetObjectsAndKeys(
   values.deinitialize(count: storageSize) // noop
   values.deallocate()
   withExtendedLifetime(canary) {}
+  // [NSArray getObjects] does not retain the objects, so keep the dictionary alive.
+  withExtendedLifetime(dictionary) {}
 }
 
 DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
@@ -5080,6 +5082,8 @@ DictionaryTestSuite.test("getObjects:andKeys:count:") {
   d.available_getObjects(vp, andKeys: kp, count: 2)
   expectEqual(expectedKeys, Array(keys))
   expectEqual(expectedValues, Array(values))
+  // [NSArray getObjects] does not retain the objects, so keep the dictionary alive.
+  withExtendedLifetime(d) {}
 }
 #endif
 

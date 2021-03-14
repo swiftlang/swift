@@ -548,6 +548,20 @@ bb0(%0 : @owned $HeapBufferStorage<T_0_0, T_0_1>):
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
+class Derived : C {}
+
+// CHECK-LABEL: sil [ossa] @dead_unconditional_checked_cast :
+// CHECK-NOT: unconditional_checked_cast
+// CHECK:     destroy_value %0
+// CHECK: } // end sil function 'dead_unconditional_checked_cast'
+sil [ossa] @dead_unconditional_checked_cast : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = unconditional_checked_cast %0 : $C to Derived
+  destroy_value %1 : $Derived
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @cond_fail_applied_to_zero_removal :
 // CHECK: bb0
 // CHECK-NEXT: cond_fail

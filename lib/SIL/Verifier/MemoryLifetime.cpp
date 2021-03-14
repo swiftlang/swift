@@ -281,6 +281,19 @@ void MemoryLocations::clear() {
   nonTrivialLocations.clear();
 }
 
+static bool hasInoutArgument(ApplySite AS) {
+  for (Operand &op : AS.getArgumentOperands()) {
+    switch (AS.getArgumentConvention(op)) {
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return true;
+    default:
+      break;
+    }
+  }
+  return false;
+}
+
 bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx,
                                     SmallVectorImpl<SILValue> &collectedVals,
                                     SubLocationMap &subLocationMap) {
@@ -329,6 +342,13 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
                                   /*fieldNr*/ 0, collectedVals, subLocationMap))
           return false;
         break;
+      case SILInstructionKind::PartialApplyInst:
+        // inout/inout_aliasable conventions means that the argument "escapes".
+        // This is okay for memory verification, but cannot handled by other
+        // optimizations, like DestroyHoisting.
+        if (!handleNonTrivialProjections && hasInoutArgument(ApplySite(user)))
+          return false;
+        break;
       case SILInstructionKind::InjectEnumAddrInst:
       case SILInstructionKind::SelectEnumAddrInst:
       case SILInstructionKind::ExistentialMetatypeInst:
@@ -344,7 +364,6 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::CheckedCastAddrBranchInst:
       case SILInstructionKind::UncheckedRefCastAddrInst:
       case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-      case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::ApplyInst:
       case SILInstructionKind::TryApplyInst:
       case SILInstructionKind::BeginApplyInst:

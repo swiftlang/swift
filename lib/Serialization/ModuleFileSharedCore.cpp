@@ -148,6 +148,9 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED:
       extendedInfo.setAllowModuleWithCompilerErrorsEnabled(true);
       break;
+    case options_block::MODULE_ABI_NAME:
+      extendedInfo.setModuleABIName(blobData);
+      break;
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -1177,6 +1180,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.IsAllowModuleWithCompilerErrorsEnabled =
           extInfo.isAllowModuleWithCompilerErrorsEnabled();
       MiscVersion = info.miscVersion;
+      ModuleABIName = extInfo.getModuleABIName();
 
       hasValidControlBlock = true;
       break;

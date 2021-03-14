@@ -1602,9 +1602,10 @@ public:
                                                     ->getCanonicalType()
                                                     .getOptionalObjectType());
       auto substSelfType = dynamicMemberRef->getBase()->getType()->getCanonicalType();
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
       substFormalType = CanFunctionType::get(
-        {AnyFunctionType::Param(substSelfType)},
-        substFormalType);
+          {AnyFunctionType::Param(substSelfType)}, substFormalType, info);
 
       setCallee(Callee::forDynamic(SGF, member,
                                    memberRef.getSubstitutions(),
@@ -5861,7 +5862,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   FuncDecl *memberFunc;
   if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl())) {
     memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
-    memberMethodTy = FunctionType::get({}, memberMethodTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo info;
+    memberMethodTy = FunctionType::get({}, memberMethodTy, info);
   } else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
   auto member = SILDeclRef(memberFunc, SILDeclRef::Kind::Func)
@@ -5880,7 +5883,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
     // For a computed variable, we want the getter.
     if (isa<VarDecl>(e->getMember().getDecl())) {
-      methodTy = CanFunctionType::get({}, valueTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
+      methodTy = CanFunctionType::get({}, valueTy, info);
     } else {
       methodTy = cast<FunctionType>(valueTy);
     }
@@ -5891,9 +5896,11 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto foreignMethodTy =
       getPartialApplyOfDynamicMethodFormalType(SGM, member, e->getMember());
 
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo info;
     FunctionType::Param arg(operand->getType().getASTType());
-    auto memberFnTy = CanFunctionType::get({arg},
-                                           memberMethodTy->getCanonicalType());
+    auto memberFnTy =
+        CanFunctionType::get({arg}, memberMethodTy->getCanonicalType(), info);
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
@@ -5984,13 +5991,18 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto valueTy = e->getType()->getCanonicalType().getOptionalObjectType();
 
     // Objective-C subscripts only ever have a single parameter.
+    //
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo methodInfo;
     FunctionType::Param indexArg(e->getIndex()->getType()->getCanonicalType());
-    auto methodTy = CanFunctionType::get({indexArg}, valueTy);
+    auto methodTy = CanFunctionType::get({indexArg}, valueTy, methodInfo);
     auto foreignMethodTy =
       getPartialApplyOfDynamicMethodFormalType(SGM, member, e->getMember());
 
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo functionInfo;
     FunctionType::Param baseArg(base->getType().getASTType());
-    auto functionTy = CanFunctionType::get({baseArg}, methodTy);
+    auto functionTy = CanFunctionType::get({baseArg}, methodTy, functionInfo);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
     SILValue memberArg =

@@ -15,7 +15,7 @@
 // MUST-EXEC-DAG: Disabling incremental build: could not read build record
 
 // RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: {"./main.swift": [443865900, 0], "./other.swift": [443865900, 0], "./yet-another.swift": [443865900, 0]}, build_time: [443865901, 0]}' > %t/main~buildrecord.swiftdeps
-// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 -driver-show-incremental -driver-show-job-lifecycle |tee /tmp/x| %FileCheck %s -check-prefix=NO-EXEC
+// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 -driver-show-incremental -driver-show-job-lifecycle | %FileCheck %s -check-prefix=NO-EXEC
 
 // NO-EXEC: inputs: ["{{(\.\/)?}}main.swift"], output: {{[{].*[}]}}{{(, condition: check-dependencies)?}}
 // NO-EXEC: inputs: ["{{(\.\/)?}}other.swift"], output: {{[{].*[}]}}{{(, condition: check-dependencies)?}}

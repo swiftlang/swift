@@ -259,11 +259,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::ConvertTaskToJob) {
     auto task = args.claimNext();
-    // The job object starts immediately past the heap-object header.
-    auto bytes = IGF.Builder.CreateBitCast(task, IGF.IGM.Int8PtrTy);
-    auto offset = IGF.IGM.RefCountedStructSize;
-    bytes = IGF.Builder.CreateInBoundsGEP(bytes, IGF.IGM.getSize(offset));
-    auto job = IGF.Builder.CreateBitCast(bytes, IGF.IGM.SwiftJobPtrTy);
+    // The job object starts at the beginning of the task.
+    auto job = IGF.Builder.CreateBitCast(task, IGF.IGM.SwiftJobPtrTy);
     out.add(job);
     return;
   }

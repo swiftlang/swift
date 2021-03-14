@@ -322,17 +322,6 @@ SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw)
   return SILValue();
 }
 
-SILValue
-InstSimplifier::
-visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
-  if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
-    if (UCCI->getType() == upcast->getOperand()->getType())
-      return upcast->getOperand();
-
-  return SILValue();
-}
-
 /// If the only use of a cast is a destroy, just destroy the cast operand.
 static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
   if (!Cast->hasUsesOfAnyResult())
@@ -354,6 +343,17 @@ static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
     }
   }
   return Cast->getOperand(0);
+}
+
+SILValue
+InstSimplifier::
+visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+  // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
+  if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
+    if (UCCI->getType() == upcast->getOperand()->getType())
+      return upcast->getOperand();
+
+  return simplifyDeadCast(UCCI);
 }
 
 SILValue

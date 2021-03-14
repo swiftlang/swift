@@ -36,8 +36,10 @@ struct SwiftError;
 class TaskStatusRecord;
 class TaskGroup;
 
+extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
+
 /// A schedulable job.
-class alignas(2 * alignof(void*)) Job {
+class alignas(2 * alignof(void*)) Job : public HeapObject {
 protected:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
@@ -62,13 +64,15 @@ public:
     TaskContinuationFunction * __ptrauth_swift_task_resume_function ResumeTask;
   };
 
-  Job(JobFlags flags, JobInvokeFunction *invoke)
-      : Flags(flags), RunJob(invoke) {
+  Job(JobFlags flags, JobInvokeFunction *invoke,
+      const HeapMetadata *metadata = &jobHeapMetadata)
+      : HeapObject(metadata), Flags(flags), RunJob(invoke) {
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
 
-  Job(JobFlags flags, TaskContinuationFunction *invoke)
-      : Flags(flags), ResumeTask(invoke) {
+  Job(JobFlags flags, TaskContinuationFunction *invoke,
+      const HeapMetadata *metadata = &jobHeapMetadata)
+      : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
     assert(isAsyncTask() && "wrong constructor for a non-task job");
   }
 
@@ -94,7 +98,7 @@ public:
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(Job) == 4 * sizeof(void*),
+static_assert(sizeof(Job) == 6 * sizeof(void*),
               "Job size is wrong");
 static_assert(alignof(Job) == 2 * alignof(void*),
               "Job alignment is wrong");
@@ -154,7 +158,7 @@ public:
 ///
 /// * The future fragment is dynamic in size, based on the future result type
 ///   it can hold, and thus must be the *last* fragment.
-class AsyncTask : public HeapObject, public Job {
+class AsyncTask : public Job {
 public:
   /// The context for resuming the job.  When a task is scheduled
   /// as a job, the next continuation should be installed as the
@@ -178,7 +182,7 @@ public:
   AsyncTask(const HeapMetadata *metadata, JobFlags flags,
             TaskContinuationFunction *run,
             AsyncContext *initialContext)
-    : HeapObject(metadata), Job(flags, run),
+    : Job(flags, run, metadata),
       ResumeContext(initialContext),
       Status(ActiveTaskStatus()),
       Local(TaskLocal::Storage()) {
@@ -444,7 +448,6 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
-
 };
 
 // The compiler will eventually assume these.

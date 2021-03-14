@@ -1286,6 +1286,7 @@ public:
     return subIGF.Builder.CreateCall(fnPtr.getAsFunction(subIGF),
                                      asyncExplosion.claimAll());
   }
+  // [FIXME: swiftasynccc] This call should be marked musttail.
   void createReturn(llvm::CallInst *call) override {
     subIGF.Builder.CreateRetVoid();
   }
@@ -2478,7 +2479,7 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   llvm::Function *dispatch =
       llvm::Function::Create(dispatchFnTy, llvm::Function::InternalLinkage,
                              llvm::StringRef(name), &IGM.Module);
-  dispatch->setCallingConv(IGM.DefaultCC);
+  dispatch->setCallingConv(IGM.SwiftAsyncCC);
   dispatch->setDoesNotThrow();
   IRGenFunction dispatchIGF(IGM, dispatch);
   if (IGM.DebugInfo)
@@ -2499,7 +2500,7 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
   auto callee = FunctionPointer(fnPtr.getKind(), fnPtrArg, newAuthInfo,
                                 fnPtr.getSignature());
   auto call = Builder.CreateCall(callee, callArgs);
-  call->setTailCall();
+  call->setTailCallKind(IGM.AsyncTailCallKind);
   Builder.CreateRetVoid();
   return dispatch;
 }
@@ -2566,7 +2567,7 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   llvm::Function *suspendFn =
       llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
                              name, &IGM.Module);
-  suspendFn->setCallingConv(IGM.DefaultCC);
+  suspendFn->setCallingConv(IGM.SwiftAsyncCC);
   suspendFn->setDoesNotThrow();
   IRGenFunction suspendIGF(IGM, suspendFn);
   if (IGM.DebugInfo)
@@ -2594,7 +2595,7 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
       { task, executor, targetExecutor });
   suspendCall->setDoesNotThrow();
   suspendCall->setCallingConv(IGM.SwiftAsyncCC);
-  suspendCall->setTailCall();
+  suspendCall->setTailCallKind(IGM.AsyncTailCallKind);
   Builder.CreateRetVoid();
   return suspendFn;
 }

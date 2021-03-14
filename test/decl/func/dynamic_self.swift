@@ -24,9 +24,9 @@ enum E0 {
 class C0 {
   func f() -> Self { } // okay
 
-  func g(_ ds: Self) { } // expected-error{{covariant 'Self' can only appear as the possibly optional type of a property, subscript or method result; did you mean 'C0'?}}
+  func g(_ ds: Self) { } // expected-error{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 
-  func h(_ ds: Self) -> Self { } // expected-error{{covariant 'Self' can only appear as the possibly optional type of a property, subscript or method result; did you mean 'C0'?}}
+  func h(_ ds: Self) -> Self { } // expected-error{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 }
 
 protocol P0 {

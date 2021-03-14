@@ -69,6 +69,16 @@
 // Only the bottom 56 bits are used, and heap objects are eight-byte-aligned.
 #define SWIFT_ABI_DEFAULT_64BIT_SPARE_BITS_MASK 0xFF00000000000007ULL
 
+// Poison sentinel value recognized by LLDB as a former reference to a
+// potentially deinitialized object. It uses no spare bits and cannot point to
+// readable memory.
+//
+// This is not ABI per-se but does stay in-sync with LLDB. If it becomes
+// out-of-sync, then users won't see a friendly diagnostic when inspecting
+// references past their lifetime.
+#define SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_32 0x00000880U
+#define SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_64 0x0000000000000880ULL
+
 /*********************************** i386 *************************************/
 
 // Heap objects are pointer-aligned, so the low two bits are unused.

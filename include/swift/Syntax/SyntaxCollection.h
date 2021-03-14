@@ -20,6 +20,8 @@
 namespace swift {
 namespace syntax {
 
+// MARK: - SyntaxCollection
+
 template <SyntaxKind CollectionKind, typename Element>
 class SyntaxCollection;
 
@@ -68,10 +70,14 @@ private:
   }
 
 public:
-  SyntaxCollection(const RC<const SyntaxData> &Data) : Syntax(Data) {}
+  SyntaxCollection(const RC<const SyntaxData> &Data) : Syntax(Data) {
+    validate();
+  }
 
   SyntaxCollection(std::initializer_list<Element> list):
     SyntaxCollection(SyntaxCollection::makeData(list)) {}
+
+  void validate() {}
 
   /// Returns true if the collection is empty.
   bool empty() const {
@@ -207,6 +213,85 @@ public:
     return kindof(S->getKind());
   }
 };
+
+// MARK: - SyntaxCollectionRef
+
+template <SyntaxKind CollectionKind, typename Element>
+class SyntaxCollectionRef;
+
+template <SyntaxKind CollectionKind, typename Element>
+struct SyntaxCollectionRefIterator {
+  const SyntaxCollectionRef<CollectionKind, Element> &Collection;
+  size_t Index;
+
+  OwnedSyntaxRef<Element> operator*() { return Collection.getChild(Index); }
+
+  SyntaxCollectionRefIterator<CollectionKind, Element> &operator++() {
+    ++Index;
+    return *this;
+  }
+
+  bool operator==(
+      const SyntaxCollectionRefIterator<CollectionKind, Element> &Other) {
+    return Collection.hasSameIdentityAs(Other.Collection) &&
+           Index == Other.Index;
+  }
+
+  bool operator!=(
+      const SyntaxCollectionRefIterator<CollectionKind, Element> &Other) {
+    return !operator==(Other);
+  }
+};
+
+/// A generic unbounded collection of \c SyntaxRef nodes.
+template <SyntaxKind CollectionKind, typename Element>
+class SyntaxCollectionRef : public SyntaxRef {
+  friend class Syntax;
+
+public:
+  SyntaxCollectionRef(const SyntaxDataRef *Data) : SyntaxRef(Data) {
+    validate();
+  }
+  SyntaxCollectionRef(const SyntaxDataRef *Data, no_validation_t)
+      : SyntaxRef(Data) {}
+
+  void validate() {}
+
+  /// Returns true if the collection is empty.
+  bool empty() const { return size() == 0; }
+
+  /// Returns the number of elements in the collection.
+  size_t size() const { return getRaw()->getLayout().size(); }
+
+  SyntaxCollectionRefIterator<CollectionKind, Element> begin() const {
+    return SyntaxCollectionRefIterator<CollectionKind, Element>{
+        /*Collection=*/*this,
+        /*Index=*/0,
+    };
+  }
+
+  SyntaxCollectionRefIterator<CollectionKind, Element> end() const {
+    return SyntaxCollectionRefIterator<CollectionKind, Element>{
+        /*Collection=*/*this,
+        /*Index=*/getRaw()->getLayout().size(),
+    };
+  }
+
+  /// Return the element at the given Index.
+  ///
+  /// Precondition: Index < size()
+  OwnedSyntaxRef<Element> getChild(const size_t Index) const {
+    assert(Index < size() && "Index out of bounds");
+    OwnedSyntaxRef<Element> Result;
+    getDataRef()->getChildRef(Index, Result.getDataPtr());
+    return Result;
+  }
+
+  static bool kindof(SyntaxKind Kind) { return Kind == CollectionKind; }
+
+  static bool classof(const SyntaxRef *S) { return kindof(S->getKind()); }
+};
+
 
 } // end namespace syntax
 } // end namespace swift

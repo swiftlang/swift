@@ -550,11 +550,11 @@ public:
         if (!handledProtocols.insert(inherited).second)
           return TypeWalker::Action::SkipChildren;
 
-        // If 'nominal' is an 'actor class', we do not synthesize its 
-        // conformance to the Actor protocol through a dummy extension.
+        // If 'nominal' is an actor, we do not synthesize its conformance
+        // to the Actor protocol through a dummy extension.
         // There is a special restriction on the Actor protocol in that
-        // it is only valid to conform to Actor on an 'actor class' decl,
-        // not extensions of that 'actor class'.
+        // it is only valid to conform to Actor on an 'actor' decl,
+        // not extensions of that 'actor'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
           return TypeWalker::Action::SkipChildren;

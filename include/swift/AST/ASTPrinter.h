@@ -37,7 +37,7 @@ namespace swift {
   class NominalTypeDecl;
   class ValueDecl;
   class SourceLoc;
-  enum class tok;
+  enum class tok : uint8_t;
   enum class AccessorKind;
 
 /// Describes the context in which a name is being printed, which

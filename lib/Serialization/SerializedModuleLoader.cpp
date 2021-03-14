@@ -723,6 +723,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setImplicitDynamicEnabled();
     if (loadedModuleFile->hasIncrementalInfo())
       M.setHasIncrementalInfo();
+    if (!loadedModuleFile->getModuleABIName().empty())
+      M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
     loadInfo.status = loadedModuleFile->associateWithFileContext(

@@ -60,7 +60,7 @@ namespace swift {
   
   namespace syntax {
     class RawSyntax;
-    enum class SyntaxKind;
+    enum class SyntaxKind : uint16_t;
   }// end of syntax namespace
 
   /// Different contexts in which BraceItemList are parsed.
@@ -463,7 +463,11 @@ public:
   /// RAII object that, when it is destructed, restores the parser and lexer to
   /// their positions at the time the object was constructed.  Will not jump
   /// forward in the token stream.
-  class BacktrackingScope {
+  /// Actual uses of the backtracking scope should choose either \c
+  /// BacktrackingScope, which will always backtrack or \c
+  /// CancellableBacktrackingScope which can be cancelled.
+  class BacktrackingScopeImpl {
+  protected:
     Parser &P;
     ParserPosition PP;
     DiagnosticTransaction DT;
@@ -501,16 +505,32 @@ public:
       }
     } TempReceiver;
 
-  public:
-    BacktrackingScope(Parser &P)
+    BacktrackingScopeImpl(Parser &P)
         : P(P), PP(P.getParserPosition()), DT(P.Diags),
           TempReceiver(P.TokReceiver) {
       SynContext.emplace(P.SyntaxContext);
-      SynContext->setBackTracking();
     }
 
-    ~BacktrackingScope();
+  public:
+    ~BacktrackingScopeImpl();
     bool willBacktrack() const { return Backtrack; }
+  };
+
+  /// A backtracking scope that will always backtrack when destructed.
+  class BacktrackingScope final : public BacktrackingScopeImpl {
+  public:
+    BacktrackingScope(Parser &P) : BacktrackingScopeImpl(P) {
+      SynContext->disable();
+    }
+  };
+
+  /// A backtracking scope whose backtracking can be disabled by calling
+  /// \c cancelBacktrack.
+  class CancellableBacktrackingScope final : public BacktrackingScopeImpl {
+  public:
+    CancellableBacktrackingScope(Parser &P) : BacktrackingScopeImpl(P) {
+      SynContext->setBackTracking();
+    }
 
     void cancelBacktrack();
   };

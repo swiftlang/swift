@@ -1356,6 +1356,22 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
+Identifier ModuleDecl::getABIName() const {
+  if (!ModuleABIName.empty())
+    return ModuleABIName;
+
+  // Hard code that the _Concurrency module has Swift as its ABI name.
+  // FIXME: This works around a backward-compatibility issue where
+  // -module-abi-name is not supported on existing Swift compilers. Remove
+  // this hack later and pass -module-abi-name when building the _Concurrency
+  // module.
+  if (getName().str() == SWIFT_CONCURRENCY_NAME) {
+    ModuleABIName = getASTContext().getIdentifier(STDLIB_NAME);
+    return ModuleABIName;
+  }
+
+  return getName();
+}
 
 StringRef ModuleDecl::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to
