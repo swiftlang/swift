@@ -1,8 +1,8 @@
-//===--- MemoryLifetime.cpp -----------------------------------------------===//
+//===--- MemoryLifetimeVerifier.cpp ---------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,17 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-memory-lifetime"
-#include "swift/SIL/MemoryLifetime.h"
-#include "swift/SIL/SILArgument.h"
+#define DEBUG_TYPE "sil-memory-lifetime-verifier"
+#include "swift/SIL/MemoryLocations.h"
+#include "swift/SIL/BitDataflow.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -29,594 +26,7 @@ llvm::cl::opt<bool> DontAbortOnMemoryLifetimeErrors(
     llvm::cl::desc("Don't abort compliation if the memory lifetime checker "
                    "detects an error."));
 
-/// Debug dump a location bit vector.
-void swift::printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits) {
-  const char *separator = "";
-  OS << '[';
-  for (int idx = bits.find_first(); idx >= 0; idx = bits.find_next(idx)) {
-    OS << separator << idx;
-    separator = ",";
-  }
-  OS << ']';
-}
-
-void swift::dumpBits(const SmallBitVector &bits) {
-  llvm::dbgs() << bits << '\n';
-}
-
-namespace swift {
 namespace {
-
-//===----------------------------------------------------------------------===//
-//                            Utility functions
-//===----------------------------------------------------------------------===//
-
-/// Enlarge the bitset if needed to set the bit with \p idx.
-static void setBitAndResize(SmallBitVector &bits, unsigned idx) {
-  if (bits.size() <= idx)
-    bits.resize(idx + 1);
-  bits.set(idx);
-}
-
-static bool allUsesInSameBlock(AllocStackInst *ASI) {
-  SILBasicBlock *BB = ASI->getParent();
-  int numDeallocStacks = 0;
-  for (Operand *use : ASI->getUses()) {
-    SILInstruction *user = use->getUser();
-    if (isa<DeallocStackInst>(user)) {
-      ++numDeallocStacks;
-      if (user->getParent() != BB)
-        return false;
-    }
-  }
-  // In case of an unreachable, the dealloc_stack can be missing. In this
-  // case we don't treat it as a single-block location.
-  assert(numDeallocStacks <= 1 &&
-    "A single-block stack location cannot have multiple deallocations");
-  return numDeallocStacks == 1;
-}
-
-static bool shouldTrackLocation(SILType ty, SILFunction *function) {
-  // Ignore empty tuples and empty structs.
-  if (auto tupleTy = ty.getAs<TupleType>()) {
-    return tupleTy->getNumElements() != 0;
-  }
-  if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
-    return decl->getStoredProperties().size() != 0;
-  }
-  return true;
-}
-
-} // anonymous namespace
-} // namespace swift
-
-
-//===----------------------------------------------------------------------===//
-//                     MemoryLocations members
-//===----------------------------------------------------------------------===//
-
-MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx) :
-      representativeValue(val),
-      parentIdx(parentIdx) {
-  assert(((parentIdx >= 0) ==
-    (isa<StructElementAddrInst>(val) || isa<TupleElementAddrInst>(val) ||
-     isa<InitEnumDataAddrInst>(val) || isa<UncheckedTakeEnumDataAddrInst>(val) ||
-     isa<InitExistentialAddrInst>(val) || isa<OpenExistentialAddrInst>(val)))
-    && "sub-locations can only be introduced with struct/tuple/enum projections");
-  setBitAndResize(subLocations, index);
-  setBitAndResize(selfAndParents, index);
-}
-
-void MemoryLocations::Location::updateFieldCounters(SILType ty, int increment) {
-  SILFunction *function = representativeValue->getFunction();
-  if (shouldTrackLocation(ty, function)) {
-    numFieldsNotCoveredBySubfields += increment;
-    if (!ty.isTrivial(*function))
-      numNonTrivialFieldsNotCovered += increment;
-  }
-}
-
-static SILValue getBaseValue(SILValue addr) {
-  while (true) {
-    switch (addr->getKind()) {
-      case ValueKind::BeginAccessInst:
-        addr = cast<BeginAccessInst>(addr)->getOperand();
-        break;
-      default:
-        return addr;
-    }
-  }
-}
-
-int MemoryLocations::getLocationIdx(SILValue addr) const {
-  auto iter = addr2LocIdx.find(getBaseValue(addr));
-  if (iter == addr2LocIdx.end())
-    return -1;
-  return iter->second;
-}
-
-const MemoryLocations::Location *
-MemoryLocations::getRootLocation(unsigned index) const {
-  while (true) {
-    const Location &loc = locations[index];
-    if (loc.parentIdx < 0)
-      return &loc;
-    index = loc.parentIdx;
-  }
-}
-
-static bool canHandleAllocStack(AllocStackInst *asi) {
-  assert(asi);
-
-  // An alloc_stack with dynamic lifetime set has a lifetime that relies on
-  // unrelated conditional control flow for correctness. This means that we may
-  // statically leak along paths that were known by the emitter to never be
-  // taken if the value is live. So bail since we can't verify this.
-  if (asi->hasDynamicLifetime())
-    return false;
-
-  // Otherwise we can optimize!
-  return true;
-}
-
-void MemoryLocations::analyzeLocations(SILFunction *function) {
-  // As we have to limit the set of handled locations to memory, which is
-  // guaranteed to be not aliased, we currently only handle indirect function
-  // arguments and alloc_stack locations.
-  for (SILArgument *arg : function->getArguments()) {
-    SILFunctionArgument *funcArg = cast<SILFunctionArgument>(arg);
-    switch (funcArg->getArgumentConvention()) {
-    case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
-    case SILArgumentConvention::Indirect_In_Guaranteed:
-    case SILArgumentConvention::Indirect_Out:
-      // These are not SIL addresses under -enable-sil-opaque-values
-      if (!function->getConventions().useLoweredAddresses())
-        break;
-
-      LLVM_FALLTHROUGH;
-    case SILArgumentConvention::Indirect_Inout:
-      analyzeLocation(funcArg);
-      break;
-    default:
-      break;
-    }
-  }
-  for (SILBasicBlock &BB : *function) {
-    for (SILInstruction &I : BB) {
-      if (auto *ASI = dyn_cast<AllocStackInst>(&I)) {
-        if (canHandleAllocStack(ASI)) {
-          if (allUsesInSameBlock(ASI)) {
-            singleBlockLocations.push_back(ASI);
-          } else {
-            analyzeLocation(ASI);
-          }
-        }
-      }
-    }
-  }
-}
-
-void MemoryLocations::analyzeLocation(SILValue loc) {
-  SILFunction *function = loc->getFunction();
-  assert(function && "cannot analyze a SILValue which is not in a function");
-
-  // Ignore trivial types to keep the number of locations small. Trivial types
-  // are not interesting anyway, because such memory locations are not
-  // destroyed.
-  if (loc->getType().isTrivial(*function))
-    return;
-
-  if (!shouldTrackLocation(loc->getType(), function))
-    return;
-
-  unsigned currentLocIdx = locations.size();
-  locations.push_back(Location(loc, currentLocIdx));
-  SmallVector<SILValue, 8> collectedVals;
-  SubLocationMap subLocationMap;
-  if (!analyzeLocationUsesRecursively(loc, currentLocIdx, collectedVals,
-                                      subLocationMap)) {
-    locations.set_size(currentLocIdx);
-    for (SILValue V : collectedVals) {
-      addr2LocIdx.erase(V);
-    }
-    return;
-  }
-  addr2LocIdx[loc] = currentLocIdx;
-}
-
-void MemoryLocations::handleSingleBlockLocations(
-                       std::function<void (SILBasicBlock *block)> handlerFunc) {
-  SILBasicBlock *currentBlock = nullptr;
-  clear();
-
-  // Walk over all collected single-block locations.
-  for (SingleValueInstruction *SVI : singleBlockLocations) {
-    // Whenever the parent block changes, process the block's locations.
-    if (currentBlock && SVI->getParent() != currentBlock) {
-      handlerFunc(currentBlock);
-      clear();
-    }
-    currentBlock = SVI->getParent();
-    analyzeLocation(SVI);
-  }
-  // Process the last block's locations.
-  if (currentBlock)
-    handlerFunc(currentBlock);
-  clear();
-}
-
-const MemoryLocations::Bits &MemoryLocations::getNonTrivialLocations() {
-  if (nonTrivialLocations.empty()) {
-    // Compute the bitset lazily.
-    nonTrivialLocations.resize(getNumLocations());
-    nonTrivialLocations.reset();
-    unsigned idx = 0;
-    for (Location &loc : locations) {
-      initFieldsCounter(loc);
-      if (loc.numNonTrivialFieldsNotCovered != 0)
-        nonTrivialLocations.set(idx);
-      ++idx;
-    }
-  }
-  return nonTrivialLocations;
-}
-
-void MemoryLocations::dump() const {
-  unsigned idx = 0;
-  for (const Location &loc : locations) {
-    llvm::dbgs() << "location #" << idx << ": sublocs=" << loc.subLocations
-                 << ", parent=" << loc.parentIdx
-                 << ", parentbits=" << loc.selfAndParents
-                 << ", #f=" << loc.numFieldsNotCoveredBySubfields
-                 << ", #ntf=" << loc.numNonTrivialFieldsNotCovered
-                 << ": " << loc.representativeValue;
-    ++idx;
-  }
-}
-
-void MemoryLocations::clear() {
-  locations.clear();
-  addr2LocIdx.clear();
-  nonTrivialLocations.clear();
-}
-
-static bool hasInoutArgument(ApplySite AS) {
-  for (Operand &op : AS.getArgumentOperands()) {
-    switch (AS.getArgumentConvention(op)) {
-    case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_InoutAliasable:
-      return true;
-    default:
-      break;
-    }
-  }
-  return false;
-}
-
-bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx,
-                                    SmallVectorImpl<SILValue> &collectedVals,
-                                    SubLocationMap &subLocationMap) {
-  for (Operand *use : V->getUses()) {
-    // We can safely ignore type dependent operands, because the lifetime of a
-    // type is decoupled from the lifetime of its value. For example, even if
-    // the result of an open_existential_addr is destroyed its type is still
-    // valid.
-    if (use->isTypeDependent())
-      continue;
-  
-    SILInstruction *user = use->getUser();
-
-    // We only handle addr-instructions which are planned to be used with
-    // opaque values. We can still consider to support other addr-instructions
-    // like addr-cast instructions. This somehow depends how opaque values will
-    // look like.
-    switch (user->getKind()) {
-      case SILInstructionKind::StructElementAddrInst: {
-        auto SEAI = cast<StructElementAddrInst>(user);
-        if (!analyzeAddrProjection(SEAI, locIdx, SEAI->getFieldIndex(),
-                                collectedVals, subLocationMap))
-          return false;
-        break;
-      }
-      case SILInstructionKind::TupleElementAddrInst: {
-        auto *TEAI = cast<TupleElementAddrInst>(user);
-        if (!analyzeAddrProjection(TEAI, locIdx, TEAI->getFieldIndex(),
-                                collectedVals, subLocationMap))
-          return false;
-        break;
-      }
-      case SILInstructionKind::BeginAccessInst:
-        if (!analyzeLocationUsesRecursively(cast<BeginAccessInst>(user), locIdx,
-                                            collectedVals, subLocationMap))
-          return false;
-        break;
-      case SILInstructionKind::InitExistentialAddrInst:
-      case SILInstructionKind::OpenExistentialAddrInst:
-      case SILInstructionKind::InitEnumDataAddrInst:
-      case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
-        if (!handleNonTrivialProjections)
-          return false;
-        // The payload is represented as a single sub-location of the enum.
-        if (!analyzeAddrProjection(cast<SingleValueInstruction>(user), locIdx,
-                                  /*fieldNr*/ 0, collectedVals, subLocationMap))
-          return false;
-        break;
-      case SILInstructionKind::PartialApplyInst:
-        // inout/inout_aliasable conventions means that the argument "escapes".
-        // This is okay for memory verification, but cannot handled by other
-        // optimizations, like DestroyHoisting.
-        if (!handleNonTrivialProjections && hasInoutArgument(ApplySite(user)))
-          return false;
-        break;
-      case SILInstructionKind::InjectEnumAddrInst:
-      case SILInstructionKind::SelectEnumAddrInst:
-      case SILInstructionKind::ExistentialMetatypeInst:
-      case SILInstructionKind::ValueMetatypeInst:
-      case SILInstructionKind::IsUniqueInst:
-      case SILInstructionKind::FixLifetimeInst:
-      case SILInstructionKind::LoadInst:
-      case SILInstructionKind::StoreInst:
-      case SILInstructionKind::StoreBorrowInst:
-      case SILInstructionKind::EndAccessInst:
-      case SILInstructionKind::LoadBorrowInst:
-      case SILInstructionKind::DestroyAddrInst:
-      case SILInstructionKind::CheckedCastAddrBranchInst:
-      case SILInstructionKind::UncheckedRefCastAddrInst:
-      case SILInstructionKind::UnconditionalCheckedCastAddrInst:
-      case SILInstructionKind::ApplyInst:
-      case SILInstructionKind::TryApplyInst:
-      case SILInstructionKind::BeginApplyInst:
-      case SILInstructionKind::DebugValueAddrInst:
-      case SILInstructionKind::CopyAddrInst:
-      case SILInstructionKind::YieldInst:
-      case SILInstructionKind::DeallocStackInst:
-      case SILInstructionKind::SwitchEnumAddrInst:
-      case SILInstructionKind::WitnessMethodInst:
-        break;
-      default:
-        return false;
-    }
-  }
-  return true;
-}
-
-bool MemoryLocations::analyzeAddrProjection(
-    SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
-    SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap) {
-
-  if (!shouldTrackLocation(projection->getType(), projection->getFunction()))
-    return false;
-
-  unsigned &subLocIdx = subLocationMap[std::make_pair(parentLocIdx, fieldNr)];
-  if (subLocIdx == 0) {
-    subLocIdx = locations.size();
-    assert(subLocIdx > 0);
-    locations.push_back(Location(projection, subLocIdx, parentLocIdx));
-
-    Location &parentLoc = locations[parentLocIdx];
-    locations.back().selfAndParents |= parentLoc.selfAndParents;
-
-    int idx = (int)parentLocIdx;
-    do {
-      Location &loc = locations[idx];
-      setBitAndResize(loc.subLocations, subLocIdx);
-      idx = loc.parentIdx;
-    } while (idx >= 0);
-
-    initFieldsCounter(parentLoc);
-    assert(parentLoc.numFieldsNotCoveredBySubfields >= 1);
-    parentLoc.updateFieldCounters(projection->getType(), -1);
-
-    if (parentLoc.numFieldsNotCoveredBySubfields == 0) {
-      int idx = (int)parentLocIdx;
-      do {
-        Location &loc = locations[idx];
-        loc.subLocations.reset(parentLocIdx);
-        idx = loc.parentIdx;
-      } while (idx >= 0);
-    }
-  } else if (!isa<OpenExistentialAddrInst>(projection)) {
-    Location *loc = &locations[subLocIdx];
-    if (loc->representativeValue->getType() != projection->getType()) {
-      assert(isa<InitEnumDataAddrInst>(projection) ||
-             isa<UncheckedTakeEnumDataAddrInst>(projection) ||
-             isa<InitExistentialAddrInst>(projection));
-             
-      // We can only handle a single enum payload type for a location or or a
-      // single concrete existential type. Mismatching types can have a differnt
-      // number of (non-trivial) sub-locations and we cannot handle this.
-      // But we ignore opened existential types, because those cannot have
-      // sub-locations (there cannot be an address projection on an
-      // open_existential_addr).
-      if (!isa<OpenExistentialAddrInst>(loc->representativeValue))
-        return false;
-      assert(loc->representativeValue->getType().isOpenedExistential());
-      loc->representativeValue = projection;
-    }
-  }
-
-  if (!analyzeLocationUsesRecursively(projection, subLocIdx, collectedVals,
-                                      subLocationMap)) {
-    return false;
-  }
-  registerProjection(projection, subLocIdx);
-  collectedVals.push_back(projection);
-  return true;
-}
-
-void MemoryLocations::initFieldsCounter(Location &loc) {
-  if (loc.numFieldsNotCoveredBySubfields >= 0)
-    return;
-
-  assert(loc.numNonTrivialFieldsNotCovered < 0);
-
-  loc.numFieldsNotCoveredBySubfields = 0;
-  loc.numNonTrivialFieldsNotCovered = 0;
-  SILFunction *function = loc.representativeValue->getFunction();
-  SILType ty = loc.representativeValue->getType();
-  if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
-    if (decl->isResilient(function->getModule().getSwiftModule(),
-                          function->getResilienceExpansion())) {
-      loc.numFieldsNotCoveredBySubfields = INT_MAX;
-      return;
-    }
-    SILModule &module = function->getModule();
-    for (VarDecl *field : decl->getStoredProperties()) {
-      loc.updateFieldCounters(
-          ty.getFieldType(field, module, TypeExpansionContext(*function)), +1);
-    }
-    return;
-  }
-  if (auto tupleTy = ty.getAs<TupleType>()) {
-    for (unsigned idx = 0, end = tupleTy->getNumElements(); idx < end; ++idx) {
-      loc.updateFieldCounters(ty.getTupleElementType(idx), +1);
-    }
-    return;
-  }
-  loc.updateFieldCounters(ty, +1);
-}
-
-
-//===----------------------------------------------------------------------===//
-//                     MemoryDataflow members
-//===----------------------------------------------------------------------===//
-
-MemoryDataflow::MemoryDataflow(SILFunction *function, unsigned numLocations) :
-  blockStates(function, [numLocations](SILBasicBlock *block) {
-    return BlockState(numLocations);
-  }) {}
-
-void MemoryDataflow::entryReachabilityAnalysis() {
-  llvm::SmallVector<SILBasicBlock *, 16> workList;
-  auto entry = blockStates.entry();
-  entry.data.reachableFromEntry = true;
-  workList.push_back(&entry.block);
-
-  while (!workList.empty()) {
-    SILBasicBlock *block = workList.pop_back_val();
-    for (SILBasicBlock *succ : block->getSuccessorBlocks()) {
-      BlockState &succState = blockStates[succ];
-      if (!succState.reachableFromEntry) {
-        succState.reachableFromEntry = true;
-        workList.push_back(succ);
-      }
-    }
-  }
-}
-
-void MemoryDataflow::exitReachableAnalysis() {
-  llvm::SmallVector<SILBasicBlock *, 16> workList;
-  for (auto bd : blockStates) {
-    if (bd.block.getTerminator()->isFunctionExiting()) {
-      bd.data.exitReachability = ExitReachability::ReachesExit;
-      workList.push_back(&bd.block);
-    } else if (isa<UnreachableInst>(bd.block.getTerminator())) {
-      bd.data.exitReachability = ExitReachability::ReachesUnreachable;
-      workList.push_back(&bd.block);
-    }
-  }
-  while (!workList.empty()) {
-    SILBasicBlock *block = workList.pop_back_val();
-    BlockState &state = blockStates[block];
-    for (SILBasicBlock *pred : block->getPredecessorBlocks()) {
-      BlockState &predState = blockStates[pred];
-      if (predState.exitReachability < state.exitReachability) {
-        // As there are 3 states, each block can be put into the workList 2
-        // times maximum.
-        predState.exitReachability = state.exitReachability;
-        workList.push_back(pred);
-      }
-    }
-  }
-}
-
-void MemoryDataflow::solveForward(JoinOperation join) {
-  // Pretty standard data flow solving.
-  bool changed = false;
-  bool firstRound = true;
-  do {
-    changed = false;
-    for (auto bd : blockStates) {
-      Bits bits = bd.data.entrySet;
-      assert(!bits.empty());
-      for (SILBasicBlock *pred : bd.block.getPredecessorBlocks()) {
-        join(bits, blockStates[pred].exitSet);
-      }
-      if (firstRound || bits != bd.data.entrySet) {
-        changed = true;
-        bd.data.entrySet = bits;
-        bits |= bd.data.genSet;
-        bits.reset(bd.data.killSet);
-        bd.data.exitSet = bits;
-      }
-    }
-    firstRound = false;
-  } while (changed);
-}
-
-void MemoryDataflow::solveForwardWithIntersect() {
-  solveForward([](Bits &entry, const Bits &predExit){
-    entry &= predExit;
-  });
-}
-
-void MemoryDataflow::solveForwardWithUnion() {
-  solveForward([](Bits &entry, const Bits &predExit){
-    entry |= predExit;
-  });
-}
-
-void MemoryDataflow::solveBackward(JoinOperation join) {
-  // Pretty standard data flow solving.
-  bool changed = false;
-  bool firstRound = true;
-  do {
-    changed = false;
-    for (auto bd : llvm::reverse(blockStates)) {
-      Bits bits = bd.data.exitSet;
-      assert(!bits.empty());
-      for (SILBasicBlock *succ : bd.block.getSuccessorBlocks()) {
-        join(bits, blockStates[succ].entrySet);
-      }
-      if (firstRound || bits != bd.data.exitSet) {
-        changed = true;
-        bd.data.exitSet = bits;
-        bits |= bd.data.genSet;
-        bits.reset(bd.data.killSet);
-        bd.data.entrySet = bits;
-      }
-    }
-    firstRound = false;
-  } while (changed);
-}
-
-void MemoryDataflow::solveBackwardWithIntersect() {
-  solveBackward([](Bits &entry, const Bits &predExit){
-    entry &= predExit;
-  });
-}
-
-void MemoryDataflow::solveBackwardWithUnion() {
-  solveBackward([](Bits &entry, const Bits &predExit){
-    entry |= predExit;
-  });
-}
-
-void MemoryDataflow::dump() const {
-    for (auto bd : blockStates) {
-    llvm::dbgs() << "bb" << bd.block.getDebugID() << ":\n"
-                 << "    entry: " << bd.data.entrySet << '\n'
-                 << "    gen:   " << bd.data.genSet << '\n'
-                 << "    kill:  " << bd.data.killSet << '\n'
-                 << "    exit:  " << bd.data.exitSet << '\n';
-  }
-}
-
-
-//===----------------------------------------------------------------------===//
-//                          MemoryLifetimeVerifier
-//===----------------------------------------------------------------------===//
 
 /// A utility for verifying memory lifetime.
 ///
@@ -630,7 +40,7 @@ class MemoryLifetimeVerifier {
 
   using Bits = MemoryLocations::Bits;
   using Location = MemoryLocations::Location;
-  using BlockState = MemoryDataflow::BlockState;
+  using BlockState = BitDataflow::BlockState;
 
   SILFunction *function;
   MemoryLocations locations;
@@ -689,7 +99,7 @@ class MemoryLifetimeVerifier {
   void setBitsOfPredecessor(Bits &genSet, Bits &killSet, SILBasicBlock *block);
 
   /// Initializes the data flow bits sets in the block states for all blocks.
-  void initDataflow(MemoryDataflow &dataFlow);
+  void initDataflow(BitDataflow &dataFlow);
 
   /// Initializes the data flow bits sets in the block state for a single block.
   void initDataflowInBlock(SILBasicBlock *block, BlockState &state);
@@ -700,7 +110,7 @@ class MemoryLifetimeVerifier {
                           bool isTryApply);
 
   /// Perform all checks in the function after the data flow has been computed.
-  void checkFunction(MemoryDataflow &dataFlow);
+  void checkFunction(BitDataflow &dataFlow);
 
   /// Check all instructions in \p block, starting with \p bits as entry set.
   void checkBlock(SILBasicBlock *block, Bits &bits);
@@ -711,9 +121,20 @@ class MemoryLifetimeVerifier {
                           SILArgumentConvention argumentConvention,
                           SILInstruction *applyInst);
 
+  // Utility functions for setting and clearing gen- and kill-bits.
+
+  void genBits(BitDataflow::BlockState &blockState, SILValue addr) {
+    locations.genBits(blockState.genSet, blockState.killSet, addr);
+  }
+
+  void killBits(BitDataflow::BlockState &blockState, SILValue addr) {
+    locations.killBits(blockState.genSet, blockState.killSet, addr);
+  }
+
 public:
   MemoryLifetimeVerifier(SILFunction *function) :
-    function(function), locations(/*handleNonTrivialProjections*/ true) {}
+    function(function), locations(/*handleNonTrivialProjections*/ true,
+                                  /*handleTrivialLocations*/ true) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.
@@ -857,7 +278,7 @@ void MemoryLifetimeVerifier::registerStoreBorrowLocation(SILValue addr) {
   }
 }
 
-void MemoryLifetimeVerifier::initDataflow(MemoryDataflow &dataFlow) {
+void MemoryLifetimeVerifier::initDataflow(BitDataflow &dataFlow) {
   // Initialize the entry and exit sets to all-bits-set. Except for the function
   // entry.
   for (auto bs : dataFlow) {
@@ -896,7 +317,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         auto *LI = cast<LoadInst>(&I);
         switch (LI->getOwnershipQualifier()) {
           case LoadOwnershipQualifier::Take:
-            state.killBits(LI->getOperand(), locations);
+            killBits(state, LI->getOperand());
             break;
           default:
             break;
@@ -904,19 +325,19 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         break;
       }
       case SILInstructionKind::StoreInst:
-        state.genBits(cast<StoreInst>(&I)->getDest(), locations);
+        genBits(state, cast<StoreInst>(&I)->getDest());
         break;
       case SILInstructionKind::StoreBorrowInst: {
         SILValue destAddr = cast<StoreBorrowInst>(&I)->getDest();
-        state.genBits(destAddr, locations);
+        genBits(state, destAddr);
         registerStoreBorrowLocation(destAddr);
         break;
       }
       case SILInstructionKind::CopyAddrInst: {
         auto *CAI = cast<CopyAddrInst>(&I);
         if (CAI->isTakeOfSrc())
-          state.killBits(CAI->getSrc(), locations);
-        state.genBits(CAI->getDest(), locations);
+          killBits(state, CAI->getSrc());
+        genBits(state, CAI->getDest());
         break;
       }
       case SILInstructionKind::InjectEnumAddrInst: {
@@ -926,20 +347,20 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
           // This is a bit tricky: an injected no-payload case means that the
           // "full" enum is initialized. So, for the purpose of dataflow, we
           // treat it like a full initialization of the payload data.
-          state.genBits(IEAI->getOperand(), locations);
+          genBits(state, IEAI->getOperand());
         }
         break;
       }
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
-        state.killBits(I.getOperand(0), locations);
+        killBits(state, I.getOperand(0));
         break;
       case SILInstructionKind::UncheckedRefCastAddrInst:
       case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
         SILValue src = I.getOperand(CopyLikeInstruction::Src);
         SILValue dest = I.getOperand(CopyLikeInstruction::Dest);
-        state.killBits(src, locations);
-        state.genBits(dest, locations);
+        killBits(state, src);
+        genBits(state, dest);
         break;
       }
       case SILInstructionKind::PartialApplyInst:
@@ -1013,14 +434,14 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
   switch (convention) {
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Constant:
-      state.killBits(op.get(), locations);
+      killBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_Out:
       // try_apply is special, because an @out result is only initialized
       // in the normal-block, but not in the throw-block.
-      // We handle @out result of try_apply in setBitsOfPredecessor.
+      // We handle the @out result of try_apply in setBitsOfPredecessor.
       if (!isTryApply)
-        state.genBits(op.get(), locations);
+        genBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
@@ -1032,7 +453,7 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
   }
 }
 
-void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
+void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
 
   // Collect the bits which we require to be set at function exits.
   Bits expectedReturnBits(locations.getNumLocations());
@@ -1173,7 +594,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InitExistentialAddrInst:
       case SILInstructionKind::InitEnumDataAddrInst: {
         SILValue addr = I.getOperand(0);
-        requireBitsClear(bits, addr, &I);
+        requireBitsClear(bits & nonTrivialLocations, addr, &I);
         requireNoStoreBorrowLocation(addr, &I);
         break;
       }
@@ -1281,8 +702,16 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_InoutAliasable:
       requireBitsSet(bits, argumentOp.get(), applyInst);
+      break;
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      // We don't require any locations to be initialized for a partial_apply
+      // which takes an inout_aliasable argument. This is used for implicit
+      // closures (e.g. for the Bool '||' and '&&' operator arguments). Such
+      // closures capture the whole "self". When this is done in an initializer
+      // it can happen that not all fields of "self" are initialized, yet.
+      if (!isa<PartialApplyInst>(applyInst))
+        requireBitsSet(bits, argumentOp.get(), applyInst);
       break;
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
@@ -1296,7 +725,7 @@ void MemoryLifetimeVerifier::verify() {
   // blocks.
   locations.analyzeLocations(function);
   if (locations.getNumLocations() > 0) {
-    MemoryDataflow dataFlow(function, locations.getNumLocations());
+    BitDataflow dataFlow(function, locations.getNumLocations());
     dataFlow.entryReachabilityAnalysis();
     dataFlow.exitReachableAnalysis();
     initDataflow(dataFlow);
@@ -1311,7 +740,9 @@ void MemoryLifetimeVerifier::verify() {
   });
 }
 
-void swift::verifyMemoryLifetime(SILFunction *function) {
-  MemoryLifetimeVerifier verifier(function);
+} // anonymous namespace
+
+void SILFunction::verifyMemoryLifetime() {
+  MemoryLifetimeVerifier verifier(this);
   verifier.verify();
 }

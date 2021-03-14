@@ -1,8 +1,8 @@
-//===--- MemoryLifetime.h ---------------------------------------*- C++ -*-===//
+//===--- MemoryLocations.h --------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,18 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// \file Contains utilities for calculating and verifying memory lifetime.
+/// \file Contains the MemoryLocations utility for analyzing memory locations in
+/// a SILFunction.
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SIL_MEMORY_LIFETIME_H
-#define SWIFT_SIL_MEMORY_LIFETIME_H
+#ifndef SWIFT_SIL_MEMORY_LOCATIONS_H
+#define SWIFT_SIL_MEMORY_LOCATIONS_H
 
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/BasicBlockData.h"
+#include "swift/SIL/SILValue.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
+
+class SILFunction;
+class SILBasicBlock;
+class SingleValueInstruction;
 
 void printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits);
 
@@ -40,10 +46,6 @@ void dumpBits(const SmallBitVector &bits);
 /// Currently only a certain set of address instructions are supported:
 /// Specifically those instructions which are going to be included when SIL
 /// supports opaque values.
-/// TODO: Support more address instructions, like cast instructions.
-///
-/// The MemoryLocations works well together with MemoryDataflow, which can be
-/// used to calculate global dataflow of location information.
 class MemoryLocations {
 public:
 
@@ -115,10 +117,10 @@ public:
     /// sub-locations 3 and 4. But bit 0 is set in location 0 (the "self" bit),
     /// because it represents the untracked field ``Outer.z``.
     ///
-    /// Single-payload enums are represented by a location with a single sub-
-    /// location (the projected payload address, i.e. an ``init_enum_data_addr``
-    /// or an ``unchecked_take_enum_data_addr``.
-    /// Multi-payload enums are not supported right now.
+    /// Enums and existentials are represented by a location with a single sub-
+    /// location (the projected payload/existential address, i.e. an
+    /// ``init_enum_data_addr``, ``unchecked_take_enum_data_addr`` or
+    /// ``init_existential_addr``.
     Bits subLocations;
 
     /// The accumulated parent bits, including the "self" bit.
@@ -196,9 +198,13 @@ private:
   /// init_existential_addr and open_existential_addr.
   bool handleNonTrivialProjections;
 
+  /// If true, also analyze trivial memory locations.
+  bool handleTrivialLocations;
+
 public:
-  MemoryLocations(bool handleNonTrivialProjections) :
-    handleNonTrivialProjections(handleNonTrivialProjections) {}
+  MemoryLocations(bool handleNonTrivialProjections, bool handleTrivialLocations) :
+    handleNonTrivialProjections(handleNonTrivialProjections),
+    handleTrivialLocations(handleTrivialLocations) {}
 
   MemoryLocations(const MemoryLocations &) = delete;
   MemoryLocations &operator=(const MemoryLocations &) = delete;
@@ -228,7 +234,7 @@ public:
   const Location *getRootLocation(unsigned index) const;
 
   /// Registers an address projection instruction for a location.
-  void registerProjection(SingleValueInstruction *projection, unsigned locIdx) {
+  void registerProjection(SILValue projection, unsigned locIdx) {
     addr2LocIdx[projection] = locIdx;
   }
 
@@ -285,9 +291,6 @@ public:
   /// Debug dump the MemoryLifetime internals.
   void dump() const;
 
-  /// Debug dump a bit set .
-  static void dumpBits(const Bits &bits);
-
 private:
   /// Clears all datastructures, except singleBlockLocations;
   void clear();
@@ -312,139 +315,6 @@ private:
   /// Calculates Location::numFieldsNotCoveredBySubfields
   void initFieldsCounter(Location &loc);
 };
-
-/// The MemoryDataflow utility calculates global dataflow of memory locations.
-///
-/// The MemoryDataflow works well together with MemoryLocations, which can be
-/// used to analyze locations as input to the dataflow.
-/// TODO: Actuall this utility can be used for any kind of dataflow, not just
-/// for memory locations. Consider renaming it.
-class MemoryDataflow {
-
-  /// What kind of terminators can be reached from a block.
-  enum class ExitReachability : uint8_t {
-    /// Worst case: the block is part of a cycle which neither reaches a
-    /// function-exit nor an unreachable-instruction.
-    InInfiniteLoop,
-
-    /// An unreachable-instruction can be reached from the block, but not a
-    /// function-exit (like "return" or "throw").
-    ReachesUnreachable,
-
-    /// A function-exit can be reached from the block.
-    /// This is the case for most basic blocks.
-    ReachesExit
-  };
-
-public:
-  using Bits = MemoryLocations::Bits;
-
-  /// Basic-block specific information used for dataflow analysis.
-  struct BlockState {
-    /// The bits valid at the entry (i.e. the first instruction) of the block.
-    Bits entrySet;
-
-    /// The bits valid at the exit (i.e. after the terminator) of the block.
-    Bits exitSet;
-
-    /// Generated bits of the block.
-    Bits genSet;
-
-    /// Killed bits of the block.
-    Bits killSet;
-
-    /// True, if this block is reachable from the entry block, i.e. is not an
-    /// unreachable block.
-    ///
-    /// This flag is only computed if entryReachabilityAnalysis is called.
-    bool reachableFromEntry = false;
-
-    /// What kind of terminators can be reached from this block.
-    ///
-    /// This is only computed if exitReachableAnalysis is called.
-    ExitReachability exitReachability = ExitReachability::InInfiniteLoop;
-
-    BlockState(unsigned numLocations) :
-      entrySet(numLocations), exitSet(numLocations),
-      genSet(numLocations), killSet(numLocations) {}
-
-    // Utility functions for setting and clearing gen- and kill-bits.
-
-    void genBits(SILValue addr, const MemoryLocations &locs) {
-      locs.genBits(genSet, killSet, addr);
-    }
-
-    void killBits(SILValue addr, const MemoryLocations &locs) {
-      locs.killBits(genSet, killSet, addr);
-    }
-
-    bool exitReachable() const {
-      return exitReachability == ExitReachability::ReachesExit;
-    }
-
-    bool isInInfiniteLoop() const {
-      return exitReachability == ExitReachability::InInfiniteLoop;
-    }
-  };
-
-private:
-  BasicBlockData<BlockState> blockStates;
-
-public:
-
-  using iterator = BasicBlockData<BlockState>::iterator;
-
-  /// Sets up the BlockState datastructures and associates all basic blocks with
-  /// a state.
-  MemoryDataflow(SILFunction *function, unsigned numLocations);
-
-  MemoryDataflow(const MemoryDataflow &) = delete;
-  MemoryDataflow &operator=(const MemoryDataflow &) = delete;
-
-  iterator begin() { return blockStates.begin(); }
-  iterator end() { return blockStates.end(); }
-
-  /// Returns the state of a block.
-  BlockState &operator[] (SILBasicBlock *block) {
-    return blockStates[block];
-  }
-
-  /// Calculates the BlockState::reachableFromEntry flags.
-  void entryReachabilityAnalysis();
-
-  /// Calculates the BlockState::exitReachable flags.
-  void exitReachableAnalysis();
-
-  using JoinOperation = std::function<void (Bits &dest, const Bits &src)>;
-
-  /// Derives the block exit sets from the entry sets by applying the gen and
-  /// kill sets.
-  /// At control flow joins, the \p join operation is applied.
-  void solveForward(JoinOperation join);
-
-  /// Calls solveForward() with a bit-intersection as join operation.
-  void solveForwardWithIntersect();
-
-  /// Calls solveForward() with a bit-union as join operation.
-  void solveForwardWithUnion();
-
-  /// Derives the block entry sets from the exit sets by applying the gen and
-  /// kill sets.
-  /// At control flow joins, the \p join operation is applied.
-  void solveBackward(JoinOperation join);
-
-  /// Calls solveBackward() with a bit-intersection as join operation.
-  void solveBackwardWithIntersect();
-
-  /// Calls solveBackward() with a bit-union as join operation.
-  void solveBackwardWithUnion();
-
-  /// Debug dump the MemoryLifetime internals.
-  void dump() const;
-};
-
-/// Verifies the lifetime of memory locations in a function.
-void verifyMemoryLifetime(SILFunction *function);
 
 } // end swift namespace
 
