@@ -396,10 +396,12 @@ bool MemoryLocations::analyzeAddrProjection(
   if (isEmptyType(projection->getType(), projection->getFunction()))
     return false;
 
-  unsigned &subLocIdx = subLocationMap[std::make_pair(parentLocIdx, fieldNr)];
+  auto key = std::make_pair(parentLocIdx, fieldNr);
+  unsigned subLocIdx = subLocationMap[key];
   if (subLocIdx == 0) {
     subLocIdx = locations.size();
     assert(subLocIdx > 0);
+    subLocationMap[key] = subLocIdx;
     locations.push_back(Location(projection, subLocIdx, parentLocIdx));
 
     Location &parentLoc = locations[parentLocIdx];
