@@ -6013,6 +6013,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         }
       }
 
+      if (auto rawValue = isRawRepresentable(*this, type)) {
+        if (!rawValue->isTypeVariableOrMember() &&
+            TypeChecker::conformsToProtocol(rawValue, protocol, DC)) {
+          auto *fix = UseRawValue::create(*this, type, protocolTy, loc);
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+        }
+      }
+
       auto anchor = locator.getAnchor();
 
       if (isExpr<UnresolvedMemberExpr>(anchor) &&
@@ -10751,7 +10759,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddPropertyWrapperAttribute:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
-  case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
@@ -10770,6 +10777,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAlwaysSucceedCheckedCast:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::ExplicitlyConstructRawRepresentable: {
+    // Let's increase impact of this fix for binary operators because
+    // it's possible to get both `.rawValue` and construction fixes for
+    // different overloads of a binary operator and `.rawValue` is a
+    // better fix because raw representable has a failable constructor.
+    return recordFix(fix,
+                     /*impact=*/isExpr<BinaryExpr>(locator.getAnchor()) ? 2 : 1)
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   }
 
   case FixKind::TreatRValueAsLValue: {

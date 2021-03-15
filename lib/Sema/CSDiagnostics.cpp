@@ -6841,6 +6841,8 @@ AbstractRawRepresentableFailure::getDiagnostic() const {
     return diag::cannot_convert_assign;
   } else if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     return diag::cannot_convert_argument_value;
+  } else if (locator->isLastElement<LocatorPathElt::AnyRequirement>()) {
+    return diag::cannot_convert_initializer_value_protocol;
   }
 
   return None;

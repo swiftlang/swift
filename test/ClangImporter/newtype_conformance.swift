@@ -16,12 +16,11 @@ func acceptHashable<T: Hashable>(_: T) {}
 // expected-note@-1 {{where 'T' = 'WrappedRef'}}
 // expected-note@-2 {{where 'T' = 'WrappedValue'}}
 func acceptComparable<T: Comparable>(_: T) {}
-// expected-note@-1 {{where 'T' = 'NSNotification.Name'}}
 
 func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
   acceptEquatable(x)
   acceptHashable(x)
-  acceptComparable(x) // expected-error {{global function 'acceptComparable' requires that 'NSNotification.Name' conform to 'Comparable'}}
+  acceptComparable(x) // expected-error {{value of type 'NSNotification.Name' does not conform to specified type 'Comparable'}} {{19-19=.rawValue}}
 
   _ = x == y
   _ = x != y
