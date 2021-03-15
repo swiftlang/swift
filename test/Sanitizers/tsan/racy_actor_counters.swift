@@ -1,6 +1,6 @@
 // RUN: %target-swiftc_driver %s -Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch -target %sanitizers-target-triple -g -sanitize=thread -o %t
 // RUN: %target-codesign %t
-// RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t 2>&1 | %FileCheck %s
+// RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t 2>&1 | %swift-demangle --simplified | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
