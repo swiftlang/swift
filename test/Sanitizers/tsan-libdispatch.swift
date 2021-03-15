@@ -9,9 +9,6 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
-// rdar://problem/75006869
-// XFAIL: OS=macosx && CPU=arm64
-
 // Test ThreadSanitizer execution end-to-end with libdispatch.
 
 import Dispatch
