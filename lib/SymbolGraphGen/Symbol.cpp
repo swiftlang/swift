@@ -120,7 +120,7 @@ void Symbol::serializeNames(llvm::json::OStream &OS) const {
     SmallVector<PathComponent, 8> PathComponents;
     getPathComponents(PathComponents);
 
-    if (isa<GenericTypeDecl>(VD)) {    
+    if (isa<GenericTypeDecl>(VD) || isa<EnumElementDecl>(VD)) {
       SmallString<64> FullyQualifiedTitle;
 
       for (const auto *It = PathComponents.begin(); It != PathComponents.end(); ++It) {
