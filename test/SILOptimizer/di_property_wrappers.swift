@@ -558,6 +558,14 @@ struct NonMutatingWrapperTestStruct {
   }
 }
 
+// Check if a non-trivial value passes the memory lifetime verifier.
+struct NonMutatingWrapperTestStructString {
+  @NonMutatingSetterWrapper var SomeProp: String
+  init(val: String) {
+    SomeProp = val
+  }
+}
+
 func testNonMutatingSetterStruct() {
   // CHECK: ## NonMutatingSetterWrapper
   print("\n## NonMutatingSetterWrapper")

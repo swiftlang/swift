@@ -525,3 +525,16 @@ bb0:
   return %5 : $()
 }
 
+sil @modify_bool : $@convention(thin) (@inout_aliasable Bool) -> ()
+
+// CHECK: SIL memory lifetime failure in @test_trivial_alloc_stack: memory is not initialized, but should
+sil [ossa] @test_trivial_alloc_stack : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $Bool
+  store %0 to [trivial] %1 : $*Bool
+  dealloc_stack %1 : $*Bool
+  %8 = function_ref @modify_bool : $@convention(thin) (@inout_aliasable Bool) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@inout_aliasable Bool) -> ()
+  %10 = tuple ()
+  return %10 : $()
+}

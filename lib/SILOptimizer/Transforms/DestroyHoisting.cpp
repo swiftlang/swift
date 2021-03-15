@@ -12,7 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-destroy-hoisting"
-#include "swift/SIL/MemoryLifetime.h"
+#include "swift/SIL/MemoryLocations.h"
+#include "swift/SIL/BitDataflow.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -65,7 +66,7 @@ namespace {
 class DestroyHoisting {
 
   using Bits = MemoryLocations::Bits;
-  using BlockState = MemoryDataflow::BlockState;
+  using BlockState = BitDataflow::BlockState;
 
   SILFunction *function;
   MemoryLocations locations;
@@ -78,14 +79,14 @@ class DestroyHoisting {
   DominanceInfo *domTree = nullptr;
   bool madeChanges = false;
 
-  void expandStores(MemoryDataflow &dataFlow);
+  void expandStores(BitDataflow &dataFlow);
 
-  void initDataflow(MemoryDataflow &dataFlow);
+  void initDataflow(BitDataflow &dataFlow);
 
   void initDataflowInBlock(SILBasicBlock *block, BlockState &state);
 
   bool canIgnoreUnreachableBlock(SILBasicBlock *block,
-                                 MemoryDataflow &dataFlow);
+                                 BitDataflow &dataFlow);
 
   int getDestroyedLoc(SILInstruction *I) {
     if (auto *DAI = dyn_cast<DestroyAddrInst>(I))
@@ -99,7 +100,7 @@ class DestroyHoisting {
 
   void getUsedLocationsOfInst(Bits &bits, SILInstruction *Inst);
 
-  void moveDestroys(MemoryDataflow &dataFlow);
+  void moveDestroys(BitDataflow &dataFlow);
 
   bool locationOverlaps(const MemoryLocations::Location *loc,
                         const Bits &destroys);
@@ -117,16 +118,18 @@ class DestroyHoisting {
 
   SILValue createAddress(unsigned locIdx, SILBuilder &builder);
 
-  void tailMerging(MemoryDataflow &dataFlow);
+  void tailMerging(BitDataflow &dataFlow);
 
-  bool tailMergingInBlock(SILBasicBlock *block, MemoryDataflow &dataFlow);
+  bool tailMergingInBlock(SILBasicBlock *block, BitDataflow &dataFlow);
 
 public:
   DestroyHoisting(SILFunction *function, DominanceAnalysis *DA) :
     function(function),
     // We currently don't handle enum and existential projections, because they
     // cannot be re-created easily. We could support this in future.
-    locations(/*handleNonTrivialProjections*/ false), DA(DA) {}
+    locations(/*handleNonTrivialProjections*/ false,
+              /*handleTrivialLocations*/ false),
+    DA(DA) {}
 
   bool hoistDestroys();
 };
@@ -147,7 +150,7 @@ static bool isExpansionEnabler(SILInstruction *I) {
 // This enables the switch-enum optimization (see above).
 // TODO: investigate the benchmark regressions and enable store-expansion more
 //       aggressively.
-void DestroyHoisting::expandStores(MemoryDataflow &dataFlow) {
+void DestroyHoisting::expandStores(BitDataflow &dataFlow) {
   Bits usedLocs(locations.getNumLocations());
 
   // Initialize the dataflow, which tells us which destroy_addr instructions are
@@ -212,7 +215,7 @@ void DestroyHoisting::expandStores(MemoryDataflow &dataFlow) {
 }
 
 // Initialize the dataflow for moving destroys up the control flow.
-void DestroyHoisting::initDataflow(MemoryDataflow &dataFlow) {
+void DestroyHoisting::initDataflow(BitDataflow &dataFlow) {
   for (auto bs : dataFlow) {
     bs.data.genSet.reset();
     bs.data.killSet.reset();
@@ -290,7 +293,7 @@ void DestroyHoisting::initDataflowInBlock(SILBasicBlock *block,
 // unreachable which does not touch any of our memory locations. We can just
 // ignore those blocks.
 bool DestroyHoisting::canIgnoreUnreachableBlock(SILBasicBlock *block,
-                                                MemoryDataflow &dataFlow) {
+                                                BitDataflow &dataFlow) {
   assert(isa<UnreachableInst>(block->getTerminator()));
 
   // Is it a single unreachable-block (i.e. it has a single predecessor from
@@ -384,7 +387,7 @@ static void processRemoveList(SmallVectorImpl<SILInstruction *> &toRemove) {
 }
 
 // Do the actual moving of destroy_addr instructions.
-void DestroyHoisting::moveDestroys(MemoryDataflow &dataFlow) {
+void DestroyHoisting::moveDestroys(BitDataflow &dataFlow) {
   // Don't eagerly delete destroy_addr instructions, instead put them into this
   // list. When we are about to "move" a destroy_addr just over some sideeffect-
   // free instructions, we'll keep it at the current location.
@@ -630,7 +633,7 @@ SILValue DestroyHoisting::createAddress(unsigned locIdx, SILBuilder &builder) {
 //     destroy_addr %a  // will be hoisted (duplicated) into bb2 and bb2
 // \endcode
 // This is mainly a code size reduction optimization.
-void DestroyHoisting::tailMerging(MemoryDataflow &dataFlow) {
+void DestroyHoisting::tailMerging(BitDataflow &dataFlow) {
 
   // TODO: we could do a worklist algorithm here instead of iterating through
   // all the function blocks.
@@ -644,7 +647,7 @@ void DestroyHoisting::tailMerging(MemoryDataflow &dataFlow) {
 }
 
 bool DestroyHoisting::tailMergingInBlock(SILBasicBlock *block,
-                                         MemoryDataflow &dataFlow) {
+                                         BitDataflow &dataFlow) {
   if (block->pred_empty() || block->getSinglePredecessorBlock())
     return false;
 
@@ -707,7 +710,7 @@ bool DestroyHoisting::tailMergingInBlock(SILBasicBlock *block,
 bool DestroyHoisting::hoistDestroys() {
   locations.analyzeLocations(function);
   if (locations.getNumLocations() > 0) {
-    MemoryDataflow dataFlow(function, locations.getNumLocations());
+    BitDataflow dataFlow(function, locations.getNumLocations());
     dataFlow.exitReachableAnalysis();
 
     // Step 1: pre-processing: expand store instructions
