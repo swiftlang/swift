@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
 
 class Box {
@@ -19,7 +19,7 @@ actor Door {
     var getOnlyInt : Int {
         get { 0 }
     }
-    
+
     @actorIndependent(unsafe) var unsafeIndependent : Int = 0
 
     @MainActor var globActor_mutable : Int = 0
@@ -68,7 +68,7 @@ func tryNonConcurrentValue() {
 
 func tryKeypaths() {
     _ = \Door.unsafeGlobActor_immutable
-    _ = \Door.unsafeGlobActor_mutable
+    _ = \Door.unsafeGlobActor_mutable // expected-error{{cannot form key path to actor-isolated property 'unsafeGlobActor_mutable'}}
 
     _ = \Door.immutable
     _ = \Door.unsafeIndependent
