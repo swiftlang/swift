@@ -1397,6 +1397,8 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicallyReplaceableFunctionVar:
       case Node::Kind::AsyncFunctionPointer:
       case Node::Kind::AsyncNonconstantPartialApplyThunk:
+      case Node::Kind::AsyncAwaitResumePartialFunction:
+      case Node::Kind::AsyncSuspendResumePartialFunction:
         mangleInReverseOrder = true;
         break;
       default:
@@ -1907,6 +1909,16 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
 
 void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
   Buffer << "Tw";
+  mangleChildNode(node, 0);
+}
+
+void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
+  Buffer << "TQ";
+  mangleChildNode(node, 0);
+}
+
+void Remangler::mangleAsyncSuspendResumePartialFunction(Node *node) {
+  Buffer << "TY";
   mangleChildNode(node, 0);
 }
 

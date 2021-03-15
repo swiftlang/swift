@@ -390,3 +390,5 @@ $s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR
 $s5async1hyyS2iJXEF ---> async.h(@concurrent (Swift.Int) -> Swift.Int) -> ()
 $s12create_pa_f2Tw_ ---> (0) thunk for non-constant partial apply in create_pa_f2
 $s12create_pa_f2Tw0_ ---> (1) thunk for non-constant partial apply in create_pa_f2
+$s5Actor02MyA0C17testAsyncFunctionyyYKFTY0_ ---> (1) suspend resume partial function for Actor.MyActor.testAsyncFunction() async throws -> ()
+$s5Actor02MyA0C17testAsyncFunctionyyYKFTQ1_ ---> (2) await resume partial function for Actor.MyActor.testAsyncFunction() async throws -> ()
