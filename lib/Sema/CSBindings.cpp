@@ -1612,6 +1612,13 @@ bool TypeVarBindingProducer::computeNext() {
       addNewBinding(binding.withType(LValueType::get(binding.BindingType)));
     }
 
+    // There is a tailored fix for optional key path root references,
+    // let's not create ambiguity by attempting unwrap when it's
+    // not allowed.
+    if (binding.Kind != BindingKind::Subtypes &&
+        getLocator()->isKeyPathRoot() && type->getOptionalObjectType())
+      continue;
+
     // Allow solving for T even for a binding kind where that's invalid
     // if fixes are allowed, because that gives us the opportunity to
     // match T? values to the T binding by adding an unwrap fix.
