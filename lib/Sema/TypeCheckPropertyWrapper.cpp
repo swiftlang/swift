@@ -545,15 +545,12 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (var->hasImplicitPropertyWrapper())
     return var->getInterfaceType();
 
-  Type rawType =
-      evaluateOrDefault(evaluator,
-                        AttachedPropertyWrapperTypeRequest{var, 0}, Type());
-
-  if (!rawType || rawType->hasError())
-    return Type();
-
   // The constraint system will infer closure parameter types
-  if (isa<ParamDecl>(var) && var->getInterfaceType()->hasError())
+  if (isa<ParamDecl>(var) && isa<ClosureExpr>(var->getDeclContext()))
+    return var->getPropertyWrapperBackingProperty()->getInterfaceType();
+
+  Type rawType = var->getAttachedPropertyWrapperType(0);
+  if (!rawType || rawType->hasError())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
@@ -581,6 +578,22 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   ASTContext &ctx = var->getASTContext();
   Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
   assert(type || ctx.Diags.hadAnyError());
+
+  if (!type)
+    return Type();
+
+  // Set the interface type of each synthesized declaration.
+  auto auxiliaryVars = var->getPropertyWrapperAuxiliaryVariables();
+  auxiliaryVars.backingVar->setInterfaceType(type);
+
+  if (auto *projection = auxiliaryVars.projectionVar) {
+    projection->setInterfaceType(computeProjectedValueType(var, type));
+  }
+
+  if (auto *wrappedValue = auxiliaryVars.localWrappedValueVar) {
+    wrappedValue->setInterfaceType(computeWrappedValueType(var, type));
+  }
+
   return type;
 }
 

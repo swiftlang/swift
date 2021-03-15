@@ -485,7 +485,8 @@ bool AttachedPropertyWrapperTypeRequest::isCached() const {
 
 bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() &&
+         !(isa<ParamDecl>(var) && isa<ClosureExpr>(var->getDeclContext()));
 }
 
 bool PropertyWrapperAuxiliaryVariablesRequest::isCached() const {

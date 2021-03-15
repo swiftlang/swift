@@ -2426,8 +2426,6 @@ static VarDecl *synthesizeLocalWrappedValueVar(VarDecl *var) {
   VarDecl *localVar = new (ctx) VarDecl(/*IsStatic=*/false,
                                         VarDecl::Introducer::Var,
                                         var->getLoc(), name, dc);
-  if (!var->hasImplicitPropertyWrapper())
-    localVar->setInterfaceType(var->getInterfaceType());
   localVar->setImplicit();
   localVar->getAttrs() = var->getAttrs();
   localVar->overwriteAccess(var->getFormalAccess());
@@ -2456,8 +2454,7 @@ static VarDecl *synthesizeLocalWrappedValueVar(VarDecl *var) {
 /// Synthesize a computed property `$foo` for a property with an attached
 /// wrapper that has a `projectedValue` property.
 static VarDecl *synthesizePropertyWrapperProjectionVar(
-    ASTContext &ctx, VarDecl *var, Type wrapperType,
-    VarDecl *wrapperVar) {
+    ASTContext &ctx, VarDecl *var, VarDecl *wrapperVar) {
   // If the original property has a @_projectedValueProperty attribute, use
   // that to find the storage wrapper property.
   if (auto attr = var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()){
@@ -2496,32 +2493,15 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   }
   Identifier name = ctx.getIdentifier(nameBuf);
 
-  // Determine the type of the property.
-  Type propertyType;
-  if (wrapperType)
-    propertyType = computeProjectedValueType(var, wrapperType);
-
   // Form the property.
   auto dc = var->getDeclContext();
   VarDecl *property = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
                                         VarDecl::Introducer::Var,
                                         var->getLoc(),
                                         name, dc);
-  if (propertyType)
-    property->setInterfaceType(propertyType);
   property->setImplicit();
   property->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(property, dc, var);
-
-  // Create the pattern binding declaration for the property.
-  Pattern *pbdPattern = NamedPattern::createImplicit(ctx, property);
-  pbdPattern->setType(propertyType);
-  pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, propertyType);
-  auto pbd = PatternBindingDecl::createImplicit(
-      ctx, property->getCorrectStaticSpelling(), pbdPattern,
-      /*init*/nullptr, dc, SourceLoc());
-  addMemberToContextIfNeeded(pbd, dc, var);
-  pbd->setStatic(var->isStatic());
 
   // Determine the access level for the property.
   property->overwriteAccess(var->getFormalAccess());
@@ -2759,38 +2739,15 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
   VarDecl *projectionVar = nullptr;
   VarDecl *wrappedValueVar = nullptr;
 
+  // Create the backing storage property.
   if (auto *param = dyn_cast<ParamDecl>(var)) {
     backingVar = ParamDecl::cloneWithoutType(ctx, param);
     backingVar->setName(name);
-    Type wrapperType;
-
-    // If this is a function parameter, compute the backing
-    // type now. For closure parameters, let the constraint
-    // system infer the backing type.
-    if (!var->getInterfaceType()->hasError()) {
-      wrapperType = var->getPropertyWrapperBackingPropertyType();
-      if (!wrapperType || wrapperType->hasError())
-        return PropertyWrapperAuxiliaryVariables();
-
-      backingVar->setInterfaceType(wrapperType);
-    }
-  }
-
-  auto wrapperType = var->getPropertyWrapperBackingPropertyType();
-
-  // Create the backing storage property and note it in the cache.
-  if (!backingVar) {
-    if (!wrapperType || wrapperType->hasError())
-      return PropertyWrapperAuxiliaryVariables();
-
-    Type storageInterfaceType = wrapperType;
-    Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
-
+  } else {
     backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
                                    VarDecl::Introducer::Var,
                                    var->getLoc(),
                                    name, dc);
-    backingVar->setInterfaceType(storageInterfaceType);
     backingVar->setImplicit();
     backingVar->setOriginalWrappedProperty(var);
 
@@ -2799,21 +2756,11 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     backingVar->overwriteSetterAccess(AccessLevel::Private);
 
     addMemberToContextIfNeeded(backingVar, dc, var);
-
-    // Create the pattern binding declaration for the backing property.
-    Pattern *pbdPattern = NamedPattern::createImplicit(ctx, backingVar);
-    pbdPattern->setType(storageType);
-    pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
-    PatternBindingDecl *pbd = PatternBindingDecl::createImplicit(
-        ctx, var->getCorrectStaticSpelling(), pbdPattern, /*init*/nullptr,
-        dc, SourceLoc());
-    addMemberToContextIfNeeded(pbd, dc, var);
-    pbd->setStatic(var->isStatic());
   }
 
   if (wrapperInfo.projectedValueVar || var->getName().hasDollarPrefix()) {
     projectionVar = synthesizePropertyWrapperProjectionVar(
-        ctx, var, wrapperType, wrapperInfo.projectedValueVar);
+        ctx, var, wrapperInfo.projectedValueVar);
   }
 
   if ((wrappedValueVar = synthesizeLocalWrappedValueVar(var))) {
@@ -2844,18 +2791,28 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   if (!wrapperType || wrapperType->hasError())
     return PropertyWrapperInitializerInfo();
 
-  Type storageInterfaceType = wrapperType;
-  Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
-
+  Type storageType = dc->mapTypeIntoContext(wrapperType);
   Expr *initializer = nullptr;
   PropertyWrapperValuePlaceholderExpr *wrappedValue = nullptr;
+
+  auto createPBD = [&](VarDecl *singleVar) -> PatternBindingDecl * {
+    Pattern *pattern = NamedPattern::createImplicit(ctx, singleVar);
+    pattern->setType(singleVar->getType());
+    pattern = TypedPattern::createImplicit(ctx, pattern, singleVar->getType());
+    PatternBindingDecl *pbd = PatternBindingDecl::createImplicit(
+        ctx, var->getCorrectStaticSpelling(), pattern, /*init*/nullptr,
+        dc, SourceLoc());
+    addMemberToContextIfNeeded(pbd, dc, var);
+    pbd->setStatic(var->isStatic());
+    return pbd;
+  };
 
   // Take the initializer from the original property.
   if (!isa<ParamDecl>(var)) {
     auto parentPBD = var->getParentPatternBinding();
     unsigned patternNumber = parentPBD->getPatternEntryIndexForVarDecl(var);
     auto *backingVar = var->getPropertyWrapperBackingProperty();
-    auto *pbd = backingVar->getParentPatternBinding();
+    auto *pbd = createPBD(backingVar);
 
     // Force the default initializer to come into existence, if there is one,
     // and the wrapper doesn't provide its own.
@@ -2897,21 +2854,25 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   // If there is a projection property (projectedValue) in the wrapper,
   // synthesize a computed property for '$foo'.
   Expr *projectedValueInit = nullptr;
-  if (wrapperInfo.projectedValueVar && wrapperInfo.hasProjectedValueInit &&
-      isa<ParamDecl>(var)) {
-    // Projected-value initialization is currently only supported for parameters.
-    auto *param = dyn_cast<ParamDecl>(var);
-    auto projectionType = computeProjectedValueType(var, storageType);
-    auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
-        ctx, var->getSourceRange(), projectionType, /*projectedValue=*/nullptr);
-    projectedValueInit = buildPropertyWrapperInitCall(
-        var, storageType, placeholder, PropertyWrapperInitKind::ProjectedValue);
-    TypeChecker::typeCheckExpression(projectedValueInit, dc);
+  if (auto *projection = var->getPropertyWrapperProjectionVar()) {
+    createPBD(projection);
 
-    // Check initializer effects.
-    auto *initContext = new (ctx) PropertyWrapperInitializer(
-        dc, param, PropertyWrapperInitializer::Kind::ProjectedValue);
-    TypeChecker::checkInitializerEffects(initContext, projectedValueInit);
+    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
+    if (wrapperInfo.hasProjectedValueInit && isa<ParamDecl>(var)) {
+      // Projected-value initialization is currently only supported for parameters.
+      auto *param = dyn_cast<ParamDecl>(var);
+      auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(
+          ctx, var->getSourceRange(), projection->getType(), /*projectedValue=*/nullptr);
+      projectedValueInit = buildPropertyWrapperInitCall(
+          var, storageType, placeholder, PropertyWrapperInitKind::ProjectedValue);
+      TypeChecker::typeCheckExpression(projectedValueInit, dc);
+
+      // Check initializer effects.
+      auto *initContext = new (ctx) PropertyWrapperInitializer(
+          dc, param, PropertyWrapperInitializer::Kind::ProjectedValue);
+      checkInitializerActorIsolation(initContext, projectedValueInit);
+      TypeChecker::checkInitializerEffects(initContext, projectedValueInit);
+    }
   }
 
   // Form the initialization of the backing property from a value of the
@@ -2920,7 +2881,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   if (wrappedValue) {
     wrappedValueInit = initializer;
   } else if (!initializer &&
-             var->allAttachedPropertyWrappersHaveWrappedValueInit()) {
+             var->allAttachedPropertyWrappersHaveWrappedValueInit() &&
+             !var->getName().hasDollarPrefix()) {
     wrappedValueInit = PropertyWrapperValuePlaceholderExpr::create(
         ctx, var->getSourceRange(), var->getType(), /*wrappedValue=*/nullptr);
 
