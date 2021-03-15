@@ -129,3 +129,35 @@ class SomeDerivedClass: SomeTestClass {
     }
   }
 }
+
+// rdar://75088379 -- 'defer' should not be able to forward-reference captures
+func badForwardReference() {
+  defer {
+    _ = x2 // expected-error {{use of local variable 'x2' before its declaration}}
+
+    let x1 = 0
+    let y1 = 0
+
+    defer {
+      _ = x1
+      _ = x2 // expected-error {{use of local variable 'x2' before its declaration}}
+      _ = y1
+      _ = y2 // expected-error {{use of local variable 'y2' before its declaration}}
+    }
+
+    let y2 = 0 // expected-note {{'y2' declared here}}
+  }
+
+  let x2 = 0 // expected-note 2{{'x2' declared here}}
+
+  func localFunc() {
+    defer {
+      _ = z1 // expected-error {{use of local variable 'z1' before its declaration}}
+      _ = z2
+    }
+
+    let z1 = 0 // expected-note {{'z1' declared here}}
+  }
+
+  let z2 = 0
+}
