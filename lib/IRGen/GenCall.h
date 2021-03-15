@@ -409,7 +409,7 @@ namespace irgen {
   /// a future.
   llvm::Value *emitTaskCreate(
     IRGenFunction &IGF, llvm::Value *flags,
-    llvm::Value *parentTask, llvm::Value *taskGroup,
+    llvm::Value *taskGroup,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction, llvm::Value *localContextInfo,
     SubstitutionMap subs);
@@ -431,9 +431,7 @@ namespace irgen {
                          Explosion &yieldedValues);
 
   enum class AsyncFunctionArgumentIndex : unsigned {
-    Task = 0,
-    Executor = 1,
-    Context = 2,
+    Context = 0,
   };
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,

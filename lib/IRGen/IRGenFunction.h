@@ -133,7 +133,6 @@ public:
   }
 
   llvm::Value *getAsyncTask();
-  llvm::Value *getAsyncExecutor();
   llvm::Value *getAsyncContext();
 
   llvm::CallInst *emitSuspendAsyncCall(ArrayRef<llvm::Value *> args);
@@ -175,8 +174,6 @@ private:
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
-  Address asyncTaskLocation;
-  Address asyncExecutorLocation;
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
@@ -198,7 +195,7 @@ public:
   }
 
   void setupAsync();
-  bool isAsync() const { return asyncTaskLocation.isValid(); }
+  bool isAsync() const { return asyncContextLocation.isValid(); }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");

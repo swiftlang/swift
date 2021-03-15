@@ -26,7 +26,7 @@ struct S {
 }
 
 // CHECK-LL: @structinstanceSInt64ToVoidTu =
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @structinstanceSInt64ToVoid(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @structinstanceSInt64ToVoid(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 sil hidden @structinstanceSInt64ToVoid : $@async @convention(method) (Int64, S) -> () {
 bb0(%int : $Int64, %self : $S):
   %takeSAndInt64 = function_ref @takeSAndInt64 : $@async @convention(thin) (S, Int64) -> ()

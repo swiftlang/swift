@@ -338,27 +338,15 @@ static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
 }
 
 void IRGenFunction::setupAsync() {
-  llvm::Value *t = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Task);
-  asyncTaskLocation = createAlloca(t->getType(), IGM.getPointerAlignment());
-  Builder.CreateStore(t, asyncTaskLocation);
-
-  llvm::Value *e = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Executor);
-  asyncExecutorLocation = createAlloca(e->getType(), IGM.getPointerAlignment());
-  Builder.CreateStore(e, asyncExecutorLocation);
-
   llvm::Value *c = CurFn->getArg((unsigned)AsyncFunctionArgumentIndex::Context);
   asyncContextLocation = createAlloca(c->getType(), IGM.getPointerAlignment());
   Builder.CreateStore(c, asyncContextLocation);
 }
 
 llvm::Value *IRGenFunction::getAsyncTask() {
-  assert(isAsync());
-  return Builder.CreateLoad(asyncTaskLocation);
-}
-
-llvm::Value *IRGenFunction::getAsyncExecutor() {
-  assert(isAsync());
-  return Builder.CreateLoad(asyncExecutorLocation);
+  auto call = Builder.CreateCall(IGM.getGetCurrentTaskFn(), {});
+  call->setDoesNotThrow();
+  return call;
 }
 
 llvm::Value *IRGenFunction::getAsyncContext() {
@@ -367,28 +355,20 @@ llvm::Value *IRGenFunction::getAsyncContext() {
 }
 
 llvm::CallInst *IRGenFunction::emitSuspendAsyncCall(ArrayRef<llvm::Value *> args) {
+  // The components of this struct type turn into the argument types
+  // of the resume function.  We only want one argument: the context
+  // pointer. TODO: take return values directly
   auto resultTy = llvm::StructType::get(
-      IGM.getLLVMContext(), {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy});
+      IGM.getLLVMContext(), {IGM.Int8PtrTy}, /*packed*/false);
 
   auto *id = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_suspend_async,
                                          {resultTy}, args);
-  // Update the current values of task, executor and context.
 
-  auto *rawTask = Builder.CreateExtractValue(id,
-      (unsigned)AsyncFunctionArgumentIndex::Task);
-  auto *task = Builder.CreateBitCast(rawTask, IGM.SwiftTaskPtrTy);
-  Builder.CreateStore(task, asyncTaskLocation);
-
-  // Update the current values of task, executor and context.
-  auto *rawExecutor = Builder.CreateExtractValue(id,
-      (unsigned)AsyncFunctionArgumentIndex::Executor);
-  auto *executor = Builder.CreateBitCast(rawExecutor, IGM.SwiftExecutorPtrTy);
-  Builder.CreateStore(executor, asyncExecutorLocation);
-
+  // Update the current context pointer using the projection
+  // function we were passsed.
   auto *calleeContext = Builder.CreateExtractValue(id,
       (unsigned)AsyncFunctionArgumentIndex::Context);
   llvm::Constant *projectFn = cast<llvm::Constant>(args[2])->stripPointerCasts();
-  // Get the caller context from the callee context.
   llvm::Value *context = Builder.CreateCall(projectFn, {calleeContext});
   context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
   Builder.CreateStore(context, asyncContextLocation);
@@ -842,9 +822,7 @@ void SignatureExpansion::expandCoroutineContinuationParameters() {
 void SignatureExpansion::addAsyncParameters() {
   // using TaskContinuationFunction =
   //   SWIFT_CC(swift)
-  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
-  ParamIRTypes.push_back(IGM.SwiftTaskPtrTy);
-  ParamIRTypes.push_back(IGM.SwiftExecutorPtrTy);
+  //   void (SWIFT_ASYNC_CONTEXT AsyncContext *);
   Attrs = Attrs.addParamAttribute(IGM.getLLVMContext(), getCurParamIndex(),
                                   llvm::Attribute::SwiftAsync);
   ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
@@ -2260,8 +2238,6 @@ public:
   void setArgs(Explosion &llArgs, bool isOutlined,
                WitnessMetadata *witnessMetadata) override {
     Explosion asyncExplosion;
-    asyncExplosion.add(IGF.getAsyncTask());
-    asyncExplosion.add(IGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer.getAddress());
     super::setArgs(asyncExplosion, false, witnessMetadata);
     SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
@@ -2300,12 +2276,6 @@ public:
                                         IGF.IGM.TaskContinuationFunctionPtrTy);
       Explosion explosion;
       explosion.add(fnVal);
-      saveValue(fieldLayout, explosion, isOutlined);
-    }
-    { // caller executor
-      Explosion explosion;
-      explosion.add(IGF.getAsyncExecutor());
-      auto fieldLayout = layout.getResumeParentExecutorLayout();
       saveValue(fieldLayout, explosion, isOutlined);
     }
     // Move all the arguments into the context.
@@ -2378,7 +2348,7 @@ public:
     auto &Builder = IGF.Builder;
     // Setup the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
-    arguments.push_back(IGM.getInt32(2)); // Index of swiftasync context.
+    arguments.push_back(IGM.getInt32(0)); // Index of swiftasync context.
     arguments.push_back(currentResumeFn);
     auto resumeProjFn = IGF.getOrCreateResumePrjFn();
     arguments.push_back(
@@ -3517,7 +3487,7 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
       llvm::Intrinsic::coro_id_async,
       {llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
        llvm::ConstantInt::get(IGM.Int32Ty, 16),
-       llvm::ConstantInt::get(IGM.Int32Ty, 2), asyncFuncPointer});
+       llvm::ConstantInt::get(IGM.Int32Ty, 0), asyncFuncPointer});
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.
   auto hdl = IGF.Builder.CreateIntrinsicCall(
@@ -3590,25 +3560,22 @@ void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
 
 llvm::Value *irgen::emitTaskCreate(
     IRGenFunction &IGF, llvm::Value *flags,
-    llvm::Value *parentTask, llvm::Value *taskGroup,
+    llvm::Value *taskGroup,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction, llvm::Value *localContextInfo,
     SubstitutionMap subs) {
-  parentTask = IGF.Builder.CreateBitOrPointerCast(
-      parentTask, IGF.IGM.SwiftTaskPtrTy);
-
   llvm::CallInst *result;
   if (taskGroup && futureResultType) {
     taskGroup = IGF.Builder.CreateBitOrPointerCast(
         taskGroup, IGF.IGM.SwiftTaskGroupPtrTy);
     result = IGF.Builder.CreateCall(
         IGF.IGM.getTaskCreateGroupFutureFn(),
-        {flags, parentTask, taskGroup, futureResultType,
+        {flags, taskGroup, futureResultType,
          taskFunction, localContextInfo});
   } else if (futureResultType) {
     result = IGF.Builder.CreateCall(
       IGF.IGM.getTaskCreateFutureFn(),
-      {flags, parentTask, futureResultType, taskFunction, localContextInfo});
+      {flags, futureResultType, taskFunction, localContextInfo});
   } else {
     llvm_unreachable("no future?!");
   }
@@ -4561,9 +4528,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
                         PointerAuthInfo(), sig);
 
   SmallVector<llvm::Value*, 4> Args;
-  // Get the current task, executor, and async context.
-  Args.push_back(IGF.getAsyncTask());
-  Args.push_back(IGF.getAsyncExecutor());
+  // Get the current async context.
   Args.push_back(IGF.getAsyncContext());
 
   // Setup the coro.end.async intrinsic call.
@@ -4605,7 +4570,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
 FunctionPointer
 IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
   auto *fnTy = llvm::FunctionType::get(
-      IGM.VoidTy, {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy},
+      IGM.VoidTy, {IGM.Int8PtrTy},
       false /*vaargs*/);
   auto signature =
       Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftAsyncCC);

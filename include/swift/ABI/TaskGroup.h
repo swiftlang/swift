@@ -38,7 +38,7 @@ public:
   void *PrivateData[NumWords_TaskGroup];
 
   /// Upon a future task's completion, offer it to the task group it belongs to.
-  void offer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
+  void offer(AsyncTask *completed, AsyncContext *context);
 };
 
 } // end namespace swift
