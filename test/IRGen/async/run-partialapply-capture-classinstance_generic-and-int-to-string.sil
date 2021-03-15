@@ -18,7 +18,7 @@ import _Concurrency
 
 // CHECK-LL: @Super_runTu =
 // CHECK-LL: @Sub_runTu =
-// CHECK-LL: @"$s20partial_apply_methodTwTu" =
+// CHECK-LL: @"$s20partial_apply_methodTw_Tu" =
 
 protocol Q {
   func testU() -> String

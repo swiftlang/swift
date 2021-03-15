@@ -592,6 +592,14 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   return %40 : $()
 }
 
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc { i8*, %swift.refcounted* } @create_pa_f2(i8* %0, %swift.refcounted* %1, i32 %2) {{#[0-9]+}}
+sil @create_pa_f2 : $@convention(thin) (@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int64, Int32) -> @owned @async @callee_guaranteed (Int64) -> Int64 {
+bb0(%thick : $@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int64 , %captured : $Int32):
+  %pa_f = partial_apply [callee_guaranteed] %thick(%captured) : $@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int64
+  %pa_f2 = partial_apply [callee_guaranteed] %thick(%captured) : $@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int64
+  return %pa_f : $@async @callee_guaranteed (Int64) -> Int64
+}
+
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s26parametric_casting_closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s26parametric_casting_closureTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s24complex_generic_functionTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
@@ -600,4 +608,6 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s37indirect_in_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s46indirect_in_constant_captured_class_pair_paramTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s12create_pa_f2Tw_"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s12create_pa_f2Tw0_"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}}
 

@@ -3334,19 +3334,6 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   Explosion llArgs;
 
   auto &lv = getLoweredValue(i->getCallee());
-  if (i->getOrigCalleeType()->isAsync()) {
-    auto result = getPartialApplicationFunction(*this, i->getCallee(),
-                                                i->getSubstitutionMap(),
-                                                i->getSubstCalleeType());
-    llvm::Value *innerContext = std::get<1>(result);
-    llvm::Value *size;
-    llvm::Value *fnPtr;
-    std::tie(fnPtr, size) = getAsyncFunctionAndSize(
-        *this, i->getOrigCalleeType()->getRepresentation(), std::get<0>(result),
-        innerContext, {/*function*/ false, /*size*/ true});
-    assert(fnPtr == nullptr);
-    llArgs.add(size);
-  }
 
   // Lower the parameters in the callee's generic context.
   {
