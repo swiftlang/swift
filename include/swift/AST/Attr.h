@@ -2147,27 +2147,59 @@ public:
   }
 };
 
-/// The `@hasAsyncAlternative` attribute marks a function as having an async
+/// The `@completionHandlerAsync` attribute marks a function as having an async
 /// alternative, optionally providing a name (for cases when the alternative
 /// has a different name).
-class HasAsyncAlternativeAttr final : public DeclAttribute  {
+class CompletionHandlerAsyncAttr final : public DeclAttribute {
+private:
+  /// DeclName of the async function in the attribute
+  const DeclNameRef AsyncFunctionName;
+
 public:
-  /// An optional name of the async alternative function, where the name of the
-  /// attributed function is used otherwise.
-  const DeclNameRef Name;
+  /// Source location of the async function name in the attribute
+  const SourceLoc AsyncFunctionNameLoc;
 
-  HasAsyncAlternativeAttr(DeclNameRef Name, SourceLoc AtLoc, SourceRange Range)
-    : DeclAttribute(DAK_HasAsyncAlternative, AtLoc, Range, false),
-      Name(Name) {}
+  /// Get the name of the async function
+  ///
+  /// The name will come from the AsyncFunctionDecl if available, otherwise will
+  /// fall back on the user-provided name. If that is not defined, this function
+  /// will abort.
+  DeclNameRef getAsyncFunctionName() const;
 
-  HasAsyncAlternativeAttr(SourceLoc AtLoc, SourceRange Range)
-    : DeclAttribute(DAK_HasAsyncAlternative, AtLoc, Range, false) {}
+  /// The index of the completion handler
+  const size_t CompletionHandlerIndex;
 
-  /// Determine whether this attribute has a name associated with it.
-  bool hasName() const { return !Name.getBaseName().empty(); }
+  /// Source location of the completion handler index passed to the index
+  const SourceLoc CompletionHandlerIndexLoc;
+
+  AbstractFunctionDecl *AsyncFunctionDecl = nullptr;
+
+  CompletionHandlerAsyncAttr(DeclNameRef asyncFunctionName,
+                             SourceLoc asyncFunctionNameLoc,
+                             size_t completionHandlerIndex,
+                             SourceLoc completionHandlerIndexLoc,
+                             SourceLoc atLoc, SourceRange range)
+      : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
+                      /*implicit*/ false),
+        AsyncFunctionName(asyncFunctionName),
+        AsyncFunctionNameLoc(asyncFunctionNameLoc),
+        CompletionHandlerIndex(completionHandlerIndex),
+        CompletionHandlerIndexLoc(completionHandlerIndexLoc) {}
+
+  CompletionHandlerAsyncAttr(AbstractFunctionDecl &asyncFunctionDecl,
+                             size_t completionHandlerIndex,
+                             SourceLoc completionHandlerIndexLoc,
+                             SourceLoc atLoc, SourceRange range)
+      : DeclAttribute(DAK_CompletionHandlerAsync, atLoc, range,
+                      /*implicit*/ false),
+        CompletionHandlerIndex(completionHandlerIndex),
+        CompletionHandlerIndexLoc(completionHandlerIndexLoc),
+        AsyncFunctionDecl(&asyncFunctionDecl) {}
+
+
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_HasAsyncAlternative;
+    return DA->getKind() == DAK_CompletionHandlerAsync;
   }
 };
 
