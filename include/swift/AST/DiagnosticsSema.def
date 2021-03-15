@@ -854,6 +854,9 @@ NOTE(unspaced_binary_operators_candidate,none,
 ERROR(unspaced_unary_operator,none,
       "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
+ERROR(nonexistent_power_operator,none,
+      "no operator '**' is defined; did you mean 'pow(_:_:)'?",
+      ())
 
 ERROR(cannot_find_in_scope,none,
       "cannot %select{find|find operator}1 %0 in scope", (DeclNameRef, bool))
