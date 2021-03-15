@@ -892,8 +892,7 @@ static bool diagnoseNonConcurrentProperty(
 /// missing.
 static bool shouldDiagnoseNonConcurrentValueViolations(
     const LangOptions &langOpts) {
-  return langOpts.EnableExperimentalConcurrency ||
-      langOpts.WarnConcurrency;
+  return langOpts.WarnConcurrency;
 }
 
 bool swift::diagnoseNonConcurrentTypesInReference(
