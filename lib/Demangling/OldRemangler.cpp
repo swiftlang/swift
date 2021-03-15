@@ -606,6 +606,10 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
 }
 
+void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
+  unreachable("unsupported");
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {

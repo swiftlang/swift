@@ -573,6 +573,7 @@ private:
     case Node::Kind::AutoDiffFunctionKind:
     case Node::Kind::DifferentiabilityWitness:
     case Node::Kind::IndexSubset:
+    case Node::Kind::AsyncNonconstantPartialApplyThunk:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2773,6 +2774,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::AsyncFunctionPointer:
     Printer << "async function pointer to ";
+    return nullptr;
+  case Node::Kind::AsyncNonconstantPartialApplyThunk:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
+    Printer << " thunk for non-constant partial apply in ";
     return nullptr;
   }
   printer_unreachable("bad node kind!");
