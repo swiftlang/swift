@@ -624,7 +624,7 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   110)
 
-DECL_ATTR(hasAsyncAlternative, HasAsyncAlternative,
+DECL_ATTR(completionHandlerAsync, CompletionHandlerAsync,
   OnAbstractFunction | ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIStableToRemove,
