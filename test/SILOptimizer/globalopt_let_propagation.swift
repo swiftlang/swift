@@ -72,6 +72,10 @@ var VPI = 3.1415
 var VI = 100
 var VS = "String2"
 
+struct GenericStruct<T> {
+  var x: T
+}
+
 // Define some static let variables inside a struct.
 struct B {
  static let PI = 3.1415
@@ -109,6 +113,8 @@ struct B {
  static let IT1 = ((10, 20), 30, 40)
 
  static let IT2 = (100, 200, 300)
+
+ static let emptyStruct = GenericStruct(x: ())
 }
 
 // Define some static let variables inside a class.
