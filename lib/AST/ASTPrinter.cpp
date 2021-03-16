@@ -2479,6 +2479,12 @@ static bool usesFeatureMarkerProtocol(Decl *decl) {
     if (proto->isMarkerProtocol())
       return true;
 
+    // Swift.Error and Swift.CodingKey "don't" use the marker protocol.
+    if (proto->isSpecificProtocol(KnownProtocolKind::Error) ||
+        proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
+      return false;
+    }
+
     if (checkInherited(proto->getInherited()))
       return true;
 
