@@ -55,3 +55,9 @@ void swift::_swift_tsan_release(void *addr) {
     tsan_release(addr);
   }
 }
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(c)
+void swift_task_set_tsan_hooks(TSanFunc *acquire, TSanFunc *release) {
+  tsan_acquire = acquire;
+  tsan_release = release;
+}
