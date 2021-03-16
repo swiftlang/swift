@@ -179,8 +179,11 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   
   switch (inst->getMode()) {
     case AssignByWrapperInst::Unknown:
-      llvm_unreachable("assign_by_wrapper must have a valid mode");
-
+      assert(b.getModule().getASTContext().hadError() &&
+             "assign_by_wrapper must have a valid mode");
+      // In case DefiniteInitialization already gave up with an error, just
+      // treat the assign_by_wrapper as an "init".
+      LLVM_FALLTHROUGH;
     case AssignByWrapperInst::Initialization:
     case AssignByWrapperInst::Assign: {
       SILValue initFn = inst->getInitializer();
