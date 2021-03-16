@@ -245,12 +245,21 @@ private:
 
   OpaqueSyntaxNode makeDeferredLayout(
       syntax::SyntaxKind k, bool isMissing,
-      const ArrayRef<RecordedOrDeferredNode> &children) override {
+      const MutableArrayRef<ParsedRawSyntaxNode> &parsedChildren) override {
     assert(!isMissing && "Missing layout nodes not implemented yet");
+
+    auto childrenMem = DeferredNodeAllocator.Allocate<RecordedOrDeferredNode>(
+        parsedChildren.size());
+    auto children =
+        llvm::makeMutableArrayRef(childrenMem, parsedChildren.size());
 
     // Compute the length of this node.
     unsigned length = 0;
-    for (auto &child : children) {
+    size_t index = 0;
+    for (auto &parsedChild : parsedChildren) {
+      auto child = parsedChild.takeRecordedOrDeferredNode();
+      children[index++] = child;
+
       switch (child.getKind()) {
       case RecordedOrDeferredNode::Kind::Null:
         break;
