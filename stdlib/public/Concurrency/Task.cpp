@@ -408,42 +408,21 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
                                              initialContextSize);
 }
 
-namespace {
-/// The header of a function context (closure captures) of
-/// a thick async function with a non-null context.
-struct ThickAsyncFunctionContext: HeapObject {
-  uint32_t ExpectedContextSize;
-};
-
 /// Extract the entry point address and initial context size from an async closure value.
 template<typename AsyncSignature, uint16_t AuthDiscriminator>
 SWIFT_ALWAYS_INLINE // so this doesn't hang out as a ptrauth gadget
 std::pair<typename AsyncSignature::FunctionType *, size_t>
 getAsyncClosureEntryPointAndContextSize(void *function,
                                         HeapObject *functionContext) {
-  // If the function context is non-null, then the function pointer is
-  // an ordinary function pointer.
-  if (functionContext) {
-    function = swift_auth_code(function, AuthDiscriminator);
-    size_t contextSize =
-      static_cast<ThickAsyncFunctionContext*>(functionContext)
-        ->ExpectedContextSize;
-    return {reinterpret_cast<typename AsyncSignature::FunctionType *>(function),
-            contextSize};
-  // Otherwise, the function pointer is an async function pointer.
-  } else {
-    auto fnPtr =
+  auto fnPtr =
       reinterpret_cast<const AsyncFunctionPointer<AsyncSignature> *>(function);
 #if SWIFT_PTRAUTH
-    fnPtr = (const AsyncFunctionPointer<AsyncSignature> *)ptrauth_auth_data(
-      (void *)fnPtr, ptrauth_key_process_independent_code,
-      AuthDiscriminator);
+  fnPtr = (const AsyncFunctionPointer<AsyncSignature> *)ptrauth_auth_data(
+      (void *)fnPtr, ptrauth_key_process_independent_code, AuthDiscriminator);
 #endif
-    return {
-      reinterpret_cast<typename AsyncSignature::FunctionType *>(fnPtr->Function.get()),
-      fnPtr->ExpectedContextSize};
-  }
-}
+  return {reinterpret_cast<typename AsyncSignature::FunctionType *>(
+              fnPtr->Function.get()),
+          fnPtr->ExpectedContextSize};
 }
 
 AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
