@@ -338,10 +338,6 @@ public:
   /// Pointer authentication.
   PointerAuthOptions PointerAuth;
 
-  /// Use async-specific lowering for async functions if it is supported for
-  /// the target.
-  bool UseAsyncLowering = USE_SWIFT_ASYNC_LOWERING;
-
   /// The different modes for dumping IRGen type info.
   enum class TypeInfoDumpFilter {
     All,
