@@ -442,31 +442,16 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
 }
 
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-GlobalActorAttributeRequest::evaluate(
-    Evaluator &evaluator,
-    llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
-  DeclContext *dc;
-  DeclAttributes *declAttrs;
-  SourceLoc loc;
-  if (auto decl = subject.dyn_cast<Decl *>()) {
-    dc = decl->getDeclContext();
-    declAttrs = &decl->getAttrs();
-    loc = decl->getLoc();
-  } else {
-    auto closure = subject.get<ClosureExpr *>();
-    dc = closure;
-    declAttrs = &closure->getAttrs();
-    loc = closure->getLoc();
-  }
+swift::checkGlobalActorAttributes(
+    SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs) {
   ASTContext &ctx = dc->getASTContext();
+
   CustomAttr *globalActorAttr = nullptr;
   NominalTypeDecl *globalActorNominal = nullptr;
-
-  for (auto attr : declAttrs->getAttributes<CustomAttr>()) {
-    auto mutableAttr = const_cast<CustomAttr *>(attr);
+  for (auto attr : attrs) {
     // Figure out which nominal declaration this custom attribute refers to.
     auto nominal = evaluateOrDefault(ctx.evaluator,
-                                     CustomAttrNominalRequest{mutableAttr, dc},
+                                     CustomAttrNominalRequest{attr, dc},
                                      nullptr);
 
     // Ignore unresolvable custom attributes.
@@ -492,14 +477,48 @@ GlobalActorAttributeRequest::evaluate(
   if (!globalActorAttr)
     return None;
 
+  return std::make_pair(globalActorAttr, globalActorNominal);
+}
+
+Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+GlobalActorAttributeRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
+  DeclContext *dc;
+  DeclAttributes *declAttrs;
+  SourceLoc loc;
+  if (auto decl = subject.dyn_cast<Decl *>()) {
+    dc = decl->getDeclContext();
+    declAttrs = &decl->getAttrs();
+    loc = decl->getLoc();
+  } else {
+    auto closure = subject.get<ClosureExpr *>();
+    dc = closure;
+    declAttrs = &closure->getAttrs();
+    loc = closure->getLoc();
+  }
+
+  // Collect the attributes.
+  SmallVector<CustomAttr *, 2> attrs;
+  for (auto attr : declAttrs->getAttributes<CustomAttr>()) {
+    auto mutableAttr = const_cast<CustomAttr *>(attr);
+    attrs.push_back(mutableAttr);
+  }
+
+  // Look for a global actor attribute.
+  auto result = checkGlobalActorAttributes(loc, dc, attrs);
+  if (!result)
+    return None;
+
   // Closures can always have a global actor attached.
   if (auto closure = subject.dyn_cast<ClosureExpr *>()) {
-    return std::make_pair(globalActorAttr, globalActorNominal);
+    return result;
   }
 
   // Check that a global actor attribute makes sense on this kind of
   // declaration.
   auto decl = subject.get<Decl *>();
+  auto globalActorAttr = result->first;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // Nominal types are okay...
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
@@ -529,7 +548,7 @@ GlobalActorAttributeRequest::evaluate(
     return None;
   }
 
-  return std::make_pair(globalActorAttr, globalActorNominal);
+  return result;
 }
 
 /// Determine the isolation rules for a given declaration.

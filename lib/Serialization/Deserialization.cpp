@@ -5099,16 +5099,17 @@ public:
     bool noescape = false, concurrent, async, throws;
     GenericSignature genericSig;
     TypeID clangTypeID;
+    TypeID globalActorTypeID;
 
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(
           scratch, resultID, rawRepresentation, clangTypeID,
-          noescape, concurrent, async, throws, rawDiffKind);
+          noescape, concurrent, async, throws, rawDiffKind, globalActorTypeID);
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(
           scratch, resultID, rawRepresentation, concurrent, async, throws,
-          rawDiffKind, rawGenericSig);
+          rawDiffKind, globalActorTypeID, rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
       clangTypeID = 0;
     }
@@ -5129,8 +5130,18 @@ public:
       clangFunctionType = loadedClangType.get();
     }
 
+    Type globalActor;
+    if (globalActorTypeID) {
+      auto globalActorTy = MF.getTypeChecked(globalActorTypeID);
+      if (!globalActorTy)
+        return globalActorTy.takeError();
+
+      globalActor = globalActorTy.get();
+    }
+
     auto info = FunctionType::ExtInfoBuilder(*representation, noescape, throws,
-                                             *diffKind, clangFunctionType)
+                                             *diffKind, clangFunctionType,
+                                             globalActor)
                     .withConcurrent(concurrent)
                     .withAsync(async)
                     .build();

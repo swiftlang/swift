@@ -406,9 +406,12 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
+  Type globalActor;
+  // FIXME: Demangle global actors.
+
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
-                                   diffKind, clangFunctionType)
+                                   diffKind, clangFunctionType, globalActor)
           .withAsync(flags.isAsync())
           .build();
 

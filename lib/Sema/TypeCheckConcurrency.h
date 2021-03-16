@@ -29,6 +29,7 @@ class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
 class ConcreteDeclRef;
+class CustomAttr;
 class Decl;
 class DeclContext;
 class EnumElementDecl;
@@ -214,6 +215,13 @@ enum class ConcurrentValueCheck {
   /// Implicit conformance to ConcurrentValue for structs and enums.
   Implicit,
 };
+
+/// Given a set of custom attributes, pick out the global actor attributes
+/// and perform any necessary resolution and diagnostics, returning the
+/// global actor attribute and type it refers to (or \c None).
+Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+checkGlobalActorAttributes(
+    SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
 
 /// Check the correctness of the given ConcurrentValue conformance.
 ///

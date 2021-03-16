@@ -1820,7 +1820,8 @@ namespace {
                            bool concurrent = false,
                            const clang::Type *parsedClangFunctionType = nullptr,
                            DifferentiabilityKind diffKind =
-                               DifferentiabilityKind::NonDifferentiable);
+                               DifferentiabilityKind::NonDifferentiable,
+                           Type globalActor = Type());
     SmallVector<AnyFunctionType::Param, 8> resolveASTFunctionTypeParams(
         TupleTypeRepr *inputRepr, TypeResolutionOptions options,
         bool requiresMappingOut, DifferentiabilityKind diffKind);
@@ -2089,8 +2090,33 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       options.is(TypeResolverContext::VariadicFunctionInput) &&
       !options.hasBase(TypeResolverContext::EnumElementDecl);
 
-  // Diagnose custom attributes.
+  // Resolve global actor.
+  CustomAttr *globalActorAttr = nullptr;
+  Type globalActor;
+  if (isa<FunctionTypeRepr>(repr)) {
+    auto foundGlobalActor = checkGlobalActorAttributes(
+        repr->getLoc(), getDeclContext(),
+        std::vector<CustomAttr *>(
+          attrs.getCustomAttrs().begin(), attrs.getCustomAttrs().end()));
+    if (foundGlobalActor) {
+      globalActorAttr = foundGlobalActor->first;
+      globalActor = evaluateOrDefault(
+          getASTContext().evaluator,
+          CustomAttrTypeRequest{
+        foundGlobalActor->first, getDeclContext(),
+            CustomAttrTypeKind::GlobalActor},
+          Type());
+      if (globalActor->hasError())
+        globalActor = Type();
+    }
+  }
+
+  // Diagnose custom attributes that haven't been processed yet.
   for (auto customAttr : attrs.getCustomAttrs()) {
+    // If this was the global actor we matched, ignore it.
+    if (globalActorAttr == customAttr)
+      continue;
+
     // Diagnose the attribute, because we don't yet handle custom type
     // attributes.
     std::string typeName;
@@ -2219,7 +2245,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     }
   }
 
-  bool hasFunctionAttr =
+  bool hasFunctionAttr = globalActor ||
       llvm::any_of(FunctionAttrs, [&attrs](const TypeAttrKind &attr) {
         return attrs.has(attr);
       });
@@ -2377,7 +2403,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
                                   concurrent, parsedClangFunctionType,
-                                  diffKind);
+                                  diffKind, globalActor);
       if (!ty || ty->hasError())
         return ty;
     }
@@ -2769,7 +2795,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     AnyFunctionType::Representation representation, bool noescape,
     bool concurrent, const clang::Type *parsedClangFunctionType,
-    DifferentiabilityKind diffKind) {
+    DifferentiabilityKind diffKind, Type globalActor) {
 
   Optional<llvm::SaveAndRestore<GenericParamList *>> saveGenericParams;
 
@@ -2822,7 +2848,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), diffKind,
-      /*clangFunctionType*/ nullptr);
+      /*clangFunctionType*/ nullptr, Type());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -2833,6 +2859,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withConcurrent(concurrent)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
+                     .withGlobalActor(globalActor)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
