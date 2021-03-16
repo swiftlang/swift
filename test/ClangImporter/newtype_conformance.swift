@@ -20,7 +20,7 @@ func acceptComparable<T: Comparable>(_: T) {}
 func testNewTypeWrapper(x: NSNotification.Name, y: NSNotification.Name) {
   acceptEquatable(x)
   acceptHashable(x)
-  acceptComparable(x) // expected-error {{value of type 'NSNotification.Name' does not conform to specified type 'Comparable'}} {{19-19=.rawValue}}
+  acceptComparable(x) // expected-error {{type 'NSNotification.Name' does not conform to protocol 'Comparable'}} {{19-19=.rawValue}}
 
   _ = x == y
   _ = x != y
