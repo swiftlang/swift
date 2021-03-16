@@ -179,12 +179,6 @@ public:
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
 
-  bool isDeferBody() const {
-    if (auto *fd = dyn_cast_or_null<FuncDecl>(getAbstractFunctionDecl()))
-      return fd->isDeferBody();
-    return false;
-  }
-
   /// Return true if this closure is passed as an argument to a function and is
   /// known not to escape from that function.  In this case, captures can be
   /// more efficient.
