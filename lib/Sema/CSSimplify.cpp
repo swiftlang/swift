@@ -3243,7 +3243,14 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   // behind itself which we can use to better understand
   // how many levels of optionality have to be unwrapped.
   if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(anchor)) {
-    auto type = cs.getType(OEE->getSubExpr());
+    auto *subExpr = OEE->getSubExpr();
+
+    // First, let's check whether it has been determined that
+    // it was incorrect to use `?` in this position.
+    if (cs.hasFixFor(cs.getConstraintLocator(subExpr), FixKind::RemoveUnwrap))
+      return true;
+
+    auto type = cs.getType(subExpr);
     // If the type of sub-expression is optional, type of the
     // `OptionalEvaluationExpr` could be safely ignored because
     // it doesn't add any type information.
