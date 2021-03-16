@@ -3305,19 +3305,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
     if (customAttrResult.isParseErrorOrHasCompletion())
       return true;
 
-    // Diagnose the attribute, because we don't yet handle custom type
-    // attributes.
-    std::string typeName;
-    auto customAttr = customAttrResult.get();
-    if (auto typeRepr = customAttr->getTypeRepr()) {
-      llvm::raw_string_ostream out(typeName);
-      typeRepr->print(out);
-    } else {
-      typeName = customAttr->getType().getString();
-    }
-
-    diagnose(customAttr->getLocation(), diag::unknown_attribute, typeName);
-    return true;
+    if (auto attr = customAttrResult.get())
+      Attributes.addCustomAttr(attr);
+    return false;
   }
   
   // Ok, it is a valid attribute, eat it, and then process it.
