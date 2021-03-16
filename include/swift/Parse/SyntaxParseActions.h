@@ -20,6 +20,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Subsystems.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
@@ -33,8 +35,6 @@ namespace syntax {
 class SourceFileSyntax;
 enum class SyntaxKind : uint16_t;
 }
-
-typedef const void *OpaqueSyntaxNode;
 
 // MARK: - Helper types
 
@@ -51,15 +51,14 @@ public:
   };
 
 private:
-  OpaqueSyntaxNode Opaque;
-  Kind NodeKind;
+  llvm::PointerIntPair<OpaqueSyntaxNode, 2, Kind> Data;
 
 public:
   RecordedOrDeferredNode(OpaqueSyntaxNode Node, Kind NodeKind)
-      : Opaque(Node), NodeKind(NodeKind) {}
+      : Data(Node, NodeKind) {}
 
-  OpaqueSyntaxNode getOpaque() const { return Opaque; }
-  Kind getKind() const { return NodeKind; }
+  OpaqueSyntaxNode getOpaque() const { return Data.getPointer(); }
+  Kind getKind() const { return Data.getInt(); }
 };
 
 /// Data returned from \c getDeferredChild. This is enough data to construct
