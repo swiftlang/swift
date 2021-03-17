@@ -303,25 +303,27 @@ struct ConformanceState {
 
 #if USE_DYLD_SHARED_CACHE_CONFORMANCE_TABLES
     if (__builtin_available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)) {
-      if (&_dyld_swift_optimizations_version) {
-        if (_dyld_swift_optimizations_version() ==
-            DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION) {
-          size_t length;
-          dyldSharedCacheStart =
-              (uintptr_t)_dyld_get_shared_cache_range(&length);
-          dyldSharedCacheEnd =
-              dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
-          validateSharedCacheResults = runtime::environment::
-              SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES();
-          SHARED_CACHE_LOG("Shared cache range is %#lx-%#lx",
-                           dyldSharedCacheStart, dyldSharedCacheEnd);
-        } else {
-          SHARED_CACHE_LOG(
-              "Disabling shared cache optimizations due to unknown "
-              "optimizations version %u",
-              _dyld_swift_optimizations_version());
-          dyldSharedCacheStart = 0;
-          dyldSharedCacheEnd = 0;
+      if (runtime::environment::SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES()) {
+        if (&_dyld_swift_optimizations_version) {
+          if (_dyld_swift_optimizations_version() ==
+              DYLD_EXPECTED_SWIFT_OPTIMIZATIONS_VERSION) {
+            size_t length;
+            dyldSharedCacheStart =
+                (uintptr_t)_dyld_get_shared_cache_range(&length);
+            dyldSharedCacheEnd =
+                dyldSharedCacheStart ? dyldSharedCacheStart + length : 0;
+            validateSharedCacheResults = runtime::environment::
+                SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES();
+            SHARED_CACHE_LOG("Shared cache range is %#lx-%#lx",
+                             dyldSharedCacheStart, dyldSharedCacheEnd);
+          } else {
+            SHARED_CACHE_LOG(
+                "Disabling shared cache optimizations due to unknown "
+                "optimizations version %u",
+                _dyld_swift_optimizations_version());
+            dyldSharedCacheStart = 0;
+            dyldSharedCacheEnd = 0;
+          }
         }
       }
     }
@@ -608,8 +610,8 @@ static void validateSharedCacheResults(
   };
 
   if (dyldCachedConformanceDescriptor) {
-    if (!std::find(conformances.begin(), conformances.end(),
-                   dyldCachedConformanceDescriptor)) {
+    if (std::find(conformances.begin(), conformances.end(),
+                  dyldCachedConformanceDescriptor) == conformances.end()) {
       auto typeName = swift_getTypeName(type, true);
       swift::fatalError(
           0,
@@ -775,7 +777,10 @@ swift_conformsToProtocolImpl(const Metadata *const type,
   }
 
   if (dyldCachedConformanceDescriptor) {
-    auto witness = dyldCachedConformanceDescriptor->getWitnessTable(type);
+    ConformanceCandidate candidate(*dyldCachedConformanceDescriptor);
+    auto *matchingType = candidate.getMatchingType(type);
+    assert(matchingType);
+    auto witness = dyldCachedConformanceDescriptor->getWitnessTable(matchingType);
     C.cacheResult(type, protocol, witness, /*always cache*/ 0);
     SHARED_CACHE_LOG("Caching generic conformance to %s found in shared cache",
                      protocol->Name.get());
