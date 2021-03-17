@@ -1127,22 +1127,25 @@ static Type getTypeForCompletion(const constraints::Solution &S, Expr *E) {
     });
 
     return S.simplifyType(completionTy.transform([&](Type type) {
-      if (auto *placeholder = type->getAs<PlaceholderType>()) {
-        if (auto *typeVar =
-                placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
-          if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-            // Code completion depends on generic parameter type being
-            // represented in terms of `ArchetypeType` since it's easy
-            // to extract protocol requirements from it.
-            if (auto *GPD = GP->getDecl())
-              return GPD->getInnermostDeclContext()->mapTypeIntoContext(GP);
+      auto *placeholder = type->getAs<PlaceholderType>();
+      if (!placeholder)
+        return type;
+
+      if (auto *typeVar =
+              placeholder->getOriginator().dyn_cast<TypeVariableType *>()) {
+        if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+          // Code completion depends on generic parameter type being
+          // represented in terms of `ArchetypeType` since it's easy
+          // to extract protocol requirements from it.
+          if (auto *GPD = GP->getDecl()) {
+            DeclContext *DC = GPD->getInnermostDeclContext();
+            if (auto mappedTy = DC->mapTypeIntoContext(GP))
+              return mappedTy;
           }
         }
-
-        return Type(CS.getASTContext().TheUnresolvedType);
       }
 
-      return type;
+      return Type(CS.getASTContext().TheUnresolvedType);
     }));
   }
 
