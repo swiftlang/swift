@@ -20,7 +20,7 @@ import _Concurrency
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
 // CHECK-LL: @voidToInt64AndInt64Tu =
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @voidToInt64AndInt64(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @voidToInt64AndInt64(
 sil @voidToInt64AndInt64 : $@async @convention(thin) () -> (Int64, Int64) {
   %int_literal1 = integer_literal $Builtin.Int64, 42
   %int1 = struct $Int64 (%int_literal1 : $Builtin.Int64)

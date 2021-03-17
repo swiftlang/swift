@@ -46,8 +46,8 @@ exit:
 }
 
 // CHECK-LL: @closureTu =
-// CHECK-LL: define internal swift{{(tail)?}}cc void @closure(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s7closureTA"(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define internal swift{{(tail)?}}cc void @closure(
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s7closureTA"(
 sil hidden @createPartialApply : $@async @convention(thin) (Int64) -> @owned @async @callee_guaranteed (Int64) -> (Int64, @error Error) {
 bb0(%captured : $Int64):
   %closure = function_ref @closure : $@async @convention(thin) (Int64, Int64) -> (Int64, @error Error)

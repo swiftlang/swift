@@ -18,7 +18,7 @@ import _Concurrency
 
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @int64ToVoid(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @int64ToVoid(
 sil @int64ToVoid : $@async @convention(thin) (Int64) -> () {
 entry(%int : $Int64):
   %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()

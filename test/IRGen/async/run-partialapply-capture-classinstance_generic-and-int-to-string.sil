@@ -62,7 +62,7 @@ bb0(%value : $String, %instance : $Super):
   return %instance : $Super
 }
 
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @Super_run(%swift.context* swiftasync %0) #0 {
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @Super_run(
 sil hidden @Super_run : $@convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String {
 bb0(%generic_addr : $*U, %int_arg : $Int64, %int : $Super):
   %printGeneric = function_ref @printGeneric : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -107,7 +107,7 @@ bb0(%instance : $Super):
   return %out : $()
 }
 
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @Sub_run(%swift.context* swiftasync %0) #0 {
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @Sub_run(
 sil hidden @Sub_run : $@convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Sub) -> @owned String {
 bb0(%U_addr : $*U, %int : $Int64, %sub : $Sub):
   strong_retain %sub : $Sub
@@ -199,7 +199,7 @@ bb0(%initialized : $Sub):
 //       CHECK-SIL:   return [[RESULT]] : $String
 // CHECK-SIL-LABEL: } // end sil function '$s20partial_apply_methodTw_'
 
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s20partial_apply_methodTw_TA"(%swift.context* swiftasync %0) #0 {
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s20partial_apply_methodTw_TA"(
 sil hidden @partial_apply_method : $@convention(thin) <U where U : Q> (@guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @callee_guaranteed @async (@in_guaranteed U, Int64) -> @owned String {
 entry(%int : $Super, %fn : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String):
     %pa = partial_apply [callee_guaranteed] %fn<U>(%int) : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String

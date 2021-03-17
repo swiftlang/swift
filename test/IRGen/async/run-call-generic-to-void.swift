@@ -12,7 +12,7 @@
 import _Concurrency
 
 // CHECK-LL: @genericToVoidTu =
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @genericToVoid(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @genericToVoid(
 @_silgen_name("genericToVoid")
 func genericToVoid<T>(_ t: T) async {
   print(t) // CHECK: 922337203685477580

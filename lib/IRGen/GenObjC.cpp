@@ -717,7 +717,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   fwd->setAttributes(attrs);
   // Merge initial attributes with attrs.
   llvm::AttrBuilder b;
-  IGM.constructInitialFnAttributes(b);
+  IGM.constructInitialFnAttributes(b, false /*disable ptr auth returns*/);
   fwd->addAttributes(llvm::AttributeList::FunctionIndex, b);
   
   IRGenFunction subIGF(IGM, fwd);
