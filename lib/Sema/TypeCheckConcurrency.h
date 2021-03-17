@@ -28,7 +28,9 @@ class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
+class ClosureExpr;
 class ConcreteDeclRef;
+class CustomAttr;
 class Decl;
 class DeclContext;
 class EnumElementDecl;
@@ -175,6 +177,10 @@ public:
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
+/// Determine whether the given context uses concurrency features, such
+/// as async functions or actors.
+bool contextUsesConcurrencyFeatures(const DeclContext *dc);
+
 /// Diagnose the presence of any non-concurrent types when referencing a
 /// given declaration from a particular declaration context.
 ///
@@ -214,6 +220,16 @@ enum class ConcurrentValueCheck {
   /// Implicit conformance to ConcurrentValue for structs and enums.
   Implicit,
 };
+
+/// Given a set of custom attributes, pick out the global actor attributes
+/// and perform any necessary resolution and diagnostics, returning the
+/// global actor attribute and type it refers to (or \c None).
+Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+checkGlobalActorAttributes(
+    SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
+
+/// Get the explicit global actor specified for a closure.
+Type getExplicitGlobalActor(ClosureExpr *closure);
 
 /// Check the correctness of the given ConcurrentValue conformance.
 ///

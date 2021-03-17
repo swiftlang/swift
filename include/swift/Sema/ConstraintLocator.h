@@ -747,7 +747,7 @@ public:
 
 class LocatorPathElt::ArgumentAttribute final : public StoredIntegerElement<1> {
 public:
-  enum Attribute : uint8_t { InOut, Escaping, Concurrent };
+  enum Attribute : uint8_t { InOut, Escaping, Concurrent, GlobalActor };
 
 private:
   ArgumentAttribute(Attribute attr)
@@ -766,6 +766,10 @@ public:
 
   static ArgumentAttribute forConcurrent() {
     return ArgumentAttribute(Attribute::Concurrent);
+  }
+
+  static ArgumentAttribute forGlobalActor() {
+    return ArgumentAttribute(Attribute::GlobalActor);
   }
 
   static bool classof(const LocatorPathElt *elt) {

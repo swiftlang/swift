@@ -2625,6 +2625,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   }
 
   ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+  attr->setInvalid();
 
   return nullptr;
 }

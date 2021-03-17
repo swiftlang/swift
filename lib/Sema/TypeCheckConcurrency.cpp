@@ -442,31 +442,16 @@ VarDecl *GlobalActorInstanceRequest::evaluate(
 }
 
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-GlobalActorAttributeRequest::evaluate(
-    Evaluator &evaluator,
-    llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
-  DeclContext *dc;
-  DeclAttributes *declAttrs;
-  SourceLoc loc;
-  if (auto decl = subject.dyn_cast<Decl *>()) {
-    dc = decl->getDeclContext();
-    declAttrs = &decl->getAttrs();
-    loc = decl->getLoc();
-  } else {
-    auto closure = subject.get<ClosureExpr *>();
-    dc = closure;
-    declAttrs = &closure->getAttrs();
-    loc = closure->getLoc();
-  }
+swift::checkGlobalActorAttributes(
+    SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs) {
   ASTContext &ctx = dc->getASTContext();
+
   CustomAttr *globalActorAttr = nullptr;
   NominalTypeDecl *globalActorNominal = nullptr;
-
-  for (auto attr : declAttrs->getAttributes<CustomAttr>()) {
-    auto mutableAttr = const_cast<CustomAttr *>(attr);
+  for (auto attr : attrs) {
     // Figure out which nominal declaration this custom attribute refers to.
     auto nominal = evaluateOrDefault(ctx.evaluator,
-                                     CustomAttrNominalRequest{mutableAttr, dc},
+                                     CustomAttrNominalRequest{attr, dc},
                                      nullptr);
 
     // Ignore unresolvable custom attributes.
@@ -492,14 +477,48 @@ GlobalActorAttributeRequest::evaluate(
   if (!globalActorAttr)
     return None;
 
+  return std::make_pair(globalActorAttr, globalActorNominal);
+}
+
+Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+GlobalActorAttributeRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<Decl *, ClosureExpr *> subject) const {
+  DeclContext *dc;
+  DeclAttributes *declAttrs;
+  SourceLoc loc;
+  if (auto decl = subject.dyn_cast<Decl *>()) {
+    dc = decl->getDeclContext();
+    declAttrs = &decl->getAttrs();
+    loc = decl->getLoc();
+  } else {
+    auto closure = subject.get<ClosureExpr *>();
+    dc = closure;
+    declAttrs = &closure->getAttrs();
+    loc = closure->getLoc();
+  }
+
+  // Collect the attributes.
+  SmallVector<CustomAttr *, 2> attrs;
+  for (auto attr : declAttrs->getAttributes<CustomAttr>()) {
+    auto mutableAttr = const_cast<CustomAttr *>(attr);
+    attrs.push_back(mutableAttr);
+  }
+
+  // Look for a global actor attribute.
+  auto result = checkGlobalActorAttributes(loc, dc, attrs);
+  if (!result)
+    return None;
+
   // Closures can always have a global actor attached.
   if (auto closure = subject.dyn_cast<ClosureExpr *>()) {
-    return std::make_pair(globalActorAttr, globalActorNominal);
+    return result;
   }
 
   // Check that a global actor attribute makes sense on this kind of
   // declaration.
   auto decl = subject.get<Decl *>();
+  auto globalActorAttr = result->first;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // Nominal types are okay...
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
@@ -529,7 +548,26 @@ GlobalActorAttributeRequest::evaluate(
     return None;
   }
 
-  return std::make_pair(globalActorAttr, globalActorNominal);
+  return result;
+}
+
+Type swift::getExplicitGlobalActor(ClosureExpr *closure) {
+  // Look at the explicit attribute.
+  auto globalActorAttr = evaluateOrDefault(
+      closure->getASTContext().evaluator,
+      GlobalActorAttributeRequest{closure}, None);
+  if (!globalActorAttr)
+    return Type();
+
+  Type globalActor = evaluateOrDefault(
+      closure->getASTContext().evaluator,
+      CustomAttrTypeRequest{
+        globalActorAttr->first, closure, CustomAttrTypeKind::GlobalActor},
+        Type());
+  if (!globalActor || globalActor->hasError())
+    return Type();
+
+  return globalActor;
 }
 
 /// Determine the isolation rules for a given declaration.
@@ -2157,34 +2195,16 @@ namespace {
 
     // Attempt to resolve the global actor type of a closure.
     Type resolveGlobalActorType(ClosureExpr *closure) {
-      auto globalActorAttr = evaluateOrDefault(
-          ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
-      if (!globalActorAttr)
-        return Type();
-
-      Type globalActor = evaluateOrDefault(
-          ctx.evaluator,
-          CustomAttrTypeRequest{
-            globalActorAttr->first, closure, CustomAttrTypeKind::GlobalActor},
-            Type());
-      if (!globalActor || globalActor->hasError())
-        return Type();
-
-      // Actor-isolated closures must be async.
-      bool isAsync = false;
+      // Check whether the closure's type has a global actor already.
       if (Type closureType = closure->getType()) {
-        if (auto closureFnType = closureType->getAs<FunctionType>())
-          isAsync = closureFnType->isAsync();
+        if (auto closureFnType = closureType->getAs<FunctionType>()) {
+          if (Type globalActor = closureFnType->getGlobalActor())
+            return globalActor;
+        }
       }
 
-      if (!isAsync) {
-        ctx.Diags.diagnose(
-            closure->getLoc(), diag::global_actor_isolated_synchronous_closure,
-            globalActor);
-        return Type();
-      }
-
-      return globalActor;
+      // Look for an explicit attribute.
+      return getExplicitGlobalActor(closure);
     }
 
     /// Determine the isolation of a particular closure.
@@ -2793,12 +2813,15 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   overridden->diagnose(diag::overridden_here);
 }
 
-static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
-  if (dc->getASTContext().LangOpts.WarnConcurrency)
-    return true;
-
+bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+      // A closure with an explicit global actor uses concurrency features.
+      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
+          return true;
+      }
+
       // Async and concurrent closures use concurrency features.
       if (auto closureType = closure->getType()) {
         if (auto fnType = closureType->getAs<AnyFunctionType>())
@@ -2831,8 +2854,8 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
     }
 
     // If we're in an actor, we're using concurrency features.
-    if (auto classDecl = dc->getSelfClassDecl()) {
-      if (classDecl->isActor())
+    if (auto nominal = dc->getSelfNominalTypeDecl()) {
+      if (nominal->isActor())
         return true;
     }
 
@@ -2841,6 +2864,13 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   }
 
   return false;
+}
+
+static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
+  if (dc->getASTContext().LangOpts.WarnConcurrency)
+    return true;
+
+  return contextUsesConcurrencyFeatures(dc);
 }
 
 static DiagnosticBehavior toDiagnosticBehavior(const LangOptions &langOpts,
