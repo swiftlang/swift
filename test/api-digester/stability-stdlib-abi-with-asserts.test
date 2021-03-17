@@ -41,6 +41,7 @@ Func _collectReferencesInsideObject(_:) is a new API without @available attribut
 Func _loadDestroyTLSCounter() is a new API without @available attribute
 Func _measureRuntimeFunctionCountersDiffs(objects:_:) is a new API without @available attribute
 Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
+Struct AnyHashable has added a conformance to an existing protocol _HasCustomAnyHashableRepresentation
 Struct _GlobalRuntimeFunctionCountersState is a new API without @available attribute
 Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
 Struct _RuntimeFunctionCounters is a new API without @available attribute
