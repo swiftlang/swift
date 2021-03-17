@@ -730,6 +730,17 @@ private:
   bool diagnoseParameterUse() const;
 };
 
+/// Diagnose failure where a global actor attribute is dropped when
+/// trying to convert one function type to another.
+class DroppedGlobalActorFunctionAttr final : public ContextualFailure {
+public:
+  DroppedGlobalActorFunctionAttr(const Solution &solution, Type fromType,
+                                 Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to use of the unwrapped optional types,
 /// which require some type of force-unwrap e.g. "!" or "try!".
 class MissingOptionalUnwrapFailure final : public ContextualFailure {

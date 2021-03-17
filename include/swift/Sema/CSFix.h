@@ -74,6 +74,9 @@ enum class FixKind : uint8_t {
   /// Mark function type as explicitly '@escaping'.
   ExplicitlyEscaping,
 
+  /// Mark function type as having a particular global actor.
+  MarkGlobalActorFunction,
+
   /// Arguments have labeling failures - missing/extraneous or incorrect
   /// labels attached to the, fix it by suggesting proper labels.
   RelabelArguments,
@@ -626,6 +629,23 @@ public:
 
   static MarkExplicitlyEscaping *create(ConstraintSystem &cs, Type lhs,
                                         Type rhs, ConstraintLocator *locator);
+};
+
+/// Mark function type as being part of a global actor.
+class MarkGlobalActorFunction final : public ContextualMismatch {
+  MarkGlobalActorFunction(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs,
+                           locator) {
+  }
+
+public:
+  std::string getName() const override { return "add @escaping"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static MarkGlobalActorFunction *create(ConstraintSystem &cs, Type lhs,
+                                         Type rhs, ConstraintLocator *locator);
 };
 
 /// Introduce a '!' to force an optional unwrap.

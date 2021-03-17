@@ -3843,6 +3843,9 @@ ERROR(converting_noattrfunc_to_type,none,
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
 
+ERROR(converting_func_loses_global_actor,none,
+      "converting function value of type %0 to %1 loses global actor %2",
+      (Type, Type, Type))
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
@@ -4502,7 +4505,6 @@ ERROR(actor_isolation_multiple_attr,none,
 ERROR(global_actor_isolated_synchronous_closure,none,
       "closure isolated to global actor %0 must be 'async'",
       (Type))
-
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %1 %2 has different actor isolation from %3 overridden declaration",
       (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
