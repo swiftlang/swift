@@ -98,15 +98,20 @@ LocalizationProducer::getMessageOr(swift::DiagID id,
   if (localizedMessage.empty())
     return defaultMessage;
   llvm::StringRef diagnosticName(diagnosticNameStrings[(unsigned)id]);
-  localizedDebugDiagnosticMessage =
-      localizedMessage.str() + diagnosticName.str();
-  return printDiagnosticName ? localizedDebugDiagnosticMessage
-                             : localizedMessage;
+  if (localizationSaver && printDiagnosticName) {
+    auto localizedDebugDiagnosticMessage =
+        localizationSaver->save(localizedMessage.str() + diagnosticName.str());
+    return localizedDebugDiagnosticMessage;
+  }
+  return localizedMessage;
 }
 
 SerializedLocalizationProducer::SerializedLocalizationProducer(
-    std::unique_ptr<llvm::MemoryBuffer> buffer, bool printDiagnosticName)
-    : LocalizationProducer(printDiagnosticName), Buffer(std::move(buffer)) {
+    std::unique_ptr<llvm::MemoryBuffer> buffer,
+    llvm::Optional<llvm::StringSaver> localizationSaver,
+    bool printDiagnosticName)
+    : LocalizationProducer(localizationSaver, printDiagnosticName),
+      Buffer(std::move(buffer)) {
   auto base =
       reinterpret_cast<const unsigned char *>(Buffer.get()->getBufferStart());
   auto tableOffset = endian::read<offset_type>(base, little);
@@ -122,9 +127,11 @@ SerializedLocalizationProducer::getMessage(swift::DiagID id) const {
   return {(const char *)value.getDataPtr(), value.getDataLen()};
 }
 
-YAMLLocalizationProducer::YAMLLocalizationProducer(llvm::StringRef filePath,
-                                                   bool printDiagnosticName)
-    : LocalizationProducer(printDiagnosticName) {
+YAMLLocalizationProducer::YAMLLocalizationProducer(
+    llvm::StringRef filePath,
+    llvm::Optional<llvm::StringSaver> localizationSaver,
+    bool printDiagnosticName)
+    : LocalizationProducer(localizationSaver, printDiagnosticName) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(filePath);
   llvm::MemoryBuffer *document = FileBufOrErr->get();
   diag::LocalizationInput yin(document->getBuffer());

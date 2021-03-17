@@ -26,6 +26,7 @@
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -154,12 +155,15 @@ public:
 };
 
 class LocalizationProducer {
+  llvm::Optional<llvm::StringSaver> localizationSaver;
   bool printDiagnosticName;
-  std::string localizedDebugDiagnosticMessage;
 
 public:
-  LocalizationProducer(bool printDiagnosticName = false)
-      : printDiagnosticName(printDiagnosticName) {}
+  LocalizationProducer(llvm::Optional<llvm::StringSaver> localizationSaver =
+                           llvm::Optional<llvm::StringSaver>(),
+                       bool printDiagnosticName = false)
+      : localizationSaver(localizationSaver),
+        printDiagnosticName(printDiagnosticName) {}
 
   /// If the  message isn't available/localized in current context
   /// return the fallback default message.
@@ -180,8 +184,11 @@ class YAMLLocalizationProducer final : public LocalizationProducer {
 public:
   /// The diagnostics IDs that are no longer available in `.def`
   std::vector<std::string> unknownIDs;
-  explicit YAMLLocalizationProducer(llvm::StringRef filePath,
-                                    bool printDiagnosticName = false);
+  explicit YAMLLocalizationProducer(
+      llvm::StringRef filePath,
+      llvm::Optional<llvm::StringSaver> localizationSaver =
+          llvm::Optional<llvm::StringSaver>(),
+      bool printDiagnosticName = false);
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation
@@ -203,6 +210,8 @@ class SerializedLocalizationProducer final : public LocalizationProducer {
 public:
   explicit SerializedLocalizationProducer(
       std::unique_ptr<llvm::MemoryBuffer> buffer,
+      llvm::Optional<llvm::StringSaver> localizationSaver =
+          llvm::Optional<llvm::StringSaver>(),
       bool printDiagnosticName = false);
 
 protected:
