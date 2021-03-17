@@ -385,11 +385,6 @@ namespace {
     if (argTy->isDoubleType() && paramTy->isCGFloatType())
       return false;
 
-    // CGFloat could be passed to a Double parameter and that's
-    // is either equivalent of widening conversion.
-    if (argTy->isCGFloatType() && paramTy->isDoubleType())
-      return true;
-
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
     if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
       auto constraints = CS.getConstraintGraph().gatherConstraints(
@@ -550,12 +545,7 @@ namespace {
 
     auto resultTy = choice->getResult();
     // Result type of the call matches expected contextual type.
-    if (contextualTy->isEqual(resultTy))
-      return true;
-
-    // Double and CGFloat could be used interchangeably, so let's
-    // favor widening conversion going from CGFloat to Double.
-    return resultTy->isCGFloatType() && contextualTy->isDoubleType();
+    return contextualTy->isEqual(resultTy);
   }
 
   /// Favor unary operator constraints where we have exact matches
