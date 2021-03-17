@@ -3449,6 +3449,13 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 
   bool isOperatorRef = overload->choice.getDecl()->isOperator();
 
+  // If one of the parameters is `inout`, we can't flip the arguments.
+  {
+    auto params = fnType->getParams();
+    if (params[0].isInOut() != params[1].isInOut())
+      return false;
+  }
+
   auto matchArgToParam = [&](Type argType, Type paramType, ASTNode anchor) {
     auto *loc = cs.getConstraintLocator(anchor);
     // If argument (and/or parameter) is a generic type let's not even try this

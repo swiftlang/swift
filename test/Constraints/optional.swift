@@ -459,3 +459,27 @@ func sr_12309() {
     return (((nil))) // Ok
   }
 }
+
+// rdar://75146811 - crash due to incrrect inout type
+func rdar75146811() {
+  func test(_: UnsafeMutablePointer<Double>) {}
+  func test_tuple(_: UnsafeMutablePointer<Double>, x: Int) {}
+  func test_named(x: UnsafeMutablePointer<Double>) {}
+
+  var arr: [Double]! = []
+
+  test(&arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test((&arr)) // expected-error {{use of extraneous '&'}}
+  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test(&(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+
+  test_tuple(&arr, x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple((&arr), x: 0) // expected-error {{use of extraneous '&'}}
+  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple(&(arr), x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+
+  test_named(x: &arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: (&arr)) // expected-error {{use of extraneous '&'}}
+  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: &(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+}
