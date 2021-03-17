@@ -1,4 +1,11 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// Test miscellaneous SimplifyCFG optimization from simplifyBlocks.
+//
+// Does not include:
+// - tryJumpThreading.
+// - dominatorBasedSimplify
+// - CheckedCastBranchJumpThreading
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -6,7 +13,6 @@
 sil_stage canonical
 
 import Builtin
-import Swift
 
 ///////////////////////
 // Type Declarations //
@@ -40,6 +46,10 @@ struct FakeBool {
 }
 
 sil [ossa] @dummy : $@convention(thin) () -> FakeBool
+
+struct NonTrivial {
+  var object: AnyObject
+}
 
 ///////////
 // Tests //
@@ -1695,24 +1705,24 @@ bb16:
   br bb8(%65 : $TestEnm)
 }
 
-sil [ossa] @print : $@convention(thin) (@guaranteed String) -> ()
-sil [ossa] @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
+sil [ossa] @print : $@convention(thin) (@guaranteed NonTrivial) -> ()
+sil [ossa] @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed NonTrivial
 
-sil [ossa] @dont_clone_begin_apply : $(Builtin.Int1, @guaranteed String) -> () {
-bb0(%condition : $Builtin.Int1, %arg : @guaranteed $String):
-  %print = function_ref @print : $@convention(thin) (@guaranteed String) -> ()
+sil [ossa] @dont_clone_begin_apply : $(Builtin.Int1, @guaranteed NonTrivial) -> () {
+bb0(%condition : $Builtin.Int1, %arg : @guaranteed $NonTrivial):
+  %print = function_ref @print : $@convention(thin) (@guaranteed NonTrivial) -> ()
   cond_br %condition, bb1, bb2
 bb1:
-  apply %print(%arg) : $@convention(thin) (@guaranteed String) -> ()
+  apply %print(%arg) : $@convention(thin) (@guaranteed NonTrivial) -> ()
   br bb3
 bb2:
   br bb3
 bb3:
-  %yield_string = function_ref @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed String
-  (%yield, %token) = begin_apply %yield_string() : $@yield_once @convention(thin) () -> @yields @guaranteed String
+  %yield_string = function_ref @yield_string : $@yield_once @convention(thin) () -> @yields @guaranteed NonTrivial
+  (%yield, %token) = begin_apply %yield_string() : $@yield_once @convention(thin) () -> @yields @guaranteed NonTrivial
   cond_br %condition, bb4, bb5
 bb4:
-  apply %print(%yield) : $@convention(thin) (@guaranteed String) -> ()
+  apply %print(%yield) : $@convention(thin) (@guaranteed NonTrivial) -> ()
   br bb6
 bb5:
   br bb6
