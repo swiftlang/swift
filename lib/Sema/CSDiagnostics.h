@@ -2284,6 +2284,8 @@ public:
   Type getFromType() const override { return RawReprType; }
   Type getToType() const override { return ExpectedType; }
 
+  bool diagnoseAsError() override;
+
 private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
 };

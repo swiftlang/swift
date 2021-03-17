@@ -6951,6 +6951,26 @@ void MissingRawRepresentableInitFailure::fixIt(
   }
 }
 
+bool MissingRawValueFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  if (locator->isLastElement<LocatorPathElt::AnyRequirement>()) {
+    MissingConformanceFailure failure(getSolution(), locator,
+                                      {RawReprType, ExpectedType});
+
+    auto diagnosed = failure.diagnoseAsError();
+    if (!diagnosed)
+      return false;
+
+    auto note = emitDiagnostic(diag::note_remapped_type, ".rawValue");
+    fixIt(note);
+
+    return true;
+  }
+
+  return AbstractRawRepresentableFailure::diagnoseAsError();
+}
+
 void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {
   auto *E = getAsExpr(getAnchor());
   if (!E)
