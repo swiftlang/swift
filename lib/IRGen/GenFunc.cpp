@@ -1036,8 +1036,6 @@ class AsyncPartialApplicationForwarderEmission
     : public PartialApplicationForwarderEmission {
   using super = PartialApplicationForwarderEmission;
   AsyncContextLayout layout;
-  llvm::Value *task;
-  llvm::Value *executor;
   llvm::Value *contextBuffer;
   Size contextSize;
   Address context;
@@ -1093,15 +1091,11 @@ public:
                                        ? staticFnPtr->suppressGenerics()
                                        : false)),
         currentArgumentIndex(outType->getNumParameters()) {
-    task = origParams.claimNext();
-    executor = origParams.claimNext();
     contextBuffer = origParams.claimNext();
   }
 
   void begin() override {
     super::begin();
-    assert(task);
-    assert(executor);
     assert(contextBuffer);
     context = layout.emitCastTo(subIGF, contextBuffer);
   }
@@ -1253,8 +1247,6 @@ public:
   }
   llvm::CallInst *createCall(FunctionPointer &fnPtr) override {
     Explosion asyncExplosion;
-    asyncExplosion.add(subIGF.getAsyncTask());
-    asyncExplosion.add(subIGF.getAsyncExecutor());
     asyncExplosion.add(contextBuffer);
     if (dynamicFunction &&
         dynamicFunction->kind == DynamicFunction::Kind::PartialApply) {
@@ -2470,19 +2462,9 @@ IRGenFunction::createAsyncDispatchFn(const FunctionPointer &fnPtr,
 void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
                                         llvm::Value *asyncResume) {
                                         
-  llvm::Value *task = getAsyncTask();
-  llvm::Value *callableResume = asyncResume;
-                                        
-  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeFunction) {
-    auto *resumeAddr = Builder.CreateStructGEP(task, 4);
-    auto authInfo = PointerAuthInfo::emit(
-        *this, schema, resumeAddr, PointerAuthEntity());
-    callableResume = emitPointerAuthSign(*this, asyncResume, authInfo);
-  }
-
   // Setup the suspend point.
   SmallVector<llvm::Value *, 8> arguments;
-  arguments.push_back(IGM.getInt32(2)); // swiftasync context index
+  arguments.push_back(IGM.getInt32(0)); // swiftasync context index
   arguments.push_back(asyncResume);
   auto resumeProjFn = getOrCreateResumeFromSuspensionFn();
   arguments.push_back(
@@ -2491,11 +2473,10 @@ void IRGenFunction::emitSuspensionPoint(llvm::Value *toExecutor,
   arguments.push_back(
       Builder.CreateBitOrPointerCast(suspendFn, IGM.Int8PtrTy));
 
-  arguments.push_back(callableResume);
+  // Extra arguments to pass to the suspension function.
+  arguments.push_back(asyncResume);
   arguments.push_back(
-      Builder.CreateBitOrPointerCast(toExecutor, getAsyncExecutor()->getType()));
-  arguments.push_back(task);
-  arguments.push_back(getAsyncExecutor());
+      Builder.CreateBitOrPointerCast(toExecutor, IGM.SwiftExecutorPtrTy));
   arguments.push_back(getAsyncContext());
 
   emitSuspendAsyncCall(arguments);
@@ -2513,18 +2494,18 @@ llvm::Function *IRGenFunction::getOrCreateResumeFromSuspensionFn() {
 }
 
 llvm::Function *IRGenFunction::createAsyncSuspendFn() {
-  SmallVector<llvm::Type*, 8> argTys;
-  argTys.push_back(IGM.Int8PtrTy); // Resume function.
-  argTys.push_back(getAsyncExecutor()->getType()); // Executor to hop to.
-  argTys.push_back(getAsyncTask()->getType());
-  argTys.push_back(getAsyncExecutor()->getType());
-  argTys.push_back(getAsyncContext()->getType());
-  auto *suspendFnTy =
-      llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
-
   StringRef name = "__swift_suspend_point";
   if (llvm::GlobalValue *F = IGM.Module.getNamedValue(name))
     return cast<llvm::Function>(F);
+
+  // The parameters here match the extra arguments passed to
+  // @llvm.coro.suspend.async by emitSuspensionPoint.
+  SmallVector<llvm::Type*, 8> argTys;
+  argTys.push_back(IGM.Int8PtrTy); // resume function
+  argTys.push_back(IGM.SwiftExecutorPtrTy); // target executor
+  argTys.push_back(getAsyncContext()->getType()); // current context
+  auto *suspendFnTy =
+      llvm::FunctionType::get(IGM.VoidTy, argTys, false /*vaargs*/);
 
   llvm::Function *suspendFn =
       llvm::Function::Create(suspendFnTy, llvm::Function::InternalLinkage,
@@ -2538,26 +2519,29 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
 
   llvm::Value *resumeFunction = suspendFn->getArg(0);
   llvm::Value *targetExecutor = suspendFn->getArg(1);
-  llvm::Value *task = suspendFn->getArg(2);
-  llvm::Value *executor = suspendFn->getArg(3);
-  llvm::Value *context = suspendFn->getArg(4);
+  llvm::Value *context = suspendFn->getArg(2);
+  context = Builder.CreateBitCast(context, IGM.SwiftContextPtrTy);
 
-  Alignment ptrAlign = IGM.getPointerAlignment();
-  auto *resumeAddr = Builder.CreateStructGEP(task, 4);
-  Builder.CreateStore(resumeFunction, Address(resumeAddr, ptrAlign));
-  auto *contextAddr = Builder.CreateStructGEP(task, 5);
-  if (auto schema = IGM.getOptions().PointerAuth.TaskResumeContext) {
-    auto authInfo = PointerAuthInfo::emit(suspendIGF, schema, contextAddr,
+  // Sign the task resume function with the C function pointer schema.
+  if (auto schema = IGM.getOptions().PointerAuth.FunctionPointers) {
+    // TODO: use the Clang type for TaskContinuationFunction*
+    // to make this work with type diversity.
+    auto authInfo = PointerAuthInfo::emit(suspendIGF, schema, nullptr,
                                           PointerAuthEntity());
-    context = emitPointerAuthSign(suspendIGF, context, authInfo);
+    resumeFunction = emitPointerAuthSign(suspendIGF, resumeFunction, authInfo);
   }
-  Builder.CreateStore(context, Address(contextAddr, ptrAlign));
+
   auto *suspendCall = Builder.CreateCall(
       IGM.getTaskSwitchFuncFn(),
-      { task, executor, targetExecutor });
+      { context, resumeFunction, targetExecutor });
   suspendCall->setDoesNotThrow();
   suspendCall->setCallingConv(IGM.SwiftAsyncCC);
   suspendCall->setTailCallKind(IGM.AsyncTailCallKind);
+
+  llvm::AttributeList attrs = suspendCall->getAttributes();
+  IGM.addSwiftAsyncContextAttributes(attrs, /*context arg index*/ 0);
+  suspendCall->setAttributes(attrs);
+
   Builder.CreateRetVoid();
   return suspendFn;
 }

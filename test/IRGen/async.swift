@@ -16,8 +16,8 @@ public class SomeClass {}
 @_silgen_name("swift_task_future_wait")
 public func task_future_wait(_ task: __owned SomeClass) async throws -> Int
 
-// CHECK: define{{.*}} swift{{(tail)?}}cc void @"$s5async8testThisyyAA9SomeClassCnYF"(%swift.task* %0, %swift.executor* %1, %swift.context* swiftasync %2)
-// CHECK-64: call swiftcc i8* @swift_task_alloc(%swift.task* %{{[0-9]+}}, i64 64)
+// CHECK: define{{.*}} swift{{(tail)?}}cc void @"$s5async8testThisyyAA9SomeClassCnYF"(%swift.context* swiftasync %0)
+// CHECK-64: call swiftcc i8* @swift_task_alloc(i64 64)
 // CHECK: {{(must)?}}tail call swift{{(tail)?}}cc void @swift_task_future_wait(
 public func testThis(_ task: __owned SomeClass) async {
   do {

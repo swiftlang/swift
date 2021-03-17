@@ -40,7 +40,7 @@ entry(%pack : $Pack):
   return %printGeneric_result1 : $()
 }
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @test_case(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @test_case(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 sil @test_case : $@async @convention(thin) () -> () {
   
   %a_literal = integer_literal $Builtin.Int1, -1

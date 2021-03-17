@@ -34,13 +34,23 @@ void _swift_task_alloc_initialize(AsyncTask *task);
 /// Destroy the task-local allocator in the given task.
 void _swift_task_alloc_destroy(AsyncTask *task);
 
-/// Given that we've already set the given executor as the active
+/// Allocate task-local memory on behalf of a specific task,
+/// not necessarily the current one.  Generally this should only be
+/// done on behalf of a child task.
+void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
+
+/// dellocate task-local memory on behalf of a specific task,
+/// not necessarily the current one.  Generally this should only be
+/// done on behalf of a child task.
+void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
+
+/// Given that we've already set the right executor as the active
 /// executor, run the given job.  This does additional bookkeeping
 /// related to the active task.
-void runJobInExecutorContext(Job *job, ExecutorRef executor);
+void runJobInEstablishedExecutorContext(Job *job);
 
 /// Clear the active task reference for the current thread.
-void _swift_task_clearCurrent();
+AsyncTask *_swift_task_clearCurrent();
 
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
@@ -65,11 +75,14 @@ void _swift_tsan_release(void *addr);
 
 namespace {
 
-/// An asynchronous context within a task that describes a general "Future".
+/// The layout of a context to call one of the following functions:
 ///
-/// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
-/// futures.
+///   @_silgen_name("swift_task_future_wait")
+///   func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
+///
+///   @_silgen_name("swift_task_future_wait_throwing")
+///   func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
+///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   // Error result is always present.
@@ -84,12 +97,8 @@ public:
   // Arguments.
   AsyncTask *task;
 
-  // Only in swift_taskGroup_wait_next_throwing.
-  TaskGroup *group;
-  // Only in swift_taskGroup_wait_next_throwing.
-  const Metadata *successType;
-
-  using AsyncContext::AsyncContext;
+  // Note that the polymorphic argument T is suppressed on these calls
+  // for code-size purposes.
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType());
@@ -101,6 +110,36 @@ public:
   void fillWithError(AsyncTask::FutureFragment *future) {
     fillWithError(future->getError());
   }
+  void fillWithError(SwiftError *error) {
+    *errorResult = error;
+    swift_errorRetain(error);
+  }
+};
+
+/// The layout of a frame to call the following function:
+///
+///   @_silgen_name("swift_taskGroup_wait_next_throwing")
+///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
+class TaskGroupNextAsyncContext : public AsyncContext {
+public:
+  // Error result is always present.
+  SwiftError **errorResult = nullptr;
+
+  OpaqueValue *successResultPointer;
+
+  // FIXME: Currently, this is always here, but it isn't technically
+  // necessary.
+  void* Self;
+
+  // Arguments.
+  TaskGroup *group;
+  const Metadata *successType;
+
+  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
+    successType->vw_initializeWithCopy(successResultPointer, src);
+  }
+
   void fillWithError(SwiftError *error) {
     *errorResult = error;
     swift_errorRetain(error);

@@ -751,7 +751,7 @@ OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
                                                               StringRef attr) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(3))
+  if (&op == &bi->getOperandRef(2))
     return OperandOwnership::DestroyingConsume;
   
   // FIXME: These are considered InteriorPointer because they may propagate a
@@ -765,7 +765,7 @@ OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskGroupFuture(BuiltinInst *bi,
                                                                    StringRef attr) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(4))
+  if (&op == &bi->getOperandRef(3))
     return OperandOwnership::DestroyingConsume;
   
   // FIXME: These are considered InteriorPointer because they may propagate a
