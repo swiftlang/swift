@@ -5594,6 +5594,29 @@ static void expandSameTypeConstraints(GenericSignatureBuilder &builder,
   }
 }
 
+static bool compareSourceLocs(SourceManager &SM, SourceLoc lhsLoc, SourceLoc rhsLoc) {
+  if (lhsLoc.isValid() != rhsLoc.isValid())
+    return lhsLoc.isValid();
+
+  if (lhsLoc.isValid() && rhsLoc.isValid()) {
+    unsigned lhsBuffer = SM.findBufferContainingLoc(lhsLoc);
+    unsigned rhsBuffer = SM.findBufferContainingLoc(rhsLoc);
+
+    // If the buffers are the same, use source location ordering.
+    if (lhsBuffer == rhsBuffer) {
+      if (SM.isBeforeInBuffer(lhsLoc, rhsLoc))
+        return true;
+    } else {
+      // Otherwise, order by buffer identifier.
+      if (SM.getIdentifierForBuffer(lhsBuffer)
+               .compare(SM.getIdentifierForBuffer(lhsBuffer)))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 /// A directed graph where the vertices are explicit requirement sources and
 /// an edge (v, w) records that the explicit source v implies the explicit
 /// source w.
@@ -5992,29 +6015,10 @@ private:
     if (cmpTypes != 0)
       return cmpTypes < 0;
 
-    // Prefer source-location-based over abstract.
     auto existingLoc = existingSource->getLoc();
     auto currentLoc = currentSource->getLoc();
-    if (existingLoc.isValid() != currentLoc.isValid())
-      return currentLoc.isValid();
 
-    if (existingLoc.isValid() && currentLoc.isValid()) {
-      unsigned existingBuffer = SM.findBufferContainingLoc(existingLoc);
-      unsigned currentBuffer = SM.findBufferContainingLoc(currentLoc);
-
-      // If the buffers are the same, use source location ordering.
-      if (existingBuffer == currentBuffer) {
-        if (SM.isBeforeInBuffer(currentLoc, existingLoc))
-          return true;
-      } else {
-        // Otherwise, order by buffer identifier.
-        if (SM.getIdentifierForBuffer(currentBuffer)
-                 .compare(SM.getIdentifierForBuffer(existingBuffer)))
-          return true;
-      }
-    }
-
-    return true;
+    return compareSourceLocs(SM, currentLoc, existingLoc);
   }
 
 public:
@@ -6226,6 +6230,7 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
   processDelayedRequirements();
 
   computeRedundantRequirements();
+  diagnoseRedundantRequirements();
 
   assert(!Impl->finalized && "Already finalized builder");
 #ifndef NDEBUG
@@ -6864,41 +6869,95 @@ void GenericSignatureBuilder::checkConformanceConstraints(
 
     // Remove any self-derived constraints.
     removeSelfDerived(*this, entry.second, entry.first);
+  }
+}
 
-    checkConstraintList<ProtocolDecl *, ProtocolDecl *>(
-      genericParams, entry.second, RequirementKind::Conformance,
-      [](const Constraint<ProtocolDecl *> &constraint) {
-        return true;
-      },
-      [&](const Constraint<ProtocolDecl *> &constraint) {
-        auto proto = constraint.value;
-        assert(proto == entry.first && "Mixed up protocol constraints");
+void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
+  SmallVector<ExplicitRequirement, 2> redundantRequirements;
 
-        // If this conformance requirement recursively makes a protocol
-        // conform to itself, don't complain here.
-        auto source = constraint.source;
+  for (auto pair : Impl->RedundantRequirements) {
+    auto *source = pair.first.getSource();
+
+    // Don't diagnose anything without a source location.
+    if (source->getLoc().isInvalid())
+      continue;
+
+    // Don't diagnose redundant inferred requirements.
+    if (source->isInferredRequirement())
+      continue;
+
+    // Don't diagnose explicit requirements that are implied by
+    // inferred requirements.
+    if (llvm::all_of(pair.second,
+                     [&](const ExplicitRequirement &otherReq) {
+                       return otherReq.getSource()->isInferredRequirement();
+                     }))
+      continue;
+
+    redundantRequirements.push_back(pair.first);
+  }
+
+  auto &SM = Context.SourceMgr;
+
+  std::sort(redundantRequirements.begin(), redundantRequirements.end(),
+            [&](ExplicitRequirement lhs, ExplicitRequirement rhs) {
+              return compareSourceLocs(SM,
+                                       lhs.getSource()->getLoc(),
+                                       rhs.getSource()->getLoc());
+            });
+
+  for (const auto &req : redundantRequirements) {
+    auto *source = req.getSource();
+    auto loc = source->getLoc();
+    assert(loc.isValid());
+
+    auto subjectType = getSugaredDependentType(source->getStoredType(),
+                                               getGenericParams());
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance: {
+      auto *proto = req.getRHS().get<ProtocolDecl *>();
+
+      // If this conformance requirement recursively makes a protocol
+      // conform to itself, don't complain here, because we diagnose
+      // the circular inheritance elsewhere.
+      {
         auto rootSource = source->getRoot();
-        if (rootSource->kind == RequirementSource::RequirementSignatureSelf &&
-            source != rootSource &&
-            proto == rootSource->getProtocolDecl() &&
-            areInSameEquivalenceClass(rootSource->getRootType(),
-                                      source->getAffectedType())) {
-          return ConstraintRelation::Unrelated;
+        if (proto == rootSource->getProtocolDecl() &&
+            rootSource->kind == RequirementSource::RequirementSignatureSelf &&
+            rootSource->getRootType()->isEqual(source->getAffectedType())) {
+          break;
         }
+      }
 
-        // If this is a redundantly inherited Objective-C protocol, treat it
-        // as "unrelated" to silence the warning about the redundant
-        // conformance.
-        if (isRedundantlyInheritableObjCProtocol(proto, constraint.source))
-          return ConstraintRelation::Unrelated;
+      // If this is a redundantly inherited Objective-C protocol, treat it
+      // as "unrelated" to silence the warning about the redundant
+      // conformance.
+      if (isRedundantlyInheritableObjCProtocol(proto, source))
+        break;
 
-        return ConstraintRelation::Redundant;
-      },
-      None,
-      diag::redundant_conformance_constraint,
-      diag::redundant_conformance_here,
-      [](ProtocolDecl *proto) { return proto; },
-      /*removeSelfDerived=*/false);
+      Context.Diags.diagnose(loc, diag::redundant_conformance_constraint,
+                             subjectType, proto);
+
+      for (auto otherReq : Impl->RedundantRequirements[req]) {
+        auto *otherSource = otherReq.getSource();
+        auto otherLoc = otherSource->getLoc();
+        if (otherLoc.isInvalid())
+          continue;
+
+        Context.Diags.diagnose(otherLoc, diag::redundant_conformance_here,
+                               1, subjectType, proto);
+      }
+
+      break;
+    }
+
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+    case RequirementKind::SameType:
+      // TODO
+      break;
+    }
   }
 }
 
