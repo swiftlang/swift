@@ -1,33 +1,24 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library)
+// RUN: %target-swiftc_driver %s -Xfrontend -enable-experimental-concurrency -parse-as-library %import-libdispatch -target %sanitizers-target-triple -g -sanitize=thread -o %t
+// RUN: %target-codesign %t
+// RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t 2>&1 | %swift-demangle --simplified | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
+// REQUIRES: tsan_runtime
+
+var globalCounterValue = 0
 
 actor Counter {
-  private var value = 0
-  private let scratchBuffer: UnsafeMutableBufferPointer<Int>
-
-  init(maxCount: Int) {
-    scratchBuffer = .allocate(capacity: maxCount)
-    scratchBuffer.initialize(repeating: 0)
-  }
-
   func next() -> Int {
-    let current = value
-
-    // Make sure we haven't produced this value before
-    assert(scratchBuffer[current] == 0)
-    scratchBuffer[current] = 1
-
-    value = value + 1
+    let current = globalCounterValue
+    globalCounterValue += 1
     return current
   }
 }
 
-
 func worker(identity: Int, counters: [Counter], numIterations: Int) async {
-  for i in 0..<numIterations {
+  for _ in 0..<numIterations {
     let counterIndex = Int.random(in: 0 ..< counters.count)
     let counter = counters[counterIndex]
     let nextValue = await counter.next()
@@ -38,8 +29,8 @@ func worker(identity: Int, counters: [Counter], numIterations: Int) async {
 func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   // Create counter actors.
   var counters: [Counter] = []
-  for i in 0..<numCounters {
-    counters.append(Counter(maxCount: numWorkers * numIterations))
+  for _ in 0..<numCounters {
+    counters.append(Counter())
   }
 
   // Create a bunch of worker threads.
@@ -47,7 +38,6 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   for i in 0..<numWorkers {
     workers.append(
       Task.runDetached { [counters] in
-        await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
@@ -66,9 +56,12 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
     // Useful for debugging: specify counter/worker/iteration counts
     let args = CommandLine.arguments
     let counters = args.count >= 2 ? Int(args[1])! : 10
-    let workers = args.count >= 3 ? Int(args[2])! : 100
-    let iterations = args.count >= 4 ? Int(args[3])! : 1000
+    let workers = args.count >= 3 ? Int(args[2])! : 10
+    let iterations = args.count >= 4 ? Int(args[3])! : 100
     print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
     await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
   }
 }
+
+// CHECK: ThreadSanitizer: {{(Swift access|data)}} race
+// CHECK: Location is global 'globalCounterValue'
