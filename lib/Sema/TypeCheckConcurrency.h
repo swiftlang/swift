@@ -177,6 +177,10 @@ public:
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
+/// Determine whether the given context uses concurrency features, such
+/// as async functions or actors.
+bool contextUsesConcurrencyFeatures(const DeclContext *dc);
+
 /// Diagnose the presence of any non-concurrent types when referencing a
 /// given declaration from a particular declaration context.
 ///

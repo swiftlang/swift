@@ -2813,12 +2813,15 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   overridden->diagnose(diag::overridden_here);
 }
 
-static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
-  if (dc->getASTContext().LangOpts.WarnConcurrency)
-    return true;
-
+bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
+      // A closure with an explicit global actor uses concurrency features.
+      if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
+          return true;
+      }
+
       // Async and concurrent closures use concurrency features.
       if (auto closureType = closure->getType()) {
         if (auto fnType = closureType->getAs<AnyFunctionType>())
@@ -2851,8 +2854,8 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
     }
 
     // If we're in an actor, we're using concurrency features.
-    if (auto classDecl = dc->getSelfClassDecl()) {
-      if (classDecl->isActor())
+    if (auto nominal = dc->getSelfNominalTypeDecl()) {
+      if (nominal->isActor())
         return true;
     }
 
@@ -2861,6 +2864,13 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
   }
 
   return false;
+}
+
+static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
+  if (dc->getASTContext().LangOpts.WarnConcurrency)
+    return true;
+
+  return contextUsesConcurrencyFeatures(dc);
 }
 
 static DiagnosticBehavior toDiagnosticBehavior(const LangOptions &langOpts,

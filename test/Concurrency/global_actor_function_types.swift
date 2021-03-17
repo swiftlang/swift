@@ -24,12 +24,16 @@ func testConversions(f: @escaping @SomeGlobalActor (Int) -> Void, g: @escaping (
 }
 
 @SomeGlobalActor func onSomeGlobalActor() -> Int { 5 }
+@SomeGlobalActor(unsafe) func onSomeGlobalActorUnsafe() -> Int { 5 }
+
+@OtherGlobalActor func onOtherGlobalActor() -> Int { 5 } // expected-note{{calls to global function 'onOtherGlobalActor()' from outside of its actor context are implicitly asynchronous}}
+@OtherGlobalActor(unsafe) func onOtherGlobalActorUnsafe() -> Int { 5 }  // expected-note 2{{calls to global function 'onOtherGlobalActorUnsafe()' from outside of its actor context are implicitly asynchronous}}
 
 func someSlowOperation() async -> Int { 5 }
 
 func acceptOnSomeGlobalActor<T>(_: @SomeGlobalActor () -> T) { }
 
-func testClosures() {
+func testClosures() async {
   // Global actors on synchronous closures become part of the type
   let cl1 = { @SomeGlobalActor in
     onSomeGlobalActor()
@@ -47,12 +51,45 @@ func testClosures() {
     onSomeGlobalActor()
   }
 
+  // Infer from context
   acceptOnSomeGlobalActor {
     onSomeGlobalActor()
   }
 
   acceptOnSomeGlobalActor { () -> Int in
     let i = onSomeGlobalActor()
+    return i
+  }
+
+  acceptOnSomeGlobalActor { () -> Int in
+    let i = onOtherGlobalActorUnsafe() // expected-error{{global function 'onOtherGlobalActorUnsafe()' isolated to global actor 'OtherGlobalActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
+    return i
+  }
+}
+
+func testClosuresOld() {
+  acceptOnSomeGlobalActor { () -> Int in
+    let i = onSomeGlobalActor()
+    return i
+  }
+
+  acceptOnSomeGlobalActor { () -> Int in
+    let i = onSomeGlobalActorUnsafe()
+    return i
+  }
+
+  acceptOnSomeGlobalActor { () -> Int in
+    let i = onOtherGlobalActor() // expected-error{{global function 'onOtherGlobalActor()' isolated to global actor 'OtherGlobalActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
+    return i
+  }
+
+  acceptOnSomeGlobalActor { () -> Int in
+    let i = onOtherGlobalActorUnsafe()
+    return i
+  }
+
+  acceptOnSomeGlobalActor { @SomeGlobalActor () -> Int in
+    let i = onOtherGlobalActorUnsafe() // expected-error{{global function 'onOtherGlobalActorUnsafe()' isolated to global actor 'OtherGlobalActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
     return i
   }
 }
