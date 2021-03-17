@@ -3261,7 +3261,14 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   // behind itself which we can use to better understand
   // how many levels of optionality have to be unwrapped.
   if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(anchor)) {
-    auto type = cs.getType(OEE->getSubExpr());
+    auto *subExpr = OEE->getSubExpr();
+
+    // First, let's check whether it has been determined that
+    // it was incorrect to use `?` in this position.
+    if (cs.hasFixFor(cs.getConstraintLocator(subExpr), FixKind::RemoveUnwrap))
+      return true;
+
+    auto type = cs.getType(subExpr);
     // If the type of sub-expression is optional, type of the
     // `OptionalEvaluationExpr` could be safely ignored because
     // it doesn't add any type information.
@@ -6028,6 +6035,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
             if (DC->isTypeContext() && DC->getSelfInterfaceType()->isEqual(GP))
               return SolutionKind::Error;
           }
+        }
+      }
+
+      if (auto rawValue = isRawRepresentable(*this, type)) {
+        if (!rawValue->isTypeVariableOrMember() &&
+            TypeChecker::conformsToProtocol(rawValue, protocol, DC)) {
+          auto *fix = UseRawValue::create(*this, type, protocolTy, loc);
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
         }
       }
 
@@ -10769,7 +10784,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddPropertyWrapperAttribute:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
-  case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
@@ -10788,6 +10802,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAlwaysSucceedCheckedCast:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::ExplicitlyConstructRawRepresentable: {
+    // Let's increase impact of this fix for binary operators because
+    // it's possible to get both `.rawValue` and construction fixes for
+    // different overloads of a binary operator and `.rawValue` is a
+    // better fix because raw representable has a failable constructor.
+    return recordFix(fix,
+                     /*impact=*/isExpr<BinaryExpr>(locator.getAnchor()) ? 2 : 1)
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   }
 
   case FixKind::TreatRValueAsLValue: {
