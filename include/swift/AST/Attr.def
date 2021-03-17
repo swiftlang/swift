@@ -638,8 +638,8 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   112)
 
 DECL_ATTR(requiresSuper, RequiresSuper,
-  OnFunc |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | On OnConstructor |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   113)
 
 #undef TYPE_ATTR
