@@ -2089,6 +2089,21 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
       options.is(TypeResolverContext::VariadicFunctionInput) &&
       !options.hasBase(TypeResolverContext::EnumElementDecl);
 
+  // Diagnose custom attributes.
+  for (auto customAttr : attrs.getCustomAttrs()) {
+    // Diagnose the attribute, because we don't yet handle custom type
+    // attributes.
+    std::string typeName;
+    if (auto typeRepr = customAttr->getTypeRepr()) {
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+    } else {
+      typeName = customAttr->getType().getString();
+    }
+
+    diagnose(customAttr->getLocation(), diag::unknown_attribute, typeName);
+  }
+
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;

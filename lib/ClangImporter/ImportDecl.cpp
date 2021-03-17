@@ -8028,6 +8028,7 @@ void ClangImporter::Implementation::importAttributes(
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
+  PatternBindingInitializer *initContext = nullptr;
   bool AnyUnavailable = MappedDecl->getAttrs().isUnavailable(C);
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
@@ -8207,7 +8208,8 @@ void ClangImporter::Implementation::importAttributes(
       SourceLoc atLoc;
       if (parser.consumeIf(tok::at_sign, atLoc)) {
         (void)parser.parseDeclAttribute(
-          MappedDecl->getAttrs(), atLoc, /*isFromClangAttribute=*/true);
+            MappedDecl->getAttrs(), atLoc, initContext,
+            /*isFromClangAttribute=*/true);
       } else {
         // Complain about the missing '@'.
         auto &clangSrcMgr = getClangASTContext().getSourceManager();
