@@ -1032,6 +1032,13 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   auto *DestBB = BI->getDestBB();
   auto *SrcBB = BI->getParent();
   TermInst *destTerminator = DestBB->getTerminator();
+  if (Fn.hasOwnership()) {
+    if (llvm::any_of(DestBB->getArguments(), [this](SILValue op) {
+          return !op->getType().isTrivial(Fn);
+        })) {
+      return false;
+   }
+  }
   // If the destination block ends with a return, we don't want to duplicate it.
   // We want to maintain the canonical form of a single return where possible.
   if (destTerminator->isFunctionExiting())
