@@ -6841,8 +6841,6 @@ AbstractRawRepresentableFailure::getDiagnostic() const {
     return diag::cannot_convert_assign;
   } else if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     return diag::cannot_convert_argument_value;
-  } else if (locator->isLastElement<LocatorPathElt::AnyRequirement>()) {
-    return diag::type_does_not_conform;
   }
 
   return None;
@@ -6936,6 +6934,26 @@ void MissingRawRepresentableInitFailure::fixIt(
           .fixItInsertAfter(range.End, ") ?? <#default value#>");
     }
   }
+}
+
+bool MissingRawValueFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  if (locator->isLastElement<LocatorPathElt::AnyRequirement>()) {
+    MissingConformanceFailure failure(getSolution(), locator,
+                                      {RawReprType, ExpectedType});
+
+    auto diagnosed = failure.diagnoseAsError();
+    if (!diagnosed)
+      return false;
+
+    auto note = emitDiagnostic(diag::note_remapped_type, ".rawValue");
+    fixIt(note);
+
+    return true;
+  }
+
+  return AbstractRawRepresentableFailure::diagnoseAsError();
 }
 
 void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {
