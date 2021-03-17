@@ -997,6 +997,14 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (checkObjCActorIsolation(VD, Reason))
     return false;
 
+  // effectful computed properties cannot be represented, and its an error
+  // to mark them as @objc
+  if (VD->getEffectfulGetAccessor()) {
+    VD->diagnose(diag::effectful_not_representable_objc,
+                 VD->getDescriptiveKind());
+    return false;
+  }
+
   if (!Result) {
     SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
     // TypeRange can be invalid; e.g. '@objc let foo = SwiftType()'
@@ -1027,6 +1035,14 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     return false;
   if (checkObjCActorIsolation(SD, Reason))
     return false;
+
+  // effectful subscripts cannot be represented, and its an error
+  // to mark them as @objc
+  if (SD->getEffectfulGetAccessor()) {
+    SD->diagnose(diag::effectful_not_representable_objc,
+                 SD->getDescriptiveKind());
+    return false;
+  }
 
   // ObjC doesn't support class subscripts.
   if (!SD->isInstanceMember()) {

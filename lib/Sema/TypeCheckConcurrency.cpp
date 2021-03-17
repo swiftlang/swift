@@ -650,6 +650,14 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
         isAccessibleAcrossActors = true;
     }
 
+    // Similarly, a computed property or subscript that has an 'async' getter
+    // provides an asynchronous context, and has no restrictions.
+    if (auto storageDecl = dyn_cast<AbstractStorageDecl>(decl)) {
+      if (auto effectfulGetter = storageDecl->getEffectfulGetAccessor())
+        if (effectfulGetter->hasAsync())
+          isAccessibleAcrossActors = true;
+    }
+
     // Determine the actor isolation of the given declaration.
     switch (auto isolation = getActorIsolation(cast<ValueDecl>(decl))) {
     case ActorIsolation::ActorInstance:

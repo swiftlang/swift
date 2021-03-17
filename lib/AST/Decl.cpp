@@ -2122,6 +2122,30 @@ AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) con
     nullptr);
 }
 
+AccessorDecl *AbstractStorageDecl::getEffectfulGetAccessor() const {
+    if (getAllAccessors().size() != 1)
+      return nullptr;
+
+    if (auto accessor = getAccessor(AccessorKind::Get))
+      if (accessor->hasAsync() || accessor->hasThrows())
+        return accessor;
+
+  return nullptr;
+}
+
+bool AbstractStorageDecl::isLessEffectfulThan(AbstractStorageDecl const* other,
+                                              EffectKind kind) const {
+  bool allowedByOther = false;
+  if (auto otherGetter = other->getEffectfulGetAccessor())
+    allowedByOther = otherGetter->hasEffect(kind);
+
+  if (auto getter = getEffectfulGetAccessor())
+    if (getter->hasEffect(kind) && !allowedByOther)
+      return false; // has the effect when other does not; it's more effectful!
+
+  return true; // OK
+}
+
 AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
   auto *accessor = getAccessor(kind);
   if (accessor && !accessor->isImplicit())

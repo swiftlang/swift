@@ -4521,6 +4521,34 @@ public:
     return {};
   }
 
+  /// This is the primary mechanism by which we can easily determine whether
+  /// this storage decl has any effects.
+  ///
+  /// \returns the getter decl iff this decl has only one accessor that is
+  ///          a 'get' with an effect (i.e., 'async', 'throws', or both).
+  ///          Otherwise returns nullptr.
+  AccessorDecl *getEffectfulGetAccessor() const;
+
+  /// Performs a "limit check" on an effect possibly exhibited by this storage
+  /// decl with respect to some other storage decl that serves as the "limit."
+  /// This check says that \c this is less effectful than \c other if
+  /// \c this either does not exhibit the effect, or if it does, then \c other
+  /// also exhibits the effect. Thus, it is conceptually equivalent to
+  /// a less-than-or-equal (≤) check like so:
+  ///
+  /// \verbatim
+  ///
+  ///           this->hasEffect(E) ≤ other->hasEffect(E)
+  ///
+  /// \endverbatim
+  ///
+  /// \param kind the single effect we are performing a check for.
+  ///
+  /// \returns true iff \c this decl either does not exhibit the effect,
+  ///          or \c other also exhibits the effect.
+  bool isLessEffectfulThan(AbstractStorageDecl const* other,
+                           EffectKind kind) const;
+
   /// Return an accessor that this storage is expected to have, synthesizing
   /// one if necessary. Note that will always synthesize one, even if the
   /// accessor is not part of the expected opaque set for the storage, so use

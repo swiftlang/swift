@@ -1584,6 +1584,10 @@ WARNING(enum_frozen_nonpublic,none,
 ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 
+ERROR(effectful_not_representable_objc,none,
+      "%0 with 'throws' or 'async' is not representable in Objective-C",
+      (DescriptiveDeclKind))
+
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes| in protocol extensions}0"
@@ -2600,6 +2604,10 @@ ERROR(override_class_declaration_in_extension,none,
 ERROR(override_throws,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
+// TODO: this really could be merged with the above.
+ERROR(override_with_more_effects,none,
+      "cannot override non-'%1' %0 with '%1' %0",
+      (DescriptiveDeclKind, StringRef))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
@@ -4150,21 +4158,21 @@ ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
 ERROR(try_unhandled,none,
       "errors thrown from here are not handled", ())
 ERROR(throwing_call_unhandled,none,
-      "call can throw, but the error is not handled", ())
+      "%0 can throw, but the error is not handled", (StringRef))
 ERROR(tryless_throwing_call_unhandled,none,
-      "call can throw, but it is not marked with 'try' and "
-      "the error is not handled", ())
+      "%0 can throw, but it is not marked with 'try' and "
+      "the error is not handled", (StringRef))
 ERROR(throw_in_nonthrowing_function,none,
       "error is not handled because the enclosing function "
       "is not declared 'throws'", ())
 
 ERROR(throwing_call_in_rethrows_function,none,
-      "call can throw, but the error is not handled; a function declared "
-      "'rethrows' may only throw if its parameter does", ())
+      "%0 can throw, but the error is not handled; a function declared "
+      "'rethrows' may only throw if its parameter does", (StringRef))
 ERROR(tryless_throwing_call_in_rethrows_function,none,
-      "call can throw, but it is not marked with 'try' and "
+      "%0 can throw, but it is not marked with 'try' and "
       "the error is not handled; a function declared "
-      "'rethrows' may only throw if its parameter does", ())
+      "'rethrows' may only throw if its parameter does", (StringRef))
 ERROR(throw_in_rethrows_function,none,
       "a function declared 'rethrows' may only throw if its parameter does", ())
 NOTE(because_rethrows_argument_throws,none,
@@ -4176,11 +4184,11 @@ NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
-      "call can throw, but it is executed in a non-throwing "
-      "autoclosure",())
+      "%0 can throw, but it is executed in a non-throwing "
+      "autoclosure",(StringRef))
 ERROR(tryless_throwing_call_in_nonthrowing_autoclosure,none,
-      "call can throw, but it is not marked with 'try' and "
-      "it is executed in a non-throwing autoclosure",())
+      "%0 can throw, but it is not marked with 'try' and "
+      "it is executed in a non-throwing autoclosure",(StringRef))
 ERROR(throw_in_nonthrowing_autoclosure,none,
       "error is not handled because it is thrown in a non-throwing "
       "autoclosure", ())
@@ -4189,17 +4197,17 @@ ERROR(try_unhandled_in_nonexhaustive_catch,none,
       "errors thrown from here are not handled because the "
       "enclosing catch is not exhaustive", ())
 ERROR(throwing_call_in_nonexhaustive_catch,none,
-      "call can throw, but the enclosing catch is not exhaustive", ())
+      "%0 can throw, but the enclosing catch is not exhaustive", (StringRef))
 ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
-      "call can throw, but it is not marked with 'try' and "
-      "the enclosing catch is not exhaustive", ())
+      "%0 can throw, but it is not marked with 'try' and "
+      "the enclosing catch is not exhaustive", (StringRef))
 ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
-ERROR(throwing_call_in_illegal_context,none,
-      "call can throw, but errors cannot be thrown out of "
+ERROR(throwing_op_in_illegal_context,none,
+      "%1 can throw, but errors cannot be thrown out of "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
+      (unsigned, StringRef))
 ERROR(throw_in_illegal_context,none,
       "errors cannot be thrown out of "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
@@ -4213,6 +4221,10 @@ ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
 ERROR(throwing_async_let_without_try,none,
       "reading 'async let' can throw but is not marked with 'try'", ())
+ERROR(throwing_prop_access_without_try,none,
+      "property access can throw but is not marked with 'try'", ())
+ERROR(throwing_subscript_access_without_try,none,
+      "subscript access can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,
       "did you mean to use 'try'?", ())
 NOTE(note_error_to_optional,none,
@@ -4382,6 +4394,9 @@ ERROR(actor_isolated_from_escaping_closure,none,
 ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to actor-isolated %0 %1",
       (DescriptiveDeclKind, DeclName))
+ERROR(effectful_keypath_component,none,
+      "cannot form key path to %0 with 'throws' or 'async'",
+      (DescriptiveDeclKind))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
@@ -5615,6 +5630,9 @@ ERROR(property_wrapper_let, none,
 ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
+ERROR(property_wrapper_effectful,none,
+    "property wrappers currently cannot define an 'async' or 'throws' accessor",
+    ())
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
