@@ -56,6 +56,11 @@ void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                        void *context);
 #endif
 
+/// release() establishes a happens-before relation with a preceding acquire()
+/// on the same address.
+void _swift_tsan_acquire(void *addr);
+void _swift_tsan_release(void *addr);
+
 // ==== ------------------------------------------------------------------------
 
 namespace {
