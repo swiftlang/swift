@@ -230,3 +230,20 @@ public func publicFunc(@PublicWrapper value: String) {
   // property wrapper init from projected value of value #1 in publicFunc(value:)
   // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfW : $@convention(thin) (@owned PublicWrapper<String>) -> @owned PublicWrapper<String>
 }
+
+// CHECK-LABEL: sil [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tF : $@convention(thin) (@guaranteed PublicWrapper<String>) -> ()
+@inlinable func inlinableFunc(@PublicWrapper value: String) {
+  // property wrapper backing initializer of value #1 in inlinableFunc(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned PublicWrapper<String>
+
+  // property wrapper init from projected value of value #1 in inlinableFunc(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfW : $@convention(thin) (@owned PublicWrapper<String>) -> @owned PublicWrapper<String>
+
+
+  _ = publicFunc(value:)
+
+  // implicit closure #1 in inlinableFunc(value:)
+  // CHECK: sil shared [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tFySScfu_ : $@convention(thin) (@guaranteed String) -> ()
+  // CHECK: function_ref @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned PublicWrapper<String>
+  // CHECK: function_ref @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tF : $@convention(thin) (@guaranteed PublicWrapper<String>) -> ()
+}

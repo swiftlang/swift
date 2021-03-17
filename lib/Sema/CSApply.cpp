@@ -1033,8 +1033,7 @@ namespace {
           ValueKind valueKind = (initKind == PropertyWrapperInitKind::ProjectedValue ?
                                  ValueKind::ProjectedValue : ValueKind::WrappedValue);
 
-          paramRef = AppliedPropertyWrapperExpr::create(context, ref, innerParam,
-                                                        innerParam->getStartLoc(),
+          paramRef = AppliedPropertyWrapperExpr::create(context, ref, innerParam, SourceLoc(),
                                                         wrapperType, paramRef, valueKind);
           cs.cacheExprTypes(paramRef);
 
