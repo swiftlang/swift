@@ -1958,15 +1958,12 @@ namespace decls_block {
     TypeIDField, // type referenced by this custom attribute
     BCFixed<1>   // is the argument (unsafe)
   >;
-<<<<<<< HEAD
-=======
 
   using RequiresSuperDeclAttrLayout =
       BCRecordLayout<RequiresSuper_DECL_ATTR,
                      BCFixed<1>, // implicit flag
                      BCBlob      // message
                      >;
->>>>>>> ae897e4d9a4 ([Parse] [AST] [Serialization] Support an optional message on the '@requiresSuper' attribute)
 }
 
 /// Returns the encoding kind for the given decl.

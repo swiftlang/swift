@@ -2723,6 +2723,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
     if (!DiscardAttribute)
       Attributes.add(attr);
+
+    break;
   }
 
   case DAK_RequiresSuper: {

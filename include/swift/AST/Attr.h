@@ -2077,7 +2077,7 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_CompletionHandlerAsync;
   }
-}
+};
 
 /// Defines the @requiresSuper attribute.
 class RequiresSuperAttr : public DeclAttribute {

@@ -2634,6 +2634,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       CompletionHandlerAsyncDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->CompletionHandlerIndex,
           asyncFuncDeclID);
+      return;
     }
     
     case DAK_RequiresSuper: {

@@ -4563,6 +4563,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         Attr = new (ctx) CompletionHandlerAsyncAttr(
             *mappedFunctionDecl, handlerIndex, /*handlerIndexLoc*/ SourceLoc(),
             /*atLoc*/ SourceLoc(), /*range*/ SourceRange());
+        break;
       }
       
       case decls_block::RequiresSuper_DECL_ATTR: {
