@@ -656,7 +656,7 @@ public:
   /// Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
-  void skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
+  ParserStatus skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
   void skipUntilAnyOperator();
 
   /// Skip until a token that starts with '>', and consume it if found.
@@ -680,7 +680,10 @@ public:
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
   /// matched in the source when they refer to a generic type,
   /// but not when used as comparison operators.
-  void skipSingle();
+  ///
+  /// Returns a parser status that can capture whether a code completion token
+  /// was returned.
+  ParserStatus skipSingle();
 
   /// Skip until the next '#else', '#endif' or until eof.
   void skipUntilConditionalBlockClose();

@@ -2821,7 +2821,8 @@ static PatternBindingInitializer *findAttributeInitContent(
 
 bool Parser::isCustomAttributeArgument() {
   BacktrackingScope backtrack(*this);
-  skipSingle();
+  if (skipSingle().hasCodeCompletion())
+    return true;
 
   // If we have any keyword, identifier, or token that follows a function
   // type's parameter list, this is a parameter list and not an attribute.
