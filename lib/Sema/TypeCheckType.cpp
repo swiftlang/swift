@@ -2112,6 +2112,10 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     if (globalActorAttr == customAttr)
       continue;
 
+    // If this attribute was marked invalid, ignore it.
+    if (customAttr->isInvalid())
+      continue;
+
     // Diagnose the attribute, because we don't yet handle custom type
     // attributes.
     std::string typeName;
@@ -2123,6 +2127,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     }
 
     diagnose(customAttr->getLocation(), diag::unknown_attribute, typeName);
+    customAttr->setInvalid();
   }
 
   // The type we're working with, in case we want to build it differently
