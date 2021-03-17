@@ -2100,12 +2100,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
           attrs.getCustomAttrs().begin(), attrs.getCustomAttrs().end()));
     if (foundGlobalActor) {
       globalActorAttr = foundGlobalActor->first;
-      globalActor = evaluateOrDefault(
-          getASTContext().evaluator,
-          CustomAttrTypeRequest{
-        foundGlobalActor->first, getDeclContext(),
-            CustomAttrTypeKind::GlobalActor},
-          Type());
+      globalActor = resolveType(globalActorAttr->getTypeRepr(), options);
       if (globalActor->hasError())
         globalActor = Type();
     }

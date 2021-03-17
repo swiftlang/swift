@@ -28,6 +28,7 @@ class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
+class ClosureExpr;
 class ConcreteDeclRef;
 class CustomAttr;
 class Decl;
@@ -222,6 +223,9 @@ enum class ConcurrentValueCheck {
 Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
 checkGlobalActorAttributes(
     SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
+
+/// Get the explicit global actor specified for a closure.
+Type getExplicitGlobalActor(ClosureExpr *closure);
 
 /// Check the correctness of the given ConcurrentValue conformance.
 ///

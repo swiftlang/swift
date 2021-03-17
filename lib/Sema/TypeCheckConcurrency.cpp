@@ -551,6 +551,25 @@ GlobalActorAttributeRequest::evaluate(
   return result;
 }
 
+Type swift::getExplicitGlobalActor(ClosureExpr *closure) {
+  // Look at the explicit attribute.
+  auto globalActorAttr = evaluateOrDefault(
+      closure->getASTContext().evaluator,
+      GlobalActorAttributeRequest{closure}, None);
+  if (!globalActorAttr)
+    return Type();
+
+  Type globalActor = evaluateOrDefault(
+      closure->getASTContext().evaluator,
+      CustomAttrTypeRequest{
+        globalActorAttr->first, closure, CustomAttrTypeKind::GlobalActor},
+        Type());
+  if (!globalActor || globalActor->hasError())
+    return Type();
+
+  return globalActor;
+}
+
 /// Determine the isolation rules for a given declaration.
 ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     ConcreteDeclRef declRef) {
@@ -2176,34 +2195,16 @@ namespace {
 
     // Attempt to resolve the global actor type of a closure.
     Type resolveGlobalActorType(ClosureExpr *closure) {
-      auto globalActorAttr = evaluateOrDefault(
-          ctx.evaluator, GlobalActorAttributeRequest{closure}, None);
-      if (!globalActorAttr)
-        return Type();
-
-      Type globalActor = evaluateOrDefault(
-          ctx.evaluator,
-          CustomAttrTypeRequest{
-            globalActorAttr->first, closure, CustomAttrTypeKind::GlobalActor},
-            Type());
-      if (!globalActor || globalActor->hasError())
-        return Type();
-
-      // Actor-isolated closures must be async.
-      bool isAsync = false;
+      // Check whether the closure's type has a global actor already.
       if (Type closureType = closure->getType()) {
-        if (auto closureFnType = closureType->getAs<FunctionType>())
-          isAsync = closureFnType->isAsync();
+        if (auto closureFnType = closureType->getAs<FunctionType>()) {
+          if (Type globalActor = closureFnType->getGlobalActor())
+            return globalActor;
+        }
       }
 
-      if (!isAsync) {
-        ctx.Diags.diagnose(
-            closure->getLoc(), diag::global_actor_isolated_synchronous_closure,
-            globalActor);
-        return Type();
-      }
-
-      return globalActor;
+      // Look for an explicit attribute.
+      return getExplicitGlobalActor(closure);
     }
 
     /// Determine the isolation of a particular closure.
