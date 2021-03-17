@@ -109,7 +109,18 @@ protected:
 /// former.
 ///
 /// We pass back the following information via callbacks so our callers can
-/// use whatever container they need to:
+/// use whatever container they need to. The callbacks are invoked in a
+/// specified order, with all invocations of the first callback instance
+/// occurring before any invocations of the next callback instance. This way,
+/// information from the callbacks can be fed to each other.
+///
+///     1. foundJointPostDomSetCompletionBlocks
+///
+///     2. inputBlocksFoundDuringWalk
+///
+///     3. inputBlocksInJointPostDomSet
+///
+/// TODO: reorder the function arguments to convey this ordering.
 ///
 /// * inputBlocksFoundDuringWalk: Any blocks from the "dominated
 ///   block set" that was found as a predecessor block during our traversal is
@@ -147,6 +158,17 @@ void findJointPostDominatingSet(
     function_ref<void(SILBasicBlock *)> inputBlocksFoundDuringWalk,
     function_ref<void(SILBasicBlock *)> foundJointPostDomSetCompletionBlocks,
     function_ref<void(SILBasicBlock *)> inputBlocksInJointPostDomSet = {});
+
+#ifndef NDEBUG
+/// Return true if sourceBlock both reaches and dominates destBlock.
+///
+/// This is useful for bootstrapping and temporary assertions when
+/// DominanceAnalysis is unavailable and the check is expected to succceed,
+/// typically because a def-use chain connects the source/dest blocks.
+/// But it should generally be avoided because the results are uncached.
+bool checkReachingBlockDominates(SILBasicBlock *sourceBlock,
+                                 SILBasicBlock *destBlock);
+#endif
 
 } // namespace swift
 
