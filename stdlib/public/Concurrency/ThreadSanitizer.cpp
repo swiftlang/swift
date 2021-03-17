@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Thread Sanitizer support for the Swift Task runtime
+// Thread Sanitizer support for the Swift Task runtime.
 //
 //===----------------------------------------------------------------------===//
 
@@ -34,30 +34,22 @@ TSanFunc *loadSymbol(const char *name) {
   return (TSanFunc *)dlsym(RTLD_DEFAULT, name);
 #endif
 }
-
-swift::swift_once_t initOnceToken;
-void initializeThreadSanitizer(void *unused) {
-  tsan_acquire = loadSymbol("__tsan_acquire");
-  tsan_release = loadSymbol("__tsan_release");
-}
 } // anonymous namespace
 
 void swift::_swift_tsan_acquire(void *addr) {
-  swift_once(&initOnceToken, initializeThreadSanitizer, nullptr);
   if (tsan_acquire) {
     tsan_acquire(addr);
   }
 }
 
 void swift::_swift_tsan_release(void *addr) {
-  swift_once(&initOnceToken, initializeThreadSanitizer, nullptr);
   if (tsan_release) {
     tsan_release(addr);
   }
 }
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(c)
-void swift_task_set_tsan_hooks(TSanFunc *acquire, TSanFunc *release) {
-  tsan_acquire = acquire;
-  tsan_release = release;
+void __tsan_on_initialize() {
+  tsan_acquire = loadSymbol("__tsan_acquire");
+  tsan_release = loadSymbol("__tsan_release");
 }
