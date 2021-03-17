@@ -4585,6 +4585,12 @@ public:
       }
     }
 
+    if (Type globalActor = info.getGlobalActor()) {
+      Printer << "@";
+      visit(globalActor);
+      Printer << " ";
+    }
+
     if (!Options.excludeAttrKind(TAK_concurrent) &&
         info.isConcurrent()) {
       Printer << "@concurrent ";

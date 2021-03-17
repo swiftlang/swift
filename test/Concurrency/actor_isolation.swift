@@ -372,7 +372,7 @@ func testGlobalActorClosures() {
     return 17
   }
 
-  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{closure isolated to global actor 'SomeGlobalActor' must be 'async'}}
+  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{converting function value of type '@SomeGlobalActor @concurrent () -> Int' to '@concurrent () -> Int' loses global actor 'SomeGlobalActor'}}
 }
 
 extension MyActor {

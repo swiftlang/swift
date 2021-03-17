@@ -491,6 +491,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
       case AttrLoc::Attribute::Concurrent:
         out << "@concurrent";
         break;
+
+      case AttrLoc::Attribute::GlobalActor:
+        out << "@<global actor>";
+        break;
       }
 
       break;

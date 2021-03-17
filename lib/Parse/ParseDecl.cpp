@@ -5856,11 +5856,10 @@ void Parser::skipSILUntilSwiftDecl() {
 
 void Parser::skipAnyAttribute() {
   consumeToken(tok::at_sign);
-  if (!consumeIf(tok::identifier))
+  if (!Tok.is(tok::identifier))
     return;
 
-  if (consumeIf(tok::l_paren))
-    skipUntil(tok::r_paren);
+  (void)canParseCustomAttribute();
 }
 
 /// Returns a descriptive name for the given accessor/addressor kind.

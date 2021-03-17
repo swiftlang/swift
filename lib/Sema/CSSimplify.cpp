@@ -2015,6 +2015,24 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
+  // A global actor can be added or can match, but cannot be removed.
+  if (func1->getGlobalActor() || func2->getGlobalActor()) {
+    if (func1->getGlobalActor() && func2->getGlobalActor()) {
+      // If both have a global actor, match them.
+      TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+      auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(), ConstraintKind::Equal, subflags, locator);
+      if (result == SolutionKind::Error)
+        return getTypeMatchFailure(locator);
+    } else if (func1->getGlobalActor()) {
+      // Cannot remove a global actor.
+      auto *fix = MarkGlobalActorFunction::create(
+          *this, func1, func2, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
+  }
+
   // To contextual type increase the score to avoid ambiguity when solver can
   // find more than one viable binding different only in representation e.g.
   //   let _: (@convention(block) () -> Void)? = Bool.random() ? nil : {}
@@ -10897,6 +10915,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::UseSubscriptOperator:
   case FixKind::ExplicitlyEscaping:
+  case FixKind::MarkGlobalActorFunction:
   case FixKind::RelabelArguments:
   case FixKind::RemoveCall:
   case FixKind::RemoveUnwrap:
