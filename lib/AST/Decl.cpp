@@ -5904,7 +5904,7 @@ bool VarDecl::hasImplicitPropertyWrapper() const {
 }
 
 bool VarDecl::hasExternalPropertyWrapper() const {
-  if (!hasAttachedPropertyWrapper())
+  if (!hasAttachedPropertyWrapper() || !isa<ParamDecl>(this))
     return false;
 
   // This decision needs to be made before closures are type checked (and
