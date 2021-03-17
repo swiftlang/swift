@@ -1,5 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg -enable-ossa-simplify-cfg | %FileCheck %s
 
+// OSSA form of tests from simplify_cfg.sil and simplify_cfg_simple.sil.
+//
 // Test miscellaneous SimplifyCFG optimization from simplifyBlocks.
 //
 // Does not include:
@@ -13,6 +15,7 @@
 sil_stage canonical
 
 import Builtin
+import Swift
 
 ///////////////////////
 // Type Declarations //
@@ -54,6 +57,27 @@ struct NonTrivial {
 ///////////
 // Tests //
 ///////////
+
+// CHECK-LABEL: sil @simple_test : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'simple_test'
+sil @simple_test : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple ()
+  return %9999 : $()
+}
 
 // CHECK-LABEL: sil [ossa] @test_dead_block :
 // CHECK-NEXT: bb0:
@@ -543,9 +567,6 @@ bb0:
 bb1:
   br bb1
 }
-
-import Builtin
-import Swift
 
 // CHECK-LABEL: @dead_loop
 // CHECK-NOT: br bb
