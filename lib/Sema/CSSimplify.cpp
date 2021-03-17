@@ -5120,7 +5120,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
         auto isCoercionOrCast = [](ASTNode anchor,
                                    ArrayRef<LocatorPathElt> path) {
-          // e.g. contextual conversion from coercion/cast
+          // E.g. contextual conversion from coercion/cast
           // to some other type.
           if (!path.empty())
             return false;
@@ -10576,12 +10576,12 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto *memberLoc = getConstraintLocator(
         applicationLoc, ConstraintLocator::ConstructorMember);
 
-    // This conversion has been already attempted for and constructor
-    // choice has been recorded.
+    // Conversion has been already attempted for this direction
+    // and constructor choice has been recorded.
     if (findSelectedOverloadFor(memberLoc))
       return SolutionKind::Solved;
 
-    // Allocate a single argument info to conver all possible
+    // Allocate a single argument info to cover all possible
     // Double <-> CGFloat conversion locations.
     if (!ArgumentInfos.count(memberLoc)) {
       auto &ctx = getASTContext();

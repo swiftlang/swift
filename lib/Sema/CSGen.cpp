@@ -565,9 +565,9 @@ namespace {
                        ->getWithoutParens()
                        ->getWithoutSpecifierType();
 
-      // There is no CGFloat overloads on some of the unary operators, so
-      // in order to preserve current behavior let's not favor overloads
-      // which would result in conversion from CGFloat to Double otherwise
+      // There are no CGFloat overloads on some of the unary operators, so
+      // in order to preserve current behavior, let's not favor overloads
+      // which would result in conversion from CGFloat to Double; otherwise
       // it would lead to ambiguities.
       if (argTy->isCGFloatType() && paramTy->isDoubleType())
         return false;

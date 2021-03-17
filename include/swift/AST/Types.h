@@ -800,7 +800,8 @@ public:
   /// Check if this is a nominal type defined at the top level of the Swift module
   bool isStdlibType();
 
-  /// Check if this is a CGFloat type from `CoreGraphics` module.
+  /// Check if this is a CGFloat type from CoreGraphics framework
+  /// on macOS or Foundation on Linux.
   bool isCGFloatType();
 
   /// Check if this is a Double type from standard library.

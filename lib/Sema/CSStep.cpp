@@ -702,7 +702,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     // Not all of the unary operators have `CGFloat` overloads,
     // so in order to preserve previous behavior (and overall
     // best solution) with implicit Double<->CGFloat conversion
-    // we need to allow  attempting generic operators for such cases.
+    // we need to allow attempting generic operators for such cases.
     if (score[SK_ImplicitValueConversion] > 0 && choice.isUnaryOperator())
       return false;
 

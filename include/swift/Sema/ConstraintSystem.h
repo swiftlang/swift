@@ -794,7 +794,7 @@ enum ScoreKind {
   SK_ForceUnchecked,
   /// An implicit conversion from a value of one type (lhs)
   /// to another type (rhs) via implicit initialization of
-  /// `rhs` type which an argument of `lhs` value.
+  /// `rhs` type with an argument of `lhs` value.
   SK_ImplicitValueConversion,
   /// A user-defined conversion.
   SK_UserConversion,
@@ -1406,7 +1406,7 @@ enum class ConstraintSystemFlags {
   /// `__attribute__((ns_consumed))`.
   UseClangFunctionTypes = 0x80,
 
-  /// Disallow to use Double and CGFloat interchangeably through means of
+  /// Disallow using Double and CGFloat interchangeably by means of
   /// an implicit value conversion.
   DisableImplicitDoubleCGFloatConversion = 0x100,
 };

@@ -580,7 +580,7 @@ namespace swift {
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
 
-    /// Disallow Double and CGFloat types to be used interchangeably.
+    /// Disallow Double and CGFloat types from being used interchangeably.
     bool DisableImplicitDoubleCGFloatConversion = false;
   };
 

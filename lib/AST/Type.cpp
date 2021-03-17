@@ -822,7 +822,7 @@ bool TypeBase::isCGFloatType() {
     return false;
 
   auto *module = DC->getParentModule();
-  // on macOS `CGFloat` is part of a `CoreGraphics` module,
+  // On macOS `CGFloat` is part of a `CoreGraphics` module,
   // but on Linux it could be found in `Foundation`.
   return (module->getName().is("CoreGraphics") ||
           module->getName().is("Foundation")) &&
