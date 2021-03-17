@@ -133,8 +133,7 @@ import SubE
 
 /// --------Swift module F
 // CHECK:      "modulePath": "F.swiftmodule",
-// CHECK-NEXT: "sourceFiles": [
-// CHECK-NEXT: ],
+// CHECK-NEXT: "sourceFiles": [],
 // CHECK-NEXT: "directDependencies": [
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "clang": "F"

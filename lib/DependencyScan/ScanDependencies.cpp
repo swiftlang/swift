@@ -36,12 +36,13 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <set>
-#include <string>
 #include <sstream>
+#include <string>
 
 using namespace swift;
 using namespace swift::dependencies;
@@ -302,50 +303,8 @@ static void discoverCrosssImportOverlayDependencies(
                 allModules.end(), action);
 }
 
-/// Write a single JSON field.
-template <typename T>
-void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
-                          const T &value, unsigned indentLevel,
-                          bool trailingComma);
-
-/// Write a string value as JSON.
-void writeJSONValue(llvm::raw_ostream &out, StringRef value,
-                    unsigned indentLevel) {
-  out << "\"";
-  out << value;
-  out << "\"";
-}
-
-void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_ref_t value,
-                    unsigned indentLevel) {
-  out << "\"";
-  out << get_C_string(value);
-  out << "\"";
-}
-
-void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_set_t *value_set,
-                    unsigned indentLevel) {
-  out << "[\n";
-
-  for (size_t i = 0; i < value_set->count; ++i) {
-    out.indent((indentLevel + 1) * 2);
-
-    writeJSONValue(out, value_set->strings[i], indentLevel + 1);
-
-    if (i != value_set->count - 1) {
-      out << ",";
-    }
-    out << "\n";
-  }
-
-  out.indent(indentLevel * 2);
-  out << "]";
-}
-
-void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
-                                   swiftscan_string_ref_t value,
-                                   unsigned indentLevel) {
-  out << "{\n";
+void writeEncodedModuleIdJSONValue(llvm::json::OStream &JSON,
+                                   swiftscan_string_ref_t value) {
   static const std::string textualPrefix("swiftTextual");
   static const std::string binaryPrefix("swiftBinary");
   static const std::string placeholderPrefix("swiftPlaceholder");
@@ -368,83 +327,25 @@ void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
     moduleKind = "clang";
     moduleName = valueStr.substr(clangPrefix.size() + 1);
   }
-  writeJSONSingleField(out, moduleKind, moduleName, indentLevel + 1,
-                       /*trailingComma=*/false);
-  out.indent(indentLevel * 2);
-  out << "}";
+  JSON.object([&] { JSON.attribute(moduleKind, moduleName); });
 }
 
-/// Write a boolean value as JSON.
-void writeJSONValue(llvm::raw_ostream &out, bool value, unsigned indentLevel) {
-  out.write_escaped(value ? "true" : "false");
+void writeStringSetAttributeArray(StringRef attr,
+                                  const swiftscan_string_set_t *set,
+                                  llvm::json::OStream &JSON) {
+  JSON.attributeArray(attr, [&] {
+    for (size_t i = 0; i < set->count; ++i)
+      JSON.value(get_C_string(set->strings[i]));
+  });
 }
 
-/// Write a JSON array.
-template <typename T>
-void writeJSONValue(llvm::raw_ostream &out, ArrayRef<T> values,
-                    unsigned indentLevel) {
-  out << "[\n";
-
-  for (const auto &value : values) {
-
-    out.indent((indentLevel + 1) * 2);
-
-    writeJSONValue(out, value, indentLevel + 1);
-
-    if (&value != &values.back()) {
-      out << ",";
+void writeDirectDependencies(llvm::json::OStream &JSON,
+                             const swiftscan_string_set_t *dependencies) {
+  JSON.attributeArray("directDependencies", [&] {
+    for (size_t i = 0; i < dependencies->count; ++i) {
+      writeEncodedModuleIdJSONValue(JSON, dependencies->strings[i]);
     }
-    out << "\n";
-  }
-
-  out.indent(indentLevel * 2);
-  out << "]";
-}
-
-/// Write a JSON array.
-template <typename T>
-void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
-                    unsigned indentLevel) {
-  writeJSONValue(out, llvm::makeArrayRef(values), indentLevel);
-}
-
-/// Write a single JSON field.
-template <typename T>
-void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
-                          const T &value, unsigned indentLevel,
-                          bool trailingComma) {
-  out.indent(indentLevel * 2);
-  writeJSONValue(out, fieldName, indentLevel);
-  out << ": ";
-  writeJSONValue(out, value, indentLevel);
-  if (trailingComma)
-    out << ",";
-  out << "\n";
-}
-
-void writeDirectDependencies(llvm::raw_ostream &out,
-                             const swiftscan_string_set_t *dependencies,
-                             unsigned indentLevel, bool trailingComma) {
-  out.indent(indentLevel * 2);
-  out << "\"directDependencies\": ";
-  out << "[\n";
-
-  for (size_t i = 0; i < dependencies->count; ++i) {
-    out.indent((indentLevel + 1) * 2);
-    writeEncodedModuleIdJSONValue(out, dependencies->strings[i],
-                                  indentLevel + 1);
-    if (i != dependencies->count - 1) {
-      out << ",";
-    }
-    out << "\n";
-  }
-
-  out.indent(indentLevel * 2);
-  out << "]";
-
-  if (trailingComma)
-    out << ",";
-  out << "\n";
+  });
 }
 
 static const swiftscan_swift_textual_details_t *
@@ -477,229 +378,178 @@ getAsClangDependencyModule(swiftscan_module_details_t details) {
 
 static void writePrescanJSON(llvm::raw_ostream &out,
                              const swiftscan_import_set_t importSet) {
-  // Write out a JSON containing all main module imports.
-  out << "{\n";
-  SWIFT_DEFER { out << "}\n"; };
-
-  writeJSONSingleField(out, "imports", importSet->imports, 0, false);
+  llvm::json::OStream JSON(out, 2);
+  JSON.object([&] {
+    writeStringSetAttributeArray("imports", importSet->imports, JSON);
+  });
 }
 
 static void writeJSON(llvm::raw_ostream &out,
                       const swiftscan_dependency_graph_t fullDependencies) {
+  llvm::json::OStream JSON(out, 2);
   // Write out a JSON description of all of the dependencies.
-  out << "{\n";
-  SWIFT_DEFER { out << "}\n"; };
-  // Name of the main module.
-  writeJSONSingleField(out, "mainModuleName",
-                       fullDependencies->main_module_name,
-                       /*indentLevel=*/1, /*trailingComma=*/true);
-  // Write out all of the modules.
-  out << "  \"modules\": [\n";
-  SWIFT_DEFER { out << "  ]\n"; };
-  const auto module_set = fullDependencies->dependencies;
-  for (size_t mi = 0; mi < module_set->count; ++mi) {
-    const auto &moduleInfo = *module_set->modules[mi];
-    auto &directDependencies = moduleInfo.direct_dependencies;
-    // The module we are describing.
-    out.indent(2 * 2);
-    writeEncodedModuleIdJSONValue(out, moduleInfo.module_name, 2);
-    out << ",\n";
-    out.indent(2 * 2);
-    out << "{\n";
-    auto swiftPlaceholderDeps =
-        getAsPlaceholderDependencyModule(moduleInfo.details);
-    auto swiftTextualDeps = getAsTextualDependencyModule(moduleInfo.details);
-    auto swiftBinaryDeps = getAsBinaryDependencyModule(moduleInfo.details);
-    auto clangDeps = getAsClangDependencyModule(moduleInfo.details);
+  JSON.object([&] {
+    // Name of the main module.
+    JSON.attribute("mainModuleName",
+                   get_C_string(fullDependencies->main_module_name));
 
-    // Module path.
-    const char *modulePathSuffix = clangDeps ? ".pcm" : ".swiftmodule";
+    // Write out all of the modules.
+    JSON.attributeArray("modules", [&] {
+      const auto module_set = fullDependencies->dependencies;
+      for (size_t mi = 0; mi < module_set->count; ++mi) {
+        const auto &moduleInfo = *module_set->modules[mi];
+        auto &directDependencies = moduleInfo.direct_dependencies;
+        // The module we are describing.
+        writeEncodedModuleIdJSONValue(JSON, moduleInfo.module_name);
+        JSON.object([&] {
+          auto swiftPlaceholderDeps =
+              getAsPlaceholderDependencyModule(moduleInfo.details);
+          auto swiftTextualDeps =
+              getAsTextualDependencyModule(moduleInfo.details);
+          auto swiftBinaryDeps =
+              getAsBinaryDependencyModule(moduleInfo.details);
+          auto clangDeps = getAsClangDependencyModule(moduleInfo.details);
 
-    std::string modulePath;
-    std::string moduleKindAndName =
-        std::string(get_C_string(moduleInfo.module_name));
-    std::string moduleName =
-        moduleKindAndName.substr(moduleKindAndName.find(":") + 1);
-    if (swiftPlaceholderDeps)
-      modulePath = get_C_string(swiftPlaceholderDeps->compiled_module_path);
-    else if (swiftBinaryDeps)
-      modulePath = get_C_string(swiftBinaryDeps->compiled_module_path);
-    else
-      modulePath = moduleName + modulePathSuffix;
+          // Module path.
+          const char *modulePathSuffix = clangDeps ? ".pcm" : ".swiftmodule";
 
-    writeJSONSingleField(out, "modulePath", modulePath, /*indentLevel=*/3,
-                         /*trailingComma=*/true);
+          std::string modulePath;
+          std::string moduleKindAndName =
+              std::string(get_C_string(moduleInfo.module_name));
+          std::string moduleName =
+              moduleKindAndName.substr(moduleKindAndName.find(":") + 1);
+          if (swiftPlaceholderDeps)
+            modulePath =
+                get_C_string(swiftPlaceholderDeps->compiled_module_path);
+          else if (swiftBinaryDeps)
+            modulePath = get_C_string(swiftBinaryDeps->compiled_module_path);
+          else
+            modulePath = moduleName + modulePathSuffix;
 
-    // Source files.
-    if (swiftTextualDeps || clangDeps) {
-      writeJSONSingleField(out, "sourceFiles", moduleInfo.source_files, 3,
-                           /*trailingComma=*/true);
-    }
+          JSON.attribute("modulePath", modulePath);
 
-    // Direct dependencies.
-    if (swiftTextualDeps || swiftBinaryDeps || clangDeps)
-      writeDirectDependencies(out, directDependencies, 3,
-                              /*trailingComma=*/true);
-    // Swift and Clang-specific details.
-    out.indent(3 * 2);
-    out << "\"details\": {\n";
-    out.indent(4 * 2);
-    if (swiftTextualDeps) {
-      out << "\"swift\": {\n";
-      /// Swift interface file, if there is one. The main module, for
-      /// example, will not have an interface file.
-      std::string moduleInterfacePath =
-          swiftTextualDeps->module_interface_path.data
-              ? get_C_string(swiftTextualDeps->module_interface_path)
-              : "";
-      if (!moduleInterfacePath.empty()) {
-        writeJSONSingleField(out, "moduleInterfacePath", moduleInterfacePath, 5,
-                             /*trailingComma=*/true);
-        writeJSONSingleField(out, "contextHash", swiftTextualDeps->context_hash,
-                             5,
-                             /*trailingComma=*/true);
-        out.indent(5 * 2);
-        out << "\"commandLine\": [\n";
-        for (int i = 0, count = swiftTextualDeps->command_line->count;
-             i < count; ++i) {
-          const auto &arg =
-              get_C_string(swiftTextualDeps->command_line->strings[i]);
-          out.indent(6 * 2);
-          out << "\"" << arg << "\"";
-          if (i != count - 1)
-            out << ",";
-          out << "\n";
-        }
-        out.indent(5 * 2);
-        out << "],\n";
-        out.indent(5 * 2);
-        out << "\"compiledModuleCandidates\": [\n";
-        for (int i = 0,
-                 count = swiftTextualDeps->compiled_module_candidates->count;
-             i < count; ++i) {
-          const auto &candidate = get_C_string(
-              swiftTextualDeps->compiled_module_candidates->strings[i]);
-          out.indent(6 * 2);
-          out << "\"" << candidate << "\"";
-          if (i != count - 1)
-            out << ",";
-          out << "\n";
-        }
-        out.indent(5 * 2);
-        out << "],\n";
+          // Source files.
+          if (swiftTextualDeps || clangDeps) {
+            writeStringSetAttributeArray("sourceFiles", moduleInfo.source_files,
+                                         JSON);
+          }
+
+          // Direct dependencies.
+          if (swiftTextualDeps || swiftBinaryDeps || clangDeps)
+            writeDirectDependencies(JSON, directDependencies);
+
+          JSON.attributeObject("details", [&] {
+            if (swiftTextualDeps) {
+              JSON.attributeObject("swift", [&] {
+                /// Swift interface file, if there is one. The main module, for
+                /// example, will not have an interface file.
+                std::string moduleInterfacePath =
+                    swiftTextualDeps->module_interface_path.data
+                        ? get_C_string(swiftTextualDeps->module_interface_path)
+                        : "";
+
+                if (!moduleInterfacePath.empty()) {
+                  JSON.attribute("moduleInterfacePath", moduleInterfacePath);
+                  JSON.attribute("contextHash",
+                                 get_C_string(swiftTextualDeps->context_hash));
+                  writeStringSetAttributeArray(
+                      "commandLine", swiftTextualDeps->command_line, JSON);
+                  writeStringSetAttributeArray(
+                      "compiledModuleCandidates",
+                      swiftTextualDeps->compiled_module_candidates, JSON);
+                }
+
+                JSON.attribute("isFramework", swiftTextualDeps->is_framework);
+
+                if (swiftTextualDeps->extra_pcm_args->count != 0) {
+                  writeStringSetAttributeArray(
+                      "extraPcmArgs", swiftTextualDeps->extra_pcm_args, JSON);
+                }
+
+                bool hasBridgingHeaderPath =
+                    swiftTextualDeps->bridging_header_path.data &&
+                    get_C_string(swiftTextualDeps->bridging_header_path)[0] !=
+                        '\0';
+
+                /// Bridging header and its source file dependencies, if any.
+                if (hasBridgingHeaderPath) {
+                  JSON.attributeObject("bridgingHeader", [&] {
+                    JSON.attribute(
+                        "path",
+                        get_C_string(swiftTextualDeps->bridging_header_path));
+                    writeStringSetAttributeArray(
+                        "sourceFiles", swiftTextualDeps->bridging_source_files,
+                        JSON);
+                    writeStringSetAttributeArray(
+                        "moduleDependencies",
+                        swiftTextualDeps->bridging_module_dependencies, JSON);
+                  });
+                }
+              });
+            } else if (swiftPlaceholderDeps) {
+              JSON.attributeObject("swiftPlaceholder", [&] {
+                // Module doc file
+                if (swiftPlaceholderDeps->module_doc_path.data &&
+                    get_C_string(swiftPlaceholderDeps->module_doc_path)[0] !=
+                        '\0')
+                  JSON.attribute(
+                      "moduleDocPath",
+                      get_C_string(swiftPlaceholderDeps->module_doc_path));
+
+                // Module Source Info file
+                if (swiftPlaceholderDeps->module_source_info_path.data &&
+                    get_C_string(
+                        swiftPlaceholderDeps->module_source_info_path)[0] !=
+                        '\0')
+                  JSON.attribute(
+                      "moduleSourceInfoPath",
+                      get_C_string(
+                          swiftPlaceholderDeps->module_source_info_path));
+              });
+            } else if (swiftBinaryDeps) {
+              JSON.attributeObject("swiftPrebuiltExternal", [&] {
+                bool hasCompiledModulePath =
+                    swiftBinaryDeps->compiled_module_path.data &&
+                    get_C_string(swiftBinaryDeps->compiled_module_path)[0] !=
+                        '\0';
+                assert(hasCompiledModulePath &&
+                       "Expected .swiftmodule for a Binary Swift Module "
+                       "Dependency.");
+
+                JSON.attribute(
+                    "compiledModulePath",
+                    get_C_string(swiftBinaryDeps->compiled_module_path));
+
+                // Module doc file
+                if (swiftBinaryDeps->module_doc_path.data &&
+                    get_C_string(swiftBinaryDeps->module_doc_path)[0] != '\0')
+                  JSON.attribute(
+                      "moduleDocPath",
+                      get_C_string(swiftBinaryDeps->module_doc_path));
+
+                // Module Source Info file
+                if (swiftBinaryDeps->module_source_info_path.data &&
+                    get_C_string(swiftBinaryDeps->module_source_info_path)[0] !=
+                        '\0')
+                  JSON.attribute(
+                      "moduleSourceInfoPath",
+                      get_C_string(swiftBinaryDeps->module_source_info_path));
+              });
+            } else {
+              JSON.attributeObject("clang", [&] {
+                JSON.attribute("moduleMapPath",
+                               get_C_string(clangDeps->module_map_path));
+                JSON.attribute("contextHash",
+                               get_C_string(clangDeps->context_hash));
+                writeStringSetAttributeArray("commandLine",
+                                             clangDeps->command_line, JSON);
+              });
+            }
+          });
+        });
       }
-      bool hasBridgingHeaderPath =
-          swiftTextualDeps->bridging_header_path.data &&
-          get_C_string(swiftTextualDeps->bridging_header_path)[0] != '\0';
-      bool commaAfterFramework =
-          swiftTextualDeps->extra_pcm_args->count != 0 || hasBridgingHeaderPath;
-
-      writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,
-                           5, commaAfterFramework);
-      if (swiftTextualDeps->extra_pcm_args->count != 0) {
-        out.indent(5 * 2);
-        out << "\"extraPcmArgs\": [\n";
-        for (int i = 0, count = swiftTextualDeps->extra_pcm_args->count;
-             i < count; ++i) {
-          const auto &arg =
-              get_C_string(swiftTextualDeps->extra_pcm_args->strings[i]);
-          out.indent(6 * 2);
-          out << "\"" << arg << "\"";
-          if (i != count - 1)
-            out << ",";
-          out << "\n";
-        }
-        out.indent(5 * 2);
-        out << (hasBridgingHeaderPath ? "],\n" : "]\n");
-      }
-      /// Bridging header and its source file dependencies, if any.
-      if (hasBridgingHeaderPath) {
-        out.indent(5 * 2);
-        out << "\"bridgingHeader\": {\n";
-        writeJSONSingleField(out, "path",
-                             swiftTextualDeps->bridging_header_path, 6,
-                             /*trailingComma=*/true);
-        writeJSONSingleField(out, "sourceFiles",
-                             swiftTextualDeps->bridging_source_files, 6,
-                             /*trailingComma=*/true);
-        writeJSONSingleField(out, "moduleDependencies",
-                             swiftTextualDeps->bridging_module_dependencies, 6,
-                             /*trailingComma=*/false);
-        out.indent(5 * 2);
-        out << "}\n";
-      }
-    } else if (swiftPlaceholderDeps) {
-      out << "\"swiftPlaceholder\": {\n";
-
-      // Module doc file
-      if (swiftPlaceholderDeps->module_doc_path.data &&
-          get_C_string(swiftPlaceholderDeps->module_doc_path)[0] != '\0')
-        writeJSONSingleField(out, "moduleDocPath",
-                             swiftPlaceholderDeps->module_doc_path,
-                             /*indentLevel=*/5,
-                             /*trailingComma=*/true);
-
-      // Module Source Info file
-      if (swiftPlaceholderDeps->module_source_info_path.data &&
-          get_C_string(swiftPlaceholderDeps->module_source_info_path)[0] !=
-              '\0')
-        writeJSONSingleField(out, "moduleSourceInfoPath",
-                             swiftPlaceholderDeps->module_source_info_path,
-                             /*indentLevel=*/5,
-                             /*trailingComma=*/false);
-    } else if (swiftBinaryDeps) {
-      out << "\"swiftPrebuiltExternal\": {\n";
-      bool hasCompiledModulePath =
-          swiftBinaryDeps->compiled_module_path.data &&
-          get_C_string(swiftBinaryDeps->compiled_module_path)[0] != '\0';
-      assert(hasCompiledModulePath &&
-             "Expected .swiftmodule for a Binary Swift Module Dependency.");
-
-      writeJSONSingleField(out, "compiledModulePath",
-                           swiftBinaryDeps->compiled_module_path,
-                           /*indentLevel=*/5,
-                           /*trailingComma=*/true);
-      // Module doc file
-      if (swiftBinaryDeps->module_doc_path.data &&
-          get_C_string(swiftBinaryDeps->module_doc_path)[0] != '\0')
-        writeJSONSingleField(out, "moduleDocPath",
-                             swiftBinaryDeps->module_doc_path,
-                             /*indentLevel=*/5,
-                             /*trailingComma=*/true);
-      // Module Source Info file
-      if (swiftBinaryDeps->module_source_info_path.data &&
-          get_C_string(swiftBinaryDeps->module_source_info_path)[0] != '\0')
-        writeJSONSingleField(out, "moduleSourceInfoPath",
-                             swiftBinaryDeps->module_source_info_path,
-                             /*indentLevel=*/5,
-                             /*trailingComma=*/false);
-    } else {
-      out << "\"clang\": {\n";
-
-      // Module map file.
-      writeJSONSingleField(out, "moduleMapPath", clangDeps->module_map_path, 5,
-                           /*trailingComma=*/true);
-
-      // Context hash.
-      writeJSONSingleField(out, "contextHash", clangDeps->context_hash, 5,
-                           /*trailingComma=*/true);
-
-      // Command line.
-      writeJSONSingleField(out, "commandLine", clangDeps->command_line, 5,
-                           /*trailingComma=*/false);
-    }
-
-    out.indent(4 * 2);
-    out << "}\n";
-    out.indent(3 * 2);
-    out << "}\n";
-    out.indent(2 * 2);
-    out << "}";
-
-    if (mi != module_set->count - 1)
-      out << ",";
-    out << "\n";
-  }
+    });
+  });
 }
 
 static std::string createEncodedModuleKindAndName(ModuleDependencyID id) {

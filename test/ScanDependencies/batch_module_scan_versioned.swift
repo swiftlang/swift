@@ -43,7 +43,6 @@
 // CHECK-PCM110-NEXT:    },
 // CHECK-PCM110-NEXT:    {
 // CHECK-PCM110-NEXT:      "modulePath": "G.pcm",
-// CHECK-PCM110:       "directDependencies": [
-// CHECK-PCM110-NEXT:  ],
+// CHECK-PCM110:       "directDependencies": [],
 // CHECK-PCM110-NOT: "clang": "X"
 // CHECK-PCM110: "-I
