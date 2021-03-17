@@ -1758,6 +1758,37 @@ SourceLoc FloatingRequirementSource::getLoc() const {
   return SourceLoc();
 }
 
+bool FloatingRequirementSource::isDerived() const {
+  switch (kind) {
+  case Explicit:
+  case Inferred:
+  case NestedTypeNameMatch:
+    return false;
+
+  case AbstractProtocol:
+    switch (storage.get<const RequirementSource *>()->kind) {
+    case RequirementSource::RequirementSignatureSelf:
+      return false;
+
+    case RequirementSource::Concrete:
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+    case RequirementSource::NestedTypeNameMatch:
+    case RequirementSource::Parent:
+    case RequirementSource::ProtocolRequirement:
+    case RequirementSource::InferredProtocolRequirement:
+    case RequirementSource::Superclass:
+    case RequirementSource::Layout:
+    case RequirementSource::EquivalentType:
+      return true;
+    }
+
+  case Resolved:
+    return storage.get<const RequirementSource *>()->isDerivedRequirement();
+  }
+  llvm_unreachable("unhandled kind");
+}
+
 bool FloatingRequirementSource::isExplicit() const {
   switch (kind) {
   case Explicit:
@@ -2556,9 +2587,20 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   } else {
     concreteSource = concreteSource->viaConcrete(*this, conformance);
     equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
-    if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
-                                   concreteSource->getLoc()))
-      return nullptr;
+
+    // Only infer conditional requirements from explicit sources.
+    bool hasExplicitSource = llvm::any_of(
+        equivClass->concreteTypeConstraints,
+        [](const ConcreteConstraint &constraint) {
+          return (!constraint.source->isDerivedRequirement() &&
+                  constraint.source->getLoc().isValid());
+        });
+
+    if (hasExplicitSource) {
+      if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
+                                     concreteSource->getLoc()))
+        return nullptr;
+    }
   }
 
   return concreteSource;
@@ -2590,9 +2632,20 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   superclassSource = superclassSource->viaSuperclass(*this, conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
-  if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
-                                 superclassSource->getLoc()))
-    return nullptr;
+
+  // Only infer conditional requirements from explicit sources.
+  bool hasExplicitSource = llvm::any_of(
+    equivClass->superclassConstraints,
+    [](const ConcreteConstraint &constraint) {
+      return (!constraint.source->isDerivedRequirement() &&
+              constraint.source->getLoc().isValid());
+    });
+
+  if (hasExplicitSource) {
+    if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
+                                   superclassSource->getLoc()))
+      return nullptr;
+  }
 
   return superclassSource;
 }
@@ -4599,9 +4652,12 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
-          if (addConditionalRequirements(conformance, inferForModule,
-                                         source.getLoc()))
-            return ConstraintResult::Conflicting;
+          // Only infer conditional requirements from explicit sources.
+          if (!source.isDerived()) {
+            if (addConditionalRequirements(conformance, inferForModule,
+                                           source.getLoc()))
+              return ConstraintResult::Conflicting;
+          }
         }
       }
     }

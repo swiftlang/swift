@@ -1422,6 +1422,9 @@ public:
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;
 
+  /// Whether this is a derived requirement.
+  bool isDerived() const;
+
   /// Whether this is a top-level requirement written in source.
   /// FIXME: This is a hack because expandConformanceRequirement()
   /// is too eager; we should remove this once we fix it properly.
