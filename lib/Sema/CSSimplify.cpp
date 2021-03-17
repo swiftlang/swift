@@ -2025,11 +2025,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return getTypeMatchFailure(locator);
     } else if (func1->getGlobalActor()) {
       // Cannot remove a global actor.
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
       auto *fix = MarkGlobalActorFunction::create(
           *this, func1, func2, getConstraintLocator(locator));
 
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
+    } else if (kind < ConstraintKind::Subtype) {
+      return getTypeMatchFailure(locator);
     }
   }
 
