@@ -221,14 +221,15 @@ static int run_driver(StringRef ExecName,
         assert(ExecName == "swift");
         subCommandArgs.push_back("--driver-mode=swift");
       }
-      subCommandArgs.insert(subCommandArgs.end(), argv.begin() + 1, argv.end());
-
       // Push these non-op frontend arguments so the build log can indicate
       // the new driver is used.
       subCommandArgs.push_back("-Xfrontend");
       subCommandArgs.push_back("-new-driver-path");
       subCommandArgs.push_back("-Xfrontend");
       subCommandArgs.push_back(NewDriverPath.c_str());
+
+      // Push on the source program arguments
+      subCommandArgs.insert(subCommandArgs.end(), argv.begin() + 1, argv.end());
 
       // Execute the subcommand.
       subCommandArgs.push_back(nullptr);
