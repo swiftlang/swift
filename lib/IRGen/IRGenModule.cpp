@@ -634,8 +634,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   //   SWIFT_CC(swift)
   //   void (AsyncTask *, ExecutorRef, AsyncContext *);
   TaskContinuationFunctionTy = llvm::FunctionType::get(
-      VoidTy, {SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftContextPtrTy},
-      /*isVarArg*/ false);
+      VoidTy, {SwiftContextPtrTy}, /*isVarArg*/ false);
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   AsyncTaskAndContextTy = createStructType(
