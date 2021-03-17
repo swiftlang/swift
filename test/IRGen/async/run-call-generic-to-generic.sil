@@ -20,7 +20,7 @@ import _Concurrency
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
 // CHECK-LL: @genericToGenericTu =
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @genericToGeneric(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @genericToGeneric(
 sil hidden @genericToGeneric : $@async @convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%out : $*T, %in : $*T):
   copy_addr %in to [initialization] %out : $*T

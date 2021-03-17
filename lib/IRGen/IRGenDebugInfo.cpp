@@ -199,9 +199,6 @@ public:
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
                         const SILDebugScope *DS, bool InCoroContext = false);
-#ifndef NDEBUG
-  bool verifyCoroutineArgument(llvm::Value *Addr);
-#endif
 
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
@@ -2476,27 +2473,6 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   }
 }
 
-#ifndef NDEBUG
-bool IRGenDebugInfoImpl::verifyCoroutineArgument(llvm::Value *Addr) {
-  llvm::Value *Storage = Addr;
-  while (Storage) {
-    if (auto *LdInst = dyn_cast<llvm::LoadInst>(Storage))
-      Storage = LdInst->getOperand(0);
-    else if (auto *GEPInst = dyn_cast<llvm::GetElementPtrInst>(Storage))
-      Storage = GEPInst->getOperand(0);
-    else if (auto *BCInst = dyn_cast<llvm::BitCastInst>(Storage))
-      Storage = BCInst->getOperand(0);
-    else if (auto *CallInst = dyn_cast<llvm::CallInst>(Storage)) {
-      assert(CallInst->getCalledFunction() == IGM.getProjectBoxFn() &&
-             "unhandled projection");
-      Storage = CallInst->getArgOperand(0);
-    } else
-      break;
-  }
-  return llvm::isa<llvm::Argument>(Storage);
-}
-#endif
-
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
     DebugTypeInfo DbgTy, bool IsLocalToUnit, bool InFixedBuffer,
@@ -2679,12 +2655,6 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
   static_cast<IRGenDebugInfoImpl *>(this)->emitDbgIntrinsic(
       Builder, Storage, Var, Expr, Line, Col, Scope, DS, InCoroContext);
 }
-
-#ifndef NDEBUG
-bool IRGenDebugInfo::verifyCoroutineArgument(llvm::Value *Addr) {
-  return static_cast<IRGenDebugInfoImpl *>(this)->verifyCoroutineArgument(Addr);
-}
-#endif
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,

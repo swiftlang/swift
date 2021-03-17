@@ -18,7 +18,7 @@ import _Concurrency
 
 sil public_external @printInt64 : $@convention(thin) (Int64) -> ()
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @afun2(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @afun2(%swift.context* swiftasync {{%[0-9]+}}
 sil @afun2 : $@async @convention(thin) (Int64) -> () {
 entry(%int : $Int64):
   %print = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
@@ -26,7 +26,7 @@ entry(%int : $Int64):
   return %result : $()
 }
 
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @test_apply_of_thin_to_thick(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @test_apply_of_thin_to_thick(
 sil @test_apply_of_thin_to_thick : $@async @convention(thin) () -> () {
 entry:
   %f = function_ref @afun2 : $@async @convention(thin) (Int64) -> ()

@@ -135,7 +135,9 @@ public:
   llvm::Value *getAsyncTask();
   llvm::Value *getAsyncContext();
 
-  llvm::CallInst *emitSuspendAsyncCall(ArrayRef<llvm::Value *> args);
+  llvm::CallInst *emitSuspendAsyncCall(unsigned swiftAsyncContextIndex,
+                                       llvm::StructType *resultTy,
+                                       ArrayRef<llvm::Value *> args);
 
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -194,7 +196,7 @@ public:
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
 
-  void setupAsync();
+  void setupAsync(unsigned asyncContextIndex);
   bool isAsync() const { return asyncContextLocation.isValid(); }
 
   Address createAlloca(llvm::Type *ty, Alignment align,

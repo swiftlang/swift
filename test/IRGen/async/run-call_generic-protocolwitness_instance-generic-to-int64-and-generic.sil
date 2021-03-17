@@ -46,7 +46,7 @@ bb0(%out_addr : $*T, %in_addr : $*T, %self : $I):
 }
 
 // CHECK-LL: @I_P_printMeTu =
-// CHECK-LL: define internal swift{{(tail)?}}cc void @I_P_printMe(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define internal swift{{(tail)?}}cc void @I_P_printMe(
 sil private [transparent] [thunk] @I_P_printMe : $@convention(witness_method: P) @async <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed I) -> (Int64, @out τ_0_0) {
 bb0(%out_addr : $*τ_0_0, %in_addr : $*τ_0_0, %self_addr : $*I):
   %self = load %self_addr : $*I
