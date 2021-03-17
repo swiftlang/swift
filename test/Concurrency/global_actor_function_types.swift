@@ -46,4 +46,13 @@ func testClosures() {
   acceptOnSomeGlobalActor { @SomeGlobalActor in
     onSomeGlobalActor()
   }
+
+  acceptOnSomeGlobalActor {
+    onSomeGlobalActor()
+  }
+
+  acceptOnSomeGlobalActor { () -> Int in
+    let i = onSomeGlobalActor()
+    return i
+  }
 }
