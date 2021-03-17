@@ -607,6 +607,7 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
         auto waitingContext =
             static_cast<TaskGroupNextAsyncContext *>(
                 waitingTask->ResumeContext);
+
         fillGroupNextResult(waitingContext, result);
 
         // TODO: allow the caller to suggest an executor
@@ -640,15 +641,19 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
 
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
-
 SWIFT_CC(swiftasync)
 void swift::swift_taskGroup_wait_next_throwing(
-    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
+    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+    TaskGroup *_group, const Metadata *successType) {
   auto waitingTask = swift_task_getCurrent();
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
   auto context = static_cast<TaskGroupNextAsyncContext *>(rawContext);
+  context->successResultPointer = resultPointer;
+  context->group = _group;
+  context->successType = successType;
+
   auto group = asImpl(context->group);
   assert(group && "swift_taskGroup_wait_next_throwing was passed context without group!");
 

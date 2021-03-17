@@ -102,7 +102,7 @@ bb0(%0 : $@thin Big.Type):
 }
 
 // CHECK-LL: @getBigTu =
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @getBig(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @getBig
 sil hidden @getBig : $@async @convention(thin) () -> Big {
 bb0:
   %0 = metatype $@thin Big.Type

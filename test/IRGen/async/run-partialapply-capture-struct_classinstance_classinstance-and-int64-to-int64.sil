@@ -62,8 +62,8 @@ sil_vtable C {
 struct S { var x: C, y: C }
 
 // CHECK-LL: @structClassInstanceClassInstanceAndInt64ToInt64Tu =
-// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @structClassInstanceClassInstanceAndInt64ToInt64(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
-// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s019structClassInstancebc10AndInt64ToE0TA"(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @structClassInstanceClassInstanceAndInt64ToInt64(
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s019structClassInstancebc10AndInt64ToE0TA"(
 sil @structClassInstanceClassInstanceAndInt64ToInt64 : $@async @convention(thin) (Int64, @guaranteed S) -> Int64 {
 entry(%in : $Int64, %s : $S):
   %s_addr = alloc_stack $S

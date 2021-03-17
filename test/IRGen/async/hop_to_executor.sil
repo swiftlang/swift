@@ -11,14 +11,12 @@ import _Concurrency
 final actor MyActor {
 }
 
-// CHECK-LABEL: define{{.*}} void @test_simple(%swift.context* swiftasync %0)
+// CHECK-LABEL: define{{.*}} void @test_simple(%swift.context* swiftasync %0, %T4test7MyActorC* swiftself %1)
 // CHECK: [[CTX:%[0-9]+]] = bitcast %swift.context* %0
-// CHECK-32: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.context*)*, %swift.executor*, i32, %swift.error**, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 5
-// CHECK-64: [[ACTOR_ADDR:%[0-9]+]] = getelementptr inbounds <{ %swift.context*, void (%swift.context*)*, %swift.executor*, i32, [4 x i8], %swift.error**, %T4test7MyActorC* }>, {{.*}} [[CTX]], i32 0, i32 6
-// CHECK: [[ACTOR:%[0-9]+]] = load %T4test7MyActorC*, %T4test7MyActorC** [[ACTOR_ADDR]]
 // CHECK: [[RESUME:%[0-9]+]] = call i8* @llvm.coro.async.resume()
-// CHECK: [[CAST_ACTOR:%[0-9]+]] = bitcast %T4test7MyActorC* [[ACTOR]] to %swift.executor*
-// CHECK: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.context* {{%[0-9]+}})
+// CHECK: [[CAST_ACTOR:%[0-9]+]] = bitcast %T4test7MyActorC* %1 to %swift.executor*
+// CHECK-x86_64: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.context* {{%[0-9]+}})
+// CHECK-arm64e: call {{.*}} @llvm.coro.suspend.async{{.*}}(i32 0, i8* [[RESUME]], i8* bitcast (i8* (i8*)* @__swift_async_resume_get_context to i8*), i8* bitcast (void (i8*, %swift.executor*, %swift.context*)* @__swift_suspend_point to i8*), i8* [[RESUME]], %swift.executor* [[CAST_ACTOR]], %swift.context* {{%[0-9]+}})
 // CHECK: [[RET_CONTINUATION:%.*]] = bitcast void (%swift.context*)* {{.*}} to i8*
 // CHECK:  call i1 (i8*, i1, ...) @llvm.coro.end.async(i8* {{.*}}, i1 false, void (i8*, %swift.context*)* @[[TAIL_CALL_FUNC:.*]], i8* [[RET_CONTINUATION]]
 // CHECK: unreachable

@@ -34,7 +34,7 @@ struct I : P {
 }
 
 // CHECK-LL: @callPrintMeTu =
-// CHECK-LL: define hidden swift{{(tail)?}}cc void @callPrintMe(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @callPrintMe(
 sil hidden @callPrintMe : $@async @convention(method) <Self where Self : P> (@in_guaranteed Self) -> Int64 {
 bb0(%self : $*Self):
   %P_printMe = witness_method $Self, #P.printMe : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
