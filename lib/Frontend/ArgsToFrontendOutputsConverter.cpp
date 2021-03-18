@@ -597,8 +597,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_emit_private_module_interface_path,
         options::OPT_emit_module_source_info_path,
         options::OPT_emit_tbd_path,
-        options::OPT_emit_ldadd_cfile_path,
-        options::OPT_emit_symbol_graph_dir)) {
+        options::OPT_emit_ldadd_cfile_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");
