@@ -55,6 +55,46 @@ class OverrideWhichSkipsSuperInBody: OverrideWhichCallsSuperInBody {
   // expected-error@-1 {{method override is missing 'super.foo()' call}}
 }
 
+struct Invalid4A {
+  @requiresSuper
+  // expected-error@-1 {{'@requiresSuper' can only be applied on non-final class methods}}
+  func foo() {}
+}
+
+class Invalid5A {
+  @requiresSuper 
+  // expected-error@-1 {{'@requiresSuper' attribute cannot be applied to this declaration}}
+  static var foo1: Int = 0
+
+  @requiresSuper 
+  // expected-error@-1 {{'@requiresSuper' attribute cannot be applied to this declaration}}
+  final var foo2: Int = 1
+
+  @requiresSuper 
+  // expected-error@-1 {{'@requiresSuper' attribute cannot be applied to this declaration}}
+  var foo3: Int = 2
+
+  @requiresSuper 
+  // expected-error@-1 {{'@requiresSuper' attribute cannot be applied to this declaration}}
+  subscript(i: Int) -> Int { fatalError() }
+}
+
+class Invalid6A { // expected-note {{in declaration of 'Invalid6A'}}
+  @requiresSuper("")
+  // expected-error@-1 {{@requiresSuper message must not be empty}}
+  // expected-error@-2 {{expected declaration}}
+  func foo1() {}
+}
+
+class Invalid7A {
+  @requiresSuper
+  init() {}
+}
+
+class Invalid7B: Invalid7A {
+  override init() {}
+  // expected-error@-1 {{method override is missing 'super.init()' call}}
+}
 
 ///////              ///////
 ///////  VALID USES  ///////
@@ -72,6 +112,15 @@ class Valid1B: Valid1A {
   }
 }
 
+class Valid2A {
+  @requiresSuper
+  init() {}
+}
+
+class Valid2B: Valid2A {
+  override init() { super.init() } // Okay
+}
+
 // MARK: Shows optional message on attribute
 class Valid3A {
   @requiresSuper("call super as final step in your implementation")
@@ -87,4 +136,3 @@ class Valid3B: Valid3A {
 class OverrideWhichCallsSuperInBody2: OverrideWhichCallsSuperInBody {
   override func foo() { super.foo() } // Okay
 }
-
