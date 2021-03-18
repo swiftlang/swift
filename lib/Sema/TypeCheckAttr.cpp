@@ -5841,23 +5841,31 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
 }
 
 void AttributeChecker::visitRequiresSuperAttr(RequiresSuperAttr *attr) {
-  auto *FD = cast<FuncDecl>(D);
-  auto &DE = FD->getASTContext().Diags;
-  if (FD->getDeclContext()->getSelfClassDecl()) {
+  auto *AFD = cast<AbstractFunctionDecl>(D);
+  auto &DE = AFD->getASTContext().Diags;
+
+  if (attr->isInvalid()) {
+    // We have probably already emitted a diagnostic elsewhere, so skip
+    // further checks as the attribute is not placed correctly or has
+    // other issues.
+    return;
+  }
+
+  if (AFD->getDeclContext()->getSelfClassDecl()) {
     // '@requiresSuper' cannot be applied to 'final' methods as they can't be
     // overridden.
-    if (FD->isFinal()) {
+    if (AFD->isFinal()) {
       DE.diagnose(attr->getLocation(),
                   diag::requires_super_attr_not_valid_final_method)
           .fixItRemove(attr->getRangeWithAt());
-      FD->getAttrs().removeAttribute(attr);
+      AFD->getAttrs().removeAttribute(attr);
       attr->setInvalid();
     }
   } else {
     // '@requiresSuper' can only be applied on methods inside classes.
     DE.diagnose(attr->getLocation(),
                 diag::requires_super_attr_only_valid_on_class_method);
-    FD->getAttrs().removeAttribute(attr);
+    AFD->getAttrs().removeAttribute(attr);
     attr->setInvalid();
   }
 }
