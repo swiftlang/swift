@@ -1757,6 +1757,8 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
   auto Elem = RespBuilder.getDictionary();
   Elem.set(KeyKind, Info.Kind);
   Elem.set(KeyName, Info.Name);
+  if (Info.DeclarationLang.isValid())
+    Elem.set(KeyDeclarationLang, Info.DeclarationLang);
   if (!Info.USR.empty())
     Elem.set(KeyUSR, Info.USR);
   if (!Info.TypeName.empty())

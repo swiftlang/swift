@@ -1580,6 +1580,12 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                               KeyModuleName);
   const char *GroupName = sourcekitd_variant_dictionary_get_string(Info,
                                                                    KeyGroupName);
+  
+  sourcekitd_uid_t LangUID =
+      sourcekitd_variant_dictionary_get_uid(Info, KeyDeclarationLang);
+  const char *DeclLang = nullptr;
+  if (LangUID)
+    DeclLang = sourcekitd_uid_get_string_ptr(LangUID);
 
   const char *LocalizationKey =
     sourcekitd_variant_dictionary_get_string(Info, KeyLocalizationKey);
@@ -1693,6 +1699,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   OS << Name << '\n';
   if (USR)
     OS << USR << '\n';
+  if (DeclLang)
+    OS << DeclLang << "\n";
   if (Typename)
     OS << Typename << '\n';
   if (TypeUsr)

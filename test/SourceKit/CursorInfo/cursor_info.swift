@@ -237,6 +237,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK1:      source.lang.swift.ref.var.global (4:5-4:9)
 // CHECK1-NEXT: glob
 // CHECK1-NEXT: s:11cursor_info4globSivp{{$}}
+// CHECK1-NEXT: source.lang.swift
 // CHECK1-NEXT: Int
 
 // FIXME(integers): Disabling the checks. See <rdar://problem/31207310>
@@ -244,6 +245,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // XCHECK2:      source.lang.swift.ref.function.operator.infix ()
 // XCHECK2-NEXT: +
 // XCHECK2-NEXT: s:s1poiyS2i_SitF
+// XCHECK2-NEXT: source.lang.swift
 // XCHECK2-NEXT: (Int, Int) -> Int{{$}}
 // XCHECK2-NEXT: $sS2i_SitcD
 // XCHECK2-NEXT: Swift{{$}}
@@ -256,6 +258,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK3:      source.lang.swift.ref.var.local (8:12-8:13)
 // CHECK3-NEXT: x{{$}}
 // CHECK3-NEXT: s:11cursor_info3gooyySiF1xL_Sivp{{$}}
+// CHECK3-NEXT: source.lang.swift
 // CHECK3-NEXT: Int{{$}}
 // CHECK3-NEXT: $sSiD
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
@@ -265,6 +268,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK4:      source.lang.swift.ref.var.global ({{.*}}Foo.framework/Headers/Foo.h:63:12-63:21)
 // CHECK4-NEXT: fooIntVar{{$}}
 // CHECK4-NEXT: c:@fooIntVar{{$}}
+// CHECK4-NEXT: source.lang.objc
 // CHECK4-NEXT: Int32{{$}}
 // CHECK4-NEXT: $ss5Int32VD
 // CHECK4-NEXT: Foo{{$}}
@@ -276,12 +280,14 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK5:      source.lang.swift.decl.function.free (8:6-8:19)
 // CHECK5-NEXT: goo(_:){{$}}
 // CHECK5-NEXT: s:11cursor_info3gooyySiF{{$}}
+// CHECK5-NEXT: source.lang.swift
 // CHECK5-NEXT: (Int) -> (){{$}}
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:32 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK6 %s
 // CHECK6:      source.lang.swift.ref.function.free ()
 // CHECK6-NEXT: fooSwiftFunc
 // CHECK6-NEXT: s:14FooSwiftModule03fooB4FuncSiyF
+// CHECK6-NEXT: source.lang.swift
 // CHECK6-NEXT: () -> Int
 // CHECK6-NEXT: $sSiycD
 // CHECK6-NEXT: FooSwiftModule
@@ -293,6 +299,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK7:      source.lang.swift.ref.struct (13:8-13:10)
 // CHECK7-NEXT: S1
 // CHECK7-NEXT: s:11cursor_info2S1V
+// CHECK7-NEXT: source.lang.swift
 // CHECK7-NEXT: S1.Type
 // CHECK7-NEXT: $s
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
@@ -303,6 +310,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK8:      source.lang.swift.ref.function.constructor (18:3-18:15)
 // CHECK8-NEXT: init
 // CHECK8-NEXT: s:11cursor_info2CCC1xACSi_tcfc
+// CHECK8-NEXT: source.lang.swift
 // CHECK8-NEXT: (CC.Type) -> (Int) -> CC
 // CHECK8-NEXT: $s1x11cursor_info2CCCSi_tcD
 // CHECK8-NEXT: <Container>$s11cursor_info2CCCD</Container>
@@ -338,6 +346,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK14: source.lang.swift.ref.function.free ({{.*}}Foo.framework/Frameworks/FooSub.framework/Headers/FooSub.h:4:5-4:16)
 // CHECK14: fooSubFunc1
 // CHECK14: c:@F@fooSubFunc1
+// CHECK14: source.lang.objc
 // CHECK14: Foo.FooSub{{$}}
 
 // RUN: %sourcekitd-test -req=cursor -pos=38:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK15 %s
@@ -353,6 +362,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK16:      source.lang.swift.ref.class ({{.*}}Foo.framework/Headers/Foo.h:158:12-158:27)
 // CHECK16-NEXT: FooClassDerived
 // CHECK16-NEXT: c:objc(cs)FooClassDerived
+// CHECK16-NEXT: source.lang.objc
 // CHECK16: <Declaration>class FooClassDerived : <Type usr="c:objc(cs)FooClassBase">FooClassBase</Type>, <Type usr="c:objc(pl)FooProtocolDerived">FooProtocolDerived</Type></Declaration>
 // CHECK16-NEXT: <decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>FooClassDerived</decl.name> : <ref.class usr="c:objc(cs)FooClassBase">FooClassBase</ref.class>, <ref.protocol usr="c:objc(pl)FooProtocolDerived">FooProtocolDerived</ref.protocol></decl.class>
 
@@ -406,6 +416,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK29: source.lang.swift.decl.function.destructor (74:3-74:9)
 // CHECK29-NEXT: deinit
 // CHECK29-NEXT: s:11cursor_info2C3Cfd
+// CHECK29-NEXT: source.lang.swift
 // CHECK29-NEXT: (C3) -> ()
 // CHECK29-NEXT: $syycD
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
@@ -415,6 +426,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK30: source.lang.swift.decl.function.constructor (75:3-75:16)
 // CHECK30-NEXT: init(x:)
 // CHECK30-NEXT: s:11cursor_info2C3C1xACSgSi_tcfc
+// CHECK30-NEXT: source.lang.swift
 // CHECK30-NEXT: (C3.Type) -> (Int) -> C3?
 // CHECK30-NEXT: $s1x11cursor_info2C3CSgSi_tcD
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
@@ -424,6 +436,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK31: source.lang.swift.decl.function.constructor (76:3-76:16)
 // CHECK31-NEXT: init(y:)
 // CHECK31-NEXT: s:11cursor_info2C3C1yACSgSi_tcfc
+// CHECK31-NEXT: source.lang.swift
 // CHECK31-NEXT: (C3.Type) -> (Int) -> C3?
 // CHECK31-NEXT: $s1y11cursor_info2C3CSgSi_tcD
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
@@ -433,6 +446,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK32: source.lang.swift.decl.function.constructor (77:3-77:15)
 // CHECK32-NEXT: init(z:)
 // CHECK32-NEXT: s:11cursor_info2C3C1zACSi_tKcfc
+// CHECK32-NEXT: source.lang.swift
 // CHECK32-NEXT: (C3.Type) -> (Int) throws -> C3
 // CHECK32-NEXT: $s1z11cursor_info2C3CSi_tKcD
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
@@ -442,6 +456,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK33: source.lang.swift.decl.struct (80:8-80:10)
 // CHECK33-NEXT: S2
 // CHECK33-NEXT: s:11cursor_info2S2V
+// CHECK33-NEXT: source.lang.swift
 // CHECK33-NEXT: S2<T, U>.Type
 // CHECK33: <Declaration>struct S2&lt;T, U&gt; where <Type usr="s:11cursor_info2S2V1Txmfp">T</Type> == <Type usr="s:11cursor_info2S2V1Uq_mfp">U</Type></Declaration>
 // CHECK33-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S2</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2S2V1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2S2V1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="s:11cursor_info2S2V1Txmfp">T</ref.generic_type_param> == <ref.generic_type_param usr="s:11cursor_info2S2V1Uq_mfp">U</ref.generic_type_param></decl.generic_type_requirement></decl.struct>
@@ -450,6 +465,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK34: source.lang.swift.decl.function.method.instance (81:8-81:62)
 // CHECK34-NEXT: foo(_:_:_:)
 // CHECK34-NEXT: s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF
+// CHECK34-NEXT: source.lang.swift
 // CHECK34-NEXT: <T, U, V, W where T == U, V == W> (S2<T, U>) -> (V, W, () -> ()) -> () -> ()
 // CHECK34: <Declaration>func foo&lt;V, W&gt;(_: <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp">V</Type>, _: <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</Type>, _ closure: () -&gt; ()) -&gt; () -&gt; () where <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp">V</Type> == <Type usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</Type></Declaration>
 // CHECK34: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp"><decl.generic_type_param.name>V</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp"><decl.generic_type_param.name>W</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp">V</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1VL_qd__mfp">V</ref.generic_type_param> == <ref.generic_type_param usr="s:11cursor_info2S2V3fooyyycqd___qd__yyXEtqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</ref.generic_type_param></decl.generic_type_requirement></decl.function.method.instance>
@@ -458,6 +474,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK35: source.lang.swift.decl.class (83:7-83:9)
 // CHECK35-NEXT: C4
 // CHECK35-NEXT: s:11cursor_info2C4C
+// CHECK35-NEXT: source.lang.swift
 // CHECK35-NEXT: C4<T, U>.Type
 // CHECK35: <Declaration>class C4&lt;T, U&gt; where <Type usr="s:11cursor_info2C4C1Txmfp">T</Type> == <Type usr="s:11cursor_info2C4C1Uq_mfp">U</Type></Declaration>
 // CHECK35-NEXT: <decl.class><syntaxtype.keyword>class</syntaxtype.keyword> <decl.name>C4</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2C4C1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2C4C1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="s:11cursor_info2C4C1Txmfp">T</ref.generic_type_param> == <ref.generic_type_param usr="s:11cursor_info2C4C1Uq_mfp">U</ref.generic_type_param></decl.generic_type_requirement></decl.class>
@@ -466,6 +483,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK36: source.lang.swift.decl.enum (84:6-84:8)
 // CHECK36-NEXT: E1
 // CHECK36-NEXT: s:11cursor_info2E1O
+// CHECK36-NEXT: source.lang.swift
 // CHECK36-NEXT: E1<T, U>.Type
 // CHECK36: <Declaration>enum E1&lt;T, U&gt; where <Type usr="s:11cursor_info2E1O1Txmfp">T</Type> == <Type usr="s:11cursor_info2E1O1Uq_mfp">U</Type></Declaration>
 // CHECK36-NEXT: <decl.enum><syntaxtype.keyword>enum</syntaxtype.keyword> <decl.name>E1</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2E1O1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2E1O1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement><ref.generic_type_param usr="s:11cursor_info2E1O1Txmfp">T</ref.generic_type_param> == <ref.generic_type_param usr="s:11cursor_info2E1O1Uq_mfp">U</ref.generic_type_param></decl.generic_type_requirement></decl.enum>
@@ -474,6 +492,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK37: source.lang.swift.decl.function.free (86:6-86:111)
 // CHECK37-NEXT: nonDefaultArgNames(external1:_:external3:external4:_:)
 // CHECK37-NEXT: s:11cursor_info18nonDefaultArgNames9external1_9external39external4_ySi_S4itF
+// CHECK37-NEXT: source.lang.swift
 // CHECK37-NEXT: (Int, Int, Int, Int, Int) -> ()
 // CHECK37: <Declaration>func nonDefaultArgNames(external1 local1: <Type usr="s:Si">Int</Type>, _ local2: <Type usr="s:Si">Int</Type>, external3 local3: <Type usr="s:Si">Int</Type>, external4 _: <Type usr="s:Si">Int</Type>, _: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK37-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>nonDefaultArgNames</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>external1</decl.var.parameter.argument_label> <decl.var.parameter.name>local1</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>local2</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>external3</decl.var.parameter.argument_label> <decl.var.parameter.name>local3</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>external4</decl.var.parameter.argument_label> <decl.var.parameter.name>_</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
@@ -485,6 +504,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK39: source.lang.swift.decl.enumelement (91:8-91:10)
 // CHECK39-NEXT: C1
 // CHECK39-NEXT: s:11cursor_info2E2O2C1yA2CmF
+// CHECK39-NEXT: source.lang.swift
 // CHECK39-NEXT: (E2.Type) -> E2
 // CHECK39: <Declaration>case C1</Declaration>
 // CHECK39-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C1</decl.name></decl.enumelement>
@@ -493,6 +513,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK40: source.lang.swift.decl.enumelement (92:8-92:10)
 // CHECK40-NEXT: C2
 // CHECK40-NEXT: s:11cursor_info2E2O2C2yACSi_SStcACmF
+// CHECK40-NEXT: source.lang.swift
 // CHECK40-NEXT: (E2.Type) -> (Int, String) -> E2
 // CHECK40: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
 // CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:SS">String</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
@@ -501,6 +522,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK41: source.lang.swift.decl.enumelement (92:31-92:33)
 // CHECK41-NEXT: C3
 // CHECK41-NEXT: s:11cursor_info2E2O2C3yACSicACmF
+// CHECK41-NEXT: source.lang.swift
 // CHECK41-NEXT: (E2.Type) -> (Int) -> E2
 // CHECK41: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<decl.var.parameter><decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
@@ -509,6 +531,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
 // CHECK42-NEXT: C
 // CHECK42-NEXT: s:11cursor_info2E3O1CyA2CmF
+// CHECK42-NEXT: source.lang.swift
 // CHECK42-NEXT: (E3.Type) -> E3
 // CHECK42: <Declaration>case C = &quot;a&quot;</Declaration>
 // CHECK42-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C</decl.name> = <syntaxtype.string>&quot;a&quot;</syntaxtype.string></decl.enumelement>
@@ -541,6 +564,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK47: source.lang.swift.decl.generic_type_param (80:11-80:12)
 // CHECK47-NEXT: T
 // CHECK47-NEXT: s:11cursor_info2S2V1Txmfp
+// CHECK47-NEXT: source.lang.swift
 // CHECK47-NEXT: T.Type
 // CHECK47: <Declaration>T</Declaration>
 // CHECK47-NEXT: <decl.generic_type_param><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>
@@ -617,6 +641,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK67: source.lang.swift.decl.associatedtype (114:18-114:19)
 // CHECK67-NEXT: T
 // CHECK67-NEXT: s:11cursor_info2P1P1T
+// CHECK67-NEXT: source.lang.swift
 // CHECK67-NEXT: T.Type
 // CHECK67: <Declaration>associatedtype T</Declaration>
 // CHECK67-NEXT: <decl.associatedtype><syntaxtype.keyword>associatedtype</syntaxtype.keyword> <decl.name>T</decl.name></decl.associatedtype>
@@ -625,6 +650,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK68: source.lang.swift.decl.typealias (152:11-152:18)
 // CHECK68-NEXT: MyAlias
 // CHECK68-NEXT: s:11cursor_info7MyAliasa
+// CHECK68-NEXT: source.lang.swift
 // CHECK68-NEXT: (T, U, T, U).Type
 // CHECK68: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>, <Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>)</Declaration>
 // CHECK68-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
@@ -633,6 +659,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK69: source.lang.swift.ref.typealias (152:11-152:18)
 // CHECK69-NEXT: MyAlias
 // CHECK69-NEXT: s:11cursor_info7MyAliasa
+// CHECK69-NEXT: source.lang.swift
 // CHECK69-NEXT: (T, U, T, U).Type
 // CHECK69: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>, <Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>)</Declaration>
 // CHECK69-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
@@ -727,6 +754,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK87:      source.lang.swift.decl.struct (213:8-213:26)
 // CHECK87-NEXT: HasLocalizationKey
 // CHECK87-NEXT: s:11cursor_info18HasLocalizationKeyV
+// CHECK87-NEXT: source.lang.swift
 // CHECK87-NEXT: HasLocalizationKey.Type
 // CHECK87-NEXT: $s
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
@@ -738,6 +766,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK88:      source.lang.swift.decl.function.free (216:6-216:27)
 // CHECK88-NEXT: hasLocalizationKey2
 // CHECK88-NEXT: s:11cursor_info19hasLocalizationKey2yyF
+// CHECK88-NEXT: source.lang.swift
 // CHECK88-NEXT: () -> ()
 // CHECK88-NEXT: $s
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>

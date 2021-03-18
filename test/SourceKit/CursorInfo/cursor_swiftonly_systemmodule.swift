@@ -31,6 +31,7 @@ func test() {
 // CHECK: source.lang.swift.ref.function.free ()
 // CHECK-NEXT: someFunc()
 // CHECK-NEXT: s:10SomeModule8someFuncyyF
+// CHECK-NEXT: source.lang.swift
 // CHECK-NEXT: () -> ()
 // CHECK-NEXT: $syycD
 // CHECK-NEXT: SomeModule
