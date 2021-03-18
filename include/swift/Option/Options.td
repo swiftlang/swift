@@ -61,6 +61,8 @@ def SwiftAPIExtractOption : OptionFlag;
 // The option should be accepted by swift-symbolgraph-extract.
 def SwiftSymbolGraphExtractOption : OptionFlag;
 
+def SwiftMergeModuleSummaryOption : OptionFlag;
+
 /////////
 // Options
 
@@ -177,6 +179,7 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
 def help : Flag<["-", "--"], "help">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
          SwiftIndentOption, SwiftAPIExtractOption,
+         SwiftMergeModuleSummaryOption,
          SwiftSymbolGraphExtractOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
@@ -200,6 +203,7 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
          NoInteractiveOption, SwiftIndentOption, ArgumentIsPath,
+         SwiftMergeModuleSummaryOption,
          SwiftAPIExtractOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
@@ -1043,7 +1047,7 @@ def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is use for linking.">;
 
 def Xllvm : Separate<["-"], "Xllvm">,
-  Flags<[FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden, SwiftMergeModuleSummaryOption]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to LLVM.">;
 
 def resource_dir : Separate<["-"], "resource-dir">,
