@@ -92,6 +92,16 @@ TypeErasureTests.test("AnyDifferentiable casting") {
   expectEqual(nil, genericAny.base as? Generic<Double>)
 }
 
+TypeErasureTests.test("AnyDifferentiable reflection") {
+  let originalVector = Vector(x: 1, y: 1)
+  let vector = AnyDifferentiable(originalVector)
+  let mirror = Mirror(reflecting: vector)
+  let children = Array(mirror.children)
+  expectEqual(2, children.count)
+  expectEqual(["x", "y"], children.map(\.label))
+  expectEqual([originalVector.x, originalVector.y], children.map { $0.value as! Float })
+}
+
 TypeErasureTests.test("AnyDerivative casting") {
   let tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
   expectEqual(Vector.TangentVector(x: 1, y: 1), tan.base as? Vector.TangentVector)
@@ -105,6 +115,16 @@ TypeErasureTests.test("AnyDerivative casting") {
   expectEqual(nil, zero.base as? Float)
   expectEqual(nil, zero.base as? Vector.TangentVector)
   expectEqual(nil, zero.base as? Generic<Float>.TangentVector)
+}
+
+TypeErasureTests.test("AnyDerivative reflection") {
+  let originalTan = Vector.TangentVector(x: 1, y: 1)
+  let tan = AnyDerivative(originalTan)
+  let mirror = Mirror(reflecting: tan)
+  let children = Array(mirror.children)
+  expectEqual(2, children.count)
+  expectEqual(["x", "y"], children.map(\.label))
+  expectEqual([originalTan.x, originalTan.y], children.map { $0.value as! Float })
 }
 
 TypeErasureTests.test("AnyDifferentiable differentiation") {
