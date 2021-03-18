@@ -691,6 +691,11 @@ private:
       }
     }
 
+    if (AFD->getAttrs().hasAttribute<RequiresSuperAttr>() &&
+        (isa<FuncDecl>(AFD) || isa<ConstructorDecl>(AFD))) {
+      os << " NS_REQUIRES_SUPER";
+    }
+
     if (!skipAvailability) {
       printAvailability(AFD);
     }
