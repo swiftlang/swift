@@ -3,7 +3,7 @@
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
 
-// UNSUPPORTED: CPU=arm64e
+// REQUIRES: rdar74588568
 
 // Test that x is described as a direct dbg.declare of the incoming function
 // argument.
