@@ -164,14 +164,14 @@ bb0(%initialized : $Sub):
   return %out : $()
 }
 
-// CHECK-SIL-LABEL: sil hidden @partial_apply_method 
+// CHECK-SIL-LABEL: sil hidden @partial_apply_method
 //  CHECK-SIL-SAME: : $@convention(thin) <U where U : Q> (
-//  CHECK-SIL-SAME:     @guaranteed Super, 
+//  CHECK-SIL-SAME:     @guaranteed Super,
 //  CHECK-SIL-SAME:     @convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String
-//  CHECK-SIL-SAME: ) -> 
+//  CHECK-SIL-SAME: ) ->
 //  CHECK-SIL-SAME:     @async @callee_guaranteed (@in_guaranteed U, Int64) -> @owned String {
 //       CHECK-SIL: bb0(
-//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : $Super, 
+//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : $Super,
 //  CHECK-SIL-SAME:     [[DYNAMIC_METHOD:%[^,]+]] : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
 //  CHECK-SIL-SAME: ):
 //       CHECK-SIL:   [[THUNK:%[^,]+]] = function_ref @$s20partial_apply_methodTw_ : $@convention(thin) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @owned String
@@ -180,20 +180,20 @@ bb0(%initialized : $Sub):
 // CHECK-SIL-LABEL: } // end sil function 'partial_apply_method'
 
 // CHECK-SIL-LABEL: sil private [thunk] [ossa] @$s20partial_apply_methodTw_ : $@convention(thin) @async <U where U : Q> (
-//  CHECK-SIL-SAME:     @in_guaranteed U, 
-//  CHECK-SIL-SAME:     Int64, 
-//  CHECK-SIL-SAME:     @guaranteed Super, 
-//  CHECK-SIL-SAME:     @convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String) -> @owned String 
+//  CHECK-SIL-SAME:     @in_guaranteed U,
+//  CHECK-SIL-SAME:     Int64,
+//  CHECK-SIL-SAME:     @guaranteed Super,
+//  CHECK-SIL-SAME:     @convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String) -> @owned String
 //  CHECK-SIL-SAME: {
 //       CHECK-SIL: bb0(
-//  CHECK-SIL-SAME:     [[GENERIC_ADDR:%[^,]+]] : $*U, 
-//  CHECK-SIL-SAME:     [[INT:%[^,]+]] : $Int64, 
-//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : @guaranteed $Super, 
+//  CHECK-SIL-SAME:     [[GENERIC_ADDR:%[^,]+]] : $*U,
+//  CHECK-SIL-SAME:     [[INT:%[^,]+]] : $Int64,
+//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : @guaranteed $Super,
 //  CHECK-SIL-SAME:     [[METHOD:%[^,]+]] : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
 //  CHECK-SIL-SAME: ):
 //       CHECK-SIL:   [[RESULT:%[^,]+]] = apply [[METHOD]]<U>(
-//  CHECK-SIL-SAME:       [[GENERIC_ADDR]], 
-//  CHECK-SIL-SAME:       [[INT]], 
+//  CHECK-SIL-SAME:       [[GENERIC_ADDR]],
+//  CHECK-SIL-SAME:       [[INT]],
 //  CHECK-SIL-SAME:       [[INSTANCE]]
 //  CHECK-SIL-SAME:   ) : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
 //       CHECK-SIL:   return [[RESULT]] : $String
@@ -264,20 +264,25 @@ sil @test_case : $@convention(thin) @async () -> () {
 // Defined in _Concurrency
 sil @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
 
+sil @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error {
+bb0(%0 :$@async @callee_guaranteed () -> ()):
+  %void = apply %0() : $@async @callee_guaranteed () -> ()
+  return %void : $()
+}
+
 // main
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
-  %test_case = convert_function %test_case_nothrow : $@convention(thin) @async () -> () to $@convention(thin) @async () -> @error Error
-  %thick_test_case = thin_to_thick_function %test_case : $@convention(thin) @async () -> @error Error to $@callee_guaranteed @async () -> @error Error
+  %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
+  %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %throwing = partial_apply [callee_guaranteed] %thunk(%thick_test_case) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
   %runAsyncMain = function_ref @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
-  %result = apply %runAsyncMain(%thick_test_case) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
-
+  %result = apply %runAsyncMain(%throwing) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
   %out_literal = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%out_literal : $Builtin.Int32)
   return %out : $Int32
 }
-
 sil_vtable Super {
   #Super.init!allocator: (Super.Type) -> (String) -> Super : @Super_allocating_init
   #Super.run: <U where U : Q> (Super) -> (U, Int64) async -> String : @Super_run

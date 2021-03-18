@@ -577,10 +577,11 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   //   W:n R:0 P:1 -> W:y R:1 P:3 // complete immediately, 2 more pending tasks
   auto assumed = statusAddReadyAssumeAcquire();
 
-  // If an error was thrown, save it in the future fragment.
-  auto futureContext = static_cast<FutureAsyncContext *>(context);
+  auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
   bool hadErrorResult = false;
-  if (auto errorObject = *futureContext->errorResult) {
+  auto errorObject = asyncContextPrefix->errorResult;
+  if (errorObject) {
     // instead we need to enqueue this result:
     hadErrorResult = true;
   }
@@ -639,6 +640,14 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   return;
 }
 
+SWIFT_CC(swiftasync)
+static void
+task_group_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+
+  auto context = static_cast<TaskGroupNextAsyncContext *>(_context);
+  return context->asyncResumeEntryPoint(_context, context->errorResult);
+}
+
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
 SWIFT_CC(swiftasync)
@@ -646,10 +655,15 @@ void swift::swift_taskGroup_wait_next_throwing(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
     TaskGroup *_group, const Metadata *successType) {
   auto waitingTask = swift_task_getCurrent();
-  waitingTask->ResumeTask = rawContext->ResumeParent;
+  auto originalResumeParent =
+      reinterpret_cast<AsyncVoidClosureResumeEntryPoint *>(
+          rawContext->ResumeParent);
+  waitingTask->ResumeTask = task_group_wait_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
   auto context = static_cast<TaskGroupNextAsyncContext *>(rawContext);
+  context->errorResult = nullptr;
+  context->asyncResumeEntryPoint = originalResumeParent;
   context->successResultPointer = resultPointer;
   context->group = _group;
   context->successType = successType;

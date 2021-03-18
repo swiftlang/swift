@@ -3,7 +3,7 @@
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
 // RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
 // RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -partial-apply-lowering %s | %FileCheck %s --check-prefix=CHECK-SIL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
@@ -94,31 +94,31 @@ sil_witness_table ObserverImpl : Observer module main {
 //       CHECK-SIL:   return [[RESULT]] : $@async @callee_guaranteed (@in O) -> ()
 // CHECK-SIL-LABEL: } // end sil function 'witness_method'
 
-// CHECK-SIL-LABEL: sil private [thunk] [ossa] @$s14witness_methodTw_ 
-//  CHECK-SIL-SAME: : $@convention(thin) @async 
+// CHECK-SIL-LABEL: sil private [thunk] [ossa] @$s14witness_methodTw_
+//  CHECK-SIL-SAME: : $@convention(thin) @async
 //  CHECK-SIL-SAME:     <S where S : Observable>
-//  CHECK-SIL-SAME:     <O where O : Observer, S.Result == O.Result> 
+//  CHECK-SIL-SAME:     <O where O : Observer, S.Result == O.Result>
 //  CHECK-SIL-SAME:     (
-//  CHECK-SIL-SAME:         @in O, 
-//  CHECK-SIL-SAME:         @in_guaranteed S, 
-//  CHECK-SIL-SAME:         @convention(witness_method: Observable) @async 
+//  CHECK-SIL-SAME:         @in O,
+//  CHECK-SIL-SAME:         @in_guaranteed S,
+//  CHECK-SIL-SAME:         @convention(witness_method: Observable) @async
 //  CHECK-SIL-SAME:             <S where S : Observable>
-//  CHECK-SIL-SAME:             <O where O : Observer, S.Result == O.Result> 
+//  CHECK-SIL-SAME:             <O where O : Observer, S.Result == O.Result>
 //  CHECK-SIL-SAME:             (@in O, @in_guaranteed S) -> ()
 //  CHECK-SIL-SAME:     ) -> () {
 //       CHECK-SIL: bb0(
-//  CHECK-SIL-SAME:     [[O_INSTANCE:%[^,]+]] : $*O, 
-//  CHECK-SIL-SAME:     [[S_INSTANCE:%[^,]+]] : $*S, 
+//  CHECK-SIL-SAME:     [[O_INSTANCE:%[^,]+]] : $*O,
+//  CHECK-SIL-SAME:     [[S_INSTANCE:%[^,]+]] : $*S,
 //  CHECK-SIL-SAME:     [[WITNESS_METHOD:%[^,]+]] : $
-//  CHECK-SIL-SAME:         @convention(witness_method: Observable) @async 
-//  CHECK-SIL-SAME:         <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> 
+//  CHECK-SIL-SAME:         @convention(witness_method: Observable) @async
+//  CHECK-SIL-SAME:         <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result>
 //  CHECK-SIL-SAME:         (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
 //  CHECK-SIL-SAME: ):
 //       CHECK-SIL:   [[RESULT:%[^,]+]] = apply [[WITNESS_METHOD]]<S, O>(
-//  CHECK-SIL-SAME:       [[O_INSTANCE]], 
+//  CHECK-SIL-SAME:       [[O_INSTANCE]],
 //  CHECK-SIL-SAME:       [[S_INSTANCE]]
-//  CHECK-SIL-SAME:   ) : $@convention(witness_method: Observable) @async <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> () 
-//       CHECK-SIL:   return [[RESULT]] : $()                                 
+//  CHECK-SIL-SAME:   ) : $@convention(witness_method: Observable) @async <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+//       CHECK-SIL:   return [[RESULT]] : $()
 // CHECK-SIL-LABEL: } // end sil function '$s14witness_methodTw_'
 
 // CHECK-LL: define internal swift{{(tail)?}}cc void @"$s14witness_methodTw_TA"(
@@ -153,14 +153,21 @@ sil @test_case : $@convention(thin) @async () -> () {
 // Defined in _Concurrency
 sil @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
 
+sil @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error {
+bb0(%0 :$@async @callee_guaranteed () -> ()):
+  %void = apply %0() : $@async @callee_guaranteed () -> ()
+  return %void : $()
+}
+
 // main
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
-  %test_case = convert_function %test_case_nothrow : $@convention(thin) @async () -> () to $@convention(thin) @async () -> @error Error
-  %thick_test_case = thin_to_thick_function %test_case : $@convention(thin) @async () -> @error Error to $@callee_guaranteed @async () -> @error Error
+  %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
+  %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %throwing = partial_apply [callee_guaranteed] %thunk(%thick_test_case) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
   %runAsyncMain = function_ref @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
-  %result = apply %runAsyncMain(%thick_test_case) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %result = apply %runAsyncMain(%throwing) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
   %out_literal = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%out_literal : $Builtin.Int32)
   return %out : $Int32

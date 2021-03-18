@@ -1527,12 +1527,7 @@ public:
   };
 
   llvm::Value *getCallerErrorResultArgument() override {
-    auto errorLayout = layout.getErrorLayout();
-    Address pointerToAddress =
-        errorLayout.project(IGF, dataAddr, /*offsets*/ llvm::None);
-    auto load = IGF.Builder.CreateLoad(pointerToAddress);
-    auto addr = Address(load, IGF.IGM.getPointerAlignment());
-    return addr.getAddress();
+    llvm_unreachable("should not be used");
   }
   llvm::Value *getContext() override { return allParamValues.takeLast(); }
   Explosion getArgumentExplosion(unsigned index, unsigned size) override {
@@ -1936,9 +1931,10 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
 
   // Bind the error result by popping it off the parameter list.
-  if (funcTy->hasErrorResult()) {
+  if (funcTy->hasErrorResult() && !funcTy->isAsync()) {
     IGF.setCallerErrorResultSlot(emission->getCallerErrorResultArgument());
   }
+
   // The coroutine context should be the first parameter.
   switch (funcTy->getCoroutineKind()) {
   case SILCoroutineKind::None:
@@ -3472,6 +3468,8 @@ static void emitReturnInst(IRGenSILFunction &IGF,
     IGF.emitCoroutineOrAsyncExit();
     return;
   }
+  SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
+                              IGF.getSILModule());
 
   // The invariant on the out-parameter is that it's always zeroed, so
   // there's nothing to do here.
@@ -3486,19 +3484,38 @@ static void emitReturnInst(IRGenSILFunction &IGF,
       IGF.Builder.CreateRetVoid();
       return;
     } else {
+      if (fnType->hasErrorResult()) {
+        SmallVector<llvm::Value *, 16> nativeResultsStorage;
+        auto errorResultType = IGF.CurSILFn->mapTypeIntoContext(
+            conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+        auto errorType =
+            cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
+        nativeResultsStorage.push_back(llvm::ConstantPointerNull::get(errorType));
+        return emitAsyncReturn(
+            IGF, asyncLayout, fnType,
+            Optional<llvm::ArrayRef<llvm::Value *>>(nativeResultsStorage));
+      }
+
       return emitAsyncReturn(IGF, asyncLayout, fnType, llvm::None);
     }
   }
 
-  SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
-                              IGF.getSILModule());
   auto funcResultType = IGF.CurSILFn->mapTypeIntoContext(
       conv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
   if (IGF.isAsync()) {
     // If we're generating an async function, store the result into the buffer.
     auto asyncLayout = getAsyncContextLayout(IGF);
-    emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result);
+    Explosion error;
+    if (fnType->hasErrorResult()) {
+      SmallVector<llvm::Value *, 16> nativeResultsStorage;
+      auto errorResultType = IGF.CurSILFn->mapTypeIntoContext(
+          conv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()));
+      auto errorType =
+          cast<llvm::PointerType>(IGF.IGM.getStorageType(errorResultType));
+      error.add(llvm::ConstantPointerNull::get(errorType));
+    }
+    emitAsyncReturn(IGF, asyncLayout, funcResultType, fnType, result, error);
   } else {
     auto funcLang = IGF.CurSILFn->getLoweredFunctionType()->getLanguage();
     auto swiftCCReturn = funcLang == SILFunctionLanguage::Swift;
@@ -3531,10 +3548,10 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   // Store the exception to the error slot.
   llvm::Value *exn = getLoweredSingletonExplosion(i->getOperand());
 
-  Builder.CreateStore(exn, getCallerErrorResultSlot());
-
-  // Async functions just return to the continuation.
-  if (isAsync()) {
+  if (!isAsync()) {
+    Builder.CreateStore(exn, getCallerErrorResultSlot());
+    // Async functions just return to the continuation.
+  } else if (isAsync()) {
     auto layout = getAsyncContextLayout(*this);
     SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
                                 getSILModule());
@@ -3542,8 +3559,10 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
         conv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
 
     Explosion empty;
+    Explosion error;
+    error.add(exn);
     emitAsyncReturn(*this, layout, funcResultType,
-                    i->getFunction()->getLoweredFunctionType(), empty);
+                    i->getFunction()->getLoweredFunctionType(), empty, error);
     return;
   }
 

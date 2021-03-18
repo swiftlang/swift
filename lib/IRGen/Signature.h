@@ -89,7 +89,8 @@ namespace {
 
 class AsyncInfo {
 public:
-  unsigned AsyncContextIdx = 0;
+  uint32_t AsyncContextIdx = 0;
+  uint32_t AsyncResumeFunctionSwiftSelfIdx = 0;
 };
 
 /// A signature represents something which can actually be called.
@@ -175,8 +176,11 @@ public:
     return AsyncInfo();
   }
 
-  unsigned getAsyncContextIndex() const {
+  uint32_t getAsyncContextIndex() const {
     return getAsyncInfo().AsyncContextIdx;
+  }
+  uint32_t getAsyncResumeFunctionSwiftSelfIndex() const {
+    return getAsyncInfo().AsyncResumeFunctionSwiftSelfIdx;
   }
 
   // The mutators below should generally only be used when building up
