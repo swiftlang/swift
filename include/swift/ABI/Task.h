@@ -87,13 +87,13 @@ public:
   /// Given that we've fully established the job context in the current
   /// thread, actually start running this job.  To establish the context
   /// correctly, call swift_job_run or runJobInExecutorContext.
-  void runInFullyEstablishedContext(ExecutorRef currentExecutor);
+  void runInFullyEstablishedContext();
 
   /// Given that we've fully established the job context in the
   /// current thread, and that the job is a simple (non-task) job,
   /// actually start running this job.
-  void runSimpleInFullyEstablishedContext(ExecutorRef currentExecutor) {
-    RunJob(this, currentExecutor);
+  void runSimpleInFullyEstablishedContext() {
+    RunJob(this);
   }
 };
 
@@ -193,8 +193,8 @@ public:
   /// in the current thread, start running this task.  To establish
   /// the job context correctly, call swift_job_run or
   /// runInExecutorContext.
-  void runInFullyEstablishedContext(ExecutorRef currentExecutor) {
-    ResumeTask(this, currentExecutor, ResumeContext);
+  void runInFullyEstablishedContext() {
+    ResumeTask(ResumeContext);
   }
   
   /// Check whether this task has been cancelled.
@@ -390,7 +390,7 @@ public:
     }
 
     /// Retrieve the error.
-    SwiftError *&getError() { return *&error; }
+    SwiftError *&getError() { return error; }
 
     /// Compute the offset of the storage from the base of the future
     /// fragment.
@@ -433,7 +433,7 @@ public:
   ///
   /// Upon completion, any waiting tasks will be scheduled on the given
   /// executor.
-  void completeFuture(AsyncContext *context, ExecutorRef executor);
+  void completeFuture(AsyncContext *context);
 
   // ==== ----------------------------------------------------------------------
 
@@ -456,11 +456,11 @@ static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
 
-inline void Job::runInFullyEstablishedContext(ExecutorRef currentExecutor) {
+inline void Job::runInFullyEstablishedContext() {
   if (auto task = dyn_cast<AsyncTask>(this))
-    task->runInFullyEstablishedContext(currentExecutor);
+    task->runInFullyEstablishedContext();
   else
-    runSimpleInFullyEstablishedContext(currentExecutor);
+    runSimpleInFullyEstablishedContext();
 }
 
 /// An asynchronous context within a task.  Generally contexts are
@@ -484,6 +484,7 @@ public:
     ResumeParent;
 
   /// The executor that the parent needs to be resumed on.
+  /// FIXME: remove this
   ExecutorRef ResumeParentExecutor;
 
   /// Flags describing this context.
@@ -496,10 +497,9 @@ public:
 
   AsyncContext(AsyncContextFlags flags,
                TaskContinuationFunction *resumeParent,
-               ExecutorRef resumeParentExecutor,
                AsyncContext *parent)
     : Parent(parent), ResumeParent(resumeParent),
-      ResumeParentExecutor(resumeParentExecutor),
+      ResumeParentExecutor(ExecutorRef::generic()),
       Flags(flags) {}
 
   AsyncContext(const AsyncContext &) = delete;
@@ -509,10 +509,10 @@ public:
   ///
   /// Generally this should be tail-called.
   SWIFT_CC(swiftasync)
-  void resumeParent(AsyncTask *task, ExecutorRef executor) {
+  void resumeParent() {
     // TODO: destroy context before returning?
     // FIXME: force tail call
-    return ResumeParent(task, executor, Parent);
+    return ResumeParent(Parent);
   }
 };
 
@@ -529,11 +529,10 @@ public:
 
   YieldingAsyncContext(AsyncContextFlags flags,
                        TaskContinuationFunction *resumeParent,
-                       ExecutorRef resumeParentExecutor,
                        TaskContinuationFunction *yieldToParent,
                        ExecutorRef yieldToParentExecutor,
                        AsyncContext *parent)
-    : AsyncContext(flags, resumeParent, resumeParentExecutor, parent),
+    : AsyncContext(flags, resumeParent, parent),
       YieldToParent(yieldToParent),
       YieldToParentExecutor(yieldToParentExecutor) {}
 
@@ -550,19 +549,47 @@ public:
 /// futures.
 class FutureAsyncContext : public AsyncContext {
 public:
-  SwiftError **errorResult = nullptr;
-  OpaqueValue *indirectResult;
-
   using AsyncContext::AsyncContext;
 };
 
-/// An asynchronous context within a task that describes a general "Future"
-/// task that was started with a closure context.
-class FutureClosureAsyncContext : public FutureAsyncContext {
-public:
-  HeapObject *closureContext;
+/// This matches the ABI of a closure `() async throws -> ()`
+using AsyncVoidClosureEntryPoint =
+  SWIFT_CC(swiftasync)
+  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
 
-  using FutureAsyncContext::FutureAsyncContext;
+/// This matches the ABI of a closure `<T>() async throws -> T`
+using AsyncGenericClosureEntryPoint =
+    SWIFT_CC(swiftasync)
+    void(OpaqueValue *,
+         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+
+/// This matches the ABI of the resume function of a closure
+///  `() async throws -> ()`.
+using AsyncVoidClosureResumeEntryPoint =
+  SWIFT_CC(swiftasync)
+  void(SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT SwiftError *);
+
+class AsyncContextPrefix {
+public:
+  // Async closure entry point adhering to compiler calling conv (e.g directly
+  // passing the closure context instead of via the async context)
+  AsyncVoidClosureEntryPoint *__ptrauth_swift_task_resume_function
+      asyncEntryPoint;
+   HeapObject *closureContext;
+  SwiftError *errorResult;
+};
+
+/// Storage that is allocated before the AsyncContext to be used by an adapter
+/// of Swift's async convention and the ResumeTask interface.
+class FutureAsyncContextPrefix {
+public:
+  OpaqueValue *indirectResult;
+  // Async closure entry point adhering to compiler calling conv (e.g directly
+  // passing the closure context instead of via the async context)
+  AsyncGenericClosureEntryPoint *__ptrauth_swift_task_resume_function
+      asyncEntryPoint;
+  HeapObject *closureContext;
+  SwiftError *errorResult;
 };
 
 } // end namespace swift

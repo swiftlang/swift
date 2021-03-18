@@ -123,6 +123,9 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::DynamicallyReplaceableFunctionKey:
     case Node::Kind::DynamicallyReplaceableFunctionVar:
     case Node::Kind::AsyncFunctionPointer:
+    case Node::Kind::AsyncNonconstantPartialApplyThunk:
+    case Node::Kind::AsyncAwaitResumePartialFunction:
+    case Node::Kind::AsyncSuspendResumePartialFunction:
       return true;
     default:
       return false;
@@ -2296,6 +2299,14 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'X': return createNode(Node::Kind::DynamicallyReplaceableFunctionVar);
     case 'x': return createNode(Node::Kind::DynamicallyReplaceableFunctionKey);
     case 'I': return createNode(Node::Kind::DynamicallyReplaceableFunctionImpl);
+    case 'Y':
+    case 'Q': {
+      NodePointer discriminator = demangleIndexAsNode();
+      return createWithChild(
+          c == 'Q' ? Node::Kind::AsyncAwaitResumePartialFunction :
+             /*'Y'*/ Node::Kind::AsyncSuspendResumePartialFunction,
+          discriminator);
+    }
     case 'C': {
       NodePointer type = popNode(Node::Kind::Type);
       return createWithChild(Node::Kind::CoroutineContinuationPrototype, type);
@@ -2520,6 +2531,11 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
         return demangleAutoDiffFunctionOrSimpleThunk(
             Node::Kind::AutoDiffFunction);
       }
+    case 'w': {
+      NodePointer discriminator = demangleIndexAsNode();
+      return createWithChild(Node::Kind::AsyncNonconstantPartialApplyThunk,
+                             discriminator);
+    }
     default:
       return nullptr;
   }

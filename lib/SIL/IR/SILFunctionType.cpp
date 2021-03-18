@@ -4466,6 +4466,11 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other,
   if (getRepresentation() != other->getRepresentation())
     return ABICompatibilityCheckResult::DifferentFunctionRepresentations;
 
+  // `() async -> ()` is not compatible with `() async -> @error Error`.
+  if (!hasErrorResult() && other->hasErrorResult() && isAsync()) {
+    return ABICompatibilityCheckResult::DifferentErrorResultConventions;
+  }
+
   // Check the results.
   if (getNumResults() != other->getNumResults())
     return ABICompatibilityCheckResult::DifferentNumberOfResults;

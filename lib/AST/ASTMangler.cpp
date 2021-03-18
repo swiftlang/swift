@@ -2857,10 +2857,21 @@ CanType ASTMangler::getDeclTypeForMangling(
     return C.TheErrorType;
   }
 
+  Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
 
-  auto canTy = decl->getInterfaceType()
-                   ->getReferenceStorageReferent()
-                   ->getCanonicalType();
+  // Strip the global actor out of the mangling.
+  ty = ty.transform([](Type type) {
+    if (auto fnType = type->getAs<AnyFunctionType>()) {
+      if (fnType->getGlobalActor()) {
+        return Type(fnType->withExtInfo(
+            fnType->getExtInfo().withGlobalActor(Type())));
+      }
+    }
+
+    return type;
+  });
+
+  auto canTy = ty->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();

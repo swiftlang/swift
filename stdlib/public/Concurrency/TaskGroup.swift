@@ -66,7 +66,7 @@ extension Task {
     body: (inout Task.Group<TaskResult>) async throws -> BodyResult
   ) async rethrows -> BodyResult {
     let task = Builtin.getCurrentAsyncTask()
-    let _group = _taskGroupCreate(task: task)
+    let _group = _taskGroupCreate()
     var group: Task.Group<TaskResult>! = Task.Group(task: task, group: _group)
 
     // Run the withGroup body.
@@ -74,13 +74,13 @@ extension Task {
       let result = try await body(&group)
       await group._tearDown()
       group = nil
-      _taskGroupDestroy(task: task, group: _group)
+      _taskGroupDestroy(group: _group)
       return result
     } catch {
       group.cancelAll()
       await group._tearDown()
       group = nil
-      _taskGroupDestroy(task: task, group: _group)
+      _taskGroupDestroy(group: _group)
       throw error
     }
   }
@@ -143,7 +143,7 @@ extension Task {
 
       // Create the asynchronous task future.
       let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
-        flags.bits, _task, _group, operation)
+        flags.bits, _group, operation)
 
       // Attach it to the group's task record in the current task.
       _taskGroupAttachChild(group: _group, child: childTask)
@@ -218,7 +218,7 @@ extension Task {
         """)
       #endif
 
-      return try await _taskGroupWaitNext(waitingTask: _task, group: _group)
+      return try await _taskGroupWaitNext(group: _group)
     }
 
     /// Query whether the group has any remaining tasks.
@@ -245,7 +245,7 @@ extension Task {
     /// - SeeAlso: `Task.isCancelled`
     /// - SeeAlso: `TaskGroup.isCancelled`
     public func cancelAll() {
-      _taskGroupCancelAll(task: _task, group: _group)
+      _taskGroupCancelAll(group: _group)
     }
 
     /// Returns `true` if the group was cancelled, e.g. by `cancelAll`.
@@ -258,7 +258,7 @@ extension Task {
     ///            `false` otherwise.
     public var isCancelled: Bool {
       return _taskIsCancelled(_task) ||
-        _taskGroupIsCancelled(task: _task, group: _group)
+        _taskGroupIsCancelled(group: _group)
     }
   }
 }
@@ -342,9 +342,7 @@ func _swiftRelease(
 )
 
 @_silgen_name("swift_taskGroup_create")
-func _taskGroupCreate(
-  task: Builtin.NativeObject
-) -> Builtin.RawPointer
+func _taskGroupCreate() -> Builtin.RawPointer
 
 /// Attach task group child to the group group to the task.
 @_silgen_name("swift_taskGroup_attachChild")
@@ -354,10 +352,7 @@ func _taskGroupAttachChild(
 ) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
 
 @_silgen_name("swift_taskGroup_destroy")
-func _taskGroupDestroy(
-  task: Builtin.NativeObject,
-  group: __owned Builtin.RawPointer
-)
+func _taskGroupDestroy(group: __owned Builtin.RawPointer)
 
 @_silgen_name("swift_taskGroup_addPending")
 func _taskGroupAddPendingTask(
@@ -365,24 +360,15 @@ func _taskGroupAddPendingTask(
 ) -> Bool
 
 @_silgen_name("swift_taskGroup_cancelAll")
-func _taskGroupCancelAll(
-  task: Builtin.NativeObject,
-  group: Builtin.RawPointer
-)
+func _taskGroupCancelAll(group: Builtin.RawPointer)
 
 /// Checks ONLY if the group was specifically cancelled.
 /// The task itself being cancelled must be checked separately.
 @_silgen_name("swift_taskGroup_isCancelled")
-func _taskGroupIsCancelled(
-  task: Builtin.NativeObject,
-  group: Builtin.RawPointer
-) -> Bool
+func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 
 @_silgen_name("swift_taskGroup_wait_next_throwing")
-func _taskGroupWaitNext<T>(
-  waitingTask: Builtin.NativeObject,
-  group: Builtin.RawPointer
-) async throws -> T?
+func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 
 enum PollStatus: Int {
   case empty   = 0

@@ -198,6 +198,23 @@ MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
+bool MarkGlobalActorFunction::diagnose(const Solution &solution,
+                                      bool asNote) const {
+  DroppedGlobalActorFunctionAttr failure(
+      solution, getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+MarkGlobalActorFunction *
+MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                               ConstraintLocator *locator) {
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
+    locator = cs.getConstraintLocator(
+        locator, LocatorPathElt::ArgumentAttribute::forGlobalActor());
+
+  return new (cs.getAllocator()) MarkGlobalActorFunction(cs, lhs, rhs, locator);
+}
+
 bool AddConcurrentAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(

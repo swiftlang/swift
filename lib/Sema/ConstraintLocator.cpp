@@ -171,10 +171,14 @@ bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
   return !path.empty() && path.back().isKeyPathDynamicMember();
 }
 
-bool ConstraintLocator::isForKeyPathComponent() const {
+bool ConstraintLocator::isInKeyPathComponent() const {
   return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
     return elt.isKeyPathComponent();
   });
+}
+
+bool ConstraintLocator::isForKeyPathComponentResult() const {
+  return isLastElement<LocatorPathElt::KeyPathComponentResult>();
 }
 
 bool ConstraintLocator::isForGenericParameter() const {
@@ -486,6 +490,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
       case AttrLoc::Attribute::Concurrent:
         out << "@concurrent";
+        break;
+
+      case AttrLoc::Attribute::GlobalActor:
+        out << "@<global actor>";
         break;
       }
 

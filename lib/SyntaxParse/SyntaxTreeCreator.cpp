@@ -11,17 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Syntax/RawSyntax.h"
-#include "swift/Syntax/SyntaxVisitor.h"
-#include "swift/Syntax/Trivia.h"
-#include "swift/Parse/ParsedTrivia.h"
-#include "swift/Parse/SyntaxParsingCache.h"
-#include "swift/Parse/Token.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/OwnedString.h"
+#include "swift/Parse/ParsedRawSyntaxNode.h"
+#include "swift/Parse/ParsedTrivia.h"
+#include "swift/Parse/SyntaxParsingCache.h"
+#include "swift/Parse/Token.h"
+#include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/SyntaxVisitor.h"
+#include "swift/Syntax/Trivia.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -35,8 +36,10 @@ SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
   const char *Data = BufferContent.data();
   Arena->copyStringToArenaIfNecessary(Data, BufferContent.size());
   ArenaSourceBuffer = StringRef(Data, BufferContent.size());
-  Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
-                               ArenaSourceBuffer.end());
+  if (!ArenaSourceBuffer.empty()) {
+    Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
+                                 ArenaSourceBuffer.end());
+  }
 }
 
 SyntaxTreeCreator::~SyntaxTreeCreator() = default;
@@ -187,17 +190,25 @@ OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredToken(tok tokenKind,
 }
 
 OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredLayout(
-    syntax::SyntaxKind k, bool IsMissing,
-    const ArrayRef<RecordedOrDeferredNode> &children) {
-  SmallVector<OpaqueSyntaxNode, 16> opaqueChildren;
-  opaqueChildren.reserve(children.size());
+    syntax::SyntaxKind kind, bool IsMissing,
+    const MutableArrayRef<ParsedRawSyntaxNode> &parsedChildren) {
+  assert(!IsMissing && "Missing layout nodes not implemented yet");
 
-  for (size_t i = 0; i < children.size(); ++i) {
-    opaqueChildren.push_back(children[i].getOpaque());
+  SmallVector<const RawSyntax *, 16> children;
+  children.reserve(parsedChildren.size());
+
+  size_t TextLength = 0;
+  for (size_t i = 0; i < parsedChildren.size(); ++i) {
+    auto Raw = static_cast<const RawSyntax *>(parsedChildren[i].takeData());
+    if (Raw) {
+      TextLength += Raw->getTextLength();
+    }
+    children.push_back(Raw);
   }
 
-  // Also see comment in makeDeferredToken
-  return recordRawSyntax(k, opaqueChildren);
+  auto raw = RawSyntax::make(kind, children, TextLength,
+                             SourcePresence::Present, Arena);
+  return static_cast<OpaqueSyntaxNode>(raw);
 }
 
 OpaqueSyntaxNode

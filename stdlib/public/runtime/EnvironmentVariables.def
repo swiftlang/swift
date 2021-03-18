@@ -53,6 +53,10 @@ VARIABLE(SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, false,
          "Validate shared cache protocol conformance results against the "
          "lists of conformances in the shared cache images.")
 
+VARIABLE(SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, true,
+         "Enable querying precomputed protocol conformances in the shared "
+         "cache.")
+
 #endif
 
 #undef VARIABLE

@@ -2015,6 +2015,29 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       return getTypeMatchFailure(locator);
   }
 
+  // A global actor can be added or can match, but cannot be removed.
+  if (func1->getGlobalActor() || func2->getGlobalActor()) {
+    if (func1->getGlobalActor() && func2->getGlobalActor()) {
+      // If both have a global actor, match them.
+      TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+      auto result = matchTypes(func1->getGlobalActor(), func2->getGlobalActor(), ConstraintKind::Equal, subflags, locator);
+      if (result == SolutionKind::Error)
+        return getTypeMatchFailure(locator);
+    } else if (func1->getGlobalActor()) {
+      // Cannot remove a global actor.
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = MarkGlobalActorFunction::create(
+          *this, func1, func2, getConstraintLocator(locator));
+
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    } else if (kind < ConstraintKind::Subtype) {
+      return getTypeMatchFailure(locator);
+    }
+  }
+
   // To contextual type increase the score to avoid ambiguity when solver can
   // find more than one viable binding different only in representation e.g.
   //   let _: (@convention(block) () -> Void)? = Bool.random() ? nil : {}
@@ -3243,7 +3266,14 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   // behind itself which we can use to better understand
   // how many levels of optionality have to be unwrapped.
   if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(anchor)) {
-    auto type = cs.getType(OEE->getSubExpr());
+    auto *subExpr = OEE->getSubExpr();
+
+    // First, let's check whether it has been determined that
+    // it was incorrect to use `?` in this position.
+    if (cs.hasFixFor(cs.getConstraintLocator(subExpr), FixKind::RemoveUnwrap))
+      return true;
+
+    auto type = cs.getType(subExpr);
     // If the type of sub-expression is optional, type of the
     // `OptionalEvaluationExpr` could be safely ignored because
     // it doesn't add any type information.
@@ -3448,6 +3478,13 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
   auto paramType = fnType->getParams()[otherArgIdx].getOldType();
 
   bool isOperatorRef = overload->choice.getDecl()->isOperator();
+
+  // If one of the parameters is `inout`, we can't flip the arguments.
+  {
+    auto params = fnType->getParams();
+    if (params[0].isInOut() != params[1].isInOut())
+      return false;
+  }
 
   auto matchArgToParam = [&](Type argType, Type paramType, ASTNode anchor) {
     auto *loc = cs.getConstraintLocator(anchor);
@@ -6013,6 +6050,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         }
       }
 
+      if (auto rawValue = isRawRepresentable(*this, type)) {
+        if (!rawValue->isTypeVariableOrMember() &&
+            TypeChecker::conformsToProtocol(rawValue, protocol, DC)) {
+          auto *fix = UseRawValue::create(*this, type, protocolTy, loc);
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+        }
+      }
+
       auto anchor = locator.getAnchor();
 
       if (isExpr<UnresolvedMemberExpr>(anchor) &&
@@ -7751,8 +7796,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       // Record a hole for memberTy to make it possible to form solutions
       // when contextual result type cannot be deduced e.g. `let _ = x.foo`.
-      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
-        recordPotentialHole(memberTypeVar);
+      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>()) {
+        if (getFixedType(memberTypeVar)) {
+          // If member has been bound before the base and the base was
+          // incorrect at that (e.g. fallback to default `Any` type),
+          // then we need to re-activate all of the constraints
+          // associated with this member reference otherwise some of
+          // the constraints could be left unchecked in inactive state.
+          // This is especially important for key path expressions because
+          // `key path` constraint can't be retired until all components
+          // are simplified.
+          addTypeVariableConstraintsToWorkList(memberTypeVar);
+        } else {
+          recordPotentialHole(memberTypeVar);
+        }
+      }
 
       return SolutionKind::Solved;
     };
@@ -8871,15 +8929,28 @@ ConstraintSystem::simplifyKeyPathConstraint(
       return SolutionKind::Solved;
 
     // If we have e.g a missing member somewhere, a component type variable
-    // will have been marked as a potential hole.
-    // FIXME: This relies on the fact that we only mark an overload type
-    // variable as a potential hole once we've added a corresponding fix. We
-    // can't use 'isPlaceholder' instead, as that doesn't handle cases where the
-    // overload type variable gets bound to another type from the context rather
-    // than a hole. We need to come up with a better way of handling the
-    // relationship between key paths and overloads.
+    // would either be marked as a potential hole or would have a fix.
     if (llvm::any_of(componentTypeVars, [&](TypeVariableType *tv) {
-          return tv->getImpl().getLocator()->isForKeyPathComponent() &&
+          auto *locator = tv->getImpl().getLocator();
+
+          // Result type of a component could be bound to a contextual
+          // (concrete) type if it's the last component in the chain,
+          // so the only way to detect errors is to check for fixes.
+          if (locator->isForKeyPathComponentResult()) {
+            auto path = locator->getPath();
+            auto *componentLoc =
+                getConstraintLocator(locator->getAnchor(), path.drop_back());
+
+            if (hasFixFor(componentLoc, FixKind::DefineMemberBasedOnUse) ||
+                hasFixFor(componentLoc, FixKind::UnwrapOptionalBase) ||
+                hasFixFor(componentLoc,
+                          FixKind::UnwrapOptionalBaseWithOptionalResult))
+              return true;
+          }
+
+          // If something inside of a component is marked as a hole,
+          // let's consider while component to be invalid.
+          return locator->isInKeyPathComponent() &&
                  tv->getImpl().canBindToHole();
         })) {
       return SolutionKind::Solved;
@@ -10725,7 +10796,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddPropertyWrapperAttribute:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:
-  case FixKind::ExplicitlyConstructRawRepresentable:
   case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast:
   case FixKind::SpecifyObjectLiteralTypeImport:
@@ -10744,6 +10814,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAlwaysSucceedCheckedCast:
   case FixKind::AllowInvalidStaticMemberRefOnProtocolMetatype: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::ExplicitlyConstructRawRepresentable: {
+    // Let's increase impact of this fix for binary operators because
+    // it's possible to get both `.rawValue` and construction fixes for
+    // different overloads of a binary operator and `.rawValue` is a
+    // better fix because raw representable has a failable constructor.
+    return recordFix(fix,
+                     /*impact=*/isExpr<BinaryExpr>(locator.getAnchor()) ? 2 : 1)
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   }
 
   case FixKind::TreatRValueAsLValue: {
@@ -10871,6 +10952,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::UseSubscriptOperator:
   case FixKind::ExplicitlyEscaping:
+  case FixKind::MarkGlobalActorFunction:
   case FixKind::RelabelArguments:
   case FixKind::RemoveCall:
   case FixKind::RemoveUnwrap:

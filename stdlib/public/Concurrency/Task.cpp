@@ -66,10 +66,12 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
     switch (queueHead.getStatus()) {
     case Status::Error:
     case Status::Success:
+      _swift_tsan_acquire(static_cast<Job *>(this));
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
 
     case Status::Executing:
+      _swift_tsan_release(static_cast<Job *>(waitingTask));
       // Task is now complete. We'll need to add ourselves to the queue.
       break;
     }
@@ -89,7 +91,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask) {
   }
 }
 
-void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
+void AsyncTask::completeFuture(AsyncContext *context) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
 
@@ -97,12 +99,17 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
   auto fragment = futureFragment();
 
   // If an error was thrown, save it in the future fragment.
-  auto futureContext = static_cast<FutureAsyncContext *>(context);
+  auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
   bool hadErrorResult = false;
-  if (auto errorObject = *futureContext->errorResult) {
-    fragment->getError() = errorObject;
+  auto errorObject = asyncContextPrefix->errorResult;
+  printf("asyncTask::completeFuture errorObject: %p\n", errorObject);
+  fragment->getError() = errorObject;
+  if (errorObject) {
     hadErrorResult = true;
   }
+
+  _swift_tsan_release(static_cast<Job *>(this));
 
   // Update the status to signal completion.
   auto newQueueHead = WaitQueueItem::get(
@@ -118,7 +125,7 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     // then we must offer into the parent group that we completed,
     // so it may `next()` poll completed child tasks in completion order.
     auto group = groupChildFragment()->getGroup();
-    group->offer(this, context, executor);
+    group->offer(this, context);
   }
 
   // Schedule every waiting task on the executor.
@@ -136,6 +143,8 @@ void AsyncTask::completeFuture(AsyncContext *context, ExecutorRef executor) {
     } else {
       waitingContext->fillWithSuccess(fragment);
     }
+
+    _swift_tsan_acquire(static_cast<Job *>(waitingTask));
 
     // Enqueue the waiter on the global executor.
     // TODO: allow waiters to fill in a suggested executor
@@ -213,10 +222,16 @@ const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
 /// The function that we put in the context of a simple task
 /// to handle the final return.
 SWIFT_CC(swiftasync)
-static void completeTask(AsyncTask *task, ExecutorRef executor,
-                         SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+static void completeTask(SWIFT_ASYNC_CONTEXT AsyncContext *context,
+                         SWIFT_CONTEXT SwiftError *error) {
   // Set that there's no longer a running task in the current thread.
-  _swift_task_clearCurrent();
+  auto task = _swift_task_clearCurrent();
+  assert(task && "completing task, but there is no active task registered");
+
+  // Store the error result.
+  auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
+  asyncContextPrefix->errorResult = error;
 
   // Destroy and deallocate any remaining task local items.
   // We need to do this before we destroy the task local deallocator.
@@ -228,7 +243,7 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 
   // Complete the future.
   if (task->isFuture()) {
-    task->completeFuture(context, executor);
+    task->completeFuture(context);
   }
 
   // TODO: set something in the status?
@@ -243,19 +258,45 @@ static void completeTask(AsyncTask *task, ExecutorRef executor,
 /// The function that we put in the context of a simple task
 /// to handle the final return from a closure.
 SWIFT_CC(swiftasync)
-static void completeTaskWithClosure(AsyncTask *task, ExecutorRef executor,
-                                    SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context,
+                                    SWIFT_CONTEXT SwiftError *error) {
   // Release the closure context.
-  auto contextWithClosure = static_cast<FutureClosureAsyncContext*>(context);
-  swift_release(contextWithClosure->closureContext);
+  auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
+
+  swift_release(asyncContextPrefix->closureContext);
   
   // Clean up the rest of the task.
-  return completeTask(task, executor, context);
+  return completeTask(context, error);
+}
+
+SWIFT_CC(swiftasync)
+static void non_future_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+  auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+      reinterpret_cast<char *>(_context) - sizeof(AsyncContextPrefix));
+  return asyncContextPrefix->asyncEntryPoint(
+      _context, asyncContextPrefix->closureContext);
+}
+
+SWIFT_CC(swiftasync)
+static void future_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+  auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+      reinterpret_cast<char *>(_context) - sizeof(FutureAsyncContextPrefix));
+  return asyncContextPrefix->asyncEntryPoint(
+      asyncContextPrefix->indirectResult, _context,
+      asyncContextPrefix->closureContext);
+}
+
+SWIFT_CC(swiftasync)
+static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
+  return context->asyncResumeEntryPoint(_context, context->errorResult);
 }
 
 /// All `swift_task_create*` variants funnel into this common implementation.
 static AsyncTaskAndContext swift_task_create_group_future_impl(
-    JobFlags flags, AsyncTask *parent, TaskGroup *group,
+    JobFlags flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     HeapObject * /* +1 */ closureContext,
@@ -263,8 +304,13 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
   assert((futureResultType != nullptr) == flags.task_isFuture());
   assert(!flags.task_isFuture() ||
          initialContextSize >= sizeof(FutureAsyncContext));
-  assert((parent != nullptr) == flags.task_isChildTask());
   assert((group != nullptr) == flags.task_isGroupChildTask());
+
+  AsyncTask *parent = nullptr;
+  if (flags.task_isChildTask()) {
+    parent = swift_task_getCurrent();
+    assert(parent != nullptr && "creating a child task with no active task");
+  }
 
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
@@ -279,6 +325,11 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
 
   if (futureResultType) {
     headerSize += FutureFragment::fragmentSize(futureResultType);
+    // Add the future async context prefix.
+    headerSize += sizeof(FutureAsyncContextPrefix);
+  } else {
+    // Add the async context prefix.
+    headerSize += sizeof(AsyncContextPrefix);
   }
 
   headerSize = llvm::alignTo(headerSize, llvm::Align(alignof(AsyncContext)));
@@ -294,6 +345,34 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
   AsyncContext *initialContext =
     reinterpret_cast<AsyncContext*>(
       reinterpret_cast<char*>(allocation) + headerSize);
+
+  //  We can't just use `function` because it uses the new async function entry
+  //  ABI -- passing parameters, closure context, indirect result addresses
+  //  directly -- but AsyncTask->ResumeTask expects the signature to be
+  //  `void (*, *, swiftasync *)`.
+  //  Instead we use an adapter. This adaptor should use the storage prefixed to
+  //  the async context to get at the parameters.
+  //  See e.g. FutureAsyncContextPrefix.
+
+  if (!futureResultType) {
+    auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+        reinterpret_cast<char *>(allocation) + headerSize -
+        sizeof(AsyncContextPrefix));
+    asyncContextPrefix->asyncEntryPoint =
+        reinterpret_cast<AsyncVoidClosureEntryPoint *>(function);
+    asyncContextPrefix->closureContext = closureContext;
+    function = non_future_adapter;
+    assert(sizeof(AsyncContextPrefix) == 3 * sizeof(void *));
+  } else {
+    auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+        reinterpret_cast<char *>(allocation) + headerSize -
+        sizeof(FutureAsyncContextPrefix));
+    asyncContextPrefix->asyncEntryPoint =
+        reinterpret_cast<AsyncGenericClosureEntryPoint *>(function);
+    function = future_adapter;
+    asyncContextPrefix->closureContext = closureContext;
+    assert(sizeof(FutureAsyncContextPrefix) == 4 * sizeof(void *));
+  }
 
   // Initialize the task so that resuming it will run the given
   // function on the initial context.
@@ -322,25 +401,13 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
     // Set up the context for the future so there is no error, and a successful
     // result will be written into the future fragment's storage.
     auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
-    futureContext->errorResult = &futureFragment->getError();
-    futureContext->indirectResult = futureFragment->getStoragePtr();
+    auto futureAsyncContextPrefix =
+        reinterpret_cast<FutureAsyncContextPrefix *>(
+            reinterpret_cast<char *>(allocation) + headerSize -
+            sizeof(FutureAsyncContextPrefix));
+    futureAsyncContextPrefix->indirectResult = futureFragment->getStoragePtr();
   }
   
-  // Stash the closure context in the future if there's room.
-  // We do this unconditionally because a null context value could still in
-  // theory be an expected context value (for instance, a captured boolean
-  // value could be represented as either nullptr or (void*)-1 on platforms
-  // where swift_retain ignores negative values). If the given entry point
-  // is not a closure invocation function, then stashing null into the context
-  // should be harmless, since it's just unused junk space at this point.
-  if (initialContextSize >= sizeof(FutureClosureAsyncContext)) {
-    auto futureClosureContext
-      = static_cast<FutureClosureAsyncContext *>(initialContext);
-    
-    futureClosureContext->closureContext = closureContext;
-  } else {
-    assert(!closureContext && "got a context but nowhere to put it?!");
-  }
 
   // Perform additional linking between parent and child task.
   if (parent) {
@@ -360,8 +427,8 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
   // as if they might be null, even though the only time they ever might
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
-  initialContext->ResumeParent
-    = closureContext ? &completeTaskWithClosure : &completeTask;
+  initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+      closureContext ? &completeTaskWithClosure : &completeTask);
   initialContext->ResumeParentExecutor = ExecutorRef::generic();
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
@@ -381,41 +448,34 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
 }
 
 AsyncTaskAndContext
-swift::swift_task_create_f(JobFlags flags, AsyncTask *parent,
+swift::swift_task_create_f(JobFlags flags,
                 ThinNullaryAsyncSignature::FunctionType *function,
                            size_t initialContextSize) {
   return swift_task_create_future_f(
-      flags, parent, nullptr, function, initialContextSize);
+      flags, nullptr, function, initialContextSize);
 }
 
 AsyncTaskAndContext swift::swift_task_create_future_f(
-    JobFlags flags, AsyncTask *parent,
+    JobFlags flags,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function, size_t initialContextSize) {
   assert(!flags.task_isGroupChildTask() &&
   "use swift_task_create_group_future_f to initialize task group child tasks");
   return swift_task_create_group_future_f(
-      flags, parent, /*group=*/nullptr, futureResultType,
+      flags, /*group=*/nullptr, futureResultType,
       function, initialContextSize);
 }
 
 AsyncTaskAndContext swift::swift_task_create_group_future_f(
-    JobFlags flags, AsyncTask *parent, TaskGroup *group,
+    JobFlags flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize) {
-  return swift_task_create_group_future_impl(flags, parent, group,
+  return swift_task_create_group_future_impl(flags, group,
                                              futureResultType,
                                              function, nullptr,
                                              initialContextSize);
 }
-
-namespace {
-/// The header of a function context (closure captures) of
-/// a thick async function with a non-null context.
-struct ThickAsyncFunctionContext: HeapObject {
-  uint32_t ExpectedContextSize;
-};
 
 /// Extract the entry point address and initial context size from an async closure value.
 template<typename AsyncSignature, uint16_t AuthDiscriminator>
@@ -423,33 +483,18 @@ SWIFT_ALWAYS_INLINE // so this doesn't hang out as a ptrauth gadget
 std::pair<typename AsyncSignature::FunctionType *, size_t>
 getAsyncClosureEntryPointAndContextSize(void *function,
                                         HeapObject *functionContext) {
-  // If the function context is non-null, then the function pointer is
-  // an ordinary function pointer.
-  if (functionContext) {
-    function = swift_auth_code(function, AuthDiscriminator);
-    size_t contextSize =
-      static_cast<ThickAsyncFunctionContext*>(functionContext)
-        ->ExpectedContextSize;
-    return {reinterpret_cast<typename AsyncSignature::FunctionType *>(function),
-            contextSize};
-  // Otherwise, the function pointer is an async function pointer.
-  } else {
-    auto fnPtr =
+  auto fnPtr =
       reinterpret_cast<const AsyncFunctionPointer<AsyncSignature> *>(function);
 #if SWIFT_PTRAUTH
-    fnPtr = (const AsyncFunctionPointer<AsyncSignature> *)ptrauth_auth_data(
-      (void *)fnPtr, ptrauth_key_process_independent_code,
-      AuthDiscriminator);
+  fnPtr = (const AsyncFunctionPointer<AsyncSignature> *)ptrauth_auth_data(
+      (void *)fnPtr, ptrauth_key_process_independent_code, AuthDiscriminator);
 #endif
-    return {
-      reinterpret_cast<typename AsyncSignature::FunctionType *>(fnPtr->Function.get()),
-      fnPtr->ExpectedContextSize};
-  }
-}
+  return {reinterpret_cast<typename AsyncSignature::FunctionType *>(
+              fnPtr->Function.get()),
+          fnPtr->ExpectedContextSize};
 }
 
 AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
-                     AsyncTask *parent,
                      const Metadata *futureResultType,
                      void *closureEntry,
                      HeapObject * /* +1 */ closureContext) {
@@ -462,14 +507,14 @@ AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
     >(closureEntry, closureContext);
 
   return swift_task_create_group_future_impl(
-      flags, parent, nullptr, futureResultType,
+      flags, nullptr, futureResultType,
       taskEntry, closureContext,
       initialContextSize);
 }
 
 AsyncTaskAndContext
 swift::swift_task_create_group_future(
-                        JobFlags flags, AsyncTask *parent, TaskGroup *group,
+                        JobFlags flags, TaskGroup *group,
                         const Metadata *futureResultType,
                         void *closureEntry,
                         HeapObject * /*+1*/closureContext) {
@@ -481,23 +526,30 @@ swift::swift_task_create_group_future(
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
   return swift_task_create_group_future_impl(
-      flags, parent, group, futureResultType,
+      flags, group, futureResultType,
       taskEntry, closureContext,
       initialContextSize);
 }
 
-void swift::swift_task_future_wait(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
+SWIFT_CC(swiftasync)
+void swift::swift_task_future_wait(OpaqueValue *result,
+                                   SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+                                   AsyncTask *task, Metadata *T) {
   // Suspend the waiting task.
+  auto waitingTask = swift_task_getCurrent();
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
+  // Stash the result pointer for when we resume later.
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
-  auto task = context->task;
+  context->asyncResumeEntryPoint = nullptr;
+  context->successResultPointer = result;
+  context->errorResult = nullptr;
+
 
   // Wait on the future.
   assert(task->isFuture());
+
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
@@ -507,25 +559,34 @@ void swift::swift_task_future_wait(
     // Run the task with a successful result.
     context->fillWithSuccess(task->futureFragment());
     // FIXME: force tail call
-    return waitingTask->runInFullyEstablishedContext(executor);
+    return waitingTask->runInFullyEstablishedContext();
 
   case FutureFragment::Status::Error:
     fatalError(0, "future reported an error, but wait cannot throw");
   }
 }
 
-void swift::swift_task_future_wait_throwing(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
+SWIFT_CC(swiftasync)
+void swift::swift_task_future_wait_throwing(OpaqueValue *result,
+    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext, AsyncTask *task,
+    Metadata *T) {
+  auto waitingTask = swift_task_getCurrent();
   // Suspend the waiting task.
-  waitingTask->ResumeTask = rawContext->ResumeParent;
+  auto originalResumeParent =
+      reinterpret_cast<AsyncVoidClosureResumeEntryPoint *>(
+          rawContext->ResumeParent);
+  waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
+  // Stash the result pointer for when we resume later.
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
-  auto task = context->task;
+  context->successResultPointer = result;
+  context->asyncResumeEntryPoint = originalResumeParent;
+  context->errorResult = nullptr;
 
   // Wait on the future.
   assert(task->isFuture());
+
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:
     // The waiting task has been queued on the future.
@@ -535,13 +596,13 @@ void swift::swift_task_future_wait_throwing(
     // Run the task with a successful result.
     context->fillWithSuccess(task->futureFragment());
     // FIXME: force tail call
-    return waitingTask->runInFullyEstablishedContext(executor);
+    return waitingTask->runInFullyEstablishedContext();
 
  case FutureFragment::Status::Error:
     // Run the task with an error result.
     context->fillWithError(task->futureFragment());
     // FIXME: force tail call
-    return waitingTask->runInFullyEstablishedContext(executor);
+    return waitingTask->runInFullyEstablishedContext();
   }
 }
 
@@ -602,37 +663,39 @@ using RunAndBlockCalleeContext =
 
 /// Second half of the runAndBlock async function.
 SWIFT_CC(swiftasync)
-static void runAndBlock_finish(AsyncTask *task, ExecutorRef executor,
-                               SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+static void runAndBlock_finish(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   auto calleeContext = static_cast<RunAndBlockCalleeContext*>(_context);
-  auto context = popAsyncContext(task, calleeContext);
+
+  auto context = popAsyncContext(calleeContext);
 
   context->Semaphore->signal();
 
-  return context->ResumeParent(task, executor, context);
+  return context->ResumeParent(context);
 }
 
 /// First half of the runAndBlock async function.
 SWIFT_CC(swiftasync)
-static void runAndBlock_start(AsyncTask *task, ExecutorRef executor,
-                              SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+static void runAndBlock_start(SWIFT_ASYNC_CONTEXT AsyncContext *_context,
+                              SWIFT_CONTEXT HeapObject *closureContext) {
   auto callerContext = static_cast<RunAndBlockContext*>(_context);
 
   RunAndBlockSignature::FunctionType *function;
   size_t calleeContextSize;
   auto functionContext = callerContext->FunctionContext;
+  assert(closureContext == functionContext);
   std::tie(function, calleeContextSize)
     = getAsyncClosureEntryPointAndContextSize<
       RunAndBlockSignature,
       SpecialPointerAuthDiscriminators::AsyncRunAndBlockFunction
     >(const_cast<void*>(callerContext->Function), functionContext);
-  
+
   auto calleeContext =
-    pushAsyncContext<RunAndBlockSignature>(task, executor, callerContext,
+    pushAsyncContext<RunAndBlockSignature>(callerContext,
                                            calleeContextSize,
                                            &runAndBlock_finish,
                                            functionContext);
-  return function(task, executor, calleeContext);
+  return reinterpret_cast<AsyncVoidClosureEntryPoint *>(function)(
+      calleeContext, functionContext);
 }
 
 // TODO: Remove this hack.
@@ -642,10 +705,11 @@ void swift::swift_task_runAndBlockThread(const void *function,
 
   // Set up a task that runs the runAndBlock async function above.
   auto flags = JobFlags(JobKind::Task, JobPriority::Default);
-  auto pair = swift_task_create_f(flags,
-                                  /*parent*/ nullptr,
-                                  &runAndBlock_start,
-                                  sizeof(RunAndBlockContext));
+  auto pair = swift_task_create_f(
+      flags,
+      reinterpret_cast<ThinNullaryAsyncSignature::FunctionType *>(
+          &runAndBlock_start),
+      sizeof(RunAndBlockContext));
   auto context = static_cast<RunAndBlockContext*>(pair.InitialContext);
   context->Function = function;
   context->FunctionContext = functionContext;
@@ -721,21 +785,21 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
 
 CancellationNotificationStatusRecord*
 swift::swift_task_addCancellationHandler(
-    AsyncTask *task, CancellationNotificationStatusRecord::FunctionType handler) {
+    CancellationNotificationStatusRecord::FunctionType handler) {
   void *allocation =
-      swift_task_alloc(task, sizeof(CancellationNotificationStatusRecord));
+      swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
   auto *record =
       new (allocation) CancellationNotificationStatusRecord(
           handler, /*arg=*/nullptr);
 
-  swift_task_addStatusRecord(task, record);
+  swift_task_addStatusRecord(record);
   return record;
 }
 
 void swift::swift_task_removeCancellationHandler(
-    AsyncTask *task, CancellationNotificationStatusRecord *record) {
-  swift_task_removeStatusRecord(task, record);
-  swift_task_dealloc(task, record);
+    CancellationNotificationStatusRecord *record) {
+  swift_task_removeStatusRecord(record);
+  swift_task_dealloc(record);
 }
 
 SWIFT_CC(swift)

@@ -78,8 +78,8 @@ extension Task {
       return try await operation()
     }
 
-    let record = _taskAddCancellationHandler(task: task, handler: handler)
-    defer { _taskRemoveCancellationHandler(task: task, record: record) }
+    let record = _taskAddCancellationHandler(handler: handler)
+    defer { _taskRemoveCancellationHandler(record: record) }
 
     return try await operation()
   }
@@ -96,13 +96,9 @@ extension Task {
 }
 
 @_silgen_name("swift_task_addCancellationHandler")
-func _taskAddCancellationHandler(
-  task: Builtin.NativeObject,
-  handler: @concurrent () -> ()
-) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+func _taskAddCancellationHandler(handler: @concurrent () -> ()) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 
 @_silgen_name("swift_task_removeCancellationHandler")
 func _taskRemoveCancellationHandler(
-  task: Builtin.NativeObject,
   record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 )

@@ -3334,6 +3334,22 @@ namespace {
       return result;
     }
 
+    bool isCxxRecordImportable(const clang::CXXRecordDecl *decl) {
+      if (auto dtor = decl->getDestructor()) {
+        if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+          return false;
+        }
+      }
+
+      // If we have no way of copying the type we can't import the class
+      // at all because we cannot express the correct semantics as a swift
+      // struct.
+      return llvm::none_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+        return ctor->isCopyConstructor() &&
+               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
+      });
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -3626,29 +3642,8 @@ namespace {
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
 
-      if (cxxRecordDecl) {
+      if (cxxRecordDecl)
         result->setIsCxxNonTrivial(!cxxRecordDecl->isTriviallyCopyable());
-
-        for (auto ctor : cxxRecordDecl->ctors()) {
-          if (ctor->isCopyConstructor()) {
-            // If we have no way of copying the type we can't import the class
-            // at all because we cannot express the correct semantics as a swift
-            // struct.
-            if (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)
-              return nullptr;
-          }
-          if (ctor->getAccess() != clang::AS_public) {
-            result->setIsCxxNonTrivial(true);
-            break;
-          }
-        }
-
-        if (auto dtor = cxxRecordDecl->getDestructor()) {
-          if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-            return nullptr;
-          }
-        }
-      }
 
       return result;
     }
@@ -3703,6 +3698,11 @@ namespace {
                                                   copyCtor);
         }
       }
+
+      // It is import that we bail on an unimportable record *before* we import
+      // any of its members or cache the decl.
+      if (!isCxxRecordImportable(decl))
+        return nullptr;
 
       return VisitRecordDecl(decl);
     }
@@ -8028,6 +8028,7 @@ void ClangImporter::Implementation::importAttributes(
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
+  PatternBindingInitializer *initContext = nullptr;
   bool AnyUnavailable = MappedDecl->getAttrs().isUnavailable(C);
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
@@ -8207,7 +8208,8 @@ void ClangImporter::Implementation::importAttributes(
       SourceLoc atLoc;
       if (parser.consumeIf(tok::at_sign, atLoc)) {
         (void)parser.parseDeclAttribute(
-          MappedDecl->getAttrs(), atLoc, /*isFromClangAttribute=*/true);
+            MappedDecl->getAttrs(), atLoc, initContext,
+            /*isFromClangAttribute=*/true);
       } else {
         // Complain about the missing '@'.
         auto &clangSrcMgr = getClangASTContext().getSourceManager();

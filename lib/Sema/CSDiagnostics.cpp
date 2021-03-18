@@ -1294,6 +1294,21 @@ public:
   int referencesCount() { return count; }
 };
 
+bool DroppedGlobalActorFunctionAttr::diagnoseAsError() {
+  auto fromFnType = getFromType()->getAs<AnyFunctionType>();
+  if (!fromFnType)
+    return false;
+
+  Type fromGlobalActor = fromFnType->getGlobalActor();
+  if (!fromGlobalActor)
+    return false;
+
+  emitDiagnostic(
+      diag::converting_func_loses_global_actor, getFromType(), getToType(),
+      fromGlobalActor);
+  return true;
+}
+
 bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (!getUnwrappedType()->isBool()) {
     if (diagnoseConversionToBool())
@@ -3975,7 +3990,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     // If this is a reference to a static member by one of the key path
     // components, let's provide a tailored diagnostic and return because
     // that is unsupported so there is no fix-it.
-    if (locator->isForKeyPathComponent()) {
+    if (locator->isInKeyPathComponent()) {
       InvalidStaticMemberRefInKeyPath failure(getSolution(), Member, locator);
       return failure.diagnoseAsError();
     }
@@ -6934,6 +6949,26 @@ void MissingRawRepresentableInitFailure::fixIt(
           .fixItInsertAfter(range.End, ") ?? <#default value#>");
     }
   }
+}
+
+bool MissingRawValueFailure::diagnoseAsError() {
+  auto *locator = getLocator();
+
+  if (locator->isLastElement<LocatorPathElt::AnyRequirement>()) {
+    MissingConformanceFailure failure(getSolution(), locator,
+                                      {RawReprType, ExpectedType});
+
+    auto diagnosed = failure.diagnoseAsError();
+    if (!diagnosed)
+      return false;
+
+    auto note = emitDiagnostic(diag::note_remapped_type, ".rawValue");
+    fixIt(note);
+
+    return true;
+  }
+
+  return AbstractRawRepresentableFailure::diagnoseAsError();
 }
 
 void MissingRawValueFailure::fixIt(InFlightDiagnostic &diagnostic) const {

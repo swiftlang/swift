@@ -402,7 +402,7 @@ extension Task {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -454,7 +454,7 @@ extension Task {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, operation)
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -487,7 +487,7 @@ extension Task {
     flags.isFuture = true
 
     // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, {})
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, {})
 
     // Enqueue the resulting job.
     _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
@@ -657,7 +657,7 @@ public func _runChildTask<T>(
 
   // Create the asynchronous task future.
   let (task, _) = Builtin.createAsyncTaskFuture(
-      flags.bits, currentTask, operation)
+      flags.bits, operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))

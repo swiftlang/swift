@@ -438,8 +438,8 @@ bb3(%20 : $((), ())):
 }
 
 // CHECK-LABEL: sil @load_tuple_of_void
-// CHECK-NOT: alloc_stack
-// CHECK:   return undef : $((), ())
+// CHECK:   [[T:%[0-9]+]] = tuple (%{{[0-9]+}} : $(), %{{[0-9]+}} : $())
+// CHECK:   return [[T]] : $((), ())
 // CHECK: } // end sil function 'load_tuple_of_void'
 sil @load_tuple_of_void : $@convention(thin) () -> ((), ()) {
 bb0:

@@ -20,6 +20,8 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Subsystems.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
@@ -28,13 +30,12 @@ class ParsedTriviaPiece;
 class SourceFile;
 class SourceLoc;
 enum class tok : uint8_t;
+class ParsedRawSyntaxNode;
 
 namespace syntax {
 class SourceFileSyntax;
 enum class SyntaxKind : uint16_t;
 }
-
-typedef const void *OpaqueSyntaxNode;
 
 // MARK: - Helper types
 
@@ -51,15 +52,14 @@ public:
   };
 
 private:
-  OpaqueSyntaxNode Opaque;
-  Kind NodeKind;
+  llvm::PointerIntPair<OpaqueSyntaxNode, 2, Kind> Data;
 
 public:
   RecordedOrDeferredNode(OpaqueSyntaxNode Node, Kind NodeKind)
-      : Opaque(Node), NodeKind(NodeKind) {}
+      : Data(Node, NodeKind) {}
 
-  OpaqueSyntaxNode getOpaque() const { return Opaque; }
-  Kind getKind() const { return NodeKind; }
+  OpaqueSyntaxNode getOpaque() const { return Data.getPointer(); }
+  Kind getKind() const { return Data.getInt(); }
 };
 
 /// Data returned from \c getDeferredChild. This is enough data to construct
@@ -113,9 +113,11 @@ public:
   /// Create a deferred layout node that may or may not be recorded later using
   /// \c recordDeferredLayout. The \c SyntaxParseAction is responsible for
   /// keeping the deferred token alive until it is destructed.
+  /// From all nodes in \p children, the underlying opaque data will be *taken*
+  /// which resets the nodes.
   virtual OpaqueSyntaxNode
   makeDeferredLayout(syntax::SyntaxKind k, bool isMissing,
-                     const ArrayRef<RecordedOrDeferredNode> &children) = 0;
+                     const MutableArrayRef<ParsedRawSyntaxNode> &children) = 0;
 
   /// Record a deferred token node that was previously created using \c
   /// makeDeferredToken. The deferred data will never be used again, so it can

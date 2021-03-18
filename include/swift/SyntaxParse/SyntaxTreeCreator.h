@@ -76,9 +76,9 @@ private:
                                      CharSourceRange range,
                                      bool isMissing) override;
 
-  OpaqueSyntaxNode
-  makeDeferredLayout(syntax::SyntaxKind k, bool IsMissing,
-                     const ArrayRef<RecordedOrDeferredNode> &children) override;
+  OpaqueSyntaxNode makeDeferredLayout(
+      syntax::SyntaxKind k, bool IsMissing,
+      const MutableArrayRef<ParsedRawSyntaxNode> &children) override;
 
   OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) override;
   OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override;
