@@ -3211,7 +3211,18 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
-      auto selected = solution.getOverloadChoice(memberLocator);
+      auto selectedElt = solution.getOverloadChoiceIfAvailable(memberLocator);
+
+      if (!selectedElt) {
+        // If constraint solving resolved this to an UnresolvedType, then we're
+        // in an ambiguity tolerant mode used for diagnostic generation.  Just
+        // leave this as whatever type of member reference it already is.
+        Type resultTy = simplifyType(cs.getType(expr));
+        cs.setType(expr, resultTy);
+        return expr;
+      }
+
+      auto selected = *selectedElt;
 
       if (!selected.choice.getBaseType()) {
         // This is one of the "outer alternatives", meaning the innermost
