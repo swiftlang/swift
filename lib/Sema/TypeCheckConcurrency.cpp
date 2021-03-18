@@ -3087,3 +3087,38 @@ NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
 
   return conformance;
 }
+
+namespace {
+class CompletionHandlerUsageChecker final : public ASTWalker {
+  ASTContext &ctx;
+
+public:
+  CompletionHandlerUsageChecker(ASTContext &ctx) : ctx(ctx) {}
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (ApplyExpr *call = dyn_cast<ApplyExpr>(expr)) {
+      if (DeclRefExpr *fnDeclExpr = dyn_cast<DeclRefExpr>(call->getFn())) {
+        ValueDecl *fnDecl = fnDeclExpr->getDecl();
+        CompletionHandlerAsyncAttr *asyncAltAttr =
+            fnDecl->getAttrs().getAttribute<CompletionHandlerAsyncAttr>();
+        if (asyncAltAttr && asyncAltAttr->AsyncFunctionDecl) {
+          ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+          ctx.Diags.diagnose(asyncAltAttr->AsyncFunctionDecl->getLoc(),
+                             diag::decl_declared_here,
+                             asyncAltAttr->AsyncFunctionDecl->getName());
+        }
+      }
+    }
+    return {true, expr};
+  }
+};
+} // namespace
+
+void swift::checkFunctionAsyncUsage(AbstractFunctionDecl *decl) {
+  if (!decl->isAsyncContext())
+    return;
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  BraceStmt *body = decl->getBody();
+  if (body)
+    body->walk(checker);
+}
