@@ -317,7 +317,7 @@ private:
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
     IsDynamicMask = 0x20,
-    IsSignedAsDataMask = 0x40,
+    IsAsyncMask = 0x40,
     ExtraDiscriminatorShift = 16,
     ExtraDiscriminatorMask = 0xFFFF0000,
   };
@@ -346,12 +346,12 @@ public:
     return copy;
   }
 
-  MethodDescriptorFlags withIsSignedAsData(bool isSignedAsData) const {
+  MethodDescriptorFlags withIsAsync(bool isAsync) const {
     auto copy = *this;
-    if (isSignedAsData)
-      copy.Value |= IsSignedAsDataMask;
+    if (isAsync)
+      copy.Value |= IsAsyncMask;
     else
-      copy.Value &= ~IsSignedAsDataMask;
+      copy.Value &= ~IsAsyncMask;
     return copy;
   }
 
@@ -372,7 +372,7 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isSignedAsData() const { return Value & IsSignedAsDataMask; }
+  bool isAsync() const { return Value & IsAsyncMask; }
 
   uint16_t getExtraDiscriminator() const {
     return (Value >> ExtraDiscriminatorShift);
@@ -539,7 +539,7 @@ private:
   enum : int_type {
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
-    IsSignedAsDataMask = 0x20,
+    IsAsyncMask = 0x20,
     ExtraDiscriminatorShift = 16,
     ExtraDiscriminatorMask = 0xFFFF0000,
   };
@@ -559,12 +559,12 @@ public:
     return copy;
   }
 
-  ProtocolRequirementFlags withIsSignedAsData(bool isSignedAsData) const {
+  ProtocolRequirementFlags withIsAsync(bool isAsync) const {
     auto copy = *this;
-    if (isSignedAsData)
-      copy.Value |= IsSignedAsDataMask;
+    if (isAsync)
+      copy.Value |= IsAsyncMask;
     else
-      copy.Value &= ~IsSignedAsDataMask;
+      copy.Value &= ~IsAsyncMask;
     return copy;
   }
 
@@ -582,7 +582,7 @@ public:
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
 
-  bool isSignedAsData() const { return Value & IsSignedAsDataMask; }
+  bool isAsync() const { return Value & IsAsyncMask; }
 
   bool isSignedWithAddress() const {
     return getKind() != Kind::BaseProtocol;
