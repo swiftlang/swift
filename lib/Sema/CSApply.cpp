@@ -7577,7 +7577,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // FIXME: handle unwrapping everywhere else
   assert(!unwrapResult);
 
-  assert(!cs.getType(fn)->is<UnresolvedType>());
+  // If this is an UnresolvedType in the system, preserve it.
+  if (cs.getType(fn)->is<UnresolvedType>()) {
+    cs.setType(apply, cs.getType(fn));
+    return apply;
+  }
 
   // We have a type constructor.
   auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
