@@ -209,7 +209,7 @@ AsyncContextLayout::AsyncContextLayout(
     SILType errorType, bool canHaveValidError)
     : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject, strategy,
                    fieldTypeInfos, /*typeToFill*/ nullptr),
-      IGM(IGM), originalType(originalType), substitutedType(substitutedType),
+      originalType(originalType), substitutedType(substitutedType),
       substitutionMap(substitutionMap), errorType(errorType),
       canHaveValidError(canHaveValidError)  {
 #ifndef NDEBUG

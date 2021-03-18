@@ -646,6 +646,8 @@ public:
 private:
   void computeRedundantRequirements();
 
+  void diagnoseRedundantRequirements() const;
+
   bool hasExplicitConformancesImpliedByConcrete() const;
 
   /// Describes the relationship between a given constraint and
