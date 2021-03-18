@@ -71,7 +71,6 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) returnToCaller;
   //   SwiftActor * __ptrauth(...) callerActor;
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
-  //   SwiftError **errorResult;
   // };
   struct AsyncContextLayout : StructLayout {
     struct ArgumentInfo {
@@ -91,13 +90,10 @@ namespace irgen {
       Parent = 1,
       ResumeParent = 1,
       ResumeParentExecutor = 1,
-      Error = 1,
     };
     CanSILFunctionType originalType;
     CanSILFunctionType substitutedType;
     SubstitutionMap substitutionMap;
-    SILType errorType;
-    bool canHaveValidError;
   
     unsigned getParentIndex() { return (unsigned)FixedIndex::Parent; }
     unsigned getResumeParentIndex() {
@@ -120,16 +116,12 @@ namespace irgen {
       return getElement(getResumeParentExecutorIndex());
     }
     ElementLayout getFlagsLayout() { return getElement(getFlagsIndex()); }
-    bool canHaveError() { return canHaveValidError; }
-    ElementLayout getErrorLayout() { return getElement(getErrorIndex()); }
-    unsigned getErrorCount() { return (unsigned)FixedCount::Error; }
-    SILType getErrorType() { return errorType; }
 
     AsyncContextLayout(
         IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
         ArrayRef<const TypeInfo *> fieldTypeInfos,
         CanSILFunctionType originalType, CanSILFunctionType substitutedType,
-        SubstitutionMap substitutionMap, SILType errorType, bool canHaveValidError);
+        SubstitutionMap substitutionMap);
   };
 
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
