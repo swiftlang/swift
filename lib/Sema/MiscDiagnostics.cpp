@@ -3241,13 +3241,14 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
 
 /// Check if this function is an override and whether it needs to emit
 // a 'super.foo()' call in its body.
-static void checkIfSuperCallIsRequired(FuncDecl *FD) {
+static void checkIfSuperCallIsRequired(AbstractFunctionDecl *AFD) {
   class SuperCallFinder : public ASTWalker {
-    const FuncDecl *BaseFunc;
+    const AbstractFunctionDecl *BaseFunc;
     bool foundSuperCall = false;
 
   public:
-    SuperCallFinder(const FuncDecl *baseFunc) : BaseFunc(baseFunc) {}
+    SuperCallFinder(const AbstractFunctionDecl *baseFunc)
+        : BaseFunc(baseFunc) {}
 
     virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (!E) {
@@ -3271,28 +3272,28 @@ static void checkIfSuperCallIsRequired(FuncDecl *FD) {
 
   auto hasSuperCall = [&](const ValueDecl *BaseVD,
                           const ValueDecl *OverrideVD) {
-    auto baseFunc = cast<FuncDecl>(BaseVD);
-    auto overriddenFunc = cast<FuncDecl>(OverrideVD);
+    auto baseFunc = cast<AbstractFunctionDecl>(BaseVD);
+    auto overriddenFunc = cast<AbstractFunctionDecl>(OverrideVD);
     auto walker = SuperCallFinder(baseFunc);
     overriddenFunc->getBody()->walk(walker);
     return walker.didFindSuperCall();
   };
 
-  if (!FD->getAttrs().hasAttribute<OverrideAttr>()) {
+  if (!AFD->getAttrs().hasAttribute<OverrideAttr>()) {
     return;
   }
 
-  auto &Diags = FD->getASTContext().Diags;
+  auto &Diags = AFD->getASTContext().Diags;
   SmallString<128> scratch;
 
-  for (auto baseDecl : FD->getOverriddenDecls()) {
+  for (auto baseDecl : AFD->getOverriddenDecls()) {
     auto requiresSuperAttr =
         baseDecl->getAttrs().getAttribute<RequiresSuperAttr>();
     if (!requiresSuperAttr) {
       continue;
     }
 
-    if (!hasSuperCall(baseDecl, FD)) {
+    if (!hasSuperCall(baseDecl, AFD)) {
       scratch.clear();
       auto baseMethodName = baseDecl->getName().getString(scratch);
       auto diag = baseDecl->hasClangNode()
@@ -3301,7 +3302,7 @@ static void checkIfSuperCallIsRequired(FuncDecl *FD) {
       auto msg = requiresSuperAttr->Message.hasValue()
                      ? requiresSuperAttr->Message.getValue()
                      : "";
-      Diags.diagnose(FD, diag, baseMethodName, msg, !msg.empty());
+      Diags.diagnose(AFD, diag, baseMethodName, msg, !msg.empty());
     }
   }
 }
@@ -3336,9 +3337,7 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD) {
     }
   }
 
-  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    checkIfSuperCallIsRequired(FD);
-  }
+  checkIfSuperCallIsRequired(AFD);
 }
 
 // Perform MiscDiagnostics on Switch Statements.
