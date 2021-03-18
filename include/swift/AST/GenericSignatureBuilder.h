@@ -620,7 +620,8 @@ public:
   /// generic signature builder no longer has valid state.
   GenericSignature computeGenericSignature(
                       bool allowConcreteGenericParams = false,
-                      bool allowBuilderToMove = true) &&;
+                      bool buildingRequirementSignature = false,
+                      bool rebuildingWithoutRedundantConformances = false) &&;
 
   /// Compute the requirement signature for the given protocol.
   static GenericSignature computeRequirementSignature(ProtocolDecl *proto);
@@ -644,6 +645,8 @@ public:
 
 private:
   void computeRedundantRequirements();
+
+  bool hasExplicitConformancesImpliedByConcrete() const;
 
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
@@ -1434,9 +1437,8 @@ public:
   /// inferred.
   FloatingRequirementSource asInferred(const TypeRepr *typeRepr) const;
 
-  /// Whether this requirement source is recursive when composed with
-  /// the given type.
-  bool isRecursive(Type rootType, GenericSignatureBuilder &builder) const;
+  /// Whether this requirement source is recursive.
+  bool isRecursive(GenericSignatureBuilder &builder) const;
 };
 
 /// Describes a specific constraint on a particular type.

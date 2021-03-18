@@ -93,3 +93,19 @@ func testClosuresOld() {
     return i
   }
 }
+
+// Test conversions that happen in various structural positions.
+struct X<T> { } // expected-note{{arguments to generic parameter 'T' ('() -> Void' and '@SomeGlobalActor () -> Void') are expected to be equal}}
+
+func f(_: (@SomeGlobalActor () -> Void)?) { }
+
+func g(fn: (() -> Void)?) {
+  f(fn)
+}
+
+func f2(_ x: X<@SomeGlobalActor () -> Void>) {
+  g2(x) // expected-error{{converting function value of type '@SomeGlobalActor () -> Void' to '() -> Void' loses global actor 'SomeGlobalActor'}}
+}
+func g2(_ x: X<() -> Void>) {
+  f2(x) // expected-error{{cannot convert value of type 'X<() -> Void>' to expected argument type 'X<@SomeGlobalActor () -> Void>'}}
+}
