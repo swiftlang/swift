@@ -83,13 +83,11 @@ namespace irgen {
     enum class FixedIndex : unsigned {
       Parent = 0,
       ResumeParent = 1,
-      ResumeParentExecutor = 2,
-      Flags = 3,
+      Flags = 2,
     };
     enum class FixedCount : unsigned {
       Parent = 1,
       ResumeParent = 1,
-      ResumeParentExecutor = 1,
     };
     CanSILFunctionType originalType;
     CanSILFunctionType substitutedType;
@@ -99,21 +97,12 @@ namespace irgen {
     unsigned getResumeParentIndex() {
       return (unsigned)FixedIndex::ResumeParent;
     }
-    unsigned getResumeParentExecutorIndex() {
-      return (unsigned)FixedIndex::ResumeParentExecutor;
-    }
     unsigned getFlagsIndex() { return (unsigned)FixedIndex::Flags; }
-    unsigned getErrorIndex() {
-      return getFlagsIndex() + 1;
-    }
 
   public:
     ElementLayout getParentLayout() { return getElement(getParentIndex()); }
     ElementLayout getResumeParentLayout() {
       return getElement(getResumeParentIndex());
-    }
-    ElementLayout getResumeParentExecutorLayout() {
-      return getElement(getResumeParentExecutorIndex());
     }
     ElementLayout getFlagsLayout() { return getElement(getFlagsIndex()); }
 
