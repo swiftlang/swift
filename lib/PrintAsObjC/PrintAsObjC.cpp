@@ -243,6 +243,9 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "#if !defined(IBSegueAction)\n"
          "# define IBSegueAction\n"
          "#endif\n"
+         "#if !defined(NS_REQUIRES_SUPER)\n"
+         "# define NS_REQUIRES_SUPER __attribute__((objc_requires_super))\n"
+         "#endif\n";
          ;
   static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
               "need to add SIMD typedefs here if max elements is increased");
