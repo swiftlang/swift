@@ -81,7 +81,7 @@ class Invalid5A {
 
 class Invalid6A { // expected-note {{in declaration of 'Invalid6A'}}
   @requiresSuper("")
-  // expected-error@-1 {{@requiresSuper message must not be empty}}
+  // expected-error@-1 {{'@requiresSuper' message must not be empty}}
   // expected-error@-2 {{expected declaration}}
   func foo1() {}
 }
