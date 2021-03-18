@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -import-objc-header %S/Inputs/objc-requires-super-obj.h %s -verify-ignore-unknown
-// REQUIRES: OS=macosx
+// REQUIRES: objc_interop
 
 // Ensure the 'objc_requires_super' attribute is imported correctly as '@requiresSuper'
 // and warnings are correctly emitted.
@@ -17,5 +17,5 @@ class MyCustomViewControllerSubclass2: MyCustomViewController {
     super.customViewDidLoad()
   }
 
-  override init() {} // Okay
+  override init() { super.init() } // Okay
 }
