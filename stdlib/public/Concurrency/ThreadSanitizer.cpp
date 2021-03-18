@@ -19,6 +19,8 @@
 #if defined(_WIN32)
 #define NOMINMAX
 #include <windows.h>
+#elif defined(__wasi__)
+
 #else
 #include <dlfcn.h>
 #endif
@@ -26,6 +28,13 @@
 namespace {
 using TSanFunc = void(void *);
 TSanFunc *tsan_acquire, *tsan_release;
+
+#if defined(__wasi__)
+
+swift::swift_once_t initOnceToken;
+void initializeThreadSanitizer(void *unused) {}
+
+#else
 
 TSanFunc *loadSymbol(const char *name) {
 #if defined(_WIN32)
@@ -40,6 +49,7 @@ void initializeThreadSanitizer(void *unused) {
   tsan_acquire = loadSymbol("__tsan_acquire");
   tsan_release = loadSymbol("__tsan_release");
 }
+#endif
 } // anonymous namespace
 
 void swift::_swift_tsan_acquire(void *addr) {
