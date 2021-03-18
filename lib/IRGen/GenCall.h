@@ -93,7 +93,6 @@ namespace irgen {
       ResumeParentExecutor = 1,
       Error = 1,
     };
-    IRGenModule &IGM;
     CanSILFunctionType originalType;
     CanSILFunctionType substitutedType;
     SubstitutionMap substitutionMap;
