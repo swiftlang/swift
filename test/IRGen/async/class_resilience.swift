@@ -48,7 +48,7 @@ public func callsAwaitable<T>(_ c: BaseClass<T>) async -> T {
   return await c.wait()
 }
 
-// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience11MyBaseClassC4waitxyYFTj"(%swift.opaque* noalias nocapture %0, %swift.context* swiftasync %1, %T16class_resilience11MyBaseClassC* swiftself %2) #0 {
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swift{{(tail)?}}cc void @"$s16class_resilience11MyBaseClassC4waitxyYFTj"(%swift.opaque* noalias nocapture %0, %swift.context* swiftasync %1, %T16class_resilience11MyBaseClassC* swiftself %2)
 
 class MyDerived : BaseClass<Int> {
   override func wait() async -> Int {
