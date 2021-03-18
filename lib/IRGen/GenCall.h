@@ -283,7 +283,8 @@ namespace irgen {
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        SILType funcResultTypeInContext,
-                       CanSILFunctionType fnType, Explosion &result);
+                       CanSILFunctionType fnType, Explosion &result,
+                       Explosion &error);
 
   Address emitAutoDiffCreateLinearMapContext(
       IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);

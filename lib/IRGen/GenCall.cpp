@@ -159,27 +159,38 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     switch (kind.getSpecialKind()) {
     case FunctionPointer::SpecialKind::TaskFutureWait:
     case FunctionPointer::SpecialKind::TaskFutureWaitThrowing: {
+      // This needs to match the layout of TaskFutureWaitAsyncContext.
       // Add storage for the waiting future's result pointer (OpaqueValue *).
       auto ty = SILType();
       auto &ti = IGM.getSwiftContextPtrTypeInfo();
+      // SwiftError *
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
       // OpaqueValue *successResultPointer
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
-      // AsyncTask *task;
-      //valTypes.push_back(ty);
-      //typeInfos.push_back(&ti);
+      // void (*, *) async  *asyncResumeEntryPoint;
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
     } break;
     case FunctionPointer::SpecialKind::TaskGroupWaitNext: {
+      // This needs to match the layout of TaskGroupNextAsyncContext.
       // Add storage for the waiting future's result pointer (OpaqueValue *).
       auto ty = SILType();
       auto &ti = IGM.getSwiftContextPtrTypeInfo();
-      // OpaqueValue *successResultPointer
+      // SwiftError * errorResult;
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      // OpaqueValue *successResultPointer;
+      valTypes.push_back(ty);
+      typeInfos.push_back(&ti);
+      // void (*, *) async  *asyncResumeEntryPoint;
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
       // TaskGroup *group;
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
-      // const Metadata *successType;
+      // Metata *successType;
       valTypes.push_back(ty);
       typeInfos.push_back(&ti);
     } break;
@@ -427,6 +438,7 @@ namespace {
     bool CanUseSelf = true;
     bool SuppressGenerics;
     unsigned AsyncContextIdx;
+    unsigned AsyncResumeFunctionSwiftSelfIdx = 0;
 
     SignatureExpansion(IRGenModule &IGM, CanSILFunctionType fnType,
                        bool suppressGenerics)
@@ -1722,24 +1734,41 @@ void SignatureExpansion::expandCoroutineContinuationType() {
 void SignatureExpansion::expandAsyncReturnType() {
   // Build up the signature of the return continuation function.
   // void (AsyncTask *, ExecutorRef, AsyncContext *, DirectResult0, ...,
-  //                                                 DirectResultN);
+  //                                                 DirectResultN, Error*);
   ResultIRType = IGM.VoidTy;
   addAsyncParameters();
   SmallVector<llvm::Type *, 8> components;
+
+  auto addErrorResult = [&]() {
+    // Add the error pointer at the end.
+    if (FnType->hasErrorResult()) {
+      llvm::Type *errorType =
+          IGM.getStorageType(getSILFuncConventions().getSILType(
+              FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext()));
+      claimSelf();
+      auto selfIdx = ParamIRTypes.size();
+      IGM.addSwiftSelfAttributes(Attrs, selfIdx);
+      AsyncResumeFunctionSwiftSelfIdx = selfIdx;
+      ParamIRTypes.push_back(errorType);
+    }
+  };
+
   auto resultType = getSILFuncConventions().getSILResultType(
       IGM.getMaximalTypeExpansionContext());
   auto &ti = IGM.getTypeInfo(resultType);
   auto &native = ti.nativeReturnValueSchema(IGM);
-  if (native.requiresIndirect())
+  if (native.requiresIndirect() || native.empty()) {
+    addErrorResult();
     return;
-  if (native.empty())
-    return;
+  }
 
   // Add the result type components as trailing parameters.
   native.enumerateComponents(
       [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
         ParamIRTypes.push_back(type);
       });
+
+  addErrorResult();
 }
 
 void SignatureExpansion::expandAsyncEntryType() {
@@ -1834,12 +1863,24 @@ void SignatureExpansion::expandAsyncAwaitType() {
   AsyncContextIdx = 0;
   components.push_back(IGM.Int8PtrTy);
 
+  auto addErrorResult = [&]() {
+    if (FnType->hasErrorResult()) {
+      llvm::Type *errorType =
+          IGM.getStorageType(getSILFuncConventions().getSILType(
+              FnType->getErrorResult(), IGM.getMaximalTypeExpansionContext()));
+      auto selfIdx = components.size();
+      AsyncResumeFunctionSwiftSelfIdx = selfIdx;
+      components.push_back(errorType);
+    }
+  };
+
   // Direct result type as arguments.
   auto resultType = getSILFuncConventions().getSILResultType(
       IGM.getMaximalTypeExpansionContext());
   auto &ti = IGM.getTypeInfo(resultType);
   auto &native = ti.nativeReturnValueSchema(IGM);
   if (native.requiresIndirect() || native.empty()) {
+    addErrorResult();
     ResultIRType = llvm::StructType::get(IGM.getLLVMContext(), components);
     return;
   }
@@ -1849,6 +1890,9 @@ void SignatureExpansion::expandAsyncAwaitType() {
       [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
         components.push_back(type);
       });
+
+  addErrorResult();
+
   ResultIRType = llvm::StructType::get(IGM.getLLVMContext(), components);
 }
 
@@ -1881,6 +1925,7 @@ Signature SignatureExpansion::getSignature() {
     result.ExtraDataKind = ExtraData::kindForMember<AsyncInfo>();
     AsyncInfo info;
     info.AsyncContextIdx = AsyncContextIdx;
+    info.AsyncResumeFunctionSwiftSelfIdx = AsyncResumeFunctionSwiftSelfIdx;
     result.ExtraDataStorage.emplace<AsyncInfo>(result.ExtraDataKind, info);
   } else {
     result.ExtraDataKind = ExtraData::kindForMember<void>();
@@ -2451,15 +2496,42 @@ public:
     auto resultTys =
         makeArrayRef(suspendResultTy->element_begin() + numAsyncContextParams,
                      suspendResultTy->element_end());
+
+    auto substCalleeType = getCallee().getSubstFunctionType();
+    SILFunctionConventions substConv(substCalleeType, IGF.getSILModule());
+    auto hasError = substCalleeType->hasErrorResult();
+    SILType errorType;
+    if (hasError)
+      errorType =
+          substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+
     if (resultTys.size() == 1) {
       result = Builder.CreateExtractValue(result, numAsyncContextParams);
+      if (hasError) {
+        Address errorAddr = IGF.getCalleeErrorResultSlot(errorType);
+        Builder.CreateStore(result, errorAddr);
+        return;
+      }
+    } else if (resultTys.size() == 2 && hasError) {
+      auto tmp = result;
+      result = Builder.CreateExtractValue(result, numAsyncContextParams);
+      auto errorResult =  Builder.CreateExtractValue(tmp, numAsyncContextParams + 1);
+      Address errorAddr = IGF.getCalleeErrorResultSlot(errorType);
+      Builder.CreateStore(errorResult, errorAddr);
     } else {
-      auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), resultTys);
+      auto directResultTys = hasError ? resultTys.drop_back() : resultTys;
+      auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), directResultTys);
       llvm::Value *resultAgg = llvm::UndefValue::get(resultTy);
-      for (unsigned i = 0, e = resultTys.size(); i != e; ++i) {
+      for (unsigned i = 0, e = directResultTys.size(); i != e; ++i) {
         llvm::Value *elt =
             Builder.CreateExtractValue(result, numAsyncContextParams + i);
         resultAgg = Builder.CreateInsertValue(resultAgg, elt, i);
+      }
+      if (hasError) {
+        auto errorResult = Builder.CreateExtractValue(
+            result, numAsyncContextParams + directResultTys.size());
+        Address errorAddr = IGF.getCalleeErrorResultSlot(errorType);
+        Builder.CreateStore(errorResult, errorAddr);
       }
       result = resultAgg;
     }
@@ -2496,17 +2568,7 @@ public:
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, nativeExplosion, resultType);
   }
   Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) override {
-    if (isCalleeAsync) {
-      auto layout = getAsyncContextLayout();
-      auto errorLayout = layout.getErrorLayout();
-      auto pointerToAddress =
-          errorLayout.project(IGF, context, /*offsets*/ llvm::None);
-      auto load = IGF.Builder.CreateLoad(pointerToAddress);
-      auto address = Address(load, IGF.IGM.getPointerAlignment());
-      return address;
-    } else {
-      return IGF.getCalleeErrorResultSlot(errorType);
-    }
+    return IGF.getCalleeErrorResultSlot(errorType);
   }
 
   FunctionPointer getFunctionPointerForDispatchCall(const FunctionPointer &fn) {
@@ -2530,9 +2592,14 @@ public:
     // Setup the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
     auto signature = fn.getSignature();
-    auto asyncContextIndex = signature.getAsyncContextIndex();
+    auto asyncContextIndex =
+        signature.getAsyncContextIndex();
+    auto paramAttributeFlags =
+        asyncContextIndex |
+        (signature.getAsyncResumeFunctionSwiftSelfIndex() << 8);
+    // Index of swiftasync context | ((index of swiftself) << 8).
     arguments.push_back(
-        IGM.getInt32(asyncContextIndex)); // Index of swiftasync context.
+        IGM.getInt32(paramAttributeFlags));
     arguments.push_back(currentResumeFn);
     auto resumeProjFn = IGF.getOrCreateResumePrjFn();
     arguments.push_back(
@@ -4750,7 +4817,11 @@ void irgen::emitAsyncReturn(
 
 void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
                             SILType funcResultTypeInContext,
-                            CanSILFunctionType fnType, Explosion &result) {
+                            CanSILFunctionType fnType, Explosion &result,
+                            Explosion &error) {
+  assert((fnType->hasErrorResult() && !error.empty()) ||
+         (!fnType->hasErrorResult() && error.empty()));
+
   auto &IGM = IGF.IGM;
 
   // Map the explosion to the native result type.
@@ -4766,6 +4837,8 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
                                          llvm::Type *componentTy) {
       nativeResultsStorage.push_back(llvm::UndefValue::get(componentTy));
     });
+    if (!error.empty())
+      nativeResultsStorage.push_back(error.claimNext());
     nativeResults = nativeResultsStorage;
   } else if (!result.empty()) {
     assert(!nativeSchema.empty());
@@ -4775,6 +4848,11 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
     while (!native.empty()) {
       nativeResultsStorage.push_back(native.claimNext());
     }
+    if (!error.empty())
+      nativeResultsStorage.push_back(error.claimNext());
+    nativeResults = nativeResultsStorage;
+  } else if (!error.empty()) {
+    nativeResultsStorage.push_back(error.claimNext());
     nativeResults = nativeResultsStorage;
   }
   emitAsyncReturn(IGF, asyncLayout, fnType, nativeResults);

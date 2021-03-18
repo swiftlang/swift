@@ -97,10 +97,13 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   auto fragment = futureFragment();
 
   // If an error was thrown, save it in the future fragment.
-  auto futureContext = static_cast<FutureAsyncContext *>(context);
+  auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
   bool hadErrorResult = false;
-  if (auto errorObject = *futureContext->errorResult) {
-    fragment->getError() = errorObject;
+  auto errorObject = asyncContextPrefix->errorResult;
+  printf("asyncTask::completeFuture errorObject: %p\n", errorObject);
+  fragment->getError() = errorObject;
+  if (errorObject) {
     hadErrorResult = true;
   }
 
@@ -217,10 +220,16 @@ const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
 /// The function that we put in the context of a simple task
 /// to handle the final return.
 SWIFT_CC(swiftasync)
-static void completeTask(SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+static void completeTask(SWIFT_ASYNC_CONTEXT AsyncContext *context,
+                         SWIFT_CONTEXT SwiftError *error) {
   // Set that there's no longer a running task in the current thread.
   auto task = _swift_task_clearCurrent();
   assert(task && "completing task, but there is no active task registered");
+
+  // Store the error result.
+  auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
+  asyncContextPrefix->errorResult = error;
 
   // Destroy and deallocate any remaining task local items.
   // We need to do this before we destroy the task local deallocator.
@@ -247,15 +256,16 @@ static void completeTask(SWIFT_ASYNC_CONTEXT AsyncContext *context) {
 /// The function that we put in the context of a simple task
 /// to handle the final return from a closure.
 SWIFT_CC(swiftasync)
-static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context,
+                                    SWIFT_CONTEXT SwiftError *error) {
   // Release the closure context.
-  auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
-      reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
+  auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(AsyncContextPrefix));
 
   swift_release(asyncContextPrefix->closureContext);
   
   // Clean up the rest of the task.
-  return completeTask(context);
+  return completeTask(context, error);
 }
 
 SWIFT_CC(swiftasync)
@@ -275,6 +285,12 @@ static void future_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
       asyncContextPrefix->closureContext);
 }
 
+SWIFT_CC(swiftasync)
+static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
+  return context->asyncResumeEntryPoint(_context, context->errorResult);
+}
 
 /// All `swift_task_create*` variants funnel into this common implementation.
 static AsyncTaskAndContext swift_task_create_group_future_impl(
@@ -344,7 +360,7 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
         reinterpret_cast<AsyncVoidClosureEntryPoint *>(function);
     asyncContextPrefix->closureContext = closureContext;
     function = non_future_adapter;
-    assert(sizeof(AsyncContextPrefix) == 2 * sizeof(void *));
+    assert(sizeof(AsyncContextPrefix) == 3 * sizeof(void *));
   } else {
     auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
@@ -353,7 +369,7 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
         reinterpret_cast<AsyncGenericClosureEntryPoint *>(function);
     function = future_adapter;
     asyncContextPrefix->closureContext = closureContext;
-    assert(sizeof(FutureAsyncContextPrefix) == 3 * sizeof(void *));
+    assert(sizeof(FutureAsyncContextPrefix) == 4 * sizeof(void *));
   }
 
   // Initialize the task so that resuming it will run the given
@@ -383,7 +399,6 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
     // Set up the context for the future so there is no error, and a successful
     // result will be written into the future fragment's storage.
     auto futureContext = static_cast<FutureAsyncContext *>(initialContext);
-    futureContext->errorResult = &futureFragment->getError();
     auto futureAsyncContextPrefix =
         reinterpret_cast<FutureAsyncContextPrefix *>(
             reinterpret_cast<char *>(allocation) + headerSize -
@@ -410,8 +425,8 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
   // as if they might be null, even though the only time they ever might
   // be is the final hop.  Store a signed null instead.
   initialContext->Parent = nullptr;
-  initialContext->ResumeParent
-    = closureContext ? &completeTaskWithClosure : &completeTask;
+  initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
+      closureContext ? &completeTaskWithClosure : &completeTask);
   initialContext->ResumeParentExecutor = ExecutorRef::generic();
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
@@ -523,13 +538,15 @@ void swift::swift_task_future_wait(OpaqueValue *result,
   waitingTask->ResumeTask = rawContext->ResumeParent;
   waitingTask->ResumeContext = rawContext;
 
+  // Stash the result pointer for when we resume later.
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  context->asyncResumeEntryPoint = nullptr;
+  context->successResultPointer = result;
+  context->errorResult = nullptr;
+
 
   // Wait on the future.
   assert(task->isFuture());
-
-  // Stash the result pointer for when we resume later.
-  context->successResultPointer = result;
 
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:
@@ -553,16 +570,20 @@ void swift::swift_task_future_wait_throwing(OpaqueValue *result,
     Metadata *T) {
   auto waitingTask = swift_task_getCurrent();
   // Suspend the waiting task.
-  waitingTask->ResumeTask = rawContext->ResumeParent;
+  auto originalResumeParent =
+      reinterpret_cast<AsyncVoidClosureResumeEntryPoint *>(
+          rawContext->ResumeParent);
+  waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
+  // Stash the result pointer for when we resume later.
   auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
+  context->successResultPointer = result;
+  context->asyncResumeEntryPoint = originalResumeParent;
+  context->errorResult = nullptr;
 
   // Wait on the future.
   assert(task->isFuture());
-
-  // Stash the result pointer for when we resume later.
-  context->successResultPointer = result;
 
   switch (task->waitFuture(waitingTask)) {
   case FutureFragment::Status::Executing:

@@ -118,7 +118,7 @@ class TaskContinuationFromLambda {
   static llvm::Optional<Fn> lambdaStorage;
 
   SWIFT_CC(swiftasync)
-  static void invoke(SWIFT_ASYNC_CONTEXT AsyncContext *context, HeapObject *) {
+  static void invoke(SWIFT_ASYNC_CONTEXT AsyncContext *context, SWIFT_CONTEXT HeapObject *) {
     (*lambdaStorage)(static_cast<Context*>(context));
   }
 
@@ -223,19 +223,19 @@ TEST(ActorTest, validateTestHarness) {
         EXPECT_PROGRESS(5);
         EXPECT_PROGRESS(6);
         finishTest();
-        return context->resumeParent();
+        return context->ResumeParent(context);
       });
     auto task1 = createTask(JobPriority::Default,
       [](AsyncContext *context) {
         EXPECT_PROGRESS(1);
         EXPECT_PROGRESS(2);
-        return context->resumeParent();
+        return context->ResumeParent(context);
       });
     auto task2 = createTask(JobPriority::Default,
       [](AsyncContext *context) {
         EXPECT_PROGRESS(3);
         EXPECT_PROGRESS(4);
-        return context->resumeParent();
+        return context->ResumeParent(context);
       });
 
     swift_task_enqueueGlobal(task0);
@@ -273,7 +273,7 @@ TEST(ActorTest, actorSwitch) {
                 EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
                 EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
                 finishTest();
-                return context->resumeParent();
+                return context->ResumeParent(context);
               });
             return swift_task_switch(context, continuation,
                                      ExecutorRef::generic());
@@ -317,7 +317,7 @@ TEST(ActorTest, actorContention) {
                 EXPECT_PROGRESS(4);
                 EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
                 EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
-                return context->resumeParent();
+                return context->ResumeParent(context);
               });
             swift_task_enqueue(task, ExecutorRef::generic());
           });
@@ -344,7 +344,7 @@ TEST(ActorTest, actorContention) {
             EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
             EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
             finishTest();
-            return context->resumeParent();
+            return context->ResumeParent(context);
           });
 
         swift_task_enqueue(task, ExecutorRef::generic());

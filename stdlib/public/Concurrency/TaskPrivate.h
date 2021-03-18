@@ -85,16 +85,12 @@ namespace {
 ///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
-  // Error result is always present.
-  SwiftError **errorResult = nullptr;
+  SwiftError *errorResult;
 
   OpaqueValue *successResultPointer;
 
-  // Arguments.
-  //AsyncTask *task;
-
-  // Note that the polymorphic argument T is suppressed on these calls
-  // for code-size purposes.
+  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
+      asyncResumeEntryPoint;
 
   void fillWithSuccess(AsyncTask::FutureFragment *future) {
     fillWithSuccess(future->getStoragePtr(), future->getResultType(),
@@ -109,7 +105,7 @@ public:
     fillWithError(future->getError());
   }
   void fillWithError(SwiftError *error) {
-    *errorResult = error;
+    errorResult = error;
     swift_errorRetain(error);
   }
 };
@@ -121,17 +117,16 @@ public:
 ///
 class TaskGroupNextAsyncContext : public AsyncContext {
 public:
-  // Error result is always present.
-  SwiftError **errorResult = nullptr;
+  SwiftError *errorResult;
 
   OpaqueValue *successResultPointer;
 
-  // FIXME: Currently, this is always here, but it isn't technically
-  // necessary.
-  void* Self;
+  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
+      asyncResumeEntryPoint;
 
   // Arguments.
   TaskGroup *group;
+
   const Metadata *successType;
 
   void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
@@ -139,7 +134,7 @@ public:
   }
 
   void fillWithError(SwiftError *error) {
-    *errorResult = error;
+    errorResult = error;
     swift_errorRetain(error);
   }
 };
