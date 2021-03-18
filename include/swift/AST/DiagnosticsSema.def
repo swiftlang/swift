@@ -3843,6 +3843,9 @@ ERROR(converting_noattrfunc_to_type,none,
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
 
+ERROR(converting_func_loses_global_actor,none,
+      "converting function value of type %0 to %1 loses global actor %2",
+      (Type, Type, Type))
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
@@ -4499,10 +4502,6 @@ ERROR(global_actor_non_unsafe_init,none,
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))
-ERROR(global_actor_isolated_synchronous_closure,none,
-      "closure isolated to global actor %0 must be 'async'",
-      (Type))
-
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %1 %2 has different actor isolation from %3 overridden declaration",
       (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
@@ -5404,21 +5403,17 @@ ERROR(specialize_missing_where_clause,none,
 ERROR(specialize_empty_where_clause,none,
       "empty 'where' clause in '_specialize' attribute", ())
 ERROR(specialize_attr_non_concrete_same_type_req,none,
-      "Only concrete type same-type requirements are supported by '_specialize' attribute", ())
+      "only concrete type same-type requirements are supported by '_specialize' attribute", ())
 ERROR(specialize_attr_only_generic_param_req,none,
-      "Only requirements on generic parameters are supported by '_specialize' attribute", ())
-ERROR(specialize_attr_only_one_concrete_same_type_req,none,
-      "Only one concrete type should be used in the same-type requirement in '_specialize' attribute", ())
-ERROR(specialize_attr_non_protocol_type_constraint_req,none,
-      "Only conformances to protocol types are supported by '_specialize' attribute", ())
+      "only requirements on generic parameters are supported by '_specialize' attribute", ())
 ERROR(specialize_attr_type_parameter_count_mismatch,none,
-      "%select{too many|too few}2 type parameters are specified "
-      "in '_specialize' attribute (got %1, but expected %0)",
-      (unsigned, unsigned, bool))
-ERROR(specialize_attr_missing_constraint,none,
-      "Missing constraint for %0 in '_specialize' attribute", (DeclName))
+      "too few generic parameters are specified "
+      "in '_specialize' attribute (got %0, but expected %1)",
+      (unsigned, unsigned))
+NOTE(specialize_attr_missing_constraint,none,
+      "missing constraint for %0 in '_specialize' attribute", (DeclName))
 ERROR(specialize_attr_unsupported_kind_of_req,none,
-      "Only same-type and layout requirements are supported by '_specialize' attribute", ())
+      "only same-type and layout requirements are supported by '_specialize' attribute", ())
 ERROR(specialize_target_function_not_found, none,
      "target function %0 could not be found", (DeclNameRef))
 ERROR(specialize_target_function_of_type_not_found, none,

@@ -14,6 +14,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
+#include "TaskPrivate.h"
 
 using namespace swift;
 
@@ -51,7 +52,7 @@ TaskLocal::Item*
 TaskLocal::Item::createParentLink(AsyncTask *task, AsyncTask *parent) {
   size_t amountToAllocate = Item::itemSize(/*valueType*/nullptr);
   // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-  void *allocation = swift_task_alloc(task, amountToAllocate);
+  void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
   Item *item = new(allocation) Item();
 
   auto parentHead = parent->Local.head;
@@ -95,7 +96,7 @@ TaskLocal::Item::createLink(AsyncTask *task,
   assert(task);
   size_t amountToAllocate = Item::itemSize(valueType);
   // assert(amountToAllocate % MaximumAlignment == 0); // TODO: do we need this?
-  void *allocation = swift_task_alloc(task, amountToAllocate);
+  void *allocation = _swift_task_alloc_specific(task, amountToAllocate);
   Item *item = new(allocation) Item(keyType, valueType);
 
   auto next = task->Local.head;
@@ -115,7 +116,7 @@ void TaskLocal::Item::destroy(AsyncTask *task) {
     valueType->vw_destroy(getStoragePtr());
   }
 
-  swift_task_dealloc(task, this);
+  _swift_task_dealloc_specific(task, this);
 }
 
 void TaskLocal::Storage::destroy(AsyncTask *task) {

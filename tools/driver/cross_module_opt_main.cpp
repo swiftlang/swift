@@ -26,14 +26,47 @@ using namespace llvm::opt;
 using namespace swift;
 using namespace modulesummary;
 
+class MergeModuleSummaryInvocation {
+public:
+  std::string OutputFilename;
+  std::vector<std::string> InputFilenames;
+
+  bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags) {
+    using namespace options;
+
+    std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+    unsigned MissingIndex;
+    unsigned MissingCount;
+    llvm::opt::InputArgList ParsedArgs =
+      Table->ParseArgs(Args, MissingIndex, MissingCount, SwiftMergeModuleSummaryOption);
+
+    if (MissingCount) {
+      Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                     ParsedArgs.getArgString(MissingIndex), MissingCount);
+      return true;
+    }
+
+    for (const Arg *A : ParsedArgs.filtered(OPT_INPUT)) {
+      InputFilenames.push_back(A->getValue());
+    }
+
+    if (const Arg *A = ParsedArgs.getLastArg(OPT_o)) {
+      OutputFilename = A->getValue();
+    }
+
+    std::vector<const char *> LLVMArgs {""};
+    for (const Arg *A : ParsedArgs.filtered(OPT_Xllvm)) {
+      LLVMArgs.push_back(A->getValue());
+    }
+
+    llvm::cl::ParseCommandLineOptions(LLVMArgs.size(), LLVMArgs.data(), "");
+    return false;
+  }
+};
+
 static llvm::cl::opt<std::string>
     LTOPrintLiveTrace("lto-print-live-trace", llvm::cl::init(""),
                       llvm::cl::desc("Print liveness trace for the symbol"));
-
-static llvm::cl::list<std::string>
-    InputFilenames(llvm::cl::Positional, llvm::cl::desc("[input files...]"));
-static llvm::cl::opt<std::string>
-    OutputFilename("o", llvm::cl::desc("output filename"));
 
 static llvm::DenseSet<GUID> computePreservedGUIDs(ModuleSummaryIndex *summary) {
   llvm::DenseSet<GUID> Set(1);
@@ -239,13 +272,16 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
                           void *MainAddr) {
   INITIALIZE_LLVM();
 
-  llvm::cl::ParseCommandLineOptions(Args.size(), Args.data(), "Swift LTO\n");
-
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);
 
-  if (InputFilenames.empty()) {
+  MergeModuleSummaryInvocation Invocation;
+  if (Invocation.parseArgs(Args, Instance.getDiags())) {
+    return true;
+  }
+
+  if (Invocation.InputFilenames.empty()) {
     Instance.getDiags().diagnose(SourceLoc(),
                                  diag::error_mode_requires_an_input_file);
     return 1;
@@ -253,7 +289,7 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
 
   auto TheSummary = std::make_unique<ModuleSummaryIndex>();
 
-  for (auto Filename : InputFilenames) {
+  for (auto Filename : Invocation.InputFilenames) {
     LLVM_DEBUG(llvm::dbgs() << "Loading module summary " << Filename << "\n");
     auto ErrOrBuf = llvm::MemoryBuffer::getFile(Filename);
     if (!ErrOrBuf) {
@@ -276,6 +312,6 @@ int cross_module_opt_main(ArrayRef<const char *> Args, const char *Argv0,
   markDeadSymbols(*TheSummary.get(), PreservedGUIDs);
 
   modulesummary::writeModuleSummaryIndex(*TheSummary, Instance.getDiags(),
-                                         OutputFilename);
+                                         Invocation.OutputFilename);
   return 0;
 }

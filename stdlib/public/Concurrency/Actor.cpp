@@ -110,6 +110,12 @@ public:
     return ActiveExecutor;
   }
 
+  static ExecutorRef getActiveExecutorInThread() {
+    if (auto activeInfo = ActiveInfoInThread.get())
+      return activeInfo->getActiveExecutor();
+    return ExecutorRef::generic();
+  }
+
   void leave() {
     ActiveInfoInThread.set(SavedInfo);
   }
@@ -139,12 +145,14 @@ void swift::swift_job_run(Job *job, ExecutorRef executor) {
   ExecutorTrackingInfo trackingInfo;
   trackingInfo.enterAndShadow(executor);
 
-  runJobInExecutorContext(job, executor);
+  runJobInEstablishedExecutorContext(job);
 
   trackingInfo.leave();
 }
 
-void swift::runJobInExecutorContext(Job *job, ExecutorRef executor) {
+void swift::runJobInEstablishedExecutorContext(Job *job) {
+  _swift_tsan_acquire(job);
+
   if (auto task = dyn_cast<AsyncTask>(job)) {
     // Update the active task in the current thread.
     ActiveTask::set(task);
@@ -154,23 +162,32 @@ void swift::runJobInExecutorContext(Job *job, ExecutorRef executor) {
     // on an actor, it should update the task status appropriately;
     // we don't need to update it afterwards.
 
-    task->runInFullyEstablishedContext(executor);
+    task->runInFullyEstablishedContext();
 
     // Clear the active task.
     ActiveTask::set(nullptr);
   } else {
     // There's no extra bookkeeping to do for simple jobs.
-    job->runSimpleInFullyEstablishedContext(executor);
+    job->runSimpleInFullyEstablishedContext();
   }
+
+  _swift_tsan_release(job);
 }
 
 AsyncTask *swift::swift_task_getCurrent() {
   return ActiveTask::get();
 }
 
-void swift::_swift_task_clearCurrent() {
+AsyncTask *swift::_swift_task_clearCurrent() {
+  auto task = ActiveTask::get();
   ActiveTask::set(nullptr);
+  return task;
 }
+
+ExecutorRef swift::swift_task_getCurrentExecutor() {
+  return ExecutorTrackingInfo::getActiveExecutorInThread();
+}
+
 
 /*****************************************************************************/
 /*********************** DEFAULT ACTOR IMPLEMENTATION ************************/
@@ -187,7 +204,7 @@ public:
     : Job({JobKind::DefaultActorInline, priority}, &process) {}
 
   SWIFT_CC(swiftasync)
-  static void process(Job *job, ExecutorRef executor);
+  static void process(Job *job);
 
   static bool classof(const Job *job) {
     return job->Flags.getKind() == JobKind::DefaultActorInline;
@@ -204,7 +221,7 @@ public:
       Actor(actor) {}
 
   SWIFT_CC(swiftasync)
-  static void process(Job *job, ExecutorRef executor);
+  static void process(Job *job);
 
   static bool classof(const Job *job) {
     return job->Flags.getKind() == JobKind::DefaultActorSeparate;
@@ -660,7 +677,7 @@ public:
   }
 
   SWIFT_CC(swiftasync)
-  static void process(Job *job, ExecutorRef _executor);
+  static void process(Job *job);
 
   static bool classof(const Job *job) {
     return job->Flags.getKind() == JobKind::DefaultActorOverride;
@@ -1129,8 +1146,7 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
     }
 
     // Run the job.
-    auto executor = ExecutorRef::forDefaultActor(asAbstract(currentActor));
-    runJobInExecutorContext(job, executor);
+    runJobInEstablishedExecutorContext(job);
 
     // The current actor may have changed after the job.
     // If it's become nil, or not a default actor, we have nothing to do.
@@ -1153,7 +1169,7 @@ static void processDefaultActor(DefaultActorImpl *currentActor,
   swift_release(actor);
 }
 
-void ProcessInlineJob::process(Job *job, ExecutorRef _executor) {
+void ProcessInlineJob::process(Job *job) {
   DefaultActorImpl *actor = DefaultActorImpl::fromInlineJob(job);
 
   // Pull the priority out of the job before we do anything that might
@@ -1166,7 +1182,7 @@ void ProcessInlineJob::process(Job *job, ExecutorRef _executor) {
   return processDefaultActor(actor, runner);
 }
 
-void ProcessOutOfLineJob::process(Job *job, ExecutorRef _executor) {
+void ProcessOutOfLineJob::process(Job *job) {
   auto self = cast<ProcessOutOfLineJob>(job);
   DefaultActorImpl *actor = self->Actor;
 
@@ -1182,7 +1198,7 @@ void ProcessOutOfLineJob::process(Job *job, ExecutorRef _executor) {
   return processDefaultActor(actor, runner);
 }
 
-void ProcessOverrideJob::process(Job *job, ExecutorRef _executor) {
+void ProcessOverrideJob::process(Job *job) {
   auto self = cast<ProcessOverrideJob>(job);
 
   // Pull the actor and priority out of the job.
@@ -1378,11 +1394,11 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
   // want these frames to potentially accumulate linearly.
   if (activeTrackingInfo != &trackingInfo) {
     // FIXME: force tail call
-    return task->runInFullyEstablishedContext(executor);
+    return task->runInFullyEstablishedContext();
   }
 
   // Otherwise, run the new task.
-  task->runInFullyEstablishedContext(executor);
+  task->runInFullyEstablishedContext();
 
   // Leave the tracking frame, and give up the current actor if
   // we have one.
@@ -1398,16 +1414,26 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
 }
 
 SWIFT_CC(swiftasync)
-void swift::swift_task_switch(AsyncTask *task, ExecutorRef currentExecutor,
+void swift::swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
+                              TaskContinuationFunction *resumeFunction,
                               ExecutorRef newExecutor) {
-  assert(task && "no task provided");
+  auto currentExecutor = ExecutorTrackingInfo::getActiveExecutorInThread();
 
   // If the current executor is compatible with running the new executor,
-  // just continue running.
+  // we can just immediately continue running with the resume function
+  // we were passed in.
   if (!currentExecutor.mustSwitchToRun(newExecutor)) {
     // FIXME: force tail call
-    return task->runInFullyEstablishedContext(currentExecutor);
+    return resumeFunction(resumeContext);
   }
+
+  auto task = swift_task_getCurrent();
+  assert(task && "no current task!");
+
+  // Park the task for simplicity instead of trying to thread the
+  // initial resumption information into everything below.
+  task->ResumeContext = resumeContext;
+  task->ResumeTask = resumeFunction;
 
   // Okay, we semantically need to switch.
   auto runner = RunningJobInfo::forOther(task->getPriority());
@@ -1434,6 +1460,8 @@ void swift::swift_task_switch(AsyncTask *task, ExecutorRef currentExecutor,
 
 void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
   assert(job && "no job provided");
+
+  _swift_tsan_release(job);
 
   if (executor.isGeneric())
     return swift_task_enqueueGlobal(job);

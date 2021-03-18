@@ -75,6 +75,8 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   // CompilerInvocation may wish to remap inputs to source buffers.
   TheDriver.setCheckInputFilesExist(false);
 
+  TheDriver.setIsDummyDriverForFrontendInvocation(true);
+
   std::unique_ptr<llvm::opt::InputArgList> ArgList =
     TheDriver.parseArgStrings(ArrayRef<const char *>(Args).slice(1));
   if (Diags.hadAnyError())

@@ -612,3 +612,19 @@ func rdar_47550715() {
   func foo(_: A<F>? = nil) {} // Ok
   func bar(_: A<F>? = .none) {} // Ok
 }
+
+// SR-14270 - test case for diagnostic note 'because_rethrows_default_argument_throws'
+func nonThrowableDefaultRethrows(_ f: () throws -> () = {}) rethrows {
+  try f()
+}
+// NOTE: This should compile and not emit a diagnostic because ideally the compiler could statically
+// know the default argument value could never throw. See SR-1524.
+nonThrowableDefaultRethrows() // expected-error {{call can throw but is not marked with 'try'}}
+                              // expected-note@-1 {{call is to 'rethrows' function, but a defaulted argument function can throw}}
+
+func throwableDefaultRethrows(_ f: () throws -> () = { throw SomeError.Badness }) rethrows {
+  try f()
+}
+// This should always emit a diagnostic because we can statically know that default argument can throw. 
+throwableDefaultRethrows()  // expected-error {{call can throw but is not marked with 'try'}}
+                            // expected-note@-1 {{call is to 'rethrows' function, but a defaulted argument function can throw}}

@@ -2082,71 +2082,79 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
   attr->setInvalid();
 }
 
-/// Collect all used generic parameter types from a given type.
-static void collectUsedGenericParameters(
-    Type Ty, SmallPtrSetImpl<TypeBase *> &ConstrainedGenericParams) {
-  if (!Ty)
-    return;
+/// Ensure that the requirements provided by the @_specialize attribute
+/// can be supported by the SIL EagerSpecializer pass.
+static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
+                                            GenericSignature originalSig,
+                                            GenericSignature specializedSig,
+                                            ASTContext &ctx) {
+  bool hadError = false;
 
-  if (!Ty->hasTypeParameter())
-    return;
-
-  // Add used generic parameters/archetypes.
-  Ty.visit([&](Type Ty) {
-    if (auto GP = dyn_cast<GenericTypeParamType>(Ty->getCanonicalType())) {
-      ConstrainedGenericParams.insert(GP);
+  auto specializedReqs = specializedSig->requirementsNotSatisfiedBy(originalSig);
+  for (auto specializedReq : specializedReqs) {
+    if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::specialize_attr_only_generic_param_req);
+      hadError = true;
+      continue;
     }
-  });
-}
 
-/// Perform some sanity checks for the requirements provided by
-/// the @_specialize attribute.
-static void checkSpecializeAttrRequirements(
-    SpecializeAttr *attr,
-    AbstractFunctionDecl *FD,
-    const SmallPtrSet<TypeBase *, 4> &constrainedGenericParams,
-    ASTContext &ctx) {
-  auto genericSig = FD->getGenericSignature();
+    switch (specializedReq.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::specialize_attr_unsupported_kind_of_req);
+      hadError = true;
+      break;
+
+    case RequirementKind::SameType:
+      if (specializedReq.getSecondType()->isTypeParameter()) {
+        ctx.Diags.diagnose(attr->getLocation(),
+                           diag::specialize_attr_non_concrete_same_type_req);
+        hadError = true;
+      }
+      break;
+
+    case RequirementKind::Layout:
+      break;
+    }
+  }
+
+  if (hadError)
+    return;
 
   if (!attr->isFullSpecialization())
     return;
 
-  if (constrainedGenericParams.size() == genericSig->getGenericParams().size())
+  if (specializedSig->areAllParamsConcrete())
+    return;
+
+  SmallVector<GenericTypeParamType *, 2> unspecializedParams;
+
+  for (auto *paramTy : specializedSig->getGenericParams()) {
+    auto canTy = paramTy->getCanonicalType();
+    if (specializedSig->isCanonicalTypeInContext(canTy) &&
+        (!specializedSig->getLayoutConstraint(canTy) ||
+         originalSig->getLayoutConstraint(canTy))) {
+      unspecializedParams.push_back(paramTy);
+    }
+  }
+
+  unsigned expectedCount = specializedSig->getGenericParams().size();
+  unsigned gotCount = expectedCount - unspecializedParams.size();
+
+  if (expectedCount == gotCount)
     return;
 
   ctx.Diags.diagnose(
       attr->getLocation(), diag::specialize_attr_type_parameter_count_mismatch,
-      genericSig->getGenericParams().size(), constrainedGenericParams.size(),
-      constrainedGenericParams.size() < genericSig->getGenericParams().size());
+      gotCount, expectedCount);
 
-  if (constrainedGenericParams.size() < genericSig->getGenericParams().size()) {
-    // Figure out which archetypes are not constrained.
-    for (auto gp : genericSig->getGenericParams()) {
-      if (constrainedGenericParams.count(gp->getCanonicalType().getPointer()))
-        continue;
-      auto gpDecl = gp->getDecl();
-      if (gpDecl) {
-        ctx.Diags.diagnose(attr->getLocation(),
-                           diag::specialize_attr_missing_constraint,
-                           gpDecl->getName());
-      }
-    }
+  for (auto paramTy : unspecializedParams) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::specialize_attr_missing_constraint,
+                       paramTy->getName());
   }
-}
-
-/// Require that the given type either not involve type parameters or be
-/// a type parameter.
-static bool diagnoseIndirectGenericTypeParam(SourceLoc loc, Type type,
-                                             TypeRepr *typeRepr) {
-  if (type->hasTypeParameter() && !type->is<GenericTypeParamType>()) {
-    type->getASTContext().Diags.diagnose(
-        loc,
-        diag::specialize_attr_only_generic_param_req)
-      .highlight(typeRepr->getSourceRange());
-    return true;
-  }
-
-  return false;
 }
 
 /// Type check that a set of requirements provided by @_specialize.
@@ -2183,93 +2191,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);
 
-  // Set of generic parameters being constrained. It is used to
-  // determine if a full specialization misses requirements for
-  // some of the generic parameters.
-  SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
-
   // Go over the set of requirements, adding them to the builder.
   WhereClauseOwner(FD, attr).visitRequirements(TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
-        // Collect all of the generic parameters used by these types.
-        switch (req.getKind()) {
-        case RequirementKind::Conformance:
-        case RequirementKind::SameType:
-        case RequirementKind::Superclass:
-          collectUsedGenericParameters(req.getSecondType(),
-                                       constrainedGenericParams);
-          LLVM_FALLTHROUGH;
-
-        case RequirementKind::Layout:
-          collectUsedGenericParameters(req.getFirstType(),
-                                       constrainedGenericParams);
-          break;
-        }
-
-        // Check additional constraints.
-        // FIXME: These likely aren't fundamental limitations.
-        switch (req.getKind()) {
-        case RequirementKind::SameType: {
-          bool firstHasTypeParameter = req.getFirstType()->hasTypeParameter();
-          bool secondHasTypeParameter = req.getSecondType()->hasTypeParameter();
-
-          // Exactly one type can have a type parameter.
-          if (firstHasTypeParameter == secondHasTypeParameter) {
-            diagnose(attr->getLocation(),
-                     firstHasTypeParameter
-                       ? diag::specialize_attr_non_concrete_same_type_req
-                       : diag::specialize_attr_only_one_concrete_same_type_req)
-              .highlight(reqRepr->getSourceRange());
-            return false;
-          }
-
-          // We either need a fully-concrete type or a generic type parameter.
-          if (diagnoseIndirectGenericTypeParam(attr->getLocation(),
-                                               req.getFirstType(),
-                                               reqRepr->getFirstTypeRepr()) ||
-              diagnoseIndirectGenericTypeParam(attr->getLocation(),
-                                               req.getSecondType(),
-                                               reqRepr->getSecondTypeRepr())) {
-            return false;
-          }
-          break;
-        }
-
-        case RequirementKind::Superclass:
-          diagnose(attr->getLocation(),
-                   diag::specialize_attr_non_protocol_type_constraint_req)
-            .highlight(reqRepr->getSourceRange());
-          return false;
-
-        case RequirementKind::Conformance:
-          if (diagnoseIndirectGenericTypeParam(attr->getLocation(),
-                                               req.getFirstType(),
-                                               reqRepr->getSubjectRepr())) {
-            return false;
-          }
-
-          if (!req.getSecondType()->is<ProtocolType>()) {
-            diagnose(attr->getLocation(),
-                     diag::specialize_attr_non_protocol_type_constraint_req)
-              .highlight(reqRepr->getSourceRange());
-            return false;
-          }
-
-          diagnose(attr->getLocation(),
-                   diag::specialize_attr_unsupported_kind_of_req)
-            .highlight(reqRepr->getSourceRange());
-
-          return false;
-
-        case RequirementKind::Layout:
-          if (diagnoseIndirectGenericTypeParam(attr->getLocation(),
-                                               req.getFirstType(),
-                                               reqRepr->getSubjectRepr())) {
-            return false;
-          }
-          break;
-        }
-
         // Add the requirement to the generic signature builder.
         using FloatingRequirementSource =
           GenericSignatureBuilder::FloatingRequirementSource;
@@ -2279,12 +2203,13 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         return false;
       });
 
-  // Check the validity of provided requirements.
-  checkSpecializeAttrRequirements(attr, FD, constrainedGenericParams, Ctx);
-
   // Check the result.
   auto specializedSig = std::move(Builder).computeGenericSignature(
       /*allowConcreteGenericParams=*/true);
+
+  // Check the validity of provided requirements.
+  checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);
+
   attr->setSpecializedSignature(specializedSig);
 
   // Check the target function if there is one.

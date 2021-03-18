@@ -37,6 +37,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/StorageImpl.h"
 #include "swift/AST/TrailingCallArguments.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -47,6 +48,7 @@ namespace swift {
 class ASTPrinter;
 class ASTContext;
 struct PrintOptions;
+class CustomAttr;
 class Decl;
 class AbstractFunctionDecl;
 class FuncDecl;
@@ -57,133 +59,6 @@ class LazyMemberLoader;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 class TypeExpr;
-
-/// TypeAttributes - These are attributes that may be applied to types.
-class TypeAttributes {
-  // Get a SourceLoc for every possible attribute that can be parsed in source.
-  // the presence of the attribute is indicated by its location being set.
-  SourceLoc AttrLocs[TAK_Count];
-public:
-  /// AtLoc - This is the location of the first '@' in the attribute specifier.
-  /// If this is an empty attribute specifier, then this will be an invalid loc.
-  SourceLoc AtLoc;
-
-  struct Convention {
-    StringRef Name = {};
-    DeclNameRef WitnessMethodProtocol = {};
-    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
-    /// Convenience factory function to create a Swift convention.
-    ///
-    /// Don't use this function if you are creating a C convention as you
-    /// probably need a ClangType field as well.
-    static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclNameRef(), Located<StringRef>("", {})};
-    }
-  };
-
-  Optional<Convention> ConventionArguments;
-
-  // Indicates whether the type's '@differentiable' attribute has a 'linear'
-  // argument.
-  DifferentiabilityKind differentiabilityKind =
-      DifferentiabilityKind::NonDifferentiable;
-
-  // For an opened existential type, the known ID.
-  Optional<UUID> OpenedID;
-  
-  // For a reference to an opaque return type, the mangled name and argument
-  // index into the generic signature.
-  struct OpaqueReturnTypeRef {
-    StringRef mangledName;
-    unsigned index;
-  };
-  Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
-
-  TypeAttributes() {}
-  
-  bool isValid() const { return AtLoc.isValid(); }
-
-  void clearAttribute(TypeAttrKind A) {
-    AttrLocs[A] = SourceLoc();
-  }
-  
-  bool has(TypeAttrKind A) const {
-    return getLoc(A).isValid();
-  }
-  
-  SourceLoc getLoc(TypeAttrKind A) const {
-    return AttrLocs[A];
-  }
-  
-  void setOpaqueReturnTypeOf(StringRef mangling, unsigned index) {
-    OpaqueReturnTypeOf = OpaqueReturnTypeRef{mangling, index};
-  }
-  
-  void setAttr(TypeAttrKind A, SourceLoc L) {
-    assert(!L.isInvalid() && "Cannot clear attribute with this method");
-    AttrLocs[A] = L;
-  }
-
-  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
-    for (auto Loc : AttrLocs) {
-      if (Loc.isValid())
-        Locs.push_back(Loc);
-    }
-  }
-
-  // This attribute list is empty if no attributes are specified.  Note that
-  // the presence of the leading @ is not enough to tell, because we want
-  // clients to be able to remove attributes they process until they get to
-  // an empty list.
-  bool empty() const {
-    for (SourceLoc elt : AttrLocs)
-      if (elt.isValid())
-        return false;
-    
-    return true;
-  }
-  
-  bool hasConvention() const { return ConventionArguments.hasValue(); }
-
-  /// Returns the primary calling convention string.
-  ///
-  /// Note: For C conventions, this may not represent the full convention.
-  StringRef getConventionName() const {
-    return ConventionArguments.getValue().Name;
-  }
-
-  /// Show the string enclosed between @convention(..)'s parentheses.
-  ///
-  /// For example, @convention(foo, bar) will give the string "foo, bar".
-  void getConventionArguments(SmallVectorImpl<char> &buffer) const;
-
-  bool hasOwnership() const {
-    return getOwnership() != ReferenceOwnership::Strong;
-  }
-  ReferenceOwnership getOwnership() const {
-#define REF_STORAGE(Name, name, ...) \
-    if (has(TAK_sil_##name)) return ReferenceOwnership::Name;
-#include "swift/AST/ReferenceStorage.def"
-    return ReferenceOwnership::Strong;
-  }
-  
-  void clearOwnership() {
-#define REF_STORAGE(Name, name, ...) \
-    clearAttribute(TAK_sil_##name);
-#include "swift/AST/ReferenceStorage.def"
-  }
-
-  bool hasOpenedID() const { return OpenedID.hasValue(); }
-  UUID getOpenedID() const { return *OpenedID; }
-
-  /// Given a name like "autoclosure", return the type attribute ID that
-  /// corresponds to it.  This returns TAK_Count on failure.
-  ///
-  static TypeAttrKind getAttrKindFromString(StringRef Str);
-
-  /// Return the name (like "autoclosure") for an attribute ID.
-  static const char *getAttrName(TypeAttrKind kind);
-};
 
 class alignas(1 << AttrAlignInBits) AttributeBase {
 public:
@@ -229,6 +104,7 @@ enum class DeclKind : uint8_t;
   /// Represents one declaration attribute.
 class DeclAttribute : public AttributeBase {
   friend class DeclAttributes;
+  friend class TypeAttributes;
 
 protected:
   union {
@@ -2407,6 +2283,170 @@ public:
   }
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
+};
+
+/// TypeAttributes - These are attributes that may be applied to types.
+class TypeAttributes {
+  // Get a SourceLoc for every possible attribute that can be parsed in source.
+  // the presence of the attribute is indicated by its location being set.
+  SourceLoc AttrLocs[TAK_Count];
+
+  /// The custom attributes, in a linked list.
+  CustomAttr *CustomAttrs = nullptr;
+
+public:
+  /// AtLoc - This is the location of the first '@' in the attribute specifier.
+  /// If this is an empty attribute specifier, then this will be an invalid loc.
+  SourceLoc AtLoc;
+
+  struct Convention {
+    StringRef Name = {};
+    DeclNameRef WitnessMethodProtocol = {};
+    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
+    /// Convenience factory function to create a Swift convention.
+    ///
+    /// Don't use this function if you are creating a C convention as you
+    /// probably need a ClangType field as well.
+    static Convention makeSwiftConvention(StringRef name) {
+      return {name, DeclNameRef(), Located<StringRef>("", {})};
+    }
+  };
+
+  Optional<Convention> ConventionArguments;
+
+  // Indicates whether the type's '@differentiable' attribute has a 'linear'
+  // argument.
+  DifferentiabilityKind differentiabilityKind =
+      DifferentiabilityKind::NonDifferentiable;
+
+  // For an opened existential type, the known ID.
+  Optional<UUID> OpenedID;
+
+  // For a reference to an opaque return type, the mangled name and argument
+  // index into the generic signature.
+  struct OpaqueReturnTypeRef {
+    StringRef mangledName;
+    unsigned index;
+  };
+  Optional<OpaqueReturnTypeRef> OpaqueReturnTypeOf;
+
+  TypeAttributes() {}
+
+  bool isValid() const { return AtLoc.isValid(); }
+
+  void clearAttribute(TypeAttrKind A) {
+    AttrLocs[A] = SourceLoc();
+  }
+
+  bool has(TypeAttrKind A) const {
+    return getLoc(A).isValid();
+  }
+
+  SourceLoc getLoc(TypeAttrKind A) const {
+    return AttrLocs[A];
+  }
+
+  void setOpaqueReturnTypeOf(StringRef mangling, unsigned index) {
+    OpaqueReturnTypeOf = OpaqueReturnTypeRef{mangling, index};
+  }
+
+  void setAttr(TypeAttrKind A, SourceLoc L) {
+    assert(!L.isInvalid() && "Cannot clear attribute with this method");
+    AttrLocs[A] = L;
+  }
+
+  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
+    for (auto Loc : AttrLocs) {
+      if (Loc.isValid())
+        Locs.push_back(Loc);
+    }
+  }
+
+  // This attribute list is empty if no attributes are specified.  Note that
+  // the presence of the leading @ is not enough to tell, because we want
+  // clients to be able to remove attributes they process until they get to
+  // an empty list.
+  bool empty() const {
+    if (CustomAttrs)
+      return false;
+
+    for (SourceLoc elt : AttrLocs)
+      if (elt.isValid())
+        return false;
+
+    return true;
+  }
+
+  bool hasConvention() const { return ConventionArguments.hasValue(); }
+
+  /// Returns the primary calling convention string.
+  ///
+  /// Note: For C conventions, this may not represent the full convention.
+  StringRef getConventionName() const {
+    return ConventionArguments.getValue().Name;
+  }
+
+  /// Show the string enclosed between @convention(..)'s parentheses.
+  ///
+  /// For example, @convention(foo, bar) will give the string "foo, bar".
+  void getConventionArguments(SmallVectorImpl<char> &buffer) const;
+
+  bool hasOwnership() const {
+    return getOwnership() != ReferenceOwnership::Strong;
+  }
+  ReferenceOwnership getOwnership() const {
+#define REF_STORAGE(Name, name, ...) \
+    if (has(TAK_sil_##name)) return ReferenceOwnership::Name;
+#include "swift/AST/ReferenceStorage.def"
+    return ReferenceOwnership::Strong;
+  }
+
+  void clearOwnership() {
+#define REF_STORAGE(Name, name, ...) \
+    clearAttribute(TAK_sil_##name);
+#include "swift/AST/ReferenceStorage.def"
+  }
+
+  bool hasOpenedID() const { return OpenedID.hasValue(); }
+  UUID getOpenedID() const { return *OpenedID; }
+
+  /// Given a name like "autoclosure", return the type attribute ID that
+  /// corresponds to it.  This returns TAK_Count on failure.
+  ///
+  static TypeAttrKind getAttrKindFromString(StringRef Str);
+
+  /// Return the name (like "autoclosure") for an attribute ID.
+  static const char *getAttrName(TypeAttrKind kind);
+
+  void addCustomAttr(CustomAttr *attr) {
+    attr->Next = CustomAttrs;
+    CustomAttrs = attr;
+  }
+
+  // Iterator for the custom type attributes.
+  class iterator
+      : public std::iterator<std::forward_iterator_tag, CustomAttr *> {
+    CustomAttr *attr;
+
+  public:
+    iterator() : attr(nullptr) { }
+    explicit iterator(CustomAttr *attr) : attr(attr) { }
+
+    iterator &operator++() {
+      attr = static_cast<CustomAttr *>(attr->Next);
+      return *this;
+    }
+
+    bool operator==(iterator x) const { return x.attr == attr; }
+    bool operator!=(iterator x) const { return x.attr != attr; }
+
+    CustomAttr *operator*() const { return attr; }
+    CustomAttr &operator->() const { return *attr; }
+  };
+
+  llvm::iterator_range<iterator> getCustomAttrs() const {
+    return llvm::make_range(iterator(CustomAttrs), iterator());
+  }
 };
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);

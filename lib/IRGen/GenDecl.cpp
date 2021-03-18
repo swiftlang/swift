@@ -2171,7 +2171,11 @@ llvm::Function *irgen::createFunction(IRGenModule &IGM,
       .to(fn, linkInfo.isForDefinition());
 
   llvm::AttrBuilder initialAttrs;
-  IGM.constructInitialFnAttributes(initialAttrs, FuncOptMode);
+  // Workaround an llvm bug that does not handle this case correctly.
+  bool disablePtrAuthReturns =
+      signature.getCallingConv() == llvm::CallingConv::SwiftTail;
+  IGM.constructInitialFnAttributes(initialAttrs, disablePtrAuthReturns,
+                                   FuncOptMode);
   // Merge initialAttrs with attrs.
   auto updatedAttrs =
     signature.getAttributes().addAttributes(IGM.getLLVMContext(),
@@ -2882,7 +2886,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   thunk->setCallingConv(llvm::CallingConv::C);
 
   llvm::AttrBuilder attrBuilder;
-  IGM.constructInitialFnAttributes(attrBuilder);
+  IGM.constructInitialFnAttributes(attrBuilder, false /*disablePtrAuthReturns*/);
   attrBuilder.addAttribute(llvm::Attribute::AlwaysInline);
   llvm::AttributeList attr = signature.getAttributes().addAttributes(
       IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, attrBuilder);

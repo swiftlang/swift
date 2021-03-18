@@ -308,7 +308,7 @@ public:
   }
 
   /// Destroy the storage associated with the group.
-  void destroy(AsyncTask *task);
+  void destroy();
 
   bool isEmpty() {
     auto oldStatus = GroupStatus{status.load(std::memory_order_relaxed)};
@@ -323,7 +323,7 @@ public:
   /// Cancel the task group and all tasks within it.
   ///
   /// Returns `true` if this is the first time cancelling the group, false otherwise.
-  bool cancelAll(AsyncTask *task);
+  bool cancelAll();
 
   GroupStatus statusCancel() {
     auto old = status.fetch_or(GroupStatus::cancelled,
@@ -405,7 +405,7 @@ public:
   /// If possible, and an existing task is already waiting on next(), this will
   /// schedule it immediately. If not, the result is enqueued and will be picked
   /// up whenever a task calls next() the next time.
-  void offer(AsyncTask *completed, AsyncContext *context, ExecutorRef executor);
+  void offer(AsyncTask *completed, AsyncContext *context);
 
   /// Attempt to dequeue ready tasks and complete the waitingTask.
   ///
@@ -444,7 +444,7 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
 // ==== initialize -------------------------------------------------------------
 
 // Initializes into the preallocated _group an actual TaskGroupImpl.
-void swift::swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group) {
+void swift::swift_taskGroup_initialize(TaskGroup *group) {
 //  // nasty trick, but we want to keep the record inside the group as we'll need
 //  // to remove it from the task as the group is destroyed, as well as interact
 //  // with it every time we add child tasks; so it is useful to pre-create it here
@@ -463,17 +463,17 @@ void swift::swift_taskGroup_initialize(AsyncTask *task, TaskGroup *group) {
   assert(impl == record && "the group IS the task record");
 
   // ok, now that the group actually is initialized: attach it to the task
-  swift_task_addStatusRecord(task, record);
+  swift_task_addStatusRecord(record);
 }
 
 // =============================================================================
 // ==== create -----------------------------------------------------------------
 
-TaskGroup* swift::swift_taskGroup_create(AsyncTask *task) {
+TaskGroup* swift::swift_taskGroup_create() {
   // TODO: John suggested we should rather create from a builtin, which would allow us to optimize allocations even more?
-  void *allocation = swift_task_alloc(task, sizeof(TaskGroup));
+  void *allocation = swift_task_alloc(sizeof(TaskGroup));
   auto group = reinterpret_cast<TaskGroup *>(allocation);
-  swift_taskGroup_initialize(task, group);
+  swift_taskGroup_initialize(group);
   return group;
 }
 
@@ -488,13 +488,13 @@ void swift::swift_taskGroup_attachChild(TaskGroup *group, AsyncTask *child) {
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
 
-void swift::swift_taskGroup_destroy(AsyncTask *task, TaskGroup *group) {
-  asImpl(group)->destroy(task);
+void swift::swift_taskGroup_destroy(TaskGroup *group) {
+  asImpl(group)->destroy();
 }
 
-void TaskGroupImpl::destroy(AsyncTask *task) {
+void TaskGroupImpl::destroy() {
   // First, remove the group from the task and deallocate the record
-  swift_task_removeStatusRecord(task, getTaskRecord());
+  swift_task_removeStatusRecord(getTaskRecord());
 
   mutex.lock(); // TODO: remove lock, and use status for synchronization
   // Release all ready tasks which are kept retained, the group destroyed,
@@ -508,18 +508,17 @@ void TaskGroupImpl::destroy(AsyncTask *task) {
   mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
 
   // TODO: get the parent task, do we need to store it?
-  swift_task_dealloc(task, this);
+  swift_task_dealloc(this);
 }
 
 // =============================================================================
 // ==== offer ------------------------------------------------------------------
 
-void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context,
-                      ExecutorRef completingExecutor) {
-  asImpl(this)->offer(completedTask, context, completingExecutor);
+void TaskGroup::offer(AsyncTask *completedTask, AsyncContext *context) {
+  asImpl(this)->offer(completedTask, context);
 }
 
-static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
+static void fillGroupNextResult(TaskGroupNextAsyncContext *context,
                                 PollResult result) {
   /// Fill in the result value
   switch (result.status) {
@@ -553,8 +552,7 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
   }
 }
 
-void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context,
-                          ExecutorRef completingExecutor) {
+void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
   assert(completedTask);
   assert(completedTask->isFuture());
   assert(completedTask->hasChildFragment());
@@ -581,10 +579,11 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context,
   //   W:n R:0 P:1 -> W:y R:1 P:3 // complete immediately, 2 more pending tasks
   auto assumed = statusAddReadyAssumeAcquire();
 
-  // If an error was thrown, save it in the future fragment.
-  auto futureContext = static_cast<FutureAsyncContext *>(context);
+  auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
+      reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
   bool hadErrorResult = false;
-  if (auto errorObject = *futureContext->errorResult) {
+  auto errorObject = asyncContextPrefix->errorResult;
+  if (errorObject) {
     // instead we need to enqueue this result:
     hadErrorResult = true;
   }
@@ -609,8 +608,9 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context,
         mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
 
         auto waitingContext =
-            static_cast<TaskFutureWaitAsyncContext *>(
+            static_cast<TaskGroupNextAsyncContext *>(
                 waitingTask->ResumeContext);
+
         fillGroupNextResult(waitingContext, result);
 
         // TODO: allow the caller to suggest an executor
@@ -642,21 +642,35 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context,
   return;
 }
 
+SWIFT_CC(swiftasync)
+static void
+task_group_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+
+  auto context = static_cast<TaskGroupNextAsyncContext *>(_context);
+  return context->asyncResumeEntryPoint(_context, context->errorResult);
+}
+
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
-
 SWIFT_CC(swiftasync)
 void swift::swift_taskGroup_wait_next_throwing(
-    AsyncTask *waitingTask,
-    ExecutorRef executor,
-    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext) {
-  waitingTask->ResumeTask = rawContext->ResumeParent;
+    OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+    TaskGroup *_group, const Metadata *successType) {
+  auto waitingTask = swift_task_getCurrent();
+  auto originalResumeParent =
+      reinterpret_cast<AsyncVoidClosureResumeEntryPoint *>(
+          rawContext->ResumeParent);
+  waitingTask->ResumeTask = task_group_wait_resume_adapter;
   waitingTask->ResumeContext = rawContext;
 
-  auto context = static_cast<TaskFutureWaitAsyncContext *>(rawContext);
-  auto task = context->task;
+  auto context = static_cast<TaskGroupNextAsyncContext *>(rawContext);
+  context->errorResult = nullptr;
+  context->asyncResumeEntryPoint = originalResumeParent;
+  context->successResultPointer = resultPointer;
+  context->group = _group;
+  context->successType = successType;
+
   auto group = asImpl(context->group);
-  assert(waitingTask == task && "attempted to wait on group.next() from other task, which is illegal!");
   assert(group && "swift_taskGroup_wait_next_throwing was passed context without group!");
 
   PollResult polled = group->poll(waitingTask);
@@ -670,7 +684,7 @@ void swift::swift_taskGroup_wait_next_throwing(
   case PollStatus::Error:
   case PollStatus::Success:
     fillGroupNextResult(context, polled);
-    return waitingTask->runInFullyEstablishedContext(executor);
+    return waitingTask->runInFullyEstablishedContext();
   }
 }
 
@@ -778,18 +792,18 @@ bool swift::swift_taskGroup_isEmpty(TaskGroup *group) {
 // =============================================================================
 // ==== isCancelled ------------------------------------------------------------
 
-bool swift::swift_taskGroup_isCancelled(AsyncTask *task, TaskGroup *group) {
+bool swift::swift_taskGroup_isCancelled(TaskGroup *group) {
   return asImpl(group)->isCancelled();
 }
 
 // =============================================================================
 // ==== cancelAll --------------------------------------------------------------
 
-void swift::swift_taskGroup_cancelAll(AsyncTask *task, TaskGroup *group) {
-  asImpl(group)->cancelAll(task);
+void swift::swift_taskGroup_cancelAll(TaskGroup *group) {
+  asImpl(group)->cancelAll();
 }
 
-bool TaskGroupImpl::cancelAll(AsyncTask *task) {
+bool TaskGroupImpl::cancelAll() {
   // store the cancelled bit
   auto old = statusCancel();
   if (old.isCancelled()) {
@@ -798,7 +812,7 @@ bool TaskGroupImpl::cancelAll(AsyncTask *task) {
   }
 
   // cancel all existing tasks within the group
-  swift_task_cancel_group_child_tasks(task, asAbstract(this));
+  swift_task_cancel_group_child_tasks(asAbstract(this));
   return true;
 }
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-sib -emit-module-summary-path %t/default_wt.swiftmodule.summary -module-name default_wt -Xllvm -module-summary-embed-debug-name %s
-// RUN: %swift_frontend_plain -merge-module-summary %t/default_wt.swiftmodule.summary -module-summary-embed-debug-name -o %t/default_wt.swiftmodule.merged-summary
+// RUN: %swift_frontend_plain -merge-module-summary %t/default_wt.swiftmodule.summary -Xllvm -module-summary-embed-debug-name -o %t/default_wt.swiftmodule.merged-summary
 // RUN: %swift-module-summary-test --to-yaml %t/default_wt.swiftmodule.merged-summary -o %t/default_wt.merged-summary.yaml
 
 // Ensure that optimizer won't eliminate PrimitiveSequenceType.getPrimitiveSequence

@@ -1361,8 +1361,6 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   auto genericParam = makeGenericParam().build(builder);
   builder.addParameter(
       makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheNativeObjectType)));
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -1375,8 +1373,6 @@ static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) 
   auto genericParam = makeGenericParam().build(builder);
   builder.addParameter(
       makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheNativeObjectType))); // parent
   builder.addParameter(
       makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
