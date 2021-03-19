@@ -1086,7 +1086,7 @@ func testUnlabeledParameterBindingPosition() {
     func f(aa: Int, bb: Int, _ cc: Int) {}
 
     f(0, 2)
-    // expected-error@-1:6 {{missing argument labels 'aa:bb:' in call}}
+    // expected-error@-1:6 {{missing argument labels 'aa:bb::' in call}}
     // expected-error@-2:8 {{missing argument for parameter 'bb' in call}}
 
     f(0, bb: 1, 2)
@@ -1191,7 +1191,7 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-1:6 {{missing arguments for parameters 'aa', 'cc' in call}}
 
     f(1, 2, 3)
-    // expected-error@-1 {{missing argument labels 'aa:cc:' in call}}
+    // expected-error@-1 {{missing argument labels 'aa:cc::' in call}}
     // expected-error@-2:11 {{missing argument for parameter 'cc' in call}}
 
     f(1, 2, 3, 4)
@@ -1223,7 +1223,7 @@ func testUnlabeledParameterBindingPosition() {
     // expected-error@-1:12 {{missing argument for parameter 'bb' in call}}
 
     f(aa: 1, xx: 2, 3)
-    // expected-error@-1 {{incorrect argument label in call (have 'aa:xx:_:', expected 'aa:bb:_:_:')}}
+    // expected-error@-1 {{incorrect argument labels in call (have 'aa:xx:_:', expected 'aa:bb:_:_:')}}
     // expected-error@-2:12 {{missing argument for parameter 'bb' in call}}
 
     f(aa: 1, bb: 2, 3, xx: 4)
