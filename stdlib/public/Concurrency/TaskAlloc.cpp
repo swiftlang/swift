@@ -67,7 +67,9 @@ void swift::_swift_task_alloc_destroy(AsyncTask *task) {
 }
 
 void *swift::swift_task_alloc(size_t size) {
-  return allocator(swift_task_getCurrent()).alloc(size);
+  auto result = allocator(swift_task_getCurrent()).alloc(size);
+  bzero((void *)result, size);
+  return result;
 }
 
 void *swift::_swift_task_alloc_specific(AsyncTask *task, size_t size) {
