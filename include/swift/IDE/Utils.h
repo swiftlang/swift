@@ -152,7 +152,7 @@ enum class CursorInfoKind {
 
 struct ResolvedCursorInfo {
   CursorInfoKind Kind = CursorInfoKind::Invalid;
-  SourceFile *SF;
+  SourceFile *SF = nullptr;
   SourceLoc Loc;
   ValueDecl *ValueD = nullptr;
   TypeDecl *CtorTyRef = nullptr;
@@ -172,6 +172,8 @@ struct ResolvedCursorInfo {
 
   ResolvedCursorInfo() = default;
   ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
+
+  ValueDecl *typeOrValue() { return CtorTyRef ? CtorTyRef : ValueD; }
 
   friend bool operator==(const ResolvedCursorInfo &lhs,
                          const ResolvedCursorInfo &rhs) {
@@ -425,43 +427,6 @@ public:
   unsigned commonPartsCount(DeclNameViewer &Other) const;
   bool isValid() const { return IsValid; }
   bool isFunction() const { return HasParen; }
-};
-
-/// This provide a utility for writing to an underlying string buffer multiple
-/// string pieces and retrieve them later when the underlying buffer is stable.
-class DelayedStringRetriever : public raw_ostream {
-    SmallVectorImpl<char> &OS;
-    llvm::raw_svector_ostream Underlying;
-    SmallVector<std::pair<unsigned, unsigned>, 4> StartEnds;
-    unsigned CurrentStart;
-
-public:
-    explicit DelayedStringRetriever(SmallVectorImpl<char> &OS) : OS(OS),
-                                                              Underlying(OS) {}
-    void startPiece() {
-      CurrentStart = OS.size();
-    }
-    void endPiece() {
-      StartEnds.emplace_back(CurrentStart, OS.size());
-    }
-    void write_impl(const char *ptr, size_t size) override {
-      Underlying.write(ptr, size);
-    }
-    uint64_t current_pos() const override {
-      return Underlying.tell();
-    }
-    size_t preferred_buffer_size() const override {
-      return 0;
-    }
-    void retrieve(llvm::function_ref<void(StringRef)> F) const {
-      for (auto P : StartEnds) {
-        F(StringRef(OS.begin() + P.first, P.second - P.first));
-      }
-    }
-    StringRef operator[](unsigned I) const {
-      auto P = StartEnds[I];
-      return StringRef(OS.begin() + P.first, P.second - P.first);
-    }
 };
 
 enum class RegionType {
