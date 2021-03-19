@@ -929,6 +929,8 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       // Try again.
       continue;
     }
+    _swift_tsan_release(this);
+    
 #if SWIFT_TASK_PRINTF_DEBUG
 #  define LOG_STATE_TRANSITION fprintf(stderr, "%p transition from %zx to %zx in %p.%s\n", \
   pthread_self(), oldState.Flags.getOpaqueValue(), newState.Flags.getOpaqueValue(), this, __FUNCTION__)
@@ -1046,6 +1048,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
                               /*failure*/ std::memory_order_acquire))
         continue;
       LOG_STATE_TRANSITION;
+      _swift_tsan_acquire(this);
       
       // If that succeeded, we can proceed to the main body.
       oldState = newState;
@@ -1108,6 +1111,11 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
       continue;
     }
     LOG_STATE_TRANSITION;
+    
+    if (jobToRun)
+      _swift_tsan_acquire(this);
+    else
+      _swift_tsan_release(this);
 
     // We successfully updated the state.
 
@@ -1341,6 +1349,7 @@ bool DefaultActorImpl::tryAssumeThread(RunningJobInfo runner) {
                               /*success*/ std::memory_order_relaxed,
                               /*failure*/ std::memory_order_acquire)) {
       LOG_STATE_TRANSITION;
+      _swift_tsan_acquire(this);
       return true;
     }
   }
