@@ -3184,8 +3184,8 @@ public:
     return getExtInfo().isNoEscape();
   }
 
-  bool isConcurrent() const {
-    return getExtInfo().isConcurrent();
+  bool isSendable() const {
+    return getExtInfo().isSendable();
   }
 
   bool isAsync() const { return getExtInfo().isAsync(); }
@@ -4196,7 +4196,7 @@ public:
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
 
-  bool isConcurrent() const { return getExtInfo().isConcurrent(); }
+  bool isSendable() const { return getExtInfo().isSendable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
 
   /// Return the array of all the yields.

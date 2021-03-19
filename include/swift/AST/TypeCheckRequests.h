@@ -2898,9 +2898,9 @@ public:
 };
 
 /// Retrieve the implicit conformance for the given nominal type to
-/// the ConcurrentValue protocol.
-class GetImplicitConcurrentValueRequest :
-    public SimpleRequest<GetImplicitConcurrentValueRequest,
+/// the Sendable protocol.
+class GetImplicitSendableRequest :
+    public SimpleRequest<GetImplicitSendableRequest,
                          NormalProtocolConformance *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:

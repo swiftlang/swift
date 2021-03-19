@@ -145,5 +145,5 @@ extension Collection where Indices == DefaultIndices<Self> {
   }
 }
 
-extension DefaultIndices: ConcurrentValue
-  where Elements: ConcurrentValue, Elements.Index: ConcurrentValue { }
+extension DefaultIndices: Sendable
+  where Elements: Sendable, Elements.Index: Sendable { }

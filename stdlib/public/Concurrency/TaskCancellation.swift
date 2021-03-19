@@ -67,7 +67,7 @@ extension Task {
   ///
   /// This function returns instantly and will never suspend.
   public static func withCancellationHandler<T>(
-    handler: @concurrent () -> (),
+    handler: @Sendable () -> (),
     operation: () async throws -> T
   ) async rethrows -> T {
     let task = Builtin.getCurrentAsyncTask()
@@ -96,7 +96,7 @@ extension Task {
 }
 
 @_silgen_name("swift_task_addCancellationHandler")
-func _taskAddCancellationHandler(handler: @concurrent () -> ()) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+func _taskAddCancellationHandler(handler: @Sendable () -> ()) -> UnsafeRawPointer /*CancellationNotificationStatusRecord*/
 
 @_silgen_name("swift_task_removeCancellationHandler")
 func _taskRemoveCancellationHandler(

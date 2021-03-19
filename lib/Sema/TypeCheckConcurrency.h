@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_TYPECHECKCONCURRENCY_H
 
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Type.h"
 #include <cassert>
 
@@ -194,7 +195,7 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 /// specific types at the use site.
 ///
 /// \param dc The declaration context from which the reference occurs. This is
-/// used to perform lookup of conformances to the \c ConcurrentValue protocol.
+/// used to perform lookup of conformances to the \c Sendable protocol.
 ///
 /// \param loc The location at which the reference occurs, which will be
 /// used when emitting diagnostics.
@@ -205,19 +206,20 @@ bool contextUsesConcurrencyFeatures(const DeclContext *dc);
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
-    ConcurrentReferenceKind refKind);
+    ConcurrentReferenceKind refKind,
+    DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
 
 /// How the concurrent value check should be performed.
-enum class ConcurrentValueCheck {
-  /// ConcurrentValue conformance was explicitly stated and should be
+enum class SendableCheck {
+  /// Sendable conformance was explicitly stated and should be
   /// fully checked.
   Explicit,
 
-  /// ConcurrentValue conformance was implied by one of the standard library
-  /// protocols that added ConcurrentValue after-the-fact.
+  /// Sendable conformance was implied by one of the standard library
+  /// protocols that added Sendable after-the-fact.
   ImpliedByStandardProtocol,
 
-  /// Implicit conformance to ConcurrentValue for structs and enums.
+  /// Implicit conformance to Sendable for structs and enums.
   Implicit,
 };
 
@@ -231,11 +233,11 @@ checkGlobalActorAttributes(
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
 
-/// Check the correctness of the given ConcurrentValue conformance.
+/// Check the correctness of the given Sendable conformance.
 ///
 /// \returns true if an error occurred.
-bool checkConcurrentValueConformance(
-    ProtocolConformance *conformance, ConcurrentValueCheck check);
+bool checkSendableConformance(
+    ProtocolConformance *conformance, SendableCheck check);
 
 } // end namespace swift
 

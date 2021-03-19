@@ -116,8 +116,8 @@ extension Array: FeatureTest.MP where Element : FeatureTest.MP { }
 // CHECK: }
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
-// CHECK-NEXT: extension OldSchool : Swift.UnsafeConcurrentValue {
-extension OldSchool: UnsafeConcurrentValue { }
+// CHECK-NEXT: extension OldSchool : Swift.UnsafeSendable {
+extension OldSchool: UnsafeSendable { }
 // CHECK-NEXT: }
 
 // CHECK: #if compiler(>=5.3) && $GlobalActors
@@ -133,17 +133,17 @@ public struct SomeGlobalActor {
 // CHECK-NEXT: #endif
 public func runSomethingSomewhere(body: () async -> Void) { }
 
-// CHECK: #if compiler(>=5.3) && $ConcurrentFunctions
-// CHECK-NEXT: func runSomethingConcurrently(body: @concurrent () -> 
+// CHECK: #if compiler(>=5.3) && $Sendable
+// CHECK-NEXT: func runSomethingConcurrently(body: @Sendable () -> 
 // CHECK-NEXT: #endif
-public func runSomethingConcurrently(body: @concurrent () -> Void) { }
+public func runSomethingConcurrently(body: @Sendable () -> Void) { }
 
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: func stage
 // CHECK-NEXT: #endif
 public func stage(with actor: MyActor) { }
 
-// CHECK-NOT: extension MyActor : Swift.ConcurrentValue
+// CHECK-NOT: extension MyActor : Swift.Sendable
 
 // CHECK: #if compiler(>=5.3) && $MarkerProtocol
 // CHECK-NEXT: extension OldSchool : FeatureTest.MP {

@@ -1159,7 +1159,7 @@ extension IteratorSequence: IteratorProtocol, Sequence {
   }
 }
 
-extension IteratorSequence: ConcurrentValue where Base: ConcurrentValue { }
+extension IteratorSequence: Sendable where Base: Sendable { }
 
 /* FIXME: ideally for compatibility we would declare
 extension Sequence {

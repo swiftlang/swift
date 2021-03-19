@@ -452,7 +452,7 @@ public:
       break;
     }
 
-    funcFlags = funcFlags.withConcurrent(flags.isConcurrent());
+    funcFlags = funcFlags.withConcurrent(flags.isSendable());
     funcFlags = funcFlags.withAsync(flags.isAsync());
 
     auto result = createTupleType({}, "");

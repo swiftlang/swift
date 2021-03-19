@@ -25,7 +25,7 @@ func writeToBool(_ b : inout Bool, _ val : Bool) {
     b = val
 }
 
-actor List<T : ConcurrentValue> {
+actor List<T : Sendable> {
     var head : T
     var tail : List<T>?
 

@@ -673,6 +673,6 @@ extension _ArrayBuffer {
   }
 }
 
-extension _ArrayBuffer: ConcurrentValue, UnsafeConcurrentValue
-  where Element: ConcurrentValue { }
+extension _ArrayBuffer: Sendable, UnsafeSendable
+  where Element: Sendable { }
 #endif

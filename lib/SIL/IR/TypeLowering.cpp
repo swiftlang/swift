@@ -2566,7 +2566,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
                                       funcType->isThrowing())
-          .withConcurrent(funcType->isConcurrent())
+          .withConcurrent(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .build();
 

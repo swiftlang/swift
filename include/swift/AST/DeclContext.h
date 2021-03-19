@@ -160,7 +160,7 @@ enum class ConformanceLookupKind : unsigned {
   /// All conformances except for inherited ones.
   NonInherited,
   /// All conformances except structurally-derived conformances, of which
-  /// ConcurrentValue is the only one.
+  /// Sendable is the only one.
   NonStructural,
 };
 

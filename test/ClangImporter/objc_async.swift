@@ -94,8 +94,8 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func uiActorMethod() { }
 }
 
-// ConcurrentValue conformance inference for imported types.
-func acceptCV<T: ConcurrentValue>(_: T) { }
+// Sendable conformance inference for imported types.
+func acceptCV<T: Sendable>(_: T) { }
 func testCV(r: NSRange) {
   acceptCV(r)
 }

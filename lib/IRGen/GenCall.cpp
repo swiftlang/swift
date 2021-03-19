@@ -114,13 +114,6 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     valTypes.push_back(ty);
     typeInfos.push_back(&ti);
   };
-  auto addExecutor = [&]() {
-    auto ty = SILType();
-    auto &ti = IGM.getSwiftExecutorPtrTypeInfo();
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-  };
-
   // AsyncContext * __ptrauth_swift_async_context_parent Parent;
   {
     auto ty = SILType();
@@ -133,9 +126,6 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   //     ResumeParent;
   addTaskContinuationFunction();
 
-  // ExecutorRef ResumeParentExecutor;
-  addExecutor();
-
   // AsyncContextFlags Flags;
   {
     auto ty = SILType::getPrimitiveObjectType(
@@ -146,13 +136,6 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     typeInfos.push_back(&ti);
   }
 
-  //   SwiftError **errorResult;
-  auto errorCanType = IGM.Context.getExceptionType();
-  auto errorType = SILType::getPrimitiveObjectType(errorCanType);
-  auto &errorTypeInfo =
-      IGM.getTypeInfoForLowered(CanInOutType::get(errorCanType));
-  typeInfos.push_back(&errorTypeInfo);
-  valTypes.push_back(errorType);
   // Add storage for data used by runtime entry points.
   // See TaskFutureWaitAsyncContext.
   if (kind.isSpecial()) {
@@ -196,22 +179,18 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     } break;
     }
   }
-  bool canHaveValidError = substitutedType->hasErrorResult();
   return AsyncContextLayout(IGM, LayoutStrategy::Optimal, valTypes, typeInfos,
-                            originalType, substitutedType, substitutionMap,
-                            errorType, canHaveValidError);
+                            originalType, substitutedType, substitutionMap);
 }
 
 AsyncContextLayout::AsyncContextLayout(
     IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
     ArrayRef<const TypeInfo *> fieldTypeInfos, CanSILFunctionType originalType,
-    CanSILFunctionType substitutedType, SubstitutionMap substitutionMap,
-    SILType errorType, bool canHaveValidError)
+    CanSILFunctionType substitutedType, SubstitutionMap substitutionMap)
     : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject, strategy,
                    fieldTypeInfos, /*typeToFill*/ nullptr),
-      IGM(IGM), originalType(originalType), substitutedType(substitutedType),
-      substitutionMap(substitutionMap), errorType(errorType),
-      canHaveValidError(canHaveValidError)  {
+      originalType(originalType), substitutedType(substitutedType),
+      substitutionMap(substitutionMap)  {
 #ifndef NDEBUG
   assert(fieldTypeInfos.size() == fieldTypes.size() &&
          "type infos don't match types");
@@ -2317,13 +2296,6 @@ public:
         IGF.Builder.CreateZExt(dynamicContextSize32, IGF.IGM.SizeTy);
     contextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
     context = layout.emitCastTo(IGF, contextBuffer.getAddress());
-    if (layout.canHaveError()) {
-      auto fieldLayout = layout.getErrorLayout();
-      auto ptrToAddr =
-          fieldLayout.project(IGF, context, /*offsets*/ llvm::None);
-      auto errorSlot = IGF.getAsyncCalleeErrorResultSlot(layout.getErrorType());
-      IGF.Builder.CreateStore(errorSlot.getAddress(), ptrToAddr);
-    }
   }
   void end() override {
     assert(contextBuffer.isValid());
@@ -4863,9 +4835,8 @@ IRGenFunction::getFunctionPointerForResumeIntrinsic(llvm::Value *resume) {
   auto *fnTy = llvm::FunctionType::get(
       IGM.VoidTy, {IGM.Int8PtrTy},
       false /*vaargs*/);
-  auto signature = Signature(
-      fnTy, IGM.constructInitialAttributes(true /*disable ptrauth-returns*/),
-      IGM.SwiftAsyncCC);
+  auto signature =
+      Signature(fnTy, IGM.constructInitialAttributes(), IGM.SwiftAsyncCC);
   auto fnPtr = FunctionPointer(
       FunctionPointer::Kind::Function,
       Builder.CreateBitOrPointerCast(resume, fnTy->getPointerTo()),

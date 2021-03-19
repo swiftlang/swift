@@ -298,7 +298,7 @@ class ASTExtInfoBuilder {
   enum : unsigned {
     RepresentationMask = 0xF << 0,
     NoEscapeMask = 1 << 4,
-    ConcurrentMask = 1 << 5,
+    SendableMask = 1 << 5,
     AsyncMask = 1 << 6,
     ThrowsMask = 1 << 7,
     DifferentiabilityMaskOffset = 8,
@@ -356,7 +356,7 @@ public:
 
   constexpr bool isNoEscape() const { return bits & NoEscapeMask; }
 
-  constexpr bool isConcurrent() const { return bits & ConcurrentMask; }
+  constexpr bool isSendable() const { return bits & SendableMask; }
 
   constexpr bool isAsync() const { return bits & AsyncMask; }
 
@@ -419,8 +419,8 @@ public:
   }
   LLVM_NODISCARD
   ASTExtInfoBuilder withConcurrent(bool concurrent = true) const {
-    return ASTExtInfoBuilder(concurrent ? (bits | ConcurrentMask)
-                                        : (bits & ~ConcurrentMask),
+    return ASTExtInfoBuilder(concurrent ? (bits | SendableMask)
+                                        : (bits & ~SendableMask),
                              clangTypeInfo, globalActor);
   }
   LLVM_NODISCARD
@@ -524,7 +524,7 @@ public:
 
   constexpr bool isNoEscape() const { return builder.isNoEscape(); }
 
-  constexpr bool isConcurrent() const { return builder.isConcurrent(); }
+  constexpr bool isSendable() const { return builder.isSendable(); }
 
   constexpr bool isAsync() const { return builder.isAsync(); }
 
@@ -648,7 +648,7 @@ class SILExtInfoBuilder {
     RepresentationMask = 0xF << 0,
     PseudogenericMask = 1 << 4,
     NoEscapeMask = 1 << 5,
-    ConcurrentMask = 1 << 6,
+    SendableMask = 1 << 6,
     AsyncMask = 1 << 7,
     DifferentiabilityMaskOffset = 8,
     DifferentiabilityMask = 0x7 << DifferentiabilityMaskOffset,
@@ -666,12 +666,12 @@ class SILExtInfoBuilder {
       : bits(bits), clangTypeInfo(clangTypeInfo.getCanonical()) {}
 
   static constexpr unsigned makeBits(Representation rep, bool isPseudogeneric,
-                                     bool isNoEscape, bool isConcurrent,
+                                     bool isNoEscape, bool isSendable,
                                      bool isAsync,
                                      DifferentiabilityKind diffKind) {
     return ((unsigned)rep) | (isPseudogeneric ? PseudogenericMask : 0) |
            (isNoEscape ? NoEscapeMask : 0) |
-           (isConcurrent ? ConcurrentMask : 0) |
+           (isSendable ? SendableMask : 0) |
            (isAsync ? AsyncMask : 0) |
            (((unsigned)diffKind << DifferentiabilityMaskOffset) &
             DifferentiabilityMask);
@@ -687,16 +687,16 @@ public:
                           ClangTypeInfo(nullptr)) {}
 
   SILExtInfoBuilder(Representation rep, bool isPseudogeneric, bool isNoEscape,
-                    bool isConcurrent, bool isAsync,
+                    bool isSendable, bool isAsync,
                     DifferentiabilityKind diffKind, const clang::Type *type)
       : SILExtInfoBuilder(makeBits(rep, isPseudogeneric, isNoEscape,
-                                   isConcurrent, isAsync, diffKind),
+                                   isSendable, isAsync, diffKind),
                           ClangTypeInfo(type)) {}
 
   // Constructor for polymorphic type.
   SILExtInfoBuilder(ASTExtInfoBuilder info, bool isPseudogeneric)
       : SILExtInfoBuilder(makeBits(info.getSILRepresentation(), isPseudogeneric,
-                                   info.isNoEscape(), info.isConcurrent(),
+                                   info.isNoEscape(), info.isSendable(),
                                    info.isAsync(),
                                    info.getDifferentiabilityKind()),
                           info.getClangTypeInfo()) {}
@@ -722,7 +722,7 @@ public:
   // Is this function guaranteed to be no-escape by the type system?
   constexpr bool isNoEscape() const { return bits & NoEscapeMask; }
 
-  constexpr bool isConcurrent() const { return bits & ConcurrentMask; }
+  constexpr bool isSendable() const { return bits & SendableMask; }
 
   constexpr bool isAsync() const { return bits & AsyncMask; }
 
@@ -793,9 +793,9 @@ public:
                              clangTypeInfo);
   }
   LLVM_NODISCARD
-  SILExtInfoBuilder withConcurrent(bool isConcurrent = true) const {
-    return SILExtInfoBuilder(isConcurrent ? (bits | ConcurrentMask)
-                                          : (bits & ~ConcurrentMask),
+  SILExtInfoBuilder withConcurrent(bool isSendable = true) const {
+    return SILExtInfoBuilder(isSendable ? (bits | SendableMask)
+                                          : (bits & ~SendableMask),
                              clangTypeInfo);
   }
   LLVM_NODISCARD
@@ -885,7 +885,7 @@ public:
 
   constexpr bool isNoEscape() const { return builder.isNoEscape(); }
 
-  constexpr bool isConcurrent() const { return builder.isConcurrent(); }
+  constexpr bool isSendable() const { return builder.isSendable(); }
 
   constexpr bool isAsync() const { return builder.isAsync(); }
 
@@ -915,8 +915,8 @@ public:
     return builder.withNoEscape(noEscape).build();
   }
   
-  SILExtInfo withConcurrent(bool isConcurrent = true) const {
-    return builder.withConcurrent(isConcurrent).build();
+  SILExtInfo withConcurrent(bool isSendable = true) const {
+    return builder.withConcurrent(isSendable).build();
   }
 
   SILExtInfo withAsync(bool isAsync = true) const {

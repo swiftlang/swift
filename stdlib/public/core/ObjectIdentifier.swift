@@ -18,7 +18,7 @@
 /// In Swift, only class instances and metatypes have unique identities. There
 /// is no notion of identity for structs, enums, functions, or tuples.
 @frozen // trivial-implementation
-public struct ObjectIdentifier: ConcurrentValue {
+public struct ObjectIdentifier: Sendable {
   @usableFromInline // trivial-implementation
   internal let _value: Builtin.RawPointer
 

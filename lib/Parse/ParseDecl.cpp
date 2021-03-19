@@ -3014,6 +3014,10 @@ ParserStatus Parser::parseDeclAttribute(
       "_functionBuilder", "resultBuilder", DAK_ResultBuilder,
       diag::attr_renamed_warning);
 
+  // Historical name for @Sendable.
+  checkInvalidAttrName(
+      "concurrent", "Sendable", DAK_Sendable, diag::attr_renamed_warning);
+
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
@@ -3253,6 +3257,23 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
   
   // Determine which attribute it is, and diagnose it if unknown.
   TypeAttrKind attr = TypeAttributes::getAttrKindFromString(Tok.getText());
+
+  auto checkInvalidAttrName = [&](
+      StringRef invalidName, StringRef correctName, TypeAttrKind kind,
+      Optional<Diag<StringRef, StringRef>> diag = None) {
+    if (attr == TAK_Count && Tok.getText() == invalidName) {
+      attr = kind;
+
+      if (diag) {
+        diagnose(Tok, *diag, invalidName, correctName)
+            .fixItReplace(Tok.getLoc(), correctName);
+      }
+    }
+  };
+
+  // Historical name for @Sendable.
+  checkInvalidAttrName(
+      "concurrent", "Sendable", TAK_Sendable, diag::attr_renamed_warning);
 
   if (attr == TAK_Count) {
     auto declAttrID = DeclAttribute::getAttrKindFromString(Tok.getText());

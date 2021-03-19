@@ -60,8 +60,8 @@ func first_allMustSucceed() async throws {
 }
 
 func first_ignoreFailures() async throws {
-  @concurrent func work() async -> Int { 42 }
-  @concurrent func boom() async throws -> Int { throw Boom() }
+  @Sendable func work() async -> Int { 42 }
+  @Sendable func boom() async throws -> Int { throw Boom() }
 
   let first: Int = try await Task.withGroup(resultType: Int.self) { group in
     await group.add { await work() }
@@ -98,7 +98,7 @@ func test_taskGroup_quorum_thenCancel() async {
     case yay
     case nay
   }
-  struct Follower: ConcurrentValue {
+  struct Follower: Sendable {
     init(_ name: String) {}
     func vote() async throws -> Vote {
       // "randomly" vote yes or no
@@ -145,13 +145,13 @@ func test_taskGroup_quorum_thenCancel() async {
   _ = await gatherQuorum(followers: [Follower("A"), Follower("B"), Follower("C")])
 }
 
-extension Collection where Self: ConcurrentValue, Element: ConcurrentValue, Self.Index: ConcurrentValue {
+extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendable {
 
   /// Just another example of how one might use task groups.
-  func map<T: ConcurrentValue>(
+  func map<T: Sendable>(
     parallelism requestedParallelism: Int? = nil/*system default*/,
     // ordered: Bool = true, /
-    _ transform: @concurrent (Element) async throws -> T
+    _ transform: @Sendable (Element) async throws -> T
   ) async throws -> [T] { // TODO: can't use rethrows here, maybe that's just life though; rdar://71479187 (rethrows is a bit limiting with async functions that use task groups)
     let defaultParallelism = 2
     let parallelism = requestedParallelism ?? defaultParallelism

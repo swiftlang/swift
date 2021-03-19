@@ -173,5 +173,5 @@ extension EmptyCollection: Equatable {
   }
 }
 
-extension EmptyCollection: ConcurrentValue { }
-extension EmptyCollection.Iterator: ConcurrentValue { }
+extension EmptyCollection: Sendable { }
+extension EmptyCollection.Iterator: Sendable { }

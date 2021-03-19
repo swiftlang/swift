@@ -1987,14 +1987,14 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     increaseScore(SK_SyncInAsync);
   }
 
-  // A @concurrent function can be a subtype of a non-@concurrent function.
-  if (func1->isConcurrent() != func2->isConcurrent()) {
-    // Cannot add '@concurrent'.
-    if (func2->isConcurrent() || kind < ConstraintKind::Subtype) {
+  // A @Sendable function can be a subtype of a non-@Sendable function.
+  if (func1->isSendable() != func2->isSendable()) {
+    // Cannot add '@Sendable'.
+    if (func2->isSendable() || kind < ConstraintKind::Subtype) {
       if (!shouldAttemptFixes())
         return getTypeMatchFailure(locator);
 
-      auto *fix = AddConcurrentAttribute::create(
+      auto *fix = AddSendableAttribute::create(
           *this, func1, func2, getConstraintLocator(locator));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
@@ -8365,10 +8365,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     parameters.push_back(param);
   }
 
-  // Propagate @concurrent from the contextual type to the closure.
+  // Propagate @Sendable from the contextual type to the closure.
   auto closureExtInfo = inferredClosureType->getExtInfo();
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
-    if (contextualFnType->isConcurrent())
+    if (contextualFnType->isSendable())
       closureExtInfo = closureExtInfo.withConcurrent();
   }
 

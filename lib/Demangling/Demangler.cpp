@@ -1891,7 +1891,7 @@ NodePointer Demangler::demangleImplFunctionType() {
     type->addChild(createNode(Node::Kind::ImplFunctionAttribute, CoroAttr), *this);
 
   if (nextIf('h')) {
-    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@concurrent"),
+    type->addChild(createNode(Node::Kind::ImplFunctionAttribute, "@Sendable"),
                    *this);
   }
 

@@ -2536,24 +2536,28 @@ static bool usesFeatureActors(Decl *decl) {
 }
 
 static bool usesFeatureConcurrentFunctions(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureSendable(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    if (func->isConcurrent())
+    if (func->isSendable())
       return true;
   }
 
-  // Check for concurrent functions in the types of declarations.
+  // Check for sendable functions in the types of declarations.
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
-      bool hasConcurrent = type.findIf([](Type type) {
+      bool hasSendable = type.findIf([](Type type) {
         if (auto fnType = type->getAs<AnyFunctionType>()) {
-          if (fnType->isConcurrent())
+          if (fnType->isSendable())
             return true;
         }
 
         return false;
       });
 
-      if (hasConcurrent)
+      if (hasSendable)
         return true;
     }
   }
@@ -4591,9 +4595,9 @@ public:
       Printer << " ";
     }
 
-    if (!Options.excludeAttrKind(TAK_concurrent) &&
-        info.isConcurrent()) {
-      Printer << "@concurrent ";
+    if (!Options.excludeAttrKind(TAK_Sendable) &&
+        info.isSendable()) {
+      Printer << "@Sendable ";
     }
 
     SmallString<64> buf;
@@ -4733,8 +4737,8 @@ public:
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
     }
-    if (info.isConcurrent()) {
-      Printer.printSimpleAttr("@concurrent") << " ";
+    if (info.isSendable()) {
+      Printer.printSimpleAttr("@Sendable") << " ";
     }
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";

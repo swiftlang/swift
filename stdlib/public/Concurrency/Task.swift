@@ -392,7 +392,7 @@ extension Task {
   @discardableResult
   public static func runDetached<T>(
     priority: Priority = .default,
-    operation: @concurrent @escaping () async -> T
+    operation: @Sendable @escaping () async -> T
     // TODO: Allow inheriting task-locals?
   ) -> Handle<T, Never> {
     // Set up the job flags for a new task.
@@ -445,7 +445,7 @@ extension Task {
   @discardableResult
   public static func runDetached<T, Failure>(
     priority: Priority = .default,
-    operation: @concurrent @escaping () async throws -> T
+    operation: @Sendable @escaping () async throws -> T
   ) -> Handle<T, Failure> {
     // Set up the job flags for a new task.
     var flags = JobFlags()
@@ -466,7 +466,7 @@ extension Task {
 // ==== Async Handler ----------------------------------------------------------
 
 public func _runAsyncHandler(operation: @escaping () async -> ()) {
-  typealias ConcurrentFunctionType = @concurrent () async -> ()
+  typealias ConcurrentFunctionType = @Sendable () async -> ()
   Task.runDetached(
     operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)
   )
@@ -617,7 +617,7 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
     }
   }
 #else
-  @MainActor @concurrent
+  @MainActor @Sendable
   func _doMain(_ asyncFun: @escaping () async throws -> ()) async {
     do {
       try await asyncFun()
@@ -644,7 +644,7 @@ public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 
 public func _runChildTask<T>(
-  operation: @concurrent @escaping () async throws -> T
+  operation: @Sendable @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
   let currentTask = Builtin.getCurrentAsyncTask()
 

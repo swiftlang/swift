@@ -29,6 +29,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -640,6 +641,8 @@ namespace swift {
     /// Track which diagnostics should be ignored.
     llvm::BitVector ignoredDiagnostics;
 
+    friend class DiagnosticStateRAII;
+
   public:
     DiagnosticState();
 
@@ -740,6 +743,7 @@ namespace swift {
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
+    friend class DiagnosticStateRAII;
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
@@ -1051,6 +1055,33 @@ namespace swift {
     SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
     }
+  };
+
+  /// Remember details about the state of a diagnostic engine and restore them
+  /// when the object is destroyed.
+  ///
+  /// Diagnostic engines contain state about the most recent diagnostic emitted
+  /// which influences subsequent emissions; in particular, if you try to emit
+  /// a note and the previous diagnostic was ignored, the note will be ignored
+  /// too. This can be a problem in code structured like:
+  ///
+  ///     D->diagnose(diag::an_error);
+  ///     if (conditionWhichMightEmitDiagnostics())
+  ///        D->diagnose(diag::a_note); // might be affected by diagnostics from
+  ///                                   // conditionWhichMightEmitDiagnostics()!
+  ///
+  /// To prevent this, functions which are called for their return values but
+  /// may emit diagnostics as a side effect can use \c DiagnosticStateRAII to
+  /// ensure that their changes to diagnostic engine state don't leak out and
+  /// affect the caller's diagnostics.
+  class DiagnosticStateRAII {
+    llvm::SaveAndRestore<DiagnosticBehavior> previousBehavior;
+
+  public:
+    DiagnosticStateRAII(DiagnosticEngine &diags)
+      : previousBehavior(diags.state.previousBehavior) {}
+
+    ~DiagnosticStateRAII() {}
   };
 
   class BufferIndirectlyCausingDiagnosticRAII {

@@ -100,13 +100,15 @@ protected:
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
     ClangImporterOptions clangImpOpts;
+    SILOptions silOpts;
     auto ctx =
         ASTContext::get(langOpts, typeckOpts, searchPathOpts, clangImpOpts,
                         sourceMgr, diags);
 
     ctx->addModuleInterfaceChecker(
       std::make_unique<ModuleInterfaceCheckerImpl>(*ctx, cacheDir,
-        prebuiltCacheDir, ModuleInterfaceLoaderOptions()));
+        prebuiltCacheDir, ModuleInterfaceLoaderOptions(),
+        swift::RequireOSSAModules_t(silOpts)));
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, *static_cast<ModuleInterfaceCheckerImpl*>(

@@ -71,7 +71,6 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) returnToCaller;
   //   SwiftActor * __ptrauth(...) callerActor;
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
-  //   SwiftError **errorResult;
   // };
   struct AsyncContextLayout : StructLayout {
     struct ArgumentInfo {
@@ -84,53 +83,34 @@ namespace irgen {
     enum class FixedIndex : unsigned {
       Parent = 0,
       ResumeParent = 1,
-      ResumeParentExecutor = 2,
-      Flags = 3,
+      Flags = 2,
     };
     enum class FixedCount : unsigned {
       Parent = 1,
       ResumeParent = 1,
-      ResumeParentExecutor = 1,
-      Error = 1,
     };
-    IRGenModule &IGM;
     CanSILFunctionType originalType;
     CanSILFunctionType substitutedType;
     SubstitutionMap substitutionMap;
-    SILType errorType;
-    bool canHaveValidError;
   
     unsigned getParentIndex() { return (unsigned)FixedIndex::Parent; }
     unsigned getResumeParentIndex() {
       return (unsigned)FixedIndex::ResumeParent;
     }
-    unsigned getResumeParentExecutorIndex() {
-      return (unsigned)FixedIndex::ResumeParentExecutor;
-    }
     unsigned getFlagsIndex() { return (unsigned)FixedIndex::Flags; }
-    unsigned getErrorIndex() {
-      return getFlagsIndex() + 1;
-    }
 
   public:
     ElementLayout getParentLayout() { return getElement(getParentIndex()); }
     ElementLayout getResumeParentLayout() {
       return getElement(getResumeParentIndex());
     }
-    ElementLayout getResumeParentExecutorLayout() {
-      return getElement(getResumeParentExecutorIndex());
-    }
     ElementLayout getFlagsLayout() { return getElement(getFlagsIndex()); }
-    bool canHaveError() { return canHaveValidError; }
-    ElementLayout getErrorLayout() { return getElement(getErrorIndex()); }
-    unsigned getErrorCount() { return (unsigned)FixedCount::Error; }
-    SILType getErrorType() { return errorType; }
 
     AsyncContextLayout(
         IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
         ArrayRef<const TypeInfo *> fieldTypeInfos,
         CanSILFunctionType originalType, CanSILFunctionType substitutedType,
-        SubstitutionMap substitutionMap, SILType errorType, bool canHaveValidError);
+        SubstitutionMap substitutionMap);
   };
 
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,

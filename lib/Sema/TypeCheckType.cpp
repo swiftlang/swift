@@ -2211,7 +2211,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_differentiable, TAK_escaping, TAK_concurrent,
+    TAK_differentiable, TAK_escaping, TAK_Sendable,
     TAK_yield_once, TAK_yield_many, TAK_async
   };
 
@@ -2352,7 +2352,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
       auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
           rep, attrs.has(TAK_pseudogeneric), attrs.has(TAK_noescape),
-          attrs.has(TAK_concurrent), attrs.has(TAK_async), diffKind,
+          attrs.has(TAK_Sendable), attrs.has(TAK_async), diffKind,
           parsedClangFunctionType);
 
       ty =
@@ -2399,7 +2399,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
         }
       }
 
-      bool concurrent = attrs.has(TAK_concurrent);
+      bool concurrent = attrs.has(TAK_Sendable);
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
                                   concurrent, parsedClangFunctionType,

@@ -51,7 +51,7 @@ public typealias Codable = Encodable & Decodable
 //===----------------------------------------------------------------------===//
 
 /// A type that can be used as a key for encoding and decoding.
-public protocol CodingKey: ConcurrentValue,
+public protocol CodingKey: Sendable,
                            CustomStringConvertible,
                            CustomDebugStringConvertible {
   /// The string to use in a named collection (e.g. a string-keyed dictionary).
@@ -3134,7 +3134,7 @@ public protocol SingleValueDecodingContainer {
 //===----------------------------------------------------------------------===//
 
 /// A user-defined key for providing context during encoding and decoding.
-public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable, ConcurrentValue {
+public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable, Sendable {
   public typealias RawValue = String
 
   /// The key's string value.
@@ -3180,7 +3180,7 @@ public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable, Concurre
 /// An error that occurs during the encoding of a value.
 public enum EncodingError: Error {
   /// The context in which the error occurred.
-  public struct Context: ConcurrentValue {
+  public struct Context: Sendable {
     /// The path of coding keys taken to get to the point of the failing encode
     /// call.
     public let codingPath: [CodingKey]
@@ -3263,7 +3263,7 @@ public enum EncodingError: Error {
 /// An error that occurs during the decoding of a value.
 public enum DecodingError: Error {
   /// The context in which the error occurred.
-  public struct Context: ConcurrentValue {
+  public struct Context: Sendable {
     /// The path of coding keys taken to get to the point of the failing decode
     /// call.
     public let codingPath: [CodingKey]
@@ -3368,7 +3368,7 @@ public enum DecodingError: Error {
 
 // The following extensions allow for easier error construction.
 
-internal struct _GenericIndexKey: CodingKey, ConcurrentValue {
+internal struct _GenericIndexKey: CodingKey, Sendable {
     internal var stringValue: String
     internal var intValue: Int?
 

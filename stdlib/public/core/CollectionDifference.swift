@@ -421,8 +421,8 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
 extension CollectionDifference: Codable where ChangeElement: Codable {}
 
 @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
-extension CollectionDifference: ConcurrentValue where ChangeElement: ConcurrentValue { }
+extension CollectionDifference: Sendable where ChangeElement: Sendable { }
 @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
-extension CollectionDifference.Change: ConcurrentValue where ChangeElement: ConcurrentValue { }
+extension CollectionDifference.Change: Sendable where ChangeElement: Sendable { }
 @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
-extension CollectionDifference.Index: ConcurrentValue where ChangeElement: ConcurrentValue { }
+extension CollectionDifference.Index: Sendable where ChangeElement: Sendable { }
