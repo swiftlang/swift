@@ -48,7 +48,6 @@ _swift_complete()
       -enable-expand-all \
       -enable-experimental-linear-map-transposition \
       -enable-loop-arc \
-      -enable-mem-behavior-dump-all \
       -enable-rc-identity-arg-strip \
       -enable-sil-passmanager-verifier-analysis \
       -enable-trap-debug-info \
