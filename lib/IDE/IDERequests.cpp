@@ -59,11 +59,11 @@ class CursorInfoResolver : public SourceEntityWalker {
   SourceLoc LocToResolve;
   ResolvedCursorInfo CursorInfo;
   Type ContainerType;
-  llvm::SmallVector<Expr*, 4> TrailingExprStack;
+  Expr *OutermostCursorExpr;
 
 public:
   explicit CursorInfoResolver(SourceFile &SrcFile) :
-    SrcFile(SrcFile), CursorInfo(&SrcFile) {}
+    SrcFile(SrcFile), CursorInfo(&SrcFile), OutermostCursorExpr(nullptr) {}
   ResolvedCursorInfo resolve(SourceLoc Loc);
   SourceManager &getSourceMgr() const;
 private:
@@ -221,44 +221,51 @@ bool CursorInfoResolver::visitDeclReference(ValueDecl *D,
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
 
-bool CursorInfoResolver::walkToExprPre(Expr *E) {
-  if (!isDone()) {
-    if (auto SAE = dyn_cast<SelfApplyExpr>(E)) {
-      if (SAE->getFn()->getStartLoc() == LocToResolve) {
-        ContainerType = SAE->getBase()->getType();
-      }
-    } else if (auto ME = dyn_cast<MemberRefExpr>(E)) {
-      SourceLoc MemberLoc = ME->getNameLoc().getBaseNameLoc();
-      if (MemberLoc.isValid() && MemberLoc == LocToResolve) {
-        ContainerType = ME->getBase()->getType();
-      }
-    }
-    auto IsProperCursorLocation = E->getStartLoc() == LocToResolve;
-    // Handle cursor placement after `try` in ForceTry and OptionalTry Expr.
-    auto CheckLocation = [&IsProperCursorLocation, this](SourceLoc Loc) {
-      IsProperCursorLocation = Loc == LocToResolve || IsProperCursorLocation;
-    };
-    if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
-      CheckLocation(FTE->getExclaimLoc());
-    }
-    if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
-      CheckLocation(OTE->getQuestionLoc());
-    }
-    // Keep track of trailing expressions.
-    if (!E->isImplicit() && IsProperCursorLocation)
-      TrailingExprStack.push_back(E);
+static bool isCursorOn(Expr *E, SourceLoc Loc) {
+  if (E->isImplicit())
+    return false;
+
+  bool IsCursorOnLoc = E->getStartLoc() == Loc;
+  // Handle cursor placement after `try` in (ForceTry|OptionalTry)Expr
+  if (auto *FTE = dyn_cast<ForceTryExpr>(E)) {
+    IsCursorOnLoc |= FTE->getExclaimLoc() == Loc;
   }
+  if (auto *OTE = dyn_cast<OptionalTryExpr>(E)) {
+    IsCursorOnLoc |= OTE->getQuestionLoc() == Loc;
+  }
+  return IsCursorOnLoc;
+}
+
+bool CursorInfoResolver::walkToExprPre(Expr *E) {
+  if (isDone())
+    return true;
+
+  if (auto SAE = dyn_cast<SelfApplyExpr>(E)) {
+    if (SAE->getFn()->getStartLoc() == LocToResolve) {
+      ContainerType = SAE->getBase()->getType();
+    }
+  } else if (auto ME = dyn_cast<MemberRefExpr>(E)) {
+    SourceLoc MemberLoc = ME->getNameLoc().getBaseNameLoc();
+    if (MemberLoc.isValid() && MemberLoc == LocToResolve) {
+      ContainerType = ME->getBase()->getType();
+    }
+  }
+
+  if (!OutermostCursorExpr && isCursorOn(E, LocToResolve))
+    OutermostCursorExpr = E;
+
   return true;
 }
 
 bool CursorInfoResolver::walkToExprPost(Expr *E) {
   if (isDone())
     return false;
-  if (!TrailingExprStack.empty() && TrailingExprStack.back() == E) {
-    // We return the outtermost expression in the token info.
-    CursorInfo.setTrailingExpr(TrailingExprStack.front());
+
+  if (OutermostCursorExpr && isCursorOn(E, LocToResolve)) {
+    CursorInfo.setTrailingExpr(OutermostCursorExpr);
     return false;
   }
+
   return true;
 }
 

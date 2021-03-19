@@ -621,6 +621,23 @@ ClangNode extensionGetClangNode(const ExtensionDecl *ext);
 /// or a curry thunk, etc.
 std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr);
 
+/// Whether the last expression in \p ExprStack is being called.
+bool isBeingCalled(ArrayRef<Expr*> ExprStack);
+
+/// The base of the last expression in \p ExprStack (which may look up the
+/// stack in eg. the case of a `DotSyntaxCallExpr`).
+Expr *getBase(ArrayRef<Expr *> ExprStack);
+
+/// Assuming that we have a call, returns whether or not it is "dynamic" based
+/// on its base expression and decl of the callee. Note that this is not
+/// Swift's "dynamic" modifier (`ValueDecl::isDynamic`), but rathar "can call a
+/// function in a conformance/subclass".
+bool isDynamicCall(Expr *Base, ValueDecl *D);
+
+/// Adds the resolved nominal types of \p Base to \p Types.
+void getReceiverType(Expr *Base,
+                     SmallVectorImpl<NominalTypeDecl *> &Types);
+
 } // namespace ide
 } // namespace swift
 
