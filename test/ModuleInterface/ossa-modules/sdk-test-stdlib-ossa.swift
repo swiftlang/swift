@@ -10,10 +10,10 @@
 // RUN: %empty-directory(%t/TempModuleCacheLibrary)
 // RUN: %empty-directory(%t/TempModuleCacheBuilder)
 // RUN: %empty-directory(%t/TempModuleCacheOther)
-// RUN: %empty-directory(%t/SDK/usr/lib/swift/Swift.swiftmodule)
+// RUN: %empty-directory(%t/SDK/usr/lib/swift/%relative-platform-module-dir-prefix/Swift.swiftmodule)
 // RUN: %empty-directory(%t/PreBuiltSDKModules)
 
-// RUN: %target-swift-frontend -c -emit-module-interface-path %t/SDK/usr/lib/swift/Swift.swiftmodule/%target-swiftinterface-name -emit-module-path %t/SDK/usr/lib/swift/Swift.swiftmodule/%target-swiftmodule-name -o %t/Swift.o -parse-stdlib -module-name Swift -enable-library-evolution -module-cache-path %t/TempModuleCacheLibrary -swift-version 5 %s -disable-objc-interop -enable-ossa-modules
+// RUN: %target-swift-frontend -c -emit-module-interface-path %t/SDK/usr/lib/swift/%relative-platform-module-dir-prefix/Swift.swiftmodule/%target-swiftinterface-name -emit-module-path %t/SDK/usr/lib/swift/%relative-platform-module-dir-prefix/Swift.swiftmodule/%target-swiftmodule-name -o %t/Swift.o -parse-stdlib -module-name Swift -enable-library-evolution -module-cache-path %t/TempModuleCacheLibrary -swift-version 5 %s -disable-objc-interop -enable-ossa-modules
 
 // RUN: %swift_build_sdk_interfaces_base -o %t/PreBuiltSDKModules -j 1 -sdk %t/SDK -module-cache-path %t/TempModuleCacheBuilder %t/SDK -v
 
