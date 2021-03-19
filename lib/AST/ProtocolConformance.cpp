@@ -482,56 +482,47 @@ ProtocolConformanceRef::getConditionalRequirements() const {
     return {};
 }
 
-void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
-    const {
-  switch (CRState) {
-  case ConditionalRequirementsState::Complete:
-    // already done!
-    return;
-  case ConditionalRequirementsState::Computing:
-    // recursive
-    return;
-  case ConditionalRequirementsState::Uncomputed:
-    // try to compute it!
-    break;
-  };
+Optional<ArrayRef<Requirement>>
+NormalProtocolConformance::getConditionalRequirementsIfAvailable() const {
+  const auto &eval = getDeclContext()->getASTContext().evaluator;
+  if (eval.hasActiveRequest(ConditionalRequirementsRequest{
+          const_cast<NormalProtocolConformance *>(this)})) {
+    return None;
+  }
+  return getConditionalRequirements();
+}
 
-  CRState = ConditionalRequirementsState::Computing;
-  auto success = [this](ArrayRef<Requirement> reqs = {}) {
-    ConditionalRequirements = reqs;
-    assert(CRState == ConditionalRequirementsState::Computing);
-    CRState = ConditionalRequirementsState::Complete;
-  };
-  auto failure = [this] {
-    assert(CRState == ConditionalRequirementsState::Computing);
-    CRState = ConditionalRequirementsState::Uncomputed;
-  };
-
-  // A non-extension conformance won't have conditional requirements.
+llvm::ArrayRef<Requirement>
+NormalProtocolConformance::getConditionalRequirements() const {
   const auto ext = dyn_cast<ExtensionDecl>(getDeclContext());
+  if (ext && ext->isComputingGenericSignature()) {
+    return {};
+  }
+  return evaluateOrDefault(getProtocol()->getASTContext().evaluator,
+                           ConditionalRequirementsRequest{
+                               const_cast<NormalProtocolConformance *>(this)},
+                           {});
+}
+
+llvm::ArrayRef<Requirement>
+ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
+                                         NormalProtocolConformance *NPC) const {
+  // A non-extension conformance won't have conditional requirements.
+  const auto ext = dyn_cast<ExtensionDecl>(NPC->getDeclContext());
   if (!ext) {
-    return success();
+    return {};
   }
 
   // If the extension is invalid, it won't ever get a signature, so we
   // "succeed" with an empty result instead.
   if (ext->isInvalid()) {
-    return success();
+    return {};
   }
 
   // A non-generic type won't have conditional requirements.
   const auto typeSig = ext->getExtendedNominal()->getGenericSignature();
   if (!typeSig) {
-    return success();
-  }
-
-  // Recursively validating the signature comes up frequently as expanding
-  // conformance requirements might re-enter this method.  We can at least catch
-  // this and come back to these requirements later.
-  //
-  // FIXME: In the long run, break this cycle in a more principled way.
-  if (ext->isComputingGenericSignature()) {
-    return failure();
+    return {};
   }
 
   const auto extensionSig = ext->getGenericSignature();
@@ -548,9 +539,9 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
   // type, these are the ones that make the conformance conditional.
   const auto unsatReqs = extensionSig->requirementsNotSatisfiedBy(typeSig);
   if (unsatReqs.empty())
-    return success();
+    return {};
 
-  return success(getProtocol()->getASTContext().AllocateCopy(unsatReqs));
+  return NPC->getProtocol()->getASTContext().AllocateCopy(unsatReqs);
 }
 
 void NormalProtocolConformance::setSignatureConformances(

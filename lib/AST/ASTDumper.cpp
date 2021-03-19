@@ -3279,8 +3279,7 @@ static void dumpProtocolConformanceRec(
       }
     }
 
-    if (auto condReqs = normal->getConditionalRequirementsIfAvailableOrCached(
-            /*computeIfPossible=*/false)) {
+    if (auto condReqs = normal->getConditionalRequirementsIfAvailable()) {
       for (auto requirement : *condReqs) {
         out << '\n';
         out.indent(indent + 2);
