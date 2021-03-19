@@ -1039,6 +1039,8 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic) {
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
           TrackingPrinter printer(entries, out, bufferAccessLevel);
+          llvm::SaveAndRestore<bool> isPrettyPrinting(
+              IsPrettyPrintingDecl, true);
           ppDecl->print(
               printer,
               PrintOptions::printForDiagnostics(

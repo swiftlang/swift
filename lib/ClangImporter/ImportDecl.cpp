@@ -3985,18 +3985,15 @@ namespace {
 
         if (dc->getSelfProtocolDecl() && !selfIdx) {
           // FIXME: source location...
-          Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
-                                           /*isInit=*/false);
-          Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
-                                           decl->getName());
+          Impl.diagnose({}, diag::swift_name_protocol_static, /*isInit=*/false);
+          Impl.diagnose({}, diag::note_while_importing, decl->getName());
           return nullptr;
         }
 
         if (!decl->hasPrototype()) {
           // FIXME: source location...
-          Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_no_prototype);
-          Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
-                                           decl->getName());
+          Impl.diagnose({}, diag::swift_name_no_prototype);
+          Impl.diagnose({}, diag::note_while_importing, decl->getName());
           return nullptr;
         }
 
@@ -6302,10 +6299,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   // Check for some invalid imports
   if (dc->getSelfProtocolDecl()) {
     // FIXME: clang source location
-    Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
-                                     /*isInit=*/true);
-    Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
-                                     decl->getName());
+    Impl.diagnose({}, diag::swift_name_protocol_static, /*isInit=*/true);
+    Impl.diagnose({}, diag::note_while_importing, decl->getName());
     return nullptr;
   }
 
@@ -8217,9 +8212,8 @@ void ClangImporter::Implementation::importAttributes(
           getBufferImporterForDiagnostics();
         SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
           clangSrcMgr, swiftAttr->getLocation());
-        SwiftContext.Diags.diagnose(
-              attrLoc, diag::clang_swift_attr_without_at,
-              swiftAttr->getAttribute());
+        diagnose(attrLoc, diag::clang_swift_attr_without_at,
+                 swiftAttr->getAttribute());
       }
       continue;
     }
