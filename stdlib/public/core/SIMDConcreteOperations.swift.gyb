@@ -129,21 +129,36 @@ extension SIMD${n} where Scalar == ${Scalar} {
     
   /// The wrapping sum of two vectors.
   @_alwaysEmitIntoClient
-  public static func &+(a: Self, b: Self) -> Self{
+  public static func &+(a: Self, b: Self) -> Self {
     Self(Builtin.add_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The wrapping difference of two vectors.
   @_alwaysEmitIntoClient
-  public static func &-(a: Self, b: Self) -> Self{
+  public static func &-(a: Self, b: Self) -> Self {
     Self(Builtin.sub_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The pointwise wrapping product of two vectors.
   @_alwaysEmitIntoClient
-  public static func &*(a: Self, b: Self) -> Self{
+  public static func &*(a: Self, b: Self) -> Self {
     Self(Builtin.mul_${Builtin}(a._storage._value, b._storage._value))
   }
+        
+  /// Updates the left hand side with the wrapping sum of the two
+  /// vectors.
+  @_alwaysEmitIntoClient
+  public static func &+=(a: inout Self, b: Self) { a = a &+ b }
+    
+  /// Updates the left hand side with the wrapping difference of the two
+  /// vectors.
+  @_alwaysEmitIntoClient
+  public static func &-=(a: inout Self, b: Self) { a = a &- b }
+    
+  /// Updates the left hand side with the pointwise wrapping product of two
+  /// vectors.
+  @_alwaysEmitIntoClient
+  public static func &*=(a: inout Self, b: Self) { a = a &* b }
 }
 
 % end
