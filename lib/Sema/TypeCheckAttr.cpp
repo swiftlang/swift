@@ -282,6 +282,8 @@ public:
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
   void visitCompletionHandlerAsyncAttr(CompletionHandlerAsyncAttr *attr);
+  
+  void visitRequiresSuperAttr(RequiresSuperAttr *attr);
 };
 } // end anonymous namespace
 
@@ -5760,5 +5762,35 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
       return;
     }
     attr->AsyncFunctionDecl = candidates.front();
+  }
+}
+
+void AttributeChecker::visitRequiresSuperAttr(RequiresSuperAttr *attr) {
+  auto *AFD = cast<AbstractFunctionDecl>(D);
+  auto &DE = AFD->getASTContext().Diags;
+
+  if (attr->isInvalid()) {
+    // We have probably already emitted a diagnostic elsewhere, so skip
+    // further checks as the attribute is not placed correctly or has
+    // other issues.
+    return;
+  }
+
+  if (AFD->getDeclContext()->getSelfClassDecl()) {
+    // '@requiresSuper' cannot be applied to 'final' methods as they can't be
+    // overridden.
+    if (AFD->isFinal()) {
+      DE.diagnose(attr->getLocation(),
+                  diag::requires_super_attr_not_valid_final_method)
+          .fixItRemove(attr->getRangeWithAt());
+      AFD->getAttrs().removeAttribute(attr);
+      attr->setInvalid();
+    }
+  } else {
+    // '@requiresSuper' can only be applied on methods inside classes.
+    DE.diagnose(attr->getLocation(),
+                diag::requires_super_attr_only_valid_on_class_method);
+    AFD->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
   }
 }

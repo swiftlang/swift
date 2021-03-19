@@ -2651,6 +2651,17 @@ ERROR(override_method_different_generic_sig,none,
       "base method's generic signature %2; expected generic signature to be %3",
       (DeclBaseName, StringRef, StringRef, StringRef))
 
+ERROR(requires_super_attr_not_valid_final_method, none, 
+      "'@requiresSuper' cannot be applied to final method", ())
+ERROR(requires_super_attr_only_valid_on_class_method, none, 
+      "'@requiresSuper' can only be applied on non-final class methods", ())
+ERROR(requires_super_call_override, none, 
+      "method override is missing 'super.%0' call%select{|: %1}2", 
+      (StringRef, StringRef, bool))
+WARNING(requires_super_call_override_warn, none, 
+        "method override is missing 'super.%0' call%select{|: %1}2", 
+        (StringRef, StringRef, bool))
+
 // Inheritance
 ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))

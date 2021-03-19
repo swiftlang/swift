@@ -4520,6 +4520,17 @@ namespace {
       addObjCAttribute(decl, ObjCSelector(Impl.SwiftContext, 0, name));
     }
 
+    /// Add a @requiresSuper attribute to the Swift declaration, if the imported
+    /// Clang decl is annotated with 'objc_requires_super'.
+    void addRequiresSuperAttributeIfNeeded(const clang::Decl *clangDecl,
+                                           Decl *swiftDecl) {
+      // Set whether this method requires its overrides to call super.
+      if (clangDecl->hasAttr<clang::ObjCRequiresSuperAttr>()) {
+        swiftDecl->getAttrs().add(new (Impl.SwiftContext)
+                                      RequiresSuperAttr(/*IsImplicit=*/true));
+      }
+    }
+
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
       auto dc = Impl.importDeclContextOf(decl, decl->getDeclContext());
       if (!dc)
@@ -4530,7 +4541,9 @@ namespace {
       if (auto Known = Impl.importDeclCached(decl, getVersion()))
         return Known;
 
-      return importObjCMethodDecl(decl, dc, None);
+      auto swiftDecl = importObjCMethodDecl(decl, dc, None);
+      addRequiresSuperAttributeIfNeeded(decl, swiftDecl);
+      return swiftDecl;
     }
 
     /// Check whether we have already imported a method with the given

@@ -1609,6 +1609,16 @@ namespace  {
         .fixItInsert(Base->getAttributeInsertionLoc(false),
                      "@objc ");
     }
+
+    void visitRequiresSuperAttr(RequiresSuperAttr *attr) {
+      // Add the @requiresSuper attribute to the override, unless it's final.
+      auto &C = Override->getASTContext();
+      auto attrs = Override->getAttrs();
+      if (!attrs.hasAttribute<RequiresSuperAttr>() && !Override->isFinal()) {
+        Override->getAttrs().add(new (C)
+                                     RequiresSuperAttr(attr->Message, false));
+      }
+    }
   };
 } // end anonymous namespace
 
