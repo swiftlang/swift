@@ -744,6 +744,7 @@ void swift::swift_task_asyncMainDrainQueue() {
     abort();
 
   pfndispatch_main();
+  exit(0);
 #else
   // CFRunLoop is not available on non-Darwin targets.  Foundation has an
   // implementation, but CoreFoundation is not meant to be exposed.  We can only
@@ -752,8 +753,10 @@ void swift::swift_task_asyncMainDrainQueue() {
 #if defined(__APPLE__)
   auto runLoop =
       reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
-  if (runLoop)
-    return runLoop();
+  if (runLoop) {
+    runLoop();
+    exit(0);
+  }
 #endif
 
     dispatch_main();
