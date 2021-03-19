@@ -2669,7 +2669,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
     if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
-      return inferredIsolation(*witnessedIsolation);
+      if (auto inferred = inferredIsolation(*witnessedIsolation))
+        return inferred;
     }
 
     // If the declaration is a class with a superclass that has specified
@@ -2688,7 +2689,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
             superclassIsolation = superclassIsolation.subst(subs);
           }
 
-          return inferredIsolation(superclassIsolation);
+          if (auto inferred = inferredIsolation(superclassIsolation))
+            return inferred;
         }
       }
     }
