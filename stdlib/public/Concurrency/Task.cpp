@@ -427,7 +427,6 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
   initialContext->Parent = nullptr;
   initialContext->ResumeParent = reinterpret_cast<TaskContinuationFunction *>(
       closureContext ? &completeTaskWithClosure : &completeTask);
-  initialContext->ResumeParentExecutor = ExecutorRef::generic();
   initialContext->Flags = AsyncContextKind::Ordinary;
   initialContext->Flags.setShouldNotDeallocateInCallee(true);
 

@@ -483,10 +483,6 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_resume
     ResumeParent;
 
-  /// The executor that the parent needs to be resumed on.
-  /// FIXME: remove this
-  ExecutorRef ResumeParentExecutor;
-
   /// Flags describing this context.
   ///
   /// Note that this field is only 32 bits; any alignment padding
@@ -499,7 +495,6 @@ public:
                TaskContinuationFunction *resumeParent,
                AsyncContext *parent)
     : Parent(parent), ResumeParent(resumeParent),
-      ResumeParentExecutor(ExecutorRef::generic()),
       Flags(flags) {}
 
   AsyncContext(const AsyncContext &) = delete;

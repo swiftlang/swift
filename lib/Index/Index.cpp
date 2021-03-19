@@ -1348,12 +1348,11 @@ static bool isSuperRefExpr(Expr *E) {
 }
 
 static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
-  // The call is 'dynamic' if the method is not of a struct/enum and the
-  // receiver is not 'super'. Note that if the receiver is 'super' that
-  // does not mean that the call is statically determined (an extension
-  // method may have injected itself in the super hierarchy).
-  // For our purposes 'dynamic' means that the method call cannot invoke
-  // a method in a subclass.
+  // "dynamic" here is not Swift's "dynamic" modifier, but rathar "can call a
+  // function in a conformance/subclass". Eg. if the receiver is "super", an
+  // extension may have injected itself in the parent hierarchy - this call
+  // would not be "dynamic" for our purposes (though would be Swift's
+  // "dynamic"), but it is also not statically determined.
   auto TyD = getNominalParent(D);
   if (!TyD)
     return false;
@@ -1361,8 +1360,21 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
     return false;
   if (isSuperRefExpr(BaseE))
     return false;
-  if (BaseE->getType()->is<MetatypeType>())
+  // `SomeType.staticOrClassMethod()`
+  if (isa<TypeExpr>(BaseE))
     return false;
+
+  // `type(of: foo).staticOrClassMethod()`, not "dynamic" if the instance type
+  // is a struct/enum or if it is a class and the function is a static method
+  // (rather than a class method).
+  if (auto IT = BaseE->getType()->getAs<MetatypeType>()) {
+    auto InstanceType = IT->getInstanceType();
+    if (InstanceType->getStructOrBoundGenericStruct() ||
+        InstanceType->getEnumOrBoundGenericEnum())
+      return false;
+    if (InstanceType->getClassOrBoundGenericClass() && D->isFinal())
+      return false;
+  }
 
   return true;
 }
@@ -1431,17 +1443,22 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
   if (!BaseE || BaseE == CurrentE)
     return false;
 
+  if (isDynamicCall(BaseE, D))
+    Info.roles |= (unsigned)SymbolRole::Dynamic;
+
   if (Type ReceiverTy = BaseE->getType()) {
     if (auto LVT = ReceiverTy->getAs<LValueType>())
       ReceiverTy = LVT->getObjectType();
     else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
       ReceiverTy = MetaT->getInstanceType();
 
+    // TODO: Handle generics and composed protocols
+    if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>())
+      ReceiverTy = OpenedTy->getOpenedExistentialType();
+
     if (auto TyD = ReceiverTy->getAnyNominal()) {
       if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy, TyD))
         return true;
-      if (isDynamicCall(BaseE, D))
-        Info.roles |= (unsigned)SymbolRole::Dynamic;
     }
   }
 

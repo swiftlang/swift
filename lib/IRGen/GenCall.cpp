@@ -114,13 +114,6 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
     valTypes.push_back(ty);
     typeInfos.push_back(&ti);
   };
-  auto addExecutor = [&]() {
-    auto ty = SILType();
-    auto &ti = IGM.getSwiftExecutorPtrTypeInfo();
-    valTypes.push_back(ty);
-    typeInfos.push_back(&ti);
-  };
-
   // AsyncContext * __ptrauth_swift_async_context_parent Parent;
   {
     auto ty = SILType();
@@ -132,9 +125,6 @@ irgen::getAsyncContextLayout(IRGenModule &IGM, CanSILFunctionType originalType,
   // TaskContinuationFunction * __ptrauth_swift_async_context_resume
   //     ResumeParent;
   addTaskContinuationFunction();
-
-  // ExecutorRef ResumeParentExecutor;
-  addExecutor();
 
   // AsyncContextFlags Flags;
   {

@@ -133,7 +133,7 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
 
 void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
   assert(func);
-  if (!isa<DestructorDecl>(func)) {
+  if (!isa<DestructorDecl>(func) && !isa<AccessorDecl>(func)) {
     auto note =
         func->diagnose(diag::note_add_async_to_function, func->getName());
 
@@ -143,8 +143,7 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
                         : "async throws";
 
       note.fixItReplace(SourceRange(func->getThrowsLoc()), replacement);
-
-    } else {
+    } else if (func->getParameters()->getRParenLoc().isValid()) {
       note.fixItInsert(func->getParameters()->getRParenLoc().getAdvancedLoc(1),
                        " async");
     }

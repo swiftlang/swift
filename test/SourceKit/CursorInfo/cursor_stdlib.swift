@@ -30,6 +30,7 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-OVERLAY:      source.lang.swift.ref.var.global
 // CHECK-OVERLAY-NEXT: NSUTF8StringEncoding
 // CHECK-OVERLAY-NEXT: s:10Foundation20NSUTF8StringEncodingSuv
+// CHECK-OVERLAY-NEXT: source.lang.swift
 // CHECK-OVERLAY-NEXT: UInt
 // CHECK-OVERLAY-NEXT: $sSuD
 // CHECK-OVERLAY-NEXT: Foundation
