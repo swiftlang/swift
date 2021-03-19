@@ -47,31 +47,31 @@ public let SIMDReduceInteger = [
     name: "SIMDReduce.Int8",
     runFunction: run_SIMDReduceInt8x1,
     tags: [.validation, .SIMD],
-    setUpFunction: { blackHole(int32Data) }
+    setUpFunction: { blackHole(int8Data) }
   ),
   BenchmarkInfo(
     name: "SIMDReduce.Int8x16.Initializer",
     runFunction: run_SIMDReduceInt8x16_init,
     tags: [.validation, .SIMD],
-    setUpFunction: { blackHole(int32Data) }
+    setUpFunction: { blackHole(int8Data) }
   ),
   BenchmarkInfo(
     name: "SIMDReduce.Int8x16.Cast",
     runFunction: run_SIMDReduceInt8x16_cast,
     tags: [.validation, .SIMD],
-    setUpFunction: { blackHole(int32Data) }
+    setUpFunction: { blackHole(int8Data) }
   ),
   BenchmarkInfo(
     name: "SIMDReduce.Int8x64.Initializer",
     runFunction: run_SIMDReduceInt8x64_init,
     tags: [.validation, .SIMD],
-    setUpFunction: { blackHole(int32Data) }
+    setUpFunction: { blackHole(int8Data) }
   ),
   BenchmarkInfo(
     name: "SIMDReduce.Int8x64.Cast",
     runFunction: run_SIMDReduceInt8x64_cast,
     tags: [.validation, .SIMD],
-    setUpFunction: { blackHole(int32Data) }
+    setUpFunction: { blackHole(int8Data) }
   )
 ]
 
