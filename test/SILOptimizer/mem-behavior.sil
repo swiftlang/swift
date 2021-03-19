@@ -491,23 +491,23 @@ bb0(%0 : @owned $Parent, %1 : $*Builtin.Int32):
 // CHECK: PAIR #8.
 // CHECK-NEXT:    %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
 // CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
-// CHECK-NEXT:  r=0,w=1
+// CHECK-NEXT:  r=1,w=1
 // CHECK: PAIR #9.
 // CHECK-NEXT:    %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
 // CHECK-NEXT:    %{{.*}} = begin_access [read] [static] %0 : $*Builtin.Int32
-// CHECK-NEXT:  r=0,w=1
+// CHECK-NEXT:  r=1,w=1
 // CHECK: PAIR #13.
 // CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
 // CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
-// CHECK-NEXT:  r=0,w=1
+// CHECK-NEXT:  r=1,w=1
 // CHECK: PAIR #14.
 // CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
 // CHECK-NEXT:    %{{.*}} = begin_access [read] [static] %0 : $*Builtin.Int32
-// CHECK-NEXT:  r=0,w=1
+// CHECK-NEXT:  r=1,w=1
 // CHECK: PAIR #15.
 // CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
 // CHECK-NEXT:    %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
-// CHECK-NEXT:  r=0,w=1
+// CHECK-NEXT:  r=1,w=1
 sil [ossa] @testReadWriteAccess : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $*Builtin.Int32):
   %read = begin_access [read] [static] %0 : $*Builtin.Int32
@@ -518,6 +518,42 @@ bb0(%0 : $*Builtin.Int32):
   store %three to [trivial] %write : $*Builtin.Int32
   end_access %write : $*Builtin.Int32
   return %val : $Builtin.Int32
+}
+
+// CHECK-LABEL: @testDeinitAccess
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %1 = begin_access [deinit] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:     %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:    end_access %1 : $*Builtin.Int32
+// CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @testDeinitAccess : $@convention(thin) (@in Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = begin_access [deinit] [static] %0 : $*Builtin.Int32
+  end_access %1 : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @testInitAccess
+// CHECK: PAIR #0.
+// CHECK-NEXT:     %{{.*}} = begin_access [init] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:     %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=0,w=1
+// CHECK: PAIR #3.
+// CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:  r=0,w=1
+sil [ossa] @testInitAccess : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  %init = begin_access [init] [static] %0 : $*Builtin.Int32
+  store %1 to [trivial] %init : $*Builtin.Int32
+  end_access %init : $*Builtin.Int32
+  %val = load [trivial] %0 : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: @testLoadTake
@@ -572,7 +608,7 @@ struct Int64Wrapper {
 // CHECK: PAIR #2.
 // CHECK:     %1 = begin_access [modify] [static] %0 : $*Int64Wrapper // users: %7, %2
 // CHECK:     %3 = begin_access [read] [static] %2 : $*Int64  // users: %6, %4
-// CHECK:   r=0,w=1
+// CHECK:   r=1,w=1
 // CHECK: PAIR #3.
 sil @testNestedAccessWithInterposedProjection : $@convention(thin) (@inout Int64Wrapper) -> () {
 bb0(%0 : $*Int64Wrapper):

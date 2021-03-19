@@ -136,37 +136,38 @@ public:
   }
 
   MemBehavior visitBeginAccessInst(BeginAccessInst *beginAccess) {
+    if (!mayAlias(beginAccess->getSource()))
+      return MemBehavior::None;
+
+    // begin_access does not physically read or write memory. But we model it
+    // as a memory read and/or write to prevent optimizations to move other
+    // aliased loads/stores across begin_access into the access scope.
     switch (beginAccess->getAccessKind()) {
     case SILAccessKind::Deinit:
-      // A [deinit] only directly reads from the object. The fact that it frees
-      // memory is modeled more precisely by the release operations within the
-      // deinit scope. Therefore, handle it like a [read] here...
-      LLVM_FALLTHROUGH;
+      // For the same reason we treat a ``load [take]`` or a ``destroy_addr``
+      // as a memory write, we do that for a ``begin_access [deinit]`` as well.
+      // See SILInstruction::MemoryBehavior.
+      return MemBehavior::MayReadWrite;
     case SILAccessKind::Read:
-      if (!mayAlias(beginAccess->getSource()))
-        return MemBehavior::None;
-
       return MemBehavior::MayRead;
-
     case SILAccessKind::Modify:
       if (isLetValue()) {
         assert(getAccessBase(beginAccess) != getValueAddress()
                && "let modification not allowed");
         return MemBehavior::None;
       }
-      // [modify] has a special case for ignoring 'let's, but otherwise is
-      // identical to an [init]...
-      LLVM_FALLTHROUGH;
+      return MemBehavior::MayReadWrite;
     case SILAccessKind::Init:
-      if (!mayAlias(beginAccess->getSource()))
-        return MemBehavior::None;
-
       return MemBehavior::MayWrite;
     }
     llvm_unreachable("invalid access kind");
   }
 
   MemBehavior visitEndAccessInst(EndAccessInst *endAccess) {
+    // end_access does not physically read or write memory. But, similar to
+    // begin_access, we model it as a memory read and/or write to prevent
+    // optimizations to move other aliased loads/stores across end_access into
+    // the access scope.
     return visitBeginAccessInst(endAccess->getBeginAccess());
   }
 
