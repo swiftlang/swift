@@ -4,7 +4,7 @@
 class NotConcurrent { }
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on actor operations
+// Sendable restriction on actor operations
 // ----------------------------------------------------------------------
 
 actor A1 {
@@ -27,7 +27,7 @@ func testActorCreation(value: NotConcurrent) {
 
 extension A1 {
   func testIsolation(other: A1) async {
-    // All within the same actor domain, so the ConcurrentValue restriction
+    // All within the same actor domain, so the Sendable restriction
     // does not apply.
     _ = localLet
     _ = synchronous()
@@ -36,7 +36,7 @@ extension A1 {
     _ = self.synchronous()
     _ = await self.asynchronous(nil)
 
-    // Across to a different actor, so ConcurrentValue restriction is enforced.
+    // Across to a different actor, so Sendable restriction is enforced.
     _ = other.localLet // expected-warning{{cannot use property 'localLet' with a non-concurrent-value type 'NotConcurrent' across actors}}
     _ = await other.synchronous() // expected-warning{{cannot call function returning non-concurrent-value type 'NotConcurrent?' across actors}}
     _ = await other.asynchronous(nil) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
@@ -44,7 +44,7 @@ extension A1 {
 }
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on global actor operations
+// Sendable restriction on global actor operations
 // ----------------------------------------------------------------------
 actor TestActor {}
 
@@ -103,7 +103,7 @@ func someGlobalTest(nc: NotConcurrent) {
 }
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on captures.
+// Sendable restriction on captures.
 // ----------------------------------------------------------------------
 func acceptNonConcurrent(_: () -> Void) { }
 func acceptConcurrent(_: @concurrent () -> Void) { }
@@ -123,7 +123,7 @@ func testConcurrency() {
 }
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on key paths.
+// Sendable restriction on key paths.
 // ----------------------------------------------------------------------
 class NC: Hashable {
   func hash(into: inout Hasher) { }
@@ -140,7 +140,7 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
 
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on conformances.
+// Sendable restriction on conformances.
 // ----------------------------------------------------------------------
 protocol AsyncProto {
   func asyncMethod(_: NotConcurrent) async
@@ -161,22 +161,22 @@ class SomeClass: MainActorProto {
 }
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on concurrent functions.
+// Sendable restriction on concurrent functions.
 // ----------------------------------------------------------------------
 
 @concurrent func concurrentFunc() -> NotConcurrent? { nil }
 
 // ----------------------------------------------------------------------
-// No ConcurrentValue restriction on @concurrent function types.
+// No Sendable restriction on @concurrent function types.
 // ----------------------------------------------------------------------
 typealias CF = @concurrent () -> NotConcurrent?
 typealias BadGenericCF<T> = @concurrent () -> T?
-typealias GoodGenericCF<T: ConcurrentValue> = @concurrent () -> T? // okay
+typealias GoodGenericCF<T: Sendable> = @concurrent () -> T? // okay
 
 var concurrentFuncVar: (@concurrent (NotConcurrent) -> Void)? = nil
 
 // ----------------------------------------------------------------------
-// ConcurrentValue restriction on @concurrent closures.
+// Sendable restriction on @concurrent closures.
 // ----------------------------------------------------------------------
 func acceptConcurrentUnary<T>(_: @concurrent (T) -> T) { }
 
@@ -188,14 +188,14 @@ func concurrentClosures<T>(_: T) {
 }
 
 // ----------------------------------------------------------------------
-// ConcurrentValue checking
+// Sendable checking
 // ----------------------------------------------------------------------
-struct S1: ConcurrentValue {
-  var nc: NotConcurrent // expected-error{{stored property 'nc' of 'ConcurrentValue'-conforming struct 'S1' has non-concurrent-value type 'NotConcurrent'}}
+struct S1: Sendable {
+  var nc: NotConcurrent // expected-error{{stored property 'nc' of 'Sendable'-conforming struct 'S1' has non-concurrent-value type 'NotConcurrent'}}
 }
 
-struct S2<T>: ConcurrentValue {
-  var nc: T // expected-error{{stored property 'nc' of 'ConcurrentValue'-conforming generic struct 'S2' has non-concurrent-value type 'T'}}
+struct S2<T>: Sendable {
+  var nc: T // expected-error{{stored property 'nc' of 'Sendable'-conforming generic struct 'S2' has non-concurrent-value type 'T'}}
 }
 
 struct S3<T> {
@@ -203,35 +203,35 @@ struct S3<T> {
   var array: [T]
 }
 
-extension S3: ConcurrentValue where T: ConcurrentValue { }
+extension S3: Sendable where T: Sendable { }
 
-enum E1: ConcurrentValue {
-  case payload(NotConcurrent) // expected-error{{associated value 'payload' of 'ConcurrentValue'-conforming enum 'E1' has non-concurrent-value type 'NotConcurrent'}}
+enum E1: Sendable {
+  case payload(NotConcurrent) // expected-error{{associated value 'payload' of 'Sendable'-conforming enum 'E1' has non-concurrent-value type 'NotConcurrent'}}
 }
 
 enum E2<T> {
   case payload(T)
 }
 
-extension E2: ConcurrentValue where T: ConcurrentValue { }
+extension E2: Sendable where T: Sendable { }
 
-final class C1: ConcurrentValue {
-  let nc: NotConcurrent? = nil // expected-error{{stored property 'nc' of 'ConcurrentValue'-conforming class 'C1' has non-concurrent-value type 'NotConcurrent?'}}
-  var x: Int = 0 // expected-error{{stored property 'x' of 'ConcurrentValue'-conforming class 'C1' is mutable}}
+final class C1: Sendable {
+  let nc: NotConcurrent? = nil // expected-error{{stored property 'nc' of 'Sendable'-conforming class 'C1' has non-concurrent-value type 'NotConcurrent?'}}
+  var x: Int = 0 // expected-error{{stored property 'x' of 'Sendable'-conforming class 'C1' is mutable}}
   let i: Int = 0
 }
 
-final class C2: ConcurrentValue {
+final class C2: Sendable {
   let x: Int = 0
 }
 
 class C3 { }
 
-class C4: C3, UnsafeConcurrentValue {
+class C4: C3, UnsafeSendable {
   var y: Int = 0 // okay
 }
 
-class C5: UnsafeConcurrentValue {
+class C5: UnsafeSendable {
   var x: Int = 0 // okay
 }
 
@@ -239,22 +239,22 @@ class C6: C5 {
   var y: Int = 0 // still okay, it's unsafe
 }
 
-final class C7<T>: ConcurrentValue { }
+final class C7<T>: Sendable { }
 
-class C9: ConcurrentValue { } // expected-error{{non-final class 'C9' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
+class C9: Sendable { } // expected-error{{non-final class 'C9' cannot conform to `Sendable`; use `UnsafeSendable`}}
 
 // ----------------------------------------------------------------------
-// UnsafeConcurrentValue disabling checking
+// UnsafeSendable disabling checking
 // ----------------------------------------------------------------------
-struct S11: UnsafeConcurrentValue {
+struct S11: UnsafeSendable {
   var nc: NotConcurrent // okay
 }
 
-struct S12<T>: UnsafeConcurrentValue {
+struct S12<T>: UnsafeSendable {
   var nc: T // okay
 }
 
-enum E11<T>: UnsafeConcurrentValue {
+enum E11<T>: UnsafeSendable {
   case payload(NotConcurrent) // okay
   case other(T) // okay
 }

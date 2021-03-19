@@ -93,7 +93,7 @@ extension String {
 ///   substrings may, therefore, prolong the lifetime of string data that is
 ///   no longer otherwise accessible, which can appear to be memory leakage.
 @frozen
-public struct Substring: ConcurrentValue {
+public struct Substring: Sendable {
   @usableFromInline
   internal var _slice: Slice<String>
 
@@ -329,7 +329,7 @@ extension Substring: LosslessStringConvertible {
 
 extension Substring {
   @frozen
-  public struct UTF8View: ConcurrentValue {
+  public struct UTF8View: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UTF8View>
   }
@@ -466,7 +466,7 @@ extension String {
 }
 extension Substring {
   @frozen
-  public struct UTF16View: ConcurrentValue {
+  public struct UTF16View: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UTF16View>
   }
@@ -592,7 +592,7 @@ extension String {
 }
 extension Substring {
   @frozen
-  public struct UnicodeScalarView: ConcurrentValue {
+  public struct UnicodeScalarView: Sendable {
     @usableFromInline
     internal var _slice: Slice<String.UnicodeScalarView>
   }

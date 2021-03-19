@@ -60,7 +60,7 @@ func tryKeyPathsFromAsync() async {
     _ = \Door.unsafeGlobActor_mutable // expected-error{{cannot form key path to actor-isolated property 'unsafeGlobActor_mutable'}}
 }
 
-func tryNonConcurrentValue() {
+func tryNonSendable() {
     _ = \Door.letDict[0] // expected-warning {{cannot form key path that accesses non-concurrent-value type '[Int : Box]'}}
     _ = \Door.varDict[0] // expected-error {{cannot form key path to actor-isolated property 'varDict'}}
     _ = \Door.letBox!.size // expected-warning {{cannot form key path that accesses non-concurrent-value type 'Box?'}}

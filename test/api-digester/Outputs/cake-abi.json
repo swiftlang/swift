@@ -147,9 +147,9 @@
         },
         {
           "kind": "Conformance",
-          "name": "ConcurrentValue",
-          "printedName": "ConcurrentValue",
-          "usr": "s:s15ConcurrentValueP"
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         },
         {
           "kind": "Conformance",
@@ -893,9 +893,9 @@
       "conformances": [
         {
           "kind": "Conformance",
-          "name": "ConcurrentValue",
-          "printedName": "ConcurrentValue",
-          "usr": "s:s15ConcurrentValueP"
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         }
       ]
     },
@@ -1747,9 +1747,9 @@
         },
         {
           "kind": "Conformance",
-          "name": "ConcurrentValue",
-          "printedName": "ConcurrentValue",
-          "usr": "s:s15ConcurrentValueP"
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         },
         {
           "kind": "Conformance",

@@ -1,3 +1,3 @@
-extension NoRawTypeKey : CodingKey, UnsafeConcurrentValue {}
-extension StringKey : CodingKey, UnsafeConcurrentValue {}
-extension IntKey : CodingKey, UnsafeConcurrentValue {}
+extension NoRawTypeKey : CodingKey, UnsafeSendable {}
+extension StringKey : CodingKey, UnsafeSendable {}
+extension IntKey : CodingKey, UnsafeSendable {}

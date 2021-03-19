@@ -498,5 +498,5 @@ extension ClosedRange: Encodable where Bound: Encodable {
   }
 }
 
-extension ClosedRange: ConcurrentValue where Bound: ConcurrentValue { }
-extension ClosedRange.Index: ConcurrentValue where Bound: ConcurrentValue { }
+extension ClosedRange: Sendable where Bound: Sendable { }
+extension ClosedRange.Index: Sendable where Bound: Sendable { }

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -enable-infer-public-concurrent-value
 
-func acceptCV<T: ConcurrentValue>(_: T) { }
+func acceptCV<T: Sendable>(_: T) { }
 
 public struct PublicStruct {
   var i: Int
