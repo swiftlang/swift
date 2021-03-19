@@ -22,7 +22,7 @@ actor A2 {
 }
 
 func testActorCreation(value: NotConcurrent) {
-  _ = A2(value: value) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent' across actors}}
+  _ = A2(value: value) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
 }
 
 extension A1 {
@@ -37,9 +37,9 @@ extension A1 {
     _ = await self.asynchronous(nil)
 
     // Across to a different actor, so Sendable restriction is enforced.
-    _ = other.localLet // expected-warning{{cannot use property 'localLet' with a non-concurrent-value type 'NotConcurrent' across actors}}
-    _ = await other.synchronous() // expected-warning{{cannot call function returning non-concurrent-value type 'NotConcurrent?' across actors}}
-    _ = await other.asynchronous(nil) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
+    _ = other.localLet // expected-warning{{cannot use property 'localLet' with a non-sendable type 'NotConcurrent' across actors}}
+    _ = await other.synchronous() // expected-warning{{cannot call function returning non-sendable type 'NotConcurrent?' across actors}}
+    _ = await other.asynchronous(nil) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
   }
 }
 
@@ -67,9 +67,9 @@ func globalAsync(_: NotConcurrent?) async {
 }
 
 func globalTest() async {
-  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-concurrent-value type 'NotConcurrent?' across actors}}
-  await globalAsync(a) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
-  await globalSync(a)  // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
+  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
+  await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
+  await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
 }
 
 struct HasSubscript {
@@ -88,10 +88,10 @@ class ClassWithGlobalActorInits {
 
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
-  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-concurrent-value type 'NotConcurrent?' across actors}}
-  await globalAsync(a) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
-  await globalSync(a)  // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent?' across actors}}
-  _ = await ClassWithGlobalActorInits(nc) // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent' across actors}}
+  let a = globalValue // expected-warning{{cannot use let 'globalValue' with a non-sendable type 'NotConcurrent?' across actors}}
+  await globalAsync(a) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
+  await globalSync(a)  // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent?' across actors}}
+  _ = await ClassWithGlobalActorInits(nc) // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
   _ = await ClassWithGlobalActorInits()
 }
 
@@ -117,7 +117,7 @@ func testConcurrency() {
     print(y) // okay
   }
   acceptConcurrent {
-    print(x) // expected-warning{{cannot use let 'x' with a non-concurrent-value type 'NotConcurrent' from concurrently-executed code}}
+    print(x) // expected-warning{{cannot use let 'x' with a non-sendable type 'NotConcurrent' from concurrently-executed code}}
     print(y) // expected-error{{reference to captured var 'y' in concurrently-executing code}}
   }
 }
@@ -135,7 +135,7 @@ class HasNC {
 }
 
 func testKeyPaths(dict: [NC: Int], nc: NC) {
-  _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-concurrent-value type 'NC'}}
+  _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-sendable type 'NC'}}
 }
 
 
@@ -148,7 +148,7 @@ protocol AsyncProto {
 
 extension A1: AsyncProto {
   // FIXME: Poor diagnostic.
-  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent' across actors}}
+  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
 }
 
 protocol MainActorProto {
@@ -157,7 +157,7 @@ protocol MainActorProto {
 
 class SomeClass: MainActorProto {
   @SomeGlobalActor
-  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{cannot pass argument of non-concurrent-value type 'NotConcurrent' across actors}}
+  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{cannot pass argument of non-sendable type 'NotConcurrent' across actors}}
 }
 
 // ----------------------------------------------------------------------
@@ -183,7 +183,7 @@ func acceptConcurrentUnary<T>(_: @concurrent (T) -> T) { }
 func concurrentClosures<T>(_: T) {
   acceptConcurrentUnary { (x: T) in
     _ = x // ok
-    acceptConcurrentUnary { _ in x } // expected-warning{{cannot use parameter 'x' with a non-concurrent-value type 'T' from concurrently-executed code}}
+    acceptConcurrentUnary { _ in x } // expected-warning{{cannot use parameter 'x' with a non-sendable type 'T' from concurrently-executed code}}
   }
 }
 
@@ -191,11 +191,11 @@ func concurrentClosures<T>(_: T) {
 // Sendable checking
 // ----------------------------------------------------------------------
 struct S1: Sendable {
-  var nc: NotConcurrent // expected-error{{stored property 'nc' of 'Sendable'-conforming struct 'S1' has non-concurrent-value type 'NotConcurrent'}}
+  var nc: NotConcurrent // expected-error{{stored property 'nc' of 'Sendable'-conforming struct 'S1' has non-sendable type 'NotConcurrent'}}
 }
 
 struct S2<T>: Sendable {
-  var nc: T // expected-error{{stored property 'nc' of 'Sendable'-conforming generic struct 'S2' has non-concurrent-value type 'T'}}
+  var nc: T // expected-error{{stored property 'nc' of 'Sendable'-conforming generic struct 'S2' has non-sendable type 'T'}}
 }
 
 struct S3<T> {
@@ -206,7 +206,7 @@ struct S3<T> {
 extension S3: Sendable where T: Sendable { }
 
 enum E1: Sendable {
-  case payload(NotConcurrent) // expected-error{{associated value 'payload' of 'Sendable'-conforming enum 'E1' has non-concurrent-value type 'NotConcurrent'}}
+  case payload(NotConcurrent) // expected-error{{associated value 'payload' of 'Sendable'-conforming enum 'E1' has non-sendable type 'NotConcurrent'}}
 }
 
 enum E2<T> {
@@ -216,7 +216,7 @@ enum E2<T> {
 extension E2: Sendable where T: Sendable { }
 
 final class C1: Sendable {
-  let nc: NotConcurrent? = nil // expected-error{{stored property 'nc' of 'Sendable'-conforming class 'C1' has non-concurrent-value type 'NotConcurrent?'}}
+  let nc: NotConcurrent? = nil // expected-error{{stored property 'nc' of 'Sendable'-conforming class 'C1' has non-sendable type 'NotConcurrent?'}}
   var x: Int = 0 // expected-error{{stored property 'x' of 'Sendable'-conforming class 'C1' is mutable}}
   let i: Int = 0
 }
@@ -227,11 +227,11 @@ final class C2: Sendable {
 
 class C3 { }
 
-class C4: C3, UnsafeSendable {
+class C4: C3, UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   var y: Int = 0 // okay
 }
 
-class C5: UnsafeSendable {
+class C5: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   var x: Int = 0 // okay
 }
 
@@ -246,15 +246,15 @@ class C9: Sendable { } // expected-error{{non-final class 'C9' cannot conform to
 // ----------------------------------------------------------------------
 // UnsafeSendable disabling checking
 // ----------------------------------------------------------------------
-struct S11: UnsafeSendable {
+struct S11: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   var nc: NotConcurrent // okay
 }
 
-struct S12<T>: UnsafeSendable {
+struct S12<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   var nc: T // okay
 }
 
-enum E11<T>: UnsafeSendable {
+enum E11<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   case payload(NotConcurrent) // okay
   case other(T) // okay
 }

@@ -86,7 +86,7 @@ func testCaseTrivialValue4() {
                     // expected-note @-8 {{capturing use}}
 }
 
-class Klass: UnsafeSendable {
+class Klass: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
   var next: Klass? = nil
 }
 func inoutUserKlass(_ k: inout Klass) {}

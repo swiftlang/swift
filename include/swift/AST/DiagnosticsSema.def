@@ -4404,24 +4404,24 @@ ERROR(global_actor_isolated_requirement_witness_conflict,none,
       (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
 WARNING(non_concurrent_param_type,none,
-        "cannot pass argument of non-concurrent-value type %0 across actors",
+        "cannot pass argument of non-sendable type %0 across actors",
         (Type))
 WARNING(non_concurrent_result_type,none,
-        "cannot call function returning non-concurrent-value type %0 across "
+        "cannot call function returning non-sendable type %0 across "
         "actors", (Type))
 WARNING(non_concurrent_property_type,none,
-        "cannot use %0 %1 with a non-concurrent-value type %2 "
+        "cannot use %0 %1 with a non-sendable type %2 "
         "%select{across actors|from concurrently-executed code}3",
         (DescriptiveDeclKind, DeclName, Type, bool))
 WARNING(non_concurrent_keypath_capture,none,
-        "cannot form key path that captures non-concurrent-value type %0",
+        "cannot form key path that captures non-sendable type %0",
         (Type))
 WARNING(non_concurrent_keypath_access,none,
-        "cannot form key path that accesses non-concurrent-value type %0",
+        "cannot form key path that accesses non-sendable type %0",
         (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
-      "'Sendable'-conforming %2 %3 has non-concurrent-value type %4",
+      "'Sendable'-conforming %2 %3 has non-sendable type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %1 %2 is mutable",

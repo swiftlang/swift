@@ -177,22 +177,22 @@ func blender(_ peeler : () -> Void) {
 
 
   await wisk({})
-  // expected-warning@-1{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
+  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
   await wisk(1)
-  // expected-warning@-1{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
+  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
   await (peelBanana)()
   await (((((peelBanana)))))()
   await (((wisk)))((wisk)((wisk)(1)))
-  // expected-warning@-1 3{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
+  // expected-warning@-1 3{{cannot pass argument of non-sendable type 'Any' across actors}}
 
   blender((peelBanana)) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
   await wisk(peelBanana) // expected-error {{global function 'peelBanana()' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
-  // expected-warning@-1{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
+  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
 
   await wisk(wisk)  // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
-  // expected-warning@-1{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
+  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
   await (((wisk)))(((wisk))) // expected-error {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
-  // expected-warning@-1{{cannot pass argument of non-concurrent-value type 'Any' across actors}}
+  // expected-warning@-1{{cannot pass argument of non-sendable type 'Any' across actors}}
 
   // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
   // expected-error@+1 {{global function 'wisk' isolated to global actor 'BananaActor' can not be referenced from different global actor 'OrangeActor'}}
@@ -240,18 +240,18 @@ actor Calculator {
 
 @OrangeActor func doSomething() async {
   let _ = (await bananaAdd(1))(2)
-  // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
+  // expected-warning@-1{{cannot call function returning non-sendable type}}
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
+  // expected-warning@-1{{cannot call function returning non-sendable type}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
-  // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
+  // expected-warning@-1{{cannot call function returning non-sendable type}}
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
+  // expected-warning@-1{{cannot call function returning non-sendable type}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
-  // expected-warning@-1{{cannot call function returning non-concurrent-value type}}
+  // expected-warning@-1{{cannot call function returning non-sendable type}}
   let _ = plusOne(2)
 }

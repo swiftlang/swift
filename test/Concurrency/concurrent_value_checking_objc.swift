@@ -16,7 +16,7 @@ final class B: NSObject, Sendable {
 class C { }
 
 final class D: NSObject, Sendable {
-  let c: C = C() // expected-error{{stored property 'c' of 'Sendable'-conforming class 'D' has non-concurrent-value type 'C'}}
+  let c: C = C() // expected-error{{stored property 'c' of 'Sendable'-conforming class 'D' has non-sendable type 'C'}}
 }
 
 

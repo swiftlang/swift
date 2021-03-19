@@ -90,7 +90,7 @@ func checkAsyncPropertyAccess() async {
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can only be mutated from inside the actor}}
 
-  _ = act.point // expected-warning{{cannot use property 'point' with a non-concurrent-value type 'Point' across actors}}
+  _ = act.point // expected-warning{{cannot use property 'point' with a non-sendable type 'Point' across actors}}
 }
 
 extension MyActor {
@@ -659,11 +659,11 @@ class SomeClassWithInits {
   func hasDetached() {
     Task.runDetached {
       // okay
-      await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-concurrent-value type 'SomeClassWithInits' from concurrently-executed code}}
-      self.isolated() // expected-warning{{cannot use parameter 'self' with a non-concurrent-value type 'SomeClassWithInits' from concurrently-executed code}}
+      await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
       // expected-error@-1{{call is 'async' but is not marked with 'await'}}
 
-      print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-concurrent-value type 'SomeClassWithInits' from concurrently-executed code}}
+      print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
     }
   }
 }

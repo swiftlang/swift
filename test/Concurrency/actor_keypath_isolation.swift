@@ -47,7 +47,7 @@ func tryKeyPathsMisc(d : Door) {
 
     // in combination with other key paths
 
-    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path that accesses non-concurrent-value type 'Box?'}}
+    _ = (\Door.letBox).appending(path:  // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
                                        \Box?.?.size)
 
     _ = (\Door.varBox).appending(path:  // expected-error {{cannot form key path to actor-isolated property 'varBox'}}
@@ -61,9 +61,9 @@ func tryKeyPathsFromAsync() async {
 }
 
 func tryNonSendable() {
-    _ = \Door.letDict[0] // expected-warning {{cannot form key path that accesses non-concurrent-value type '[Int : Box]'}}
+    _ = \Door.letDict[0] // expected-warning {{cannot form key path that accesses non-sendable type '[Int : Box]'}}
     _ = \Door.varDict[0] // expected-error {{cannot form key path to actor-isolated property 'varDict'}}
-    _ = \Door.letBox!.size // expected-warning {{cannot form key path that accesses non-concurrent-value type 'Box?'}}
+    _ = \Door.letBox!.size // expected-warning {{cannot form key path that accesses non-sendable type 'Box?'}}
 }
 
 func tryKeypaths() {

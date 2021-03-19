@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-infer-public-concurrent-value
+// RUN: %target-typecheck-verify-swift -enable-infer-public-sendable
 
 func acceptCV<T: Sendable>(_: T) { }
 
