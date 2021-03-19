@@ -153,11 +153,12 @@ pushAsyncContext(CallerContext *callerContext, size_t calleeContextSize,
                  Args... args) {
   using CalleeContext =
     AsyncCalleeContext<CallerContext, CalleeSignature>;
-  assert(calleeContextSize >= sizeof(CalleeContext));
 
   void *rawCalleeContext = swift_task_alloc(calleeContextSize);
-  return new (rawCalleeContext) CalleeContext(resumeFunction,
-                                              callerContext, args...);
+  // We no longer store arguments in the context so we can just cast to an async
+  // context.
+  return reinterpret_cast<CalleeContext *>(new (rawCalleeContext) AsyncContext(
+      AsyncContextKind::Ordinary, resumeFunction, callerContext));
 }
 
 /// Make an asynchronous call.
