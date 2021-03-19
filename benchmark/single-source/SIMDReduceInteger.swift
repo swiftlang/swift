@@ -14,69 +14,72 @@ import TestsUtils
 
 public let SIMDReduceInteger = [
   BenchmarkInfo(
-    name: "SIMDReduceInt32x1",
+    name: "SIMDReduce.Int32",
     runFunction: run_SIMDReduceInt32x1,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt32x4_init",
+    name: "SIMDReduce.Int32x4.Initializer",
     runFunction: run_SIMDReduceInt32x4_init,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt32x4_cast",
+    name: "SIMDReduce.Int32x4.Cast",
     runFunction: run_SIMDReduceInt32x4_cast,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ), 
   BenchmarkInfo(
-    name: "SIMDReduceInt32x16_init",
+    name: "SIMDReduce.Int32x16.Initializer",
     runFunction: run_SIMDReduceInt32x16_init,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt32x16_cast",
+    name: "SIMDReduce.Int32x16.Cast",
     runFunction: run_SIMDReduceInt32x16_cast,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt8x1",
+    name: "SIMDReduce.Int8",
     runFunction: run_SIMDReduceInt8x1,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt8x16_init",
+    name: "SIMDReduce.Int8x16.Initializer",
     runFunction: run_SIMDReduceInt8x16_init,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt8x16_cast",
+    name: "SIMDReduce.Int8x16.Cast",
     runFunction: run_SIMDReduceInt8x16_cast,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt8x64_init",
+    name: "SIMDReduce.Int8x64.Initializer",
     runFunction: run_SIMDReduceInt8x64_init,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   ),
   BenchmarkInfo(
-    name: "SIMDReduceInt8x64_cast",
+    name: "SIMDReduce.Int8x64.Cast",
     runFunction: run_SIMDReduceInt8x64_cast,
     tags: [.validation, .SIMD],
     setUpFunction: { blackHole(int32Data) }
   )
 ]
 
+// TODO: use 100 for Onone?
+let scale = 1000
+
 let int32Data: UnsafeBufferPointer<Int32> = {
-  let count = 64
+  let count = 256
   // Allocate memory for `count` Int32s with alignment suitable for all
   // SIMD vector types.
   let untyped = UnsafeMutableRawBufferPointer.allocate(
@@ -93,7 +96,7 @@ let int32Data: UnsafeBufferPointer<Int32> = {
 
 @inline(never)
 public func run_SIMDReduceInt32x1(_ N: Int) {
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum: Int32 = 0
     for v in int32Data {
       accum &+= v &* v
@@ -104,7 +107,7 @@ public func run_SIMDReduceInt32x1(_ N: Int) {
 
 @inline(never)
 public func run_SIMDReduceInt32x4_init(_ N: Int) {
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD4<Int32>()
     for i in stride(from: 0, to: int32Data.count, by: 4) {
       let v = SIMD4(int32Data[i ..< i+4])
@@ -126,7 +129,7 @@ public func run_SIMDReduceInt32x4_cast(_ N: Int) {
     start: UnsafeRawPointer(int32Data.baseAddress!).assumingMemoryBound(to: SIMD4<Int32>.self),
     count: int32Data.count / 4
   )
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD4<Int32>()
     for v in vecs {
       accum &+= v &* v
@@ -137,7 +140,7 @@ public func run_SIMDReduceInt32x4_cast(_ N: Int) {
 
 @inline(never)
 public func run_SIMDReduceInt32x16_init(_ N: Int) {
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD16<Int32>()
     for i in stride(from: 0, to: int32Data.count, by: 16) {
       let v = SIMD16(int32Data[i ..< i+16])
@@ -153,7 +156,7 @@ public func run_SIMDReduceInt32x16_cast(_ N: Int) {
     start: UnsafeRawPointer(int32Data.baseAddress!).assumingMemoryBound(to: SIMD16<Int32>.self),
     count: int32Data.count / 16
   )
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD16<Int32>()
     for v in vecs {
       accum &+= v &* v
@@ -163,7 +166,7 @@ public func run_SIMDReduceInt32x16_cast(_ N: Int) {
 }
 
 let int8Data: UnsafeBufferPointer<Int8> = {
-  let count = 256
+  let count = 1024
   // Allocate memory for `count` Int8s with alignment suitable for all
   // SIMD vector types.
   let untyped = UnsafeMutableRawBufferPointer.allocate(
@@ -180,7 +183,7 @@ let int8Data: UnsafeBufferPointer<Int8> = {
 
 @inline(never)
 public func run_SIMDReduceInt8x1(_ N: Int) {
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum: Int8 = 0
     for v in int8Data {
       accum &+= v &* v
@@ -191,7 +194,7 @@ public func run_SIMDReduceInt8x1(_ N: Int) {
 
 @inline(never)
 public func run_SIMDReduceInt8x16_init(_ N: Int) {
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD16<Int8>()
     for i in stride(from: 0, to: int8Data.count, by: 16) {
       let v = SIMD16(int8Data[i ..< i+16])
@@ -207,7 +210,7 @@ public func run_SIMDReduceInt8x16_cast(_ N: Int) {
     start: UnsafeRawPointer(int8Data.baseAddress!).assumingMemoryBound(to: SIMD16<Int8>.self),
     count: int8Data.count / 16
   )
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD16<Int8>()
     for v in vecs {
       accum &+= v &* v
@@ -218,7 +221,7 @@ public func run_SIMDReduceInt8x16_cast(_ N: Int) {
 
 @inline(never)
 public func run_SIMDReduceInt8x64_init(_ N: Int) {
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD64<Int8>()
     for i in stride(from: 0, to: int8Data.count, by: 64) {
       let v = SIMD64(int8Data[i ..< i+64])
@@ -234,7 +237,7 @@ public func run_SIMDReduceInt8x64_cast(_ N: Int) {
     start: UnsafeRawPointer(int8Data.baseAddress!).assumingMemoryBound(to: SIMD64<Int8>.self),
     count: int8Data.count / 64
   )
-  for _ in 0 ..< 1000*N {
+  for _ in 0 ..< scale*N {
     var accum = SIMD64<Int8>()
     for v in vecs {
       accum &+= v &* v
