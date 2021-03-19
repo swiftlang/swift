@@ -6,7 +6,7 @@ var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared 
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
-func acceptConcurrentClosure<T>(_: @concurrent () -> T) { }
+func acceptConcurrentClosure<T>(_: @Sendable () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping (String) -> ()) async -> T? { nil }
 
@@ -254,7 +254,7 @@ extension MyActor {
     }
 
     // Local functions might run concurrently.
-    @concurrent func localFn1() {
+    @Sendable func localFn1() {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
       _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
       _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
@@ -262,7 +262,7 @@ extension MyActor {
       _ = localConstant
     }
 
-    @concurrent func localFn2() {
+    @Sendable func localFn2() {
       acceptClosure {
         _ = text[0]  // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
         _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
@@ -372,7 +372,7 @@ func testGlobalActorClosures() {
     return 17
   }
 
-  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{converting function value of type '@SomeGlobalActor @concurrent () -> Int' to '@concurrent () -> Int' loses global actor 'SomeGlobalActor'}}
+  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
 }
 
 extension MyActor {
@@ -519,7 +519,7 @@ func f() {
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
   }
 
-  @concurrent func g() {
+  @Sendable func g() {
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
   }
 }
@@ -535,7 +535,7 @@ func checkLocalFunctions() async {
     i = 17
   }
 
-  func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@concurrent'}}{{3-3=@concurrent }}
+  func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@Sendable'}}{{3-3=@Sendable }}
     j = 42
   }
 
@@ -564,7 +564,7 @@ func checkLocalFunctions() async {
     }
   }
 
-  func local3() { // expected-error{{concurrently-executed local function 'local3()' must be marked as '@concurrent'}}
+  func local3() { // expected-error{{concurrently-executed local function 'local3()' must be marked as '@Sendable'}}
     k = 25 // expected-error{{mutation of captured var 'k' in concurrently-executing code}}
   }
 

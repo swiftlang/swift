@@ -755,10 +755,10 @@ static bool isEscapingClosure(const AbstractClosureExpr *closure) {
 }
 
 /// Determine whether this closure is escaping.
-static bool isConcurrentClosure(const AbstractClosureExpr *closure) {
+static bool isSendableClosure(const AbstractClosureExpr *closure) {
   if (auto type = closure->getType()) {
     if (auto fnType = type->getAs<AnyFunctionType>())
-      return fnType->isConcurrent();
+      return fnType->isSendable();
   }
 
   return false;
@@ -864,7 +864,7 @@ static bool isSendableType(const DeclContext *dc, Type type) {
 
     bool visitFunctionType(FunctionType *type) {
       // Concurrent function types meet the requirements.
-      if (type->isConcurrent())
+      if (type->isSendable())
         return true;
 
       // C and thin function types meeting the requirements because they
@@ -1875,18 +1875,18 @@ namespace {
       }
 
       if (auto func = dyn_cast<FuncDecl>(value)) {
-        if (func->isConcurrent())
+        if (func->isSendable())
           return false;
 
         func->diagnose(
             diag::local_function_executed_concurrently,
             func->getDescriptiveKind(), func->getName())
-          .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
+          .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ");
 
-        // Add the @concurrent attribute implicitly, so we don't diagnose
+        // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
         const_cast<FuncDecl *>(func)->getAttrs().add(
-            new (ctx) ConcurrentAttr(true));
+            new (ctx) SendableAttr(true));
         return true;
       }
 
@@ -2039,7 +2039,7 @@ namespace {
       }
 
       if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-        if (isConcurrentClosure(closure)) {
+        if (isSendableClosure(closure)) {
           return diag::actor_isolated_from_concurrent_closure;
         }
 
@@ -2051,7 +2051,7 @@ namespace {
       }
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-        if (func->isConcurrent())
+        if (func->isSendable())
           return diag::actor_isolated_from_concurrent_function;
       }
 
@@ -2226,7 +2226,7 @@ namespace {
       }
 
       // Escaping and concurrent closures are always actor-independent.
-      if (isEscapingClosure(closure) || isConcurrentClosure(closure))
+      if (isEscapingClosure(closure) || isSendableClosure(closure))
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.
@@ -2278,14 +2278,14 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
   while (useContext != defContext) {
     // If we find a concurrent closure... it can be run concurrently.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isConcurrentClosure(closure))
+      if (isSendableClosure(closure))
         return true;
     }
 
     if (auto func = dyn_cast<FuncDecl>(useContext)) {
       if (func->isLocalCapture()) {
-        // If the function is @concurrent... it can be run concurrently.
-        if (func->isConcurrent())
+        // If the function is @Sendable... it can be run concurrently.
+        if (func->isSendable())
           return true;
       }
     }
@@ -2545,9 +2545,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // overridden by other inference rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
 
-  // A @concurrent function is assumed to be actor-independent.
+  // A @Sendable function is assumed to be actor-independent.
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->isConcurrent()) {
+    if (func->isSendable()) {
       defaultIsolation = ActorIsolation::forIndependent(
           ActorIndependentKind::Safe);
     }
@@ -2831,7 +2831,7 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
       // Async and concurrent closures use concurrency features.
       if (auto closureType = closure->getType()) {
         if (auto fnType = closureType->getAs<AnyFunctionType>())
-          if (fnType->isAsync() || fnType->isConcurrent())
+          if (fnType->isAsync() || fnType->isSendable())
             return true;
       }
     } else if (auto decl = dc->getAsDecl()) {
@@ -2842,7 +2842,7 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         // Async and concurrent functions use concurrency features.
-        if (func->hasAsync() || func->isConcurrent())
+        if (func->hasAsync() || func->isSendable())
           return true;
 
         // If there is an explicit @asyncHandler, we're using concurrency

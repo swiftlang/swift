@@ -133,10 +133,10 @@ public struct SomeGlobalActor {
 // CHECK-NEXT: #endif
 public func runSomethingSomewhere(body: () async -> Void) { }
 
-// CHECK: #if compiler(>=5.3) && $ConcurrentFunctions
-// CHECK-NEXT: func runSomethingConcurrently(body: @concurrent () -> 
+// CHECK: #if compiler(>=5.3) && $Sendable
+// CHECK-NEXT: func runSomethingConcurrently(body: @Sendable () -> 
 // CHECK-NEXT: #endif
-public func runSomethingConcurrently(body: @concurrent () -> Void) { }
+public func runSomethingConcurrently(body: @Sendable () -> Void) { }
 
 // CHECK: #if compiler(>=5.3) && $Actors
 // CHECK-NEXT: func stage

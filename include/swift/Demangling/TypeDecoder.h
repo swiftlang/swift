@@ -312,7 +312,7 @@ public:
 
   bool isEscaping() const { return Escaping; }
 
-  bool isConcurrent() const { return Concurrent; }
+  bool isSendable() const { return Concurrent; }
 
   bool isPseudogeneric() const { return Pseudogeneric; }
 
@@ -752,10 +752,10 @@ public:
         ++firstChildIdx;
       }
 
-      bool isConcurrent = false;
+      bool isSendable = false;
       if (Node->getChild(firstChildIdx)->getKind()
             == NodeKind::ConcurrentFunctionType) {
-        isConcurrent = true;
+        isSendable = true;
         ++firstChildIdx;
       }
 
@@ -766,7 +766,7 @@ public:
         ++firstChildIdx;
       }
 
-      flags = flags.withConcurrent(isConcurrent)
+      flags = flags.withConcurrent(isSendable)
           .withAsync(isAsync).withThrows(isThrow);
 
       if (Node->getNumChildren() < firstChildIdx + 2)
@@ -844,7 +844,7 @@ public:
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
-          if (child->getText() == "@concurrent") {
+          if (child->getText() == "@Sendable") {
             flags = flags.withConcurrent();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();

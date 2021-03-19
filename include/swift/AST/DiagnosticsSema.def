@@ -3825,18 +3825,18 @@ NOTE(generic_parameters_always_escaping,none,
 
 ERROR(passing_noattrfunc_to_attrfunc,none,
       "passing %select{non-escaping|non-concurrent}0 parameter %1 to function "
-      "expecting %select{an @escaping|a @concurrent}0 closure",
+      "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noespace_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
 ERROR(assigning_noattrfunc_to_attrfunc,none,
       "assigning %select{non-escaping|non-concurrent}0 parameter %1 to "
-      "%select{an @escaping|a @concurrent}0 closure",
+      "%select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(general_noattrfunc_to_attr,none,
       "using %select{non-escaping|non-concurrent}0 parameter %1 in a context "
-      "expecting %select{an @escaping|a @concurrent}0 closure",
+      "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noattrfunc_to_type,none,
       "converting %select{non-escaping|non-concurrent function}0 value to %1 "
@@ -4371,7 +4371,7 @@ ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to actor-isolated %0 %1",
       (DescriptiveDeclKind, DeclName))
 ERROR(local_function_executed_concurrently,none,
-      "concurrently-executed %0 %1 must be marked as '@concurrent'",
+      "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "

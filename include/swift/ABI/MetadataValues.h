@@ -811,7 +811,7 @@ class TargetFunctionTypeFlags {
     DifferentiabilityMask  = 0x98000000U,
     DifferentiabilityShift = 27U,
     AsyncMask              = 0x20000000U,
-    ConcurrentMask         = 0x40000000U,
+    SendableMask           = 0x40000000U,
   };
   int_type Data;
   
@@ -861,10 +861,10 @@ public:
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
-  withConcurrent(bool isConcurrent) const {
+  withConcurrent(bool isSendable) const {
     return TargetFunctionTypeFlags<int_type>(
-        (Data & ~ConcurrentMask) |
-        (isConcurrent ? ConcurrentMask : 0));
+        (Data & ~SendableMask) |
+        (isSendable ? SendableMask : 0));
   }
 
   unsigned getNumParameters() const { return Data & NumParametersMask; }
@@ -881,8 +881,8 @@ public:
     return bool (Data & EscapingMask);
   }
 
-  bool isConcurrent() const {
-    return bool (Data & ConcurrentMask);
+  bool isSendable() const {
+    return bool (Data & SendableMask);
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }

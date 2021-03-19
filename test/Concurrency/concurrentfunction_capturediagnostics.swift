@@ -2,9 +2,9 @@
 
 // REQUIRES: concurrency
 
-func f(_: @escaping @concurrent () -> Void) { }
+func f(_: @escaping @Sendable () -> Void) { }
 open class F {
-  func useConcurrent(_: @escaping @concurrent () -> Void) { }
+  func useConcurrent(_: @escaping @Sendable () -> Void) { }
 }
 
 extension Int {

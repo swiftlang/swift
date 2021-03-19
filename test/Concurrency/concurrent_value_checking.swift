@@ -106,7 +106,7 @@ func someGlobalTest(nc: NotConcurrent) {
 // Sendable restriction on captures.
 // ----------------------------------------------------------------------
 func acceptNonConcurrent(_: () -> Void) { }
-func acceptConcurrent(_: @concurrent () -> Void) { }
+func acceptConcurrent(_: @Sendable () -> Void) { }
 
 func testConcurrency() {
   let x = NotConcurrent()
@@ -164,21 +164,21 @@ class SomeClass: MainActorProto {
 // Sendable restriction on concurrent functions.
 // ----------------------------------------------------------------------
 
-@concurrent func concurrentFunc() -> NotConcurrent? { nil }
+@Sendable func concurrentFunc() -> NotConcurrent? { nil }
 
 // ----------------------------------------------------------------------
-// No Sendable restriction on @concurrent function types.
+// No Sendable restriction on @Sendable function types.
 // ----------------------------------------------------------------------
-typealias CF = @concurrent () -> NotConcurrent?
-typealias BadGenericCF<T> = @concurrent () -> T?
-typealias GoodGenericCF<T: Sendable> = @concurrent () -> T? // okay
+typealias CF = @Sendable () -> NotConcurrent?
+typealias BadGenericCF<T> = @Sendable () -> T?
+typealias GoodGenericCF<T: Sendable> = @Sendable () -> T? // okay
 
-var concurrentFuncVar: (@concurrent (NotConcurrent) -> Void)? = nil
+var concurrentFuncVar: (@Sendable (NotConcurrent) -> Void)? = nil
 
 // ----------------------------------------------------------------------
-// Sendable restriction on @concurrent closures.
+// Sendable restriction on @Sendable closures.
 // ----------------------------------------------------------------------
-func acceptConcurrentUnary<T>(_: @concurrent (T) -> T) { }
+func acceptConcurrentUnary<T>(_: @Sendable (T) -> T) { }
 
 func concurrentClosures<T>(_: T) {
   acceptConcurrentUnary { (x: T) in

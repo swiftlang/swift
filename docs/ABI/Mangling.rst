@@ -567,14 +567,14 @@ Types
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? concurrent? throws? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? // results and parameters
 
   params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
   params-type ::= empty-list                  // shortcut for no parameters
 
-  concurrent ::= 'J'                         // @concurrent on function types
+  sendable ::= 'J'                         // @Sendable on function types
   async ::= 'Y'                              // 'async' annotation on function types
   throws ::= 'K'                             // 'throws' annotation on function types
 
@@ -636,7 +636,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? CONCURRENT? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
@@ -666,7 +666,7 @@ mangled in to disambiguate.
   COROUTINE-KIND ::= 'A'                     // yield-once coroutine
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
-  CONCURRENT ::= 'h'                         // @concurrent
+  SENDABLE ::= 'h'                         // @Sendable
   ASYNC ::= 'H'                              // @async
 
   PARAM-CONVENTION ::= 'i'                   // indirect in

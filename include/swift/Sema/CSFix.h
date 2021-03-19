@@ -668,21 +668,21 @@ public:
                                ConstraintLocator *locator);
 };
 
-/// This is a contextual mismatch between @concurrent and non-@concurrent
-/// function types, repair it by adding @concurrent attribute.
-class AddConcurrentAttribute final : public ContextualMismatch {
-  AddConcurrentAttribute(ConstraintSystem &cs, FunctionType *fromType,
+/// This is a contextual mismatch between @Sendable and non-@Sendable
+/// function types, repair it by adding @Sendable attribute.
+class AddSendableAttribute final : public ContextualMismatch {
+  AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
                      FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, fromType, toType, locator) {
-    assert(fromType->isConcurrent() != toType->isConcurrent());
+    assert(fromType->isSendable() != toType->isSendable());
   }
 
 public:
-  std::string getName() const override { return "add '@concurrent' attribute"; }
+  std::string getName() const override { return "add '@Sendable' attribute"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AddConcurrentAttribute *create(ConstraintSystem &cs,
+  static AddSendableAttribute *create(ConstraintSystem &cs,
                                     FunctionType *fromType,
                                     FunctionType *toType,
                                     ConstraintLocator *locator);

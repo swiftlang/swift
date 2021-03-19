@@ -42,7 +42,7 @@ func async_let_nested() async {
   async let x1: () = Task.withLocal(\.number, boundTo: 2) {
     async let x2 = printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 
-    @concurrent
+    @Sendable
     func test() async {
       printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
       async let x31 = printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}

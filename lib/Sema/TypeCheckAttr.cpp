@@ -129,7 +129,7 @@ public:
   IGNORED_ATTR(OriginallyDefinedIn)
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(SpecializeExtension)
-  IGNORED_ATTR(Concurrent)
+  IGNORED_ATTR(Sendable)
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
 #undef IGNORED_ATTR
@@ -5567,7 +5567,7 @@ public:
     attr->setInvalid();
   }
 
-  void visitConcurrentAttr(ConcurrentAttr *attr) {
+  void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
   }
 
