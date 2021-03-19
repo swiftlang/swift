@@ -1342,6 +1342,13 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(id, { }, ctx.TheNativeObjectType);
 }
 
+static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  builder.setResult(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
+  builder.setAsync();
+  return builder.build(id);
+}
+
 static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
@@ -2557,6 +2564,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetCurrentAsyncTask:
     return getGetCurrentAsyncTask(Context, Id);
+
+  case BuiltinValueKind::GetCurrentExecutor:
+    return getGetCurrentExecutor(Context, Id);
 
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
