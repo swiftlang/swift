@@ -198,7 +198,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
 
 bool NameMatcher::walkToDeclPre(Decl *D) {
   // Handle occurrences in any preceding doc comments
-  RawComment R = D->getRawComment();
+  RawComment R = D->getRawComment(/*SerializedOK=*/false);
   if (!R.isEmpty()) {
     for(SingleRawComment C: R.Comments) {
       while(!shouldSkip(C.Range))
