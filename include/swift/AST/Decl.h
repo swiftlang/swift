@@ -5738,8 +5738,8 @@ public:
 
   /// Determine whether the given function is concurrent.
   ///
-  /// A function is concurrent if it has the @concurrent attribute.
-  bool isConcurrent() const;
+  /// A function is concurrent if it has the @Sendable attribute.
+  bool isSendable() const;
 
   /// Returns true if the function is a suitable 'async' context.
   ///

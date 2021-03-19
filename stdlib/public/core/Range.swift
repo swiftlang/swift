@@ -1018,8 +1018,8 @@ public typealias CountableRange<Bound: Strideable> = Range<Bound>
 public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
   where Bound.Stride: SignedInteger
 
-extension Range: ConcurrentValue where Bound: ConcurrentValue { }
-extension PartialRangeUpTo: ConcurrentValue where Bound: ConcurrentValue { }
-extension PartialRangeThrough: ConcurrentValue where Bound: ConcurrentValue { }
-extension PartialRangeFrom: ConcurrentValue where Bound: ConcurrentValue { }
-extension PartialRangeFrom.Iterator: ConcurrentValue where Bound: ConcurrentValue { }
+extension Range: Sendable where Bound: Sendable { }
+extension PartialRangeUpTo: Sendable where Bound: Sendable { }
+extension PartialRangeThrough: Sendable where Bound: Sendable { }
+extension PartialRangeFrom: Sendable where Bound: Sendable { }
+extension PartialRangeFrom.Iterator: Sendable where Bound: Sendable { }

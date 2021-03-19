@@ -61,7 +61,7 @@ extension String {
   ///     }
   ///     // Prints "My favorite emoji is "
   @frozen
-  public struct UnicodeScalarView: ConcurrentValue {
+  public struct UnicodeScalarView: Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
 
@@ -169,7 +169,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 
 extension String.UnicodeScalarView {
   @frozen
-  public struct Iterator: IteratorProtocol, ConcurrentValue {
+  public struct Iterator: IteratorProtocol, Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
 

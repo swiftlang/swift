@@ -3825,18 +3825,18 @@ NOTE(generic_parameters_always_escaping,none,
 
 ERROR(passing_noattrfunc_to_attrfunc,none,
       "passing %select{non-escaping|non-concurrent}0 parameter %1 to function "
-      "expecting %select{an @escaping|a @concurrent}0 closure",
+      "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noespace_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
 ERROR(assigning_noattrfunc_to_attrfunc,none,
       "assigning %select{non-escaping|non-concurrent}0 parameter %1 to "
-      "%select{an @escaping|a @concurrent}0 closure",
+      "%select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(general_noattrfunc_to_attr,none,
       "using %select{non-escaping|non-concurrent}0 parameter %1 in a context "
-      "expecting %select{an @escaping|a @concurrent}0 closure",
+      "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noattrfunc_to_type,none,
       "converting %select{non-escaping|non-concurrent function}0 value to %1 "
@@ -4371,7 +4371,7 @@ ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to actor-isolated %0 %1",
       (DescriptiveDeclKind, DeclName))
 ERROR(local_function_executed_concurrently,none,
-      "concurrently-executed %0 %1 must be marked as '@concurrent'",
+      "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_access_of_local_capture,none,
       "%select{mutation of|reference to}0 captured %1 %2 in "
@@ -4404,37 +4404,37 @@ ERROR(global_actor_isolated_requirement_witness_conflict,none,
       (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
 WARNING(non_concurrent_param_type,none,
-        "cannot pass argument of non-concurrent-value type %0 across actors",
+        "cannot pass argument of non-sendable type %0 across actors",
         (Type))
 WARNING(non_concurrent_result_type,none,
-        "cannot call function returning non-concurrent-value type %0 across "
+        "cannot call function returning non-sendable type %0 across "
         "actors", (Type))
 WARNING(non_concurrent_property_type,none,
-        "cannot use %0 %1 with a non-concurrent-value type %2 "
+        "cannot use %0 %1 with a non-sendable type %2 "
         "%select{across actors|from concurrently-executed code}3",
         (DescriptiveDeclKind, DeclName, Type, bool))
 WARNING(non_concurrent_keypath_capture,none,
-        "cannot form key path that captures non-concurrent-value type %0",
+        "cannot form key path that captures non-sendable type %0",
         (Type))
 WARNING(non_concurrent_keypath_access,none,
-        "cannot form key path that accesses non-concurrent-value type %0",
+        "cannot form key path that accesses non-sendable type %0",
         (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
-      "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
+      "'Sendable'-conforming %2 %3 has non-sendable type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
-      "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
+      "stored property %0 of 'Sendable'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_outside_source_file,none,
-      "conformance to 'ConcurrentValue' must occur in the same source file as "
-      "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
+      "conformance to 'Sendable' must occur in the same source file as "
+      "%0 %1; use 'UnsafeSendable' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_nonfinal_class,none,
-      "non-final class %0 cannot conform to `ConcurrentValue`; "
-      "use `UnsafeConcurrentValue`", (DeclName))
+      "non-final class %0 cannot conform to `Sendable`; "
+      "use `UnsafeSendable`", (DeclName))
 ERROR(concurrent_value_inherit,none,
-      "`ConcurrentValue` class %1 cannot inherit from another class"
+      "`Sendable` class %1 cannot inherit from another class"
       "%select{| other than 'NSObject'}0",
       (bool, DeclName))
 

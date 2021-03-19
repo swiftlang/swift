@@ -2107,8 +2107,8 @@ static CanSILFunctionType getSILFunctionType(
       (!foreignInfo.Async || substFnInterfaceType->getExtInfo().isAsync())
       && "foreignAsync was set but function type is not async?");
 
-  // Map '@concurrent' to the appropriate `@concurrent` modifier.
-  bool isConcurrent = substFnInterfaceType->getExtInfo().isConcurrent();
+  // Map '@Sendable' to the appropriate `@Sendable` modifier.
+  bool isSendable = substFnInterfaceType->getExtInfo().isSendable();
 
   // Map 'async' to the appropriate `@async` modifier.
   bool isAsync = false;
@@ -2224,7 +2224,7 @@ static CanSILFunctionType getSILFunctionType(
   }
   auto silExtInfo = extInfoBuilder.withClangFunctionType(clangType)
                         .withIsPseudogeneric(pseudogeneric)
-                        .withConcurrent(isConcurrent)
+                        .withConcurrent(isSendable)
                         .withAsync(isAsync)
                         .build();
 

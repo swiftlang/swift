@@ -968,12 +968,12 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol) {
   // If we are recursively checking for implicit conformance of a nominal
-  // type to ConcurrentValue, fail without evaluating this request. This
+  // type to Sendable, fail without evaluating this request. This
   // squashes cycles.
   LookupConformanceInModuleRequest request{{this, type, protocol}};
-  if (protocol->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     if (auto nominal = type->getAnyNominal()) {
-      GetImplicitConcurrentValueRequest icvRequest{nominal};
+      GetImplicitSendableRequest icvRequest{nominal};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
           getASTContext().evaluator.hasActiveRequest(request))
         return ProtocolConformanceRef::forInvalid();
@@ -1047,11 +1047,11 @@ LookupConformanceInModuleRequest::evaluate(
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(mod, protocol, conformances)) {
-    if (!protocol->isSpecificProtocol(KnownProtocolKind::ConcurrentValue))
+    if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
       return ProtocolConformanceRef::forInvalid();
 
-    // Try to infer ConcurrentValue conformance.
-    GetImplicitConcurrentValueRequest cvRequest{nominal};
+    // Try to infer Sendable conformance.
+    GetImplicitSendableRequest cvRequest{nominal};
     if (auto conformance = evaluateOrDefault(
             ctx.evaluator, cvRequest, nullptr)) {
       conformances.clear();

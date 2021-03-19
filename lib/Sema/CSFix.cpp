@@ -215,7 +215,7 @@ MarkGlobalActorFunction::create(ConstraintSystem &cs, Type lhs, Type rhs,
   return new (cs.getAllocator()) MarkGlobalActorFunction(cs, lhs, rhs, locator);
 }
 
-bool AddConcurrentAttribute::diagnose(const Solution &solution,
+bool AddSendableAttribute::diagnose(const Solution &solution,
                                       bool asNote) const {
   AttributedFuncToTypeConversionFailure failure(
       solution, getFromType(), getToType(), getLocator(),
@@ -223,8 +223,8 @@ bool AddConcurrentAttribute::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
-AddConcurrentAttribute *
-AddConcurrentAttribute::create(ConstraintSystem &cs,
+AddSendableAttribute *
+AddSendableAttribute::create(ConstraintSystem &cs,
                                FunctionType *fromType,
                                FunctionType *toType,
                                ConstraintLocator *locator) {
@@ -232,7 +232,7 @@ AddConcurrentAttribute::create(ConstraintSystem &cs,
     locator = cs.getConstraintLocator(
         locator, LocatorPathElt::ArgumentAttribute::forConcurrent());
 
-  return new (cs.getAllocator()) AddConcurrentAttribute(
+  return new (cs.getAllocator()) AddSendableAttribute(
       cs, fromType, toType, locator);
 }
 bool RelabelArguments::diagnose(const Solution &solution, bool asNote) const {

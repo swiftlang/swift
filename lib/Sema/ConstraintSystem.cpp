@@ -2522,7 +2522,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
-  bool concurrent = expr->getAttrs().hasAttribute<ConcurrentAttr>();
+  bool concurrent = expr->getAttrs().hasAttribute<SendableAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws)

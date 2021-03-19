@@ -56,7 +56,7 @@ actor Cat {
     var bestFriend : Birb
 }
 
-struct Sweater : ConcurrentValue {
+struct Sweater : Sendable {
     let owner : Cat
     init (_ owner : Cat) {
         self.owner = owner

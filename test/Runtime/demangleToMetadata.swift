@@ -45,7 +45,7 @@ func f1_variadic(x: ()...) { }
 func f1_inout(x: inout ()) { }
 func f1_shared(x: __shared AnyObject) { }
 func f1_owned(x: __owned AnyObject) { }
-func f1_takes_concurrent(_: @concurrent () -> Void) { }
+func f1_takes_concurrent(_: @Sendable () -> Void) { }
 func f2_variadic_inout(x: ()..., y: inout ()) { }
 
 func f1_escaping(_: @escaping (Int) -> Float) { }

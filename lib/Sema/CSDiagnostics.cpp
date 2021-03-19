@@ -940,7 +940,7 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
       }
 
       // If there are no generic parameters involved, this could
-      // only mean that parameter is expecting @escaping/@concurrent function
+      // only mean that parameter is expecting @escaping/@Sendable function
       // type.
       diagnostic = diag::passing_noattrfunc_to_attrfunc;
     }
@@ -971,7 +971,7 @@ bool AttributedFuncToTypeConversionFailure::diagnoseParameterUse() const {
     }
   }
   if (attributeKind == AttributeKind::Concurrent) {
-    note.fixItInsert(reprLoc, "@concurrent ");
+    note.fixItInsert(reprLoc, "@Sendable ");
   }
   else if (!PD->isAutoClosure()) {
     note.fixItInsert(reprLoc, "@escaping ");

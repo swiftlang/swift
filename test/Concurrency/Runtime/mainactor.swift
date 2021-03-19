@@ -56,7 +56,7 @@ actor A {
   return checkAnotherFn(count) + 1
 }
 
-@concurrent func someFunc() async -> Int {
+@Sendable func someFunc() async -> Int {
   // NOTE: the "return" counter is just to make sure we're properly returning values.
   // the expected number should be equal to the number of "plus-one" expressions.
   // since there are no loops or duplicate function calls

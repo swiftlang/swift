@@ -1326,9 +1326,9 @@ IterableDeclContext::getLocalProtocols(ConformanceLookupKind lookupKind) const {
   return result;
 }
 
-/// Find a synthesized ConcurrentValue conformance in this declaration context,
+/// Find a synthesized Sendable conformance in this declaration context,
 /// if there is one.
-static ProtocolConformance *findSynthesizedConcurrentValueConformance(
+static ProtocolConformance *findSynthesizedSendableConformance(
     const DeclContext *dc) {
   auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal)
@@ -1341,7 +1341,7 @@ static ProtocolConformance *findSynthesizedConcurrentValueConformance(
     return nullptr;
 
   auto cvProto = nominal->getASTContext().getProtocol(
-      KnownProtocolKind::ConcurrentValue);
+      KnownProtocolKind::Sendable);
   if (!cvProto)
     return nullptr;
 
@@ -1438,10 +1438,10 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
   switch (lookupKind) {
     case ConformanceLookupKind::All:
     case ConformanceLookupKind::NonInherited: {
-      // Look for a ConcurrentValue conformance globally. If it is synthesized
+      // Look for a Sendable conformance globally. If it is synthesized
       // and matches this declaration context, use it.
       auto dc = getAsGenericContext();
-      if (auto conformance = findSynthesizedConcurrentValueConformance(dc))
+      if (auto conformance = findSynthesizedSendableConformance(dc))
         result.push_back(conformance);
       break;
     }

@@ -79,4 +79,4 @@ func lookupOnAnyObject(object: AnyObject) { // expected-provides {{lookupOnAnyOb
 // expected-member{{Swift.CustomDebugStringConvertible.someMember}}
 // expected-member{{Swift.CustomStringConvertible.someMember}}
 // expected-member{{Swift.Hashable.someMember}}
-// expected-member{{Swift.ConcurrentValue.callAsFunction}}
+// expected-member{{Swift.Sendable.callAsFunction}}

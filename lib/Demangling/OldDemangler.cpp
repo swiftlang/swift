@@ -2150,7 +2150,7 @@ private:
     }
 
     if (Mangled.nextIf('h'))
-      addImplFunctionAttribute(type, "@concurrent");
+      addImplFunctionAttribute(type, "@Sendable");
 
     if (Mangled.nextIf('H'))
       addImplFunctionAttribute(type, "@async");

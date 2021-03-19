@@ -17,7 +17,7 @@ import Swift
 ///
 /// The \c Actor protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.
-public protocol Actor: AnyObject, ConcurrentValue {
+public protocol Actor: AnyObject, Sendable {
 }
 
 /// Called to initialize the default actor instance in an actor.

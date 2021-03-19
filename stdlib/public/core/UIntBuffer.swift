@@ -231,4 +231,4 @@ extension _UIntBuffer: RangeReplaceableCollection {
   }
 }
 
-extension _UIntBuffer: ConcurrentValue where Element: ConcurrentValue { }
+extension _UIntBuffer: Sendable where Element: Sendable { }

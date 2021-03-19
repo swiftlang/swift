@@ -4366,7 +4366,7 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         clangType,
         fnTy->isNoEscape(),
-        fnTy->isConcurrent(),
+        fnTy->isSendable(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
@@ -4383,7 +4383,7 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        fnTy->isConcurrent(), fnTy->isAsync(), fnTy->isThrowing(),
+        fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         S.addTypeRef(fnTy->getGlobalActor()),
         S.addGenericSignatureRef(genericSig));
@@ -4462,7 +4462,7 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isConcurrent(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),

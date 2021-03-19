@@ -8,8 +8,8 @@ class GlobalCounter {
 let rs = GlobalCounter()
 var globalInt = 17 // expected-note 2{{var declared here}}
 
-class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
-  var storage = 0 // expected-warning{{stored property 'storage' of 'ConcurrentValue'-conforming class 'MyError' is mutable}}
+class MyError: Error { // expected-warning{{non-final class 'MyError' cannot conform to `Sendable`; use `UnsafeSendable`}}
+  var storage = 0 // expected-warning{{stored property 'storage' of 'Sendable'-conforming class 'MyError' is mutable}}
 }
 
 func testWarnings() {

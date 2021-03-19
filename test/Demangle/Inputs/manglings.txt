@@ -388,7 +388,7 @@ $s39differentiation_subset_parameters_thunk19inoutIndirectCalleryq_x_q_q0_t16_Di
 $sS2f8mangling3FooV13TangentVectorVIegydd_SfAESfIegydd_TJOp ---> autodiff self-reordering reabstraction thunk for pullback from @escaping @callee_guaranteed (@unowned Swift.Float) -> (@unowned Swift.Float, @unowned mangling.Foo.TangentVector) to @escaping @callee_guaranteed (@unowned Swift.Float) -> (@unowned mangling.Foo.TangentVector, @unowned Swift.Float)
 $s13test_mangling3fooyS2f_S2ftFWJrSpSr ---> reverse-mode differentiability witness for test_mangling.foo(Swift.Float, Swift.Float, Swift.Float) -> Swift.Float with respect to parameters {0} and results {0}
 $s13test_mangling3fooyS2f_xq_t16_Differentiation14DifferentiableR_r0_lFAcDRzAcDR_r0_lWJrUSSpSr ---> reverse-mode differentiability witness for test_mangling.foo<A, B where B: _Differentiation.Differentiable>(Swift.Float, A, B) -> Swift.Float with respect to parameters {1, 2} and results {0} with <A, B where A: _Differentiation.Differentiable, B: _Differentiation.Differentiable>
-$s5async1hyyS2iJXEF ---> async.h(@concurrent (Swift.Int) -> Swift.Int) -> ()
+$s5async1hyyS2iJXEF ---> async.h(@Sendable (Swift.Int) -> Swift.Int) -> ()
 $s12create_pa_f2Tw_ ---> (0) thunk for non-constant partial apply in create_pa_f2
 $s12create_pa_f2Tw0_ ---> (1) thunk for non-constant partial apply in create_pa_f2
 $s5Actor02MyA0C17testAsyncFunctionyyYKFTY0_ ---> (1) suspend resume partial function for Actor.MyActor.testAsyncFunction() async throws -> ()

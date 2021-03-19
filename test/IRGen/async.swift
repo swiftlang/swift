@@ -9,7 +9,7 @@ public func f() async { }
 public func g() async throws { }
 
 // CHECK: "$s5async1hyyS2iJXEF"
-public func h(_: @concurrent (Int) -> Int) { }
+public func h(_: @Sendable (Int) -> Int) { }
 
 public class SomeClass {}
 

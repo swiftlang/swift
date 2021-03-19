@@ -1,3 +1,3 @@
-extension NoRawTypeKey : CodingKey, UnsafeConcurrentValue {}
-extension StringKey : CodingKey, UnsafeConcurrentValue {}
-extension IntKey : CodingKey, UnsafeConcurrentValue {}
+extension NoRawTypeKey : CodingKey, UnsafeSendable {} // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+extension StringKey : CodingKey, UnsafeSendable {} // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
+extension IntKey : CodingKey, UnsafeSendable {} // expected-warning{{'UnsafeSendable' is deprecated: Use @unchecked Sendable instead}}
