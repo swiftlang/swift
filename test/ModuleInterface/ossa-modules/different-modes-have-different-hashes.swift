@@ -80,8 +80,8 @@
 // RUN: diff -u %t/MCP.default/*.swiftmodule %t/MCP.default/old/*.swiftmodule
 //
 // But their actual names should be different since the hash is in the file name.
-// RUN: (cd %t/MCP.default && ls *.swiftmodule) > %t/MCP.default/firstFile
-// RUN: (cd %t/MCP.default/old && ls *.swiftmodule) > %t/MCP.default/secondFile
+// RUN: cd %t/MCP.default && ls *.swiftmodule > %t/MCP.default/firstFile
+// RUN: cd %t/MCP.default/old && ls *.swiftmodule > %t/MCP.default/secondFile
 // RUN: not diff -u %t/MCP.default/firstFile %t/MCP.default/secondFile
 
 ///////////
@@ -106,8 +106,8 @@
 // RUN: diff -u %t/MCP.Onone/*.swiftmodule %t/MCP.Onone/old/*.swiftmodule
 //
 // But their name should be different
-// RUN: (cd %t/MCP.Onone && ls *.swiftmodule) > %t/MCP.Onone/firstFile
-// RUN: (cd %t/MCP.Onone/old && ls *.swiftmodule) > %t/MCP.Onone/secondFile
+// RUN: cd %t/MCP.Onone && ls *.swiftmodule > %t/MCP.Onone/firstFile
+// RUN: cd %t/MCP.Onone/old && ls *.swiftmodule > %t/MCP.Onone/secondFile
 // RUN: not diff -u %t/MCP.Onone/firstFile %t/MCP.Onone/secondFile
 
 ///////////
@@ -134,8 +134,8 @@
 // RUN: not diff -u %t/MCP.Osize/*.swiftmodule %t/MCP.Osize/old/*.swiftmodule
 //
 // And their name should be different
-// RUN: (cd %t/MCP.Osize && ls *.swiftmodule) > %t/MCP.Osize/firstFile
-// RUN: (cd %t/MCP.Osize/old && ls *.swiftmodule) > %t/MCP.Osize/secondFile
+// RUN: cd %t/MCP.Osize && ls *.swiftmodule > %t/MCP.Osize/firstFile
+// RUN: cd %t/MCP.Osize/old && ls *.swiftmodule > %t/MCP.Osize/secondFile
 // RUN: not diff -u %t/MCP.Osize/firstFile %t/MCP.Osize/secondFile
 
 ///////
@@ -162,8 +162,8 @@
 // RUN: not diff -u %t/MCP.O/*.swiftmodule %t/MCP.O/old/*.swiftmodule
 //
 // And their name should be different
-// RUN: (cd %t/MCP.O && ls *.swiftmodule) > %t/MCP.O/firstFile
-// RUN: (cd %t/MCP.O/old && ls *.swiftmodule) > %t/MCP.O/secondFile
+// RUN: cd %t/MCP.O && ls *.swiftmodule > %t/MCP.O/firstFile
+// RUN: cd %t/MCP.O/old && ls *.swiftmodule > %t/MCP.O/secondFile
 // RUN: not diff -u %t/MCP.O/firstFile %t/MCP.O/secondFile
 
 @_fixed_layout
