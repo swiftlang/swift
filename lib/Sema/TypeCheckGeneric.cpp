@@ -105,11 +105,20 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       fixitLoc = originatingDecl->getStartLoc();
     }
 
-    ctx.Diags.diagnose(repr->getLoc(),
-                       diag::opaque_type_in_protocol_requirement)
-      .fixItInsert(fixitLoc, "associatedtype <#AssocType#>\n")
-      .fixItReplace(repr->getSourceRange(), "<#AssocType#>");
-    
+    std::string result;
+    const char *const placeholder = "<#AssocType#>";
+    {
+      llvm::raw_string_ostream out(result);
+      out << "associatedtype " << placeholder << ": ";
+      repr->getConstraint()->print(out);
+      out << "\n";
+    }
+
+    ctx.Diags
+        .diagnose(repr->getLoc(), diag::opaque_type_in_protocol_requirement)
+        .fixItInsert(fixitLoc, result)
+        .fixItReplace(repr->getSourceRange(), placeholder);
+
     return nullptr;
   }
   
