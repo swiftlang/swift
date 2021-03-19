@@ -156,6 +156,7 @@ import ReduceInto
 import RemoveWhere
 import ReversedCollections
 import RomanNumbers
+import SIMDReduceInteger
 import SequenceAlgos
 import SetTests
 import SevenBoom
@@ -352,6 +353,7 @@ registerBenchmark(ReduceInto)
 registerBenchmark(RemoveWhere)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
+registerBenchmark(SIMDReduceInteger)
 registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
