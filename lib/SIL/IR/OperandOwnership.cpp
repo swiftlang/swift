@@ -798,6 +798,7 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
         "Builtin should never be visited! E.x.: It may not have arguments");   \
   }
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
+SHOULD_NEVER_VISIT_BUILTIN(GetCurrentExecutor)
 #undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

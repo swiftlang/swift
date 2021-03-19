@@ -43,3 +43,17 @@ fileprivate func _registerMainActor(actor: AnyObject)
     _registerMainActor(actor: self)
   }
 }
+
+extension MainActor {
+  /// Execute the given body closure on the main actor.
+  public static func run<T>(
+    resultType: T.Type = T.self,
+    body: @MainActor @Sendable () throws -> T
+  ) async rethrows -> T {
+    @MainActor func runOnMain(body: @MainActor @Sendable () throws -> T) async rethrows -> T {
+      return try body()
+    }
+
+    return try await runOnMain(body: body)
+  }
+}

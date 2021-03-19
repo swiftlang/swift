@@ -13,6 +13,7 @@
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
+#include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -1455,6 +1456,7 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
+                                     ExecutorBreadcrumb prevExecutor,
                                      SILResultInfo exnResult,
                                      bool suppressErrorPath) {
   assert(exnResult.getConvention() == ResultConvention::Owned);
@@ -1468,8 +1470,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
 
-  if (fnTy->isAsync())
-    emitHopToCurrentExecutor(loc);
+  prevExecutor.emit(*this, loc);
 
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.
