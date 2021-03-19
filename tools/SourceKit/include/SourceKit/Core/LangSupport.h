@@ -391,6 +391,7 @@ struct CursorInfoData {
   StringRef InternalDiagnostic;
 
   UIdent Kind;
+  UIdent DeclarationLang;
   StringRef Name;
   StringRef USR;
   StringRef TypeName;
