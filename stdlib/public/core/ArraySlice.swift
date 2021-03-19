@@ -1518,5 +1518,5 @@ extension ArraySlice {
   }
 }
 
-extension ArraySlice: ConcurrentValue, UnsafeConcurrentValue
-  where Element: ConcurrentValue { }
+extension ArraySlice: Sendable, UnsafeSendable
+  where Element: Sendable { }

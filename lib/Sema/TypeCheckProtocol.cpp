@@ -5676,8 +5676,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto &Context = dc->getASTContext();
   MultiConformanceChecker groupChecker(Context);
 
-  ProtocolConformance *concurrentValueConformance = nullptr;
-  ProtocolConformance *unsafeConcurrentValueConformance = nullptr;
+  ProtocolConformance *SendableConformance = nullptr;
+  ProtocolConformance *unsafeSendableConformance = nullptr;
   ProtocolConformance *errorConformance = nullptr;
   ProtocolConformance *codingKeyConformance = nullptr;
   bool anyInvalid = false;
@@ -5706,11 +5706,11 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
         diagnoseMissingAppendInterpolationMethod(typeDecl);
       }
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
-      concurrentValueConformance = conformance;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      SendableConformance = conformance;
     } else if (proto->isSpecificProtocol(
-                   KnownProtocolKind::UnsafeConcurrentValue)) {
-      unsafeConcurrentValueConformance = conformance;
+                   KnownProtocolKind::UnsafeSendable)) {
+      unsafeSendableConformance = conformance;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
       errorConformance = conformance;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
@@ -5718,12 +5718,12 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     }
   }
 
-  // Check constraints of ConcurrentValue.
-  if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
-    ConcurrentValueCheck check = ConcurrentValueCheck::Explicit;
+  // Check constraints of Sendable.
+  if (SendableConformance && !unsafeSendableConformance) {
+    SendableCheck check = SendableCheck::Explicit;
     if (errorConformance || codingKeyConformance)
-      check = ConcurrentValueCheck::ImpliedByStandardProtocol;
-    checkConcurrentValueConformance(concurrentValueConformance, check);
+      check = SendableCheck::ImpliedByStandardProtocol;
+    checkSendableConformance(SendableConformance, check);
   }
 
   // Check all conformances.

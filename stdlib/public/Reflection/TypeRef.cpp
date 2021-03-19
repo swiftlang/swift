@@ -662,7 +662,7 @@ public:
     auto funcNode = Dem.createNode(kind);
     if (F->getFlags().isThrowing())
       funcNode->addChild(Dem.createNode(Node::Kind::ThrowsAnnotation), Dem);
-    if (F->getFlags().isConcurrent()) {
+    if (F->getFlags().isSendable()) {
       funcNode->addChild(
           Dem.createNode(Node::Kind::ConcurrentFunctionType), Dem);
     }

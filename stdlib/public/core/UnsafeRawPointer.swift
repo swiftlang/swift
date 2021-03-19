@@ -169,7 +169,7 @@
 ///       let numberPointer = UnsafeRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
-public struct UnsafeRawPointer: _Pointer, ConcurrentValue {
+public struct UnsafeRawPointer: _Pointer, Sendable {
   
   public typealias Pointee = UInt8
   
@@ -521,7 +521,7 @@ extension UnsafeRawPointer: Strideable {
 ///       let numberPointer = UnsafeMutableRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
-public struct UnsafeMutableRawPointer: _Pointer, ConcurrentValue {
+public struct UnsafeMutableRawPointer: _Pointer, Sendable {
   
   public typealias Pointee = UInt8
   

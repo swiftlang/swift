@@ -1790,7 +1790,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
 
   // Concurrent functions.
-  if (fn->isConcurrent()) {
+  if (fn->isSendable()) {
     OpArgs.push_back('h');
   }
 
@@ -2459,7 +2459,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
     appendOperator("Y");
-  if (fn->isConcurrent())
+  if (fn->isSendable())
     appendOperator("J");
   if (fn->isThrowing())
     appendOperator("K");

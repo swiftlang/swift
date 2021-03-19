@@ -2100,17 +2100,17 @@ public typealias DictionaryIndex<Key: Hashable, Value> =
 public typealias DictionaryIterator<Key: Hashable, Value> =
   Dictionary<Key, Value>.Iterator
 
-extension Dictionary: ConcurrentValue, UnsafeConcurrentValue
-  where Key: ConcurrentValue, Value: ConcurrentValue { }
-extension Dictionary.Keys: ConcurrentValue, UnsafeConcurrentValue
-  where Key: ConcurrentValue, Value: ConcurrentValue { }
-extension Dictionary.Values: ConcurrentValue, UnsafeConcurrentValue
-  where Key: ConcurrentValue, Value: ConcurrentValue { }
-extension Dictionary.Keys.Iterator: ConcurrentValue, UnsafeConcurrentValue
-  where Key: ConcurrentValue, Value: ConcurrentValue { }
-extension Dictionary.Values.Iterator: ConcurrentValue, UnsafeConcurrentValue
-  where Key: ConcurrentValue, Value: ConcurrentValue { }
-extension Dictionary.Index: ConcurrentValue, UnsafeConcurrentValue
-  where Key: ConcurrentValue, Value: ConcurrentValue { }
-extension Dictionary.Iterator: ConcurrentValue, UnsafeConcurrentValue
-  where Key: ConcurrentValue, Value: ConcurrentValue { }
+extension Dictionary: Sendable, UnsafeSendable
+  where Key: Sendable, Value: Sendable { }
+extension Dictionary.Keys: Sendable, UnsafeSendable
+  where Key: Sendable, Value: Sendable { }
+extension Dictionary.Values: Sendable, UnsafeSendable
+  where Key: Sendable, Value: Sendable { }
+extension Dictionary.Keys.Iterator: Sendable, UnsafeSendable
+  where Key: Sendable, Value: Sendable { }
+extension Dictionary.Values.Iterator: Sendable, UnsafeSendable
+  where Key: Sendable, Value: Sendable { }
+extension Dictionary.Index: Sendable, UnsafeSendable
+  where Key: Sendable, Value: Sendable { }
+extension Dictionary.Iterator: Sendable, UnsafeSendable
+  where Key: Sendable, Value: Sendable { }

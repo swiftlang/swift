@@ -1701,8 +1701,8 @@ public:
     SILFunctionConventions substConv(substTy, F.getModule());
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
-    bool isConcurrentAndStageIsCanonical =
-        PAI->getFunctionType()->isConcurrent() &&
+    bool isSendableAndStageIsCanonical =
+        PAI->getFunctionType()->isSendable() &&
         F.getModule().getStage() >= SILStage::Canonical;
     for (auto p : llvm::enumerate(PAI->getArguments())) {
       requireSameType(
@@ -1713,7 +1713,7 @@ public:
           "inputs");
 
       // TODO: Expand this to also be true for address only types.
-      if (isConcurrentAndStageIsCanonical)
+      if (isSendableAndStageIsCanonical)
         require(
             !p.value()->getType().getASTType()->is<SILBoxType>() ||
                 p.value()->getType().getSILBoxFieldType(&F).isAddressOnly(F),

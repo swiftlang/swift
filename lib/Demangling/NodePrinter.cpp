@@ -818,7 +818,7 @@ private:
     }
 
     unsigned startIndex = 0;
-    bool isConcurrent = false, isAsync = false, isThrows = false;
+    bool isSendable = false, isAsync = false, isThrows = false;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
       ++startIndex;
@@ -830,15 +830,15 @@ private:
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::ConcurrentFunctionType) {
       ++startIndex;
-      isConcurrent = true;
+      isSendable = true;
     }
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
     }
 
-    if (isConcurrent)
-      Printer << "@concurrent ";
+    if (isSendable)
+      Printer << "@Sendable ";
 
     printFunctionParameters(LabelList, node->getChild(startIndex),
                             Options.ShowFunctionArgumentTypes);
@@ -2542,7 +2542,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
 
   case Node::Kind::ConcurrentFunctionType:
-    Printer<< "@concurrent ";
+    Printer<< "@Sendable ";
     return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer<< " async ";

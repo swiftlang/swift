@@ -2548,7 +2548,7 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
     return AnyFunctionType::ExtInfo();
   return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
-      .withConcurrent(info.isConcurrent())
+      .withConcurrent(info.isSendable())
       .withAsync(info.isAsync())
       .withThrows(info.isThrowing())
       .withClangFunctionType(info.getClangTypeInfo().getType())
@@ -6832,8 +6832,8 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   return false;
 }
 
-bool AbstractFunctionDecl::isConcurrent() const {
-  return getAttrs().hasAttribute<ConcurrentAttr>();
+bool AbstractFunctionDecl::isSendable() const {
+  return getAttrs().hasAttribute<SendableAttr>();
 }
 
 bool AbstractFunctionDecl::isAsyncHandler() const {

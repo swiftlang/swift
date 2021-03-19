@@ -80,8 +80,8 @@ PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
-PROTOCOL(ConcurrentValue)
-PROTOCOL(UnsafeConcurrentValue)
+PROTOCOL(Sendable)
+PROTOCOL(UnsafeSendable)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)

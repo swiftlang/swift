@@ -36,7 +36,7 @@ static bool shouldInferAttributeInContext(const DeclContext *dc) {
       if (auto sourceFile = dc->getParentSourceFile()) {
         switch (sourceFile->Kind) {
         case SourceFileKind::Interface:
-          // Interfaces have explicitly called-out ConcurrentValue conformances.
+          // Interfaces have explicitly called-out Sendable conformances.
           return false;
 
         case SourceFileKind::Library:
@@ -754,26 +754,26 @@ static bool isEscapingClosure(const AbstractClosureExpr *closure) {
 }
 
 /// Determine whether this closure is escaping.
-static bool isConcurrentClosure(const AbstractClosureExpr *closure) {
+static bool isSendableClosure(const AbstractClosureExpr *closure) {
   if (auto type = closure->getType()) {
     if (auto fnType = type->getAs<AnyFunctionType>())
-      return fnType->isConcurrent();
+      return fnType->isSendable();
   }
 
   return false;
 }
 
 /// Determine whether the given type is suitable as a concurrent value type.
-static bool isConcurrentValueType(const DeclContext *dc, Type type) {
-  class IsConcurrentValue : public TypeVisitor<IsConcurrentValue, bool> {
+static bool isSendableType(const DeclContext *dc, Type type) {
+  class IsSendable : public TypeVisitor<IsSendable, bool> {
     DeclContext *dc;
-    ProtocolDecl *concurrentValueProto;
+    ProtocolDecl *SendableProto;
 
   public:
-    IsConcurrentValue(const DeclContext *dc)
+    IsSendable(const DeclContext *dc)
         : dc(const_cast<DeclContext *>(dc)) {
-      concurrentValueProto = dc->getASTContext().getProtocol(
-          KnownProtocolKind::ConcurrentValue);
+      SendableProto = dc->getASTContext().getProtocol(
+          KnownProtocolKind::Sendable);
     }
 
 #define ALWAYS_CONCURRENT_VALUE(Id) \
@@ -809,11 +809,11 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
 #undef ALWAYS_CONCURRENT_VALUE
 
     bool visitForConformanceCheck(TypeBase *type) {
-      if (!concurrentValueProto)
+      if (!SendableProto)
         return true;
 
       return !TypeChecker::conformsToProtocol(
-          Type(type), concurrentValueProto, dc).isInvalid();
+          Type(type), SendableProto, dc).isInvalid();
     }
 
     bool visitTupleType(TupleType *type) {
@@ -842,11 +842,11 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
     }
 
     bool visitProtocolType(ProtocolType *type) {
-      if (!concurrentValueProto)
+      if (!SendableProto)
         return true;
 
       return !TypeChecker::containsProtocol(
-        Type(type), concurrentValueProto, dc).isInvalid();
+        Type(type), SendableProto, dc).isInvalid();
     }
 
     bool visitBoundGenericType(BoundGenericType *type) {
@@ -863,7 +863,7 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
 
     bool visitFunctionType(FunctionType *type) {
       // Concurrent function types meet the requirements.
-      if (type->isConcurrent())
+      if (type->isSendable())
         return true;
 
       // C and thin function types meeting the requirements because they
@@ -880,10 +880,10 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
     }
 
     bool visitProtocolCompositionType(ProtocolCompositionType *type) {
-      if (!concurrentValueProto)
+      if (!SendableProto)
         return true;
 
-      return !TypeChecker::containsProtocol(type, concurrentValueProto, dc)
+      return !TypeChecker::containsProtocol(type, SendableProto, dc)
         .isInvalid();
     }
 
@@ -928,9 +928,9 @@ static bool diagnoseNonConcurrentProperty(
   return false;
 }
 
-/// Whether we should diagnose cases where ConcurrentValue conformances are
+/// Whether we should diagnose cases where Sendable conformances are
 /// missing.
-static bool shouldDiagnoseNonConcurrentValueViolations(
+static bool shouldDiagnoseNonSendableViolations(
     const LangOptions &langOpts) {
   return langOpts.WarnConcurrency;
 }
@@ -939,7 +939,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
     ConcurrentReferenceKind refKind, DiagnosticBehavior behavior) {
   // Bail out immediately if we aren't supposed to do this checking.
-  if (!shouldDiagnoseNonConcurrentValueViolations(dc->getASTContext().LangOpts))
+  if (!shouldDiagnoseNonSendableViolations(dc->getASTContext().LangOpts))
     return false;
 
   // For functions, check the parameter and result types.
@@ -947,7 +947,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
   if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
     for (auto param : *function->getParameters()) {
       Type paramType = param->getInterfaceType().subst(subs);
-      if (!isConcurrentValueType(dc, paramType)) {
+      if (!isSendableType(dc, paramType)) {
         return diagnoseNonConcurrentParameter(
             loc, refKind, declRef, param, paramType, behavior);
       }
@@ -956,7 +956,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     // Check the result type of a function.
     if (auto func = dyn_cast<FuncDecl>(function)) {
       Type resultType = func->getResultInterfaceType().subst(subs);
-      if (!isConcurrentValueType(dc, resultType)) {
+      if (!isSendableType(dc, resultType)) {
         return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType,
                                            behavior);
       }
@@ -969,7 +969,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     Type propertyType = var->isLocalCapture()
         ? var->getType()
         : var->getValueInterfaceType().subst(subs);
-    if (!isConcurrentValueType(dc, propertyType)) {
+    if (!isSendableType(dc, propertyType)) {
       return diagnoseNonConcurrentProperty(loc, refKind, var, propertyType,
                                            behavior);
     }
@@ -978,7 +978,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
   if (auto subscript = dyn_cast<SubscriptDecl>(declRef.getDecl())) {
     for (auto param : *subscript->getIndices()) {
       Type paramType = param->getInterfaceType().subst(subs);
-      if (!isConcurrentValueType(dc, paramType)) {
+      if (!isSendableType(dc, paramType)) {
         return diagnoseNonConcurrentParameter(
             loc, refKind, declRef, param, paramType, behavior);
       }
@@ -986,7 +986,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
 
     // Check the element type of a subscript.
     Type resultType = subscript->getElementInterfaceType().subst(subs);
-    if (!isConcurrentValueType(dc, resultType)) {
+    if (!isSendableType(dc, resultType)) {
       return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType,
                                          behavior);
     }
@@ -1618,7 +1618,7 @@ namespace {
       FoundAsync, // successfully marked an implicitly-async operation
       NotFound,  // fail: no valid implicitly-async operation was found
       SyncContext, // fail: a valid implicitly-async op, but in sync context
-      NotConcurrentValue  // fail: valid op and context, but not ConcurrentValue
+      NotSendable  // fail: valid op and context, but not Sendable
     };
 
     /// Attempts to identify and mark a valid cross-actor use of a synchronous
@@ -1696,7 +1696,7 @@ namespace {
               concDeclRef, getDeclContext(), declLoc,
               ConcurrentReferenceKind::SynchronousAsAsyncCall);
         if (problemFound)
-          result = AsyncMarkingResult::NotConcurrentValue;
+          result = AsyncMarkingResult::NotSendable;
       }
 
       return result;
@@ -1852,7 +1852,7 @@ namespace {
         auto parent = mutableLocalVarParent[declRefExpr];
 
         // If the variable is immutable, it's fine so long as it involves
-        // ConcurrentValue types.
+        // Sendable types.
         //
         // When flow-sensitive concurrent captures are enabled, we also
         // allow reads, depending on a SIL diagnostic pass to identify the
@@ -1874,18 +1874,18 @@ namespace {
       }
 
       if (auto func = dyn_cast<FuncDecl>(value)) {
-        if (func->isConcurrent())
+        if (func->isSendable())
           return false;
 
         func->diagnose(
             diag::local_function_executed_concurrently,
             func->getDescriptiveKind(), func->getName())
-          .fixItInsert(func->getAttributeInsertionLoc(false), "@concurrent ");
+          .fixItInsert(func->getAttributeInsertionLoc(false), "@Sendable ");
 
-        // Add the @concurrent attribute implicitly, so we don't diagnose
+        // Add the @Sendable attribute implicitly, so we don't diagnose
         // again.
         const_cast<FuncDecl *>(func)->getAttrs().add(
-            new (ctx) ConcurrentAttr(true));
+            new (ctx) SendableAttr(true));
         return true;
       }
 
@@ -1911,8 +1911,8 @@ namespace {
         if (auto varDecl = dyn_cast<VarDecl>(decl)) {
           if (varDecl->isLet()) {
             auto type = component.getComponentType();
-            if (shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts)
-                && !isConcurrentValueType(getDeclContext(), type)) {
+            if (shouldDiagnoseNonSendableViolations(ctx.LangOpts)
+                && !isSendableType(getDeclContext(), type)) {
               ctx.Diags.diagnose(
                   component.getLoc(), diag::non_concurrent_keypath_access,
                   type);
@@ -1963,13 +1963,13 @@ namespace {
           }; // end switch
         }
 
-        // Captured values in a path component must conform to ConcurrentValue.
+        // Captured values in a path component must conform to Sendable.
         // These captured values appear in Subscript, aka "index" components,
         // such as \Type.dict[k] where k is a captured dictionary key.
         if (auto indexExpr = component.getIndexExpr()) {
           auto type = indexExpr->getType();
-          if (type && shouldDiagnoseNonConcurrentValueViolations(ctx.LangOpts)
-              && !isConcurrentValueType(getDeclContext(), type)) {
+          if (type && shouldDiagnoseNonSendableViolations(ctx.LangOpts)
+              && !isSendableType(getDeclContext(), type)) {
             ctx.Diags.diagnose(
                 component.getLoc(), diag::non_concurrent_keypath_capture,
                 indexExpr->getType());
@@ -2038,7 +2038,7 @@ namespace {
       }
 
       if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-        if (isConcurrentClosure(closure)) {
+        if (isSendableClosure(closure)) {
           return diag::actor_isolated_from_concurrent_closure;
         }
 
@@ -2050,7 +2050,7 @@ namespace {
       }
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-        if (func->isConcurrent())
+        if (func->isSendable())
           return diag::actor_isolated_from_concurrent_function;
       }
 
@@ -2096,7 +2096,7 @@ namespace {
           auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
           if (result == AsyncMarkingResult::FoundAsync)
             return false; // no problems
-          else if (result == AsyncMarkingResult::NotConcurrentValue)
+          else if (result == AsyncMarkingResult::NotSendable)
             return true;
 
           auto useKind = static_cast<unsigned>(
@@ -2139,7 +2139,7 @@ namespace {
             auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
             if (result == AsyncMarkingResult::FoundAsync)
               return false; // no problems
-            else if (result == AsyncMarkingResult::NotConcurrentValue)
+            else if (result == AsyncMarkingResult::NotSendable)
               return true;
 
             // The 'self' is for an actor-independent member, which means
@@ -2158,7 +2158,7 @@ namespace {
             auto result = tryMarkImplicitlyAsync(memberLoc, memberRef, context);
             if (result == AsyncMarkingResult::FoundAsync)
               return false; // no problems
-            else if (result == AsyncMarkingResult::NotConcurrentValue)
+            else if (result == AsyncMarkingResult::NotSendable)
               return true;
 
             // The 'self' is for a member that's part of a global actor, which
@@ -2225,7 +2225,7 @@ namespace {
       }
 
       // Escaping and concurrent closures are always actor-independent.
-      if (isEscapingClosure(closure) || isConcurrentClosure(closure))
+      if (isEscapingClosure(closure) || isSendableClosure(closure))
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.
@@ -2277,14 +2277,14 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
   while (useContext != defContext) {
     // If we find a concurrent closure... it can be run concurrently.
     if (auto closure = dyn_cast<AbstractClosureExpr>(useContext)) {
-      if (isConcurrentClosure(closure))
+      if (isSendableClosure(closure))
         return true;
     }
 
     if (auto func = dyn_cast<FuncDecl>(useContext)) {
       if (func->isLocalCapture()) {
-        // If the function is @concurrent... it can be run concurrently.
-        if (func->isConcurrent())
+        // If the function is @Sendable... it can be run concurrently.
+        if (func->isSendable())
           return true;
       }
     }
@@ -2544,9 +2544,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // overridden by other inference rules.
   ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
 
-  // A @concurrent function is assumed to be actor-independent.
+  // A @Sendable function is assumed to be actor-independent.
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->isConcurrent()) {
+    if (func->isSendable()) {
       defaultIsolation = ActorIsolation::forIndependent(
           ActorIndependentKind::Safe);
     }
@@ -2830,7 +2830,7 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
       // Async and concurrent closures use concurrency features.
       if (auto closureType = closure->getType()) {
         if (auto fnType = closureType->getAs<AnyFunctionType>())
-          if (fnType->isAsync() || fnType->isConcurrent())
+          if (fnType->isAsync() || fnType->isSendable())
             return true;
       }
     } else if (auto decl = dc->getAsDecl()) {
@@ -2841,7 +2841,7 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         // Async and concurrent functions use concurrency features.
-        if (func->hasAsync() || func->isConcurrent())
+        if (func->hasAsync() || func->isSendable())
           return true;
 
         // If there is an explicit @asyncHandler, we're using concurrency
@@ -2879,29 +2879,29 @@ static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc) {
 }
 
 static DiagnosticBehavior toDiagnosticBehavior(const LangOptions &langOpts,
-                                               ConcurrentValueCheck check,
+                                               SendableCheck check,
                                                bool diagnoseImplicit = false) {
   switch (check) {
-  case ConcurrentValueCheck::ImpliedByStandardProtocol:
-    return shouldDiagnoseNonConcurrentValueViolations(langOpts)
+  case SendableCheck::ImpliedByStandardProtocol:
+    return shouldDiagnoseNonSendableViolations(langOpts)
         ? DiagnosticBehavior::Warning
         : DiagnosticBehavior::Ignore;
-  case ConcurrentValueCheck::Explicit:
+  case SendableCheck::Explicit:
     return DiagnosticBehavior::Unspecified;
-  case ConcurrentValueCheck::Implicit:
+  case SendableCheck::Implicit:
     return (diagnoseImplicit &&
-            shouldDiagnoseNonConcurrentValueViolations(langOpts))
+            shouldDiagnoseNonSendableViolations(langOpts))
       ? DiagnosticBehavior::Unspecified
       : DiagnosticBehavior::Ignore;
   }
 }
 
 /// Check the instance storage of the given nominal type to verify whether
-/// it is comprised only of ConcurrentValue instance storage.
-static bool checkConcurrentValueInstanceStorage(
-    NominalTypeDecl *nominal, DeclContext *dc, ConcurrentValueCheck check) {
+/// it is comprised only of Sendable instance storage.
+static bool checkSendableInstanceStorage(
+    NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check) {
   // Stored properties of structs and classes must have
-  // ConcurrentValue-conforming types.
+  // Sendable-conforming types.
   const auto &langOpts = dc->getASTContext().LangOpts;
   auto behavior = toDiagnosticBehavior(langOpts, check);
   bool invalid = false;
@@ -2920,7 +2920,7 @@ static bool checkConcurrentValueInstanceStorage(
       }
 
       auto propertyType = dc->mapTypeIntoContext(property->getInterfaceType());
-      if (!isConcurrentValueType(dc, propertyType)) {
+      if (!isSendableType(dc, propertyType)) {
         if (behavior == DiagnosticBehavior::Ignore)
           return true;
         property->diagnose(diag::non_concurrent_type_member,
@@ -2936,7 +2936,7 @@ static bool checkConcurrentValueInstanceStorage(
     return invalid;
   }
 
-  // Associated values of enum cases must have ConcurrentValue-conforming
+  // Associated values of enum cases must have Sendable-conforming
   // types.
   if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
     for (auto caseDecl : enumDecl->getAllCases()) {
@@ -2946,7 +2946,7 @@ static bool checkConcurrentValueInstanceStorage(
 
         auto elementType = dc->mapTypeIntoContext(
             element->getArgumentInterfaceType());
-        if (!isConcurrentValueType(dc, elementType)) {
+        if (!isSendableType(dc, elementType)) {
           if (behavior == DiagnosticBehavior::Ignore)
             return true;
           element->diagnose(diag::non_concurrent_type_member,
@@ -2964,8 +2964,8 @@ static bool checkConcurrentValueInstanceStorage(
   return invalid;
 }
 
-bool swift::checkConcurrentValueConformance(
-    ProtocolConformance *conformance, ConcurrentValueCheck check) {
+bool swift::checkSendableConformance(
+    ProtocolConformance *conformance, SendableCheck check) {
   auto conformanceDC = conformance->getDeclContext();
   auto nominal = conformance->getType()->getAnyNominal();
   if (!nominal)
@@ -2973,12 +2973,12 @@ bool swift::checkConcurrentValueConformance(
 
   auto classDecl = dyn_cast<ClassDecl>(nominal);
   if (classDecl) {
-    // Actors implicitly conform to ConcurrentValue and protect their state.
+    // Actors implicitly conform to Sendable and protect their state.
     if (classDecl->isActor())
       return false;
   }
 
-  // ConcurrentValue can only be used in the same source file.
+  // Sendable can only be used in the same source file.
   auto conformanceDecl = conformanceDC->getAsDecl();
   auto behavior = toDiagnosticBehavior(
       nominal->getASTContext().LangOpts, check, /*diagnoseImplicit=*/true);
@@ -2994,7 +2994,7 @@ bool swift::checkConcurrentValueConformance(
   }
 
   if (classDecl) {
-    // An non-final class cannot conform to `ConcurrentValue`.
+    // An non-final class cannot conform to `Sendable`.
     if (!classDecl->isFinal()) {
       classDecl->diagnose(diag::concurrent_value_nonfinal_class,
                           classDecl->getName())
@@ -3004,7 +3004,7 @@ bool swift::checkConcurrentValueConformance(
         return true;
     }
 
-    // A 'ConcurrentValue' class cannot inherit from another class, although
+    // A 'Sendable' class cannot inherit from another class, although
     // we allow `NSObject` for Objective-C interoperability.
     if (!isa<InheritedProtocolConformance>(conformance)) {
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
@@ -3022,18 +3022,18 @@ bool swift::checkConcurrentValueConformance(
     }
   }
 
-  return checkConcurrentValueInstanceStorage(nominal, conformanceDC, check);
+  return checkSendableInstanceStorage(nominal, conformanceDC, check);
 }
 
-NormalProtocolConformance *GetImplicitConcurrentValueRequest::evaluate(
+NormalProtocolConformance *GetImplicitSendableRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
-  // Only structs and enums can get implicit ConcurrentValue conformances.
+  // Only structs and enums can get implicit Sendable conformances.
   if (!isa<StructDecl>(nominal) && !isa<EnumDecl>(nominal))
     return nullptr;
 
   // Public, non-frozen structs and enums defined in Swift don't get implicit
-  // ConcurrentValue conformances.
-  if (!nominal->getASTContext().LangOpts.EnableInferPublicConcurrentValue &&
+  // Sendable conformances.
+  if (!nominal->getASTContext().LangOpts.EnableInferPublicSendable &&
       nominal->getFormalAccessScope(
           /*useDC=*/nullptr,
           /*treatUsableFromInlineAsPublic=*/true).isPublic() &&
@@ -3051,7 +3051,7 @@ NormalProtocolConformance *GetImplicitConcurrentValueRequest::evaluate(
       if (auto sourceFile = nominal->getParentSourceFile()) {
         switch (sourceFile->Kind) {
         case SourceFileKind::Interface:
-          // Interfaces have explicitly called-out ConcurrentValue conformances.
+          // Interfaces have explicitly called-out Sendable conformances.
           return nullptr;
 
         case SourceFileKind::Library:
@@ -3065,7 +3065,7 @@ NormalProtocolConformance *GetImplicitConcurrentValueRequest::evaluate(
     case FileUnitKind::Builtin:
     case FileUnitKind::SerializedAST:
     case FileUnitKind::Synthesized:
-      // Explicitly-handled modules don't infer ConcurrentValue conformances.
+      // Explicitly-handled modules don't infer Sendable conformances.
       return nullptr;
 
     case FileUnitKind::ClangModule:
@@ -3077,13 +3077,13 @@ NormalProtocolConformance *GetImplicitConcurrentValueRequest::evaluate(
     return nullptr;
   }
 
-  // Check the instance storage for ConcurrentValue conformance.
-  if (checkConcurrentValueInstanceStorage(
-          nominal, nominal, ConcurrentValueCheck::Implicit))
+  // Check the instance storage for Sendable conformance.
+  if (checkSendableInstanceStorage(
+          nominal, nominal, SendableCheck::Implicit))
     return nullptr;
 
   ASTContext &ctx = nominal->getASTContext();
-  auto proto = ctx.getProtocol(KnownProtocolKind::ConcurrentValue);
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
     return nullptr;
 

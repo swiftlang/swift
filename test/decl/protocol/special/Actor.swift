@@ -33,7 +33,7 @@ actor A7 {
 }
 
 // A non-actor can conform to the Actor protocol, if it does it properly.
-class C1: Actor { // expected-error{{non-final class 'C1' cannot conform to `ConcurrentValue`; use `UnsafeConcurrentValue`}}
+class C1: Actor { // expected-error{{non-final class 'C1' cannot conform to `Sendable`; use `UnsafeSendable`}}
   func enqueue(partialTask: PartialAsyncTask) { }
 }
 

@@ -188,13 +188,13 @@ public:
     return false;
   }
 
-  /// Whether this function is @concurrent.
-  bool isConcurrent() const {
+  /// Whether this function is @Sendable.
+  bool isSendable() const {
     if (!hasType())
       return false;
 
     if (auto *fnType = getType()->getAs<AnyFunctionType>())
-      return fnType->isConcurrent();
+      return fnType->isSendable();
 
     return false;
   }

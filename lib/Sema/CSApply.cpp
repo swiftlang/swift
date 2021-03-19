@@ -6830,7 +6830,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // If we have a ClosureExpr, then we can safely propagate the 'concurrent'
     // bit to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
-    if (toEI.isConcurrent() && !fromEI.isConcurrent()) {
+    if (toEI.isSendable() && !fromEI.isSendable()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();

@@ -489,7 +489,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
         break;
 
       case AttrLoc::Attribute::Concurrent:
-        out << "@concurrent";
+        out << "@Sendable";
         break;
 
       case AttrLoc::Attribute::GlobalActor:

@@ -146,7 +146,7 @@ extension RandomNumberGenerator {
 ///   from `/dev/urandom`.
 /// - Windows uses `BCryptGenRandom`.
 @frozen
-public struct SystemRandomNumberGenerator: RandomNumberGenerator, ConcurrentValue {
+public struct SystemRandomNumberGenerator: RandomNumberGenerator, Sendable {
   /// Creates a new instance of the system's default random number generator.
   @inlinable
   public init() { }

@@ -45,7 +45,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
-  ConcurrentValue.swift
+  Sendable.swift
   ContiguousArray.swift
   ContiguouslyStored.swift
   ClosedRange.swift

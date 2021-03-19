@@ -581,7 +581,7 @@ Type ASTBuilder::createImplFunctionType(
   }
   auto einfo = SILFunctionType::ExtInfoBuilder(
                    representation, flags.isPseudogeneric(), !flags.isEscaping(),
-                   flags.isConcurrent(), flags.isAsync(), diffKind, clangFnType)
+                   flags.isSendable(), flags.isAsync(), diffKind, clangFnType)
                    .build();
   auto witnessMethodConformance =
       witnessMethodConformanceRequirement

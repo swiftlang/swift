@@ -23,7 +23,7 @@ func test_detach() async {
 }
 
 func test_multiple_lo_indirectly_escalated() async {
-  @concurrent
+  @Sendable
   func loopUntil(priority: Task.Priority) async {
     while (Task.currentPriority != priority) {
       await Task.sleep(1_000_000_000)
