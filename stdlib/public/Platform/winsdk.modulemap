@@ -423,6 +423,7 @@ module WinSDK [system] {
   module User {
     header "WinUser.h"
     export *
+    link "User32.Lib"
   }
 
   module WIC {
