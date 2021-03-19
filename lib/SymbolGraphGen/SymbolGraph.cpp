@@ -72,7 +72,7 @@ PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   Opts.SkipUnderscoredStdlibProtocols = true;
   Opts.PrintGenericRequirements = true;
   Opts.PrintInherited = false;
-  Opts.ExplodeEnumCaseDecls = IsForSingleNode;
+  Opts.ExplodeEnumCaseDecls = true;
 
   Opts.ExclusiveAttrList.clear();
 
