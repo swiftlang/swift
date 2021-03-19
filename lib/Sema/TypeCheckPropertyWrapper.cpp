@@ -565,6 +565,8 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
       TypeChecker::typeCheckPatternBinding(binding, index);
+    if (binding->isInvalid())
+      return Type();
   } else {
     using namespace constraints;
     auto dc = var->getInnermostDeclContext();
