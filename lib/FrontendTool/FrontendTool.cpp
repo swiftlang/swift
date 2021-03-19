@@ -417,11 +417,11 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangImporterOptions(),
-      Invocation.getClangModuleCachePath(),
-      PrebuiltCachePath, Invocation.getModuleName(), InputPath,
-      Invocation.getOutputFilename(),
+      Invocation.getClangModuleCachePath(), PrebuiltCachePath,
+      Invocation.getModuleName(), InputPath, Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.shouldTrackSystemDependencies(), LoaderOpts);
+      FEOpts.shouldTrackSystemDependencies(), LoaderOpts,
+      RequireOSSAModules_t(Invocation.getSILOptions()));
 }
 
 static bool compileLLVMIR(CompilerInstance &Instance) {

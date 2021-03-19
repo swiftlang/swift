@@ -524,8 +524,9 @@ bool CompilerInstance::setUpModuleLoaders() {
   auto &FEOpts = Invocation.getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   Context->addModuleInterfaceChecker(
-    std::make_unique<ModuleInterfaceCheckerImpl>(*Context, ModuleCachePath,
-      FEOpts.PrebuiltModuleCachePath, LoaderOpts));
+      std::make_unique<ModuleInterfaceCheckerImpl>(
+          *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath, LoaderOpts,
+          RequireOSSAModules_t(Invocation.getSILOptions())));
   // If implicit modules are disabled, we need to install an explicit module
   // loader.
   bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
@@ -564,15 +565,14 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                        ->getClangModuleLoader()->getClangInstance());
     auto &FEOpts = Invocation.getFrontendOptions();
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-    InterfaceSubContextDelegateImpl ASTDelegate(Context->SourceMgr, Context->Diags,
-                                                Context->SearchPathOpts, Context->LangOpts,
-                                                Context->ClangImporterOpts,
-                                                LoaderOpts,
-                                                /*buildModuleCacheDirIfAbsent*/false,
-                                                ModuleCachePath,
-                                                FEOpts.PrebuiltModuleCachePath,
-                                                FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                                FEOpts.shouldTrackSystemDependencies());
+    InterfaceSubContextDelegateImpl ASTDelegate(
+        Context->SourceMgr, Context->Diags, Context->SearchPathOpts,
+        Context->LangOpts, Context->ClangImporterOpts, LoaderOpts,
+        /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+        FEOpts.PrebuiltModuleCachePath,
+        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        FEOpts.shouldTrackSystemDependencies(),
+        RequireOSSAModules_t(Invocation.getSILOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
       std::make_unique<PlaceholderSwiftModuleScanner>(*Context,
