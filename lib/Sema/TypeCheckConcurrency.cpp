@@ -902,27 +902,30 @@ static bool isConcurrentValueType(const DeclContext *dc, Type type) {
 
 static bool diagnoseNonConcurrentParameter(
     SourceLoc loc, ConcurrentReferenceKind refKind, ConcreteDeclRef declRef,
-    ParamDecl *param, Type paramType) {
+    ParamDecl *param, Type paramType, DiagnosticBehavior behavior) {
   ASTContext &ctx = declRef.getDecl()->getASTContext();
-  ctx.Diags.diagnose(loc, diag::non_concurrent_param_type, paramType);
+  ctx.Diags.diagnose(loc, diag::non_concurrent_param_type, paramType)
+      .limitBehavior(behavior);
   return false;
 }
 
 static bool diagnoseNonConcurrentResult(
     SourceLoc loc, ConcurrentReferenceKind refKind, ConcreteDeclRef declRef,
-    Type resultType) {
+    Type resultType, DiagnosticBehavior behavior) {
   ASTContext &ctx = declRef.getDecl()->getASTContext();
-  ctx.Diags.diagnose(loc, diag::non_concurrent_result_type, resultType);
+  ctx.Diags.diagnose(loc, diag::non_concurrent_result_type, resultType)
+      .limitBehavior(behavior);
   return false;
 }
 
 static bool diagnoseNonConcurrentProperty(
     SourceLoc loc, ConcurrentReferenceKind refKind, VarDecl *var,
-    Type propertyType) {
+    Type propertyType, DiagnosticBehavior behavior) {
   ASTContext &ctx = var->getASTContext();
   ctx.Diags.diagnose(loc, diag::non_concurrent_property_type,
                      var->getDescriptiveKind(), var->getName(),
-                     propertyType, var->isLocalCapture());
+                     propertyType, var->isLocalCapture())
+      .limitBehavior(behavior);
   return false;
 }
 
@@ -935,7 +938,7 @@ static bool shouldDiagnoseNonConcurrentValueViolations(
 
 bool swift::diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
-    ConcurrentReferenceKind refKind) {
+    ConcurrentReferenceKind refKind, DiagnosticBehavior behavior) {
   // Bail out immediately if we aren't supposed to do this checking.
   if (!shouldDiagnoseNonConcurrentValueViolations(dc->getASTContext().LangOpts))
     return false;
@@ -947,7 +950,7 @@ bool swift::diagnoseNonConcurrentTypesInReference(
       Type paramType = param->getInterfaceType().subst(subs);
       if (!isConcurrentValueType(dc, paramType)) {
         return diagnoseNonConcurrentParameter(
-            loc, refKind, declRef, param, paramType);
+            loc, refKind, declRef, param, paramType, behavior);
       }
     }
 
@@ -955,7 +958,8 @@ bool swift::diagnoseNonConcurrentTypesInReference(
     if (auto func = dyn_cast<FuncDecl>(function)) {
       Type resultType = func->getResultInterfaceType().subst(subs);
       if (!isConcurrentValueType(dc, resultType)) {
-        return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType);
+        return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType,
+                                           behavior);
       }
     }
 
@@ -967,7 +971,8 @@ bool swift::diagnoseNonConcurrentTypesInReference(
         ? var->getType()
         : var->getValueInterfaceType().subst(subs);
     if (!isConcurrentValueType(dc, propertyType)) {
-      return diagnoseNonConcurrentProperty(loc, refKind, var, propertyType);
+      return diagnoseNonConcurrentProperty(loc, refKind, var, propertyType,
+                                           behavior);
     }
   }
 
@@ -976,14 +981,15 @@ bool swift::diagnoseNonConcurrentTypesInReference(
       Type paramType = param->getInterfaceType().subst(subs);
       if (!isConcurrentValueType(dc, paramType)) {
         return diagnoseNonConcurrentParameter(
-            loc, refKind, declRef, param, paramType);
+            loc, refKind, declRef, param, paramType, behavior);
       }
     }
 
     // Check the element type of a subscript.
     Type resultType = subscript->getElementInterfaceType().subst(subs);
     if (!isConcurrentValueType(dc, resultType)) {
-      return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType);
+      return diagnoseNonConcurrentResult(loc, refKind, declRef, resultType,
+                                         behavior);
     }
 
     return false;
