@@ -908,7 +908,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
       param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
     } else {
-      auto *placeholder = vd->getPropertyWrapperBackingPropertyInfo().getProjectedValuePlaceholder();
+      auto *placeholder =
+          vd->getPropertyWrapperInitializerInfo().getProjectedValuePlaceholder();
       auto interfaceType = placeholder->getType();
       if (interfaceType->hasArchetype())
         interfaceType = interfaceType->mapTypeOutOfContext();
@@ -934,24 +935,24 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     // in the initializer expression to the given parameter.
     if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
       auto var = cast<VarDecl>(function.getDecl());
-      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
       auto param = params->get(0);
-      auto *placeholder = wrappedInfo.getWrappedValuePlaceholder();
+      auto *placeholder = initInfo.getWrappedValuePlaceholder();
       opaqueValue.emplace(
           *this, placeholder->getOpaqueValuePlaceholder(),
           maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
 
-      assert(value == wrappedInfo.getInitFromWrappedValue());
+      assert(value == initInfo.getInitFromWrappedValue());
     } else if (function.kind == SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue) {
       auto var = cast<VarDecl>(function.getDecl());
-      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
       auto param = params->get(0);
-      auto *placeholder = wrappedInfo.getProjectedValuePlaceholder();
+      auto *placeholder = initInfo.getProjectedValuePlaceholder();
       opaqueValue.emplace(
           *this, placeholder->getOpaqueValuePlaceholder(),
           maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
 
-      assert(value == wrappedInfo.getInitFromProjectedValue());
+      assert(value == initInfo.getInitFromProjectedValue());
     }
 
     emitReturnExpr(Loc, value);

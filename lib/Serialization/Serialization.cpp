@@ -3522,7 +3522,7 @@ public:
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
 
-    if (auto backingInfo = var->getPropertyWrapperBackingPropertyInfo()) {
+    if (auto backingInfo = var->getPropertyWrapperAuxiliaryVariables()) {
       if (backingInfo.backingVar) {
         ++numBackingProperties;
         arrayFields.push_back(S.addDeclRef(backingInfo.backingVar));

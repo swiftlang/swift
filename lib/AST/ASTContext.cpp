@@ -5020,7 +5020,7 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   if (!kind)
     return original;
 
-  auto wrapperInfo = original->getPropertyWrapperBackingPropertyInfo();
+  auto wrapperInfo = original->getPropertyWrapperAuxiliaryVariables();
   switch (*kind) {
   case PropertyWrapperSynthesizedPropertyKind::Backing:
     return this == wrapperInfo.backingVar ? original : nullptr;
