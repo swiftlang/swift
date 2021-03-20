@@ -2842,7 +2842,7 @@ public:
 // C++ header imported in Swift.
 
 struct MyCxxContainer {
-  public subscript(_ i: Int) { get set }
+  public subscript(_ i: Int) -> Double { get set }
 }
 ```
 
