@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -Xfrontend -enable-experimental-distributed -parse-as-library) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -7,6 +7,15 @@ import Dispatch
 import _Concurrency
 
 distributed actor SomeSpecificDistributedActor {
+  distributed func hello() async throws -> String {
+    "local impl"
+  }
+}
+
+extension SomeSpecificDistributedActor {
+  static func _remote_hello(actor: SomeSpecificDistributedActor) async throws -> String {
+    return "remote impl (address: \(actor.actorAddress))"
+  }
 }
 
 // ==== Fake Transport ---------------------------------------------------------

@@ -144,12 +144,36 @@ public struct ActorAddress: Codable, ConcurrentValue, Equatable {
   public var uid: UInt64 // TODO: should we remove this
 
   public init(parse: String) {
-    self.protocol = "xxx"
+    self.protocol = "sact"
     self.host = "xxx"
     self.port = 7337
     self.nodeID = 11
-    self.path = "/example"
+    self.path = "example"
     self.uid = 123123
+  }
+}
+
+// TODO: naive impl, bring in a real one
+extension ActorAddress: CustomStringConvertible {
+  public var description: String {
+    var result = `protocol`
+    result += "://"
+    if let host = host {
+      result += host
+    }
+    if let port = port {
+      result += ":\(port)"
+    }
+//    if let nodeID = nodeID {
+//      result += "@\(nodeID)"
+//    }
+    if let path = path {
+      result += "/\(path)"
+    }
+    if uid > 0 {
+      result += "#\(uid)"
+    }
+    return result
   }
 }
 

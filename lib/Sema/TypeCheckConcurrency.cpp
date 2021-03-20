@@ -139,13 +139,13 @@ static bool checkAsyncHandler(FuncDecl *func, bool diagnose) {
 /// \returns \c true if there was a problem with adding the attribute, \c false
 /// otherwise.
 static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
-  // All parameters and the result type must be Codable
+  // === All parameters and the result type must be Codable
 
   auto &C = func->getASTContext();
   auto encodableType = C.getProtocol(KnownProtocolKind::Encodable);
   auto decodableType = C.getProtocol(KnownProtocolKind::Decodable);
 
-  // Check parameters for 'Codable' conformance
+  // --- Check parameters for 'Codable' conformance
   for (auto param : *func->getParameters()) {
     auto paramType = func->mapTypeIntoContext(param->getInterfaceType()); // TODO: getDeclaredInterfaceType instead?
     if (TypeChecker::conformsToProtocol(paramType, encodableType, func).isInvalid() ||
@@ -161,7 +161,7 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
     }
   }
 
-  // Result type must be either void or a codable type
+  // --- Result type must be either void or a codable type
   // TODO: In the future we can also support AsyncSequence of Codable values
   auto resultType = func->mapTypeIntoContext(func->getResultInterfaceType()); // TODO: getDeclaredInterfaceType instead?
   if (!resultType->isVoid()) {
@@ -175,6 +175,45 @@ static bool checkDistributedFunc(FuncDecl *func, bool diagnose) {
       // TODO: suggest a fixit to add Codable to the type?
       return true;
     }
+  }
+
+  // === Each distributed function must have a static _remote_<func_name> counterpart
+  ClassDecl *actorDecl = dyn_cast<ClassDecl>(func->getParent());
+  assert(actorDecl && actorDecl->isDistributedActor());
+
+  auto remoteFuncDecl = actorDecl->lookupDirectRemoteFunc(func);
+  if (!remoteFuncDecl) {
+    if (diagnose) {
+      auto localFuncName = func->getBaseIdentifier().str().str();
+      func->diagnose(
+          diag::distributed_actor_func_missing_remote_func,
+          C.getIdentifier("_remote_" + localFuncName));
+    }
+    return true;
+  }
+
+  if (!remoteFuncDecl->isStatic()) {
+    if (diagnose)
+      func->diagnose(
+          diag::distributed_actor_remote_func_is_not_static,
+          remoteFuncDecl->getName());
+    return true;
+  }
+
+  if (!remoteFuncDecl->hasAsync() || !remoteFuncDecl->hasThrows()) {
+    if (diagnose)
+      func->diagnose(
+          diag::distributed_actor_remote_func_is_not_async_throws,
+          remoteFuncDecl->getName());
+    return true;
+  }
+
+  if (remoteFuncDecl->isDistributed()) {
+    if (diagnose)
+      func->diagnose(
+          diag::distributed_actor_remote_func_must_not_be_distributed,
+          remoteFuncDecl->getName());
+    return true;
   }
 
   return false;

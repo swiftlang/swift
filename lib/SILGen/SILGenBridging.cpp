@@ -2033,12 +2033,10 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
 
 
   // if __isRemoteActor(self) {
-  //   return try await Self._distributed_X(...)
+  //   return try await Self._remote_X(...)
   // }
   {
     B.emitBlock(isRemoteBB);
-
-    auto remoteFnId = ctx.getIdentifier("_remote_" + fd->getBaseIdentifier().str().str());
 
     auto *selfTyDecl = FunctionDC->getParent()->getSelfNominalTypeDecl();
     // FIXME: should this be an llvm_unreachable instead?
@@ -2047,13 +2045,8 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
     auto selfMetatype = getLoweredType(selfTyDecl->getInterfaceType());
     SILValue metatypeValue = B.createMetatype(loc, selfMetatype);
 
-    auto remoteFnDecls = selfTyDecl->lookupDirect(DeclName(remoteFnId));
-
-    // TODO: handle properly
-    assert(!remoteFnDecls.empty());
-
-    auto *remoteFnDecl = dyn_cast<FuncDecl>(remoteFnDecls.front());
-    assert(remoteFnDecl);
+    auto remoteFnDecl = selfTyDecl->lookupDirectRemoteFunc(fd);
+    assert(remoteFnDecl && "Could not find _remote_<dist_func_name> function");
     auto remoteFnRef = SILDeclRef(remoteFnDecl);
 
     SILGenFunctionBuilder builder(SGM);
