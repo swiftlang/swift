@@ -3038,10 +3038,12 @@ public:
         projectionVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
       }
 
-      PropertyWrapperBackingPropertyInfo info(
-          backingVar, projectionVar, nullptr, nullptr);
+      PropertyWrapperAuxiliaryVariables vars(backingVar, projectionVar);
       ctx.evaluator.cacheOutput(
-          PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
+          PropertyWrapperAuxiliaryVariablesRequest{var}, std::move(vars));
+      ctx.evaluator.cacheOutput(
+          PropertyWrapperInitializerInfoRequest{var},
+          PropertyWrapperInitializerInfo());
       ctx.evaluator.cacheOutput(
           PropertyWrapperBackingPropertyTypeRequest{var},
           backingVar->getInterfaceType());

@@ -141,6 +141,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::COWBufferForReading:
     case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::GetCurrentAsyncTask:
+    case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:
       return false;
 

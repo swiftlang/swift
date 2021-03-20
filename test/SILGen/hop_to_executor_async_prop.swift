@@ -81,14 +81,11 @@ struct GlobalCat {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test015accessSweaterOfC03catAA0C0VAA3CatC_tYF : $@convention(thin) @async (@guaranteed Cat) -> @owned Sweater {
 // CHECK:  bb0([[CAT:%[0-9]+]] : @guaranteed $Cat):
+// CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT]] : $Cat
 // CHECK:    [[CAT_GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER1_REF:%[0-9]+]] = apply [[CAT_GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
-
-//               Notice that we don't hop back to the previous executor after invoking the getter,
-//               following the current code emission style when calling an actor from a non-actor async function.
-
-// CHECK-NOT: hop_to_executor
+// CHECK:    hop_to_executor [[PREV_EXEC]]
 // CHECK:    [[SWEATER1:%[0-9]+]] = begin_borrow [[SWEATER1_REF]] : $Sweater
 // CHECK:    [[SWEATER1_OWNER:%[0-9]+]] = struct_extract [[SWEATER1]] : $Sweater, #Sweater.owner
 // CHECK:    [[CAT2_REF:%[0-9]+]] = copy_value [[SWEATER1_OWNER]] : $Cat
@@ -96,14 +93,15 @@ struct GlobalCat {
 // CHECK:    destroy_value [[SWEATER1_REF]] : $Sweater
 // CHECK:    [[CAT2:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
 
+// CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[CAT2]] : $Cat
 // CHECK:    [[CAT2_FOR_LOAD:%[0-9]+]] = begin_borrow [[CAT2_REF]] : $Cat
 // CHECK:    [[CAT2_GETTER:%[0-9]+]] = class_method [[CAT2_FOR_LOAD]] : $Cat, #Cat.computedSweater!getter : (Cat) -> () -> Sweater, $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    [[SWEATER2_OWNER:%[0-9]+]] = apply [[CAT2_GETTER]]([[CAT2_FOR_LOAD]]) : $@convention(method) (@guaranteed Cat) -> @owned Sweater
 // CHECK:    end_borrow [[CAT2_FOR_LOAD]] : $Cat
 // CHECK:    end_borrow [[CAT2]] : $Cat
+// CHECK:    hop_to_executor [[PREV_EXEC]]
 
-// CHECK-NOT: hop_to_executor
 // CHECK:    destroy_value [[CAT2_REF]] : $Cat
 // CHECK:    return [[SWEATER2_OWNER]] : $Sweater
 // CHECK: } // end sil function '$s4test015accessSweaterOfC03catAA0C0VAA3CatC_tYF'
@@ -120,10 +118,12 @@ func accessSweaterOfSweater(cat : Cat) async -> Sweater {
 // CHECK:    [[GLOBAL_CAT_REF:%[0-9]+]] = load [copy] [[GLOBAL_CAT_ADDR]] : $*Cat
 // CHECK:    [[GLOBAL_CAT:%[0-9]+]] = begin_borrow [[GLOBAL_CAT_REF]] : $Cat
 
+// CHECK:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"
 // CHECK:    hop_to_executor [[GLOBAL_CAT]] : $Cat
 // CHECK:    [[GETTER:%[0-9]+]] = class_method [[CAT]] : $Cat, #Cat.leader!getter : (Cat) -> () -> String, $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    [[THE_STRING:%[0-9]+]] = apply [[GETTER]]([[CAT]]) : $@convention(method) (@guaranteed Cat) -> @owned String
 // CHECK:    end_borrow [[GLOBAL_CAT]] : $Cat
+// CHECK:    hop_to_executor [[PREV_EXEC]]
 // CHECK:    destroy_value [[GLOBAL_CAT_REF]] : $Cat
 // CHECK:    return [[THE_STRING]] : $String
 // CHECK: } // end sil function '$s4test26accessGlobalIsolatedMember3catSSAA3CatC_tYF'

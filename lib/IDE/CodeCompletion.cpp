@@ -261,7 +261,7 @@ public:
 
 void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   auto Interested = false;
-  for (auto C : D->getRawComment().Comments) {
+  for (auto C : D->getRawComment(/*SerializedOK=*/false).Comments) {
     if (containsInterestedWords(C.RawText, "-", /*AllowWhitespace*/true)) {
       Interested = true;
       break;

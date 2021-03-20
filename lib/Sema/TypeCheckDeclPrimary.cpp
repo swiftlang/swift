@@ -1647,7 +1647,8 @@ public:
     (void) VD->getInterfaceType();
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();
-    (void) VD->getPropertyWrapperBackingProperty();
+    (void) VD->getPropertyWrapperAuxiliaryVariables();
+    (void) VD->getPropertyWrapperInitializerInfo();
     (void) VD->getImplInfo();
 
     // Visit auxiliary decls first
@@ -1776,15 +1777,16 @@ public:
     if (!singleVar->hasAttachedPropertyWrapper())
       return;
 
-    auto backingInfo = singleVar->getPropertyWrapperBackingPropertyInfo();
-    if (!backingInfo)
+    auto *backingVar = singleVar->getPropertyWrapperBackingProperty();
+    if (!backingVar)
       return;
 
-    auto backingPBD = backingInfo.backingVar->getParentPatternBinding();
+    auto backingPBD = backingVar->getParentPatternBinding();
     if (!backingPBD)
       return;
 
-    if (auto initializer = backingInfo.getInitFromWrappedValue()) {
+    auto initInfo = singleVar->getPropertyWrapperInitializerInfo();
+    if (auto initializer = initInfo.getInitFromWrappedValue()) {
       checkPropertyWrapperActorIsolation(backingPBD, initializer);
       TypeChecker::checkPropertyWrapperEffects(backingPBD, initializer);
     }

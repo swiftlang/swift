@@ -1132,10 +1132,9 @@ public:
 
     // If this variable has an attached property wrapper with an initialization
     // function, emit the backing initializer function.
-    if (auto wrapperInfo = vd->getPropertyWrapperBackingPropertyInfo()) {
-      if (wrapperInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
-        SGM.emitPropertyWrapperBackingInitializer(vd);
-      }
+    auto initInfo = vd->getPropertyWrapperInitializerInfo();
+    if (initInfo.hasInitFromWrappedValue() && !vd->isStatic()) {
+      SGM.emitPropertyWrapperBackingInitializer(vd);
     }
 
     visitAbstractStorageDecl(vd);

@@ -1189,8 +1189,8 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     auto *var = PBD->getSingleVar();
     if (var && var->getDeclContext()->isLocalContext()) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
-        auto wrapperInfo = orig->getPropertyWrapperBackingPropertyInfo();
-        if (auto *placeholder = wrapperInfo.getWrappedValuePlaceholder()) {
+        auto initInfo = orig->getPropertyWrapperInitializerInfo();
+        if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
           Init = placeholder->getOriginalWrappedValue();
 
           auto value = emitRValue(Init);
@@ -1226,8 +1226,8 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   // no wrapper.
   if (D->getAttrs().hasAttribute<CustomAttr>()) {
     // Emit the property wrapper backing initializer if necessary.
-    auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
-    if (wrapperInfo && wrapperInfo.hasInitFromWrappedValue())
+    auto initInfo = D->getPropertyWrapperInitializerInfo();
+    if (initInfo.hasInitFromWrappedValue())
       SGM.emitPropertyWrapperBackingInitializer(D);
   }
 

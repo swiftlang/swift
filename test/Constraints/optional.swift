@@ -461,7 +461,7 @@ func sr_12309() {
   }
 }
 
-// rdar://75146811 - crash due to incrrect inout type
+// rdar://75146811 - crash due to incorrect inout type
 func rdar75146811() {
   func test(_: UnsafeMutablePointer<Double>) {}
   func test_tuple(_: UnsafeMutablePointer<Double>, x: Int) {}
