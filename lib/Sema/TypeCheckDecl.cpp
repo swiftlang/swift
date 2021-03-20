@@ -680,8 +680,12 @@ ExistentialRequiresAnyRequest::evaluate(Evaluator &evaluator,
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      if (!decl->isAvailableInExistential(valueMember))
+      const auto info = valueMember->findProtocolSelfReferences(
+          decl, /*treatNonResultCovariantSelfAsInvariant=*/false);
+      if (info.selfRef > SelfReferencePosition::Covariant ||
+          info.assocTypeRef) {
         return true;
+      }
     }
   }
 

@@ -5789,6 +5789,25 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(
   ctx.Diags.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
 }
 
+bool ConstraintSystem::isAvailableInExistential(const ProtocolDecl *proto,
+                                                const ValueDecl *member) const {
+  // If the type of the member references 'Self' in non-covariant position, or
+  // an associated type in any position, we cannot make use of the member.
+  const auto info = member->findProtocolSelfReferences(
+      proto, /*treatNonResultCovariantSelfAsInvariant=*/false);
+  if (info.selfRef > SelfReferencePosition::Covariant || info.assocTypeRef) {
+    return false;
+  }
+
+  // FIXME: Appropriately diagnose assignments instead.
+  if (auto *const storageDecl = dyn_cast<AbstractStorageDecl>(member)) {
+    if (info.hasCovariantSelfResult && storageDecl->supportsMutation())
+      return false;
+  }
+
+  return true;
+}
+
 SourceLoc constraints::getLoc(ASTNode anchor) {
   if (auto *E = anchor.dyn_cast<Expr *>()) {
     return E->getLoc();

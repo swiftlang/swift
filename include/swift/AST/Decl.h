@@ -2157,6 +2157,82 @@ public:
   
 class OpaqueTypeDecl;
 
+/// A convenience wrapper around the \c SelfReferencePosition::Kind enum.
+struct SelfReferencePosition final {
+  enum Kind : uint8_t { None, Covariant, Contravariant, Invariant };
+
+private:
+  Kind kind;
+
+public:
+  SelfReferencePosition(Kind kind) : kind(kind) {}
+
+  SelfReferencePosition flipped() const {
+    switch (kind) {
+    case None:
+    case Invariant:
+      return *this;
+    case Covariant:
+      return Contravariant;
+    case Contravariant:
+      return Covariant;
+    }
+    llvm_unreachable("unhandled self reference position!");
+  }
+
+  explicit operator bool() const { return kind > None; }
+
+  operator Kind() const { return kind; }
+};
+
+/// Describes the least favorable positions at which a protocol member refers
+/// to 'Self' in terms of variance. Used in the is-inheritable and
+/// is-available-in-existential checks.
+struct SelfReferenceInfo final {
+  using Position = SelfReferencePosition;
+
+  bool hasCovariantSelfResult;
+  Position selfRef;
+  Position assocTypeRef;
+
+  /// A reference to 'Self'.
+  static SelfReferenceInfo forSelfRef(Position position) {
+    assert(position);
+    return SelfReferenceInfo(false, position, Position::None);
+  }
+
+  /// A reference to 'Self' through an associated type.
+  static SelfReferenceInfo forAssocTypeRef(Position position) {
+    assert(position);
+    return SelfReferenceInfo(false, Position::None, position);
+  }
+
+  SelfReferenceInfo operator|=(const SelfReferenceInfo &pos) {
+    hasCovariantSelfResult |= pos.hasCovariantSelfResult;
+    if (pos.selfRef > selfRef) {
+      selfRef = pos.selfRef;
+    }
+    if (pos.assocTypeRef > assocTypeRef) {
+      assocTypeRef = pos.assocTypeRef;
+    }
+    return *this;
+  }
+
+  explicit operator bool() const {
+    return hasCovariantSelfResult || selfRef || assocTypeRef;
+  }
+
+  SelfReferenceInfo()
+      : hasCovariantSelfResult(false), selfRef(Position::None),
+        assocTypeRef(Position::None) {}
+
+private:
+  SelfReferenceInfo(bool hasCovariantSelfResult, Position selfRef,
+                    Position assocTypeRef)
+      : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
+        assocTypeRef(assocTypeRef) {}
+};
+
 /// ValueDecl - All named decls that are values in the language.  These can
 /// have a type, etc.
 class ValueDecl : public Decl {
@@ -2634,6 +2710,15 @@ public:
   /// @_dynamicReplacement(for: ...), compute the original declaration
   /// that this declaration dynamically replaces.
   ValueDecl *getDynamicallyReplacedDecl() const;
+
+  /// Report 'Self' references within the type of this protocol member.
+  ///
+  /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' or 'Self?'
+  /// is considered covariant only when it appears as the immediate type of a
+  /// property, or the uncurried result type of a method/subscript.
+  SelfReferenceInfo
+  findProtocolSelfReferences(const ProtocolDecl *proto,
+                             bool treatNonResultCovariantSelfAsInvariant) const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -4212,82 +4297,6 @@ public:
   bool isForeignReferenceType();
 };
 
-/// A convenience wrapper around the \c SelfReferencePosition::Kind enum.
-struct SelfReferencePosition final {
-  enum Kind : uint8_t { None, Covariant, Contravariant, Invariant };
-
-private:
-  Kind kind;
-
-public:
-  SelfReferencePosition(Kind kind) : kind(kind) {}
-
-  SelfReferencePosition flipped() const {
-    switch (kind) {
-    case None:
-    case Invariant:
-      return *this;
-    case Covariant:
-      return Contravariant;
-    case Contravariant:
-      return Covariant;
-    }
-    llvm_unreachable("unhandled self reference position!");
-  }
-
-  explicit operator bool() const { return kind > None; }
-
-  operator Kind() const { return kind; }
-};
-
-/// Describes the least favorable positions at which a requirement refers
-/// to 'Self' in terms of variance, for use in the is-inheritable and
-/// is-available-existential checks.
-struct SelfReferenceInfo final {
-  using Position = SelfReferencePosition;
-
-  bool hasCovariantSelfResult;
-  Position selfRef;
-  Position assocTypeRef;
-
-  /// A reference to 'Self'.
-  static SelfReferenceInfo forSelfRef(Position position) {
-    assert(position);
-    return SelfReferenceInfo(false, position, Position::None);
-  }
-
-  /// A reference to 'Self' through an associated type.
-  static SelfReferenceInfo forAssocTypeRef(Position position) {
-    assert(position);
-    return SelfReferenceInfo(false, Position::None, position);
-  }
-
-  SelfReferenceInfo operator|=(const SelfReferenceInfo &pos) {
-    hasCovariantSelfResult |= pos.hasCovariantSelfResult;
-    if (pos.selfRef > selfRef) {
-      selfRef = pos.selfRef;
-    }
-    if (pos.assocTypeRef > assocTypeRef) {
-      assocTypeRef = pos.assocTypeRef;
-    }
-    return *this;
-  }
-
-  explicit operator bool() const {
-    return hasCovariantSelfResult || selfRef || assocTypeRef;
-  }
-
-  SelfReferenceInfo()
-      : hasCovariantSelfResult(false), selfRef(Position::None),
-        assocTypeRef(Position::None) {}
-
-private:
-  SelfReferenceInfo(bool hasCovariantSelfResult, Position selfRef,
-                    Position assocTypeRef)
-      : hasCovariantSelfResult(hasCovariantSelfResult), selfRef(selfRef),
-        assocTypeRef(assocTypeRef) {}
-};
-
 /// The set of known protocols for which derived conformances are supported.
 enum class KnownDerivableProtocolKind : uint8_t {
   RawRepresentable,
@@ -4480,21 +4489,6 @@ public:
 
   /// Does this protocol require a self-conformance witness table?
   bool requiresSelfConformanceWitnessTable() const;
-
-  /// Find direct Self references within the given requirement.
-  ///
-  /// \param treatNonResultCovariantSelfAsInvariant If true, 'Self' is only
-  /// assumed to be covariant in a top-level non-function type, or in the
-  /// eventual result type of a top-level function type.
-  SelfReferenceInfo
-  findProtocolSelfReferences(const ValueDecl *decl,
-                             bool treatNonResultCovariantSelfAsInvariant) const;
-
-  /// Determine whether we are allowed to refer to an existential type
-  /// conforming to this protocol. This is only permitted if the type of
-  /// the member does not contain any associated types, and does not
-  /// contain 'Self' in 'parameter' or 'other' position.
-  bool isAvailableInExistential(const ValueDecl *decl) const;
 
   /// Determine whether an existential type must be explicitly prefixed
   /// with \c any. \c any is required if any of the members contain

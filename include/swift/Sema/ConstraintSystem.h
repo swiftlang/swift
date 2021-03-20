@@ -5296,6 +5296,13 @@ public:
   /// in (if any) has a result builder applied to its body.
   bool isInResultBuilderContext(ClosureExpr *closure) const;
 
+  /// Determine whether we are allowed to refer to an existential type
+  /// conforming to the given protocol. This is only permitted if the type of
+  /// the member does not contain any associated types, and does not
+  /// contain 'Self' in 'parameter' or 'other' position.
+  bool isAvailableInExistential(const ProtocolDecl *proto,
+                                const ValueDecl *member) const;
+
   SWIFT_DEBUG_DUMP;
   SWIFT_DEBUG_DUMPER(dump(Expr *));
 
