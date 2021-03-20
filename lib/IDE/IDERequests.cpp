@@ -60,6 +60,7 @@ class CursorInfoResolver : public SourceEntityWalker {
   ResolvedCursorInfo CursorInfo;
   Type ContainerType;
   Expr *OutermostCursorExpr;
+  llvm::SmallVector<Expr*, 8> ExprStack;
 
 public:
   explicit CursorInfoResolver(SourceFile &SrcFile) :
@@ -99,8 +100,8 @@ SourceManager &CursorInfoResolver::getSourceMgr() const
 }
 
 bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
-                                 ExtensionDecl *ExtTyRef, SourceLoc Loc,
-                                 bool IsRef, Type Ty) {
+                                    ExtensionDecl *ExtTyRef, SourceLoc Loc,
+                                    bool IsRef, Type Ty) {
   if (!D->hasName())
     return false;
 
@@ -116,6 +117,14 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
       }
     }
   }
+
+  if (isBeingCalled(ExprStack)) {
+    if (Expr *BaseE = getBase(ExprStack)) {
+      CursorInfo.IsDynamic = isDynamicCall(BaseE, D);
+      ide::getReceiverType(BaseE, CursorInfo.ReceiverTypes);
+    }
+  }
+
   CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
   return true;
 }
@@ -254,6 +263,8 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
   if (!OutermostCursorExpr && isCursorOn(E, LocToResolve))
     OutermostCursorExpr = E;
 
+  ExprStack.push_back(E);
+
   return true;
 }
 
@@ -265,6 +276,8 @@ bool CursorInfoResolver::walkToExprPost(Expr *E) {
     CursorInfo.setTrailingExpr(OutermostCursorExpr);
     return false;
   }
+
+  ExprStack.pop_back();
 
   return true;
 }

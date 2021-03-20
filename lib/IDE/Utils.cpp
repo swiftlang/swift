@@ -1214,33 +1214,41 @@ Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
 
   Expr *CurrentE = ExprStack.back();
   Expr *ParentE = getContainingExpr(ExprStack, 1);
+  Expr *Base = nullptr;
   if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
-    return DSE->getBase();
+    Base = DSE->getBase();
   else if (auto MRE = dyn_cast<MemberRefExpr>(CurrentE))
-    return MRE->getBase();
+    Base = MRE->getBase();
   else if (auto SE = dyn_cast<SubscriptExpr>(CurrentE))
-    return SE->getBase();
-  return nullptr;
-}
+    Base = SE->getBase();
 
-static bool isSuperRefExpr(Expr *E) {
-  if (!E)
-    return false;
-  if (isa<SuperRefExpr>(E))
-    return true;
-  if (auto LoadE = dyn_cast<LoadExpr>(E))
-    return isSuperRefExpr(LoadE->getSubExpr());
-  return false;
+  if (Base) {
+    while (auto ICE = dyn_cast<ImplicitConversionExpr>(Base))
+      Base = ICE->getSubExpr();
+    // DotSyntaxCallExpr with getBase() == CurrentE (ie. the current call is
+    // the base of another expression)
+    if (Base == CurrentE)
+      return nullptr;
+  }
+  return Base;
 }
 
 bool swift::ide::isDynamicCall(Expr *Base, ValueDecl *D) {
   auto TyD = D->getDeclContext()->getSelfNominalTypeDecl();
   if (!TyD)
     return false;
-  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD))
+
+  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD) || D->isFinal())
     return false;
-  if (isSuperRefExpr(Base))
+
+  // super.method()
+  // TODO: Should be dynamic if `D` is marked as dynamic and @objc, but in
+  //       that case we really need to change the role the index outputs as
+  //       well - the overrides we'd want to include are from the type of
+  //       super up to `D`
+  if (Base->isSuperExpr())
     return false;
+
   // `SomeType.staticOrClassMethod()`
   if (isa<TypeExpr>(Base))
     return false;
@@ -1270,6 +1278,8 @@ void swift::ide::getReceiverType(Expr *Base,
     ReceiverTy = LVT->getObjectType();
   else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
     ReceiverTy = MetaT->getInstanceType();
+  else if (auto SelfT = ReceiverTy->getAs<DynamicSelfType>())
+    ReceiverTy = SelfT->getSelfType();
 
   // TODO: Handle generics and composed protocols
   if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>())

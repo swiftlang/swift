@@ -164,6 +164,11 @@ struct ResolvedCursorInfo {
   Type ContainerType;
   Stmt *TrailingStmt = nullptr;
   Expr *TrailingExpr = nullptr;
+  /// If this is a call, whether it is "dynamic", see ide::isDynamicCall.
+  bool IsDynamic = false;
+  /// If this is a call, the types of the base (multiple in the case of
+  /// protocol composition).
+  SmallVector<NominalTypeDecl *, 1> ReceiverTypes;
 
   ResolvedCursorInfo() = default;
   ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
@@ -174,12 +179,9 @@ struct ResolvedCursorInfo {
       lhs.Loc.getOpaquePointerValue() == rhs.Loc.getOpaquePointerValue();
   }
 
-  void setValueRef(ValueDecl *ValueD,
-                   TypeDecl *CtorTyRef,
-                   ExtensionDecl *ExtTyRef,
-                   bool IsRef,
-                   Type Ty,
-                   Type ContainerType) {
+  void setValueRef(ValueDecl *ValueD, TypeDecl *CtorTyRef,
+                   ExtensionDecl *ExtTyRef, bool IsRef,
+                   Type Ty, Type ContainerType) {
     Kind = CursorInfoKind::ValueRef;
     this->ValueD = ValueD;
     this->CtorTyRef = CtorTyRef;

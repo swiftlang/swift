@@ -1817,6 +1817,13 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
       RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
     }
   }
+  if (!Info.ReceiverUSRs.empty()) {
+    auto Receivers = Elem.setArray(KeyReceivers);
+    for (auto USR : Info.ReceiverUSRs) {
+      auto Receiver = Receivers.appendDictionary();
+      Receiver.set(KeyUSR, USR);
+    }
+  }
   if (Info.IsSystem)
     Elem.setBool(KeyIsSystem, true);
   if (!Info.TypeInterface.empty())
@@ -1836,6 +1843,8 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
       Parent.set(KeyUSR, ParentTy.USR);
     }
   }
+  if (Info.IsDynamic)
+    Elem.setBool(KeyIsDynamic, true);
 
   return Rec(RespBuilder.createResponse());
 }
