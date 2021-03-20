@@ -3747,6 +3747,16 @@ namespace {
       if (isSpecializationDepthGreaterThan(def, 8))
         return nullptr;
 
+      // If we have an inline data member, it won't get eagerly instantiated
+      // when we instantiate the class. So, make sure we do that now to catch
+      // any instantiation errors.
+      for (auto member : decl->decls()) {
+        if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
+          Impl.getClangSema()
+            .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
+        }
+      }
+
       return VisitCXXRecordDecl(def);
     }
 
@@ -8320,6 +8330,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               bool &TypedefIsSuperfluous,
                                               bool &HadForwardDeclaration) {
   assert(ClangDecl);
+
+  // If this decl isn't valid, don't import it. Bail now.
+  if (ClangDecl->isInvalidDecl())
+    return nullptr;
 
   // Private and protected C++ class members should never be used, so we skip
   // them entirely (instead of importing them with a corresponding Swift access
