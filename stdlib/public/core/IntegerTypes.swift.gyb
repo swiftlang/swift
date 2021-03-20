@@ -1225,12 +1225,10 @@ public struct ${Self}
 %   end
 
   @_alwaysEmitIntoClient
-  @usableFromInline
   internal init<T: BinaryFloatingPoint>(_unchecked source: T) {
     switch (T.exponentBitCount, T.significandBitCount) {
 %   for (FloatType, FloatBits, FloatExponentBits, FloatSignificandBits) in [
-%     ('Float16', 16, 5, 10), ('Float', 32, 8, 23),
-%     ('Double', 64, 11, 52), ('Float80', 80, 15, 63)]:
+%     ('Float16',16,5,10), ('Float',32,8,23), ('Double',64,11,52), ('Float80',80,15,63)]:
 %     if FloatType == 'Float16':
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 %     elif FloatType == 'Float80':
@@ -1260,7 +1258,6 @@ public struct ${Self}
   }
   
   @_alwaysEmitIntoClient
-  @inlinable
   @inline(__always)
   public init<T: BinaryFloatingPoint>(_ source: T) {
     _precondition(source.isFinite,
@@ -1273,7 +1270,6 @@ public struct ${Self}
   }
 
   @_alwaysEmitIntoClient
-  @inlinable
   @inline(__always)
   public init?<T: BinaryFloatingPoint>(exactly source: T) {
     // The value passed as `source` must not be infinite, NaN, or exceed the
