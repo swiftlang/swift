@@ -1232,13 +1232,15 @@ public struct ${Self}
 %     ('Float16', 16, 5, 10), ('Float', 32, 8, 23),
 %     ('Double', 64, 11, 52), ('Float80', 80, 15, 63)]:
 %     if FloatType == 'Float16':
-#if !os(macOS) && !(os(iOS) && targetEnvironment(macCatalyst))
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 %     elif FloatType == 'Float80':
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %     end
     case (${FloatExponentBits}, ${FloatSignificandBits}):
 %     if FloatType == 'Float16':
-      guard #available(iOS 14.0, watchOS 7.0, tvOS 14.0, *) else { break }
+      guard #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
+        break
+      }
 %     end
       let source_ = source as? ${FloatType} ?? ${FloatType}(
         sign: source.sign,
