@@ -1265,17 +1265,10 @@ public struct ${Self}
   public init<T: BinaryFloatingPoint>(_ source: T) {
     _precondition(source.isFinite,
       "Floating-point value cannot be converted to ${Self} because it is either infinite or NaN")
-%   if bits >= 32:
-    // Float16 is always in-range.
-    if T.exponentBitCount > 5 {
-%   else:
-    do {
-%   end
-      _precondition(source > ${str(lower)}.0,
-        "Floating-point value cannot be converted to ${Self} because the result would be less than ${Self}.min")
-      _precondition(source < ${str(upper)}.0,
-        "Floating-point value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
-    }
+    _precondition(source > ${str(lower)}.0,
+      "Floating-point value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(source < ${str(upper)}.0,
+      "Floating-point value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
     self.init(_unchecked: source)
   }
 
@@ -1286,13 +1279,7 @@ public struct ${Self}
     // The value passed as `source` must not be infinite, NaN, or exceed the
     // bounds of the integer type; the result of `fptosi` or `fptoui` is
     // undefined if it overflows.
-%   if bits >= 32:
-    // Float16 is always in-range.
-    guard (T.exponentBitCount <= 5 && source.isFinite)
-      || (source > ${str(lower)}.0 && source < ${str(upper)}.0) else {
-%   else:
     guard source > ${str(lower)}.0 && source < ${str(upper)}.0 else {
-%   end
       return nil
     }
     guard source == source.rounded(.towardZero) else {
