@@ -348,12 +348,13 @@ protected:
     Flags : NumFlagBits
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+16,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
     HasExtInfo : 1,
     HasClangTypeInfo : 1,
+    HasGlobalActor : 1,
     : NumPadBits,
     NumParams : 16
   );
@@ -2933,6 +2934,8 @@ protected:
       Bits.AnyFunctionType.ExtInfoBits = Info.getValue().getBits();
       Bits.AnyFunctionType.HasClangTypeInfo =
           !Info.getValue().getClangTypeInfo().empty();
+      Bits.AnyFunctionType.HasGlobalActor =
+          !Info.getValue().getGlobalActor().isNull();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.getValue().getBits() &&
              "Bits were dropped!");
@@ -2943,6 +2946,7 @@ protected:
       Bits.AnyFunctionType.HasExtInfo = false;
       Bits.AnyFunctionType.HasClangTypeInfo = false;
       Bits.AnyFunctionType.ExtInfoBits = 0;
+      Bits.AnyFunctionType.HasGlobalActor = false;
     }
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -2985,8 +2989,14 @@ public:
     return Bits.AnyFunctionType.HasClangTypeInfo;
   }
 
+  bool hasGlobalActor() const {
+    return Bits.AnyFunctionType.HasGlobalActor;
+  }
+
   ClangTypeInfo getClangTypeInfo() const;
   ClangTypeInfo getCanonicalClangTypeInfo() const;
+
+  Type getGlobalActor() const;
 
   /// Returns true if the function type stores a Clang type that cannot
   /// be derived from its Swift type. Returns false otherwise, including if
@@ -3010,7 +3020,8 @@ public:
 
   ExtInfo getExtInfo() const {
     assert(hasExtInfo());
-    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo());
+    return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
+                   getGlobalActor());
   }
 
   /// Get the canonical ExtInfo for the function type.
@@ -3019,9 +3030,13 @@ public:
   /// In the future, we will always use the canonical clang function type.
   ExtInfo getCanonicalExtInfo(bool useClangFunctionType) const {
     assert(hasExtInfo());
+    Type globalActor = getGlobalActor();
+    if (globalActor)
+      globalActor = globalActor->getCanonicalType();
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits,
                    useClangFunctionType ? getCanonicalClangTypeInfo()
-                                        : ClangTypeInfo());
+                                        : ClangTypeInfo(),
+                   globalActor);
   }
 
   bool hasSameExtInfoAs(const AnyFunctionType *otherFn);
@@ -3169,8 +3184,8 @@ public:
     return getExtInfo().isNoEscape();
   }
 
-  bool isConcurrent() const {
-    return getExtInfo().isConcurrent();
+  bool isSendable() const {
+    return getExtInfo().isSendable();
   }
 
   bool isAsync() const { return getExtInfo().isAsync(); }
@@ -3236,7 +3251,7 @@ class FunctionType final
     : public AnyFunctionType,
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param,
-                                    ClangTypeInfo> {
+                                    ClangTypeInfo, Type> {
   friend TrailingObjects;
 
 
@@ -3246,6 +3261,10 @@ class FunctionType final
 
   size_t numTrailingObjects(OverloadToken<ClangTypeInfo>) const {
     return hasClangTypeInfo() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return hasGlobalActor() ? 1 : 0;
   }
 
 public:
@@ -3265,6 +3284,12 @@ public:
     assert(!info->empty() &&
            "If the ClangTypeInfo was empty, we shouldn't have stored it.");
     return *info;
+  }
+
+  Type getGlobalActor() const {
+    if (!hasGlobalActor())
+      return Type();
+    return *getTrailingObjects<Type>();
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -3345,10 +3370,19 @@ std::string getParamListAsString(ArrayRef<AnyFunctionType::Param> parameters);
 /// generic parameters.
 class GenericFunctionType final : public AnyFunctionType,
     public llvm::FoldingSetNode,
-    private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param> {
+    private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param,
+                                  Type> {
   friend TrailingObjects;
       
   GenericSignature Signature;
+
+  size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
+    return getNumParams();
+  }
+                                    
+  size_t numTrailingObjects(OverloadToken<Type>) const {
+    return hasGlobalActor() ? 1 : 0;
+  }
 
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature sig,
@@ -3357,7 +3391,7 @@ class GenericFunctionType final : public AnyFunctionType,
                       Optional<ExtInfo> info,
                       const ASTContext *ctx,
                       RecursiveTypeProperties properties);
-      
+
 public:
   /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature sig,
@@ -3369,7 +3403,13 @@ public:
   ArrayRef<Param> getParams() const {
     return {getTrailingObjects<Param>(), getNumParams()};
   }
-      
+
+  Type getGlobalActor() const {
+    if (!hasGlobalActor())
+      return Type();
+    return *getTrailingObjects<Type>();
+  }
+
   /// Retrieve the generic signature of this function type.
   GenericSignature getGenericSignature() const {
     return Signature;
@@ -4156,7 +4196,7 @@ public:
     return SILCoroutineKind(Bits.SILFunctionType.CoroutineKind);
   }
 
-  bool isConcurrent() const { return getExtInfo().isConcurrent(); }
+  bool isSendable() const { return getExtInfo().isSendable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
 
   /// Return the array of all the yields.

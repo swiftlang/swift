@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-copy-propagation -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -25,7 +25,7 @@ func writeToBool(_ b : inout Bool, _ val : Bool) {
     b = val
 }
 
-actor List<T : ConcurrentValue> {
+actor List<T : Sendable> {
     var head : T
     var tail : List<T>?
 

@@ -7,7 +7,7 @@
 // this needs to match with the check count below.
 let NUM_TASKS : Int = 100
 
-final class Capture : ConcurrentValue {
+final class Capture : Sendable {
     func doSomething() { }
     deinit {
         // CHECK-COUNT-100: deinit was called!

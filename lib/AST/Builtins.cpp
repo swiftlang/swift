@@ -1342,6 +1342,13 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(id, { }, ctx.TheNativeObjectType);
 }
 
+static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  builder.setResult(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
+  builder.setAsync();
+  return builder.build(id);
+}
+
 static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
@@ -1361,8 +1368,6 @@ static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   auto genericParam = makeGenericParam().build(builder);
   builder.addParameter(
       makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheNativeObjectType)));
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -1375,8 +1380,6 @@ static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) 
   auto genericParam = makeGenericParam().build(builder);
   builder.addParameter(
       makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
-  builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheNativeObjectType))); // parent
   builder.addParameter(
       makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
@@ -2561,6 +2564,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetCurrentAsyncTask:
     return getGetCurrentAsyncTask(Context, Id);
+
+  case BuiltinValueKind::GetCurrentExecutor:
+    return getGetCurrentExecutor(Context, Id);
 
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);

@@ -1438,5 +1438,5 @@ extension ContiguousArray {
   }
 }
 
-extension ContiguousArray: ConcurrentValue, UnsafeConcurrentValue
-  where Element: ConcurrentValue { }
+extension ContiguousArray: Sendable, UnsafeSendable
+  where Element: Sendable { }

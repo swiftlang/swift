@@ -99,7 +99,7 @@ extension String {
   ///     }
   ///     // Prints "Let it snow!"
   @frozen
-  public struct UTF16View: ConcurrentValue {
+  public struct UTF16View: Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
 
@@ -259,7 +259,7 @@ extension String.UTF16View: BidirectionalCollection {
 
 extension String.UTF16View {
   @frozen
-  public struct Iterator: IteratorProtocol, ConcurrentValue {
+  public struct Iterator: IteratorProtocol, Sendable {
     @usableFromInline
     internal var _guts: _StringGuts
 

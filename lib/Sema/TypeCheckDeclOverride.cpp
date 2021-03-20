@@ -1449,7 +1449,7 @@ namespace  {
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
-    UNINTERESTING_ATTR(HasAsyncAlternative)
+    UNINTERESTING_ATTR(CompletionHandlerAsync)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
@@ -1537,7 +1537,7 @@ namespace  {
     UNINTERESTING_ATTR(ActorIndependent)
     UNINTERESTING_ATTR(GlobalActor)
     UNINTERESTING_ATTR(Async)
-    UNINTERESTING_ATTR(Concurrent)
+    UNINTERESTING_ATTR(Sendable)
 
     UNINTERESTING_ATTR(AtRethrows)
     UNINTERESTING_ATTR(Marker)

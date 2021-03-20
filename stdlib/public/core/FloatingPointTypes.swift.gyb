@@ -1344,7 +1344,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 % end
 
 ${Availability(bits)}
-extension ${Self} : ConcurrentValue { }
+extension ${Self} : Sendable { }
 
 //===----------------------------------------------------------------------===//
 // Deprecated operators

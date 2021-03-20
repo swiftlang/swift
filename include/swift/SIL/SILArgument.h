@@ -117,6 +117,9 @@ public:
   /// opposed to a cast or projection.
   bool isPhiArgument() const;
 
+  /// Return true if this block argument is a terminator result.
+  bool isTerminatorResult() const;
+
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
   SILValue getIncomingPhiValue(SILBasicBlock *predBlock) const;
@@ -178,6 +181,10 @@ public:
   /// terminator has a single operand, return that terminator.
   TermInst *getSingleTerminator() const;
 
+  /// Return the terminator instruction for which this argument is a result,
+  /// otherwise return nullptr.
+  TermInst *getTerminatorForResultArg() const;
+
   /// Return the SILArgumentKind of this argument.
   SILArgumentKind getKind() const {
     return SILArgumentKind(ValueBase::getKind());
@@ -207,6 +214,9 @@ public:
   /// Return true if this is block argument is actually a phi argument as
   /// opposed to a cast or projection.
   bool isPhiArgument() const;
+
+  /// Return true if this block argument is a terminator result.
+  bool isTerminatorResult() const { return !isPhiArgument(); }
 
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
@@ -283,6 +293,10 @@ public:
   /// terminator has a single operand, return that terminator.
   TermInst *getSingleTerminator() const;
 
+  /// Return the terminator instruction for which this argument is a result,
+  /// otherwise return nullptr.
+  TermInst *getTerminatorForResultArg() const;
+
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
   static bool classof(SILNodePointer node) {
@@ -341,6 +355,16 @@ inline bool SILArgument::isPhiArgument() const {
   switch (getKind()) {
   case SILArgumentKind::SILPhiArgument:
     return cast<SILPhiArgument>(this)->isPhiArgument();
+  case SILArgumentKind::SILFunctionArgument:
+    return false;
+  }
+  llvm_unreachable("Covered switch is not covered?!");
+}
+
+inline bool SILArgument::isTerminatorResult() const {
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->isTerminatorResult();
   case SILArgumentKind::SILFunctionArgument:
     return false;
   }
@@ -411,6 +435,16 @@ inline TermInst *SILArgument::getSingleTerminator() const {
   switch (getKind()) {
   case SILArgumentKind::SILPhiArgument:
     return cast<SILPhiArgument>(this)->getSingleTerminator();
+  case SILArgumentKind::SILFunctionArgument:
+    return nullptr;
+  }
+  llvm_unreachable("Covered switch is not covered?!");
+}
+
+inline TermInst *SILArgument::getTerminatorForResultArg() const {
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getTerminatorForResultArg();
   case SILArgumentKind::SILFunctionArgument:
     return nullptr;
   }

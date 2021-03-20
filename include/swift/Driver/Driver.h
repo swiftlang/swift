@@ -167,7 +167,8 @@ public:
     AutolinkExtract, // swift-autolink-extract
     SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph
-    APIExtract       // swift-api-extract
+    APIExtract,      // swift-api-extract
+    APIDigester      // swift-api-digester
   };
 
   class InputInfoMap;
@@ -200,6 +201,11 @@ private:
   /// Indicates whether the driver should check that the input files exist.
   bool CheckInputFilesExist = true;
 
+  /// Indicates that this driver never actually executes any commands but is
+  /// just set up to retrieve the swift-frontend invocation that would be
+  /// executed during compilation.
+  bool IsDummyDriverForFrontendInvocation = false;
+
 public:
   Driver(StringRef DriverExecutable, StringRef Name,
          ArrayRef<const char *> Args, DiagnosticEngine &Diags);
@@ -225,6 +231,14 @@ public:
   bool getCheckInputFilesExist() const { return CheckInputFilesExist; }
 
   void setCheckInputFilesExist(bool Value) { CheckInputFilesExist = Value; }
+
+  bool isDummyDriverForFrontendInvocation() const {
+    return IsDummyDriverForFrontendInvocation;
+  }
+
+  void setIsDummyDriverForFrontendInvocation(bool Value) {
+    IsDummyDriverForFrontendInvocation = Value;
+  }
 
   /// Creates an appropriate ToolChain for a given driver, given the target
   /// specified in \p Args (or the default target). Sets the value of \c

@@ -2522,7 +2522,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
-  bool concurrent = expr->getAttrs().hasAttribute<ConcurrentAttr>();
+  bool concurrent = expr->getAttrs().hasAttribute<SendableAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws)
@@ -4542,6 +4542,59 @@ Type Solution::resolveInterfaceType(Type type) const {
 
 Optional<FunctionArgApplyInfo>
 Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
+
+  // It's only valid to use `&` in argument positions, but we need
+  // to figure out exactly where it was used.
+  if (auto *argExpr = getAsExpr<InOutExpr>(locator->getAnchor())) {
+    auto *argList = cs.getParentExpr(argExpr);
+    assert(argList);
+
+    // `inout` expression might be wrapped in a number of
+    // parens e.g. `test(((&x)))`.
+    if (isa<ParenExpr>(argList)) {
+      for (;;) {
+        auto nextParent = cs.getParentExpr(argList);
+        assert(nextParent && "Incorrect use of `inout` expression");
+
+        // e.g. `test((&x), x: ...)`
+        if (isa<TupleExpr>(nextParent)) {
+          argList = nextParent;
+          break;
+        }
+
+        // e.g. `test(((&x)))`
+        if (isa<ParenExpr>(nextParent)) {
+          argList = nextParent;
+          continue;
+        }
+
+        break;
+      }
+    }
+
+    unsigned argIdx = 0;
+    if (auto *tuple = dyn_cast<TupleExpr>(argList)) {
+      auto arguments = tuple->getElements();
+
+      for (auto idx : indices(arguments)) {
+        if (arguments[idx]->getSemanticsProvidingExpr() == argExpr) {
+          argIdx = idx;
+          break;
+        }
+      }
+    }
+
+    auto *call = cs.getParentExpr(argList);
+    assert(call);
+
+    ParameterTypeFlags flags;
+    locator = cs.getConstraintLocator(
+        call, {ConstraintLocator::ApplyArgument,
+               LocatorPathElt::ApplyArgToParam(argIdx, argIdx,
+                                               flags.withInOut(true))});
+  }
+
   auto anchor = locator->getAnchor();
   auto path = locator->getPath();
 
@@ -4635,7 +4688,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  auto &cs = getConstraintSystem();
   return FunctionArgApplyInfo(cs.getParentExpr(argExpr), argExpr, argIdx,
                               simplifyType(getType(argExpr)), paramIdx,
                               fnInterfaceType, fnType, callee);

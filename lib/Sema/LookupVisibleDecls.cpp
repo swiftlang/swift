@@ -560,8 +560,10 @@ synthesizePropertyWrapperVariables(IterableDeclContext *IDC) {
 
   for (auto Member : IDC->getMembers())
     if (auto var = dyn_cast<VarDecl>(Member))
-      if (var->hasAttachedPropertyWrapper())
-        (void)var->getPropertyWrapperBackingPropertyInfo();
+      if (var->hasAttachedPropertyWrapper()) {
+        (void)var->getPropertyWrapperAuxiliaryVariables();
+        (void)var->getPropertyWrapperInitializerInfo();
+      }
 }
 
 /// Trigger synthesizing implicit member declarations to make them "visible".

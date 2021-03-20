@@ -7,6 +7,4 @@
 #cmakedefine01 SWIFT_BNI_OS_BUILD
 #cmakedefine01 SWIFT_BNI_XCODE_BUILD
 
-#cmakedefine01 USE_SWIFT_ASYNC_LOWERING
-
 #endif

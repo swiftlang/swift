@@ -1790,7 +1790,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
 
   // Concurrent functions.
-  if (fn->isConcurrent()) {
+  if (fn->isSendable()) {
     OpArgs.push_back('h');
   }
 
@@ -2459,7 +2459,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
     appendOperator("Y");
-  if (fn->isConcurrent())
+  if (fn->isSendable())
     appendOperator("J");
   if (fn->isThrowing())
     appendOperator("K");
@@ -2857,10 +2857,21 @@ CanType ASTMangler::getDeclTypeForMangling(
     return C.TheErrorType;
   }
 
+  Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
 
-  auto canTy = decl->getInterfaceType()
-                   ->getReferenceStorageReferent()
-                   ->getCanonicalType();
+  // Strip the global actor out of the mangling.
+  ty = ty.transform([](Type type) {
+    if (auto fnType = type->getAs<AnyFunctionType>()) {
+      if (fnType->getGlobalActor()) {
+        return Type(fnType->withExtInfo(
+            fnType->getExtInfo().withGlobalActor(Type())));
+      }
+    }
+
+    return type;
+  });
+
+  auto canTy = ty->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();

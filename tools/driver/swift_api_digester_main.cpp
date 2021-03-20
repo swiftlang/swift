@@ -33,8 +33,8 @@
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include <functional>
-#include "ModuleAnalyzerNodes.h"
-#include "ModuleDiagsConsumer.h"
+#include "swift/APIDigester/ModuleAnalyzerNodes.h"
+#include "swift/APIDigester/ModuleDiagsConsumer.h"
 
 using namespace swift;
 using namespace ide;
@@ -2551,13 +2551,6 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   return 0;
 }
 
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
-
 static void setSDKPath(CompilerInvocation &InitInvok, bool IsBaseline) {
   if (IsBaseline) {
     // Set baseline SDK
@@ -2578,12 +2571,10 @@ static void setSDKPath(CompilerInvocation &InitInvok, bool IsBaseline) {
   }
 }
 
-static int prepareForDump(const char *Main,
+static int prepareForDump(std::string MainExecutablePath,
                           CompilerInvocation &InitInvok,
-                          llvm::StringSet<> &Modules,
-                          bool IsBaseline = false) {
-  InitInvok.setMainExecutablePath(fs::getMainExecutable(Main,
-    reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+                          llvm::StringSet<> &Modules, bool IsBaseline = false) {
+  InitInvok.setMainExecutablePath(MainExecutablePath);
   InitInvok.setModuleName("swift_ide_test");
   setSDKPath(InitInvok, IsBaseline);
 
@@ -2692,7 +2683,7 @@ static int deserializeNameCorrection(APIDiffItemStore &Store,
   return EC.value();
 }
 
-static CheckerOptions getCheckOpts(int argc, char *argv[]) {
+static CheckerOptions getCheckOpts(ArrayRef<const char *> Args) {
   CheckerOptions Opts;
   Opts.AvoidLocation = options::AvoidLocation;
   Opts.AvoidToolArgs = options::AvoidToolArgs;
@@ -2708,8 +2699,8 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   Opts.SkipOSCheck = options::DisableOSChecks;
   Opts.CompilerStyle = options::CompilerStyleDiags ||
     !options::SerializedDiagPath.empty();
-  for (int i = 1; i < argc; ++i)
-    Opts.ToolArgs.push_back(argv[i]);
+  for (auto Arg : Args)
+    Opts.ToolArgs.push_back(Arg);
 
   if (!options::SDK.empty()) {
     auto Ver = getSDKBuildVersion(options::SDK);
@@ -2721,10 +2712,11 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   return Opts;
 }
 
-static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx, bool IsBaseline) {
+static SDKNodeRoot *getSDKRoot(std::string MainExecutablePath, SDKContext &Ctx,
+                               bool IsBaseline) {
   CompilerInvocation Invok;
   llvm::StringSet<> Modules;
-  if (prepareForDump(Main, Invok, Modules, IsBaseline))
+  if (prepareForDump(MainExecutablePath, Invok, Modules, IsBaseline))
     return nullptr;
   return getSDKNodeRoot(Ctx, Invok, Modules);
 }
@@ -2749,20 +2741,18 @@ static ComparisonInputMode checkComparisonInputMode() {
     return ComparisonInputMode::BaselineJson;
 }
 
-static std::string getDefaultBaselineDir(const char *Main) {
+static std::string getDefaultBaselineDir(std::string MainExecutablePath) {
   llvm::SmallString<128> BaselineDir;
-  // The path of the swift-api-digester executable.
-  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
-    reinterpret_cast<void *>(&anchorForGetMainExecutable));
-  BaselineDir.append(ExePath);
+  BaselineDir.append(MainExecutablePath);
   llvm::sys::path::remove_filename(BaselineDir); // Remove /swift-api-digester
   llvm::sys::path::remove_filename(BaselineDir); // Remove /bin
   llvm::sys::path::append(BaselineDir, "lib", "swift", "FrameworkABIBaseline");
   return BaselineDir.str().str();
 }
 
-static std::string getEmptyBaselinePath(const char *Main) {
-  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+static std::string getEmptyBaselinePath(std::string MainExecutablePath) {
+  llvm::SmallString<128> BaselinePath(
+      getDefaultBaselineDir(MainExecutablePath));
   llvm::sys::path::append(BaselinePath, "nil.json");
   return BaselinePath.str().str();
 }
@@ -2788,10 +2778,11 @@ static StringRef getBaselineFilename(llvm::Triple Triple) {
   }
 }
 
-static std::string getDefaultBaselinePath(const char *Main, StringRef Module,
-                                          llvm::Triple Triple,
+static std::string getDefaultBaselinePath(std::string MainExecutablePath,
+                                          StringRef Module, llvm::Triple Triple,
                                           bool ABI) {
-  llvm::SmallString<128> BaselinePath(getDefaultBaselineDir(Main));
+  llvm::SmallString<128> BaselinePath(
+      getDefaultBaselineDir(MainExecutablePath));
   llvm::sys::path::append(BaselinePath, Module);
   // Look for ABI or API baseline
   llvm::sys::path::append(BaselinePath, ABI? "ABI": "API");
@@ -2807,12 +2798,13 @@ static std::string getCustomBaselinePath(llvm::Triple Triple, bool ABI) {
   return BaselinePath.str().str();
 }
 
-static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
+static SDKNodeRoot *getBaselineFromJson(std::string MainExecutablePath,
+                                        SDKContext &Ctx) {
   SwiftDeclCollector Collector(Ctx);
   CompilerInvocation Invok;
   llvm::StringSet<> Modules;
   // We need to call prepareForDump to parse target triple.
-  if (prepareForDump(Main, Invok, Modules, true))
+  if (prepareForDump(MainExecutablePath, Invok, Modules, true))
     return nullptr;
 
   assert(Modules.size() == 1 &&
@@ -2825,9 +2817,9 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
     Path = getCustomBaselinePath(Invok.getLangOptions().Target,
                                  Ctx.checkingABI());
   } else if (options::UseEmptyBaseline) {
-    Path = getEmptyBaselinePath(Main);
+    Path = getEmptyBaselinePath(MainExecutablePath);
   } else {
-    Path = getDefaultBaselinePath(Main, Modules.begin()->getKey(),
+    Path = getDefaultBaselinePath(MainExecutablePath, Modules.begin()->getKey(),
                                   Invok.getLangOptions().Target,
                                   Ctx.checkingABI());
   }
@@ -2860,26 +2852,37 @@ static std::string getJsonOutputFilePath(llvm::Triple Triple, bool ABI) {
   exit(1);
 }
 
-int main(int argc, char *argv[]) {
-  PROGRAM_START(argc, argv);
+int swift_api_digester_main(ArrayRef<const char *> Args, const char *Argv0,
+                            void *MainAddr) {
   INITIALIZE_LLVM();
 
+  // LLVM Command Line parsing expects to trim off argv[0].
+  SmallVector<const char *, 8> ArgsWithArgv0{Argv0};
+  ArgsWithArgv0.append(Args.begin(), Args.end());
+
+  std::string MainExecutablePath = fs::getMainExecutable(Argv0, MainAddr);
+
   llvm::cl::HideUnrelatedOptions(options::Category);
-  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SDK Digester\n");
+  llvm::cl::ParseCommandLineOptions(ArgsWithArgv0.size(),
+                                    llvm::makeArrayRef(ArgsWithArgv0).data(),
+                                    "Swift SDK Digester\n");
   CompilerInvocation InitInvok;
 
   llvm::StringSet<> Modules;
   std::vector<std::string> PrintApis;
   llvm::StringSet<> IgnoredUsrs;
   readIgnoredUsrs(IgnoredUsrs);
-  CheckerOptions Opts = getCheckOpts(argc, argv);
+  CheckerOptions Opts = getCheckOpts(Args);
   for (auto Name : options::ApisPrintUsrs)
     PrintApis.push_back(Name);
   switch (options::Action) {
   case ActionType::DumpSDK:
-    return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSDKContent(InitInvok, Modules,
-                     getJsonOutputFilePath(InitInvok.getLangOptions().Target, Opts.ABI),
+    return (prepareForDump(MainExecutablePath, InitInvok, Modules))
+               ? 1
+               : dumpSDKContent(
+                     InitInvok, Modules,
+                     getJsonOutputFilePath(InitInvok.getLangOptions().Target,
+                                           Opts.ABI),
                      Opts);
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
@@ -2904,17 +2907,17 @@ int main(int argc, char *argv[]) {
     }
     case ComparisonInputMode::BaselineJson: {
       SDKContext Ctx(Opts);
-      return diagnoseModuleChange(Ctx, getBaselineFromJson(argv[0], Ctx),
-                                  getSDKRoot(argv[0], Ctx, false),
-                                  options::OutputFile,
-                                  std::move(protocolAllowlist));
+      return diagnoseModuleChange(
+          Ctx, getBaselineFromJson(MainExecutablePath, Ctx),
+          getSDKRoot(MainExecutablePath, Ctx, false), options::OutputFile,
+          std::move(protocolAllowlist));
     }
     case ComparisonInputMode::BothLoad: {
       SDKContext Ctx(Opts);
-      return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
-                                  getSDKRoot(argv[0], Ctx, false),
-                                  options::OutputFile,
-                                  std::move(protocolAllowlist));
+      return diagnoseModuleChange(
+          Ctx, getSDKRoot(MainExecutablePath, Ctx, true),
+          getSDKRoot(MainExecutablePath, Ctx, false), options::OutputFile,
+          std::move(protocolAllowlist));
     }
     }
   }

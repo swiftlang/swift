@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 
 import Swift
 
@@ -1606,4 +1605,29 @@ class A {
       self.init(x: i)
     }
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
- }
+}
+
+@propertyWrapper
+struct Wrapper<T> {
+  var wrappedValue: T
+
+  init(wrappedValue initialValue: T) {
+    self.wrappedValue = initialValue
+  }
+}
+
+func foo(_ d: DerivedWrappedProperty) {
+  print(d)
+}
+
+class DerivedWrappedProperty : SomeClass {
+  @Wrapper var y: String
+  var z : String
+
+  init(s: String) {
+    y = s
+    z = s
+    foo(self)  // expected-error {{'self' used in method call 'foo' before 'super.init' call}}
+  }  // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
+
+}

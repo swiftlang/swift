@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 603; // module ABI name
+const uint16_t SWIFTMODULE_VERSION_MINOR = 606; // ossa module hash change
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -999,8 +999,8 @@ namespace decls_block {
     BCFixed<1>,   // concurrent?
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
-    DifferentiabilityKindField // differentiability kind
-
+    DifferentiabilityKindField, // differentiability kind
+    TypeIDField   // global actor
     // trailed by parameters
   >;
 
@@ -1077,6 +1077,7 @@ namespace decls_block {
     BCFixed<1>,          // async?
     BCFixed<1>,          // throws?
     DifferentiabilityKindField, // differentiability kind
+    TypeIDField,         // global actor
     GenericSignatureIDField // generic signture
 
     // trailed by parameters
@@ -1924,10 +1925,10 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
 
-  using HasAsyncAlternativeDeclAttrLayout = BCRecordLayout<
-    HasAsyncAlternative_DECL_ATTR,
-    BCFixed<1>,                // True if compound name
-    BCArray<IdentifierIDField> // Name and parameters
+  using CompletionHandlerAsyncDeclAttrLayout = BCRecordLayout<
+    CompletionHandlerAsync_DECL_ATTR,
+    BCVBR<5>,                   // Completion handler index
+    DeclIDField                 // Mapped async function decl
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \

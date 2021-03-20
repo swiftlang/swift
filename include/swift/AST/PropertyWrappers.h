@@ -170,8 +170,10 @@ void simple_display(llvm::raw_ostream &os, PropertyWrapperLValueness l);
 /// be initialized out-of-line using an expression of the wrapped property type.
 PropertyWrapperValuePlaceholderExpr *findWrappedValuePlaceholder(Expr *init);
 
-/// Describes the backing property of a property that has an attached wrapper.
-struct PropertyWrapperBackingPropertyInfo {
+/// The synthesized auxiliary declarations for a wrapped property, including the
+/// backing property wrapper, the projected value variable, and if the wrapped
+/// declaration is a parameter, the local wrapped value variable.
+struct PropertyWrapperAuxiliaryVariables {
   /// The backing property.
   VarDecl *backingVar = nullptr;
 
@@ -179,7 +181,28 @@ struct PropertyWrapperBackingPropertyInfo {
   /// of the original wrapped property prefixed with \c $
   VarDecl *projectionVar = nullptr;
 
-private:
+  /// The synthesized local wrapped value property, which shadows the original wrapped
+  /// declaration if it is a parameter.
+  VarDecl *localWrappedValueVar = nullptr;
+
+  PropertyWrapperAuxiliaryVariables() {}
+
+  PropertyWrapperAuxiliaryVariables(VarDecl *backingVar, VarDecl *projectionVar,
+                                    VarDecl *localWrappedValueVar = nullptr)
+      : backingVar(backingVar), projectionVar(projectionVar),
+        localWrappedValueVar(localWrappedValueVar) {}
+
+  /// Whether this is a valid property wrapper.
+  bool isValid() const {
+    return backingVar != nullptr;
+  }
+
+  explicit operator bool() const { return isValid(); }
+};
+
+/// Describes how to initialize the backing storage of a property with
+/// an attached wrapper.
+class PropertyWrapperInitializerInfo {
   struct {
     /// An expression that initializes the backing property from a value of
     /// the original property's type via \c init(wrappedValue:) if supported
@@ -203,15 +226,10 @@ private:
   } projectedValueInit;
 
 public:
-  PropertyWrapperBackingPropertyInfo() { }
+  PropertyWrapperInitializerInfo() { }
 
-  PropertyWrapperBackingPropertyInfo(VarDecl *backingVar, VarDecl *projectionVar)
-      : backingVar(backingVar), projectionVar(projectionVar) { }
-
-  PropertyWrapperBackingPropertyInfo(VarDecl *backingVar, VarDecl *projectionVar,
-                                     Expr *wrappedValueInitExpr,
-                                     Expr *projectedValueInitExpr)
-      : backingVar(backingVar), projectionVar(projectionVar) {
+  PropertyWrapperInitializerInfo(Expr *wrappedValueInitExpr,
+                                 Expr *projectedValueInitExpr) {
     wrappedValueInit.expr = wrappedValueInitExpr;
     if (wrappedValueInitExpr) {
       wrappedValueInit.placeholder = findWrappedValuePlaceholder(wrappedValueInitExpr);
@@ -223,16 +241,11 @@ public:
     }
   }
 
-  /// Whether this is a valid property wrapper.
-  bool isValid() const {
-    return backingVar != nullptr;
-  }
-
   bool hasInitFromWrappedValue() const {
     return wrappedValueInit.expr != nullptr;
   }
 
-  Expr *getInitFromWrappedValue() {
+  Expr *getInitFromWrappedValue() const {
     return wrappedValueInit.expr;
   }
 
@@ -244,7 +257,7 @@ public:
     return projectedValueInit.expr != nullptr;
   }
 
-  Expr *getInitFromProjectedValue() {
+  Expr *getInitFromProjectedValue() const {
     return projectedValueInit.expr;
   }
 
@@ -255,14 +268,6 @@ public:
   bool hasSynthesizedInitializers() const {
     return hasInitFromWrappedValue() || hasInitFromProjectedValue();
   }
-
-  explicit operator bool() const { return isValid(); }
-
-  friend bool operator==(const PropertyWrapperBackingPropertyInfo &lhs,
-                         const PropertyWrapperBackingPropertyInfo &rhs) {
-    // FIXME: Can't currently compare expressions.
-    return lhs.backingVar == rhs.backingVar;
-  }
 };
 
 void simple_display(
@@ -271,7 +276,11 @@ void simple_display(
 
 void simple_display(
     llvm::raw_ostream &out,
-    const PropertyWrapperBackingPropertyInfo &backingInfo);
+    const PropertyWrapperInitializerInfo &initInfo);
+
+void simple_display(
+    llvm::raw_ostream &out,
+    const PropertyWrapperAuxiliaryVariables &auxiliaryVars);
 
 } // end namespace swift
 

@@ -2622,21 +2622,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_HasAsyncAlternative: {
-      auto *attr = cast<HasAsyncAlternativeAttr>(DA);
+    case DAK_CompletionHandlerAsync: {
+      auto *attr = cast<CompletionHandlerAsyncAttr>(DA);
       auto abbrCode =
-          S.DeclTypeAbbrCodes[HasAsyncAlternativeDeclAttrLayout::Code];
+          S.DeclTypeAbbrCodes[CompletionHandlerAsyncDeclAttrLayout::Code];
 
-      SmallVector<IdentifierID, 4> pieces;
-      if (attr->hasName()) {
-        pieces.push_back(S.addDeclBaseNameRef(attr->Name.getBaseName()));
-        for (auto argName : attr->Name.getArgumentNames())
-          pieces.push_back(S.addDeclBaseNameRef(argName));
-      }
+      assert(attr->AsyncFunctionDecl &&
+             "Serializing unresolved completion handler async function decl");
+      auto asyncFuncDeclID = S.addDeclRef(attr->AsyncFunctionDecl);
 
-      HasAsyncAlternativeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->Name.isCompoundName(),
-          pieces);
+      CompletionHandlerAsyncDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->CompletionHandlerIndex,
+          asyncFuncDeclID);
       return;
     }
     }
@@ -3525,7 +3522,7 @@ public:
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
 
-    if (auto backingInfo = var->getPropertyWrapperBackingPropertyInfo()) {
+    if (auto backingInfo = var->getPropertyWrapperAuxiliaryVariables()) {
       if (backingInfo.backingVar) {
         ++numBackingProperties;
         arrayFields.push_back(S.addDeclRef(backingInfo.backingVar));
@@ -4361,6 +4358,7 @@ public:
       S.getASTContext().LangOpts.UseClangFunctionTypes
       ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
       : ClangTypeID(0);
+    auto globalActor = S.addTypeRef(fnTy->getGlobalActor());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4368,10 +4366,11 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         clangType,
         fnTy->isNoEscape(),
-        fnTy->isConcurrent(),
+        fnTy->isSendable(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
-        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
+        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
+        globalActor);
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -4384,8 +4383,9 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        fnTy->isConcurrent(), fnTy->isAsync(), fnTy->isThrowing(),
+        fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
+        S.addTypeRef(fnTy->getGlobalActor()),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -4462,7 +4462,7 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isConcurrent(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),

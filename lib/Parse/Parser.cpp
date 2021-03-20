@@ -647,21 +647,22 @@ SourceLoc Parser::consumeStartingGreater() {
   return consumeStartingCharacterOfCurrentToken(tok::r_angle);
 }
 
-void Parser::skipSingle() {
+ParserStatus Parser::skipSingle() {
+  ParserStatus status;
   switch (Tok.getKind()) {
   case tok::l_paren:
     consumeToken();
-    skipUntil(tok::r_paren, tok::r_brace);
+    status |= skipUntil(tok::r_paren, tok::r_brace);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
     consumeToken();
-    skipUntil(tok::r_brace);
+    status |= skipUntil(tok::r_brace);
     consumeIf(tok::r_brace);
     break;
   case tok::l_square:
     consumeToken();
-    skipUntil(tok::r_square, tok::r_brace);
+    status |= skipUntil(tok::r_square, tok::r_brace);
     consumeIf(tok::r_square);
     break;
   case tok::pound_if:
@@ -669,27 +670,35 @@ void Parser::skipSingle() {
   case tok::pound_elseif:
     consumeToken();
     // skipUntil also implicitly stops at tok::pound_endif.
-    skipUntil(tok::pound_else, tok::pound_elseif);
+    status |= skipUntil(tok::pound_else, tok::pound_elseif);
       
     if (Tok.isAny(tok::pound_else, tok::pound_elseif))
-      skipSingle();
+      status |= skipSingle();
     else
       consumeIf(tok::pound_endif);
     break;
       
   default:
+    if (Tok.is(tok::code_complete))
+      status.setHasCodeCompletionAndIsError();
     consumeToken();
     break;
   }
+
+  return status;
 }
 
-void Parser::skipUntil(tok T1, tok T2) {
+ParserStatus Parser::skipUntil(tok T1, tok T2) {
+  ParserStatus status;
+
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
-  if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
+  if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return status;
 
   while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::pound_else,
                    tok::pound_elseif))
-    skipSingle();
+    status |= skipSingle();
+
+  return status;
 }
 
 void Parser::skipUntilAnyOperator() {

@@ -82,7 +82,8 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
-  struct PropertyWrapperBackingPropertyInfo;
+  struct PropertyWrapperAuxiliaryVariables;
+  class PropertyWrapperInitializerInfo;
   struct PropertyWrapperTypeInfo;
   struct PropertyWrapperMutability;
   class ProtocolDecl;
@@ -4957,10 +4958,15 @@ public:
   /// unbound generic types. It will be the type of the backing property.
   Type getPropertyWrapperBackingPropertyType() const;
 
-  /// Retrieve information about the backing properties of the attached
-  /// property wrapper.
-  PropertyWrapperBackingPropertyInfo
-      getPropertyWrapperBackingPropertyInfo() const;
+  /// If there is an attached property wrapper, retrieve the synthesized
+  /// auxiliary variables.
+  PropertyWrapperAuxiliaryVariables
+      getPropertyWrapperAuxiliaryVariables() const;
+
+  /// If there is an attached property wrapper, retrieve information about
+  /// how to initialize the backing property.
+  PropertyWrapperInitializerInfo
+      getPropertyWrapperInitializerInfo() const;
 
   /// Retrieve information about the mutability of the composed
   /// property wrappers.
@@ -5738,8 +5744,8 @@ public:
 
   /// Determine whether the given function is concurrent.
   ///
-  /// A function is concurrent if it has the @concurrent attribute.
-  bool isConcurrent() const;
+  /// A function is concurrent if it has the @Sendable attribute.
+  bool isSendable() const;
 
   /// Returns true if the function is a suitable 'async' context.
   ///

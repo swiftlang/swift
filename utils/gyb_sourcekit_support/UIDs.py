@@ -188,6 +188,7 @@ UID_KEYS = [
     KEY('AnnotatedTypename', 'key.annotated.typename'),
     KEY('CompileOperation', 'key.compile_operation'),
     KEY('EffectiveAccess', 'key.effective_access'),
+    KEY('DeclarationLang', 'key.decl_lang'),
 ]
 
 
@@ -452,4 +453,6 @@ UID_KINDS = [
     KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
     KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
     KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
+    KIND('Swift', 'source.lang.swift'),
+    KIND('ObjC', 'source.lang.objc'),
 ]

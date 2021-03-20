@@ -551,7 +551,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   bool isAsyncCCSupported =
     clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
     == clang::TargetInfo::CCCR_OK;
-  if (opts.UseAsyncLowering && isAsyncCCSupported) {
+  if (isAsyncCCSupported) {
     SwiftAsyncCC = llvm::CallingConv::SwiftTail;
     AsyncTailCallKind = llvm::CallInst::TCK_MustTail;
   } else {
@@ -634,8 +634,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   //   SWIFT_CC(swift)
   //   void (AsyncTask *, ExecutorRef, AsyncContext *);
   TaskContinuationFunctionTy = llvm::FunctionType::get(
-      VoidTy, {SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftContextPtrTy},
-      /*isVarArg*/ false);
+      VoidTy, {SwiftContextPtrTy}, /*isVarArg*/ false);
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   AsyncTaskAndContextTy = createStructType(

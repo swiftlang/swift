@@ -17,7 +17,7 @@ import Swift
 ///
 /// The \c Actor protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.
-public protocol Actor: AnyObject, ConcurrentValue {
+public protocol Actor: AnyObject, Sendable {
 }
 
 /// Called to initialize the default actor instance in an actor.
@@ -41,5 +41,19 @@ fileprivate func _registerMainActor(actor: AnyObject)
   
   init() {
     _registerMainActor(actor: self)
+  }
+}
+
+extension MainActor {
+  /// Execute the given body closure on the main actor.
+  public static func run<T>(
+    resultType: T.Type = T.self,
+    body: @MainActor @Sendable () throws -> T
+  ) async rethrows -> T {
+    @MainActor func runOnMain(body: @MainActor @Sendable () throws -> T) async rethrows -> T {
+      return try body()
+    }
+
+    return try await runOnMain(body: body)
   }
 }

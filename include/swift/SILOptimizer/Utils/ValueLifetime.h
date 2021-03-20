@@ -25,6 +25,23 @@
 
 namespace swift {
 
+/// Record the last use points and CFG edges that form the boundary of a
+/// SILValue's lifetime.
+///
+/// Only valid when critical edges are disallowed (currently OSSA-only).
+///
+/// Useful when the client processes the boundary differently depending on the
+/// last user.
+///
+/// TODO: When critical edges are universally prohibited, completely replace the
+/// Frontier implementation by adding a utility method that populates a vector
+/// of insertion points based on this boundary, where each each
+/// block-terminating lastUser adds an insertion point at each successor block.
+struct ValueLifetimeBoundary {
+  SmallVector<SILInstruction *, 8> lastUsers;
+  SmallVector<SILBasicBlock *, 8> boundaryEdges;
+};
+
 /// Computes the lifetime frontier for a given value with respect to a
 /// given set of uses. The lifetime frontier is the list of instructions
 /// following the last uses. The set of uses can be passed by the clients
@@ -103,6 +120,16 @@ public:
     propagateLiveness();
   }
 
+  /// Compute the LifetimeBoundary--the last users and boundary edges. This
+  /// always succeeds.
+  ///
+  /// Precondition: no critical edges
+  ///
+  /// Note: this should never use DeadEndBlocks. If the client cares about
+  /// dead-end CFG edges because it is inserting destroys, it can handle those
+  /// specially when processing LifetimeBoundary.boundaryEdges.
+  void computeLifetimeBoundary(ValueLifetimeBoundary &boundary);
+
   enum Mode {
     /// Don't split critical edges if the frontier instructions are located on
     /// a critical edges. Instead fail.
@@ -178,6 +205,12 @@ private:
 
   /// Returns the last use of the value in the live block \p bb.
   SILInstruction *findLastUserInBlock(SILBasicBlock *bb);
+
+  void computeLifetime(
+      llvm::function_ref<bool(SILBasicBlock *)> visitBlock,
+      llvm::function_ref<void(SILInstruction *)> visitLastUser,
+      llvm::function_ref<void(SILBasicBlock *predBB, SILBasicBlock *succBB)>
+          visitBoundaryEdge);
 };
 
 /// Destroys \p valueOrStackLoc at \p frontier.

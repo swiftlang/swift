@@ -124,7 +124,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @frozen
-public struct OpaquePointer: ConcurrentValue {
+public struct OpaquePointer: Sendable {
   @usableFromInline
   internal var _rawValue: Builtin.RawPointer
 
@@ -235,7 +235,7 @@ extension UInt {
 /// A wrapper around a C `va_list` pointer.
 #if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
 @frozen
-public struct CVaListPointer: ConcurrentValue {
+public struct CVaListPointer: Sendable {
   @usableFromInline // unsafe-performance
   internal var _value: (__stack: UnsafeMutablePointer<Int>?,
                         __gr_top: UnsafeMutablePointer<Int>?,

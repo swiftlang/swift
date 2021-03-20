@@ -751,7 +751,7 @@ OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
                                                               StringRef attr) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(3))
+  if (&op == &bi->getOperandRef(2))
     return OperandOwnership::DestroyingConsume;
   
   // FIXME: These are considered InteriorPointer because they may propagate a
@@ -765,7 +765,7 @@ OperandOwnership
 OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskGroupFuture(BuiltinInst *bi,
                                                                    StringRef attr) {
   // The function operand is consumed by the new task.
-  if (&op == &bi->getOperandRef(4))
+  if (&op == &bi->getOperandRef(3))
     return OperandOwnership::DestroyingConsume;
   
   // FIXME: These are considered InteriorPointer because they may propagate a
@@ -798,6 +798,7 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
         "Builtin should never be visited! E.x.: It may not have arguments");   \
   }
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
+SHOULD_NEVER_VISIT_BUILTIN(GetCurrentExecutor)
 #undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

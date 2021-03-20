@@ -1022,7 +1022,7 @@ namespace {
                           ? LValueType::get(outerParamType) : outerParamType);
         cs.cacheType(paramRef);
 
-        if (auto wrapperInfo = innerParam->getPropertyWrapperBackingPropertyInfo()) {
+        if (innerParam->hasAttachedPropertyWrapper()) {
           // Rewrite the parameter ref to the backing wrapper initialization
           // expression.
           auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
@@ -6830,12 +6830,28 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // If we have a ClosureExpr, then we can safely propagate the 'concurrent'
     // bit to the closure without invalidating prior analysis.
     auto fromEI = fromFunc->getExtInfo();
-    if (toEI.isConcurrent() && !fromEI.isConcurrent()) {
+    if (toEI.isSendable() && !fromEI.isSendable()) {
       auto newFromFuncType = fromFunc->withExtInfo(fromEI.withConcurrent());
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
         // Propagating the 'concurrent' bit might have satisfied the entire
+        // conversion. If so, we're done, otherwise keep converting.
+        if (fromFunc->isEqual(toType))
+          return expr;
+      }
+    }
+
+    // If we have a ClosureExpr, then we can safely propagate a global actor
+    // to the closure without invalidating prior analysis.
+    fromEI = fromFunc->getExtInfo();
+    if (toEI.getGlobalActor() && !fromEI.getGlobalActor()) {
+      auto newFromFuncType = fromFunc->withExtInfo(
+          fromEI.withGlobalActor(toEI.getGlobalActor()));
+      if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+        fromFunc = newFromFuncType->castTo<FunctionType>();
+
+        // Propagating the global actor bit might have satisfied the entire
         // conversion. If so, we're done, otherwise keep converting.
         if (fromFunc->isEqual(toType))
           return expr;

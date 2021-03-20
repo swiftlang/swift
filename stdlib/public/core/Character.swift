@@ -62,7 +62,7 @@
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 @frozen
-public struct Character: ConcurrentValue {
+public struct Character: Sendable {
   @usableFromInline
   internal var _str: String
 

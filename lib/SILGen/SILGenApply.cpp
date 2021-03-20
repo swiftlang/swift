@@ -14,6 +14,7 @@
 #include "ArgumentSource.h"
 #include "Callee.h"
 #include "Conversion.h"
+#include "ExecutorBreadcrumb.h"
 #include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -1707,7 +1708,8 @@ static void emitRawApply(SILGenFunction &SGF,
                          CanSILFunctionType substFnType,
                          ApplyOptions options,
                          ArrayRef<SILValue> indirectResultAddrs,
-                         SmallVectorImpl<SILValue> &rawResults) {
+                         SmallVectorImpl<SILValue> &rawResults,
+                         ExecutorBreadcrumb prevExecutor) {
   SILFunctionConventions substFnConv(substFnType, SGF.SGM.M);
   // Get the callee value.
   bool isConsumed = substFnType->isCalleeConsumed();
@@ -1783,7 +1785,7 @@ static void emitRawApply(SILGenFunction &SGF,
     rawResults.push_back(result);
 
     SILBasicBlock *errorBB =
-      SGF.getTryApplyErrorDest(loc, substFnType,
+      SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
                                substFnType->getErrorResult(),
                                options.contains(ApplyFlags::DoesNotThrow));
 
@@ -3815,7 +3817,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   // Emit the call.
   SmallVector<SILValue, 4> rawResults;
   emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-               /*indirect results*/ {}, rawResults);
+               /*indirect results*/ {}, rawResults, ExecutorBreadcrumb());
 
   auto token = rawResults.pop_back_val();
   auto yieldValues = llvm::makeArrayRef(rawResults);
@@ -4385,6 +4387,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
            subs.getGenericSignature().getCanonicalSignature());
   }
 
+  ExecutorBreadcrumb breadcrumb;
+  
   // The presence of `implicitlyAsyncApply` indicates that the callee is a 
   // synchronous function isolated to an actor other than our own.
   // Such functions require the caller to hop to the callee's executor
@@ -4399,24 +4403,28 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
       if (args.size() > 0)
         actorSelf = args.back();
 
-      auto didHop = emitHopToTargetActor(loc, getActorIsolation(funcDecl),
-                                         actorSelf);
-      assert(didHop);
+      breadcrumb = emitHopToTargetActor(loc, getActorIsolation(funcDecl),
+                                        actorSelf);
     }
+  } else if (actor && substFnType->isAsync()) {
+    // Otherwise, if we're in an actor method ourselves, and we're calling into
+    // any sort of async function, we'll want to make sure to hop back to our
+    // own executor afterward, since the callee could have made arbitrary hops
+    // out of our isolation domain.
+    breadcrumb = ExecutorBreadcrumb(actor);
   }
 
   SILValue rawDirectResult;
   {
     SmallVector<SILValue, 1> rawDirectResults;
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-                 indirectResultAddrs, rawDirectResults);
+                 indirectResultAddrs, rawDirectResults, breadcrumb);
     assert(rawDirectResults.size() == 1);
     rawDirectResult = rawDirectResults[0];
   }
 
   // hop back to the current executor
-  if (substFnType->isAsync() || implicitlyAsyncApply.hasValue())
-    emitHopToCurrentExecutor(loc);
+  breadcrumb.emit(*this, loc);
 
   // Pop the argument scope.
   argScope.pop();

@@ -13,6 +13,7 @@
 // This file implements constraint generation for the type checker.
 //
 //===----------------------------------------------------------------------===//
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -2044,6 +2045,11 @@ namespace {
             shouldTypeCheckInEnclosingExpression(closure) ? 0
                                                           : TVO_CanBindToHole));
       }();
+
+      // For a non-async function type, add the global actor if present.
+      if (!extInfo.isAsync()) {
+        extInfo = extInfo.withGlobalActor(getExplicitGlobalActor(closure));
+      }
 
       return FunctionType::get(closureParams, resultTy, extInfo);
     }

@@ -265,8 +265,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
           varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
 
-          auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
-          isAutoClosure = wrapperInfo.getWrappedValuePlaceholder()->isAutoClosure();
+          auto initInfo = var->getPropertyWrapperInitializerInfo();
+          isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
         } else {
           varInterfaceType = backingPropertyType;
         }

@@ -3334,6 +3334,22 @@ namespace {
       return result;
     }
 
+    bool isCxxRecordImportable(const clang::CXXRecordDecl *decl) {
+      if (auto dtor = decl->getDestructor()) {
+        if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
+          return false;
+        }
+      }
+
+      // If we have no way of copying the type we can't import the class
+      // at all because we cannot express the correct semantics as a swift
+      // struct.
+      return llvm::none_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
+        return ctor->isCopyConstructor() &&
+               (ctor->isDeleted() || ctor->getAccess() != clang::AS_public);
+      });
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
       // as stored properties.
@@ -3626,29 +3642,8 @@ namespace {
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
 
-      if (cxxRecordDecl) {
+      if (cxxRecordDecl)
         result->setIsCxxNonTrivial(!cxxRecordDecl->isTriviallyCopyable());
-
-        for (auto ctor : cxxRecordDecl->ctors()) {
-          if (ctor->isCopyConstructor()) {
-            // If we have no way of copying the type we can't import the class
-            // at all because we cannot express the correct semantics as a swift
-            // struct.
-            if (ctor->isDeleted() || ctor->getAccess() != clang::AS_public)
-              return nullptr;
-          }
-          if (ctor->getAccess() != clang::AS_public) {
-            result->setIsCxxNonTrivial(true);
-            break;
-          }
-        }
-
-        if (auto dtor = cxxRecordDecl->getDestructor()) {
-          if (dtor->isDeleted() || dtor->getAccess() != clang::AS_public) {
-            return nullptr;
-          }
-        }
-      }
 
       return result;
     }
@@ -3704,6 +3699,11 @@ namespace {
         }
       }
 
+      // It is import that we bail on an unimportable record *before* we import
+      // any of its members or cache the decl.
+      if (!isCxxRecordImportable(decl))
+        return nullptr;
+
       return VisitRecordDecl(decl);
     }
 
@@ -3746,6 +3746,16 @@ namespace {
       // instantiating.
       if (isSpecializationDepthGreaterThan(def, 8))
         return nullptr;
+
+      // If we have an inline data member, it won't get eagerly instantiated
+      // when we instantiate the class. So, make sure we do that now to catch
+      // any instantiation errors.
+      for (auto member : decl->decls()) {
+        if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
+          Impl.getClangSema()
+            .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
+        }
+      }
 
       return VisitCXXRecordDecl(def);
     }
@@ -8028,6 +8038,7 @@ void ClangImporter::Implementation::importAttributes(
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
+  PatternBindingInitializer *initContext = nullptr;
   bool AnyUnavailable = MappedDecl->getAttrs().isUnavailable(C);
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
@@ -8207,7 +8218,8 @@ void ClangImporter::Implementation::importAttributes(
       SourceLoc atLoc;
       if (parser.consumeIf(tok::at_sign, atLoc)) {
         (void)parser.parseDeclAttribute(
-          MappedDecl->getAttrs(), atLoc, /*isFromClangAttribute=*/true);
+            MappedDecl->getAttrs(), atLoc, initContext,
+            /*isFromClangAttribute=*/true);
       } else {
         // Complain about the missing '@'.
         auto &clangSrcMgr = getClangASTContext().getSourceManager();
@@ -8318,6 +8330,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               bool &TypedefIsSuperfluous,
                                               bool &HadForwardDeclaration) {
   assert(ClangDecl);
+
+  // If this decl isn't valid, don't import it. Bail now.
+  if (ClangDecl->isInvalidDecl())
+    return nullptr;
 
   // Private and protected C++ class members should never be used, so we skip
   // them entirely (instead of importing them with a corresponding Swift access

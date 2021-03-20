@@ -96,15 +96,16 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   }
 
   Optional<DriverKind> Kind =
-  llvm::StringSwitch<Optional<DriverKind>>(DriverName)
-  .Case("swift", DriverKind::Interactive)
-  .Case("swiftc", DriverKind::Batch)
-  .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-  .Case("swift-indent", DriverKind::SwiftIndent)
-  .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
-  .Case("swift-api-extract", DriverKind::APIExtract)
-  .Default(None);
-  
+      llvm::StringSwitch<Optional<DriverKind>>(DriverName)
+          .Case("swift", DriverKind::Interactive)
+          .Case("swiftc", DriverKind::Batch)
+          .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
+          .Case("swift-indent", DriverKind::SwiftIndent)
+          .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
+          .Case("swift-api-extract", DriverKind::APIExtract)
+          .Case("swift-api-digester", DriverKind::APIDigester)
+          .Default(None);
+
   if (Kind.hasValue())
     driverKind = Kind.getValue();
   else if (!OptName.empty())
@@ -3497,6 +3498,7 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
   case DriverKind::APIExtract:
+  case DriverKind::APIDigester:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

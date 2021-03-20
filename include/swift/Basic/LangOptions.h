@@ -253,8 +253,8 @@ namespace swift {
     /// Enable experimental flow-sensitive concurrent captures.
     bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
 
-    /// Enable inference of ConcurrentValue conformances for public types.
-    bool EnableInferPublicConcurrentValue = false;
+    /// Enable inference of Sendable conformances for public types.
+    bool EnableInferPublicSendable = false;
 
     /// Enable experimental derivation of `Codable` for enums.
     bool EnableExperimentalEnumCodableDerivation = false;

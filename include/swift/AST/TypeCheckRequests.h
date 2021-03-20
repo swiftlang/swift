@@ -44,7 +44,7 @@ class DefaultArgumentExpr;
 class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
-struct PropertyWrapperBackingPropertyInfo;
+class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
@@ -712,11 +712,10 @@ public:
   bool isCached() const;
 };
 
-/// Request information about the backing property for properties that have
-/// attached property wrappers.
-class PropertyWrapperBackingPropertyInfoRequest :
-    public SimpleRequest<PropertyWrapperBackingPropertyInfoRequest,
-                         PropertyWrapperBackingPropertyInfo(VarDecl *),
+/// Request the synthesized auxiliary declarations for a wrapped property.
+class PropertyWrapperAuxiliaryVariablesRequest :
+    public SimpleRequest<PropertyWrapperAuxiliaryVariablesRequest,
+                         PropertyWrapperAuxiliaryVariables(VarDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -725,7 +724,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  PropertyWrapperBackingPropertyInfo
+  PropertyWrapperAuxiliaryVariables
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
@@ -733,11 +732,11 @@ public:
   bool isCached() const;
 };
 
-/// Request the synthesized local wrapped value var for a parameter
-/// that has an attached property wrapper.
-class PropertyWrapperWrappedValueVarRequest :
-    public SimpleRequest<PropertyWrapperWrappedValueVarRequest,
-                         VarDecl *(VarDecl *),
+/// Request information about initialization of the backing property
+/// for properties that have attached property wrappers.
+class PropertyWrapperInitializerInfoRequest :
+    public SimpleRequest<PropertyWrapperInitializerInfoRequest,
+                         PropertyWrapperInitializerInfo(VarDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -746,7 +745,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  VarDecl *evaluate(Evaluator &evaluator, VarDecl *var) const;
+  PropertyWrapperInitializerInfo
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
   // Caching
@@ -2898,9 +2898,9 @@ public:
 };
 
 /// Retrieve the implicit conformance for the given nominal type to
-/// the ConcurrentValue protocol.
-class GetImplicitConcurrentValueRequest :
-    public SimpleRequest<GetImplicitConcurrentValueRequest,
+/// the Sendable protocol.
+class GetImplicitSendableRequest :
+    public SimpleRequest<GetImplicitSendableRequest,
                          NormalProtocolConformance *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
@@ -2914,6 +2914,25 @@ private:
 
 public:
   // Caching
+  bool isCached() const { return true; }
+};
+
+class ConditionalRequirementsRequest
+    : public SimpleRequest<ConditionalRequirementsRequest,
+                           llvm::ArrayRef<Requirement>(
+                               NormalProtocolConformance *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::ArrayRef<Requirement> evaluate(Evaluator &evaluator,
+                                       NormalProtocolConformance *decl) const;
+
+public:
   bool isCached() const { return true; }
 };
 

@@ -63,6 +63,12 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
 
 @main struct Main {
   static func main() async {
-    await runTest(numCounters: 10, numWorkers: 100, numIterations: 1000)
+    // Useful for debugging: specify counter/worker/iteration counts
+    let args = CommandLine.arguments
+    let counters = args.count >= 2 ? Int(args[1])! : 10
+    let workers = args.count >= 3 ? Int(args[2])! : 100
+    let iterations = args.count >= 4 ? Int(args[3])! : 1000
+    print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
+    await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
   }
 }

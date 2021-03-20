@@ -2,45 +2,45 @@
 // REQUIRES: concurrency
 
 // Concurrent attribute on a function type.
-func f(_ fn: @concurrent (Int) -> Int) { }
+func f(_ fn: @Sendable (Int) -> Int) { }
 
-// Okay to overload @concurrent vs. not concurrent
+// Okay to overload @Sendable vs. not concurrent
 func f(_ fn: (Int) -> Int) { }
 
 // Concurrent attribute with other function attributes.
-func onEscaping(_ fn: @escaping @concurrent (Int) -> Int) { }
-func onEscaping2(_ fn: @concurrent @escaping (Int) -> Int) { }
-func onAutoclosure(_ fn: @autoclosure @concurrent () -> Int) { }
-func onAutoclosure2(_ fn: @concurrent @autoclosure () -> Int) { }
-func onEscapingAutoclosure(_ fn: @concurrent @autoclosure @escaping () -> Int) { }
-func onEscapingAutoclosure2(_ fn: @escaping @autoclosure @concurrent () -> Int) { }
+func onEscaping(_ fn: @escaping @Sendable (Int) -> Int) { }
+func onEscaping2(_ fn: @Sendable @escaping (Int) -> Int) { }
+func onAutoclosure(_ fn: @autoclosure @Sendable () -> Int) { }
+func onAutoclosure2(_ fn: @Sendable @autoclosure () -> Int) { }
+func onEscapingAutoclosure(_ fn: @Sendable @autoclosure @escaping () -> Int) { }
+func onEscapingAutoclosure2(_ fn: @escaping @autoclosure @Sendable () -> Int) { }
 
-func acceptsConcurrent(_ fn: @concurrent (Int) -> Int) { }
+func acceptsConcurrent(_ fn: @Sendable (Int) -> Int) { }
 func acceptsNonConcurrent(_ fn: (Int) -> Int) { }
 
-@concurrent func negate(_ x: Int) -> Int { -x }
+@Sendable func negate(_ x: Int) -> Int { -x }
 
 func passingConcurrentOrNot(
-  _ cfn: @concurrent (Int) -> Int,
-  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-concurrent}}{{9-9=@concurrent }}
+  _ cfn: @Sendable (Int) -> Int,
+  ncfn: (Int) -> Int // expected-note{{parameter 'ncfn' is implicitly non-concurrent}}{{9-9=@Sendable }}
 ) {
   // Okay due to overloading
   f(cfn)
   f(ncfn)
 
   acceptsConcurrent(cfn) // okay
-  acceptsConcurrent(ncfn) // expected-error{{passing non-concurrent parameter 'ncfn' to function expecting a @concurrent closure}}
+  acceptsConcurrent(ncfn) // expected-error{{passing non-concurrent parameter 'ncfn' to function expecting a @Sendable closure}}
   acceptsNonConcurrent(cfn) // okay
   acceptsNonConcurrent(ncfn) // okay
 
   acceptsConcurrent(negate)
   acceptsNonConcurrent(negate)
 
-  let _: Int = negate // expected-error{{cannot convert value of type '@concurrent (Int) -> Int' to specified type 'Int'}}
+  let _: Int = negate // expected-error{{cannot convert value of type '@Sendable (Int) -> Int' to specified type 'Int'}}
 }
 
 func closures() {
-  // Okay, inferring @concurrent
+  // Okay, inferring @Sendable
   acceptsConcurrent { $0 }
   acceptsConcurrent({ $0 })
   acceptsConcurrent({ i in i })
@@ -50,10 +50,10 @@ func closures() {
     })
 
   let closure1 = { $0 + 1 } // inferred to be non-concurrent
-  acceptsConcurrent(closure1) // expected-error{{converting non-concurrent function value to '@concurrent (Int) -> Int' may introduce data races}}
+  acceptsConcurrent(closure1) // expected-error{{converting non-concurrent function value to '@Sendable (Int) -> Int' may introduce data races}}
 }
 
-// Mutation of captured locals from within @concurrent functions.
+// Mutation of captured locals from within @Sendable functions.
 extension Int {
   mutating func makeNegative() {
     self = -self
@@ -120,8 +120,8 @@ func testCaseNonTrivialValue() {
 }
 
 func testExplicitConcurrentClosure() {
-  let fn = { @concurrent in
+  let fn = { @Sendable in
     17
   }
-  let _: String = fn // expected-error{{cannot convert value of type '@concurrent () -> Int' to specified type 'String'}}
+  let _: String = fn // expected-error{{cannot convert value of type '@Sendable () -> Int' to specified type 'String'}}
 }

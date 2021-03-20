@@ -219,6 +219,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // getCurrentActor has no arguments.
+  if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
+    auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetCurrentExecutorFn(),
+                                        {});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    out.add(call);
+    return;
+  }
+
   // Everything else cares about the (rvalue) argument.
 
   if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {
@@ -230,7 +240,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture) {
 
     auto flags = args.claimNext();
-    auto parentTask = args.claimNext();
     auto taskGroup =
         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture)
         ? args.claimNext()
@@ -244,7 +253,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto taskContext = args.claimNext();
 
     auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, parentTask, taskGroup, futureResultType, taskFunction, taskContext,
+        IGF, flags, taskGroup, futureResultType, taskFunction, taskContext,
         substitutions);
 
     // Cast back to NativeObject/RawPointer.

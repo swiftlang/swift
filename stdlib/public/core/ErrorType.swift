@@ -110,7 +110,7 @@ import SwiftShims
 ///         print("Other error: \(error)")
 ///     }
 ///     // Prints "Parsing error: mismatchedTag [19:5]"
-public protocol Error: ConcurrentValue {
+public protocol Error: Sendable {
   var _domain: String { get }
   var _code: Int { get }
 

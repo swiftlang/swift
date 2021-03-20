@@ -72,7 +72,7 @@ func genericWrapperCaller(projection: Projection<Int>) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter33testSimpleClosureWrapperParameteryyF : $@convention(thin) () -> ()
 func testSimpleClosureWrapperParameter() {
-  let closure: (Int) -> Void = { (@Wrapper value: Int) in
+  let closure: (Int) -> Void = { (@Wrapper value) in
     _ = value
     _ = _value
     _ = $value
@@ -161,7 +161,7 @@ struct ProjectionWrapper<Value> {
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tF : $@convention(thin) (ProjectionWrapper<Int>) -> ()
 func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
-  let multiStatement: (ProjectionWrapper<Int>) -> Void = { ($value: ProjectionWrapper<Int>) in
+  let multiStatement: (ProjectionWrapper<Int>) -> Void = { $value in
     _ = value
     _ = _value
     _ = $value
@@ -184,7 +184,7 @@ func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
   // getter of value #1 in closure #1 in implicit closure #1 in testImplicitPropertyWrapper(projection:)
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_5valueL_Sivg : $@convention(thin) () -> Int
 
-  let _: (ProjectionWrapper<Int>) -> (Int, ProjectionWrapper<Int>) = { ($value: ProjectionWrapper<Int>) in
+  let _: (ProjectionWrapper<Int>) -> (Int, ProjectionWrapper<Int>) = { $value in
     (value, $value)
   }
 

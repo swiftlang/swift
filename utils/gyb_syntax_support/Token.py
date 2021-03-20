@@ -9,7 +9,8 @@ class Token(object):
     """
 
     def __init__(self, name, kind, serialization_code, unprefixed_kind=None,
-                 text=None, classification='None', is_keyword=False):
+                 text=None, classification='None', is_keyword=False,
+                 requires_leading_space=False, requires_trailing_space=False):
         self.name = name
         self.kind = kind
         if unprefixed_kind is None:
@@ -20,6 +21,8 @@ class Token(object):
         self.text = text or ""
         self.classification = classification_by_name(classification)
         self.is_keyword = is_keyword
+        self.requires_leading_space = requires_leading_space
+        self.requires_trailing_space = requires_trailing_space
 
     def swift_kind(self):
         name = lowercase_first_word(self.name)
@@ -37,7 +40,8 @@ class Keyword(Token):
                  classification='Keyword'):
         Token.__init__(self, name, 'kw_' + text, serialization_code,
                        unprefixed_kind=text, text=text,
-                       classification=classification, is_keyword=True)
+                       classification=classification, is_keyword=True,
+                       requires_trailing_space=True)
 
     def macro_name(self):
         return "KEYWORD"
@@ -78,7 +82,8 @@ class PoundKeyword(Token):
                  classification='Keyword'):
         Token.__init__(self, name, 'pound_' + kind, serialization_code,
                        unprefixed_kind=kind, text=text,
-                       classification=classification, is_keyword=True)
+                       classification=classification, is_keyword=True,
+                       requires_trailing_space=True)
 
     def macro_name(self):
         return "POUND_KEYWORD"
@@ -215,24 +220,31 @@ SYNTAX_TOKENS = [
                serialization_code=92),
     Punctuator('RightSquareBracket', 'r_square', text=']',
                serialization_code=93),
-    Punctuator('LeftAngle', 'l_angle', text='<', serialization_code=94),
-    Punctuator('RightAngle', 'r_angle', text='>', serialization_code=95),
+    Punctuator('LeftAngle', 'l_angle', text='<', requires_leading_space=True, 
+               requires_trailing_space=True, serialization_code=94),
+    Punctuator('RightAngle', 'r_angle', text='>', requires_leading_space=True,
+               requires_trailing_space=True, serialization_code=95),
 
     Punctuator('Period', 'period', text='.', serialization_code=85),
     Punctuator('PrefixPeriod', 'period_prefix', text='.',
                serialization_code=87),
-    Punctuator('Comma', 'comma', text=',', serialization_code=84),
+    Punctuator('Comma', 'comma', text=',', requires_trailing_space=True,
+               serialization_code=84),
     Punctuator('Ellipsis', 'ellipsis', text='...', serialization_code=118),
-    Punctuator('Colon', 'colon', text=':', serialization_code=82),
+    Punctuator('Colon', 'colon', text=':', requires_trailing_space=True,
+               serialization_code=82),
     Punctuator('Semicolon', 'semi', text=';', serialization_code=83),
-    Punctuator('Equal', 'equal', text='=', serialization_code=86),
+    Punctuator('Equal', 'equal', text='=', requires_leading_space=True,
+               requires_trailing_space=True, serialization_code=86),
     Punctuator('AtSign', 'at_sign', text='@', classification='Attribute',
                serialization_code=80),
     Punctuator('Pound', 'pound', text='#', serialization_code=81),
 
     Punctuator('PrefixAmpersand', 'amp_prefix', text='&',
+               requires_leading_space=True, requires_trailing_space=True, 
                serialization_code=96),
-    Punctuator('Arrow', 'arrow', text='->', serialization_code=78),
+    Punctuator('Arrow', 'arrow', text='->', requires_trailing_space=True,
+               serialization_code=78),
 
 
     Punctuator('Backtick', 'backtick', text='`', serialization_code=79),

@@ -245,22 +245,16 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       auto &Diags = getASTContext().Diags;
 
       SourceLoc loc;
-      bool isDeferBody;
       if (closure.kind == SILDeclRef::Kind::DefaultArgGenerator) {
         auto *param = getParameterAt(closure.getDecl(),
                                      closure.defaultArgIndex);
         loc = param->getLoc();
-        isDeferBody = false;
       } else {
         auto f = *closure.getAnyFunctionRef();
         loc = f.getLoc();
-        isDeferBody = f.isDeferBody();
       }
 
-      Diags.diagnose(loc,
-                     isDeferBody
-                     ? diag::capture_before_declaration_defer
-                     : diag::capture_before_declaration,
+      Diags.diagnose(loc, diag::capture_before_declaration,
                      vd->getBaseIdentifier());
       Diags.diagnose(vd->getLoc(), diag::captured_value_declared_here);
       Diags.diagnose(capture.getLoc(), diag::value_captured_here);
@@ -914,7 +908,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
       param->setInterfaceType(vd->getPropertyWrapperInitValueInterfaceType());
     } else {
-      auto *placeholder = vd->getPropertyWrapperBackingPropertyInfo().getProjectedValuePlaceholder();
+      auto *placeholder =
+          vd->getPropertyWrapperInitializerInfo().getProjectedValuePlaceholder();
       auto interfaceType = placeholder->getType();
       if (interfaceType->hasArchetype())
         interfaceType = interfaceType->mapTypeOutOfContext();
@@ -940,24 +935,24 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     // in the initializer expression to the given parameter.
     if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
       auto var = cast<VarDecl>(function.getDecl());
-      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
       auto param = params->get(0);
-      auto *placeholder = wrappedInfo.getWrappedValuePlaceholder();
+      auto *placeholder = initInfo.getWrappedValuePlaceholder();
       opaqueValue.emplace(
           *this, placeholder->getOpaqueValuePlaceholder(),
           maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
 
-      assert(value == wrappedInfo.getInitFromWrappedValue());
+      assert(value == initInfo.getInitFromWrappedValue());
     } else if (function.kind == SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue) {
       auto var = cast<VarDecl>(function.getDecl());
-      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto initInfo = var->getPropertyWrapperInitializerInfo();
       auto param = params->get(0);
-      auto *placeholder = wrappedInfo.getProjectedValuePlaceholder();
+      auto *placeholder = initInfo.getProjectedValuePlaceholder();
       opaqueValue.emplace(
           *this, placeholder->getOpaqueValuePlaceholder(),
           maybeEmitValueOfLocalVarDecl(param, AccessKind::Read));
 
-      assert(value == wrappedInfo.getInitFromProjectedValue());
+      assert(value == initInfo.getInitFromProjectedValue());
     }
 
     emitReturnExpr(Loc, value);

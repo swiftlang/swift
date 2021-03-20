@@ -133,10 +133,11 @@ public:
   }
 
   llvm::Value *getAsyncTask();
-  llvm::Value *getAsyncExecutor();
   llvm::Value *getAsyncContext();
 
-  llvm::CallInst *emitSuspendAsyncCall(ArrayRef<llvm::Value *> args);
+  llvm::CallInst *emitSuspendAsyncCall(unsigned swiftAsyncContextIndex,
+                                       llvm::StructType *resultTy,
+                                       ArrayRef<llvm::Value *> args);
 
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -175,8 +176,6 @@ private:
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
-  Address asyncTaskLocation;
-  Address asyncExecutorLocation;
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
@@ -197,8 +196,8 @@ public:
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
 
-  void setupAsync();
-  bool isAsync() const { return asyncTaskLocation.isValid(); }
+  void setupAsync(unsigned asyncContextIndex);
+  bool isAsync() const { return asyncContextLocation.isValid(); }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");

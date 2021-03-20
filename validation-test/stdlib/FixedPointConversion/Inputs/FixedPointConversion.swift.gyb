@@ -1,6 +1,7 @@
 % # FIXME(integers): add tests that perform the same checks in generic code.
 % #
 % # cd validation-test/stdlib/FixedPointConversion/
+% #
 % # ../../../utils/gyb --line-directive="" \
 % #   ./Inputs/FixedPointConversion.swift.gyb | ../../../utils/split_file.py
 %
@@ -10,18 +11,18 @@
 % from itertools import product
 %
 % # Generate a test-suite file for each integer type.
-% for (configuration, ptrsize) in product(['Debug', 'Release'], [32, 64]):
-%   long_test = ', long_test' if (configuration, ptrsize) == ('Release', 32) else ''
+% for (configuration, bitWidth) in product(['Debug', 'Release'], [32, 64]):
 %   optimizations = '-Onone' if configuration == 'Debug' else '-O'
 %
-%   for self_type in all_integer_types(ptrsize):
-%     SelfName = self_type.stdlib_name
-%     selfMin = self_type.min
-%     selfMax = self_type.max
+%   for selfType in all_integer_types(bitWidth):
+%     SelfName = selfType.stdlib_name
+%     selfMin = selfType.min
+%     selfMax = selfType.max
 %
-%     test_suite = 'FixedPointConversion_' + configuration + str(ptrsize) + '_To' + SelfName
+%     testSuite = 'FixedPointConversion_{configuration}{bitWidth}_To{SelfName}'\
+%       .format(**locals()) # TODO(python3): use f-string (PEP 498).
 %
-// BEGIN ${test_suite}.swift
+// BEGIN ${testSuite}.swift
 //===----------------------------------------------------------------------===//
 //
 // Automatically Generated From ./Inputs/FixedPointConversion.swift.gyb
@@ -29,8 +30,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// REQUIRES: executable_test${long_test}
-// REQUIRES: PTRSIZE=${str(ptrsize)}
+// REQUIRES: executable_test
+// REQUIRES: PTRSIZE=${format(bitWidth)}
 // RUN: %target-run-simple-swift(${optimizations})
 // END.
 //
@@ -38,196 +39,298 @@
 
 import StdlibUnittest
 
-let ${test_suite} = TestSuite("${test_suite}")
+let ${testSuite} = TestSuite(
+   "${testSuite}"
+)
 
 %     # Test conversion behaviors for all integer types.
-%     for other_type in all_integer_types(ptrsize):
-%       OtherName = other_type.stdlib_name
-%       otherMin = other_type.min
-%       otherMax = other_type.max
+%     for otherType in all_integer_types(bitWidth):
+%       OtherName = otherType.stdlib_name
+%       otherMin = otherType.min
+%       otherMax = otherType.max
 %
 //===----------------------------------------------------------------------===//
-// MARK: ${OtherName}: (${str(otherMin)})...(${str(otherMax)})
+// MARK: ${OtherName}: (${format(otherMin, '+')})...(${format(otherMax, '+')})
 //===----------------------------------------------------------------------===//
 
-%       intValues = [
-%         selfMin,
-%         selfMax,
-%         selfMin - 1,
-%         selfMax + 1,
-%         otherMin,
-%         otherMax,
-%         0,
-%       ]
-%       for intValue in sorted(set(intValues)):
-%         if otherMin <= intValue <= otherMax:
+%       otherValues = sorted(
+%         set(
+%           filter(
+%             lambda otherValue: (otherMin <= otherValue <= otherMax),
+%             [
+%               selfMin,
+%               selfMax,
+%               selfMin - 1,
+%               selfMax + 1,
+%               otherMin,
+%               otherMax,
+%               0,
+%             ]
+%           )
+%         )
+%       )
+%       otherValues_NeverTraps = otherValues_NeverFails = list(
+%         filter(
+%           lambda otherValue: (selfMin <= otherValue <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_AlwaysTraps = otherValues_AlwaysFails = list(
+%         filter(
+%           lambda otherValue: not (selfMin <= otherValue <= selfMax),
+%           otherValues
+%         )
+%       )
 %
-%           intLiteral = str(intValue)
+%       if len(otherValues_NeverTraps) > 0:
 %
-%           if selfMin <= intValue <= selfMax:
+${testSuite}
+.test("From${OtherName}_NeverTraps")
+.forEach(in: [
 %
-${test_suite}.test("From${OtherName}(${intLiteral})_NeverTraps") {
-  let input = get${OtherName}(${intLiteral})
-  let actual = ${SelfName}(input)
-  expectEqual(${intLiteral}, actual)
+%         for otherValue in otherValues_NeverTraps:
+%           selfLiteral = otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}($0.1))
 }
 
-${test_suite}.test("From${OtherName}(${intLiteral})_NeverFails") {
-  let input = get${OtherName}(${intLiteral})
-  let actual = ${SelfName}(exactly: input)
-  expectEqual(${intLiteral}, actual)
-}
-
-%           else:
+%       end # if
 %
-${test_suite}.test("From${OtherName}(${intLiteral})_AlwaysTraps") {
-  let input = get${OtherName}(${intLiteral})
-  expectCrash {
-    let actual = ${SelfName}(input)
-    _blackHole(actual)
-  }
+%       if len(otherValues_NeverFails) > 0:
+%
+${testSuite}
+.test("From${OtherName}_NeverFails")
+.forEach(in: [
+%
+%         for otherValue in otherValues_NeverFails:
+%           selfLiteral = otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}(exactly: $0.1))
 }
 
-${test_suite}.test("From${OtherName}(${intLiteral})_AlwaysFails") {
-  let input = get${OtherName}(${intLiteral})
-  let actual = ${SelfName}(exactly: input)
-  expectNil(actual)
+%       end # if
+%
+%       if len(otherValues_AlwaysTraps) > 0:
+%
+${testSuite}
+.test("From${OtherName}_AlwaysTraps")
+.forEach(in: [
+%
+%         for otherValue in otherValues_AlwaysTraps:
+%           otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%         end # for
+]) {
+  expectCrashLater()
+  _blackHole(${SelfName}($0))
 }
 
-%           end # if
-%         end # if
-%       end # for intValue in ...
-%     end # for other_type in ...
+%       end # if
+%
+%       if len(otherValues_AlwaysFails) > 0:
+%
+${testSuite}
+.test("From${OtherName}_AlwaysFails")
+.forEach(in: [
+%
+%         for otherValue in otherValues_AlwaysFails:
+%           otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%         end # for
+]) {
+  expectNil(${SelfName}(exactly: $0))
+}
+
+%       end # if
+%
+%     end # for otherType in ...
 %
 %     # Test conversion behaviors for all floating-point types.
-%     for float_type in all_floating_point_types():
-%       FloatName = "Float" + str(float_type.bits)
-%       floatMax = int_max(bits=float_type.explicit_significand_bits, signed=False)
-%       floatMin = -floatMax
+%     for otherType in all_floating_point_types():
+%       OtherName = 'Float{}'.format(otherType.bits)
+%       otherMax = int_max(bits=otherType.explicit_significand_bits, signed=False)
+%       otherMin = -otherMax
 %
 //===----------------------------------------------------------------------===//
-// MARK: ${FloatName}: (${str(floatMin)})...(${str(floatMax)})
+// MARK: ${OtherName}: (${format(otherMin, '+')})...(${format(otherMax, '+')})
 //===----------------------------------------------------------------------===//
 
-%       if FloatName == 'Float16':
+%       if OtherName == 'Float16':
 %
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
 
-%       elif FloatName == 'Float80':
+%       elif OtherName == 'Float80':
 %
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 
 %       end # if
 %
-%       floatValues = [
-%         Decimal(selfMin),
-%         Decimal(selfMax),
-%         Decimal(selfMin - 1),
-%         Decimal(selfMax + 1),
-%         Decimal(floatMin),
-%         Decimal(floatMax),
-%         Decimal('-0.0'),
-%         Decimal('+0.0'),
-%         Decimal('-0.5'),
-%         Decimal('+0.5'),
-%         Decimal('-128.5'),
-%         Decimal('+127.5'),
-%         Decimal('+255.5'),
-%         Decimal('-32768.5'),
-%         Decimal('+32767.5'),
-%         Decimal('+65535.5'),
-%       ]
-%       for floatValue in sorted(floatValues):
-%         if floatMin <= floatValue <= floatMax:
+%       otherValues = sorted(
+%         map(
+%           lambda otherLiteral: Decimal(otherLiteral).normalize(),
+%           set(
+%             map(
+%               lambda otherValue: format(otherValue.normalize(), '+'),
+%               filter(
+%                 lambda otherValue: (otherMin <= otherValue <= otherMax),
+%                 [
+%                   Decimal(selfMin),
+%                   Decimal(selfMax),
+%                   Decimal(selfMin - 1),
+%                   Decimal(selfMax + 1),
+%                   Decimal(otherMin),
+%                   Decimal(otherMax),
+%                   Decimal('-0.0'),
+%                   Decimal('+0.0'),
+%                   Decimal('-0.5'),
+%                   Decimal('+0.5'),
+%                   Decimal('-128.5'),
+%                   Decimal('+127.5'),
+%                   Decimal('+255.5'),
+%                   Decimal('-32768.5'),
+%                   Decimal('+32767.5'),
+%                   Decimal('+65535.5'),
+%                 ]
+%               )
+%             )
+%           )
+%         )
+%       )
+%       otherValues_NeverTraps = list(
+%         filter(
+%           lambda otherValue: (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_NeverFails = list(
+%         filter(
+%           lambda otherValue: (otherValue == int(otherValue)) and \
+%                              (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_AlwaysTraps = list(
+%         filter(
+%           lambda otherValue: not (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       otherValues_AlwaysFails = list(
+%         filter(
+%           lambda otherValue: (otherValue != int(otherValue)) or \
+%                              not (selfMin <= int(otherValue) <= selfMax),
+%           otherValues
+%         )
+%       )
+%       signs = ['-', '+']
+%       nonFinites = ['infinity', 'nan', 'signalingNaN']
 %
-%           intValue = int(floatValue)
-%           intLiteral = str(intValue)
-%           floatLiteral = str(floatValue)
+%       if len(otherValues_NeverTraps) > 0:
 %
-%           if selfMin <= intValue <= selfMax:
+${testSuite}
+.test("From${OtherName}_NeverTraps")
+.forEach(in: [
 %
-${test_suite}.test("From${FloatName}(${floatLiteral})_NeverTraps") {
-  let input = get${FloatName}(${floatLiteral})
-  let actual = ${SelfName}(input)
-  expectEqual(${intLiteral}, actual)
+%         for otherValue in otherValues_NeverTraps:
+%           selfLiteral = format(int(otherValue), '+')
+%           otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}($0.1))
 }
 
-%             if floatValue == intValue:
+%       end # if
 %
-${test_suite}.test("From${FloatName}(${floatLiteral})_NeverFails") {
-  let input = get${FloatName}(${floatLiteral})
-  let actual = ${SelfName}(exactly: input)
-  expectEqual(${intLiteral}, actual)
+%       if len(otherValues_NeverFails) > 0:
+%
+${testSuite}
+.test("From${OtherName}_NeverFails")
+.forEach(in: [
+%
+%         for otherValue in otherValues_NeverFails:
+%           selfLiteral = format(int(otherValue), '+')
+%           otherLiteral = format(otherValue, '+')
+%
+  (get${SelfName}(${selfLiteral}), get${OtherName}(${otherLiteral})),
+%
+%         end # for
+]) {
+  expectEqual($0.0, ${SelfName}(exactly: $0.1))
 }
 
-%             else:
+%       end # if
 %
-${test_suite}.test("From${FloatName}(${floatLiteral})_AlwaysFails") {
-  let input = get${FloatName}(${floatLiteral})
-  let actual = ${SelfName}(exactly: input)
-  expectNil(actual)
+${testSuite}
+.test("From${OtherName}_AlwaysTraps")
+.forEach(in: [
+%
+%       for otherValue in otherValues_AlwaysTraps:
+%         otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%       end # for
+%
+%       for (sign, nonFinite) in product(signs, nonFinites):
+%
+  get${OtherName}(${sign}.${nonFinite}),
+%
+%       end # for
+]) {
+  expectCrashLater()
+  _blackHole(${SelfName}($0))
 }
 
-%             end # if
-%           else:
+${testSuite}
+.test("From${OtherName}_AlwaysFails")
+.forEach(in: [
 %
-${test_suite}.test("From${FloatName}(${floatLiteral})_AlwaysTraps") {
-  let input = get${FloatName}(${floatLiteral})
-  expectCrash {
-    let actual = ${SelfName}(input)
-    _blackHole(actual)
-  }
+%       for otherValue in otherValues_AlwaysFails:
+%         otherLiteral = format(otherValue, '+')
+%
+  get${OtherName}(${otherLiteral}),
+%
+%       end # for
+%
+%       for (sign, nonFinite) in product(signs, nonFinites):
+%
+  get${OtherName}(${sign}.${nonFinite}),
+%
+%       end # for
+]) {
+  expectNil(${SelfName}(exactly: $0))
 }
 
-${test_suite}.test("From${FloatName}(${floatLiteral})_AlwaysFails") {
-  let input = get${FloatName}(${floatLiteral})
-  let actual = ${SelfName}(exactly: input)
-  expectNil(actual)
-}
-
-%           end # if
-%         end # if
-%       end # for floatValue in ...
-%
-%       nonFinites = [
-%         '-.infinity',
-%         '+.infinity',
-%         '-.nan',
-%         '+.nan',
-%         '-.signalingNaN',
-%         '+.signalingNaN',
-%       ]
-%       for nonFinite in nonFinites:
-%
-${test_suite}.test("From${FloatName}(${nonFinite})_AlwaysTraps") {
-  let input = get${FloatName}(${nonFinite})
-  expectCrash {
-    let actual = ${SelfName}(input)
-    _blackHole(actual)
-  }
-}
-
-${test_suite}.test("From${FloatName}(${nonFinite})_AlwaysFails") {
-  let input = get${FloatName}(${nonFinite})
-  let actual = ${SelfName}(exactly: input)
-  expectNil(actual)
-}
-
-%       end # for nonFinite in ...
-%
-%       if FloatName == 'Float16':
+%       if OtherName == 'Float16':
 }
 #endif // Float16
 
-%       elif FloatName == 'Float80':
+%       elif OtherName == 'Float80':
 %
 #endif // Float80
 
 %       end # if
-%     end # for float_type in ...
+%
+%     end # for otherType in ...
 %
 runAllTests()
 
-%   end # for self_type in ...
-% end # for (configuration, ptrsize) in ...
+%   end # for selfType in ...
+%
+% end # for (configuration, bitWidth) in ...

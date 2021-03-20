@@ -3254,8 +3254,9 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(result.getPointer());
   if (info.hasValue()) {
     auto infoKey = info.getValue().getFuncAttrKey();
-    ID.AddInteger(infoKey.first);
-    ID.AddPointer(infoKey.second);
+    ID.AddInteger(std::get<0>(infoKey));
+    ID.AddPointer(std::get<1>(infoKey));
+    ID.AddPointer(std::get<2>(infoKey));
   }
 }
 
@@ -3283,8 +3284,13 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   bool hasClangInfo =
       info.hasValue() && !info.getValue().getClangTypeInfo().empty();
 
-  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, ClangTypeInfo>(
-      params.size(), hasClangInfo ? 1 : 0);
+  Type globalActor;
+  if (info.hasValue())
+    globalActor = info->getGlobalActor();
+
+  size_t allocSize = totalSizeToAlloc<
+      AnyFunctionType::Param, ClangTypeInfo, Type
+    >(params.size(), hasClangInfo ? 1 : 0, globalActor ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
@@ -3294,6 +3300,9 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     else
       isCanonical = false;
   }
+
+  if (globalActor && !globalActor->isCanonical())
+    isCanonical = false;
 
   auto funcTy = new (mem) FunctionType(params, result, info,
                                        isCanonical ? &ctx : nullptr,
@@ -3314,6 +3323,8 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params, Type output,
     auto clangTypeInfo = info.getValue().getClangTypeInfo();
     if (!clangTypeInfo.empty())
       *getTrailingObjects<ClangTypeInfo>() = clangTypeInfo;
+    if (Type globalActor = info->getGlobalActor())
+      *getTrailingObjects<Type>() = globalActor;
   }
 }
 
@@ -3326,8 +3337,9 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(result.getPointer());
   if (info.hasValue()) {
     auto infoKey = info.getValue().getFuncAttrKey();
-    ID.AddInteger(infoKey.first);
-    ID.AddPointer(infoKey.second);
+    ID.AddInteger(std::get<0>(infoKey));
+    ID.AddPointer(std::get<1>(infoKey));
+    ID.AddPointer(std::get<2>(infoKey));
   }
 }
 
@@ -3364,8 +3376,16 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
         = ctx.getImpl().GenericFunctionTypes.FindNodeOrInsertPos(id, insertPos)) {
     return funcTy;
   }
-  
-  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param>(params.size());
+
+  Type globalActor;
+  if (info.hasValue())
+    globalActor = info->getGlobalActor();
+
+  if (globalActor && !globalActor->isCanonical())
+    isCanonical = false;
+
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param, Type>(
+      params.size(), globalActor ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
@@ -3388,6 +3408,10 @@ GenericFunctionType::GenericFunctionType(
                     properties, params.size(), info), Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  if (info) {
+    if (Type globalActor = info->getGlobalActor())
+      *getTrailingObjects<Type>() = globalActor;
+  }
 }
 
 GenericTypeParamType *GenericTypeParamType::get(unsigned depth, unsigned index,
@@ -4996,7 +5020,7 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   if (!kind)
     return original;
 
-  auto wrapperInfo = original->getPropertyWrapperBackingPropertyInfo();
+  auto wrapperInfo = original->getPropertyWrapperAuxiliaryVariables();
   switch (*kind) {
   case PropertyWrapperSynthesizedPropertyKind::Backing:
     return this == wrapperInfo.backingVar ? original : nullptr;
