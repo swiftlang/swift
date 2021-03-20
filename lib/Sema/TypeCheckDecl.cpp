@@ -2666,8 +2666,10 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     if (auto *var = dyn_cast<VarDecl>(member)) {
       // The projected storage wrapper ($foo) might have
       // dynamically-dispatched accessors, so force them to be synthesized.
-      if (var->hasAttachedPropertyWrapper())
-        (void) var->getPropertyWrapperBackingProperty();
+      if (var->hasAttachedPropertyWrapper()) {
+        (void) var->getPropertyWrapperAuxiliaryVariables();
+        (void) var->getPropertyWrapperInitializerInfo();
+      }
     }
   }
 
