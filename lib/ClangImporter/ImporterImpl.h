@@ -763,7 +763,12 @@ public:
   /// already in flight.
   template<typename ...Args>
   void diagnose(SourceLoc loc, Args &&...args) {
-    diagnose(loc, std::forward<Args>(args)...);
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(loc, std::forward<Args>(args)...);
   }
 
   /// Import the given Clang identifier into Swift.
