@@ -725,10 +725,10 @@ namespace swift {
     /// diagnostic message.
     std::unique_ptr<diag::LocalizationProducer> localization;
 
-    /// This allocator will retain localized diagnostic strings for the duration
-    /// of compiler invocation.
+    /// This allocator will retain localized diagnostic strings containing the
+    /// diagnostic's message and identifier for the duration of compiler invocation.
     llvm::BumpPtrAllocator localizationAllocator;
-    llvm::Optional<llvm::StringSaver> localizationSaver;
+    llvm::StringSaver localizationSaver;
 
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
