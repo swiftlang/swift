@@ -98,7 +98,8 @@ LocalizationProducer::getMessageOr(swift::DiagID id,
   if (localizedMessage.empty())
     return defaultMessage;
   llvm::StringRef diagnosticName(diagnosticNameStrings[(unsigned)id]);
-  if (localizationSaver && printDiagnosticName) {
+  if (printDiagnosticName) {
+    assert(localizationSaver);
     auto localizedDebugDiagnosticMessage =
         localizationSaver->save(localizedMessage.str() + diagnosticName.str());
     return localizedDebugDiagnosticMessage;
