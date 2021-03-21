@@ -1909,6 +1909,12 @@ public:
   /// closures being passed to non-closure parameters.
   bool diagnoseTrailingClosureMismatch() const;
 
+  /// Tailored key path as function diagnostics for argument mismatches where
+  /// argument is a keypath expression that has a root type that matches a
+  /// function parameter, but keypath value don't match the function parameter
+  /// result value.
+  bool diagnoseKeyPathAsFunctionResultMismatch() const;
+
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
   unsigned getArgPosition() const { return Info.getArgPosition(); }

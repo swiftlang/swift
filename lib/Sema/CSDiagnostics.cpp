@@ -5973,6 +5973,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseTrailingClosureMismatch())
     return true;
 
+  if (diagnoseKeyPathAsFunctionResultMismatch())
+    return true;
+
   auto argType = getFromType();
   auto paramType = getToType();
 
@@ -6224,6 +6227,31 @@ bool ArgumentMismatchFailure::diagnoseTrailingClosureMismatch() const {
     }
   }
 
+  return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
+  auto argExpr = getArgExpr();
+  if (!isExpr<KeyPathExpr>(argExpr))
+    return false;
+
+  auto argType = getFromType();
+  auto paramType = getToType();
+
+  if (!isKnownKeyPathType(argType))
+    return false;
+
+  auto kpType = argType->castTo<BoundGenericType>();
+  auto kpRootType = kpType->getGenericArgs()[0];
+  auto kpValueType = kpType->getGenericArgs()[1];
+
+  auto paramFnType = paramType->getAs<FunctionType>();
+  if (!(paramFnType && paramFnType->getNumParams() == 1 &&
+        paramFnType->getParams().front().getPlainType()->isEqual(kpRootType)))
+    return false;
+
+  emitDiagnostic(diag::expr_smart_keypath_value_covert_to_contextual_type,
+                 kpValueType, paramFnType->getResult());
   return true;
 }
 
