@@ -20,6 +20,10 @@ distributed actor class DistributedActor_0 { // expected-warning{{'actor class' 
   distributed func okey() {}
 }
 
+extension DistributedActor_0 {
+  static func _remote_okey(actor: DistributedActor_0) async throws {}
+}
+
 distributed actor DistributedActor_1 {
 
   let name: String = "alice" // expected-note{{distributed actor state is only available within the actor instance}}
@@ -101,6 +105,30 @@ distributed actor DistributedActor_1 {
   }
 }
 
+extension DistributedActor_1 {
+  static func _remote_distHello(actor: DistributedActor_1) async throws { }
+  static func _remote_distHelloAsync(actor: DistributedActor_1) async throws  { }
+  static func _remote_distHelloThrows(actor: DistributedActor_1) async throws { }
+  static func _remote_distHelloAsyncThrows(actor: DistributedActor_1) async throws { }
+
+  static func _remote_distInt(actor: DistributedActor_1) async throws -> Int { 42 }
+  static func _remote_distInt(int: Int, actor: DistributedActor_1) async throws -> Int { int }
+
+  static func _remote_distReturnGeneric<T: Codable>(int: Int, actor: DistributedActor_1) async throws -> T {
+    fatalError()
+  }
+  static func _remote_distReturnGenericWhere<T>(int: Int, actor: DistributedActor_1) async throws -> T where T: Codable {
+    fatalError()
+  }
+
+  static func _remote_distGenericParam<T: Codable>(value: T, actor: DistributedActor_1) async throws {
+    fatalError()
+  }
+  static func _remote_distGenericParamWhere<T>(value: T, actor: DistributedActor_1) async throws -> T where T: Codable {
+    fatalError()
+  }
+}
+
 func test_outside(
   local: LocalActor_1,
   distributed: DistributedActor_1
@@ -123,6 +151,15 @@ func test_outside(
   _ = await distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = await distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   _ = try await distributed.helloAsyncThrows() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
+}
+
+distributed actor DistributedActor_2 {
+  // TODO: should report the error on the remote function instead?
+  distributed func okey() {} // expected-error{{remote function '_remote_okey()' must be static.}}
+}
+
+extension DistributedActor_2 {
+  func _remote_okey() {}
 }
 
 // ==== Codable parameters and return types ------------------------------------

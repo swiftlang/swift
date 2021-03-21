@@ -13,6 +13,13 @@ distributed actor D {
   distributed func distHelloAsyncThrows() async throws { } // ok
 }
 
+extension D {
+  static func _remote_distHello(actor: D) async throws { }
+  static func _remote_distHelloAsync(actor: D) async throws { }
+  static func _remote_distHelloThrows(actor: D) async throws { }
+  static func _remote_distHelloAsyncThrows(actor: D) async throws { }
+}
+
 func test_not_distributed_funcs(distributed: D) async {
   distributed.hello() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}
   distributed.helloAsync() // expected-error{{only 'distributed' functions can be called from outside the distributed actor}}

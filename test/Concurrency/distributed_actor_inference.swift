@@ -36,6 +36,12 @@ distributed actor SomeDistributedActor_6 {
   distributed func yay() async throws -> Int { 42 } // ok
 }
 
+extension SomeDistributedActor_6 {
+  static func _remote_yay(actor: SomeDistributedActor_6) async throws -> Int {
+    fatalError()
+  }
+}
+
 distributed actor BadValuesDistributedActor_7 {
   distributed var varItNope: Int { 13 } // expected-error{{'distributed' modifier cannot be applied to this declaration}}
   distributed let letItNope: Int = 13 // expected-error{{'distributed' modifier cannot be applied to this declaration}}
