@@ -2446,16 +2446,59 @@ static bool usesFeatureAsyncAwait(Decl *decl) {
 }
 
 static bool usesFeatureMarkerProtocol(Decl *decl) {
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          for (ProtocolType *protoTy : layout.getProtocols()) {
+            if (protoTy->getDecl()->isMarkerProtocol())
+              return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  // Check generic requirements for a marker protocol.
+  auto checkRequirements = [&](ArrayRef<Requirement> requirements) -> bool {
+    for (const auto &req: requirements) {
+      if (req.getKind() == RequirementKind::Conformance &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl()
+              ->isMarkerProtocol())
+        return true;
+    }
+
+    return false;
+  };
+
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     if (proto->isMarkerProtocol())
+      return true;
+
+    // Swift.Error and Swift.CodingKey "don't" use the marker protocol.
+    if (proto->isSpecificProtocol(KnownProtocolKind::Error) ||
+        proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
+      return false;
+    }
+
+    if (checkInherited(proto->getInherited()))
+      return true;
+
+    if (checkRequirements(proto->getRequirementSignature()))
       return true;
   }
 
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto proto = ext->getSelfProtocolDecl())
-      if (proto->isMarkerProtocol())
-        return true;
-  }       
+    if (checkRequirements(ext->getGenericRequirements()))
+      return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
+  }
 
   return false;
 }
@@ -2493,24 +2536,28 @@ static bool usesFeatureActors(Decl *decl) {
 }
 
 static bool usesFeatureConcurrentFunctions(Decl *decl) {
+  return false;
+}
+
+static bool usesFeatureSendable(Decl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    if (func->isConcurrent())
+    if (func->isSendable())
       return true;
   }
 
-  // Check for concurrent functions in the types of declarations.
+  // Check for sendable functions in the types of declarations.
   if (auto value = dyn_cast<ValueDecl>(decl)) {
     if (Type type = value->getInterfaceType()) {
-      bool hasConcurrent = type.findIf([](Type type) {
+      bool hasSendable = type.findIf([](Type type) {
         if (auto fnType = type->getAs<AnyFunctionType>()) {
-          if (fnType->isConcurrent())
+          if (fnType->isSendable())
             return true;
         }
 
         return false;
       });
 
-      if (hasConcurrent)
+      if (hasSendable)
         return true;
     }
   }
@@ -2524,15 +2571,40 @@ static bool usesFeatureRethrowsProtocol(
   if (!checked.insert(decl).second)
     return false;
 
+  // Check an inheritance clause for a marker protocol.
+  auto checkInherited = [&](ArrayRef<TypeLoc> inherited) -> bool {
+    for (const auto &inheritedEntry : inherited) {
+      if (auto inheritedType = inheritedEntry.getType()) {
+        if (inheritedType->isExistentialType()) {
+          auto layout = inheritedType->getExistentialLayout();
+          for (ProtocolType *protoTy : layout.getProtocols()) {
+            if (usesFeatureRethrowsProtocol(protoTy->getDecl(), checked))
+              return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (checkInherited(nominal->getInherited()))
+      return true;
+  }
+
   if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
     if (proto->getAttrs().hasAttribute<AtRethrowsAttr>())
       return true;
   }
 
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto proto = ext->getSelfProtocolDecl())
-      if (usesFeatureRethrowsProtocol(proto, checked))
+    if (auto nominal = ext->getSelfNominalTypeDecl())
+      if (usesFeatureRethrowsProtocol(nominal, checked))
         return true;
+
+    if (checkInherited(ext->getInherited()))
+      return true;
   }
 
   if (auto genericSig = decl->getInnermostDeclContext()
@@ -2635,15 +2707,30 @@ static std::vector<Feature> getUniqueFeaturesUsed(Decl *decl) {
   if (features.empty())
     return features;
 
-  Decl *enclosingDecl;
-  if (auto accessor = dyn_cast<AccessorDecl>(decl))
-    enclosingDecl = accessor->getStorage();
-  else
-    enclosingDecl = decl->getDeclContext()->getAsDecl();
-  if (!enclosingDecl)
-    return features;
+  // Gather the features used by all enclosing declarations.
+  Decl *enclosingDecl = decl;
+  std::vector<Feature> enclosingFeatures;
+  while (true) {
+    // Find the next outermost enclosing declaration.
+    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+      enclosingDecl = accessor->getStorage();
+    else
+      enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();
+    if (!enclosingDecl)
+      break;
 
-  auto enclosingFeatures = getFeaturesUsed(enclosingDecl);
+    auto outerEnclosingFeatures = getFeaturesUsed(enclosingDecl);
+    if (outerEnclosingFeatures.empty())
+      continue;
+
+    auto currentEnclosingFeatures = std::move(enclosingFeatures);
+    enclosingFeatures.clear();
+    std::merge(outerEnclosingFeatures.begin(), outerEnclosingFeatures.end(),
+               currentEnclosingFeatures.begin(), currentEnclosingFeatures.end(),
+               std::back_inserter(enclosingFeatures));
+  }
+
+  // If there were no enclosing features, we're done.
   if (enclosingFeatures.empty())
     return features;
 
@@ -4474,6 +4561,10 @@ public:
   }
 
   void printFunctionExtInfo(AnyFunctionType *fnType) {
+    if (!fnType->hasExtInfo()) {
+      Printer << "@_NO_EXTINFO ";
+      return;
+    }
     auto &ctx = fnType->getASTContext();
     auto info = fnType->getExtInfo();
     if (Options.SkipAttributes)
@@ -4498,9 +4589,15 @@ public:
       }
     }
 
-    if (!Options.excludeAttrKind(TAK_concurrent) &&
-        info.isConcurrent()) {
-      Printer << "@concurrent ";
+    if (Type globalActor = info.getGlobalActor()) {
+      Printer << "@";
+      visit(globalActor);
+      Printer << " ";
+    }
+
+    if (!Options.excludeAttrKind(TAK_Sendable) &&
+        info.isSendable()) {
+      Printer << "@Sendable ";
     }
 
     SmallString<64> buf;
@@ -4640,8 +4737,8 @@ public:
     if (info.isNoEscape()) {
       Printer.printSimpleAttr("@noescape") << " ";
     }
-    if (info.isConcurrent()) {
-      Printer.printSimpleAttr("@concurrent") << " ";
+    if (info.isSendable()) {
+      Printer.printSimpleAttr("@Sendable") << " ";
     }
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
@@ -4693,13 +4790,15 @@ public:
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
-    if (T->isAsync()) {
-      Printer << " ";
-      Printer.printKeyword("async", Options);
-    }
+    if (T->hasExtInfo()) {
+      if (T->isAsync()) {
+        Printer << " ";
+        Printer.printKeyword("async", Options);
+      }
 
-    if (T->isThrowing())
-      Printer << " " << tok::kw_throws;
+      if (T->isThrowing())
+        Printer << " " << tok::kw_throws;
+    }
 
     Printer << " -> ";
 
@@ -4738,13 +4837,15 @@ public:
 
    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
 
-    if (T->isAsync()) {
-      Printer << " ";
-      Printer.printKeyword("async", Options);
-    }
+   if (T->hasExtInfo()) {
+     if (T->isAsync()) {
+       Printer << " ";
+       Printer.printKeyword("async", Options);
+     }
 
-    if (T->isThrowing())
-      Printer << " " << tok::kw_throws;
+     if (T->isThrowing())
+       Printer << " " << tok::kw_throws;
+   }
 
     Printer << " -> ";
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);

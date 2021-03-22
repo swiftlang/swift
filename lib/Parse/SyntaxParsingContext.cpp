@@ -84,13 +84,12 @@ size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
   assert(Mode == AccumulationMode::CreateSyntax &&
          "Loading from cache is only supported for mode CreateSyntax");
   auto foundNode = getRecorder().lookupNode(LexerOffset, Loc, SynKind);
-  if (foundNode.isNull()) {
+  if (foundNode.Node.isNull()) {
     return 0;
   }
   Mode = AccumulationMode::SkippedForIncrementalUpdate;
-  auto length = foundNode.getRecordedRange().getByteLength();
-  getStorage().push_back(std::move(foundNode));
-  return length;
+  getStorage().push_back(std::move(foundNode.Node));
+  return foundNode.Length;
 }
 
 ParsedRawSyntaxNode
@@ -329,7 +328,8 @@ OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
   // the root context.
   getStorage().clear();
 
-  return root.takeOpaqueNode();
+  assert(root.isRecorded() && "Root of syntax tree should be recorded");
+  return root.takeData();
 }
 
 void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {

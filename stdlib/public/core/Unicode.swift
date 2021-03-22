@@ -21,7 +21,7 @@ import SwiftShims
 /// an indication that no more Unicode scalars are available, or an indication
 /// of a decoding error.
 @frozen
-public enum UnicodeDecodingResult: Equatable, ConcurrentValue {
+public enum UnicodeDecodingResult: Equatable, Sendable {
   /// A decoded Unicode scalar value.
   case scalarValue(Unicode.Scalar)
   

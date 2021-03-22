@@ -1021,9 +1021,21 @@ ConstraintSystem::getWrappedPropertyInformation(
 /// \param baseType - the type of the base on which this object
 ///   is being accessed; must be null if and only if this is not
 ///   a type member
-static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
-                                     Type baseType, DeclContext *useDC,
-                                     const DeclRefExpr *base = nullptr) {
+static bool
+doesStorageProduceLValue(AbstractStorageDecl *storage, Type baseType,
+                         DeclContext *useDC,
+                         ConstraintLocator *memberLocator = nullptr) {
+  const DeclRefExpr *base = nullptr;
+  if (memberLocator) {
+    if (auto *const E = getAsExpr(memberLocator->getAnchor())) {
+      if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+        base = dyn_cast<DeclRefExpr>(MRE->getBase());
+      } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+        base = dyn_cast<DeclRefExpr>(UDE->getBase());
+      }
+    }
+  }
+
   // Unsettable storage decls always produce rvalues.
   if (!storage->isSettable(useDC, base))
     return false;
@@ -1043,10 +1055,9 @@ static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
           !storage->isSetterMutating());
 }
 
-Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                                  DeclContext *UseDC,
-                                                  const DeclRefExpr *base,
-                                                  bool wantInterfaceType) {
+Type ConstraintSystem::getUnopenedTypeOfReference(
+    VarDecl *value, Type baseType, DeclContext *UseDC,
+    ConstraintLocator *memberLocator, bool wantInterfaceType) {
   return ConstraintSystem::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
@@ -1059,13 +1070,13 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
 
         return wantInterfaceType ? var->getInterfaceType() : var->getType();
       },
-      base, wantInterfaceType);
+      memberLocator, wantInterfaceType);
 }
 
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
-    llvm::function_ref<Type(VarDecl *)> getType, const DeclRefExpr *base,
-    bool wantInterfaceType) {
+    llvm::function_ref<Type(VarDecl *)> getType,
+    ConstraintLocator *memberLocator, bool wantInterfaceType) {
   Type requestedType =
       getType(value)->getWithoutSpecifierType()->getReferenceStorageReferent();
 
@@ -1081,7 +1092,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(value, baseType, UseDC, base) &&
+  if (doesStorageProduceLValue(value, baseType, UseDC, memberLocator) &&
       !requestedType->hasError()) {
     return LValueType::get(requestedType);
   }
@@ -1503,13 +1514,42 @@ static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
+Type constraints::getDynamicSelfReplacementType(
+    Type baseObjTy, const ValueDecl *member, ConstraintLocator *memberLocator) {
+  // Constructions must always have their dynamic 'Self' result type replaced
+  // with the base object type, 'super' or not.
+  if (isa<ConstructorDecl>(member))
+    return baseObjTy;
+
+  const SuperRefExpr *SuperExpr = nullptr;
+  if (auto *E = getAsExpr(memberLocator->getAnchor())) {
+    if (auto *LE = dyn_cast<LookupExpr>(E)) {
+      SuperExpr = dyn_cast<SuperRefExpr>(LE->getBase());
+    } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(E)) {
+      SuperExpr = dyn_cast<SuperRefExpr>(UDE->getBase());
+    }
+  }
+
+  // For anything else that isn't 'super', we want it to be the base
+  // object type.
+  if (!SuperExpr)
+    return baseObjTy;
+
+  // 'super' is special in that we actually want dynamic 'Self' to behave
+  // as if the base were 'self'.
+  const auto *selfDecl = SuperExpr->getSelf();
+  return selfDecl->getDeclContext()
+      ->getInnermostTypeContext()
+      ->mapTypeIntoContext(selfDecl->getInterfaceType())
+      ->getMetatypeInstanceType();
+}
+
 std::pair<Type, Type>
 ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC,
     bool isDynamicResult,
     FunctionRefKind functionRefKind,
-    ConstraintLocatorBuilder locator,
-    const DeclRefExpr *base,
+    ConstraintLocator *locator,
     OpenedTypeMap *replacementsPtr) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
@@ -1534,9 +1574,8 @@ ConstraintSystem::getTypeOfMemberReference(
   bool isStaticMemberRefOnProtocol = false;
   if (resolvedBaseTy->is<MetatypeType>() && baseObjTy->isExistentialType() &&
       value->isStatic()) {
-    if (auto last = locator.last())
-      isStaticMemberRefOnProtocol =
-          last->is<LocatorPathElt::UnresolvedMember>();
+    isStaticMemberRefOnProtocol =
+        locator->isLastElement<LocatorPathElt::UnresolvedMember>();
   }
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
@@ -1583,7 +1622,7 @@ ConstraintSystem::getTypeOfMemberReference(
     if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
       auto elementTy = subscript->getElementInterfaceType();
 
-      if (doesStorageProduceLValue(subscript, baseTy, useDC, base))
+      if (doesStorageProduceLValue(subscript, baseTy, useDC, locator))
         elementTy = LValueType::get(elementTy);
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1597,11 +1636,13 @@ ConstraintSystem::getTypeOfMemberReference(
 
       auto indices = subscript->getInterfaceType()
                               ->castTo<AnyFunctionType>()->getParams();
-      refType = FunctionType::get(indices, elementTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      refType = FunctionType::get(indices, elementTy, info);
     } else {
-      refType =
-          getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC, base,
-                                     /*wantInterfaceType=*/true);
+      refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
+                                           locator,
+                                           /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
@@ -1618,10 +1659,13 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // If the storage is generic, add a generic signature.
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
     if (auto sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType);
+      GenericFunctionType::ExtInfo info;
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType, info);
     } else {
-      funcType = FunctionType::get({selfParam}, refType);
+      FunctionType::ExtInfo info;
+      funcType = FunctionType::get({selfParam}, refType, info);
     }
   }
 
@@ -1697,27 +1741,32 @@ ConstraintSystem::getTypeOfMemberReference(
     auto *functionType = fullFunctionType->getResult()->getAs<FunctionType>();
     functionType = unwrapPropertyWrapperParameterTypes(*this, funcDecl, functionRefKind,
                                                        functionType, locator);
-    openedType = FunctionType::get(fullFunctionType->getParams(), functionType);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    openedType =
+        FunctionType::get(fullFunctionType->getParams(), functionType, info);
   }
 
   // Compute the type of the reference.
   Type type = openedType;
 
+  // Cope with dynamic 'Self'.
   if (!outerDC->getSelfProtocolDecl()) {
-    // Class methods returning Self as well as constructors get the
-    // result replaced with the base object type.
+    const auto replacementTy =
+        getDynamicSelfReplacementType(baseObjTy, value, locator);
+
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
       if (func->hasDynamicSelfResult() &&
           !baseObjTy->getOptionalObjectType()) {
-        type = type->replaceCovariantResultType(baseObjTy, 2);
+        type = type->replaceCovariantResultType(replacementTy, 2);
       }
     } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
       if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
-        type = type->replaceCovariantResultType(baseObjTy, 2);
+        type = type->replaceCovariantResultType(replacementTy, 2);
       }
     } else if (auto *decl = dyn_cast<VarDecl>(value)) {
       if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
-        type = type->replaceCovariantResultType(baseObjTy, 1);
+        type = type->replaceCovariantResultType(replacementTy, 1);
       }
     }
   }
@@ -1757,7 +1806,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // (e.g. "colorLiteralRed:") by stripping all the redundant stuff about
   // literals (leaving e.g. "red:").
   {
-    auto anchor = locator.getAnchor();
+    auto anchor = locator->getAnchor();
     if (auto *OLE = getAsExpr<ObjectLiteralExpr>(anchor)) {
       auto fnType = type->castTo<FunctionType>();
 
@@ -1786,7 +1835,8 @@ ConstraintSystem::getTypeOfMemberReference(
   return { openedType, type };
 }
 
-Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
+Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
+                                                const OverloadChoice &overload,
                                                 bool allowMembers,
                                                 DeclContext *useDC) {
   switch (overload.getKind()) {
@@ -1845,15 +1895,26 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
     if (!allowMembers)
       return Type();
 
+    const auto withDynamicSelfResultReplaced = [&](Type type,
+                                                   unsigned uncurryLevel) {
+      const Type baseObjTy = overload.getBaseType()
+                                 ->getRValueType()
+                                 ->getMetatypeInstanceType()
+                                 ->lookThroughAllOptionalTypes();
+
+      return type->replaceCovariantResultType(
+          getDynamicSelfReplacementType(baseObjTy, decl, locator),
+          uncurryLevel);
+    };
+
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
       auto elementTy = subscript->getElementInterfaceType();
 
       if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
         elementTy = LValueType::get(elementTy);
       else if (elementTy->hasDynamicSelfType()) {
-        Type selfType = overload.getBaseType()->getRValueType()
-            ->getMetatypeInstanceType()->lookThroughAllOptionalTypes();
-        elementTy = elementTy->replaceCovariantResultType(selfType, 0);
+        elementTy = withDynamicSelfResultReplaced(elementTy,
+                                                  /*uncurryLevel=*/0);
       }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
@@ -1864,11 +1925,16 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       auto indices = subscript->getInterfaceType()
                        ->castTo<AnyFunctionType>()->getParams();
-      type = FunctionType::get(indices, elementTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      type = FunctionType::get(indices, elementTy, info);
     } else if (auto var = dyn_cast<VarDecl>(decl)) {
       type = var->getValueInterfaceType();
-      if (doesStorageProduceLValue(var, overload.getBaseType(), useDC))
+      if (doesStorageProduceLValue(var, overload.getBaseType(), useDC)) {
         type = LValueType::get(type);
+      } else if (type->hasDynamicSelfType()) {
+        type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/0);
+      }
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
       if (decl->isInstanceMember() &&
           (!overload.getBaseType() ||
@@ -1883,18 +1949,16 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
             return Type();
 
           if (!overload.getBaseType()->getOptionalObjectType()) {
-            Type selfType = overload.getBaseType()
-                                ->getRValueType()
-                                ->getMetatypeInstanceType();
-
             // `Int??(0)` if we look through all optional types for `Self`
             // we'll end up with incorrect type `Int?` for result because
             // the actual result type is `Int??`.
-            if (isa<ConstructorDecl>(decl) && selfType->getOptionalObjectType())
+            if (isa<ConstructorDecl>(decl) && overload.getBaseType()
+                                                  ->getRValueType()
+                                                  ->getMetatypeInstanceType()
+                                                  ->getOptionalObjectType())
               return Type();
 
-            type = type->replaceCovariantResultType(
-                selfType->lookThroughAllOptionalTypes(), 2);
+            type = withDynamicSelfResultReplaced(type, /*uncurryLevel=*/2);
           }
         }
       }
@@ -1975,7 +2039,9 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     CS.addConstraint(
         ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::DynamicType));
-    auto refType = FunctionType::get({inputArg}, output);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo info;
+    auto refType = FunctionType::get({inputArg}, output, info);
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
@@ -2456,7 +2522,7 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
   // set of effects.
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
-  bool concurrent = expr->getAttrs().hasAttribute<ConcurrentAttr>();
+  bool concurrent = expr->getAttrs().hasAttribute<SendableAttr>();
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws)
@@ -2644,8 +2710,10 @@ void ConstraintSystem::bindOverloadType(
                                ConstraintLocator::FunctionResult),
           TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
       auto adjustedFnTy =
-          FunctionType::get(fnType->getParams(), subscriptResultTy);
+          FunctionType::get(fnType->getParams(), subscriptResultTy, info);
 
       ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
       addConstraint(
@@ -2726,28 +2794,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       // Retrieve the type of a reference to the specific declaration choice.
       assert(!baseTy->hasTypeParameter());
 
-      auto getDotBase = [](const Expr *E) -> const DeclRefExpr * {
-        if (E == nullptr) return nullptr;
-        switch (E->getKind()) {
-        case ExprKind::MemberRef: {
-          auto Base = cast<MemberRefExpr>(E)->getBase();
-          return dyn_cast<const DeclRefExpr>(Base);
-        }
-        case ExprKind::UnresolvedDot: {
-          auto Base = cast<UnresolvedDotExpr>(E)->getBase();
-          return dyn_cast<const DeclRefExpr>(Base);
-        }
-        default:
-          return nullptr;
-        }
-      };
-      auto *anchor = locator ? getAsExpr(locator->getAnchor()) : nullptr;
-      auto base = getDotBase(anchor);
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(baseTy, choice.getDecl(), useDC,
                                    (kind == OverloadChoiceKind::DeclViaDynamic),
                                    choice.getFunctionRefKind(),
-                                   locator, base, nullptr);
+                                   locator, nullptr);
     } else {
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(),
@@ -2802,10 +2853,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     FunctionType::Param indices[] = {
       FunctionType::Param(keyPathIndexTy, getASTContext().Id_keyPath),
     };
-    auto subscriptTy = FunctionType::get(indices, elementTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo subscriptInfo;
+    auto subscriptTy = FunctionType::get(indices, elementTy, subscriptInfo);
 
     FunctionType::Param baseParam(choice.getBaseType());
-    auto fullTy = FunctionType::get({baseParam}, subscriptTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    FunctionType::ExtInfo fullInfo;
+    auto fullTy = FunctionType::get({baseParam}, subscriptTy, fullInfo);
     openedFullType = fullTy;
     refType = subscriptTy;
 
@@ -4487,6 +4542,59 @@ Type Solution::resolveInterfaceType(Type type) const {
 
 Optional<FunctionArgApplyInfo>
 Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
+  auto &cs = getConstraintSystem();
+
+  // It's only valid to use `&` in argument positions, but we need
+  // to figure out exactly where it was used.
+  if (auto *argExpr = getAsExpr<InOutExpr>(locator->getAnchor())) {
+    auto *argList = cs.getParentExpr(argExpr);
+    assert(argList);
+
+    // `inout` expression might be wrapped in a number of
+    // parens e.g. `test(((&x)))`.
+    if (isa<ParenExpr>(argList)) {
+      for (;;) {
+        auto nextParent = cs.getParentExpr(argList);
+        assert(nextParent && "Incorrect use of `inout` expression");
+
+        // e.g. `test((&x), x: ...)`
+        if (isa<TupleExpr>(nextParent)) {
+          argList = nextParent;
+          break;
+        }
+
+        // e.g. `test(((&x)))`
+        if (isa<ParenExpr>(nextParent)) {
+          argList = nextParent;
+          continue;
+        }
+
+        break;
+      }
+    }
+
+    unsigned argIdx = 0;
+    if (auto *tuple = dyn_cast<TupleExpr>(argList)) {
+      auto arguments = tuple->getElements();
+
+      for (auto idx : indices(arguments)) {
+        if (arguments[idx]->getSemanticsProvidingExpr() == argExpr) {
+          argIdx = idx;
+          break;
+        }
+      }
+    }
+
+    auto *call = cs.getParentExpr(argList);
+    assert(call);
+
+    ParameterTypeFlags flags;
+    locator = cs.getConstraintLocator(
+        call, {ConstraintLocator::ApplyArgument,
+               LocatorPathElt::ApplyArgToParam(argIdx, argIdx,
+                                               flags.withInOut(true))});
+  }
+
   auto anchor = locator->getAnchor();
   auto path = locator->getPath();
 
@@ -4580,7 +4688,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  auto &cs = getConstraintSystem();
   return FunctionArgApplyInfo(cs.getParentExpr(argExpr), argExpr, argIdx,
                               simplifyType(getType(argExpr)), paramIdx,
                               fnInterfaceType, fnType, callee);

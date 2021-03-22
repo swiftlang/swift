@@ -54,7 +54,7 @@ TYPE_ATTR(escaping)
 TYPE_ATTR(differentiable)
 TYPE_ATTR(noDerivative)
 TYPE_ATTR(async)
-TYPE_ATTR(concurrent)
+TYPE_ATTR(Sendable)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -601,7 +601,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   APIBreakingToAdd | APIBreakingToRemove,
   106)
 
-SIMPLE_DECL_ATTR(concurrent, Concurrent,
+SIMPLE_DECL_ATTR(Sendable, Sendable,
   OnFunc | OnConstructor | OnAccessor |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
@@ -620,29 +620,36 @@ SIMPLE_DECL_ATTR(reasync, Reasync,
   109)
 
 SIMPLE_DECL_ATTR(reasync, AtReasync,
-  OnProtocol |
+  OnProtocol | ConcurrencyOnly |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   110)
 
-DECL_ATTR(hasAsyncAlternative, HasAsyncAlternative,
+DECL_ATTR(completionHandlerAsync, CompletionHandlerAsync,
   OnAbstractFunction | ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIStableToRemove,
   111)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
+  DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript |
+  ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIStableToRemove,
+  112)
 
 CONTEXTUAL_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc |
   ConcurrencyOnly | DistributedOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
-  112)
+  113)
 
 DECL_ATTR(_distributedActorIndependent, DistributedActorIndependent,
   OnFunc | OnVar |
   ConcurrencyOnly | DistributedOnly | UserInaccessible |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
-  113)
+  114)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

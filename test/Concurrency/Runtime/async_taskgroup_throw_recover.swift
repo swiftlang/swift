@@ -14,7 +14,7 @@ func boom() async throws -> Int {
 }
 
 func test_taskGroup_throws() async {
-  let got: Int = try! await Task.withGroup(resultType: Int.self) { group in
+  let got: Int = await Task.withGroup(resultType: Int.self) { group in
     await group.add { try await boom()  }
 
     do {

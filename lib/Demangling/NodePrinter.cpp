@@ -573,6 +573,9 @@ private:
     case Node::Kind::AutoDiffFunctionKind:
     case Node::Kind::DifferentiabilityWitness:
     case Node::Kind::IndexSubset:
+    case Node::Kind::AsyncNonconstantPartialApplyThunk:
+    case Node::Kind::AsyncAwaitResumePartialFunction:
+    case Node::Kind::AsyncSuspendResumePartialFunction:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -815,7 +818,7 @@ private:
     }
 
     unsigned startIndex = 0;
-    bool isConcurrent = false, isAsync = false, isThrows = false;
+    bool isSendable = false, isAsync = false, isThrows = false;
     if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
       // handled earlier
       ++startIndex;
@@ -827,15 +830,15 @@ private:
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::ConcurrentFunctionType) {
       ++startIndex;
-      isConcurrent = true;
+      isSendable = true;
     }
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
     }
 
-    if (isConcurrent)
-      Printer << "@concurrent ";
+    if (isSendable)
+      Printer << "@Sendable ";
 
     printFunctionParameters(LabelList, node->getChild(startIndex),
                             Options.ShowFunctionArgumentTypes);
@@ -2539,7 +2542,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
 
   case Node::Kind::ConcurrentFunctionType:
-    Printer<< "@concurrent ";
+    Printer<< "@Sendable ";
     return nullptr;
   case Node::Kind::AsyncAnnotation:
     Printer<< " async ";
@@ -2774,7 +2777,26 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::AsyncFunctionPointer:
     Printer << "async function pointer to ";
     return nullptr;
+  case Node::Kind::AsyncNonconstantPartialApplyThunk:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
+    Printer << " thunk for non-constant partial apply in ";
+    return nullptr;
+  case Node::Kind::AsyncAwaitResumePartialFunction:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
+    Printer << " await resume partial function for ";
+    return nullptr;
+  case Node::Kind::AsyncSuspendResumePartialFunction:
+    Printer << "(";
+    print(Node->getChild(0));
+    Printer << ")";
+    Printer << " suspend resume partial function for ";
+    return nullptr;
   }
+
   printer_unreachable("bad node kind!");
 }
 

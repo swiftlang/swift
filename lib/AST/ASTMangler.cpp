@@ -1791,7 +1791,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   }
 
   // Concurrent functions.
-  if (fn->isConcurrent()) {
+  if (fn->isSendable()) {
     OpArgs.push_back('h');
   }
 
@@ -2144,13 +2144,15 @@ void ASTMangler::appendModule(const ModuleDecl *module,
                               StringRef useModuleName) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
+  StringRef ModName =
+      DWARFMangling ? module->getName().str() : module->getABIName().str();
+
   // Try the special 'swift' substitution.
-  if (module->isStdlibModule()) {
+  if (ModName == STDLIB_NAME) {
     assert(useModuleName.empty());
     return appendOperator("s");
   }
 
-  StringRef ModName = module->getName().str();
   if (ModName == MANGLING_MODULE_OBJC) {
     assert(useModuleName.empty());
     return appendOperator("So");
@@ -2458,7 +2460,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
   appendFunctionInputType(fn->getParams(), forDecl);
   if (fn->isAsync() || functionMangling == AsyncHandlerBodyMangling)
     appendOperator("Y");
-  if (fn->isConcurrent())
+  if (fn->isSendable())
     appendOperator("J");
   if (fn->isThrowing())
     appendOperator("K");
@@ -2847,16 +2849,30 @@ CanType ASTMangler::getDeclTypeForMangling(
 
   auto &C = decl->getASTContext();
   if (decl->isInvalid()) {
-    if (isa<AbstractFunctionDecl>(decl))
+    if (isa<AbstractFunctionDecl>(decl)) {
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  C.TheErrorType);
+                                  C.TheErrorType, info);
+    }
     return C.TheErrorType;
   }
 
+  Type ty = decl->getInterfaceType()->getReferenceStorageReferent();
 
-  auto canTy = decl->getInterfaceType()
-                   ->getReferenceStorageReferent()
-                   ->getCanonicalType();
+  // Strip the global actor out of the mangling.
+  ty = ty.transform([](Type type) {
+    if (auto fnType = type->getAs<AnyFunctionType>()) {
+      if (fnType->getGlobalActor()) {
+        return Type(fnType->withExtInfo(
+            fnType->getExtInfo().withGlobalActor(Type())));
+      }
+    }
+
+    return type;
+  });
+
+  auto canTy = ty->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();

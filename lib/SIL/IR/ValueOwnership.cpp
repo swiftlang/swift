@@ -540,7 +540,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskFuture)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskGroupFuture)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
@@ -551,6 +550,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDistributedActor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

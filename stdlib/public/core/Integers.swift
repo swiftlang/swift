@@ -3160,20 +3160,25 @@ extension FixedWidthInteger {
       self = Self(_truncatingBits: source._lowWord)
     }
     else {
-      let neg = source < (0 as T)
-      var result: Self = neg ? ~0 : 0
-      var shift: Self = 0
-      let width = Self(_truncatingBits: Self.bitWidth._lowWord)
-      for word in source.words {
-        guard shift < width else { break }
-        // Masking shift is OK here because we have already ensured
-        // that shift < Self.bitWidth. Not masking results in
-        // infinite recursion.
-        result ^= Self(_truncatingBits: neg ? ~word : word) &<< shift
-        shift += Self(_truncatingBits: Int.bitWidth._lowWord)
-      }
-      self = result
+      self = Self._truncatingInit(source)
     }
+  }
+
+  @_alwaysEmitIntoClient
+  internal static func _truncatingInit<T: BinaryInteger>(_ source: T) -> Self {
+    let neg = source < (0 as T)
+    var result: Self = neg ? ~0 : 0
+    var shift: Self = 0
+    let width = Self(_truncatingBits: Self.bitWidth._lowWord)
+    for word in source.words {
+      guard shift < width else { break }
+      // Masking shift is OK here because we have already ensured
+      // that shift < Self.bitWidth. Not masking results in
+      // infinite recursion.
+      result ^= Self(_truncatingBits: neg ? ~word : word) &<< shift
+      shift += Self(_truncatingBits: Int.bitWidth._lowWord)
+    }
+    return result
   }
 
   @_transparent

@@ -113,6 +113,7 @@ bb0(%0 : $*P):
   %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
   %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  destroy_addr %4 : $*P
   dealloc_stack %4 : $*P
   return %8 : $Int32
 }
@@ -191,7 +192,9 @@ bb0(%0 : $*P, %1 : $*P):
   %19 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %19 : $Builtin.Int1
   %21 = struct $Int32 (%18 : $Builtin.Int32)
+  destroy_addr %9 : $*P
   dealloc_stack %9 : $*P
+  destroy_addr %4 : $*P
   dealloc_stack %4 : $*P
   return %21 : $Int32
 }

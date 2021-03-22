@@ -1,0 +1,300 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
+// RUN: %target-codesign %t/%target-library-name(PrintShims)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -partial-apply-lowering %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
+// REQUIRES: concurrency
+// UNSUPPORTED: use_os_stdlib
+
+import Builtin
+import Swift
+import _Concurrency
+
+// CHECK-LL: @Super_runTu =
+// CHECK-LL: @Sub_runTu =
+// CHECK-LL: @"$s20partial_apply_methodTw_Tu" =
+
+protocol Q {
+  func testU() -> String
+}
+
+sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+class Super {
+  init(_ t: String)
+  @_hasStorage private final let t: String { get }
+  func run<U>(on u: U, at i: Int64) async -> String where U : Q
+  deinit
+}
+
+@_inheritsConvenienceInitializers class Sub : Super {
+  @_hasStorage @_hasInitialValue var t2: String? { get set }
+  override func run<U>(on u: U, at i: Int64) async -> String where U : Q
+  override init(_ t: String)
+  deinit
+}
+
+struct QImpl : Q {
+  func testU() -> String
+  init()
+}
+
+sil hidden [exact_self_class] @Super_allocating_init : $@convention(method) (@owned String, @thick Super.Type) -> @owned Super {
+bb0(%value : $String, %super_type : $@thick Super.Type):
+  %uninitialized = alloc_ref $Super
+  %Super_init = function_ref @Super_init : $@convention(method) (@owned String, @owned Super) -> @owned Super
+  %result = apply %Super_init(%value, %uninitialized) : $@convention(method) (@owned String, @owned Super) -> @owned Super
+  return %result : $Super
+}
+
+sil hidden @Super_init : $@convention(method) (@owned String, @owned Super) -> @owned Super {
+bb0(%value : $String, %instance : $Super):
+  retain_value %value : $String
+  %field_addr = ref_element_addr %instance : $Super, #Super.t
+  store %value to %field_addr : $*String
+  release_value %value : $String
+  return %instance : $Super
+}
+
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @Super_run(
+sil hidden @Super_run : $@convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String {
+bb0(%generic_addr : $*U, %int_arg : $Int64, %int : $Super):
+  %printGeneric = function_ref @printGeneric : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: QImpl()
+  %printGeneric_result = apply %printGeneric<U>(%generic_addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %testU = witness_method $U, #Q.testU : <Self where Self : Q> (Self) -> () -> String : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> @owned String
+  %testU_result = apply %testU<U>(%generic_addr) : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> @owned String
+  %testU_result_addr = alloc_stack $String
+  store %testU_result to %testU_result_addr : $*String
+  // CHECK: QImpl.testU
+  %printGeneric_result2 = apply %printGeneric<String>(%testU_result_addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %testU_result_addr : $*String
+  dealloc_stack %testU_result_addr : $*String
+  %int_arg_addr = alloc_stack $Int64
+  store %int_arg to %int_arg_addr : $*Int64
+  // CHECK: 42
+  %printGeneric_result3 = apply %printGeneric<Int64>(%int_arg_addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %int_arg_addr : $*Int64
+  %field_addr = ref_element_addr %int : $Super, #Super.t
+  %field = load %field_addr : $*String
+  retain_value %field : $String
+  return %field : $String
+}
+
+sil hidden @Super_deinit : $@convention(method) (@guaranteed Super) -> @owned Builtin.NativeObject {
+bb0(%instance : $Super):
+  %field_addr = ref_element_addr %instance : $Super, #Super.t
+  %field = begin_access [deinit] [static] %field_addr : $*String
+  destroy_addr %field : $*String
+  end_access %field : $*String
+  %uninitialized = unchecked_ref_cast %instance : $Super to $Builtin.NativeObject
+  return %uninitialized : $Builtin.NativeObject
+}
+
+sil hidden @Super_deallocating_deinit : $@convention(method) (@owned Super) -> () {
+bb0(%instance : $Super):
+  %Super_deinit = function_ref @Super_deinit : $@convention(method) (@guaranteed Super) -> @owned Builtin.NativeObject
+  %uninitialized = apply %Super_deinit(%instance) : $@convention(method) (@guaranteed Super) -> @owned Builtin.NativeObject
+  %uninitailized_super = unchecked_ref_cast %uninitialized : $Builtin.NativeObject to $Super
+  dealloc_ref %uninitailized_super : $Super
+  %out = tuple ()
+  return %out : $()
+}
+
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @Sub_run(
+sil hidden @Sub_run : $@convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Sub) -> @owned String {
+bb0(%U_addr : $*U, %int : $Int64, %sub : $Sub):
+  strong_retain %sub : $Sub
+  %super = upcast %sub : $Sub to $Super
+  %Super_run = function_ref @Super_run : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
+  %result = apply %Super_run<U>(%U_addr, %int, %super) : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
+  strong_release %super : $Super
+  return %result : $String
+}
+
+sil hidden [exact_self_class] @Sub_allocating_init : $@convention(method) (@owned String, @thick Sub.Type) -> @owned Sub {
+bb0(%value : $String, %type : $@thick Sub.Type):
+  %uninitialized = alloc_ref $Sub
+  %Sub_init = function_ref @Sub_init : $@convention(method) (@owned String, @owned Sub) -> @owned Sub
+  %result = apply %Sub_init(%value, %uninitialized) : $@convention(method) (@owned String, @owned Sub) -> @owned Sub
+  return %result : $Sub
+}
+
+sil hidden @Sub_init : $@convention(method) (@owned String, @owned Sub) -> @owned Sub {
+bb0(%value : $String, %uninitialized : $Sub):
+  %field_addr = ref_element_addr %uninitialized : $Sub, #Sub.t2
+  %none = enum $Optional<String>, #Optional.none!enumelt
+  store %none to %field_addr : $*Optional<String>
+  %uninitialized_super = upcast %uninitialized : $Sub to $Super
+  retain_value %value : $String
+  %Super_init = function_ref @Super_init : $@convention(method) (@owned String, @owned Super) -> @owned Super
+  %result_super = apply %Super_init(%value, %uninitialized_super) : $@convention(method) (@owned String, @owned Super) -> @owned Super
+  %result = unchecked_ref_cast %result_super : $Super to $Sub
+  strong_retain %result : $Sub
+  release_value %value : $String
+  return %result : $Sub
+}
+
+sil hidden @Sub_deinit : $@convention(method) (@guaranteed Sub) -> @owned Builtin.NativeObject {
+bb0(%initialized : $Sub):
+  %initialized_super = upcast %initialized : $Sub to $Super
+  %Super_deinit = function_ref @Super_deinit : $@convention(method) (@guaranteed Super) -> @owned Builtin.NativeObject
+  %uninitialized = apply %Super_deinit(%initialized_super) : $@convention(method) (@guaranteed Super) -> @owned Builtin.NativeObject
+  %uninitialized_super = unchecked_ref_cast %uninitialized : $Builtin.NativeObject to $Sub
+  %field_addr = ref_element_addr %uninitialized_super : $Sub, #Sub.t2
+  %field = begin_access [deinit] [static] %field_addr : $*Optional<String>
+  destroy_addr %field : $*Optional<String>
+  end_access %field : $*Optional<String>
+  return %uninitialized : $Builtin.NativeObject
+}
+
+sil hidden @Sub_deallocating_deinit : $@convention(method) (@owned Sub) -> () {
+bb0(%initialized : $Sub):
+  %Sub_deinit = function_ref @Sub_deinit : $@convention(method) (@guaranteed Sub) -> @owned Builtin.NativeObject
+  %uninitialized = apply %Sub_deinit(%initialized) : $@convention(method) (@guaranteed Sub) -> @owned Builtin.NativeObject
+  %uninitialized_sub = unchecked_ref_cast %uninitialized : $Builtin.NativeObject to $Sub
+  dealloc_ref %uninitialized_sub : $Sub
+  %out = tuple ()
+  return %out : $()
+}
+
+// CHECK-SIL-LABEL: sil hidden @partial_apply_method
+//  CHECK-SIL-SAME: : $@convention(thin) <U where U : Q> (
+//  CHECK-SIL-SAME:     @guaranteed Super,
+//  CHECK-SIL-SAME:     @convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String
+//  CHECK-SIL-SAME: ) ->
+//  CHECK-SIL-SAME:     @async @callee_guaranteed (@in_guaranteed U, Int64) -> @owned String {
+//       CHECK-SIL: bb0(
+//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : $Super,
+//  CHECK-SIL-SAME:     [[DYNAMIC_METHOD:%[^,]+]] : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
+//  CHECK-SIL-SAME: ):
+//       CHECK-SIL:   [[THUNK:%[^,]+]] = function_ref @$s20partial_apply_methodTw_ : $@convention(thin) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @owned String
+//       CHECK-SIL:   [[RESULT:%[^,]+]] = partial_apply [callee_guaranteed] [[THUNK]]<U>([[INSTANCE]], [[DYNAMIC_METHOD]]) : $@convention(thin) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @owned String
+//       CHECK-SIL:   return [[RESULT]] : $@async @callee_guaranteed (@in_guaranteed U, Int64) -> @owned String
+// CHECK-SIL-LABEL: } // end sil function 'partial_apply_method'
+
+// CHECK-SIL-LABEL: sil private [thunk] [ossa] @$s20partial_apply_methodTw_ : $@convention(thin) @async <U where U : Q> (
+//  CHECK-SIL-SAME:     @in_guaranteed U,
+//  CHECK-SIL-SAME:     Int64,
+//  CHECK-SIL-SAME:     @guaranteed Super,
+//  CHECK-SIL-SAME:     @convention(method) @async <U where U : Q> (@in_guaranteed U, Int64, @guaranteed Super) -> @owned String) -> @owned String
+//  CHECK-SIL-SAME: {
+//       CHECK-SIL: bb0(
+//  CHECK-SIL-SAME:     [[GENERIC_ADDR:%[^,]+]] : $*U,
+//  CHECK-SIL-SAME:     [[INT:%[^,]+]] : $Int64,
+//  CHECK-SIL-SAME:     [[INSTANCE:%[^,]+]] : @guaranteed $Super,
+//  CHECK-SIL-SAME:     [[METHOD:%[^,]+]] : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
+//  CHECK-SIL-SAME: ):
+//       CHECK-SIL:   [[RESULT:%[^,]+]] = apply [[METHOD]]<U>(
+//  CHECK-SIL-SAME:       [[GENERIC_ADDR]],
+//  CHECK-SIL-SAME:       [[INT]],
+//  CHECK-SIL-SAME:       [[INSTANCE]]
+//  CHECK-SIL-SAME:   ) : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
+//       CHECK-SIL:   return [[RESULT]] : $String
+// CHECK-SIL-LABEL: } // end sil function '$s20partial_apply_methodTw_'
+
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s20partial_apply_methodTw_TA"(
+sil hidden @partial_apply_method : $@convention(thin) <U where U : Q> (@guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @callee_guaranteed @async (@in_guaranteed U, Int64) -> @owned String {
+entry(%int : $Super, %fn : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String):
+    %pa = partial_apply [callee_guaranteed] %fn<U>(%int) : $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
+    return %pa : $@callee_guaranteed @async (@in_guaranteed U, Int64) -> @owned String
+}
+
+sil hidden @doit : $@convention(thin) @async <U where U : Q> (Int64, @in_guaranteed U, @guaranteed Super) -> @owned String {
+bb0(%int : $Int64, %generic_addr : $*U, %instance : $Super):
+  %run_method = class_method %instance : $Super, #Super.run : <U where U : Q> (Super) -> (U, Int64) async -> String, $@convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String
+  %partial_apply_method = function_ref @partial_apply_method : $@convention(thin) <U where U : Q> (@guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @callee_guaranteed @async (@in_guaranteed U, Int64) -> @owned String
+  %partially_applied_method = apply %partial_apply_method<U>(%instance, %run_method) : $@convention(thin) <U where U : Q> (@guaranteed Super, @convention(method) @async <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, Int64, @guaranteed Super) -> @owned String) -> @callee_guaranteed @async (@in_guaranteed U, Int64) -> @owned String
+  %result = apply %partially_applied_method(%generic_addr, %int) : $@callee_guaranteed @async (@in_guaranteed U, Int64) -> @owned String
+  return %result : $String
+}
+
+sil hidden @QImpl_testU : $@convention(method) (QImpl) -> @owned String {
+bb0(%instance : $QImpl):
+  %string_literal = string_literal utf8 "QImpl.testU"
+  %utf8CodeUnitCount = integer_literal $Builtin.Word, 11
+  %isASCII = integer_literal $Builtin.Int1, -1
+  %string_type = metatype $@thin String.Type
+  %String_init = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %result = apply %String_init(%string_literal, %utf8CodeUnitCount, %isASCII, %string_type) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  return %result : $String
+}
+
+sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+sil private [transparent] [thunk] @QImpl_testU_conformance_thunk : $@convention(witness_method: Q) (@in_guaranteed QImpl) -> @owned String {
+bb0(%qimpl_addr : $*QImpl):
+  %qimpl = load %qimpl_addr : $*QImpl
+  %QImpl_testU = function_ref @QImpl_testU : $@convention(method) (QImpl) -> @owned String
+  %result = apply %QImpl_testU(%qimpl) : $@convention(method) (QImpl) -> @owned String
+  return %result : $String
+}
+
+sil @test_case : $@convention(thin) @async () -> () {
+  %sub_type = metatype $@thick Sub.Type
+  %string_literal = string_literal utf8 "42"
+  %utf8CodeUnitCount = integer_literal $Builtin.Word, 2
+  %isASCII = integer_literal $Builtin.Int1, -1
+  %string_type = metatype $@thin String.Type
+  %string_init = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %string = apply %string_init(%string_literal, %utf8CodeUnitCount, %isASCII, %string_type) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %Sub_allocating_init = function_ref @Sub_allocating_init : $@convention(method) (@owned String, @thick Sub.Type) -> @owned Sub
+  %instance_sub = apply %Sub_allocating_init(%string, %sub_type) : $@convention(method) (@owned String, @thick Sub.Type) -> @owned Sub
+  %int_literal = integer_literal $Builtin.Int64, 42
+  %int = struct $Int64 (%int_literal : $Builtin.Int64)
+  %qimpl = struct $QImpl ()
+  %qimpl_addr = alloc_stack $QImpl
+  store %qimpl to %qimpl_addr : $*QImpl
+  %instance_super = upcast %instance_sub : $Sub to $Super
+  %doit = function_ref @doit : $@convention(thin) @async <τ_0_0 where τ_0_0 : Q> (Int64, @in_guaranteed τ_0_0, @guaranteed Super) -> @owned String
+  %doit_result = apply %doit<QImpl>(%int, %qimpl_addr, %instance_super) : $@convention(thin) @async <τ_0_0 where τ_0_0 : Q> (Int64, @in_guaranteed τ_0_0, @guaranteed Super) -> @owned String
+  dealloc_stack %qimpl_addr : $*QImpl
+  strong_release %instance_sub : $Sub
+
+  %void = tuple()
+  return %void : $()
+}
+
+// Defined in _Concurrency
+sil @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+
+sil @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error {
+bb0(%0 :$@async @callee_guaranteed () -> ()):
+  %void = apply %0() : $@async @callee_guaranteed () -> ()
+  return %void : $()
+}
+
+// main
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
+  %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
+  %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %throwing = partial_apply [callee_guaranteed] %thunk(%thick_test_case) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %runAsyncMain = function_ref @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %result = apply %runAsyncMain(%throwing) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %out_literal = integer_literal $Builtin.Int32, 0
+  %out = struct $Int32 (%out_literal : $Builtin.Int32)
+  return %out : $Int32
+}
+sil_vtable Super {
+  #Super.init!allocator: (Super.Type) -> (String) -> Super : @Super_allocating_init
+  #Super.run: <U where U : Q> (Super) -> (U, Int64) async -> String : @Super_run
+  #Super.deinit!deallocator: @Super_deallocating_deinit
+}
+
+sil_vtable Sub {
+  #Super.init!allocator: (Super.Type) -> (String) -> Super : @Sub_allocating_init [override]
+  #Super.run: <U where U : Q> (Super) -> (U, Int64) async -> String : @Sub_run [override]
+  #Sub.deinit!deallocator: @Sub_deallocating_deinit
+}
+
+sil_witness_table hidden QImpl: Q module main {
+  method #Q.testU: <Self where Self : Q> (Self) -> () -> String : @QImpl_testU_conformance_thunk
+}

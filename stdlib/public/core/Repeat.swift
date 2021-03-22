@@ -108,4 +108,4 @@ public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
   return Repeated(_repeating: element, count: n)
 }
 
-extension Repeated: ConcurrentValue where Element: ConcurrentValue { }
+extension Repeated: Sendable where Element: Sendable { }

@@ -193,11 +193,11 @@ def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
 def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
   HelpText<"Don't run SIL copy propagation to preserve object lifetime.">;
 
-def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-concurrent-value">,
-    HelpText<"Enable inference of ConcurrentValue conformances for public structs and enums">;
+def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-sendable">,
+    HelpText<"Enable inference of Sendable conformances for public structs and enums">;
 
-def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-concurrent-value">,
-    HelpText<"Disable inference of ConcurrentValue conformances for public structs and enums">;
+def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
+    HelpText<"Disable inference of Sendable conformances for public structs and enums">;
 
 } // end let Flags = [FrontendOption, NoDriverOption]
 

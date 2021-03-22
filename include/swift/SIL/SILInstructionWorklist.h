@@ -215,7 +215,7 @@ public:
     return newInstruction;
   }
 
-  // This method is to be used when an instruction is found to be dead,
+  // This method is to be used when an instruction is found to be dead or
   // replaceable with another preexisting expression. Here we add all uses of
   // instruction to the worklist, and replace all uses of instruction with the
   // new value.

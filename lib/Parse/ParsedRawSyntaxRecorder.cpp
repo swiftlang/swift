@@ -28,171 +28,98 @@ using namespace swift;
 using namespace swift::syntax;
 
 ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::recordToken(const Token &tok, StringRef leadingTrivia,
-                                     StringRef trailingTrivia) {
-  return recordToken(tok.getKind(), tok.getRange(), leadingTrivia,
-                     trailingTrivia);
-}
-
-ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::recordToken(tok tokKind, CharSourceRange tokRange,
-                                     StringRef leadingTrivia,
-                                     StringRef trailingTrivia) {
-  SourceLoc offset = tokRange.getStart().getAdvancedLoc(-leadingTrivia.size());
-  unsigned length =
-      leadingTrivia.size() + tokRange.getByteLength() + trailingTrivia.size();
-  CharSourceRange range(offset, length);
-  OpaqueSyntaxNode n =
-      SPActions->recordToken(tokKind, leadingTrivia, trailingTrivia, range);
-  return ParsedRawSyntaxNode(SyntaxKind::Token, tokKind, range, n);
-}
-
-ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordMissingToken(tok tokenKind, SourceLoc loc) {
-  CharSourceRange range{loc, 0};
   OpaqueSyntaxNode n = SPActions->recordMissingToken(tokenKind, loc);
-  return ParsedRawSyntaxNode{SyntaxKind::Token, tokenKind, range, n,
-                             /*isMissing=*/true};
-}
-
-static ParsedRawSyntaxNode
-getRecordedNode(ParsedRawSyntaxNode node, ParsedRawSyntaxRecorder &rec) {
-  assert(!node.isNull() && !node.isRecorded());
-  if (node.isDeferredLayout())
-    return rec.recordRawSyntax(node.getKind(), node.getDeferredChildren());
-  assert(node.isDeferredToken());
-  CharSourceRange tokRange = node.getDeferredTokenRange();
-  tok tokKind = node.getTokenKind();
-  if (node.isMissing())
-    return rec.recordMissingToken(tokKind, tokRange.getStart());
-  return rec.recordToken(tokKind, tokRange, node.getDeferredLeadingTrivia(),
-                         node.getDeferredTrailingTrivia());
-}
-
-ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
-                                         MutableArrayRef<ParsedRawSyntaxNode> elements) {
-#ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(elements);
-#endif
-  CharSourceRange range;
-  SmallVector<OpaqueSyntaxNode, 16> subnodes;
-  if (!elements.empty()) {
-    SourceLoc offset;
-    unsigned length = 0;
-    for (auto &subnode : elements) {
-      CharSourceRange localRange;
-      if (subnode.isNull()) {
-        subnodes.push_back(nullptr);
-      } else if (subnode.isRecorded()) {
-        localRange = subnode.getRecordedRange();
-        subnodes.push_back(subnode.takeOpaqueNode());
-      } else {
-        auto recorded = getRecordedNode(subnode.copyDeferred(), *this);
-        localRange = recorded.getRecordedRange();
-        subnodes.push_back(recorded.takeOpaqueNode());
-      }
-
-      if (localRange.isValid()) {
-        if (offset.isInvalid())
-          offset = localRange.getStart();
-        length += localRange.getByteLength();
-      }
-    }
-    range = CharSourceRange{offset, length};
-  }
-  OpaqueSyntaxNode n = SPActions->recordRawSyntax(kind, subnodes, range);
-  return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
+  return makeParsedRawSyntaxNode(n, SyntaxKind::Token, tokenKind,
+                                 ParsedRawSyntaxNode::DataKind::Recorded,
+                                 /*isMissing=*/true, CharSourceRange(loc, 0));
 }
 
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordEmptyRawSyntaxCollection(SyntaxKind kind,
                                                         SourceLoc loc) {
-  CharSourceRange range{loc, 0};
-  OpaqueSyntaxNode n = SPActions->recordRawSyntax(kind, {}, range);
-  return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
-}
-
-/// Create a deferred layout node.
-ParsedRawSyntaxNode ParsedRawSyntaxRecorder::makeDeferred(
-    syntax::SyntaxKind k, MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
-    SyntaxParsingContext &ctx) {
-  CharSourceRange range;
-  if (deferredNodes.empty()) {
-    return ParsedRawSyntaxNode(k, range, {});
-  }
-  ParsedRawSyntaxNode *newPtr =
-      ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
-
-#ifndef NDEBUG
-  ParsedRawSyntaxRecorder::verifyElementRanges(deferredNodes);
-#endif
-  auto ptr = newPtr;
-  for (auto &node : deferredNodes) {
-    // Cached range.
-    if (!node.isNull() && !node.isMissing()) {
-      auto nodeRange = node.getDeferredRange();
-      if (nodeRange.isValid()) {
-        if (range.isInvalid())
-          range = nodeRange;
-        else
-          range.widen(nodeRange);
-      }
-    }
-
-    // uninitialized move;
-    ::new (static_cast<void *>(ptr++)) ParsedRawSyntaxNode(std::move(node));
-  }
-  return ParsedRawSyntaxNode(
-      k, range, llvm::makeMutableArrayRef(newPtr, deferredNodes.size()));
-}
-
-/// Create a deferred token node.
-ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::makeDeferred(Token tok, StringRef leadingTrivia,
-                                      StringRef trailingTrivia) {
-  CharSourceRange tokRange = tok.getRange();
-  return ParsedRawSyntaxNode(tok.getKind(), tokRange.getStart(),
-                             tokRange.getByteLength(), leadingTrivia,
-                             trailingTrivia);
+  OpaqueSyntaxNode n = SPActions->recordRawSyntax(kind, {});
+  return makeParsedRawSyntaxNode(n, kind, tok::unknown,
+                                 ParsedRawSyntaxNode::DataKind::Recorded,
+                                 /*IsMissing=*/false, CharSourceRange(loc, 0));
 }
 
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::makeDeferredMissing(tok tokKind, SourceLoc loc) {
-  auto raw = ParsedRawSyntaxNode(tokKind, loc, /*tokLength=*/0,
-                                 /*leadingTrivia=*/StringRef(),
-                                 /*trailingTrivia=*/StringRef());
-  raw.IsMissing = true;
-  return raw;
+  auto Data = SPActions->makeDeferredToken(
+      tokKind, /*leadingTrivia=*/StringRef(),
+      /*trailingTrivia=*/StringRef(), CharSourceRange(loc, /*Length=*/0),
+      /*IsMissing=*/true);
+  return makeParsedRawSyntaxNode(Data, SyntaxKind::Token, tokKind,
+                                 ParsedRawSyntaxNode::DataKind::DeferredToken,
+                                 /*IsMissing=*/true,
+                                 CharSourceRange(loc, /*Length=*/0));
 }
 
-ParsedRawSyntaxNode
-ParsedRawSyntaxRecorder::lookupNode(size_t lexerOffset, SourceLoc loc,
-                                    SyntaxKind kind) {
+ParseLookupResult ParsedRawSyntaxRecorder::lookupNode(size_t lexerOffset,
+                                                      SourceLoc loc,
+                                                      SyntaxKind kind) {
   size_t length;
   OpaqueSyntaxNode n;
   std::tie(length, n) = SPActions->lookupNode(lexerOffset, kind);
   if (length == 0) {
-    return ParsedRawSyntaxNode::null();
+    return ParseLookupResult(ParsedRawSyntaxNode::null(), length);
   }
-  CharSourceRange range{loc, unsigned(length)};
-  return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
+  return ParseLookupResult(
+      makeParsedRawSyntaxNode(
+          n, kind, tok::unknown, ParsedRawSyntaxNode::DataKind::Recorded,
+          /*IsMissing=*/false, CharSourceRange(loc, unsigned(length))),
+      length);
 }
 
-#ifndef NDEBUG
-void ParsedRawSyntaxRecorder::verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements) {
+ParsedRawSyntaxNode
+ParsedRawSyntaxRecorder::getDeferredChild(const ParsedRawSyntaxNode &parent,
+                                          size_t childIndex) const {
+  assert(parent.isDeferredLayout());
+  auto childInfo = SPActions->getDeferredChild(
+      parent.getUnsafeDeferredOpaqueData(), childIndex);
+
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
+  auto range = SPActions->getDeferredChildRange(
+      parent.getUnsafeDeferredOpaqueData(), childIndex,
+      parent.getRange().getStart());
+  return ParsedRawSyntaxNode(childInfo.Data, childInfo.SyntaxKind,
+                             childInfo.TokenKind, childInfo.IsMissing, range);
+#else
+  return ParsedRawSyntaxNode(childInfo.Data, childInfo.SyntaxKind,
+                             childInfo.TokenKind, childInfo.IsMissing);
+#endif
+}
+
+size_t ParsedRawSyntaxRecorder::getDeferredNumChildren(
+    const ParsedRawSyntaxNode &node) const {
+  assert(node.isDeferredLayout());
+  return SPActions->getDeferredNumChildren(node.getUnsafeDeferredOpaqueData());
+}
+
+#ifdef PARSEDRAWSYNTAXNODE_VERIFY_RANGES
+CharSourceRange ParsedRawSyntaxRecorder::verifyElementRanges(
+    ArrayRef<ParsedRawSyntaxNode> elements) {
+  SourceLoc startLoc;
+  unsigned length = 0;
+
   SourceLoc prevEndLoc;
   for (const auto &elem: elements) {
-    if (elem.isMissing() || elem.isNull())
+    if (elem.isNull() || elem.isMissing())
       continue;
-    CharSourceRange range = elem.isRecorded()
-      ? elem.getRecordedRange()
-      : elem.getDeferredRange();
+
+    CharSourceRange range = elem.getRange();
     if (range.isValid()) {
+      if (startLoc.isInvalid()) {
+        startLoc = range.getStart();
+      }
+      length += range.getByteLength();
+
       assert((prevEndLoc.isInvalid() || range.getStart() == prevEndLoc)
              && "Non-contiguous child ranges?");
       prevEndLoc = range.getEnd();
     }
   }
+  return CharSourceRange(startLoc, length);
 }
 #endif

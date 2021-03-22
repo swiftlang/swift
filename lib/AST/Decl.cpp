@@ -638,6 +638,7 @@ StringRef Decl::getAlternateModuleName() const {
       }
     }
   }
+  
   for (auto *DC = getDeclContext(); DC; DC = DC->getParent()) {
     if (auto decl = DC->getAsDecl()) {
       if (decl == this)
@@ -2547,7 +2548,7 @@ mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
     return AnyFunctionType::ExtInfo();
   return AnyFunctionType::ExtInfoBuilder()
       .withRepresentation(info.getRepresentation())
-      .withConcurrent(info.isConcurrent())
+      .withConcurrent(info.isSendable())
       .withAsync(info.isAsync())
       .withThrows(info.isThrowing())
       .withClangFunctionType(info.getClangTypeInfo().getType())
@@ -3767,6 +3768,14 @@ PropertyWrapperTypeInfo NominalTypeDecl::getPropertyWrapperTypeInfo() const {
                            PropertyWrapperTypeInfo());
 }
 
+bool NominalTypeDecl::isActor() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsActorRequest{mutableThis},
+                           false);
+}
+
+
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  ArrayRef<TypeLoc> inherited,
@@ -4224,13 +4233,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->setSynthesized(true);
 
   return DD;
-}
-
-bool ClassDecl::isActor() const {
-  auto mutableThis = const_cast<ClassDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsActorRequest{mutableThis},
-                           false);
 }
 
 bool ClassDecl::isDefaultActor() const {
@@ -5965,14 +5967,24 @@ Type VarDecl::getPropertyWrapperBackingPropertyType() const {
       Type());
 }
 
-PropertyWrapperBackingPropertyInfo
-VarDecl::getPropertyWrapperBackingPropertyInfo() const {
+PropertyWrapperAuxiliaryVariables
+VarDecl::getPropertyWrapperAuxiliaryVariables() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator,
-      PropertyWrapperBackingPropertyInfoRequest{mutableThis},
-      PropertyWrapperBackingPropertyInfo());
+      PropertyWrapperAuxiliaryVariablesRequest{mutableThis},
+      PropertyWrapperAuxiliaryVariables());
+}
+
+PropertyWrapperInitializerInfo
+VarDecl::getPropertyWrapperInitializerInfo() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyWrapperInitializerInfoRequest{mutableThis},
+      PropertyWrapperInitializerInfo());
 }
 
 Optional<PropertyWrapperMutability>
@@ -5997,20 +6009,15 @@ VarDecl::getPropertyWrapperSynthesizedPropertyKind() const {
 }
 
 VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
-  return getPropertyWrapperBackingPropertyInfo().backingVar;
+  return getPropertyWrapperAuxiliaryVariables().backingVar;
 }
 
 VarDecl *VarDecl::getPropertyWrapperProjectionVar() const {
-  return getPropertyWrapperBackingPropertyInfo().projectionVar;
+  return getPropertyWrapperAuxiliaryVariables().projectionVar;
 }
 
 VarDecl *VarDecl::getPropertyWrapperWrappedValueVar() const {
-  auto &ctx = getASTContext();
-  auto mutableThis = const_cast<VarDecl *>(this);
-  return evaluateOrDefault(
-      ctx.evaluator,
-      PropertyWrapperWrappedValueVarRequest{mutableThis},
-      nullptr);
+  return getPropertyWrapperAuxiliaryVariables().localWrappedValueVar;
 }
 
 void VarDecl::visitAuxiliaryDecls(llvm::function_ref<void(VarDecl *)> visit) const {
@@ -6072,11 +6079,11 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
 }
 
 Type VarDecl::getPropertyWrapperInitValueInterfaceType() const {
-  auto wrapperInfo = getPropertyWrapperBackingPropertyInfo();
-  if (!wrapperInfo || !wrapperInfo.getWrappedValuePlaceholder())
+  auto initInfo = getPropertyWrapperInitializerInfo();
+  if (!initInfo.getWrappedValuePlaceholder())
     return Type();
 
-  Type valueInterfaceTy = wrapperInfo.getWrappedValuePlaceholder()->getType();
+  Type valueInterfaceTy = initInfo.getWrappedValuePlaceholder()->getType();
   if (valueInterfaceTy->hasArchetype())
     valueInterfaceTy = valueInterfaceTy->mapTypeOutOfContext();
 
@@ -6866,8 +6873,8 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   return false;
 }
 
-bool AbstractFunctionDecl::isConcurrent() const {
-  return getAttrs().hasAttribute<ConcurrentAttr>();
+bool AbstractFunctionDecl::isSendable() const {
+  return getAttrs().hasAttribute<SendableAttr>();
 }
 
 bool AbstractFunctionDecl::isAsyncHandler() const {
@@ -7898,11 +7905,16 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   // Constructors have an initializer type that takes an instance
   // instead of a metatype.
   auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
+
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
   Type initFuncTy;
-  if (auto sig = getGenericSignature())
-    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy);
-  else
-    initFuncTy = FunctionType::get({initSelfParam}, funcTy);
+  if (auto sig = getGenericSignature()) {
+    GenericFunctionType::ExtInfo info;
+    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy, info);
+  } else {
+    FunctionType::ExtInfo info;
+    initFuncTy = FunctionType::get({initSelfParam}, funcTy, info);
+  }
   InitializerInterfaceType = initFuncTy;
 
   return InitializerInterfaceType;

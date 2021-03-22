@@ -43,6 +43,9 @@ SWIFT_REQUEST(TypeChecker, CodeCompletionFileRequest,
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
               bool (DeclContext *, ValueDecl *, ValueDecl *, bool), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ConditionalRequirementsRequest,
+              ArrayRef<Requirement> (NormalProtocolConformance *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDeclRefinementOfRequest,
               bool (ValueDecl *, ValueDecl *),
               Cached, NoLocationInfo)
@@ -94,7 +97,7 @@ SWIFT_REQUEST(TypeChecker, IsAsyncHandlerRequest, bool(FuncDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CanBeAsyncHandlerRequest, bool(FuncDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(ClassDecl *),
+SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest, bool(ClassDecl *),
               Cached, NoLocationInfo)
@@ -192,11 +195,11 @@ SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
               ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
-              PropertyWrapperBackingPropertyInfo(VarDecl *), Cached,
+SWIFT_REQUEST(TypeChecker, PropertyWrapperAuxiliaryVariablesRequest,
+              PropertyWrapperAuxiliaryVariables(VarDecl *), Cached,
               NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, PropertyWrapperWrappedValueVarRequest,
-              VarDecl *(VarDecl *), Cached,
+SWIFT_REQUEST(TypeChecker, PropertyWrapperInitializerInfoRequest,
+              PropertyWrapperInitializerInfo(VarDecl *), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyTypeRequest,
               Type(VarDecl *), Cached, NoLocationInfo)
@@ -323,6 +326,6 @@ SWIFT_REQUEST(TypeChecker, SimpleDidSetRequest,
               bool(AccessorDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeMainFunctionRequest,
               FuncDecl *(Decl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, GetImplicitConcurrentValueRequest,
+SWIFT_REQUEST(TypeChecker, GetImplicitSendableRequest,
               NormalProtocolConformance *(NominalTypeDecl *),
               Cached, NoLocationInfo)

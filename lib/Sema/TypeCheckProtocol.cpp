@@ -744,22 +744,24 @@ swift::matchWitness(
       }
     }
 
-    // If the witness is 'async', the requirement must be.
-    if (witnessFnType->getExtInfo().isAsync() &&
-          !reqFnType->getExtInfo().isAsync()) {
-      return RequirementMatch(witness, MatchKind::AsyncConflict);
-    }
+    if (witnessFnType->hasExtInfo()) {
+      // If the witness is 'async', the requirement must be.
+      if (witnessFnType->getExtInfo().isAsync() &&
+            !reqFnType->getExtInfo().isAsync()) {
+        return RequirementMatch(witness, MatchKind::AsyncConflict);
+      }
 
-    // If witness is sync, the requirement cannot be @objc and 'async'
-    if (!witnessFnType->getExtInfo().isAsync() &&
-          (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
-      return RequirementMatch(witness, MatchKind::AsyncConflict);
-    }
+      // If witness is sync, the requirement cannot be @objc and 'async'
+      if (!witnessFnType->getExtInfo().isAsync() &&
+            (req->isObjC() && reqFnType->getExtInfo().isAsync())) {
+        return RequirementMatch(witness, MatchKind::AsyncConflict);
+      }
 
-    // If the witness is 'throws', the requirement must be.
-    if (witnessFnType->getExtInfo().isThrowing() &&
-        !reqFnType->getExtInfo().isThrowing()) {
-      return RequirementMatch(witness, MatchKind::ThrowsConflict);
+      // If the witness is 'throws', the requirement must be.
+      if (witnessFnType->getExtInfo().isThrowing() &&
+          !reqFnType->getExtInfo().isThrowing()) {
+        return RequirementMatch(witness, MatchKind::ThrowsConflict);
+      }
     }
   } else {
     auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
@@ -902,8 +904,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
   ConstraintLocator *reqLocator = nullptr;
   ConstraintLocator *witnessLocator = nullptr;
   Type witnessType, openWitnessType;
-  Type openedFullWitnessType;
-  Type reqType, openedFullReqType;
+  Type reqType;
 
   GenericSignature reqSig = proto->getGenericSignature();
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(req)) {
@@ -988,12 +989,11 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     reqLocator = cs->getConstraintLocator(
         static_cast<Expr *>(nullptr), LocatorPathElt::ProtocolRequirement(req));
     OpenedTypeMap reqReplacements;
-    std::tie(openedFullReqType, reqType)
+    std::tie(std::ignore, reqType)
       = cs->getTypeOfMemberReference(selfTy, req, dc,
                                      /*isDynamicResult=*/false,
                                      FunctionRefKind::DoubleApply,
                                      reqLocator,
-                                     /*base=*/nullptr,
                                      &reqReplacements);
     reqType = reqType->getRValueType();
 
@@ -1022,13 +1022,13 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     witnessLocator = cs->getConstraintLocator({},
                                               LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
-      std::tie(openedFullWitnessType, openWitnessType) 
+      std::tie(std::ignore, openWitnessType)
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
                                        /*isDynamicResult=*/false,
                                        FunctionRefKind::DoubleApply,
                                        witnessLocator);
     } else {
-      std::tie(openedFullWitnessType, openWitnessType) 
+      std::tie(std::ignore, openWitnessType)
         = cs->getTypeOfReference(witness,
                                  FunctionRefKind::DoubleApply,
                                  witnessLocator, /*useDC=*/nullptr);
@@ -2752,7 +2752,11 @@ bool ConformanceChecker::checkActorIsolation(
     LLVM_FALLTHROUGH;
   }
   case ActorIsolationRestriction::ActorSelf: {
-    // Actor-isolated witnesses cannot conform to protocol requirements.
+    // An actor-isolated witness can only conform to an actor-isolated
+    // requirement.
+    if (getActorIsolation(requirement) == ActorIsolation::ActorInstance)
+      return false;
+
     witness->diagnose(diag::actor_isolated_witness,
                       witness->getDescriptiveKind(),
                       witness->getName());
@@ -2771,10 +2775,10 @@ bool ConformanceChecker::checkActorIsolation(
       auto witnessVar = dyn_cast<VarDecl>(witness);
       if ((witnessVar && !witnessVar->hasStorage()) || !witnessVar) {
         auto independentNote = witness->diagnose(
-            diag::note_add_actorindependent_to_decl,
+            diag::note_add_nonisolated_to_decl,
             witness->getName(), witness->getDescriptiveKind());
-        independentNote.fixItInsert(witness->getAttributeInsertionLoc(false),
-            "@actorIndependent ");
+        independentNote.fixItInsert(witness->getAttributeInsertionLoc(true),
+            "nonisolated ");
       }
     }
 
@@ -5696,8 +5700,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   auto &Context = dc->getASTContext();
   MultiConformanceChecker groupChecker(Context);
 
-  ProtocolConformance *concurrentValueConformance = nullptr;
-  ProtocolConformance *unsafeConcurrentValueConformance = nullptr;
+  ProtocolConformance *SendableConformance = nullptr;
+  ProtocolConformance *unsafeSendableConformance = nullptr;
   ProtocolConformance *errorConformance = nullptr;
   ProtocolConformance *codingKeyConformance = nullptr;
   bool anyInvalid = false;
@@ -5726,11 +5730,11 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
       if (auto typeDecl = dc->getSelfNominalTypeDecl()) {
         diagnoseMissingAppendInterpolationMethod(typeDecl);
       }
-    } else if (proto->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
-      concurrentValueConformance = conformance;
+    } else if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      SendableConformance = conformance;
     } else if (proto->isSpecificProtocol(
-                   KnownProtocolKind::UnsafeConcurrentValue)) {
-      unsafeConcurrentValueConformance = conformance;
+                   KnownProtocolKind::UnsafeSendable)) {
+      unsafeSendableConformance = conformance;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
       errorConformance = conformance;
     } else if (proto->isSpecificProtocol(KnownProtocolKind::CodingKey)) {
@@ -5738,12 +5742,12 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     }
   }
 
-  // Check constraints of ConcurrentValue.
-  if (concurrentValueConformance && !unsafeConcurrentValueConformance) {
-    ConcurrentValueCheck check = ConcurrentValueCheck::Explicit;
+  // Check constraints of Sendable.
+  if (SendableConformance && !unsafeSendableConformance) {
+    SendableCheck check = SendableCheck::Explicit;
     if (errorConformance || codingKeyConformance)
-      check = ConcurrentValueCheck::ImpliedByStandardProtocol;
-    checkConcurrentValueConformance(concurrentValueConformance, check);
+      check = SendableCheck::ImpliedByStandardProtocol;
+    checkSendableConformance(SendableConformance, check);
   }
 
   // Check all conformances.

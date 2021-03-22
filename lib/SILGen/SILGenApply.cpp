@@ -14,6 +14,7 @@
 #include "ArgumentSource.h"
 #include "Callee.h"
 #include "Conversion.h"
+#include "ExecutorBreadcrumb.h"
 #include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -1607,9 +1608,10 @@ public:
                                                     ->getCanonicalType()
                                                     .getOptionalObjectType());
       auto substSelfType = dynamicMemberRef->getBase()->getType()->getCanonicalType();
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
       substFormalType = CanFunctionType::get(
-        {AnyFunctionType::Param(substSelfType)},
-        substFormalType);
+          {AnyFunctionType::Param(substSelfType)}, substFormalType, info);
 
       setCallee(Callee::forDynamic(SGF, member,
                                    memberRef.getSubstitutions(),
@@ -1711,7 +1713,8 @@ static void emitRawApply(SILGenFunction &SGF,
                          CanSILFunctionType substFnType,
                          ApplyOptions options,
                          ArrayRef<SILValue> indirectResultAddrs,
-                         SmallVectorImpl<SILValue> &rawResults) {
+                         SmallVectorImpl<SILValue> &rawResults,
+                         ExecutorBreadcrumb prevExecutor) {
   SILFunctionConventions substFnConv(substFnType, SGF.SGM.M);
   // Get the callee value.
   bool isConsumed = substFnType->isCalleeConsumed();
@@ -1787,7 +1790,7 @@ static void emitRawApply(SILGenFunction &SGF,
     rawResults.push_back(result);
 
     SILBasicBlock *errorBB =
-      SGF.getTryApplyErrorDest(loc, substFnType,
+      SGF.getTryApplyErrorDest(loc, substFnType, prevExecutor,
                                substFnType->getErrorResult(),
                                options.contains(ApplyFlags::DoesNotThrow));
 
@@ -3826,7 +3829,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
   // Emit the call.
   SmallVector<SILValue, 4> rawResults;
   emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-               /*indirect results*/ {}, rawResults);
+               /*indirect results*/ {}, rawResults, ExecutorBreadcrumb());
 
   auto token = rawResults.pop_back_val();
   auto yieldValues = llvm::makeArrayRef(rawResults);
@@ -4396,6 +4399,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
            subs.getGenericSignature().getCanonicalSignature());
   }
 
+  ExecutorBreadcrumb breadcrumb;
+  
   // The presence of `implicitlyAsyncApply` indicates that the callee is a 
   // synchronous function isolated to an actor other than our own.
   // Such functions require the caller to hop to the callee's executor
@@ -4410,24 +4415,28 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
       if (args.size() > 0)
         actorSelf = args.back();
 
-      auto didHop = emitHopToTargetActor(loc, getActorIsolation(funcDecl),
-                                         actorSelf);
-      assert(didHop);
+      breadcrumb = emitHopToTargetActor(loc, getActorIsolation(funcDecl),
+                                        actorSelf);
     }
+  } else if (actor && substFnType->isAsync()) {
+    // Otherwise, if we're in an actor method ourselves, and we're calling into
+    // any sort of async function, we'll want to make sure to hop back to our
+    // own executor afterward, since the callee could have made arbitrary hops
+    // out of our isolation domain.
+    breadcrumb = ExecutorBreadcrumb(actor);
   }
 
   SILValue rawDirectResult;
   {
     SmallVector<SILValue, 1> rawDirectResults;
     emitRawApply(*this, loc, fn, subs, args, substFnType, options,
-                 indirectResultAddrs, rawDirectResults);
+                 indirectResultAddrs, rawDirectResults, breadcrumb);
     assert(rawDirectResults.size() == 1);
     rawDirectResult = rawDirectResults[0];
   }
 
   // hop back to the current executor
-  if (substFnType->isAsync() || implicitlyAsyncApply.hasValue())
-    emitHopToCurrentExecutor(loc);
+  breadcrumb.emit(*this, loc);
 
   // Pop the argument scope.
   argScope.pop();
@@ -5878,7 +5887,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   FuncDecl *memberFunc;
   if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl())) {
     memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
-    memberMethodTy = FunctionType::get({}, memberMethodTy);
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo info;
+    memberMethodTy = FunctionType::get({}, memberMethodTy, info);
   } else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
   auto member = SILDeclRef(memberFunc, SILDeclRef::Kind::Func)
@@ -5897,7 +5908,9 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
     // For a computed variable, we want the getter.
     if (isa<VarDecl>(e->getMember().getDecl())) {
-      methodTy = CanFunctionType::get({}, valueTy);
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
+      methodTy = CanFunctionType::get({}, valueTy, info);
     } else {
       methodTy = cast<FunctionType>(valueTy);
     }
@@ -5908,9 +5921,11 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
     auto foreignMethodTy =
       getPartialApplyOfDynamicMethodFormalType(SGM, member, e->getMember());
 
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo info;
     FunctionType::Param arg(operand->getType().getASTType());
-    auto memberFnTy = CanFunctionType::get({arg},
-                                           memberMethodTy->getCanonicalType());
+    auto memberFnTy =
+        CanFunctionType::get({arg}, memberMethodTy->getCanonicalType(), info);
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
@@ -6001,13 +6016,18 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto valueTy = e->getType()->getCanonicalType().getOptionalObjectType();
 
     // Objective-C subscripts only ever have a single parameter.
+    //
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo methodInfo;
     FunctionType::Param indexArg(e->getIndex()->getType()->getCanonicalType());
-    auto methodTy = CanFunctionType::get({indexArg}, valueTy);
+    auto methodTy = CanFunctionType::get({indexArg}, valueTy, methodInfo);
     auto foreignMethodTy =
       getPartialApplyOfDynamicMethodFormalType(SGM, member, e->getMember());
 
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    CanFunctionType::ExtInfo functionInfo;
     FunctionType::Param baseArg(base->getType().getASTType());
-    auto functionTy = CanFunctionType::get({baseArg}, methodTy);
+    auto functionTy = CanFunctionType::get({baseArg}, methodTy, functionInfo);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
     SILValue memberArg =

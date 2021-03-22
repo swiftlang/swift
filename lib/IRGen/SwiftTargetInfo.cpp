@@ -94,6 +94,8 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
   // x86-64 only has 48 effective bits of address space and reserves the high
   // half for the kernel.
   target.SwiftRetainIgnoresNegativeValues = true;
+
+  target.UsableSwiftAsyncContextAddrIntrinsic = true;
 }
 
 /// Configures target-specific information for 32-bit x86 platforms.
@@ -156,6 +158,13 @@ SwiftTargetInfo::SwiftTargetInfo(
             SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK);
   setToMask(FunctionPointerSpareBits, numPointerBits,
             SWIFT_ABI_DEFAULT_FUNCTION_SPARE_BITS_MASK);
+  if (numPointerBits == 64) {
+    ReferencePoisonDebugValue =
+      SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_64;
+  } else {
+    ReferencePoisonDebugValue =
+      SWIFT_ABI_DEFAULT_REFERENCE_POISON_DEBUG_VALUE_32;
+  }
 }
 
 SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {

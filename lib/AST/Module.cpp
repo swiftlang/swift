@@ -968,12 +968,12 @@ ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
 ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
                                                      ProtocolDecl *protocol) {
   // If we are recursively checking for implicit conformance of a nominal
-  // type to ConcurrentValue, fail without evaluating this request. This
+  // type to Sendable, fail without evaluating this request. This
   // squashes cycles.
   LookupConformanceInModuleRequest request{{this, type, protocol}};
-  if (protocol->isSpecificProtocol(KnownProtocolKind::ConcurrentValue)) {
+  if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     if (auto nominal = type->getAnyNominal()) {
-      GetImplicitConcurrentValueRequest icvRequest{nominal};
+      GetImplicitSendableRequest icvRequest{nominal};
       if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
           getASTContext().evaluator.hasActiveRequest(request))
         return ProtocolConformanceRef::forInvalid();
@@ -1047,11 +1047,11 @@ LookupConformanceInModuleRequest::evaluate(
   // Find the (unspecialized) conformance.
   SmallVector<ProtocolConformance *, 2> conformances;
   if (!nominal->lookupConformance(mod, protocol, conformances)) {
-    if (!protocol->isSpecificProtocol(KnownProtocolKind::ConcurrentValue))
+    if (!protocol->isSpecificProtocol(KnownProtocolKind::Sendable))
       return ProtocolConformanceRef::forInvalid();
 
-    // Try to infer ConcurrentValue conformance.
-    GetImplicitConcurrentValueRequest cvRequest{nominal};
+    // Try to infer Sendable conformance.
+    GetImplicitSendableRequest cvRequest{nominal};
     if (auto conformance = evaluateOrDefault(
             ctx.evaluator, cvRequest, nullptr)) {
       conformances.clear();
@@ -1356,6 +1356,22 @@ ImportedModule::removeDuplicates(SmallVectorImpl<ImportedModule> &imports) {
   imports.erase(last, imports.end());
 }
 
+Identifier ModuleDecl::getABIName() const {
+  if (!ModuleABIName.empty())
+    return ModuleABIName;
+
+  // Hard code that the _Concurrency module has Swift as its ABI name.
+  // FIXME: This works around a backward-compatibility issue where
+  // -module-abi-name is not supported on existing Swift compilers. Remove
+  // this hack later and pass -module-abi-name when building the _Concurrency
+  // module.
+  if (getName().str() == SWIFT_CONCURRENCY_NAME) {
+    ModuleABIName = getASTContext().getIdentifier(STDLIB_NAME);
+    return ModuleABIName;
+  }
+
+  return getName();
+}
 
 StringRef ModuleDecl::getModuleFilename() const {
   // FIXME: Audit uses of this function and figure out how to migrate them to

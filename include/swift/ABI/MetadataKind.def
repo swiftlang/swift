@@ -89,6 +89,10 @@ METADATAKIND(ErrorObject,
 METADATAKIND(Task,
              2 | MetadataKindIsNonType | MetadataKindIsRuntimePrivate)
 
+/// A non-task async job.
+METADATAKIND(Job,
+             3 | MetadataKindIsNonType | MetadataKindIsRuntimePrivate)
+
 // getEnumeratedMetadataKind assumes that all the enumerated values here
 // will be <= LastEnumeratedMetadataKind.
 

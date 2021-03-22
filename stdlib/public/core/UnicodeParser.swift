@@ -60,4 +60,4 @@ extension Unicode {
   public typealias Parser = _UnicodeParser
 }
 
-extension Unicode.ParseResult: ConcurrentValue where T: ConcurrentValue { }
+extension Unicode.ParseResult: Sendable where T: Sendable { }

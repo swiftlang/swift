@@ -17,8 +17,8 @@ open actor A3<T>: Actor {
 }
 
 // enqueue(partialTask:) has the same discriminator across all classes.
-// CHECK: s4main2A1C7enqueue11partialTasky12_Concurrency012PartialAsyncE0V_tF.ptrauth{{.*}}i64 36669
+// CHECK: s4main2A1C7enqueue11partialTaskys012PartialAsyncE0V_tF.ptrauth{{.*}}i64 36669
 
-// CHECK: @"$s4main2A3CyxG12_Concurrency5ActorAaeFP7enqueue11partialTaskyAE012PartialAsyncG0V_tFTW"
+// CHECK: @"$s4main2A3CyxGs5ActorAaeFP7enqueue11partialTaskyAE012PartialAsyncG0V_tFTW"
 // CHECK-NOT: ret void
 // CHECK: call i64 @llvm.ptrauth.blend.i64(i64 %{{[0-9]+}}, i64 36669)

@@ -9,11 +9,11 @@ sil_stage canonical
 
 import Builtin
 
-func f(_: @escaping @concurrent () -> ())
+func f(_: @escaping @Sendable () -> ())
 
 @_hasMissingDesignatedInitializers
 class F {
-  func useConcurrent(_: @escaping @concurrent () -> ())
+  func useConcurrent(_: @escaping @Sendable () -> ())
   init()
 }
 
@@ -32,9 +32,9 @@ class Klass {}
 // Loadable Type  //
 ////////////////////
 
-sil @$s37concurrentfunction_capturediagnostics1fyyyyJcF : $@convention(thin) (@guaranteed @concurrent @callee_guaranteed () -> ()) -> ()
+sil @$s37concurrentfunction_capturediagnostics1fyyyyJcF : $@convention(thin) (@guaranteed @Sendable @callee_guaranteed () -> ()) -> ()
 sil @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %5
-sil @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyFyyJcfU_ : $@convention(thin) @concurrent (@guaranteed { var Int }) -> () // user: %10
+sil @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyFyyJcfU_ : $@convention(thin) @Sendable (@guaranteed { var Int }) -> () // user: %10
 
 // testCaseTrivialValue()
 sil hidden [ossa] @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyF : $@convention(thin) () -> () {
@@ -48,13 +48,13 @@ bb0:
   %5 = apply %4(%2, %3) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %6
   store %5 to [trivial] %1 : $*Int                // id: %6
   // function_ref closure #1 in testCaseTrivialValue()
-  %7 = function_ref @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyFyyJcfU_ : $@convention(thin) @concurrent (@guaranteed { var Int }) -> () // user: %10
+  %7 = function_ref @$s37concurrentfunction_capturediagnostics20testCaseTrivialValueyyFyyJcfU_ : $@convention(thin) @Sendable (@guaranteed { var Int }) -> () // user: %10
   %8 = copy_value %0 : ${ var Int }               // user: %10
-  %10 = partial_apply [callee_guaranteed] %7(%8) : $@convention(thin) @concurrent (@guaranteed { var Int }) -> () // users: %13, %12
+  %10 = partial_apply [callee_guaranteed] %7(%8) : $@convention(thin) @Sendable (@guaranteed { var Int }) -> () // users: %13, %12
   // function_ref f(_:)
-  %11 = function_ref @$s37concurrentfunction_capturediagnostics1fyyyyJcF : $@convention(thin) (@guaranteed @concurrent @callee_guaranteed () -> ()) -> () // user: %12
-  %12 = apply %11(%10) : $@convention(thin) (@guaranteed @concurrent @callee_guaranteed () -> ()) -> ()
-  destroy_value %10 : $@concurrent @callee_guaranteed () -> () // id: %13
+  %11 = function_ref @$s37concurrentfunction_capturediagnostics1fyyyyJcF : $@convention(thin) (@guaranteed @Sendable @callee_guaranteed () -> ()) -> () // user: %12
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed @Sendable @callee_guaranteed () -> ()) -> ()
+  destroy_value %10 : $@Sendable @callee_guaranteed () -> () // id: %13
   destroy_value %0 : ${ var Int }
   %35 = tuple ()                                  // user: %36
   return %35 : $()                                // id: %36

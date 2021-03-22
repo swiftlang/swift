@@ -443,19 +443,6 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// requirement signature of the protocol.
   ArrayRef<ProtocolConformanceRef> SignatureConformances;
 
-  /// Any additional requirements that are required for this conformance to
-  /// apply, e.g. 'Something: Baz' in 'extension Foo: Bar where Something: Baz'.
-  mutable ArrayRef<Requirement> ConditionalRequirements;
-  enum class ConditionalRequirementsState {
-    Uncomputed,
-    Computing,
-    Complete,
-  };
-  /// The state of the ConditionalRequirements field: whether it has been
-  /// computed or not.
-  mutable ConditionalRequirementsState CRState =
-      ConditionalRequirementsState::Uncomputed;
-
   /// The lazy member loader provides callbacks for populating imported and
   /// deserialized conformances.
   ///
@@ -466,8 +453,6 @@ class NormalProtocolConformance : public RootProtocolConformance,
   friend class ASTContext;
 
   void resolveLazyInfo() const;
-
-  void differenceAndStoreConditionalRequirements() const;
 
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
@@ -494,38 +479,11 @@ public:
   }
 
   /// Get any additional requirements that are required for this conformance to
-  /// be satisfied if they can be computed.
-  ///
-  /// If \c computeIfPossible is false, this will not do the lazy computation of
-  /// the conditional requirements and will just query the current state. This
-  /// should almost certainly only be used for debugging purposes, prefer \c
-  /// getConditionalRequirementsIfAvailable (these are separate because
-  /// CONFORMANCE_SUBCLASS_DISPATCH does some type checks and a defaulted
-  /// parameter gets in the way of that).
-  Optional<ArrayRef<Requirement>>
-  getConditionalRequirementsIfAvailableOrCached(bool computeIfPossible) const {
-    if (computeIfPossible)
-      differenceAndStoreConditionalRequirements();
-
-    if (CRState == ConditionalRequirementsState::Complete)
-      return ConditionalRequirements;
-
-    return None;
-  }
-  /// Get any additional requirements that are required for this conformance to
-  /// be satisfied if they can be computed.
-  Optional<ArrayRef<Requirement>>
-  getConditionalRequirementsIfAvailable() const {
-    return getConditionalRequirementsIfAvailableOrCached(
-        /*computeIfPossible=*/true);
-  }
-
-  /// Get any additional requirements that are required for this conformance to
   /// be satisfied, e.g. for Array<T>: Equatable, T: Equatable also needs
   /// to be satisfied.
-  ArrayRef<Requirement> getConditionalRequirements() const {
-    return *getConditionalRequirementsIfAvailable();
-  }
+  ArrayRef<Requirement> getConditionalRequirements() const;
+
+  Optional<ArrayRef<Requirement>> getConditionalRequirementsIfAvailable() const;
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {

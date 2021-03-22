@@ -74,6 +74,9 @@ enum class FixKind : uint8_t {
   /// Mark function type as explicitly '@escaping'.
   ExplicitlyEscaping,
 
+  /// Mark function type as having a particular global actor.
+  MarkGlobalActorFunction,
+
   /// Arguments have labeling failures - missing/extraneous or incorrect
   /// labels attached to the, fix it by suggesting proper labels.
   RelabelArguments,
@@ -628,6 +631,23 @@ public:
                                         Type rhs, ConstraintLocator *locator);
 };
 
+/// Mark function type as being part of a global actor.
+class MarkGlobalActorFunction final : public ContextualMismatch {
+  MarkGlobalActorFunction(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::MarkGlobalActorFunction, lhs, rhs,
+                           locator) {
+  }
+
+public:
+  std::string getName() const override { return "add @escaping"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static MarkGlobalActorFunction *create(ConstraintSystem &cs, Type lhs,
+                                         Type rhs, ConstraintLocator *locator);
+};
+
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ContextualMismatch {
   ForceOptional(ConstraintSystem &cs, Type fromType, Type toType,
@@ -648,21 +668,21 @@ public:
                                ConstraintLocator *locator);
 };
 
-/// This is a contextual mismatch between @concurrent and non-@concurrent
-/// function types, repair it by adding @concurrent attribute.
-class AddConcurrentAttribute final : public ContextualMismatch {
-  AddConcurrentAttribute(ConstraintSystem &cs, FunctionType *fromType,
+/// This is a contextual mismatch between @Sendable and non-@Sendable
+/// function types, repair it by adding @Sendable attribute.
+class AddSendableAttribute final : public ContextualMismatch {
+  AddSendableAttribute(ConstraintSystem &cs, FunctionType *fromType,
                      FunctionType *toType, ConstraintLocator *locator)
       : ContextualMismatch(cs, fromType, toType, locator) {
-    assert(fromType->isConcurrent() != toType->isConcurrent());
+    assert(fromType->isSendable() != toType->isSendable());
   }
 
 public:
-  std::string getName() const override { return "add '@concurrent' attribute"; }
+  std::string getName() const override { return "add '@Sendable' attribute"; }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AddConcurrentAttribute *create(ConstraintSystem &cs,
+  static AddSendableAttribute *create(ConstraintSystem &cs,
                                     FunctionType *fromType,
                                     FunctionType *toType,
                                     ConstraintLocator *locator);

@@ -60,7 +60,7 @@ namespace swift {
   
   namespace syntax {
     class RawSyntax;
-    enum class SyntaxKind;
+    enum class SyntaxKind : uint16_t;
   }// end of syntax namespace
 
   /// Different contexts in which BraceItemList are parsed.
@@ -463,7 +463,11 @@ public:
   /// RAII object that, when it is destructed, restores the parser and lexer to
   /// their positions at the time the object was constructed.  Will not jump
   /// forward in the token stream.
-  class BacktrackingScope {
+  /// Actual uses of the backtracking scope should choose either \c
+  /// BacktrackingScope, which will always backtrack or \c
+  /// CancellableBacktrackingScope which can be cancelled.
+  class BacktrackingScopeImpl {
+  protected:
     Parser &P;
     ParserPosition PP;
     DiagnosticTransaction DT;
@@ -501,16 +505,32 @@ public:
       }
     } TempReceiver;
 
-  public:
-    BacktrackingScope(Parser &P)
+    BacktrackingScopeImpl(Parser &P)
         : P(P), PP(P.getParserPosition()), DT(P.Diags),
           TempReceiver(P.TokReceiver) {
       SynContext.emplace(P.SyntaxContext);
-      SynContext->setBackTracking();
     }
 
-    ~BacktrackingScope();
+  public:
+    ~BacktrackingScopeImpl();
     bool willBacktrack() const { return Backtrack; }
+  };
+
+  /// A backtracking scope that will always backtrack when destructed.
+  class BacktrackingScope final : public BacktrackingScopeImpl {
+  public:
+    BacktrackingScope(Parser &P) : BacktrackingScopeImpl(P) {
+      SynContext->disable();
+    }
+  };
+
+  /// A backtracking scope whose backtracking can be disabled by calling
+  /// \c cancelBacktrack.
+  class CancellableBacktrackingScope final : public BacktrackingScopeImpl {
+  public:
+    CancellableBacktrackingScope(Parser &P) : BacktrackingScopeImpl(P) {
+      SynContext->setBackTracking();
+    }
 
     void cancelBacktrack();
   };
@@ -636,7 +656,7 @@ public:
   /// Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
-  void skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
+  ParserStatus skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
   void skipUntilAnyOperator();
 
   /// Skip until a token that starts with '>', and consume it if found.
@@ -660,7 +680,10 @@ public:
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
   /// matched in the source when they refer to a generic type,
   /// but not when used as comparison operators.
-  void skipSingle();
+  ///
+  /// Returns a parser status that can capture whether a code completion token
+  /// was returned.
+  ParserStatus skipSingle();
 
   /// Skip until the next '#else', '#endif' or until eof.
   void skipUntilConditionalBlockClose();
@@ -1049,7 +1072,22 @@ public:
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
+                                  PatternBindingInitializer *&initContext,
                                   bool isFromClangAttribute = false);
+
+  bool isCustomAttributeArgument();
+  bool canParseCustomAttribute();
+
+  /// Parse a custom attribute after the initial '@'.
+  ///
+  /// \param atLoc The location of the already-parsed '@'.
+  ///
+  /// \param initContext A reference to the initializer context used
+  /// for the set of custom attributes. This should start as nullptr, and
+  /// will get filled in by this function. The same variable should be provided
+  /// for every custom attribute within the same attribute list.
+  ParserResult<CustomAttr> parseCustomAttribute(
+      SourceLoc atLoc, PatternBindingInitializer *&initContext);
 
   bool parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                              DeclAttrKind DK,
@@ -1078,6 +1116,7 @@ public:
                                         TypeAttributes::Convention &convention);
 
   bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                          PatternBindingInitializer *&initContext,
                           bool justChecking = false);
   
   

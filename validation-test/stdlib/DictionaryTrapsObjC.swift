@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Onone -DDEBUG)
+// RUN: %target-run-simple-swift(-Onone)
 // RUN: %target-run-simple-swift(-O)
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -198,11 +198,6 @@ DictionaryTraps.test("ForcedNonverbatimBridge.Value")
   _ = d1 as! Dictionary<NSObject, String>
 }
 
-// FIXME: <https://bugs.swift.org/browse/SR-14282>
-// Segmentation fault: 11 (when compiling with optimizations).
-// While running pass #0 SILModuleTransform "SILGenCleanup".
-#if DEBUG
-
 DictionaryTraps.test("ForcedVerbatimBridge.StringKey")
   .skip(.custom(
     { _isFastAssertConfiguration() },
@@ -280,8 +275,6 @@ DictionaryTraps.test("ForcedVerbatimBridge.Value")
     _ = (key, value)
   }
 }
-
-#endif // DEBUG
 
 DictionaryTraps.test("Downcast.Verbatim")
   .skip(.custom(

@@ -61,7 +61,7 @@
 /// that functions, methods, and properties imported from C and Objective-C
 /// have a consistent type interface.
 @frozen
-public struct Bool: ConcurrentValue {
+public struct Bool: Sendable {
   @usableFromInline
   internal var _value: Builtin.Int1
 

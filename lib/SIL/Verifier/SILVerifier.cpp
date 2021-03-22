@@ -29,7 +29,6 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1702,8 +1701,8 @@ public:
     SILFunctionConventions substConv(substTy, F.getModule());
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
-    bool isConcurrentAndStageIsCanonical =
-        PAI->getFunctionType()->isConcurrent() &&
+    bool isSendableAndStageIsCanonical =
+        PAI->getFunctionType()->isSendable() &&
         F.getModule().getStage() >= SILStage::Canonical;
     for (auto p : llvm::enumerate(PAI->getArguments())) {
       requireSameType(
@@ -1714,7 +1713,7 @@ public:
           "inputs");
 
       // TODO: Expand this to also be true for address only types.
-      if (isConcurrentAndStageIsCanonical)
+      if (isSendableAndStageIsCanonical)
         require(
             !p.value()->getType().getASTType()->is<SILBoxType>() ||
                 p.value()->getType().getSILBoxFieldType(&F).isAddressOnly(F),
@@ -2501,8 +2500,7 @@ public:
             "Source value should be an object value");
     require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
             "Source value should be non-trivial");
-    require(I->poisonRefs() || !fnConv.useLoweredAddresses()
-            || F.hasOwnership(),
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "destroy_value is only valid in functions with qualified "
             "ownership");
   }
@@ -5625,7 +5623,7 @@ public:
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !F->getModule().getASTContext().hadError()) {
-      verifyMemoryLifetime(F);
+      F->verifyMemoryLifetime();
     }
   }
 

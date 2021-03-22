@@ -46,6 +46,7 @@ class ResultPlan;
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 class ArgumentScope;
 class Scope;
+class ExecutorBreadcrumb;
 
 struct LValueOptions {
   bool IsNonAccessing = false;
@@ -763,11 +764,7 @@ public:
                        CanAnyFunctionType inputSubstType,
                        CanAnyFunctionType outputSubstType,
                        bool baseLessVisibleThanDerived);
-  
-  /// If the current function is actor isolated, insert a hop_to_executor
-  /// instruction.
-  void emitHopToCurrentExecutor(SILLocation loc);
-  
+    
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
@@ -839,11 +836,17 @@ public:
   /// Generates code to obtain the executor for the given actor isolation,
   /// as-needed, and emits a \c hop_to_executor to that executor.
   ///
-  /// \returns a non-null pointer if a \c hop_to_executor was emitted.
-  HopToExecutorInst* emitHopToTargetActor(SILLocation loc,
+  /// \returns an \c ExecutorBreadcrumb that saves the information necessary to hop
+  /// back to what was previously the current executor after the actor-isolated
+  /// region ends. Invoke \c emit on the breadcrumb to
+  /// restore the previously-active executor.
+  ExecutorBreadcrumb emitHopToTargetActor(SILLocation loc,
                             Optional<ActorIsolation> actorIso,
                             Optional<ManagedValue> actorSelf);
 
+  /// Gets a reference to the current executor for the task.
+  SILValue emitGetCurrentExecutor(SILLocation loc);
+  
   /// Generates code to obtain the executor given the actor's decl.
   /// \returns a SILValue representing the executor.
   SILValue emitLoadActorExecutor(VarDecl *actorDecl);
@@ -1635,6 +1638,7 @@ public:
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
+                                      ExecutorBreadcrumb prevExecutor,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);
 

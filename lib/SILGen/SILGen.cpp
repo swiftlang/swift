@@ -916,7 +916,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
       if (originalProperty
               ->isPropertyMemberwiseInitializedWithWrappedType()) {
         auto wrapperInfo =
-            originalProperty->getPropertyWrapperBackingPropertyInfo();
+            originalProperty->getPropertyWrapperInitializerInfo();
         assert(wrapperInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue());
         init = wrapperInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue();
       }
@@ -950,7 +950,7 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X(
         "silgen emitPropertyWrapperBackingInitializer", f);
-    auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+    auto wrapperInfo = var->getPropertyWrapperInitializerInfo();
     assert(wrapperInfo.hasInitFromWrappedValue());
     f->createProfiler(wrapperInfo.getInitFromWrappedValue(), constant,
                       ForDefinition);
@@ -968,13 +968,13 @@ void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
     preEmitFunction(constant, f, loc);
     PrettyStackTraceSILFunction X(
         "silgen emitPropertyWrapperInitFromProjectedValue", f);
-    auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
-    assert(wrapperInfo.hasInitFromProjectedValue());
-    f->createProfiler(wrapperInfo.getInitFromProjectedValue(), constant,
+    auto initInfo = var->getPropertyWrapperInitializerInfo();
+    assert(initInfo.hasInitFromProjectedValue());
+    f->createProfiler(initInfo.getInitFromProjectedValue(), constant,
                       ForDefinition);
     auto varDC = var->getInnermostDeclContext();
     SILGenFunction SGF(*this, *f, varDC);
-    SGF.emitGeneratorFunction(constant, wrapperInfo.getInitFromProjectedValue());
+    SGF.emitGeneratorFunction(constant, initInfo.getInitFromProjectedValue());
     postEmitFunction(constant, f);
     break;
   }
@@ -1518,14 +1518,14 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
 
 void SILGenModule::
 emitPropertyWrapperBackingInitializer(VarDecl *var) {
-  auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+  auto initInfo = var->getPropertyWrapperInitializerInfo();
 
-  if (wrapperInfo.hasInitFromWrappedValue()) {
+  if (initInfo.hasInitFromWrappedValue()) {
     SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
     emitOrDelayFunction(*this, constant);
   }
 
-  if (wrapperInfo.hasInitFromProjectedValue()) {
+  if (initInfo.hasInitFromProjectedValue()) {
     SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue);
     emitOrDelayFunction(*this, constant);
   }

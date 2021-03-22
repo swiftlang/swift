@@ -629,12 +629,10 @@ OptionalTypeKind importer::translateNullability(
 
   case clang::NullabilityKind::Unspecified:
     return OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional;
-
-  default:
-    return OptionalTypeKind::OTK_Optional;
   }
 
   llvm_unreachable("Invalid NullabilityKind.");
+  return OptionalTypeKind::OTK_Optional;
 }
 
 bool importer::isRequiredInitializer(const clang::ObjCMethodDecl *method) {

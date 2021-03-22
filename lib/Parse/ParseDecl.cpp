@@ -1120,7 +1120,7 @@ static Optional<AccessorKind> isAccessorLabel(const Token &token) {
 /// or to `nullptr` if not. A missing base type is not considered an error.
 static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   baseType = nullptr;
-  Parser::BacktrackingScope backtrack(P);
+  Parser::CancellableBacktrackingScope backtrack(P);
 
   // If base type cannot be parsed, return false (no error).
   if (!P.canParseBaseTypeForQualifiedDeclName())
@@ -1570,42 +1570,68 @@ void Parser::parseAllAvailabilityMacroArguments() {
   AvailabilityMacrosComputed = true;
 }
 
-static HasAsyncAlternativeAttr *parseAsyncAlternativeAttribute(
-    Parser &P, StringRef AttrName, SourceLoc AtLoc, DeclAttrKind DK) {
+static CompletionHandlerAsyncAttr *
+parseCompletionHandlerAsyncAttribute(Parser &P, StringRef AttrName,
+                                     SourceLoc AtLoc, DeclAttrKind DK) {
   SourceLoc Loc = P.PreviousLoc;
 
-  // Unnamed @hasAsyncAlternative attribute
-  if (P.Tok.isNot(tok::l_paren))
-    return new (P.Context) HasAsyncAlternativeAttr(AtLoc, Loc);
-
-  P.consumeToken(tok::l_paren);
+  if (!P.consumeIf(tok::l_paren)) {
+    P.diagnose(P.getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+    return nullptr;
+  }
 
   if (!P.Tok.is(tok::string_literal)) {
     P.diagnose(Loc, diag::attr_expected_string_literal, AttrName);
     return nullptr;
   }
 
-  auto Value = P.getStringLiteralIfNotInterpolated(
-      Loc, ("argument of '" + AttrName + "'").str());
+  SourceLoc nameLoc = P.Tok.getLoc();
+  Optional<StringRef> asyncFunctionName = P.getStringLiteralIfNotInterpolated(
+      nameLoc, ("argument of '" + AttrName + "'").str());
   P.consumeToken(tok::string_literal);
-  if (!Value)
+
+  if (!asyncFunctionName)
     return nullptr;
 
-  ParsedDeclName parsedName = parseDeclName(Value.getValue());
-  if (!parsedName || !parsedName.ContextName.empty()) {
-    P.diagnose(AtLoc, diag::has_async_alternative_invalid_name, AttrName);;
+  ParsedDeclName parsedAsyncName = parseDeclName(*asyncFunctionName);
+  if (!parsedAsyncName || !parsedAsyncName.ContextName.empty()) {
+    P.diagnose(nameLoc, diag::attr_completion_handler_async_invalid_name,
+               AttrName);
     return nullptr;
+  }
+
+  size_t handlerIndex = 0;
+  SourceLoc handlerIndexLoc = SourceLoc();
+  if (P.consumeIf(tok::comma)) {
+    // The completion handler is explicitly specified, parse it
+    if (P.parseSpecificIdentifier("completionHandlerIndex",
+                                  diag::attr_missing_label,
+                                  "completionHandlerIndex", AttrName) ||
+        P.parseToken(tok::colon, diag::expected_colon_after_label,
+                     "completionHandlerIndex")) {
+      return nullptr;
+    }
+
+    if (P.Tok.getText().getAsInteger(0, handlerIndex)) {
+      P.diagnose(P.Tok.getLoc(), diag::attr_expected_integer_literal, AttrName);
+      return nullptr;
+    }
+
+    handlerIndexLoc = P.consumeToken(tok::integer_literal);
   }
 
   SourceRange AttrRange = SourceRange(Loc, P.Tok.getRange().getStart());
   if (!P.consumeIf(tok::r_paren)) {
-    P.diagnose(Loc, diag::attr_expected_rparen, AttrName,
+    P.diagnose(P.getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
     return nullptr;
   }
 
-  return new (P.Context) HasAsyncAlternativeAttr(
-      parsedName.formDeclNameRef(P.Context), AtLoc, AttrRange);
+  return new (P.Context) CompletionHandlerAsyncAttr(
+      parsedAsyncName.formDeclNameRef(P.Context), nameLoc,
+      handlerIndex, handlerIndexLoc, AtLoc,
+      AttrRange);
 }
 
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
@@ -2704,8 +2730,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         name, AtLoc, range, /*implicit*/ false));
     break;
   }
-  case DAK_HasAsyncAlternative: {
-    auto *attr = parseAsyncAlternativeAttribute(*this, AttrName, AtLoc, DK);
+  case DAK_CompletionHandlerAsync: {
+    auto *attr =
+        parseCompletionHandlerAsyncAttribute(*this, AttrName, AtLoc, DK);
     if (!attr) {
       skipUntilDeclStmtRBrace(tok::r_paren);
       consumeIf(tok::r_paren);
@@ -2810,6 +2837,102 @@ static PatternBindingInitializer *findAttributeInitContent(
   return nullptr;
 }
 
+bool Parser::isCustomAttributeArgument() {
+  BacktrackingScope backtrack(*this);
+  if (skipSingle().hasCodeCompletion())
+    return true;
+
+  // If we have any keyword, identifier, or token that follows a function
+  // type's parameter list, this is a parameter list and not an attribute.
+  // Alternatively, we might have a token that illustrates we're not going to
+  // get anything following the attribute, which means the parentheses describe
+  // what follows the attribute.
+  return !Tok.isAny(
+      tok::arrow, tok::kw_throw, tok::kw_throws, tok::kw_rethrows,
+      tok::r_paren, tok::r_brace, tok::r_square, tok::r_angle) &&
+    !Tok.isContextualKeyword("async") && !Tok.isContextualKeyword("reasync") ;
+}
+
+bool Parser::canParseCustomAttribute() {
+  if (!canParseType())
+    return false;
+
+  if (Tok.isFollowingLParen() && isCustomAttributeArgument())
+    skipSingle();
+
+  return true;
+}
+
+ParserResult<CustomAttr> Parser::parseCustomAttribute(
+    SourceLoc atLoc, PatternBindingInitializer *&initContext) {
+  SyntaxContext->setCreateSyntax(SyntaxKind::CustomAttribute);
+
+  // Parse a custom attribute.
+  auto type = parseType(diag::expected_type);
+  if (type.hasCodeCompletion() || type.isNull()) {
+    if (Tok.is(tok::l_paren) && isCustomAttributeArgument())
+      skipSingle();
+
+    return ParserResult<CustomAttr>(ParserStatus(type));
+  }
+
+  // Parse the optional arguments.
+  SourceLoc lParenLoc, rParenLoc;
+  SmallVector<Expr *, 2> args;
+  SmallVector<Identifier, 2> argLabels;
+  SmallVector<SourceLoc, 2> argLabelLocs;
+  SmallVector<TrailingClosure, 2> trailingClosures;
+  bool hasInitializer = false;
+
+  // If we're not in a local context, we'll need a context to parse
+  // initializers into (should we have one).  This happens for properties
+  // and global variables in libraries.
+  ParserStatus status;
+  if (Tok.isFollowingLParen() && isCustomAttributeArgument()) {
+    if (peekToken().is(tok::code_complete)) {
+      consumeToken(tok::l_paren);
+      if (CodeCompletion) {
+        auto typeE = new (Context) TypeExpr(type.get());
+        auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+        CodeCompletion->completePostfixExprParen(typeE, CCE);
+      }
+      consumeToken(tok::code_complete);
+      skipUntil(tok::r_paren);
+      consumeIf(tok::r_paren);
+      status.setHasCodeCompletionAndIsError();
+    } else {
+      // If we have no local context to parse the initial value into, create
+      // one for the PBD we'll eventually create.  This allows us to have
+      // reasonable DeclContexts for any closures that may live inside of
+      // initializers.
+      Optional<ParseFunctionBody> initParser;
+      if (!CurDeclContext->isLocalContext()) {
+        if (!initContext) {
+          initContext =
+              new (Context) PatternBindingInitializer(CurDeclContext);
+        }
+
+        initParser.emplace(*this, initContext);
+      }
+      status |= parseExprList(tok::l_paren, tok::r_paren,
+                              /*isPostfix=*/false, /*isExprBasic=*/true,
+                              lParenLoc, args, argLabels, argLabelLocs,
+                              rParenLoc,
+                              trailingClosures,
+                              SyntaxKind::TupleExprElementList);
+      assert(trailingClosures.empty() && "Cannot parse a trailing closure here");
+      hasInitializer = true;
+    }
+  }
+
+  // Form the attribute.
+  auto *TE = new (Context) TypeExpr(type.get());
+  auto customAttr = CustomAttr::create(Context, atLoc, TE, hasInitializer,
+                                       initContext, lParenLoc, args, argLabels,
+                                       argLabelLocs, rParenLoc);
+  return makeParserResult(status, customAttr);
+}
+
 /// \verbatim
 ///   attribute:
 ///     '_silgen_name' '(' identifier ')'
@@ -2834,7 +2957,9 @@ static PatternBindingInitializer *findAttributeInitContent(
 /// but rejected since they have context-sensitive keywords.
 ///
 ParserStatus Parser::parseDeclAttribute(
-  DeclAttributes &Attributes, SourceLoc AtLoc, bool isFromClangAttribute) {
+  DeclAttributes &Attributes, SourceLoc AtLoc,
+  PatternBindingInitializer *&initContext,
+  bool isFromClangAttribute) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
@@ -2907,6 +3032,10 @@ ParserStatus Parser::parseDeclAttribute(
       "_functionBuilder", "resultBuilder", DAK_ResultBuilder,
       diag::attr_renamed_warning);
 
+  // Historical name for @Sendable.
+  checkInvalidAttrName(
+      "concurrent", "Sendable", DAK_Sendable, diag::attr_renamed_warning);
+
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
@@ -2954,74 +3083,11 @@ ParserStatus Parser::parseDeclAttribute(
     diagnose(Tok, diag::unknown_attribute, "unknown");
   } else {
     // Change the context to create a custom attribute syntax.
-    SyntaxContext->setCreateSyntax(SyntaxKind::CustomAttribute);
-    // Parse a custom attribute.
-    auto type = parseType(diag::expected_type);
-    if (type.hasCodeCompletion() || type.isNull()) {
-      if (Tok.is(tok::l_paren))
-        skipSingle();
+    auto customAttr = parseCustomAttribute(AtLoc, initContext);
+    if (auto attr = customAttr.getPtrOrNull())
+      Attributes.add(attr);
 
-      return ParserStatus(type);
-    }
-
-    // Parse the optional arguments.
-    SourceLoc lParenLoc, rParenLoc;
-    SmallVector<Expr *, 2> args;
-    SmallVector<Identifier, 2> argLabels;
-    SmallVector<SourceLoc, 2> argLabelLocs;
-    SmallVector<TrailingClosure, 2> trailingClosures;
-    bool hasInitializer = false;
-    ParserStatus status;
-
-    // If we're not in a local context, we'll need a context to parse
-    // initializers into (should we have one).  This happens for properties
-    // and global variables in libraries.
-    PatternBindingInitializer *initContext = nullptr;
-
-    if (Tok.isFollowingLParen()) {
-      if (peekToken().is(tok::code_complete)) {
-        consumeToken(tok::l_paren);
-        if (CodeCompletion) {
-          auto typeE = new (Context) TypeExpr(type.get());
-          auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-          CodeCompletion->completePostfixExprParen(typeE, CCE);
-        }
-        consumeToken(tok::code_complete);
-        skipUntil(tok::r_paren);
-        consumeIf(tok::r_paren);
-        status.setHasCodeCompletionAndIsError();
-      } else {
-        // If we have no local context to parse the initial value into, create
-        // one for the PBD we'll eventually create.  This allows us to have
-        // reasonable DeclContexts for any closures that may live inside of
-        // initializers.
-        Optional<ParseFunctionBody> initParser;
-        if (!CurDeclContext->isLocalContext()) {
-          initContext = findAttributeInitContent(Attributes);
-          if (!initContext)
-            initContext =
-                new (Context) PatternBindingInitializer(CurDeclContext);
-
-          initParser.emplace(*this, initContext);
-        }
-        status |= parseExprList(tok::l_paren, tok::r_paren,
-                                /*isPostfix=*/false, /*isExprBasic=*/true,
-                                lParenLoc, args, argLabels, argLabelLocs,
-                                rParenLoc,
-                                trailingClosures,
-                                SyntaxKind::TupleExprElementList);
-        assert(trailingClosures.empty() && "Cannot parse a trailing closure here");
-        hasInitializer = true;
-      }
-    }
-
-    // Form the attribute.
-    auto *TE = new (Context) TypeExpr(type.get());
-    auto attr = CustomAttr::create(Context, AtLoc, TE, hasInitializer,
-                                   initContext, lParenLoc, args, argLabels,
-                                   argLabelLocs, rParenLoc);
-    Attributes.add(attr);
-    return status;
+    return ParserStatus(customAttr);
   }
 
   // Recover by eating @foo(...) when foo is not known.
@@ -3034,7 +3100,8 @@ ParserStatus Parser::parseDeclAttribute(
 
 bool Parser::canParseTypeAttribute() {
   TypeAttributes attrs; // ignored
-  return !parseTypeAttribute(attrs, /*atLoc=*/SourceLoc(),
+  PatternBindingInitializer *initContext = nullptr;
+  return !parseTypeAttribute(attrs, /*atLoc=*/SourceLoc(), initContext,
                              /*justChecking*/ true);
 }
 
@@ -3046,7 +3113,7 @@ bool Parser::canParseTypeAttribute() {
 /// \returns true on error, false on success
 static bool parseDifferentiableTypeAttributeArgument(
     Parser &P, TypeAttributes &Attributes, bool emitDiagnostics) {
-  Parser::BacktrackingScope backtrack(P);
+  Parser::CancellableBacktrackingScope backtrack(P);
 
   // Match '( <identifier> )', and store the identifier token to `argument`.
   if (!P.consumeIf(tok::l_paren))
@@ -3195,6 +3262,7 @@ bool Parser::parseConventionAttributeInternal(
 ///   canParseTypeAttribute; don't emit any diagnostics, and there's
 ///   no need to actually record the attribute
 bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                                PatternBindingInitializer *&initContext,
                                 bool justChecking) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
@@ -3208,16 +3276,29 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
   // Determine which attribute it is, and diagnose it if unknown.
   TypeAttrKind attr = TypeAttributes::getAttrKindFromString(Tok.getText());
 
-  if (attr == TAK_Count) {
-    if (justChecking) return true;
+  auto checkInvalidAttrName = [&](
+      StringRef invalidName, StringRef correctName, TypeAttrKind kind,
+      Optional<Diag<StringRef, StringRef>> diag = None) {
+    if (attr == TAK_Count && Tok.getText() == invalidName) {
+      attr = kind;
 
+      if (diag) {
+        diagnose(Tok, *diag, invalidName, correctName)
+            .fixItReplace(Tok.getLoc(), correctName);
+      }
+    }
+  };
+
+  // Historical name for @Sendable.
+  checkInvalidAttrName(
+      "concurrent", "Sendable", TAK_Sendable, diag::attr_renamed_warning);
+
+  if (attr == TAK_Count) {
     auto declAttrID = DeclAttribute::getAttrKindFromString(Tok.getText());
-    if (declAttrID == DAK_Count) {
-      // Not a decl or type attribute.
-      diagnose(Tok, diag::unknown_attribute, Tok.getText());
-    } else {
-      // Otherwise this is a valid decl attribute so they should have put it on
-      // the decl instead of the type.
+    if (declAttrID != DAK_Count) {
+      // This is a valid decl attribute so they should have put it on the decl
+      // instead of the type.
+      if (justChecking) return true;
 
       // If this is the first attribute, and if we are on a simple decl, emit a
       // fixit to move the attribute.  Otherwise, we don't have the location of
@@ -3237,22 +3318,36 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
           .fixItInsert(StructureMarkers.back().Loc,
                        "@" + Tok.getText().str()+" ");
       }
-    }
-    
-    // Recover by eating @foo(...) when foo is not known.
-    consumeToken();
-    SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
 
-    if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
-      BacktrackingScope backtrack(*this);
-      skipSingle();
-      // If we found '->', or 'throws' after paren, it's likely a parameter
-      // of function type.
-      if (Tok.isNot(tok::arrow, tok::kw_throws, tok::kw_rethrows,
-                    tok::kw_throw))
-        backtrack.cancelBacktrack();
+      // Recover by eating @foo(...) when foo is not known.
+      consumeToken();
+      SyntaxParsingContext TokListContext(SyntaxContext, SyntaxKind::TokenList);
+
+      if (Tok.is(tok::l_paren) && getEndOfPreviousLoc() == Tok.getLoc()) {
+        CancellableBacktrackingScope backtrack(*this);
+        skipSingle();
+        // If we found '->', or 'throws' after paren, it's likely a parameter
+        // of function type.
+        if (Tok.isNot(tok::arrow, tok::kw_throws, tok::kw_rethrows,
+                      tok::kw_throw))
+          backtrack.cancelBacktrack();
+      }
+
+      return true;
     }
-    return true;
+
+    // If we're just checking, try to parse now.
+    if (justChecking)
+      return !canParseCustomAttribute();
+
+    // Parse as a custom attribute.
+    auto customAttrResult = parseCustomAttribute(AtLoc, initContext);
+    if (customAttrResult.isParseErrorOrHasCompletion())
+      return true;
+
+    if (auto attr = customAttrResult.get())
+      Attributes.addCustomAttr(attr);
+    return false;
   }
   
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -3438,12 +3533,13 @@ ParserStatus Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
   if (Tok.isNot(tok::at_sign))
     return makeParserSuccess();
 
+  PatternBindingInitializer *initContext = nullptr;
   ParserStatus Status;
   SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   do {
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     SourceLoc AtLoc = consumeToken();
-    Status |= parseDeclAttribute(Attributes, AtLoc);
+    Status |= parseDeclAttribute(Attributes, AtLoc, initContext);
   } while (Tok.is(tok::at_sign));
   return Status;
 }
@@ -3670,6 +3766,7 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 bool Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                            SourceLoc &SpecifierLoc,
                                            TypeAttributes &Attributes) {
+  PatternBindingInitializer *initContext = nullptr;
   Specifier = ParamDecl::Specifier::Default;
   while (Tok.is(tok::kw_inout) ||
          (Tok.is(tok::identifier) &&
@@ -3702,7 +3799,7 @@ bool Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
       Attributes.AtLoc = Tok.getLoc();
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     SourceLoc AtLoc = consumeToken();
-    if (parseTypeAttribute(Attributes, AtLoc))
+    if (parseTypeAttribute(Attributes, AtLoc, initContext))
       return true;
   }
   
@@ -5074,7 +5171,7 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
 
   // Skip until the matching right curly bracket; if we find a pound directive,
   // we can't lazily parse.
-  BacktrackingScope BackTrack(*this);
+  CancellableBacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
   bool HasNestedTypeDeclarations;
   skipUntilMatchingRBrace(*this,
@@ -5808,11 +5905,10 @@ void Parser::skipSILUntilSwiftDecl() {
 
 void Parser::skipAnyAttribute() {
   consumeToken(tok::at_sign);
-  if (!consumeIf(tok::identifier))
+  if (!Tok.is(tok::identifier))
     return;
 
-  if (consumeIf(tok::l_paren))
-    skipUntil(tok::r_paren);
+  (void)canParseCustomAttribute();
 }
 
 /// Returns a descriptive name for the given accessor/addressor kind.
@@ -6003,7 +6099,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   };
 
   // Prepare backtracking for implicit getter.
-  Optional<BacktrackingScope> backtrack;
+  Optional<CancellableBacktrackingScope> backtrack;
   backtrack.emplace(*this);
 
   bool Invalid = false;
@@ -7142,7 +7238,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       // For recovery, see if the user typed something resembling a switch
       // "case" label.
       {
-        BacktrackingScope backtrack(*this);
+        CancellableBacktrackingScope backtrack(*this);
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
         T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
         parseMatchingPattern(/*isExprBasic*/false);

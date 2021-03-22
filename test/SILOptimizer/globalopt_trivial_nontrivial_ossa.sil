@@ -18,6 +18,10 @@ public class TClass {
   deinit
 }
 
+struct GenericStruct<T> {
+  var x: T
+}
+
 let nontrivialglobal: TClass
 
 // CHECK-LABEL: sil_global hidden [let] @$trivialglobal : $TStruct = {
@@ -31,6 +35,9 @@ sil_global hidden [let] @$trivialglobal : $TStruct
 sil_global private @globalinit_nontrivialglobal_token : $Builtin.Word
 
 sil_global hidden [let] @$nontrivialglobal : $TClass
+
+sil_global hidden [let] @empty_global : $GenericStruct<()>
+sil_global private @empty_global_token : $Builtin.Word
 
 sil private [global_init_once_fn] [ossa] @globalinit_trivialglobal_func : $@convention(c) () -> () {
 bb0:
@@ -124,5 +131,30 @@ bb0:
   end_borrow %3b : $TClass
   destroy_value %3 : $TClass 
   return %5 : $Int32                              
+}
+
+// Check that we don't crash on an initializer struct with an "undef" operand.
+// CHECK-LABEL: sil hidden [global_init_once_fn] [ossa] @globalinit_empty_global :
+// CHECK: struct $GenericStruct<()> (undef : $())
+// CHECK-LABEL: } // end sil function 'globalinit_empty_global'
+sil hidden [global_init_once_fn] [ossa] @globalinit_empty_global : $@convention(c) () -> () {
+bb0:
+  alloc_global @empty_global
+  %1 = global_addr @empty_global : $*GenericStruct<()>
+  %2 = struct $GenericStruct<()> (undef : $())
+  store %2 to [trivial] %1 : $*GenericStruct<()>
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil hidden [global_init] [ossa] @empty_global_accessor : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @empty_global_token : $*Builtin.Word
+  %1 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
+  %2 = function_ref @globalinit_empty_global : $@convention(c) () -> ()
+  %3 = builtin "once"(%1 : $Builtin.RawPointer, %2 : $@convention(c) () -> ()) : $()
+  %4 = global_addr @empty_global : $*GenericStruct<()>
+  %5 = address_to_pointer %4 : $*GenericStruct<()> to $Builtin.RawPointer
+  return %5 : $Builtin.RawPointer
 }
 

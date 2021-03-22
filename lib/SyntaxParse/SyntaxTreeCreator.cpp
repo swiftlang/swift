@@ -11,18 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "swift/Syntax/RawSyntax.h"
-#include "swift/Syntax/SyntaxVisitor.h"
-#include "swift/Syntax/Trivia.h"
-#include "swift/Parse/ParsedTrivia.h"
-#include "swift/Parse/SyntaxParsingCache.h"
-#include "swift/Parse/Token.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/OwnedString.h"
-#include "RawSyntaxTokenCache.h"
+#include "swift/Parse/ParsedRawSyntaxNode.h"
+#include "swift/Parse/ParsedTrivia.h"
+#include "swift/Parse/SyntaxParsingCache.h"
+#include "swift/Parse/Token.h"
+#include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/SyntaxVisitor.h"
+#include "swift/Syntax/Trivia.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -30,17 +30,16 @@ using namespace swift::syntax;
 SyntaxTreeCreator::SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
                                      SyntaxParsingCache *syntaxCache,
                                      RC<syntax::SyntaxArena> arena)
-    : SM(SM), BufferID(bufferID),
-      Arena(std::move(arena)),
-      SyntaxCache(syntaxCache),
-      TokenCache(new RawSyntaxTokenCache()) {
+    : SM(SM), BufferID(bufferID), Arena(std::move(arena)),
+      SyntaxCache(syntaxCache) {
   StringRef BufferContent = SM.getEntireTextForBuffer(BufferID);
-  char *Data = (char *)Arena->Allocate(BufferContent.size(), alignof(char *));
-  std::uninitialized_copy(BufferContent.begin(), BufferContent.end(), Data);
+  const char *Data = BufferContent.data();
+  Arena->copyStringToArenaIfNecessary(Data, BufferContent.size());
   ArenaSourceBuffer = StringRef(Data, BufferContent.size());
-  assert(ArenaSourceBuffer == BufferContent);
-  Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
-                               ArenaSourceBuffer.end());
+  if (!ArenaSourceBuffer.empty()) {
+    Arena->setHotUseMemoryRegion(ArenaSourceBuffer.begin(),
+                                 ArenaSourceBuffer.end());
+  }
 }
 
 SyntaxTreeCreator::~SyntaxTreeCreator() = default;
@@ -127,9 +126,9 @@ OpaqueSyntaxNode SyntaxTreeCreator::recordToken(tok tokenKind,
   StringRef trailingTriviaText = ArenaSourceBuffer.substr(
       trailingTriviaStartOffset, trailingTrivia.size());
 
-  auto raw =
-      TokenCache->getToken(Arena, tokenKind, range.getByteLength(), tokenText,
-                           leadingTriviaText, trailingTriviaText);
+  auto raw = RawSyntax::make(tokenKind, tokenText, range.getByteLength(),
+                             leadingTriviaText, trailingTriviaText,
+                             SourcePresence::Present, Arena);
   return static_cast<OpaqueSyntaxNode>(raw);
 }
 
@@ -141,14 +140,17 @@ SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
 
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) {
+                                   ArrayRef<OpaqueSyntaxNode> elements) {
   SmallVector<const RawSyntax *, 16> parts;
   parts.reserve(elements.size());
+  size_t TextLength = 0;
   for (OpaqueSyntaxNode opaqueN : elements) {
-    parts.push_back(static_cast<const RawSyntax *>(opaqueN));
+    auto Raw = static_cast<const RawSyntax *>(opaqueN);
+    parts.push_back(Raw);
+    if (Raw) {
+      TextLength += Raw->getTextLength();
+    }
   }
-  size_t TextLength = range.isValid() ? range.getByteLength() : 0;
   auto raw =
       RawSyntax::make(kind, parts, TextLength, SourcePresence::Present, Arena);
   return static_cast<OpaqueSyntaxNode>(raw);
@@ -164,4 +166,110 @@ SyntaxTreeCreator::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
   const RawSyntax *raw = cacheLookup->getRaw();
   size_t length = raw->getTextLength();
   return {length, static_cast<OpaqueSyntaxNode>(raw)};
+}
+
+OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredToken(tok tokenKind,
+                                                      StringRef leadingTrivia,
+                                                      StringRef trailingTrivia,
+                                                      CharSourceRange range,
+                                                      bool isMissing) {
+  // Instead of creating dedicated deferred nodes that will be recorded only if
+  // needed, the SyntaxTreeCreator always records all nodes and forms RawSyntax
+  // nodes for them. This eliminates a bunch of copies that would otherwise
+  // be required to record the deferred nodes.
+  // Should a deferred node not be recorded, its data stays alive in the
+  // SyntaxArena. This causes a small memory leak but since most nodes are
+  // being recorded, it is acceptable.
+  if (isMissing) {
+    auto Node = recordMissingToken(tokenKind, range.getStart());
+    return Node;
+  } else {
+    auto Node = recordToken(tokenKind, leadingTrivia, trailingTrivia, range);
+    return Node;
+  }
+}
+
+OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredLayout(
+    syntax::SyntaxKind kind, bool IsMissing,
+    const MutableArrayRef<ParsedRawSyntaxNode> &parsedChildren) {
+  assert(!IsMissing && "Missing layout nodes not implemented yet");
+
+  SmallVector<const RawSyntax *, 16> children;
+  children.reserve(parsedChildren.size());
+
+  size_t TextLength = 0;
+  for (size_t i = 0; i < parsedChildren.size(); ++i) {
+    auto Raw = static_cast<const RawSyntax *>(parsedChildren[i].takeData());
+    if (Raw) {
+      TextLength += Raw->getTextLength();
+    }
+    children.push_back(Raw);
+  }
+
+  auto raw = RawSyntax::make(kind, children, TextLength,
+                             SourcePresence::Present, Arena);
+  return static_cast<OpaqueSyntaxNode>(raw);
+}
+
+OpaqueSyntaxNode
+SyntaxTreeCreator::recordDeferredToken(OpaqueSyntaxNode deferred) {
+  // We don't diffirentiate between deferred and recorded nodes. See comment in
+  // makeDeferredToken.
+  return deferred;
+}
+
+OpaqueSyntaxNode
+SyntaxTreeCreator::recordDeferredLayout(OpaqueSyntaxNode deferred) {
+  // We don't diffirentiate between deferred and recorded nodes. See comment in
+  // makeDeferredToken.
+  return deferred;
+}
+
+DeferredNodeInfo SyntaxTreeCreator::getDeferredChild(OpaqueSyntaxNode node,
+                                                     size_t ChildIndex) const {
+  const RawSyntax *raw = static_cast<const RawSyntax *>(node);
+
+  const RawSyntax *Child = raw->getChild(ChildIndex);
+  if (Child == nullptr) {
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(nullptr, RecordedOrDeferredNode::Kind::Null),
+        syntax::SyntaxKind::Unknown, tok::NUM_TOKENS, /*IsMissing=*/false);
+  } else if (Child->isToken()) {
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(Child,
+                               RecordedOrDeferredNode::Kind::DeferredToken),
+        syntax::SyntaxKind::Token, Child->getTokenKind(), Child->isMissing());
+  } else {
+    return DeferredNodeInfo(
+        RecordedOrDeferredNode(Child,
+                               RecordedOrDeferredNode::Kind::DeferredLayout),
+        Child->getKind(), tok::NUM_TOKENS,
+        /*IsMissing=*/false);
+  }
+}
+
+CharSourceRange SyntaxTreeCreator::getDeferredChildRange(
+    OpaqueSyntaxNode node, size_t ChildIndex, SourceLoc StartLoc) const {
+  const RawSyntax *raw = static_cast<const RawSyntax *>(node);
+
+  // Compute the start offset of the child node by advancing StartLoc by the
+  // length of all previous child nodes.
+  for (unsigned i = 0; i < ChildIndex; ++i) {
+    const RawSyntax *child = raw->getChild(i);
+    if (child) {
+      StartLoc = StartLoc.getAdvancedLoc(child->getTextLength());
+    }
+  }
+
+  const RawSyntax *Child = raw->getChild(ChildIndex);
+  if (Child == nullptr) {
+    return CharSourceRange(StartLoc, /*Length=*/0);
+  } else {
+    return CharSourceRange(StartLoc, Child->getTextLength());
+  }
+}
+
+size_t SyntaxTreeCreator::getDeferredNumChildren(OpaqueSyntaxNode node) {
+  const syntax::RawSyntax *raw = static_cast<const syntax::RawSyntax *>(node);
+  return raw->getNumChildren();
 }

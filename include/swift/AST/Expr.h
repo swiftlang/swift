@@ -5705,6 +5705,26 @@ public:
       llvm_unreachable("unhandled kind");
     }
 
+    bool hasDeclRef() const {
+      switch (getKind()) {
+      case Kind::Property:
+      case Kind::Subscript:
+        return true;
+
+      case Kind::Invalid:
+      case Kind::UnresolvedProperty:
+      case Kind::UnresolvedSubscript:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::Identity:
+      case Kind::TupleElement:
+      case Kind::DictionaryKey:
+        return false;
+      }
+      llvm_unreachable("unhandled kind");
+    }
+
     ConcreteDeclRef getDeclRef() const {
       switch (getKind()) {
       case Kind::Property:

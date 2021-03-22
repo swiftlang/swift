@@ -744,6 +744,13 @@ BUILTIN_MISC_OPERATION(DestroyDistributedActor,
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
+// getCurrentExecutor: () async -> Builtin.Word
+//
+// Retrieve the ExecutorRef on which the current asynchronous
+// function is executing.
+// Does not retain an actor executor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "n", Special)
+
 // getCurrentAsyncTask: () -> Builtin.NativeObject
 //
 // Retrieve the pointer to the task in which the current asynchronous
@@ -754,14 +761,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 ///
 /// Cancel the given asynchronous task.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
-
-/// createAsyncTask(): (
-///     Int, Builtin.NativeObject?, @escaping () async throws -> Void
-/// ) -> Builtin.NativeObject
-///
-/// Create a new asynchronous task, given flags, an (optional) parent task, and
-/// a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask, "createAsyncTask", "", Special)
 
 /// createAsyncTaskFuture(): (
 ///     Int, Builtin.NativeObject?, @escaping () async throws -> T

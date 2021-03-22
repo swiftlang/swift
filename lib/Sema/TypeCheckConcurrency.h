@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_TYPECHECKCONCURRENCY_H
 
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Type.h"
 #include <cassert>
 
@@ -29,7 +30,9 @@ class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
+class ClosureExpr;
 class ConcreteDeclRef;
+class CustomAttr;
 class Decl;
 class DeclContext;
 class EnumElementDecl;
@@ -110,8 +113,8 @@ private:
     /// The local context that an entity is tied to.
     DeclContext *localContext;
 
-    /// The actor class that the entity is declared in.
-    ClassDecl *actorClass;
+    /// The actor that the entity is declared in.
+    NominalTypeDecl *actorType;
 
     /// The global actor type.
     TypeBase *globalActor;
@@ -130,12 +133,12 @@ public:
 
   Kind getKind() const { return kind; }
 
-  /// Retrieve the actor class that the declaration is within.
-  ClassDecl *getActorClass() const {
+  /// Retrieve the actor type that the declaration is within.
+  NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || 
            kind == CrossActorSelf || 
            kind == DistributedActor);
-    return data.actorClass;
+    return data.actorType;
   }
 
   /// Retrieve the actor class that the declaration is within.
@@ -157,10 +160,10 @@ public:
   /// Accesses to the given declaration can only be made via the 'self' of
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
-      ClassDecl *actorClass, bool isCrossActor) {
+      NominalTypeDecl *actor, bool isCrossActor) {
     ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
                                      isCrossActor);
-    result.data.actorClass = actorClass;
+    result.data.actorType = actor;
     return result;
   }
 
@@ -193,6 +196,10 @@ public:
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
+/// Determine whether the given context uses concurrency features, such
+/// as async functions or actors.
+bool contextUsesConcurrencyFeatures(const DeclContext *dc);
+
 /// Diagnose the presence of any non-concurrent types when referencing a
 /// given declaration from a particular declaration context.
 ///
@@ -206,7 +213,7 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// specific types at the use site.
 ///
 /// \param dc The declaration context from which the reference occurs. This is
-/// used to perform lookup of conformances to the \c ConcurrentValue protocol.
+/// used to perform lookup of conformances to the \c Sendable protocol.
 ///
 /// \param loc The location at which the reference occurs, which will be
 /// used when emitting diagnostics.
@@ -217,27 +224,38 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
-    ConcurrentReferenceKind refKind);
+    ConcurrentReferenceKind refKind,
+    DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
 
 /// How the concurrent value check should be performed.
-enum class ConcurrentValueCheck {
-  /// ConcurrentValue conformance was explicitly stated and should be
+enum class SendableCheck {
+  /// Sendable conformance was explicitly stated and should be
   /// fully checked.
   Explicit,
 
-  /// ConcurrentValue conformance was implied by one of the standard library
-  /// protocols that added ConcurrentValue after-the-fact.
+  /// Sendable conformance was implied by one of the standard library
+  /// protocols that added Sendable after-the-fact.
   ImpliedByStandardProtocol,
 
-  /// Implicit conformance to ConcurrentValue for structs and enums.
+  /// Implicit conformance to Sendable for structs and enums.
   Implicit,
 };
 
-/// Check the correctness of the given ConcurrentValue conformance.
+/// Given a set of custom attributes, pick out the global actor attributes
+/// and perform any necessary resolution and diagnostics, returning the
+/// global actor attribute and type it refers to (or \c None).
+Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+checkGlobalActorAttributes(
+    SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
+/// Get the explicit global actor specified for a closure.
+
+Type getExplicitGlobalActor(ClosureExpr *closure);
+
+/// Check the correctness of the given Sendable conformance.
 ///
 /// \returns true if an error occurred.
-bool checkConcurrentValueConformance(
-    ProtocolConformance *conformance, ConcurrentValueCheck check);
+bool checkSendableConformance(
+    ProtocolConformance *conformance, SendableCheck check);
 
 } // end namespace swift
 

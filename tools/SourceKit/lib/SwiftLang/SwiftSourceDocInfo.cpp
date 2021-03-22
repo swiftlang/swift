@@ -971,6 +971,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invoc))
     ModuleInterfaceName = IFaceGenRef->getDocumentName();
 
+  UIdent DeclLang = SwiftLangSupport::getUIDForDeclLanguage(VD);
   UIdent Kind = SwiftLangSupport::getUIDForDecl(VD, IsRef);
   StringRef Name = StringRef(SS.begin()+NameBegin, NameEnd-NameBegin);
   StringRef USR = StringRef(SS.begin()+USRBegin, USREnd-USRBegin);
@@ -1040,6 +1041,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   std::string TypeInterface;
 
   CursorInfoData Info;
+  Info.DeclarationLang = DeclLang;
   Info.Kind = Kind;
   Info.Name = Name;
   Info.USR = USR;

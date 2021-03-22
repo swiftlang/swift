@@ -574,6 +574,9 @@ namespace {
 struct OperandOwnershipBuiltinClassifier
     : SILBuiltinVisitor<OperandOwnershipBuiltinClassifier, OperandOwnership> {
   using Map = OperandOwnership;
+      
+  const Operand &op;
+  OperandOwnershipBuiltinClassifier(const Operand &op) : op(op) {}
 
   OperandOwnership visitLLVMIntrinsic(BuiltinInst *bi, llvm::Intrinsic::ID id) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
@@ -744,14 +747,35 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, IntInstrprofIncrement)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, UnsafeGuaranteed)
 
-// FIXME: These are considered InteriorPointer because they may propagate a
-// pointer into a borrowed values. If they do not propagate an interior pointer,
-// then they should be InstantaneousUse instead and should not require a
-// guaranteed value.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskFuture(BuiltinInst *bi,
+                                                              StringRef attr) {
+  // The function operand is consumed by the new task.
+  if (&op == &bi->getOperandRef(2))
+    return OperandOwnership::DestroyingConsume;
+  
+  // FIXME: These are considered InteriorPointer because they may propagate a
+  // pointer into a borrowed values. If they do not propagate an interior pointer,
+  // then they should be InstantaneousUse instead and should not require a
+  // guaranteed value.
+  return OperandOwnership::InteriorPointer;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskGroupFuture(BuiltinInst *bi,
+                                                                   StringRef attr) {
+  // The function operand is consumed by the new task.
+  if (&op == &bi->getOperandRef(3))
+    return OperandOwnership::DestroyingConsume;
+  
+  // FIXME: These are considered InteriorPointer because they may propagate a
+  // pointer into a borrowed values. If they do not propagate an interior pointer,
+  // then they should be InstantaneousUse instead and should not require a
+  // guaranteed value.
+  return OperandOwnership::InteriorPointer;
+}
+
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTask)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTaskFuture)
-BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CreateAsyncTaskGroupFuture)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)
 
@@ -777,6 +801,7 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContext)
         "Builtin should never be visited! E.x.: It may not have arguments");   \
   }
 SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
+SHOULD_NEVER_VISIT_BUILTIN(GetCurrentExecutor)
 #undef SHOULD_NEVER_VISIT_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see
@@ -790,7 +815,7 @@ SHOULD_NEVER_VISIT_BUILTIN(GetCurrentAsyncTask)
 #include "swift/AST/Builtins.def"
 
 OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
-  return OperandOwnershipBuiltinClassifier().check(bi);
+  return OperandOwnershipBuiltinClassifier(op).check(bi);
 }
 
 //===----------------------------------------------------------------------===//

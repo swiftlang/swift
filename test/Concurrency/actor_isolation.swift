@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
@@ -6,7 +6,7 @@ var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared 
 
 func globalFunc() { }
 func acceptClosure<T>(_: () -> T) { }
-func acceptConcurrentClosure<T>(_: @concurrent () -> T) { }
+func acceptConcurrentClosure<T>(_: @Sendable () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping () -> T) { }
 func acceptEscapingClosure<T>(_: @escaping (String) -> ()) async -> T? { nil }
 
@@ -90,20 +90,20 @@ func checkAsyncPropertyAccess() async {
 
   act.text[0] += "hello" // expected-error{{actor-isolated property 'text' can only be mutated from inside the actor}}
 
-  _ = act.point // expected-warning{{cannot use property 'point' with a non-concurrent-value type 'Point' across actors}}
+  _ = act.point // expected-warning{{cannot use property 'point' with a non-sendable type 'Point' across actors}}
 }
 
 extension MyActor {
-  @actorIndependent var actorIndependentVar: Int {
+  nonisolated var actorIndependentVar: Int {
     get { 5 }
     set { }
   }
 
-  @actorIndependent func actorIndependentFunc(otherActor: MyActor) -> Int {
+  nonisolated func actorIndependentFunc(otherActor: MyActor) -> Int {
     _ = immutable
-    _ = mutable // expected-error{{actor-isolated property 'mutable' can not be referenced from an '@actorIndependent'}}
-    _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from an '@actorIndependent' context}}
-    _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
+    _ = mutable // expected-error{{actor-isolated property 'mutable' can not be referenced from a non-isolated}}
+    _ = text[0] // expected-error{{actor-isolated property 'text' can not be referenced from a non-isolated context}}
+    _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
 
     // @actorIndependent
     _ = actorIndependentFunc(otherActor: self)
@@ -120,24 +120,24 @@ extension MyActor {
     otherActor.actorIndependentVar = 17
 
     // async promotion
-    _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
+    _ = synchronous() // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
 
     // Global actors
-    syncGlobalActorFunc() /// expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' synchronous context}}
-    _ = syncGlobalActorFunc // expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from an '@actorIndependent' context}}
+    syncGlobalActorFunc() /// expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
+    _ = syncGlobalActorFunc // expected-error{{global function 'syncGlobalActorFunc()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated context}}
 
     // Global data is okay if it is immutable.
     _ = immutableGlobal
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
 
     // Partial application
-    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
-    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from an '@actorIndependent' context}}
-    acceptClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
-    acceptClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}
+    _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from a non-isolated context}}
+    acceptClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
+    acceptClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}
     acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
-    acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent' context}}}}
-    acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from an '@actorIndependent'}}
+    acceptEscapingClosure(synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated context}}}}
+    acceptEscapingClosure(self.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can not be referenced from a non-isolated}}
     acceptEscapingClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
 
     return 5
@@ -254,7 +254,7 @@ extension MyActor {
     }
 
     // Local functions might run concurrently.
-    @concurrent func localFn1() {
+    @Sendable func localFn1() {
       _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
       _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
       _ = localVar // expected-error{{reference to captured var 'localVar' in concurrently-executing code}}
@@ -262,7 +262,7 @@ extension MyActor {
       _ = localConstant
     }
 
-    @concurrent func localFn2() {
+    @Sendable func localFn2() {
       acceptClosure {
         _ = text[0]  // expected-error{{actor-isolated property 'text' cannot be referenced from a concurrent function}}
         _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from a concurrent function}}
@@ -281,7 +281,7 @@ extension MyActor {
 
     // Partial application
     _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from an '@actorIndependent' context}}
+    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from a non-isolated context}}
     acceptClosure(synchronous)
     acceptClosure(self.synchronous)
     acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
@@ -372,7 +372,7 @@ func testGlobalActorClosures() {
     return 17
   }
 
-  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{closure isolated to global actor 'SomeGlobalActor' must be 'async'}}
+  acceptConcurrentClosure { @SomeGlobalActor in 5 } // expected-error{{converting function value of type '@SomeGlobalActor @Sendable () -> Int' to '@Sendable () -> Int' loses global actor 'SomeGlobalActor'}}
 }
 
 extension MyActor {
@@ -519,7 +519,7 @@ func f() {
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
   }
 
-  @concurrent func g() {
+  @Sendable func g() {
     _ = mutableGlobal // expected-warning{{reference to var 'mutableGlobal' is not concurrency-safe because it involves shared mutable state}}
   }
 }
@@ -535,7 +535,7 @@ func checkLocalFunctions() async {
     i = 17
   }
 
-  func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@concurrent'}}{{3-3=@concurrent }}
+  func local2() { // expected-error{{concurrently-executed local function 'local2()' must be marked as '@Sendable'}}{{3-3=@Sendable }}
     j = 42
   }
 
@@ -564,7 +564,7 @@ func checkLocalFunctions() async {
     }
   }
 
-  func local3() { // expected-error{{concurrently-executed local function 'local3()' must be marked as '@concurrent'}}
+  func local3() { // expected-error{{concurrently-executed local function 'local3()' must be marked as '@Sendable'}}
     k = 25 // expected-error{{mutation of captured var 'k' in concurrently-executing code}}
   }
 
@@ -585,7 +585,7 @@ actor LazyActor {
     lazy var l12: Int = v
     lazy var l13: Int = { self.v }()
     lazy var l14: Int = self.v
-    lazy var l15: Int = { [unowned self] in self.v }() // expected-error{{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    lazy var l15: Int = { [unowned self] in self.v }() // expected-error{{actor-isolated property 'v' can not be referenced from a non-isolated context}}
 
     lazy var l21: Int = { l }()
     lazy var l22: Int = l
@@ -593,22 +593,22 @@ actor LazyActor {
     lazy var l24: Int = self.l
     lazy var l25: Int = { [unowned self] in self.l }()
 
-    @actorIndependent lazy var l31: Int = { v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l32: Int = v
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l33: Int = { self.v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l34: Int = self.v
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
-    @actorIndependent lazy var l35: Int = { [unowned self] in self.v }()
-    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from an '@actorIndependent' context}}
+    nonisolated lazy var l31: Int = { v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    nonisolated lazy var l32: Int = v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    nonisolated lazy var l33: Int = { self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    nonisolated lazy var l34: Int = self.v
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
+    nonisolated lazy var l35: Int = { [unowned self] in self.v }()
+    // expected-error@-1 {{actor-isolated property 'v' can not be referenced from a non-isolated context}}
 
-    @actorIndependent lazy var l41: Int = { l }()
-    @actorIndependent lazy var l42: Int = l
-    @actorIndependent lazy var l43: Int = { self.l }()
-    @actorIndependent lazy var l44: Int = self.l
-    @actorIndependent lazy var l45: Int = { [unowned self] in self.l }()
+    nonisolated lazy var l41: Int = { l }()
+    nonisolated lazy var l42: Int = l
+    nonisolated lazy var l43: Int = { self.l }()
+    nonisolated lazy var l44: Int = self.l
+    nonisolated lazy var l45: Int = { [unowned self] in self.l }()
 }
 
 // Infer global actors from context only for instance members.
@@ -655,4 +655,39 @@ class SomeClassWithInits {
   }
 
   func isolated() { }
+
+  func hasDetached() {
+    Task.runDetached {
+      // okay
+      await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+      // expected-error@-1{{call is 'async' but is not marked with 'await'}}
+
+      print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
+    }
+  }
+}
+
+// ----------------------------------------------------------------------
+// Actor protocols.
+// ----------------------------------------------------------------------
+protocol P: Actor {
+  func f()
+}
+
+extension P {
+  func g() { f() }
+}
+
+actor MyActorP: P {
+  func f() { }
+
+  func h() { g() }
+}
+
+func testCrossActorProtocol<T: P>(t: T) async {
+  await t.f()
+  await t.g()
+  t.f() // expected-error{{call is 'async' but is not marked with 'await'}}
+  t.g() // expected-error{{call is 'async' but is not marked with 'await'}}
 }

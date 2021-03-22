@@ -5594,8 +5594,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       },
       {
         key.kind: source.lang.swift.ref.protocol,
-        key.name: "ConcurrentValue",
-        key.usr: "s:s15ConcurrentValueP"
+        key.name: "Sendable",
+        key.usr: "s:s8SendableP"
       }
     ]
   },

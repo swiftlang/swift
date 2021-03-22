@@ -36,8 +36,10 @@ struct SwiftError;
 class TaskStatusRecord;
 class TaskGroup;
 
+extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
+
 /// A schedulable job.
-class alignas(2 * alignof(void*)) Job {
+class alignas(2 * alignof(void*)) Job : public HeapObject {
 protected:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
@@ -62,13 +64,15 @@ public:
     TaskContinuationFunction * __ptrauth_swift_task_resume_function ResumeTask;
   };
 
-  Job(JobFlags flags, JobInvokeFunction *invoke)
-      : Flags(flags), RunJob(invoke) {
+  Job(JobFlags flags, JobInvokeFunction *invoke,
+      const HeapMetadata *metadata = &jobHeapMetadata)
+      : HeapObject(metadata), Flags(flags), RunJob(invoke) {
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
 
-  Job(JobFlags flags, TaskContinuationFunction *invoke)
-      : Flags(flags), ResumeTask(invoke) {
+  Job(JobFlags flags, TaskContinuationFunction *invoke,
+      const HeapMetadata *metadata = &jobHeapMetadata)
+      : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
     assert(isAsyncTask() && "wrong constructor for a non-task job");
   }
 
@@ -83,18 +87,18 @@ public:
   /// Given that we've fully established the job context in the current
   /// thread, actually start running this job.  To establish the context
   /// correctly, call swift_job_run or runJobInExecutorContext.
-  void runInFullyEstablishedContext(ExecutorRef currentExecutor);
+  void runInFullyEstablishedContext();
 
   /// Given that we've fully established the job context in the
   /// current thread, and that the job is a simple (non-task) job,
   /// actually start running this job.
-  void runSimpleInFullyEstablishedContext(ExecutorRef currentExecutor) {
-    RunJob(this, currentExecutor);
+  void runSimpleInFullyEstablishedContext() {
+    RunJob(this);
   }
 };
 
 // The compiler will eventually assume these.
-static_assert(sizeof(Job) == 4 * sizeof(void*),
+static_assert(sizeof(Job) == 6 * sizeof(void*),
               "Job size is wrong");
 static_assert(alignof(Job) == 2 * alignof(void*),
               "Job alignment is wrong");
@@ -154,7 +158,7 @@ public:
 ///
 /// * The future fragment is dynamic in size, based on the future result type
 ///   it can hold, and thus must be the *last* fragment.
-class AsyncTask : public HeapObject, public Job {
+class AsyncTask : public Job {
 public:
   /// The context for resuming the job.  When a task is scheduled
   /// as a job, the next continuation should be installed as the
@@ -178,7 +182,7 @@ public:
   AsyncTask(const HeapMetadata *metadata, JobFlags flags,
             TaskContinuationFunction *run,
             AsyncContext *initialContext)
-    : HeapObject(metadata), Job(flags, run),
+    : Job(flags, run, metadata),
       ResumeContext(initialContext),
       Status(ActiveTaskStatus()),
       Local(TaskLocal::Storage()) {
@@ -189,8 +193,8 @@ public:
   /// in the current thread, start running this task.  To establish
   /// the job context correctly, call swift_job_run or
   /// runInExecutorContext.
-  void runInFullyEstablishedContext(ExecutorRef currentExecutor) {
-    ResumeTask(this, currentExecutor, ResumeContext);
+  void runInFullyEstablishedContext() {
+    ResumeTask(ResumeContext);
   }
   
   /// Check whether this task has been cancelled.
@@ -386,7 +390,7 @@ public:
     }
 
     /// Retrieve the error.
-    SwiftError *&getError() { return *&error; }
+    SwiftError *&getError() { return error; }
 
     /// Compute the offset of the storage from the base of the future
     /// fragment.
@@ -429,7 +433,7 @@ public:
   ///
   /// Upon completion, any waiting tasks will be scheduled on the given
   /// executor.
-  void completeFuture(AsyncContext *context, ExecutorRef executor);
+  void completeFuture(AsyncContext *context);
 
   // ==== ----------------------------------------------------------------------
 
@@ -444,7 +448,6 @@ private:
     return reinterpret_cast<AsyncTask *&>(
         SchedulerPrivate[NextWaitingTaskIndex]);
   }
-
 };
 
 // The compiler will eventually assume these.
@@ -453,11 +456,11 @@ static_assert(sizeof(AsyncTask) == 14 * sizeof(void*),
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
 
-inline void Job::runInFullyEstablishedContext(ExecutorRef currentExecutor) {
+inline void Job::runInFullyEstablishedContext() {
   if (auto task = dyn_cast<AsyncTask>(this))
-    task->runInFullyEstablishedContext(currentExecutor);
+    task->runInFullyEstablishedContext();
   else
-    runSimpleInFullyEstablishedContext(currentExecutor);
+    runSimpleInFullyEstablishedContext();
 }
 
 /// An asynchronous context within a task.  Generally contexts are
@@ -480,9 +483,6 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_resume
     ResumeParent;
 
-  /// The executor that the parent needs to be resumed on.
-  ExecutorRef ResumeParentExecutor;
-
   /// Flags describing this context.
   ///
   /// Note that this field is only 32 bits; any alignment padding
@@ -493,10 +493,8 @@ public:
 
   AsyncContext(AsyncContextFlags flags,
                TaskContinuationFunction *resumeParent,
-               ExecutorRef resumeParentExecutor,
                AsyncContext *parent)
     : Parent(parent), ResumeParent(resumeParent),
-      ResumeParentExecutor(resumeParentExecutor),
       Flags(flags) {}
 
   AsyncContext(const AsyncContext &) = delete;
@@ -506,10 +504,10 @@ public:
   ///
   /// Generally this should be tail-called.
   SWIFT_CC(swiftasync)
-  void resumeParent(AsyncTask *task, ExecutorRef executor) {
+  void resumeParent() {
     // TODO: destroy context before returning?
     // FIXME: force tail call
-    return ResumeParent(task, executor, Parent);
+    return ResumeParent(Parent);
   }
 };
 
@@ -526,11 +524,10 @@ public:
 
   YieldingAsyncContext(AsyncContextFlags flags,
                        TaskContinuationFunction *resumeParent,
-                       ExecutorRef resumeParentExecutor,
                        TaskContinuationFunction *yieldToParent,
                        ExecutorRef yieldToParentExecutor,
                        AsyncContext *parent)
-    : AsyncContext(flags, resumeParent, resumeParentExecutor, parent),
+    : AsyncContext(flags, resumeParent, parent),
       YieldToParent(yieldToParent),
       YieldToParentExecutor(yieldToParentExecutor) {}
 
@@ -547,10 +544,47 @@ public:
 /// futures.
 class FutureAsyncContext : public AsyncContext {
 public:
-  SwiftError **errorResult = nullptr;
-  OpaqueValue *indirectResult;
-
   using AsyncContext::AsyncContext;
+};
+
+/// This matches the ABI of a closure `() async throws -> ()`
+using AsyncVoidClosureEntryPoint =
+  SWIFT_CC(swiftasync)
+  void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+
+/// This matches the ABI of a closure `<T>() async throws -> T`
+using AsyncGenericClosureEntryPoint =
+    SWIFT_CC(swiftasync)
+    void(OpaqueValue *,
+         SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT HeapObject *);
+
+/// This matches the ABI of the resume function of a closure
+///  `() async throws -> ()`.
+using AsyncVoidClosureResumeEntryPoint =
+  SWIFT_CC(swiftasync)
+  void(SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT SwiftError *);
+
+class AsyncContextPrefix {
+public:
+  // Async closure entry point adhering to compiler calling conv (e.g directly
+  // passing the closure context instead of via the async context)
+  AsyncVoidClosureEntryPoint *__ptrauth_swift_task_resume_function
+      asyncEntryPoint;
+   HeapObject *closureContext;
+  SwiftError *errorResult;
+};
+
+/// Storage that is allocated before the AsyncContext to be used by an adapter
+/// of Swift's async convention and the ResumeTask interface.
+class FutureAsyncContextPrefix {
+public:
+  OpaqueValue *indirectResult;
+  // Async closure entry point adhering to compiler calling conv (e.g directly
+  // passing the closure context instead of via the async context)
+  AsyncGenericClosureEntryPoint *__ptrauth_swift_task_resume_function
+      asyncEntryPoint;
+  HeapObject *closureContext;
+  SwiftError *errorResult;
 };
 
 } // end namespace swift

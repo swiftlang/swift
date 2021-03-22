@@ -6,6 +6,7 @@ CHANGELOG
 
 | Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
+| [Swift 5.5](#swift-55) |            |             |
 | [Swift 5.4](#swift-54) |            |             |
 | [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
 | [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
@@ -25,8 +26,28 @@ CHANGELOG
 
 </details>
 
-Swift Next
-----------
+Swift 5.5
+---------
+
+* [SE-0299][]:
+
+  It is now possible to use leading-dot syntax in generic contexts to access static members of protocol extensions where `Self` is constrained to a fully concrete type:
+
+  ```swift
+  public protocol ToggleStyle { ... }
+
+  public struct DefaultToggleStyle: ToggleStyle { ... }
+
+  extension ToggleStyle where Self == DefaultToggleStyle {
+    public static var `default`: Self { .init() }
+  }
+
+  struct Toggle {
+    func applyToggle<T: ToggleStyle>(_ style: T) { ... }
+  }
+
+  Toggle(...).applyToggle(.default)
+  ```
 
 * Whenever a reference to `Self` does not impede the usage of a protocol as a value type, or a protocol member on a value of protocol type, the same is now true for references to `[Self]` and `[Key : Self]`:
 
@@ -8363,6 +8384,7 @@ Swift 1.0
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
 [SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
 [SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
+[SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

@@ -179,8 +179,11 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   
   switch (inst->getMode()) {
     case AssignByWrapperInst::Unknown:
-      llvm_unreachable("assign_by_wrapper must have a valid mode");
-
+      assert(b.getModule().getASTContext().hadError() &&
+             "assign_by_wrapper must have a valid mode");
+      // In case DefiniteInitialization already gave up with an error, just
+      // treat the assign_by_wrapper as an "init".
+      LLVM_FALLTHROUGH;
     case AssignByWrapperInst::Initialization:
     case AssignByWrapperInst::Assign: {
       SILValue initFn = inst->getInitializer();
@@ -210,6 +213,12 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       // is an inout. Therefore we cannot keep it as a dead closure to be
       // cleaned up later. We have to delete it in this pass.
       toDelete.insert(inst->getSetter());
+      
+      // Also the argument of the closure (which usually is a "load") has to be
+      // deleted to avoid memory lifetime violations.
+      auto *setterPA = dyn_cast<PartialApplyInst>(inst->getSetter());
+      if (setterPA && setterPA->getNumArguments() == 1)
+        toDelete.insert(setterPA->getArgument(0));
       break;
     }
     case AssignByWrapperInst::AssignWrappedValue: {
@@ -249,6 +258,22 @@ static void deleteDeadAccessMarker(BeginAccessInst *BA) {
     User->eraseFromParent();
   }
   BA->eraseFromParent();
+}
+
+/// Delete a dead load for a dead setter-closure.
+static void deleteDeadClosureArg(LoadInst *load) {
+  if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Trivial &&
+      load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
+    return;
+    
+  for (Operand *use : load->getUses()) {
+    if (!isa<DestroyValueInst>(use->getUser()))
+      return;
+  }
+  while (!load->use_empty()) {
+    load->use_begin()->getUser()->eraseFromParent();
+  }
+  load->eraseFromParent();
 }
 
 /// lowerRawSILOperations - There are a variety of raw-sil instructions like
@@ -311,6 +336,8 @@ static bool lowerRawSILOperations(SILFunction &fn) {
     for (SILValue deadVal : toDelete) {
       if (auto *beginAccess = dyn_cast<BeginAccessInst>(deadVal)) {
         deleteDeadAccessMarker(beginAccess);
+      } else if (auto *load = dyn_cast<LoadInst>(deadVal)) {
+        deleteDeadClosureArg(load);
       } else if (auto *svi = dyn_cast<SingleValueInstruction>(deadVal)) {
         tryDeleteDeadClosure(svi);
       }

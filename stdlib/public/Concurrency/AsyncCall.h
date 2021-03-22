@@ -104,11 +104,10 @@ struct AsyncFrameStorage<AsyncSignature<ResultTy(ArgTys...),
 
   AsyncFrameStorage(AsyncContextFlags flags,
                     TaskContinuationFunction *resumeFunction,
-                    ExecutorRef resumeToExecutor,
                     AsyncContext *resumeToContext,
                     ArgTys... args)
       : AsyncFrameStorageHelper<FrameLayout::BasicLayout::size>(
-          flags, resumeFunction, resumeToExecutor, resumeToContext) {
+          flags, resumeFunction, resumeToContext) {
     initializeHelper<FrameLayout::firstArgIndex>(this->data(), args...);
   }
 
@@ -135,11 +134,10 @@ struct AsyncCalleeContext : AsyncFrameStorage<CalleeSignature> {
 
   template <class... Args>
   AsyncCalleeContext(TaskContinuationFunction *resumeFunction,
-                     ExecutorRef resumeToExecutor,
                      CallerContext *resumeToContext,
                      Args... args)
     : AsyncFrameStorage<CalleeSignature>(AsyncContextKind::Ordinary,
-                                         resumeFunction, resumeToExecutor,
+                                         resumeFunction,
                                          resumeToContext, args...) {}
 
   CallerContext *getParent() const {
@@ -150,33 +148,31 @@ struct AsyncCalleeContext : AsyncFrameStorage<CalleeSignature> {
 /// Push a context to call a function.
 template <class CalleeSignature, class CallerContext, class... Args>
 static AsyncCalleeContext<CallerContext, CalleeSignature> *
-pushAsyncContext(AsyncTask *task, ExecutorRef executor,
-                 CallerContext *callerContext, size_t calleeContextSize,
+pushAsyncContext(CallerContext *callerContext, size_t calleeContextSize,
                  TaskContinuationFunction *resumeFunction,
                  Args... args) {
   using CalleeContext =
     AsyncCalleeContext<CallerContext, CalleeSignature>;
-  assert(calleeContextSize >= sizeof(CalleeContext));
 
-  void *rawCalleeContext = swift_task_alloc(task, calleeContextSize);
-  return new (rawCalleeContext) CalleeContext(resumeFunction, executor,
-                                              callerContext, args...);
+  void *rawCalleeContext = swift_task_alloc(calleeContextSize);
+  // We no longer store arguments in the context so we can just cast to an async
+  // context.
+  return reinterpret_cast<CalleeContext *>(new (rawCalleeContext) AsyncContext(
+      AsyncContextKind::Ordinary, resumeFunction, callerContext));
 }
 
 /// Make an asynchronous call.
 template <class CalleeSignature, class CallerContext, class... Args>
 SWIFT_CC(swiftasync)
-static void callAsync(AsyncTask *task,
-                      ExecutorRef executor,
-                      CallerContext *callerContext,
+static void callAsync(CallerContext *callerContext,
                       TaskContinuationFunction *resumeFunction,
                 const typename CalleeSignature::FunctionPointer *function,
                       Args... args) {
   auto calleeContextSize = function->ExpectedContextSize;
-  auto calleeContext = pushAsyncContext(task, executor, callerContext,
+  auto calleeContext = pushAsyncContext(callerContext,
                                         calleeContextSize, resumeFunction,
                                         args...);
-  return function->Function(task, executor, calleeContext);
+  return function->Function(calleeContext);
 }
 
 /// Given that that we've just entered the caller's continuation function
@@ -184,9 +180,9 @@ static void callAsync(AsyncTask *task,
 /// callee's context and return the caller's context.
 template <class CalleeContext>
 static typename CalleeContext::CallerContext *
-popAsyncContext(AsyncTask *task, CalleeContext *calleeContext) {
+popAsyncContext(CalleeContext *calleeContext) {
   auto callerContext = calleeContext->getParent();
-  swift_task_dealloc(task, calleeContext);
+  swift_task_dealloc(calleeContext);
   return callerContext;
 }
 

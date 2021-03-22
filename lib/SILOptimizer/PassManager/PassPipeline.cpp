@@ -752,6 +752,7 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // Insert SIL passes to run during IRGen.
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
+  P.addPartialApplyLowering();
   P.addAllocStackHoisting();
   P.addLoadableByAddress();
 
@@ -845,7 +846,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  if (P.getOptions().EnableCopyPropagation) {
+  if (!P.getOptions().DisableCopyPropagation) {
     // MandatoryCopyPropagation should only be run at -Onone, not -O.
     P.addMandatoryCopyPropagation();
   }

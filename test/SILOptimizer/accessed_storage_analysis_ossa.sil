@@ -451,7 +451,7 @@ enum TreeB<T> {
 sil [ossa] @readIndirectEnum : $@convention(thin) <T> (@in TreeB<T>) -> (@out TreeB<T>) {
 bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
   %enumAddr = unchecked_take_enum_data_addr %1 : $*TreeB<T>, #TreeB.Branch!enumelt
-  %box = load [copy] %enumAddr : $*<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>
+  %box = load [take] %enumAddr : $*<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>
   %boxAddr = project_box %box : $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>, 0
   %boxAccess = begin_access [read] [dynamic] %boxAddr : $*(left: TreeB<T>, right: TreeB<T>)
   %leftAddr = tuple_element_addr %boxAccess : $*(left: TreeB<T>, right: TreeB<T>), 0

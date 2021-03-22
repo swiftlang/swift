@@ -704,7 +704,7 @@ public:
 };
 
 /// Diagnose errors related to converting function type which
-/// isn't explicitly '@escaping' or '@concurrent' to some other type.
+/// isn't explicitly '@escaping' or '@Sendable' to some other type.
 class AttributedFuncToTypeConversionFailure final : public ContextualFailure {
 public:
   enum AttributeKind {
@@ -724,10 +724,21 @@ public:
 
 private:
   /// Emit tailored diagnostics for no-escape/non-concurrent parameter
-  /// conversions e.g. passing such parameter as an @escaping or @concurrent
+  /// conversions e.g. passing such parameter as an @escaping or @Sendable
   /// argument, or trying to assign it to a variable which expects @escaping
-  /// or @concurrent function.
+  /// or @Sendable function.
   bool diagnoseParameterUse() const;
+};
+
+/// Diagnose failure where a global actor attribute is dropped when
+/// trying to convert one function type to another.
+class DroppedGlobalActorFunctionAttr final : public ContextualFailure {
+public:
+  DroppedGlobalActorFunctionAttr(const Solution &solution, Type fromType,
+                                 Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to use of the unwrapped optional types,
@@ -1576,7 +1587,7 @@ public:
                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), Member(member) {
     assert(member->hasName());
-    assert(locator->isForKeyPathComponent() ||
+    assert(locator->isInKeyPathComponent() ||
            locator->isForKeyPathDynamicMemberLookup());
   }
 
@@ -2272,6 +2283,8 @@ public:
 
   Type getFromType() const override { return RawReprType; }
   Type getToType() const override { return ExpectedType; }
+
+  bool diagnoseAsError() override;
 
 private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;

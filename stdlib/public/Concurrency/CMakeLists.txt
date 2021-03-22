@@ -66,6 +66,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   TaskGroup.swift
   TaskLocal.cpp
   TaskLocal.swift
+  ThreadSanitizer.cpp
   Mutex.cpp
   ${swift_concurrency_objc_sources}
 

@@ -150,10 +150,6 @@ public:
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
                         const SILDebugScope *DS, bool InCoroContext = false);
-#ifndef NDEBUG
-  /// Verify that Addr can be processed by llvm's CoroFrame/CoroSplit.
-  bool verifyCoroutineArgument(llvm::Value *Addr);
-#endif
 
   enum { NotHeapAllocated = false };
   

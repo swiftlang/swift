@@ -2364,7 +2364,9 @@ getCanonicalSignatureOrNull(GenericSignature sig) {
 /// Get the type of a global variable accessor function, () -> RawPointer.
 static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
-  return CanFunctionType::get({}, C.TheRawPointerType);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanFunctionType::ExtInfo info;
+  return CanFunctionType::get({}, C.TheRawPointerType, info);
 }
 
 /// Removes @noescape from the given type if it's a function type. Otherwise,
@@ -2406,8 +2408,10 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
     }
   }
 
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 {}, canResultTy);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {},
+                                 canResultTy, info);
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -2432,8 +2436,10 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
 
   auto sig = DC->getGenericSignatureOfContext();
 
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 {}, resultTy);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {}, resultTy,
+                                 info);
 }
 
 /// Get the type of a property wrapper backing initializer,
@@ -2453,8 +2459,10 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
   AnyFunctionType::Param param(
       inputType, Identifier(),
       ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
-                                 resultType);
+                                 resultType, info);
 }
 
 static CanAnyFunctionType getPropertyWrapperInitFromProjectedValueInterfaceType(TypeConverter &TC,
@@ -2474,8 +2482,10 @@ static CanAnyFunctionType getPropertyWrapperInitFromProjectedValueInterfaceType(
   AnyFunctionType::Param param(
       inputType, Identifier(),
       ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanAnyFunctionType::ExtInfo info;
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
-                                 resultType);
+                                 resultType, info);
 }
 
 /// Get the type of a destructor function.
@@ -2502,7 +2512,9 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   CanType resultTy = (isDeallocating
                       ? TupleType::getEmpty(C)
                       : C.TheNativeObjectType);
-  CanType methodTy = CanFunctionType::get({}, resultTy);
+  // FIXME: Verify ExtInfo state is correct, not working by accident.
+  CanFunctionType::ExtInfo info;
+  CanType methodTy = CanFunctionType::get({}, resultTy, info);
 
   auto sig = dd->getGenericSignatureOfContext();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
@@ -2554,7 +2566,7 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
                                       funcType->isThrowing())
-          .withConcurrent(funcType->isConcurrent())
+          .withConcurrent(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .build();
 
@@ -3073,6 +3085,11 @@ TypeConverter::checkForABIDifferences(SILModule &M,
     if (auto fnTy2 = type2.getAs<SILFunctionType>()) {
       // Async/synchronous conversions always need a thunk.
       if (fnTy1->isAsync() != fnTy2->isAsync())
+        return ABIDifference::NeedsThunk;
+      // Usin an async function without an error result in place of an async
+      // function that needs an error result is not ABI compatible.
+      if (fnTy2->isAsync() && !fnTy1->hasErrorResult() &&
+          fnTy2->hasErrorResult())
         return ABIDifference::NeedsThunk;
 
       // @convention(block) is a single retainable pointer so optionality

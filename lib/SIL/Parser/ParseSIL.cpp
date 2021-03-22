@@ -3097,14 +3097,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugValueAddrInst: {
+    bool poisonRefs = false;
     SILDebugVariable VarInfo;
-    if (parseTypedValueRef(Val, B) || parseSILDebugVar(VarInfo) ||
+    if (parseSILOptional(poisonRefs, *this, "poison")
+        || parseTypedValueRef(Val, B) || parseSILDebugVar(VarInfo) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     if (Opcode == SILInstructionKind::DebugValueInst)
-      ResultVal = B.createDebugValue(InstLoc, Val, VarInfo);
-    else
+      ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs);
+    else {
+      assert(!poisonRefs && "debug_value_addr does not support poison");
       ResultVal = B.createDebugValueAddr(InstLoc, Val, VarInfo);
+    }
     break;
   }
 

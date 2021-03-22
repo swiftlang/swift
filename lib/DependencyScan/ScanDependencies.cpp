@@ -982,6 +982,11 @@ forEachBatchEntry(CompilerInstance &invocationInstance,
       // those of the current scanner invocation.
       updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
     } else {
+      // We must reset option occurences because we are handling an unrelated command-line
+      // to those parsed before. We must do so because LLVM options parsing is done
+      // using a managed static `GlobalParser`.
+      llvm::cl::ResetAllOptionOccurrences();
+
       // Create a new instance by the arguments and save it in the map.
       subInstanceMap->insert(
           {entry.arguments,
@@ -1240,7 +1245,8 @@ swift::dependencies::performModuleScan(CompilerInstance &instance,
       /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
       FEOpts.PrebuiltModuleCachePath,
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.shouldTrackSystemDependencies());
+      FEOpts.shouldTrackSystemDependencies(),
+      RequireOSSAModules_t(instance.getSILOptions()));
 
   // Explore the dependencies of every module.
   for (unsigned currentModuleIdx = 0; currentModuleIdx < allModules.size();
@@ -1331,7 +1337,8 @@ swift::dependencies::performBatchModuleScan(
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
-            FEOpts.shouldTrackSystemDependencies());
+            FEOpts.shouldTrackSystemDependencies(),
+            RequireOSSAModules_t(instance.getSILOptions()));
         Optional<ModuleDependencies> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.
@@ -1398,7 +1405,8 @@ swift::dependencies::performBatchModulePrescan(
             /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
             FEOpts.PrebuiltModuleCachePath,
             FEOpts.SerializeModuleInterfaceDependencyHashes,
-            FEOpts.shouldTrackSystemDependencies());
+            FEOpts.shouldTrackSystemDependencies(),
+            RequireOSSAModules_t(instance.getSILOptions()));
         Optional<ModuleDependencies> rootDeps;
         if (isClang) {
           // Loading the clang module using Clang importer.

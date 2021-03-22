@@ -28,7 +28,7 @@
 @frozen
 public enum Never {}
 
-extension Never: ConcurrentValue { }
+extension Never: Sendable { }
 
 extension Never: Error {}
 

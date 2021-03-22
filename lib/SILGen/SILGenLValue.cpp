@@ -18,6 +18,7 @@
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Conversion.h"
+#include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -1319,8 +1320,8 @@ namespace {
 
         // If this is not a wrapper property that can be initialized from
         // a value of the wrapped type, we can't perform the initialization.
-        auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo();
-        if (!wrapperInfo.hasInitFromWrappedValue())
+        auto initInfo = VD->getPropertyWrapperInitializerInfo();
+        if (!initInfo.hasInitFromWrappedValue())
           return false;
 
         bool isAssignmentToSelfParamInInit =
@@ -1335,14 +1336,14 @@ namespace {
         // If this var isn't in a type context, assignment will always use the setter
         // if there is an initial value.
         if (!VD->getDeclContext()->isTypeContext() &&
-            wrapperInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue())
+            initInfo.getWrappedValuePlaceholder()->getOriginalWrappedValue())
           return false;
 
         // If this property wrapper uses autoclosure in it's initializer,
         // the argument types of the setter and initializer shall be
         // different, so we don't rewrite an assignment into an
         // initialization.
-        return !wrapperInfo.getWrappedValuePlaceholder()->isAutoClosure();
+        return !initInfo.getWrappedValuePlaceholder()->isAutoClosure();
       }
 
       return false;
@@ -1588,13 +1589,13 @@ namespace {
       assert(getAccessorDecl()->isGetter());
 
       SILDeclRef getter = Accessor;
-      bool didHop = false;
+      ExecutorBreadcrumb prevExecutor;
       RValue rvalue;
       {
         FormalEvaluationScope scope(SGF);
 
         // If the 'get' is in the context of the target's actor, do a hop first.
-        didHop = SGF.emitHopToTargetActor(loc, ActorIso, base);
+        prevExecutor = SGF.emitHopToTargetActor(loc, ActorIso, base);
 
         auto args =
             std::move(*this).prepareAccessorArgs(SGF, loc, base, getter);
@@ -1606,8 +1607,7 @@ namespace {
       } // End the evaluation scope before any hop back to the current executor.
 
       // If we hopped to the target's executor, then we need to hop back.
-      if (didHop)
-        SGF.emitHopToCurrentExecutor(loc);
+      prevExecutor.emit(SGF, loc);
 
       return rvalue;
     }
@@ -4154,7 +4154,7 @@ static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
 RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
                                         SGFContext C, bool isBaseGuaranteed) {
   assert(isReadAccess(src.getAccessKind()));
-  bool didHop = false;
+  ExecutorBreadcrumb prevExecutor;
   RValue result;
   {
     // Any writebacks should be scoped to after the load.
@@ -4175,7 +4175,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
       auto actorIso = component.asPhysical().getActorIsolation();
 
       // If the load must happen in the context of an actor, do a hop first.
-        didHop = emitHopToTargetActor(loc, actorIso, /*actorSelf=*/None);
+      prevExecutor = emitHopToTargetActor(loc, actorIso, /*actorSelf=*/None);
 
       auto projection = std::move(component).project(*this, loc, addr);
       if (projection.getType().isAddress()) {
@@ -4195,8 +4195,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
   } // End the evaluation scope before any hop back to the current executor.
 
   // If we hopped to the target's executor, then we need to hop back.
-  if (didHop)
-    emitHopToCurrentExecutor(loc);
+  prevExecutor.emit(*this, loc);
 
   return result;
 }

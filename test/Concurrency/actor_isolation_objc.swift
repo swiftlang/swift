@@ -14,11 +14,21 @@ actor A {
   }
 
   func keypaths() {
+    _ = #keyPath(A.w) // expected-error {{'#keyPath' refers to non-'@objc' property 'w'}}
+
+    // expected-error@+1 {{cannot form key path to actor-isolated property 'x'}}
     _ = #keyPath(A.x) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'x'}}
+
+    // expected-error@+1 {{cannot form key path to actor-isolated property 'y'}}
     _ = #keyPath(A.y) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'y'}}
+
+    // expected-error@+1 {{cannot form key path to actor-isolated property 'computed'}}
     _ = #keyPath(A.computed) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'computed'}}
+
     _ = #keyPath(A.z)
   }
+
+  let w: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
 
   var x: Int = 0 // expected-note{{add '@objc' to expose this property to Objective-C}}
 

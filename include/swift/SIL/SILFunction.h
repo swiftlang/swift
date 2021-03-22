@@ -1147,6 +1147,9 @@ public:
   /// invariants.
   void verify(bool SingleFunction = true) const;
 
+  /// Verifies the lifetime of memory locations in the function.
+  void verifyMemoryLifetime();
+
   /// Run the SIL ownership verifier to check for ownership invariant failures.
   ///
   /// NOTE: The ownership verifier is always run when performing normal IR

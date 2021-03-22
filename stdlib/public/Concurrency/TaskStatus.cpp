@@ -270,8 +270,9 @@ static void releaseStatusRecordLock(AsyncTask *task,
 /*************************** RECORD MANAGEMENT ****************************/
 /**************************************************************************/
 
-bool swift::swift_task_addStatusRecord(AsyncTask *task,
-                                       TaskStatusRecord *newRecord) {
+bool swift::swift_task_addStatusRecord(TaskStatusRecord *newRecord) {
+  auto task = swift_task_getCurrent();
+
   // Load the current state.  We can use a relaxed load because we're
   // synchronous with the task.
   auto oldStatus = task->Status.load(std::memory_order_relaxed);
@@ -297,8 +298,9 @@ bool swift::swift_task_addStatusRecord(AsyncTask *task,
   }
 }
 
-bool swift::swift_task_tryAddStatusRecord(AsyncTask *task,
-                                          TaskStatusRecord *newRecord) {
+bool swift::swift_task_tryAddStatusRecord(TaskStatusRecord *newRecord) {
+  auto task = swift_task_getCurrent();
+
   // Load the current state.  We can use a relaxed load because we're
   // synchronous with the task.
   auto oldStatus = task->Status.load(std::memory_order_relaxed);
@@ -332,8 +334,9 @@ bool swift::swift_task_tryAddStatusRecord(AsyncTask *task,
   }
 }
 
-bool swift::swift_task_removeStatusRecord(AsyncTask *task,
-                                          TaskStatusRecord *record) {
+bool swift::swift_task_removeStatusRecord(TaskStatusRecord *record) {
+  auto task = swift_task_getCurrent();
+
   // Load the current state.
   auto oldStatus = task->Status.load(std::memory_order_relaxed);
 
@@ -400,16 +403,16 @@ bool swift::swift_task_removeStatusRecord(AsyncTask *task,
 // ==== Child tasks ------------------------------------------------------------
 
 ChildTaskStatusRecord*
-swift::swift_task_attachChild(AsyncTask *parent, AsyncTask *child) {
+swift::swift_task_attachChild(AsyncTask *child) {
   void *allocation = malloc(sizeof(swift::ChildTaskStatusRecord));
   auto record = new (allocation) swift::ChildTaskStatusRecord(child);
-  swift_task_addStatusRecord(parent, record);
+  swift_task_addStatusRecord(record);
   return record;
 }
 
 void
-swift::swift_task_detachChild(AsyncTask *parent, ChildTaskStatusRecord *record) {
-  swift_task_removeStatusRecord(parent, record);
+swift::swift_task_detachChild(ChildTaskStatusRecord *record) {
+  swift_task_removeStatusRecord(record);
 }
 
 /****************************** CANCELLATION ******************************/
@@ -525,7 +528,7 @@ void swift::swift_task_cancel(AsyncTask *task) {
   releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
 }
 
-void swift::swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *group) {
+void swift::swift_task_cancel_group_child_tasks(TaskGroup *group) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
@@ -533,6 +536,7 @@ void swift::swift_task_cancel_group_child_tasks(AsyncTask *task, TaskGroup *grou
   // We purposefully DO NOT make this a cancellation by itself.
   // We are cancelling the task group, and all tasks it contains.
   // We are NOT cancelling the entire parent task though.
+  auto task = swift_task_getCurrent();
   auto oldStatus = acquireStatusRecordLock(task, recordLockRecord,
                                            /*forCancellation*/ false);
   // Carry out the cancellation operations associated with all

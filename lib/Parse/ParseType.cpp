@@ -406,9 +406,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       if (InputNode.is<ParsedTupleTypeSyntax>()) {
         auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>();
         // Decompose TupleTypeSyntax and repack into FunctionType.
-        auto LeftParen = TupleTypeNode.getDeferredLeftParen();
-        auto Arguments = TupleTypeNode.getDeferredElements();
-        auto RightParen = TupleTypeNode.getDeferredRightParen();
+        auto LeftParen = TupleTypeNode.getDeferredLeftParen(SyntaxContext);
+        auto Arguments = TupleTypeNode.getDeferredElements(SyntaxContext);
+        auto RightParen = TupleTypeNode.getDeferredRightParen(SyntaxContext);
         Builder
           .useLeftParen(std::move(LeftParen))
           .useArguments(std::move(Arguments))
@@ -999,7 +999,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // 'inout' here can be a obsoleted use of the marker in an argument list,
     // consume it in backtracking context so we can determine it's really a
     // deprecated use of it.
-    llvm::Optional<BacktrackingScope> Backtracking;
+    llvm::Optional<CancellableBacktrackingScope> Backtracking;
     SourceLoc ObsoletedInOutLoc;
     if (Tok.is(tok::kw_inout)) {
       Backtracking.emplace(*this);

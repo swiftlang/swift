@@ -90,6 +90,11 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (T->hasArchetype())
     T = T->mapTypeOutOfContext();
 
+  // If there are no (instance) members for this type, bail.
+  if (!T->mayHaveMembers() || T->is<ModuleType>()) {
+    return;
+  }
+
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {
     if (auto *PD = resolveProtocolName(CurDeclContext, Name)) {
@@ -107,8 +112,7 @@ void ConformingMethodListCallbacks::doneParsing() {
 void ConformingMethodListCallbacks::getMatchingMethods(
     Type T, llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
     SmallVectorImpl<ValueDecl *> &result) {
-  if (!T->mayHaveMembers())
-    return;
+  assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
     ModuleDecl *CurModule;

@@ -73,12 +73,15 @@ where Element: Differentiable {
     Array<Element.TangentVector>.DifferentiableView
 
   public mutating func move(by offset: TangentVector) {
+    if offset.base.isEmpty {
+      return
+    }
     precondition(
       base.count == offset.base.count, """
         Count mismatch: \(base.count) ('self') and \(offset.base.count) \
         ('direction')
         """)
-    for i in base.indices {
+    for i in offset.base.indices {
       base[i].move(by: offset.base[i])
     }
   }
@@ -217,10 +220,13 @@ extension Array where Element: Differentiable {
     pullback: (TangentVector) -> (TangentVector, TangentVector)
   ) {
     func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
+      if v.base.isEmpty {
+        return (.zero, .zero)
+      }
       precondition(
         v.base.count == lhs.count + rhs.count, """
-          Tangent vector with invalid count; expected to equal the sum of \
-          operand counts \(lhs.count) and \(rhs.count)
+          Tangent vector with invalid count \(v.base.count); expected to \
+          equal the sum of operand counts \(lhs.count) and \(rhs.count)
           """)
       return (
         TangentVector([Element.TangentVector](v.base[0..<lhs.count])),

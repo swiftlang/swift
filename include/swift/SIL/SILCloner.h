@@ -1280,7 +1280,8 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createDebugValue(Inst->getLoc(),
                                           getOpValue(Inst->getOperand()),
-                                          *Inst->getVarInfo()));
+                                          *Inst->getVarInfo(),
+                                          Inst->poisonRefs()));
 }
 template<typename ImplClass>
 void

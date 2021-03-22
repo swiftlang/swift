@@ -22,3 +22,8 @@ module StaticMemberFunc {
   header "static-member-func.h"
   requires cplusplus
 }
+
+module ConstexprStaticMemberVarErrors {
+  header "constexpr-static-member-var-errors.h"
+  requires cplusplus
+}

@@ -6,9 +6,6 @@
 // REQUIRES: foundation
 // UNSUPPORTED: OS=tvos
 
-// rdar://problem/75006869
-// XFAIL: OS=macosx && CPU=arm64
-
 import Foundation
 
 let sem = DispatchSemaphore(value: 0)

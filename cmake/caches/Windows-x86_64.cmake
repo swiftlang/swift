@@ -40,6 +40,8 @@ set(LLDB_USE_STATIC_BINDINGS YES CACHE BOOL "")
 
 # This requires perl which may not be available on Windows
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")
+set(SWIFT_BUILD_ENABLE_PARSER_LIB YES CACHE BOOL "")
+# static linking is not supported on Windows yet
 set(SWIFT_BUILD_STATIC_STDLIB NO CACHE BOOL "")
 set(SWIFT_BUILD_STATIC_SDK_OVERLAY NO CACHE BOOL "")
 
@@ -117,6 +119,7 @@ set(SWIFT_INSTALL_COMPONENTS
       sourcekit-inproc
       swift-remote-mirror
       swift-remote-mirror-headers
+      parser-lib
     CACHE STRING "")
 
 set(LLVM_DISTRIBUTION_COMPONENTS
