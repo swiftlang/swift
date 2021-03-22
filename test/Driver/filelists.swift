@@ -35,6 +35,16 @@
 // CHECK-WMO-NOT: Handled
 
 
+// RUN: %swiftc_driver -save-temps -driver-print-jobs -c %S/Inputs/lib.swift -module-name lib -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -whole-module-optimization -emit-module -emit-symbol-graph -emit-symbol-graph-dir %t 2>&1 | tee %t/forWMOFilelistCapture | %FileCheck -check-prefix=CHECK-WMO-SYM-FILELIST %s
+// RUN: tail -2 %t/forWMOFilelistCapture | head -1 | sed 's/.*-supplementary-output-file-map //' | sed 's/ .*//' > %t/supplementary-output
+// RUN: cat $(cat %t/supplementary-output) | %FileCheck -check-prefix CHECK-WMO-SYM-SUPP %s
+
+// CHECK-WMO-SYM-FILELIST: swift
+// CHECK-WMO-SYM-FILELIST-DAG: -supplementary-output-file-map
+
+// CHECK-WMO-SYM-SUPP: symbol-graph-output-path
+
+
 // RUN: %empty-directory(%t/bin)
 // RUN: ln -s %S/Inputs/filelists/fake-ld.py %t/bin/ld
 
