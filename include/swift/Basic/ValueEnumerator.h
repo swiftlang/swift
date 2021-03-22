@@ -18,18 +18,20 @@
 
 namespace swift {
 
+typedef unsigned ValueIndexTy;
+
 /// / This class maps values to unique indices.
-template<class ValueTy, class IndexTy = size_t>
+template<class ValueTy>
 class ValueEnumerator {
   /// A running counter to enumerate values.
-  IndexTy counter = 0;
+  ValueIndexTy counter = 0;
 
   /// Maps values to unique integers.
-  llvm::DenseMap<ValueTy, IndexTy> ValueToIndex;
+  llvm::DenseMap<ValueTy, ValueIndexTy> ValueToIndex;
 
 public:
   /// Return the index of value \p v.
-  IndexTy getIndex(const ValueTy &v) {
+  ValueIndexTy getIndex(const ValueTy &v) {
     // Return the index of this Key, if we've assigned one already.
     auto It = ValueToIndex.find(v);
     if (It != ValueToIndex.end()) {
@@ -38,6 +40,7 @@ public:
 
     // Generate a new counter for the key.
     ValueToIndex[v] = ++counter;
+    assert(counter != 0 && "counter overflow in ValueEnumerator");
     return counter;
   }
 
