@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// XFAIL: *
+
+
 actor Counter {
   private var value = 0
   private let scratchBuffer: UnsafeMutableBufferPointer<Int>

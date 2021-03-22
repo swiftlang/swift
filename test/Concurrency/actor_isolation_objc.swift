@@ -2,6 +2,8 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
+// XFAIL: *
+
 import Foundation
 
 func g(_ selector: Selector) -> Int { }

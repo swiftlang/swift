@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
 
+// XFAIL: *
+
+
 let immutableGlobal: String = "hello"
 var mutableGlobal: String = "can't touch this" // expected-note 5{{var declared here}}
 

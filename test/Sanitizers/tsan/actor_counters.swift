@@ -7,6 +7,8 @@
 // UNSUPPORTED: linux
 // UNSUPPORTED: windows
 
+// XFAIL: *
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)

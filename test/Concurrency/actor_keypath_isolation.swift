@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
 // REQUIRES: concurrency
 
+// XFAIL: *
+
+
 class Box {
     let size : Int = 0
 }
