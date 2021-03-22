@@ -2669,7 +2669,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
     if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
-      if (auto inferred = inferredIsolation(*witnessedIsolation))
+      if (auto inferred = inferredIsolation(
+              *witnessedIsolation, /*propagateUnsafe=*/defaultIsolation))
         return inferred;
     }
 
