@@ -924,4 +924,27 @@ CastsTests.test("Optional cast to AnyHashable") {
   expectNotEqual(xh, yh)
 }
 
+// Repeatedly casting to AnyHashable should still test equal.
+// (This was broken for a while because repeatedly casting to
+// AnyHashable could end up with multiple nested AnyHashables.)
+// rdar://75180619
+CastsTests.test("Recursive AnyHashable") {
+  struct P: Hashable {
+    var x: Int
+  }
+  struct S {
+    var x: AnyHashable?
+    init<T: Hashable>(_ x: T?) {
+      self.x = x
+    }
+  }
+  let p = P(x: 0)
+  let hp = p as AnyHashable?
+  print(hp.debugDescription)
+  let s = S(hp)
+  print(s.x.debugDescription)
+  expectEqual(s.x, hp)
+  expectEqual(s.x, p)
+}
+
 runAllTests()
