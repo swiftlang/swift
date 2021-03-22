@@ -152,7 +152,7 @@ extension SIMD {
     }
   }
   
-  /// Returns a vector mask with the result of a pointwise equality comparison.
+  /// A vector mask with the result of a pointwise equality comparison.
   @_transparent
   public static func .==(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
     var result = SIMDMask<MaskStorage>()
@@ -822,6 +822,8 @@ extension SIMD where Scalar: FloatingPoint {
     return result
   }
   
+  /// A vector formed by rounding each lane of the source vector to an integral
+  /// value according to the specified rounding `rule`.
   @_transparent
   public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var result = Self()
@@ -829,19 +831,19 @@ extension SIMD where Scalar: FloatingPoint {
     return result
   }
   
-  /// Returns the least scalar in the vector.
+  /// The least scalar in the vector.
   @_alwaysEmitIntoClient
   public func min() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Scalar.minimum($0, self[$1]) }
   }
   
-  /// Returns the greatest scalar in the vector.
+  /// The greatest scalar in the vector.
   @_alwaysEmitIntoClient
   public func max() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Scalar.maximum($0, self[$1]) }
   }
   
-  /// Returns the sum of the scalars in the vector.
+  /// The sum of the scalars in the vector.
   @_alwaysEmitIntoClient
   public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
