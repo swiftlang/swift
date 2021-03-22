@@ -4844,7 +4844,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   }
 
   // Most bound generic types are invariant.
-  if (auto *const bgt = type->getAs<BoundGenericType>()) {
+  if (auto *bgt = type->getAs<BoundGenericType>()) {
     auto info = SelfReferenceInfo();
 
     const auto &ctx = bgt->getDecl()->getASTContext();
@@ -4866,6 +4866,12 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
     }
 
     return info;
+  }
+
+  // Nominal types might have a bound generic type parent.
+  if (auto *nominalTy = type->getAs<NominalType>()) {
+    return findProtocolSelfReferences(proto, nominalTy->getParent(),
+                                      SelfReferencePosition::Invariant);
   }
 
   // Opaque result types of protocol extension members contain an invariant
