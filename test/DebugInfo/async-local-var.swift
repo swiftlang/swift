@@ -12,6 +12,7 @@ func getString() async -> String {
 func wait() async throws {}
 
 public func makeDinner() async throws -> String {
+  let local_constant = 5
   let local = await getString()
   try await wait()
 // CHECK-LABEL: define {{.*}} void @"$s1a10makeDinnerSSyYKF.resume.0"
