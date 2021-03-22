@@ -4,8 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// XFAIL: *
-
 
 actor Counter {
   private var value = 0
