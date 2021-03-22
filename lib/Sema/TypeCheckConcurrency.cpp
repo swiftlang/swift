@@ -406,14 +406,16 @@ bool IsDefaultActorRequest::evaluate(
 }
 
 bool IsDistributedActorRequest::evaluate(
-    Evaluator &evaluator, ClassDecl *classDecl) const {
-  // If concurrency is not enabled, we don't have actors.
-  auto distributedAttr = classDecl->getAttrs()
-      .getAttribute<DistributedActorAttr>();
+    Evaluator &evaluator, NominalTypeDecl *nominal) const {
+  if (auto actor = dyn_cast<ClassDecl>(nominal)) {
+    auto distributedAttr = nominal->getAttrs()
+        .getAttribute<DistributedActorAttr>();
 
-  // NOTE: that we DO NOT infer distributed even if the parent class was distributed.
+    return distributedAttr != nullptr;
+  }
 
-  return distributedAttr != nullptr;
+  // TODO: also check for protocols conforming to DistributedActor, similar to isActor
+  return false;
 }
 
 bool IsDistributedFuncRequest::evaluate(
@@ -1652,7 +1654,7 @@ namespace {
         }
         case ActorIsolationRestriction::CrossActorSelf:
         case ActorIsolationRestriction::ActorSelf:
-        case ActorIsolationRestriction::DistributedActor: {
+        case ActorIsolationRestriction::DistributedActorSelf: {
           if (isPartialApply) {
             // The partially applied InoutArg is a property of actor. This
             // can really only happen when the property is a struct with a
@@ -2005,7 +2007,62 @@ namespace {
       }
 
       case ActorIsolation::Unspecified: {
-        // NOTE: we must always inspect for implicit effects (async or throws)
+//        // NOTE: we must always inspect for implicit effects (async or throws)
+//        auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
+//        bool implicitlyAsyncExpr = (result == AsyncMarkingResult::FoundAsync);
+//        bool didEmitDiagnostic = false;
+//
+//        if (result == AsyncMarkingResult::FoundAsync)
+//          return false;
+//
+//        // Diagnose the reference.
+//        auto useKind = static_cast<unsigned>(
+//            kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
+//        ctx.Diags.diagnose(
+//          loc, diag::global_actor_from_nonactor_context,
+//          value->getDescriptiveKind(), value->getName(), globalActor,
+//          /*actorIndependent=*/false, useKind,
+//          result == AsyncMarkingResult::SyncContext);
+//
+//        if (AbstractFunctionDecl const* fn =
+//            dyn_cast_or_null<AbstractFunctionDecl>(declContext->getAsDecl())) {
+//          bool isAsyncContext = fn->isAsyncContext();
+//
+//          if (implicitlyAsyncExpr && isAsyncContext)
+//            return didEmitDiagnostic; // definitely an OK reference.
+//
+//          // otherwise, there's something wrong.
+//
+//          // if it's an implicitly-async call in a non-async context,
+//          // then we know later type-checking will raise an error,
+//          // so we just emit a note pointing out that callee of the call is
+//          // implicitly async.
+//          emitError(/*justNote=*/implicitlyAsyncExpr);
+//
+//          // otherwise, if it's any kind of global-actor reference within
+//          // this synchronous function, we'll additionally suggest becoming
+//          // part of the global actor associated with the reference,
+//          // since this function is not associated with an actor.
+//          if (isa<FuncDecl>(fn) && !isAsyncContext) {
+//            didEmitDiagnostic = true;
+//            fn->diagnose(diag::note_add_globalactor_to_function,
+//                globalActor->getWithoutParens().getString(),
+//                fn->getDescriptiveKind(),
+//                fn->getName(),
+//                globalActor)
+//              .fixItInsert(fn->getAttributeInsertionLoc(false),
+//                diag::insert_globalactor_attr, globalActor);
+//          }
+//
+//        } else {
+//          // just the generic error with note.
+//          emitError();
+//        }
+//
+//        return false;
+//      } // end Unspecified case
+//      } // end switch
+//      llvm_unreachable("unhandled actor isolation kind!");
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
         if (result == AsyncMarkingResult::FoundAsync)
           return false;
@@ -2014,47 +2071,28 @@ namespace {
         auto useKind = static_cast<unsigned>(
             kindOfUsage(value, context).getValueOr(VarRefUseEnv::Read));
         ctx.Diags.diagnose(
-          loc, diag::global_actor_from_nonactor_context,
-          value->getDescriptiveKind(), value->getName(), globalActor,
-          /*actorIndependent=*/false, useKind,
-          result == AsyncMarkingResult::SyncContext);
+            loc, diag::global_actor_from_nonactor_context,
+            value->getDescriptiveKind(), value->getName(), globalActor,
+            /*actorIndependent=*/false, useKind,
+            result == AsyncMarkingResult::SyncContext);
 
-        if (AbstractFunctionDecl const* fn =
-            dyn_cast_or_null<AbstractFunctionDecl>(declContext->getAsDecl())) {
-          bool isAsyncContext = fn->isAsyncContext();
-
-          if (implicitlyAsyncExpr && isAsyncContext)
-            return didEmitDiagnostic; // definitely an OK reference.
-
-          // otherwise, there's something wrong.
-
-          // if it's an implicitly-async call in a non-async context,
-          // then we know later type-checking will raise an error,
-          // so we just emit a note pointing out that callee of the call is
-          // implicitly async.
-          emitError(/*justNote=*/implicitlyAsyncExpr);
-
-          // otherwise, if it's any kind of global-actor reference within
-          // this synchronous function, we'll additionally suggest becoming
-          // part of the global actor associated with the reference,
-          // since this function is not associated with an actor.
-          if (isa<FuncDecl>(fn) && !isAsyncContext) {
-            didEmitDiagnostic = true;
+        // If we are in a synchronous function on the global actor,
+        // suggest annotating with the global actor itself.
+        if (auto fn = dyn_cast<FuncDecl>(declContext)) {
+          if (!isa<AccessorDecl>(fn) && !fn->isAsyncContext()) {
             fn->diagnose(diag::note_add_globalactor_to_function,
-                globalActor->getWithoutParens().getString(),
-                fn->getDescriptiveKind(),
-                fn->getName(),
-                globalActor)
-              .fixItInsert(fn->getAttributeInsertionLoc(false),
-                diag::insert_globalactor_attr, globalActor);
+                         globalActor->getWithoutParens().getString(),
+                         fn->getDescriptiveKind(),
+                         fn->getName(),
+                         globalActor)
+                .fixItInsert(fn->getAttributeInsertionLoc(false),
+                             diag::insert_globalactor_attr, globalActor);
           }
-
-        } else {
-          // just the generic error with note.
-          emitError();
         }
 
-        return didEmitDiagnostic;
+        noteIsolatedActorMember(value, context, isDistributedActor);
+
+        return true;
       } // end Unspecified case
       } // end switch
       llvm_unreachable("unhandled actor isolation kind!");
@@ -2192,10 +2230,13 @@ namespace {
             }
             LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
 
-          case ActorIsolationRestriction::ActorSelf: {
+          case ActorIsolationRestriction::ActorSelf:
+          case ActorIsolationRestriction::DistributedActorSelf: {
             auto decl = concDecl.getDecl();
             ctx.Diags.diagnose(component.getLoc(),
                                diag::actor_isolated_keypath_component,
+                               /*isDistributed=*/isolation.getKind() ==
+                                  ActorIsolationRestriction::DistributedActorSelf,
                                decl->getDescriptiveKind(), decl->getName());
             diagnosed = true;
             break;
@@ -2239,7 +2280,7 @@ namespace {
 
       case ActorIsolationRestriction::CrossActorSelf:
       case ActorIsolationRestriction::ActorSelf:
-      case ActorIsolationRestriction::DistributedActor: // TODO: is it DistributedActorSelf?
+      case ActorIsolationRestriction::DistributedActorSelf:
         llvm_unreachable("non-member reference into an actor");
 
       case ActorIsolationRestriction::GlobalActorUnsafe:
@@ -2330,7 +2371,7 @@ namespace {
             ConcurrentReferenceKind::CrossActor);
       }
 
-      case ActorIsolationRestriction::DistributedActor: {
+      case ActorIsolationRestriction::DistributedActorSelf: {
         /// mark for later diagnostics that we have we're in a distributed actor.
         isDistributedActor = true;
 
@@ -2892,6 +2933,7 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
       auto requirementIsolation = getActorIsolation(requirement);
       switch (requirementIsolation) {
       case ActorIsolation::ActorInstance:
+      case ActorIsolation::DistributedActorInstance:
       case ActorIsolation::Unspecified:
         continue;
 
@@ -2996,9 +3038,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
   if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
     if (nominal->isActor() &&
         (value->isInstanceMember() || isa<ConstructorDecl>(value))) {
-      defaultIsolation = classDecl->isDistributedActor() ?
-                         ActorIsolation::forDistributedActorInstance(classDecl) :
-                         ActorIsolation::forActorInstance(classDecl);
+      defaultIsolation = nominal->isDistributedActor() ?
+                         ActorIsolation::forDistributedActorInstance(nominal) :
+                         ActorIsolation::forActorInstance(nominal);
     } else if (isa<ConstructorDecl>(value)) {
       defaultIsolation = ActorIsolation::forActorInstance(nominal);
     }
@@ -3013,10 +3055,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
     switch (inferred) {
     // FIXME: if the context is 'unsafe', is it fine to infer the 'safe' one?
     case ActorIsolation::IndependentUnsafe:
-    case ActorIsolation::Independent:
-      value->getAttrs().add(new (ctx) ActorIndependentAttr(
-                              ActorIndependentKind::Safe, /*IsImplicit=*/true));
+    case ActorIsolation::Independent: {
+      auto var = dyn_cast<VarDecl>(value);
+      if ((var && !var->isLet()) || !var) {
+        // It is illegal to add @actorIndependent to let properties,
+        // and if we did this would fail in type checking attributes.
+        value->getAttrs().add(new(ctx) ActorIndependentAttr(
+            ActorIndependentKind::Safe, /*IsImplicit=*/true));
+      }
       break;
+    }
 
     case ActorIsolation::GlobalActorUnsafe:
       if (!propagateUnsafe && !value->hasClangNode()) {

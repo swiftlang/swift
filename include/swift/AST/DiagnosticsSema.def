@@ -4372,8 +4372,8 @@ ERROR(actor_isolated_from_escaping_closure,none,
         "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from an '@escaping' closure",
         (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_keypath_component,none,
-      "cannot form key path to actor-isolated %0 %1",
-      (DescriptiveDeclKind, DeclName))
+      "cannot form key path to %select{|distributed}0 actor-isolated %1 %2",
+      (bool, DescriptiveDeclKind, DeclName))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))

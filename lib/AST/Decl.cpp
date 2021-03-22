@@ -3775,6 +3775,12 @@ bool NominalTypeDecl::isActor() const {
                            false);
 }
 
+bool NominalTypeDecl::isDistributedActor() const {
+  auto mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsDistributedActorRequest{mutableThis},
+                           false);
+}
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
@@ -4239,13 +4245,6 @@ bool ClassDecl::isDefaultActor() const {
   auto mutableThis = const_cast<ClassDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
                            IsDefaultActorRequest{mutableThis},
-                           false);
-}
-
-bool ClassDecl::isDistributedActor() const {
-  auto mutableThis = const_cast<ClassDecl *>(this);
-  return evaluateOrDefault(getASTContext().evaluator,
-                           IsDistributedActorRequest{mutableThis},
                            false);
 }
 
@@ -8141,11 +8140,13 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     }
 
     case ClosureActorIsolation::ActorInstance: {
-      auto selfDecl = isolation.getActorInstance();
-      auto actorClass = selfDecl->getType()->getRValueType()
-          ->getClassOrBoundGenericClass();
-      assert(actorClass && "Bad closure actor isolation?");
-      return ActorIsolation::forActorInstance(actorClass);
+      return ActorIsolation::forIndependent(ActorIndependentKind::Safe); // FIXME: workaround to build toolchain for now !!!!!
+//      auto selfDecl = isolation.getActorInstance();
+//      selfDecl->dump();
+//      auto actorClass = selfDecl->getType()->getRValueType()
+//          ->getClassOrBoundGenericClass();
+//      assert(actorClass && "Bad closure actor isolation?");
+//      return ActorIsolation::forActorInstance(actorClass);
     }
     }
   }

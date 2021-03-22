@@ -105,7 +105,7 @@ public:
 
     /// References to declarations that are part of a distributed actor are
     /// only permitted if they are async.
-    DistributedActor, // TODO: should it be DistributedActorSelf? Self things are the same as a local actor hmm
+    DistributedActorSelf,
   };
 
 private:
@@ -137,7 +137,7 @@ public:
   NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || 
            kind == CrossActorSelf || 
-           kind == DistributedActor);
+           kind == DistributedActorSelf);
     return data.actorType;
   }
 
@@ -170,9 +170,9 @@ public:
   /// Accesses to the given declaration can only be made via the 'self' of
   /// the current actor.
   static ActorIsolationRestriction forDistributedActorSelf(
-      ClassDecl *actorClass, bool isCrossActor) {
-    ActorIsolationRestriction result(DistributedActor, isCrossActor);
-    result.data.actorClass = actorClass;
+      NominalTypeDecl *actor, bool isCrossActor) {
+    ActorIsolationRestriction result(DistributedActorSelf, isCrossActor);
+    result.data.actorType = actor;
     return result;
   }
 

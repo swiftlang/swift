@@ -51,7 +51,7 @@ public protocol DistributedActor: Actor, Codable {
   /// `distributed actor` declaration.
   // FIXME: don't express it as a protocol requirement, since there never
   //        is a reason to reach into it externally?
-  var actorTransport: ActorTransport { get }
+  nonisolated var actorTransport: ActorTransport { get }
 
   /// Logical address which this distributed actor represents.
   ///
@@ -59,7 +59,7 @@ public protocol DistributedActor: Actor, Codable {
   ///
   /// Conformance to this requirement is synthesized automatically for any
   /// `distributed actor` declaration.
-  var actorAddress: ActorAddress { get }
+  nonisolated var actorAddress: ActorAddress { get }
 }
 
 // ==== Codable conformance ----------------------------------------------------
@@ -77,7 +77,7 @@ extension DistributedActor {
 
     var container = try decoder.singleValueContainer()
     let address = try container.decode(ActorAddress.self)
-    // self = try Self(resolve: address, using: transport) // FIXME!!!!
+    // self = try Self(resolve: address, using: transport) // FIXME: This is going to be solved by the init() work!!!!
     fatalError("XXXX")
   }
 
@@ -91,7 +91,7 @@ extension DistributedActor {
 /***************************** Actor Transport ********************************/
 /******************************************************************************/
 
-public protocol ActorTransport: ConcurrentValue {
+public protocol ActorTransport: Sendable {
   /// Resolve a local or remote actor address to a real actor instance, or throw if unable to.
   /// The returned value is either a local actor or proxy to a remote actor.
   func resolve<Act>(address: ActorAddress, as actorType: Act.Type)
@@ -109,15 +109,18 @@ public protocol ActorTransport: ConcurrentValue {
   /// to the same actor.
   func assignAddress<Act>(
     _ actorType: Act.Type
-//    ,
-//    onActorCreated: (Act) -> ()
   ) -> ActorAddress
     where Act: DistributedActor
 
-  // FIXME: call from deinit
-//  func resignAddress(address: ActorAddress)
-//    from recipient: ActorAddress
-//  ) async throws where Request: Codable, Reply: Codable
+  func actorReady<Act>(
+    _ actor: Act
+  ) where Act: DistributedActor
+
+  /// Called during actor deinit/destroy.
+  func resignAddress(
+    _ address: ActorAddress
+  )
+
 }
 
 public enum ActorResolved<Act: DistributedActor> {
@@ -129,7 +132,7 @@ public enum ActorResolved<Act: DistributedActor> {
 /***************************** Actor Address **********************************/
 /******************************************************************************/
 
-public struct ActorAddress: Codable, ConcurrentValue, Equatable {
+public struct ActorAddress: Codable, Sendable, Equatable {
   /// Uniquely specifies the actor transport and the protocol used by it.
   ///
   /// E.g. "xpc", "specific-clustering-protocol" etc.

@@ -956,7 +956,7 @@ public:
 /// Determine whether the given class is an distributed actor.
 class IsDistributedActorRequest :
     public SimpleRequest<IsDistributedActorRequest,
-        bool(ClassDecl *),
+        bool(NominalTypeDecl *),
         RequestFlags::Cached> {
 public:
     using SimpleRequest::SimpleRequest;
@@ -964,7 +964,7 @@ public:
 private:
     friend SimpleRequest;
 
-    bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+    bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
     // Caching

@@ -103,13 +103,13 @@ public:
     return ActorIsolation(ActorInstance, actor);
   }
 
+  static ActorIsolation forDistributedActorInstance(NominalTypeDecl *actor) {
+    return ActorIsolation(DistributedActorInstance, actor);
+  }
+
   static ActorIsolation forGlobalActor(Type globalActor, bool unsafe) {
     return ActorIsolation(
         unsafe ? GlobalActorUnsafe : GlobalActor, globalActor);
-  }
-
-  static ActorIsolation forDistributedActorInstance(ClassDecl *actor) {
-    return ActorIsolation(DistributedActorInstance, actor);
   }
 
   Kind getKind() const { return kind; }

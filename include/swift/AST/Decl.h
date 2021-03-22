@@ -3172,6 +3172,10 @@ public:
   /// `Actor` protocol.
   bool isActor() const;
 
+  /// Whether this nominal type qualifies as a distributed actor, meaning that
+  /// it is either a distributed actor. // TODO: also support DistributedActor protocols.
+  bool isDistributedActor() const;
+
   /// Return the range of semantics attributes attached to this NominalTypeDecl.
   auto getSemanticsAttrs() const
       -> decltype(getAttrs().getSemanticsAttrs()) {
@@ -3723,9 +3727,6 @@ public:
 
   /// Whether the class was explicitly declared with the `actor` keyword.
   bool isExplicitActor() const { return Bits.ClassDecl.IsActor; }
-  
-  /// Whether the class is an distributed actor.
-  bool isDistributedActor() const; // TODO: define it on NominalType instead?
 
   /// Does this class explicitly declare any of the methods that
   /// would prevent it from being a default actor?

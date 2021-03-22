@@ -49,11 +49,17 @@ struct FakeTransport: ActorTransport {
   }
   func assignAddress<Act>(
     _ actorType: Act.Type
-//    ,
-//    onActorCreated: (Act) -> ()
   ) -> ActorAddress where Act : DistributedActor {
     fatalError()
   }
+
+  public func actorReady<Act>(
+    _ actor: Act
+  ) where Act: DistributedActor {}
+
+  public func resignAddress(
+    _ address: ActorAddress
+  ) {}
 }
 
 // ==== Execute ----------------------------------------------------------------
