@@ -260,6 +260,13 @@ extension AnyHashable: CustomReflectable {
   }
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+extension AnyHashable: _HasCustomAnyHashableRepresentation {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
+    return self
+  }
+}
+
 /// Returns a default (non-custom) representation of `self`
 /// as `AnyHashable`.
 ///
