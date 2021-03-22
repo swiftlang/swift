@@ -653,6 +653,9 @@ static bool collectPossibleCalleesForApply(
   } else if (auto CRCE = dyn_cast<ConstructorRefCallExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, CRCE->getArg(), DeclNameRef::createConstructor(), candidates);
+  } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
+    collectPossibleCalleesByQualifiedLookup(
+        DC, TE, DeclNameRef::createConstructor(), candidates);
   } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(fnExpr)) {
     collectPossibleCalleesForUnresolvedMember(DC, UME, candidates);
   }
@@ -806,13 +809,13 @@ static bool getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
     }
 
     // Look for a matching parameter label.
-    bool FoundLabelMatch = false;
+    bool AdvancedPosInParams = false;
     for (unsigned i = PosInParams; i < Params.size(); ++i) {
       if (Params[i].getLabel() == ArgName) {
         // We have found a label match. Advance the position in the params
         // to point to the param after the one with this label.
         PosInParams = i + 1;
-        FoundLabelMatch = true;
+        AdvancedPosInParams = true;
         if (Params[i].isVariadic()) {
           LastParamWasVariadic = true;
         }
@@ -820,9 +823,23 @@ static bool getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
       }
     }
 
-    if (!FoundLabelMatch) {
-      // We haven't found a matching argument label. Assume the current one is
-      // named incorrectly and advance by one.
+    bool IsTrailingClosure =
+        PosInArgs >= tuple->getNumElements() - tuple->getNumTrailingElements();
+    if (!AdvancedPosInParams && IsTrailingClosure) {
+      // If the argument is a trailing closure, it can't match non-function
+      // parameters. Advance to the next function parameter.
+      for (unsigned i = PosInParams; i < Params.size(); ++i) {
+        if (Params[i].getParameterType()->is<FunctionType>()) {
+          PosInParams = i + 1;
+          AdvancedPosInParams = true;
+          break;
+        }
+      }
+    }
+
+    if (!AdvancedPosInParams) {
+      // We haven't performed any special advance logic. Assume the argument
+      // and parameter match, so advance PosInParams by 1.
       ++PosInParams;
     }
   }
