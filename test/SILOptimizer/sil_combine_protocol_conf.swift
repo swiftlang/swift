@@ -238,13 +238,15 @@ public class OtherClass {
 // CHECK: bb0([[ARG:%.*]] :
 // CHECK: debug_value
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg1
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*PropProtocol to $*@opened("{{.*}}") PropProtocol
+// CHECK: [[ACC1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R1]]
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[ACC1]] : $*PropProtocol to $*@opened("{{.*}}") PropProtocol
 // CHECK: [[U1:%.*]] = unchecked_addr_cast [[O1]] : $*@opened("{{.*}}") PropProtocol to $*PropClass 
 // CHECK: [[S1:%.*]] = struct_element_addr [[U1]] : $*PropClass, #PropClass.val
 // CHECK: [[S11:%.*]] = struct_element_addr [[S1]] : $*Int, #Int._value
 // CHECK: load [[S11]] 
 // CHECK: [[R2:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg2
-// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[R2]] : $*GenericPropProtocol to $*@opened("{{.*}}") GenericPropProtocol
+// CHECK: [[ACC2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R2]]
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[ACC2]] : $*GenericPropProtocol to $*@opened("{{.*}}") GenericPropProtocol
 // CHECK: [[T1:%.*]] = alloc_stack $@opened
 // CHECK: copy_addr [[O2]] to [initialization] [[T1]]
 // CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") GenericPropProtocol, #GenericPropProtocol.val!getter : <Self where Self : GenericPropProtocol> (Self) -> () -> Int, [[O2]] : $*@opened("{{.*}}") GenericPropProtocol : $@convention(witness_method: GenericPropProtocol) <τ_0_0 where τ_0_0 : GenericPropProtocol> (@in_guaranteed τ_0_0) -> Int
@@ -256,7 +258,8 @@ public class OtherClass {
 // CHECK: tuple_extract
 // CHECK: cond_fail
 // CHECK: [[R4:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg3
-// CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[R4]] : $*NestedPropProtocol to $*@opened("{{.*}}") NestedPropProtocol
+// CHECK: [[ACC4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R4]]
+// CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[ACC4]] : $*NestedPropProtocol to $*@opened("{{.*}}") NestedPropProtocol
 // CHECK: [[U4:%.*]] = unchecked_addr_cast [[O4]] : $*@opened("{{.*}}") NestedPropProtocol to $*Outer.Inner
 // CHECK: [[S4:%.*]] = struct_element_addr [[U4]] : $*Outer.Inner, #Outer.Inner.val
 // CHECK: [[S41:%.*]] = struct_element_addr [[S4]] : $*Int, #Int._value
@@ -266,7 +269,8 @@ public class OtherClass {
 // CHECK: tuple_extract
 // CHECK: cond_fail
 // CHECK: [[R5:%.*]] = ref_element_addr [[ARG]] : $OtherClass, #OtherClass.arg4
-// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[R5]] : $*GenericNestedPropProtocol to $*@opened("{{.*}}") GenericNestedPropProtocol
+// CHECK: [[ACC5:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R5]]
+// CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[ACC5]] : $*GenericNestedPropProtocol to $*@opened("{{.*}}") GenericNestedPropProtocol
 // CHECK: [[T2:%.*]] = alloc_stack $@opened
 // CHECK: copy_addr [[O5]] to [initialization] [[T2]]
 // CHECK: [[W5:%.*]] = witness_method $@opened("{{.*}}") GenericNestedPropProtocol, #GenericNestedPropProtocol.val!getter : <Self where Self : GenericNestedPropProtocol> (Self) -> () -> Int, [[O5:%.*]] : $*@opened("{{.*}}") GenericNestedPropProtocol : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int 
@@ -336,7 +340,8 @@ public class OtherKlass {
 // CHECK: debug_value
 // CHECK: integer_literal
 // CHECK: [[R1:%.*]] = ref_element_addr [[ARG]] : $OtherKlass, #OtherKlass.arg2
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[R1]] : $*AGenericProtocol to $*@opened("{{.*}}") AGenericProtocol
+// CHECK: [[ACC1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[R1]]
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[ACC1]] : $*AGenericProtocol to $*@opened("{{.*}}") AGenericProtocol
 // CHECK: [[T1:%.*]] = alloc_stack $@opened
 // CHECK: copy_addr [[O1]] to [initialization] [[T1]]
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}") AGenericProtocol, #AGenericProtocol.val!getter : <Self where Self : AGenericProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}") AGenericProtocol : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
