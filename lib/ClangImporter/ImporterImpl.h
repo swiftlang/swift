@@ -747,6 +747,30 @@ public:
                       bool fullyQualified,
                       llvm::raw_ostream &os);
 
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(std::forward<Args>(args)...);
+  }
+
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(SourceLoc loc, Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(loc, std::forward<Args>(args)...);
+  }
+
   /// Import the given Clang identifier into Swift.
   ///
   /// \param identifier The Clang identifier to map into Swift.

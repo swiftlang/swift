@@ -740,6 +740,10 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// Whether we are actively pretty-printing a declaration as part of
+    /// diagnostics.
+    bool IsPrettyPrintingDecl = false;
+
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     friend class CompoundDiagnosticTransaction;
@@ -795,6 +799,8 @@ namespace swift {
     StringRef getDiagnosticDocumentationPath() {
       return diagnosticDocumentationPath;
     }
+
+    bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
 
     void setLocalization(std::string locale, std::string path) {
       assert(!locale.empty());
