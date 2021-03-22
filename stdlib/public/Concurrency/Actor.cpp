@@ -890,6 +890,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
   auto firstNewJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr,
                                      overridesToWake);
 
+  _swift_tsan_release(this);
   while (true) {
     State newState = oldState;
     newState.FirstJob = JobRef::getPreprocessed(firstNewJob);
@@ -929,7 +930,6 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       // Try again.
       continue;
     }
-    _swift_tsan_release(this);
     
 #if SWIFT_TASK_PRINTF_DEBUG
 #  define LOG_STATE_TRANSITION fprintf(stderr, "%p transition from %zx to %zx in %p.%s\n", \
@@ -1069,6 +1069,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
                                      nullptr, overridesToWake);
 
   Optional<JobPriority> remainingJobPriority;
+  _swift_tsan_release(this);
   while (true) {
     State newState = oldState;
 
@@ -1112,11 +1113,6 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
     }
     LOG_STATE_TRANSITION;
     
-    if (jobToRun)
-      _swift_tsan_acquire(this);
-    else
-      _swift_tsan_release(this);
-
     // We successfully updated the state.
 
     // If we're giving up the thread with jobs remaining, we need
