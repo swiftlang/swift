@@ -795,6 +795,7 @@ func test_keypath_with_method_refs() {
   }
 
   let _: KeyPath<S, Int> = \.foo // expected-error {{key path cannot refer to instance method 'foo()'}}
+  // expected-error@-1 {{key path value type '() -> Int' cannot be converted to contextual type 'Int'}}
   let _: KeyPath<S, Int> = \.bar // expected-error {{key path cannot refer to static member 'bar()'}}
   let _ = \S.Type.bar // expected-error {{key path cannot refer to static method 'bar()'}}
 
@@ -1093,4 +1094,20 @@ func rdar74711236() {
       return []
     }()
   }
+}
+
+extension String {
+  var filterOut : (Self) throws -> Bool {
+    { $0.contains("a") }
+  }
+}
+
+func test_kp_as_function_mismatch() {
+  let a : [String] = [ "asd", "bcd", "def" ]
+
+  let _ : (String) ->  Bool = \.filterOut // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+  _ = a.filter(\.filterOut) // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+  let _ : (String) ->  Bool = \String.filterOut // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+  _ = a.filter(\String.filterOut) // expected-error{{key path value type '(String) throws -> Bool' cannot be converted to contextual type 'Bool'}}
+
 }

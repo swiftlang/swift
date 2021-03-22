@@ -3795,10 +3795,13 @@ bool ConstraintSystem::repairFailures(
     // there is going to be a constraint to match result of the
     // member lookup to the generic parameter `V` of *KeyPath<R, V>
     // type associated with key path expression, which we need to
-    // fix-up here.
-    if (isExpr<KeyPathExpr>(anchor)) {
-      auto *fnType = lhs->getAs<FunctionType>();
-      if (fnType && fnType->getResult()->isEqual(rhs))
+    // fix-up here unless last component has already a invalid type or
+    // instance fix recorded.
+    if (auto *kpExpr = getAsExpr<KeyPathExpr>(anchor)) {
+      auto i = kpExpr->getComponents().size() - 1;
+      auto lastCompLoc = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt::KeyPathComponent(i)));
+      if (hasFixFor(lastCompLoc, FixKind::AllowTypeOrInstanceMember))
         return true;
 
       auto lastComponentType = lhs->lookThroughAllOptionalTypes();
