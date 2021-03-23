@@ -417,9 +417,8 @@ def disable_conformance_availability_errors : Flag<["-"],
   "disable-conformance-availability-errors">,
   HelpText<"Diagnose conformance availability violations as warnings">;
 
-def enable_infer_import_as_member :
-  Flag<["-"], "enable-infer-import-as-member">,
-  HelpText<"Infer when a global could be imported as a member">;
+def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
+  HelpText<"Deprecated, will be removed in future versions.">;
 
 def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,

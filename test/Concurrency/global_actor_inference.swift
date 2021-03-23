@@ -361,6 +361,13 @@ struct StructUGA2: UGA {
   nonisolated func req() { }
 }
 
+@SomeGlobalActor
+struct StructUGA3: UGA {
+  func req() {
+    sibling()
+  }
+}
+
 @GenericGlobalActor<String>
 func testUGA<T: UGA>(_ value: T) {
   value.req() // expected-error{{instance method 'req()' isolated to global actor 'SomeGlobalActor' can not be referenced from different global actor 'GenericGlobalActor<String>'}}

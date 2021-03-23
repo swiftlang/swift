@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// This test is flaky on VS2017 (unknown reasons)
+// UNSUPPORTED: MSVC_VER=15.0
+
 @main struct Main {
   static func main() async {
     let handle = Task.runDetached {

@@ -487,8 +487,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
-  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
-
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
@@ -869,7 +867,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                           {"-working-directory", workingDirectory.str()});
   }
 
-  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))

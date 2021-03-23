@@ -2894,7 +2894,8 @@ namespace {
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
-      assert(!type->is<UnresolvedType>());
+      if (type->is<UnresolvedType>())
+        return expr;
 
       auto &ctx = cs.getASTContext();
 
@@ -2917,11 +2918,14 @@ namespace {
       ConcreteDeclRef witness = conformance.getWitnessByName(
           conformingType->getRValueType(), constrName);
 
-      auto selectedOverload = solution.getOverloadChoice(
+      auto selectedOverload = solution.getOverloadChoiceIfAvailable(
           cs.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
 
+      if (!selectedOverload)
+        return nullptr;
+
       auto fnType =
-          simplifyType(selectedOverload.openedType)->castTo<FunctionType>();
+          simplifyType(selectedOverload->openedType)->castTo<FunctionType>();
 
       auto newArg = coerceCallArguments(
           expr->getArg(), fnType, witness,
@@ -3221,8 +3225,18 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
-      auto selected = solution.getOverloadChoice(memberLocator);
+      auto selectedElt = solution.getOverloadChoiceIfAvailable(memberLocator);
 
+      if (!selectedElt) {
+        // If constraint solving resolved this to an UnresolvedType, then we're
+        // in an ambiguity tolerant mode used for diagnostic generation.  Just
+        // leave this as whatever type of member reference it already is.
+        Type resultTy = simplifyType(cs.getType(expr));
+        cs.setType(expr, resultTy);
+        return expr;
+      }
+
+      auto selected = *selectedElt;
       if (!selected.choice.getBaseType()) {
         // This is one of the "outer alternatives", meaning the innermost
         // methods didn't work out.
@@ -3454,19 +3468,40 @@ namespace {
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       auto *memberLocator =
           cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
-      auto overload = solution.getOverloadChoice(memberLocator);
+      auto overload = solution.getOverloadChoiceIfAvailable(memberLocator);
 
-      if (overload.choice.getKind() ==
+      // Handles situation where there was a solution available but it didn't
+      // have a proper overload selected from subscript call, might be because
+      // solver was allowed to return free or unresolved types, which can
+      // happen while running diagnostics on one of the expressions.
+      if (!overload) {
+        auto *base = expr->getBase();
+        auto &de = cs.getASTContext().Diags;
+        auto baseType = cs.getType(base);
+
+        if (auto errorType = baseType->getAs<ErrorType>()) {
+          de.diagnose(base->getLoc(), diag::cannot_subscript_base,
+                      errorType->getOriginalType())
+              .highlight(base->getSourceRange());
+        } else {
+          de.diagnose(base->getLoc(), diag::cannot_subscript_ambiguous_base)
+              .highlight(base->getSourceRange());
+        }
+
+        return nullptr;
+      }
+
+      if (overload->choice.getKind() ==
               OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         return buildDynamicMemberLookupRef(
             expr, expr->getBase(), expr->getIndex()->getStartLoc(), SourceLoc(),
-            overload, memberLocator);
+            *overload, memberLocator);
       }
 
       return buildSubscript(
           expr->getBase(), expr->getIndex(), expr->getArgumentLabels(),
           expr->hasTrailingClosure(), cs.getConstraintLocator(expr),
-          expr->isImplicit(), expr->getAccessSemantics(), overload);
+          expr->isImplicit(), expr->getAccessSemantics(), *overload);
     }
 
     /// "Finish" an array expression by filling in the semantic expression.
@@ -4337,7 +4372,8 @@ namespace {
       expr->getSubPattern()->forEachVariable([](VarDecl *VD) {
         VD->setInvalid();
       });
-      if (!SuppressDiagnostics) {
+      if (!SuppressDiagnostics
+          && !cs.getType(simplified)->is<UnresolvedType>()) {
         auto &de = cs.getASTContext().Diags;
         de.diagnose(simplified->getLoc(), diag::pattern_in_expr,
                     expr->getSubPattern()->getKind());
@@ -4816,12 +4852,18 @@ namespace {
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
             kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
-          auto foundDecl = solution.getOverloadChoice(locator);
+          auto foundDecl = solution.getOverloadChoiceIfAvailable(locator);
+          if (!foundDecl) {
+            // If we couldn't resolve the component, leave it alone.
+            resolvedComponents.push_back(origComponent);
+            componentTy = origComponent.getComponentType();
+            continue;
+          }
 
           isDynamicMember =
-              foundDecl.choice.getKind() ==
+              foundDecl->choice.getKind() ==
                   OverloadChoiceKind::DynamicMemberLookup ||
-              foundDecl.choice.getKind() ==
+              foundDecl->choice.getKind() ==
                   OverloadChoiceKind::KeyPathDynamicMemberLookup;
 
           // If this was a @dynamicMemberLookup property, then we actually
@@ -4852,9 +4894,11 @@ namespace {
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
           // Chaining always forces the element to be an rvalue.
-          assert(!componentTy->hasUnresolvedType());
           auto objectTy =
               componentTy->getWithoutSpecifierType()->getOptionalObjectType();
+          if (componentTy->hasUnresolvedType() && !objectTy) {
+            objectTy = componentTy;
+          }
           assert(objectTy);
           
           auto loc = origComponent.getLoc();
@@ -4906,8 +4950,8 @@ namespace {
       }
       
       // Wrap a non-optional result if there was chaining involved.
-      assert(!componentTy->hasUnresolvedType());
       if (didOptionalChain && componentTy &&
+          !componentTy->hasUnresolvedType() &&
           !componentTy->getWithoutSpecifierType()->isEqual(leafTy)) {
         assert(leafTy->getOptionalObjectType()->isEqual(
             componentTy->getWithoutSpecifierType()));
@@ -4926,8 +4970,8 @@ namespace {
       
       // The final component type ought to line up with the leaf type of the
       // key path.
-      assert(!componentTy->hasUnresolvedType());
-      assert(componentTy->getWithoutSpecifierType()->isEqual(leafTy));
+      assert(!componentTy || componentTy->hasUnresolvedType()
+             || componentTy->getWithoutSpecifierType()->isEqual(leafTy));
 
       if (!isFunctionType)
         return E;
@@ -5038,13 +5082,18 @@ namespace {
 
       // Unwrap the last component type, preserving @lvalue-ness.
       auto optionalTy = components.back().getComponentType();
-      assert(!optionalTy->hasUnresolvedType());
       Type objectTy;
       if (auto lvalue = optionalTy->getAs<LValueType>()) {
         objectTy = lvalue->getObjectType()->getOptionalObjectType();
+        if (optionalTy->hasUnresolvedType() && !objectTy) {
+          objectTy = optionalTy;
+        }
         objectTy = LValueType::get(objectTy);
       } else {
         objectTy = optionalTy->getOptionalObjectType();
+        if (optionalTy->hasUnresolvedType() && !objectTy) {
+          objectTy = optionalTy;
+        }
       }
       assert(objectTy);
 
@@ -5473,9 +5522,11 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType) {
   Type toInstanceType = toType;
 
   // Look through metatypes
-  while (fromInstanceType->is<AnyMetatypeType>() &&
+  while ((fromInstanceType->is<UnresolvedType>() ||
+          fromInstanceType->is<AnyMetatypeType>()) &&
          toInstanceType->is<ExistentialMetatypeType>()) {
-    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
+    if (!fromInstanceType->is<UnresolvedType>())
+      fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
     toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getInstanceType();
   }
 
@@ -5675,6 +5726,11 @@ Expr *ExprRewriter::coerceCallArguments(
         LocatorPathElt::ApplyArgToParam(argIdx, paramIdx, flags));
   };
 
+  bool matchCanFail =
+      llvm::any_of(params, [](const AnyFunctionType::Param &param) {
+        return param.getPlainType()->hasUnresolvedType();
+      });
+
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
@@ -5732,7 +5788,9 @@ Expr *ExprRewriter::coerceCallArguments(
       args, params, paramInfo, unlabeledTrailingClosureIndex,
       /*allowFixes=*/false, listener, trailingClosureMatching);
 
-  assert(callArgumentMatch && "Call arguments did not match up?");
+  assert((matchCanFail || callArgumentMatch) &&
+         "Call arguments did not match up?");
+  (void)matchCanFail;
 
   auto parameterBindings = std::move(callArgumentMatch->parameterBindings);
 
@@ -6469,7 +6527,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (knownRestriction != solution.ConstraintRestrictions.end()) {
     switch (knownRestriction->second) {
     case ConversionRestrictionKind::DeepEquality: {
-      assert(!toType->hasUnresolvedType());
+      if (toType->hasUnresolvedType())
+        break;
 
       // HACK: Fix problem related to Swift 4 mode (with assertions),
       // since Swift 4 mode allows passing arguments with extra parens
@@ -7030,8 +7089,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     break;
   }
 
-  assert(!fromType->hasUnresolvedType());
-  assert(!toType->hasUnresolvedType());
+  // Unresolved types come up in diagnostics for lvalue and inout types.
+  if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
+    return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
 
   // Use an opaque type to abstract a value of the underlying concrete type.
   if (toType->getAs<OpaqueTypeArchetypeType>()) {
@@ -7608,7 +7668,11 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // FIXME: handle unwrapping everywhere else
   assert(!unwrapResult);
 
-  assert(!cs.getType(fn)->is<UnresolvedType>());
+  // If this is an UnresolvedType in the system, preserve it.
+  if (cs.getType(fn)->is<UnresolvedType>()) {
+    cs.setType(apply, cs.getType(fn));
+    return apply;
+  }
 
   // We have a type constructor.
   auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
@@ -7616,6 +7680,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // If we're "constructing" a tuple type, it's simply a conversion.
   if (auto tupleTy = ty->getAs<TupleType>()) {
+    // FIXME: Need an AST to represent this properly.
     return coerceToType(apply->getArg(), tupleTy, locator);
   }
 
@@ -7624,14 +7689,19 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *ctorLocator =
       cs.getConstraintLocator(locator, {ConstraintLocator::ApplyFunction,
                                         ConstraintLocator::ConstructorMember});
-  auto selected = solution.getOverloadChoice(ctorLocator);
+  auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
+  if (!selected) {
+    assert(ty->hasError() || ty->hasUnresolvedType());
+    cs.setType(apply, ty);
+    return apply;
+  }
 
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
          ty->isExistentialType() || ty->is<ArchetypeType>());
 
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
-  Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), selected,
+  Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), *selected,
                                  DeclNameLoc(fn->getEndLoc()), locator,
                                  ctorLocator, /*implicit=*/true,
                                  AccessSemantics::Ordinary);

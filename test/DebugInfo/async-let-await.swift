@@ -8,7 +8,7 @@ public func getVegetables() async -> [String] {
   return ["leek", "carrot"]  
 }
 
-// CHECK: define {{.*}} @"$s1M14chopVegetablesSaySSGyYKF.resume.0"
+// CHECK: define {{.*}} @"$s1M14chopVegetablesSaySSGyYKFTQ0_"
 public func chopVegetables() async throws -> [String] {
   let veggies = await getVegetables()
   // CHECK-NOT: {{^define }}
