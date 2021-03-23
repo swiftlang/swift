@@ -537,7 +537,7 @@ void swift_continuation_logFailedCheck(const char *message);
 /// If the binary links CoreFoundation, uses CFRunLoopRun
 /// Otherwise it uses dispatchMain.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_asyncMainDrainQueue();
+void swift_task_asyncMainDrainQueue [[noreturn]]();
 
 /// Establish that the current thread is running as the given
 /// executor, then run a job.
