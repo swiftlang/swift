@@ -809,7 +809,7 @@ static void swift_task_removeCancellationHandlerImpl(
 
 SWIFT_CC(swift)
 void *swift_continuation_exchange(AsyncTask *task, void *continuation) {
-  return task->activeContinuation.exchange(
+  return task->ActiveContinuation.exchange(
       continuation, std::memory_order_acquire);
 }
 

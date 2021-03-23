@@ -175,8 +175,8 @@ public:
 
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
-  
-  std::atomic<void *> activeContinuation;
+
+  std::atomic<void *> ActiveContinuation;
 
   /// Task local values storage container.
   TaskLocal::Storage Local;
@@ -187,6 +187,7 @@ public:
     : Job(flags, run, metadata),
       ResumeContext(initialContext),
       Status(ActiveTaskStatus()),
+      ActiveContinuation(nullptr),
       Local(TaskLocal::Storage()) {
     assert(flags.isAsyncTask());
   }
