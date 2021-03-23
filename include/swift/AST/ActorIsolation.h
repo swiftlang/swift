@@ -40,7 +40,7 @@ public:
     /// The actor isolation has not been specified. It is assumed to be
     /// unsafe to interact with this declaration from any actor.
     Unspecified = 0,
-    /// The declaration is isolated to the instance of an actor class.
+    /// The declaration is isolated to the instance of an actor.
     /// For example, a mutable stored property or synchronous function within
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
