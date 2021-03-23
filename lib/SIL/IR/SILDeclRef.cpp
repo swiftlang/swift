@@ -906,6 +906,7 @@ static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
 }
 
 bool SILDeclRef::requiresNewVTableEntry() const {
+  // TODO: if distributed thunk return false here
   if (getDerivativeFunctionIdentifier())
     if (derivativeFunctionRequiresNewVTableEntry(*this))
       return true;
