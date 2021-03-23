@@ -4323,7 +4323,7 @@ ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
 ERROR(actor_with_nonactor_superclass,none,
-      "actor class cannot inherit from non-actor class %0", (DeclName))
+      "actor cannot inherit from non-actor class %0", (DeclName))
 
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
@@ -4500,7 +4500,7 @@ ERROR(multiple_global_actors,none,
 ERROR(global_actor_disallowed,none,
       "%0 cannot have a global actor", (DescriptiveDeclKind))
 ERROR(global_actor_on_actor_class,none,
-      "actor class %0 cannot have a global actor", (Identifier))
+      "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
