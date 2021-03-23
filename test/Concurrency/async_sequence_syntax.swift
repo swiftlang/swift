@@ -55,3 +55,12 @@ func doubleDiagCheckConcrete(_ seq: ThrowingAsyncSequence) async {
   // expected-error@+1{{call can throw, but it is not marked with 'try' and the error is not handled}}
   let _ = await it.next()
 }
+
+// rdar://75274975
+func forAwaitInsideDoCatch<Source: AsyncSequence>(_ source: Source) async {
+  do {
+    for try await item in source {
+      print(item)
+    }
+  } catch {} // no-warning
+}
