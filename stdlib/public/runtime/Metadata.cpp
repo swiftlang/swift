@@ -1028,13 +1028,13 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
   // Unwrap ObjC class wrappers.
-  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+  if (auto wrapper = dyn_cast_or_null<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
   }
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(theClass->isTypeMetadata());
+  assert(!theClass || theClass->isTypeMetadata());
   return theClass;
 }
 
