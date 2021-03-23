@@ -8188,8 +8188,6 @@ void ClangImporter::Implementation::importAttributes(
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
           attr->setArgIsUnsafe(isUnsafe);
-          if (isUnsafe)
-            attr->setImplicit();
           MappedDecl->getAttrs().add(attr);
         }
 
