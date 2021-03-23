@@ -114,6 +114,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_2 | %FileCheck %s -check-prefix=VARIADIC_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VARIADIC_3 | %FileCheck %s -check-prefix=VARIADIC_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_IN_SELF_DOT_INIT | %FileCheck %s -check-prefix=LABEL_IN_SELF_DOT_INIT
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -908,4 +910,16 @@ func testVariadic(_ arg: Any..., option1: Int = 0, option2: String = 1) {
 // VARIADIC_2: End completions
     testVariadic(1, 2, #^VARIADIC_3^#)
 // Same as VARIADIC_2.
+}
+
+func testLabelsInSelfDotInit() {
+  class Foo {
+    init(a: Int, b: Int) {}
+    convenience init() {
+      self.init(a: 1, #^LABEL_IN_SELF_DOT_INIT^#)
+// LABEL_IN_SELF_DOT_INIT: Begin completions, 1 item
+// LABEL_IN_SELF_DOT_INIT-DAG: Pattern/ExprSpecific:               {#b: Int#}[#Int#]
+// LABEL_IN_SELF_DOT_INIT: End completions
+    }
+  }
 }

@@ -551,10 +551,20 @@ static void collectPossibleCalleesByQualifiedLookup(
   }
   baseTy = baseTy->getWithoutSpecifierType();
 
-  // Use metatype for lookup 'super.init' if it's inside constructors.
-  if (isa<SuperRefExpr>(baseExpr) && isa<ConstructorDecl>(DC) &&
-      name == DeclNameRef::createConstructor())
-    baseTy = MetatypeType::get(baseTy);
+  // Use metatype for lookup 'super.init' and 'self.init' if it's inside
+  // constructors.
+  if (name == DeclNameRef::createConstructor() && isa<ConstructorDecl>(DC)) {
+    bool isSuperCall = isa<SuperRefExpr>(baseExpr);
+    bool isSelfCall = false;
+    if (auto declRef = dyn_cast<DeclRefExpr>(baseExpr)) {
+      if (declRef->getDecl()->getName() == DC.getASTContext().Id_self) {
+        isSelfCall = true;
+      }
+    }
+    if (isSuperCall || isSelfCall) {
+      baseTy = MetatypeType::get(baseTy);
+    }
+  }
 
   collectPossibleCalleesByQualifiedLookup(DC, baseTy, name, candidates);
 
