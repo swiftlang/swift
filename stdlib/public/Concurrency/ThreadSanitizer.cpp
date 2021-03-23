@@ -16,24 +16,16 @@
 
 #include "TaskPrivate.h"
 
+// Thread Sanitizer is not supported on Windows.
 #if defined(_WIN32)
-#define NOMINMAX
-#include <windows.h>
+void swift::_swift_tsan_acquire(void *addr) {}
+void swift::_swift_tsan_release(void *addr) {}
 #else
 #include <dlfcn.h>
-#endif
 
 namespace {
 using TSanFunc = void(void *);
 TSanFunc *tsan_acquire, *tsan_release;
-
-TSanFunc *loadSymbol(const char *name) {
-#if defined(_WIN32)
-  return (TSanFunc *)GetProcAddress(GetModuleHandle(NULL), name);
-#else
-  return (TSanFunc *)dlsym(RTLD_DEFAULT, name);
-#endif
-}
 } // anonymous namespace
 
 void swift::_swift_tsan_acquire(void *addr) {
@@ -50,6 +42,7 @@ void swift::_swift_tsan_release(void *addr) {
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(c)
 void __tsan_on_initialize() {
-  tsan_acquire = loadSymbol("__tsan_acquire");
-  tsan_release = loadSymbol("__tsan_release");
+  tsan_acquire = (TSanFunc *)dlsym(RTLD_DEFAULT, "__tsan_acquire");
+  tsan_release = (TSanFunc *)dlsym(RTLD_DEFAULT, "__tsan_release");
 }
+#endif
