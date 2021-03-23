@@ -1,12 +1,13 @@
 // REQUIRES: concurrency
 
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -parse-as-library
 
 // ===================
 // Parsing
 // ===================
 
-// expected-note@+1{{'asyncFunc' declared here}}
+// expected-note@+1 3 {{'asyncFunc' declared here}}
 func asyncFunc(_ text: String) async -> Int { }
 
 @completionHandlerAsync("asyncFunc(_:)", completionHandlerIndex: 1)
@@ -145,10 +146,20 @@ func typecheckFunc9(handler: @escaping () -> Void) {}
 
 // Suggest using async alternative function in async context
 
-
 func asyncContext() async {
-  // expected-warning@+1:3{{consider using asynchronous alternative}}
+  // expected-warning@+1:3{{consider using asynchronous alternative function}}
   goodFunc1(value: "Hello") { _ in }
+
+  let _ = {
+    // No warning or error since we're in a sync context here
+    goodFunc1(value: "Hello") { _ in }
+  }
+
+  let _ = { () async -> () in
+    let _ = await asyncFunc("Hello World")
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    goodFunc1(value: "Hello") { _ in }
+  }
 
   let _ = await asyncFunc("World")
 
@@ -159,4 +170,9 @@ func asyncContext() async {
 
 func syncContext() {
   goodFunc1(value: "Hello") { _ in }
+}
+
+let asyncGlobalClosure = { () async -> () in
+  // expected-warning@+1:3{{consider using asynchronous alternative function}}
+  goodFunc1(value: "neat") { _ in }
 }

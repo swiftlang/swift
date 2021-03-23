@@ -245,7 +245,7 @@ bool checkSendableConformance(
 /// a '@completionHandlerAsync' attribute, we emit a diagnostic suggesting the
 /// async call.
 void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
-
+void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

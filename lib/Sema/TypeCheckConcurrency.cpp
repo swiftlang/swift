@@ -3096,12 +3096,29 @@ public:
   CompletionHandlerUsageChecker(ASTContext &ctx) : ctx(ctx) {}
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (ClosureExpr *closure = dyn_cast<ClosureExpr>(expr)) {
+      if (closure->isBodyAsync())
+        return {true, closure};
+      else
+        return {true, nullptr};
+    }
+
     if (ApplyExpr *call = dyn_cast<ApplyExpr>(expr)) {
       if (DeclRefExpr *fnDeclExpr = dyn_cast<DeclRefExpr>(call->getFn())) {
         ValueDecl *fnDecl = fnDeclExpr->getDecl();
         CompletionHandlerAsyncAttr *asyncAltAttr =
             fnDecl->getAttrs().getAttribute<CompletionHandlerAsyncAttr>();
-        if (asyncAltAttr && asyncAltAttr->AsyncFunctionDecl) {
+        if (asyncAltAttr) {
+          // Ensure that the attribute typechecks,
+          // this also resolves the async function decl.
+          if (!evaluateOrDefault(
+                  ctx.evaluator,
+                  TypeCheckCompletionHandlerAsyncAttrRequest{
+                      cast<AbstractFunctionDecl>(fnDecl), asyncAltAttr},
+                  false)) {
+            return {true,
+                    nullptr}; // This didn't typecheck, don't traverse down
+          }
           ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
           ctx.Diags.diagnose(asyncAltAttr->AsyncFunctionDecl->getLoc(),
                              diag::decl_declared_here,
@@ -3121,4 +3138,9 @@ void swift::checkFunctionAsyncUsage(AbstractFunctionDecl *decl) {
   BraceStmt *body = decl->getBody();
   if (body)
     body->walk(checker);
+}
+
+void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  decl->walk(checker);
 }
