@@ -21,7 +21,7 @@ public func callNative ()
       my_native_c()      
 }
 
-// CHECK:        "target": "x86_64-apple-macosx10.9",
+// CHECK:        "target": 
 // CHECK-NEXT:   "globals": [
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule10callNativeyyF",
