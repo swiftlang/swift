@@ -1419,6 +1419,7 @@ bool ModuleDecl::isBuiltinModule() const {
 }
 
 bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+  assert(mainDecl);
   if (mainDecl == MainDecl)
     return false;
 
