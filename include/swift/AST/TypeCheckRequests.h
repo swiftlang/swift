@@ -2936,6 +2936,26 @@ public:
   bool isCached() const { return true; }
 };
 
+class TypeCheckCompletionHandlerAsyncAttrRequest
+    : public SimpleRequest<TypeCheckCompletionHandlerAsyncAttrRequest,
+                           bool(AbstractFunctionDecl *,
+                                CompletionHandlerAsyncAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator,
+                AbstractFunctionDecl *attachedFucntionDecl,
+                CompletionHandlerAsyncAttr *attr) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
