@@ -8,9 +8,7 @@
 
 // CHECK: Handled main.swift
 // CHECK: Handled other.swift
-// CHECK-NOT: error
 // CHECK: error: input file 'other.swift' was modified during the build
-// CHECK-NOT: error
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-RECOVER %s
 
@@ -23,12 +21,8 @@
 
 // CHECK-REVERSED: Handled other.swift
 // CHECK-REVERSED: Handled main.swift
-// CHECK-REVERSED-NOT: error
 // CHECK-REVERSED: error: input file 'main.swift' was modified during the build
-// CHECK-REVERSED-NOT: error
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-REVERSED-RECOVER %s
 
-// CHECK-REVERSED-RECOVER-NOT: Handled other.swift
 // CHECK-REVERSED-RECOVER: Handled main.swift
-// CHECK-REVERSED-RECOVER-NOT: Handled other.swift
