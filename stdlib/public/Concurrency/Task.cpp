@@ -808,6 +808,12 @@ static void swift_task_removeCancellationHandlerImpl(
 }
 
 SWIFT_CC(swift)
+void *swift_continuation_exchange(AsyncTask *task, void *continuation) {
+  return task->activeContinuation.exchange(
+      continuation, std::memory_order_acquire);
+}
+
+SWIFT_CC(swift)
 void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }

@@ -1,3 +1,4 @@
+
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -12,132 +13,102 @@
 
 import Swift
 
-public struct YieldingContinuation<T, E: Error>: ConcurrentValue {
-  @_fixed_layout
-  @usableFromInline
-  internal final class Storage: UnsafeConcurrentValue {
-    @usableFromInline
-    var continuation: UnsafeContinuation<T, Error>?
-  }
-  
-  @usableFromInline
-  let storage = Storage()
+@_silgen_name("swift_continuation_exchange")
+func exchangeContinuation(_ task: Builtin.NativeObject, _ continuation: Builtin.RawUnsafeContinuation?) -> Builtin.RawUnsafeContinuation?
 
-  public init(producing: T.Type, throwing: E.Type) { }
-
-  @inlinable
-  @inline(__always)
-  internal func _extract() -> UnsafeContinuation<T, Error>? {
-    let raw = Builtin.atomicrmw_xchg_seqcst_Word(
-      Builtin.addressof(&storage.continuation), 
-      UInt(bitPattern: 0)._builtinWordValue)
-    return unsafeBitCast(raw, to: UnsafeContinuation<T, Error>?.self)
-  }
-  
-  @inlinable
-  @inline(__always)
-  internal func _inject(
-    _ continuation: UnsafeContinuation<T, Error>
-  ) -> UnsafeContinuation<T, Error>? {
-    let rawContinuation = unsafeBitCast(continuation, to: Builtin.Word.self)
-    let raw = Builtin.atomicrmw_xchg_seqcst_Word(
-      Builtin.addressof(&storage.continuation), rawContinuation)
-    return unsafeBitCast(raw, to: UnsafeContinuation<T, Error>?.self)
-  }
-  
-  /// Resume the task awaiting the continuation by having it return normally
-  /// from its suspension point.
-  ///
-  /// - Parameter value: The value to return from the continuation.
-  ///
-  /// Unlike other continuations `YieldingContinuation` may resume more than 
-  /// once. However if there are no potential awaiting calls to `next` this 
-  /// function will return false, indicating that the caller needs to decide how
-  /// the behavior should be handled.
-  ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
-  /// able to reschedule it.
-  public func resume(yielding value: __owned T) -> Bool {
-    if let continuation = _extract() {
-      continuation.resume(returning: value)
-      _fixLifetime(storage)
-      return true
-    }
-    return false
-  }
-  
-  /// Resume the task awaiting the continuation by having it throw an error
-  /// from its suspension point.
-  ///
-  /// - Parameter error: The error to throw from the continuation.
-  ///
-  /// Unlike other continuations `YieldingContinuation` may resume more than 
-  /// once. However if there are no potential awaiting calls to `next` this 
-  /// function will return false, indicating that the caller needs to decide how
-  /// the behavior should be handled.
-  ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
-  /// able to reschedule it.
-  public func resume(throwing error: __owned E) -> Bool {
-    if let continuation = _extract() {
-      continuation.resume(throwing: error)
-      _fixLifetime(storage)
-      return true
-    }
-    return false
-  }
-
-  public func next() async throws -> T {
-    var existing: UnsafeContinuation<T, Error>?
-    do {
-      let result = try await withUnsafeThrowingContinuation { 
-        (continuation: UnsafeContinuation<T, Error>) in
-        existing = _inject(continuation)
-      }
-      existing?.resume(returning: result)
-      _fixLifetime(storage)
-      return result
-    } catch {
-      existing?.resume(throwing: error)
-      _fixLifetime(storage)
-      throw error
-    }
-  }
+public func withYieldingContinuation<T>(
+    _ body: (YieldingContinuation<T, Never>) -> Void
+) async -> YieldingContinuation<T, Never>.Handle {
+  let task = Builtin.getCurrentAsyncTask()
+  let continuation =
+    YieldingContinuation(producing: T.self, throwing: Never.self, task: task)
+  body(continuation)
+  return YieldingContinuation<T, Never>.Handle(task: task)
 }
 
-extension YieldingContinuation where E == Never {
-  public init(producing: T.Type) { }
+public func withYieldingThrowingContinuation<T>(
+    _ body: (YieldingContinuation<T, Error>) -> Void
+) async -> YieldingContinuation<T, Error>.Handle {
+  let task = Builtin.getCurrentAsyncTask()
+  let continuation =
+    YieldingContinuation(producing: T.self, throwing: Error.self, task: task)
+  body(continuation)
+  return YieldingContinuation<T, Error>.Handle(task: task)
+}
 
-  public func next() async -> T {
-    var existing: UnsafeContinuation<T, Error>?
-    let result = try! await withUnsafeThrowingContinuation { 
-      (continuation: UnsafeContinuation<T, Error>) in
-      existing = _inject(continuation)
+public struct YieldingContinuation<T, E: Error>: Sendable {
+  typealias Continuation = UnsafeContinuation<T, Never>
+  typealias ThrowingContinuation = UnsafeContinuation<T, Error>
+  
+  public struct Handle {
+    let task: Builtin.NativeObject
+    
+    public mutating func get() async throws -> T {
+      var other: ThrowingContinuation?
+      do {
+        let result: T = try await withUnsafeThrowingContinuation {
+          let continuation = unsafeBitCast($0, to: Builtin.RawUnsafeContinuation.self)
+          let existing = exchangeContinuation(task, continuation)
+          other = unsafeBitCast(existing, to: ThrowingContinuation?.self)
+        }
+        other?.resume(returning: result)
+        return result
+      } catch {
+        other?.resume(throwing: error)
+        throw error
+      }
     }
-    existing?.resume(returning: result)
-    _fixLifetime(storage)
-    return result
+    
+    public mutating func get() async -> T where E == Never {
+      var other: Continuation?
+      let result: T = await withUnsafeContinuation {
+        let continuation = unsafeBitCast($0, to: Builtin.RawUnsafeContinuation.self)
+        let existing = exchangeContinuation(task, continuation)
+        other = unsafeBitCast(existing, to: Continuation?.self)
+      }
+      other?.resume(returning: result)
+      return result
+    }
+  }
+  
+  let task: Builtin.NativeObject
+  
+  init(producing: T.Type, throwing: E.Type, task: Builtin.NativeObject) {
+    self.task = task
+  }
+
+  public func resume(yielding value: __owned T) -> Bool where E == Never {
+    if let continuation = unsafeBitCast(
+      exchangeContinuation(task, nil),
+      to: Continuation?.self) {
+      continuation.resume(returning: value)
+      return true
+    }
+    return false
+  }
+  
+  public func resume(yielding value: __owned T) -> Bool {
+    if let continuation = unsafeBitCast(
+      exchangeContinuation(task, nil),
+      to: ThrowingContinuation?.self) {
+      continuation.resume(returning: value)
+      return true
+    }
+    return false
+  }
+  
+  public func resume(throwing error: __owned E) -> Bool {
+    if let continuation = unsafeBitCast(
+      exchangeContinuation(task, nil),
+      to: ThrowingContinuation?.self) {
+      continuation.resume(throwing: error)
+      return true
+    }
+    return false
   }
 }
 
 extension YieldingContinuation {
-  /// Resume the task awaiting the continuation by having it either
-  /// return normally or throw an error based on the state of the given
-  /// `Result` value.
-  ///
-  /// - Parameter result: A value to either return or throw from the
-  ///   continuation.
-  ///
-  /// Unlike other continuations `YieldingContinuation` may resume more than 
-  /// once. However if there are no potential awaiting calls to `next` this 
-  /// function will return false, indicating that the caller needs to decide how
-  /// the behavior should be handled.
-  ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
-  /// able to reschedule it.
   public func resume<Er: Error>(
     with result: Result<T, Er>
   ) -> Bool where E == Error {
@@ -148,22 +119,7 @@ extension YieldingContinuation {
         return self.resume(throwing: err)
     }
   }
-  
-  /// Resume the task awaiting the continuation by having it either
-  /// return normally or throw an error based on the state of the given
-  /// `Result` value.
-  ///
-  /// - Parameter result: A value to either return or throw from the
-  ///   continuation.
-  ///
-  /// Unlike other continuations `YieldingContinuation` may resume more than 
-  /// once. However if there are no potential awaiting calls to `next` this 
-  /// function will return false, indicating that the caller needs to decide how
-  /// the behavior should be handled.
-  ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
-  /// able to reschedule it.
+
   public func resume(with result: Result<T, E>) -> Bool {
     switch result {
       case .success(let val):
@@ -172,18 +128,7 @@ extension YieldingContinuation {
         return self.resume(throwing: err)
     }
   }
-  
-  /// Resume the task awaiting the continuation by having it return normally
-  /// from its suspension point.
-  ///
-  /// Unlike other continuations `YieldingContinuation` may resume more than 
-  /// once. However if there are no potential awaiting calls to `next` this 
-  /// function will return false, indicating that the caller needs to decide how
-  /// the behavior should be handled.
-  ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
-  /// able to reschedule it.
+
   public func resume() -> Bool where T == Void {
     return self.resume(yielding: ())
   }

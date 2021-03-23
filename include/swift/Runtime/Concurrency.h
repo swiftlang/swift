@@ -540,6 +540,9 @@ void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
                                                 void *continuation,
                                                 const Metadata *resumeType);
 
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void *swift_continuation_exchange(AsyncTask *task, void *continuation);
+
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)
 void swift_continuation_logFailedCheck(const char *message);

@@ -175,6 +175,8 @@ public:
 
   /// Reserved for the use of the task-local stack allocator.
   void *AllocatorPrivate[4];
+  
+  std::atomic<void *> activeContinuation;
 
   /// Task local values storage container.
   TaskLocal::Storage Local;
