@@ -1043,7 +1043,7 @@ namespace swift {
 
   public:
     llvm::StringRef diagnosticStringFor(const DiagID id,
-                                        bool printDiagnosticName);
+                                        bool printDiagnosticNames);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
