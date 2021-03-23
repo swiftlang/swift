@@ -113,6 +113,19 @@ private:
   /// The computeMemoryBehavior() method uses this map to cache queries.
   llvm::DenseMap<MemBehaviorKeyTy, MemoryBehavior> MemoryBehaviorCache;
 
+  /// Set of instructions inside immutable-scopes.
+  ///
+  /// Contains pairs of intruction indices: the first instruction is the begin-
+  /// scope instruction (e.g. begin_access), the second instruction is an
+  /// instruction inside the scope (only may-write instructions are considered).
+  llvm::DenseSet<MemBehaviorKeyTy> instsInImmutableScopes;
+
+  /// Computed immutable scopes.
+  ///
+  /// Contains the begin-scope instruction's indices (e.g. begin_access) of
+  /// all computed scopes.
+  llvm::DenseSet<ValueIndexTy> immutableScopeComputed;
+
   /// The caches can't directly map a pair of value/instruction pointers
   /// to results because we'd like to be able to remove deleted instruction
   /// pointers without having to scan the whole map. So, instead of storing
@@ -135,6 +148,10 @@ private:
 
   virtual bool needsNotifications() override { return true; }
 
+  void computeImmutableScope(SingleValueInstruction *beginScopeInst,
+                             ValueIndexTy beginIdx);
+
+  bool isInImmutableScope(SILInstruction *inst, SILValue V);
 
 public:
   AliasAnalysis(SILModule *M)
@@ -246,6 +263,8 @@ public:
     MemoryBehaviorCache.clear();
     InstructionToIndex.clear();
     ValueToIndex.clear();
+    instsInImmutableScopes.clear();
+    immutableScopeComputed.clear();
   }
 
   virtual void invalidate(SILFunction *,
