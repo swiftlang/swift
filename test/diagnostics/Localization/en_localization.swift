@@ -1,18 +1,12 @@
-// RUN: not %target-swift-frontend -typecheck %s 2>&1 -localization-path %S/Inputs -locale en | %FileCheck %s --check-prefix=CHECK_NONAMES
-// RUN: not %target-swift-frontend -debug-diagnostic-names -localization-path %S/Inputs -locale en -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK_NAMES
+// RUN: %target-typecheck-verify-swift -localization-path %S/Inputs -locale en
 
 _ = "HI!
-// CHECK_NONAMES: error: unterminated string literal{{$}}
-// CHECK_NAMES: error: unterminated string literal [lex_unterminated_string]{{$}}
-
+// expected-error@-1{{unterminated string literal}}
 var self1 = self1
-// CHECK_NONAMES: error: circular reference{{$}}
-// CHECK_NONAMES: note: through reference here{{$}}
-// CHECK_NAMES: error: circular reference [circular_reference]{{$}}
-// CHECK_NAMES: note: through reference here [circular_reference_through]{{$}}
+// expected-note@-1 2{{through reference here}}
+// expected-error@-2 {{circular reference}}
 
 struct Broken {
-  var b : Bool = True 
+  var b : Bool = True // expected-error{{cannot find 'True' in scope}}
 }
-// CHECK_NONAMES: error: cannot find 'True' in scope{{$}}
-// CHECK_NAMES: error: cannot find 'True' in scope [cannot_find_in_scope]{{$}}
+var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}

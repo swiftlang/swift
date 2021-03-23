@@ -29,7 +29,6 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/VersionTuple.h"
 
@@ -725,11 +724,6 @@ namespace swift {
     /// diagnostic message.
     std::unique_ptr<diag::LocalizationProducer> localization;
 
-    /// This allocator will retain localized diagnostic strings containing the
-    /// diagnostic's message and identifier for the duration of compiler invocation.
-    llvm::BumpPtrAllocator localizationAllocator;
-    llvm::StringSaver localizationSaver;
-
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
@@ -754,8 +748,7 @@ namespace swift {
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
         : SourceMgr(SourceMgr), ActiveDiagnostic(),
-          TransactionStrings(TransactionAllocator),
-          localizationSaver(localizationAllocator) {}
+          TransactionStrings(TransactionAllocator) {}
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const { return state.hadAnyError(); }
@@ -815,8 +808,7 @@ namespace swift {
       if (llvm::sys::fs::exists(filePath)) {
         if (auto file = llvm::MemoryBuffer::getFile(filePath)) {
           localization = std::make_unique<diag::SerializedLocalizationProducer>(
-              std::move(file.get()), localizationSaver,
-              getPrintDiagnosticNames());
+              std::move(file.get()), getPrintDiagnosticNames());
         }
       } else {
         llvm::sys::path::replace_extension(filePath, ".yaml");
@@ -824,7 +816,7 @@ namespace swift {
         // from `.def` files.
         if (llvm::sys::fs::exists(filePath)) {
           localization = std::make_unique<diag::YAMLLocalizationProducer>(
-              filePath.str(), localizationSaver, getPrintDiagnosticNames());
+              filePath.str(), getPrintDiagnosticNames());
         }
       }
     }

@@ -155,14 +155,16 @@ public:
 };
 
 class LocalizationProducer {
-  llvm::Optional<llvm::StringSaver> localizationSaver;
+  /// This allocator will retain localized diagnostic strings containing the
+  /// diagnostic's message and identifier for the duration of compiler
+  /// invocation
+  llvm::BumpPtrAllocator localizationAllocator;
+  llvm::StringSaver localizationSaver;
   bool printDiagnosticName;
 
 public:
-  LocalizationProducer(llvm::Optional<llvm::StringSaver> localizationSaver =
-                           llvm::Optional<llvm::StringSaver>(),
-                       bool printDiagnosticName = false)
-      : localizationSaver(localizationSaver),
+  LocalizationProducer(bool printDiagnosticName = false)
+      : localizationSaver(localizationAllocator),
         printDiagnosticName(printDiagnosticName) {}
 
   /// If the  message isn't available/localized in current context
@@ -186,8 +188,6 @@ public:
   std::vector<std::string> unknownIDs;
   explicit YAMLLocalizationProducer(
       llvm::StringRef filePath,
-      llvm::Optional<llvm::StringSaver> localizationSaver =
-          llvm::Optional<llvm::StringSaver>(),
       bool printDiagnosticName = false);
 
   /// Iterate over all of the available (non-empty) translations
@@ -210,8 +210,6 @@ class SerializedLocalizationProducer final : public LocalizationProducer {
 public:
   explicit SerializedLocalizationProducer(
       std::unique_ptr<llvm::MemoryBuffer> buffer,
-      llvm::Optional<llvm::StringSaver> localizationSaver =
-          llvm::Optional<llvm::StringSaver>(),
       bool printDiagnosticName = false);
 
 protected:
