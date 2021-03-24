@@ -8183,10 +8183,6 @@ void GenericSignatureBuilder::enumerateRequirements(
         }
       }
 
-      // Sort the protocols in canonical order.
-      llvm::array_pod_sort(protocols.begin(), protocols.end(), 
-                           TypeDecl::compare);
-
       // Enumerate the conformance requirements.
       for (auto proto : protocols) {
         recordRequirement(RequirementKind::Conformance, subjectType, proto);
@@ -8194,14 +8190,9 @@ void GenericSignatureBuilder::enumerateRequirements(
     }
   }
 
-  // Sort the subject types in canonical order. This needs to be a stable sort
-  // so that the relative order of requirements that have the same subject type
-  // is preserved.
-  std::stable_sort(requirements.begin(), requirements.end(),
-                   [](const Requirement &lhs, const Requirement &rhs) {
-    return compareDependentTypes(lhs.getFirstType(),
-                                 rhs.getFirstType()) < 0;
-  });
+  // Sort the requirements in canonical order.
+  llvm::array_pod_sort(requirements.begin(), requirements.end(),
+                       compareRequirements);
 }
 
 void GenericSignatureBuilder::dump() {
