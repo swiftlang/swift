@@ -7,7 +7,7 @@
 // Parsing
 // ===================
 
-// expected-note@+1 3 {{'asyncFunc' declared here}}
+// expected-note@+1 4 {{'asyncFunc' declared here}}
 func asyncFunc(_ text: String) async -> Int { }
 
 @completionHandlerAsync("asyncFunc(_:)", completionHandlerIndex: 1)
@@ -175,4 +175,29 @@ func syncContext() {
 let asyncGlobalClosure = { () async -> () in
   // expected-warning@+1:3{{consider using asynchronous alternative function}}
   goodFunc1(value: "neat") { _ in }
+}
+
+class ClassCallingAsyncStuff {
+  // expected-note@+1 3 {{'asyncFunc()' declared here}}
+  func asyncFunc() async {}
+
+  @completionHandlerAsync("asyncFunc()")
+  func compHandlerFunc(handler: @escaping () -> ()) {}
+
+  @completionHandlerAsync("asyncFunc()")
+  func compAsyncHandlerFunc(handler: @escaping () async -> ()) {}
+
+  func async1() async {
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    goodFunc1(value: "hi") { _ in }
+
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    compAsyncHandlerFunc() { [self] () async -> () in
+      // expected-warning@+1{{consider using asynchronous alternative function}}
+      compAsyncHandlerFunc() { [self] () async -> () in
+        // expected-warning@+1{{consider using asynchronous alternative function}}
+        compHandlerFunc() { print("foo") }
+      }
+    }
+  }
 }
