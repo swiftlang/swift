@@ -80,6 +80,36 @@ createCall_DistributedActor_transport_assignAddress(ASTContext &C,
                                   C.AllocateCopy(argLabels));
 }
 
+
+/// Creates a new \c CallExpr representing
+///
+///     transport.actorReady(self)
+static CallExpr *
+createCall_DistributedActor_transport_actorReady(ASTContext &C,
+                                                 DeclContext *DC,
+                                                 Expr *base, Type actorType,
+                                                 Expr *initalizedSelf) {
+  // (_ actor:)
+  auto *paramDecl = new (C) ParamDecl(SourceLoc(),
+                                      SourceLoc(), Identifier(),
+                                      SourceLoc(), C.Id_actor, DC);
+  paramDecl->setImplicit();
+  paramDecl->setSpecifier(ParamSpecifier::Default);
+  paramDecl->setInterfaceType(actorType);
+
+  // transport.actorReady(_:) expr
+  auto *paramList = ParameterList::createWithoutLoc(paramDecl);
+  auto *unboundCall = UnresolvedDotExpr::createImplicit(C, base,
+                                                        C.Id_actorReady,
+                                                        paramList);
+
+  // Full bound transport.actorReady(self) call
+  Expr *args[1] = {initalizedSelf};
+  Identifier argLabels[1] = {Identifier()};
+  return CallExpr::createImplicit(C, unboundCall, C.AllocateCopy(args),
+                                  C.AllocateCopy(argLabels));
+}
+
 /// Synthesizes the body of the `init(transport:)` initializer as:
 ///
 /// ```
@@ -105,30 +135,48 @@ createBody_DistributedActor_init_transport(AbstractFunctionDecl *initDecl, void 
   auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
 
   // ==== `self.actorTransport = transport`
-  auto *varTransportExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
-                                                             C.Id_actorTransport);
-  auto *assignTransportExpr = new (C) AssignExpr(
-      varTransportExpr, SourceLoc(), transportExpr, /*Implicit=*/true);
-  statements.push_back(assignTransportExpr);
+  {
+    // self.actorTransport
+    auto *varTransportExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                               C.Id_actorTransport);
+    auto *assignTransportExpr = new (C) AssignExpr(
+        varTransportExpr, SourceLoc(), transportExpr, /*Implicit=*/true);
+    statements.push_back(assignTransportExpr);
+  }
+
+  auto selfType = funcDC->getInnermostTypeContext()->getSelfTypeInContext();
 
   // ==== `self.actorAddress = transport.assignAddress<Self>(Self.self)`
-  // self.actorAddress
-  auto *varAddressExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
-                                                           C.Id_actorAddress);
-  // Bound transport.assignAddress(Self.self) call
-  auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
-  auto selfType = funcDC->getInnermostTypeContext()->getSelfTypeInContext();
-  auto *callExpr = createCall_DistributedActor_transport_assignAddress(C, funcDC,
-      /*base=*/transportExpr,
-      /*returnType=*/addressType,
-      /*param=*/selfType);
-  auto *assignAddressExpr = new (C) AssignExpr(
-      varAddressExpr, SourceLoc(), callExpr, /*Implicit=*/true);
-  statements.push_back(assignAddressExpr);
+  {
+    // self.actorAddress
+    auto *varAddressExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                             C.Id_actorAddress);
+    // Bound transport.assignAddress(Self.self) call
+    auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
+    auto *callExpr = createCall_DistributedActor_transport_assignAddress(C, funcDC,
+        /*base=*/transportExpr,
+        /*returnType=*/addressType,
+        /*param=*/selfType);
+    auto *assignAddressExpr = new (C) AssignExpr(
+        varAddressExpr, SourceLoc(), callExpr, /*Implicit=*/true);
+    statements.push_back(assignAddressExpr);
+  }
+
+  // ---=== Done initializing ===---
+  // === `transport.actorReady(self)`
+  {
+    // Bound transport.actorReady(self) call
+    auto addressType = C.getActorAddressDecl()->getDeclaredInterfaceType();
+    auto selfType = funcDC->getInnermostTypeContext()->getSelfTypeInContext();
+    auto *callExpr = createCall_DistributedActor_transport_actorReady(C, funcDC,
+        /*base=*/transportExpr,
+        /*actorType=*/selfType,
+        /*param=*/selfRef);
+    statements.push_back(callExpr);
+  }
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
       /*implicit=*/true);
-
   return { body, /*isTypeChecked=*/false };
 }
 
