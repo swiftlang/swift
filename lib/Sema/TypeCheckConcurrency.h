@@ -238,14 +238,6 @@ Type getExplicitGlobalActor(ClosureExpr *closure);
 /// \returns true if an error occurred.
 bool checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check);
-
-/// Check that we use the async version of a function where available
-///
-/// If a completion-handler function is called from an async context and it has
-/// a '@completionHandlerAsync' attribute, we emit a diagnostic suggesting the
-/// async call.
-void checkFunctionAsyncUsage(AbstractFunctionDecl *decl);
-void checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl);
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

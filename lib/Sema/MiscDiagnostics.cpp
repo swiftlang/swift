@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -4615,6 +4616,65 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
   ComparisonWithNaNFinder Walker(DC);
   const_cast<Expr *>(E)->walk(Walker);
+}
+
+namespace {
+
+class CompletionHandlerUsageChecker final : public ASTWalker {
+  ASTContext &ctx;
+
+public:
+  CompletionHandlerUsageChecker(ASTContext &ctx) : ctx(ctx) {}
+
+  bool walkToDeclPre(Decl *D) override { return !isa<PatternBindingDecl>(D); }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (ClosureExpr *closure = dyn_cast<ClosureExpr>(expr))
+      return {closure->isBodyAsync(), closure};
+
+    if (ApplyExpr *call = dyn_cast<ApplyExpr>(expr)) {
+      if (DeclRefExpr *fnDeclExpr = dyn_cast<DeclRefExpr>(call->getFn())) {
+        ValueDecl *fnDecl = fnDeclExpr->getDecl();
+        CompletionHandlerAsyncAttr *asyncAltAttr =
+            fnDecl->getAttrs().getAttribute<CompletionHandlerAsyncAttr>();
+        if (asyncAltAttr) {
+          // Ensure that the attribute typechecks,
+          // this also resolves the async function decl.
+          if (!evaluateOrDefault(
+                  ctx.evaluator,
+                  TypeCheckCompletionHandlerAsyncAttrRequest{
+                      cast<AbstractFunctionDecl>(fnDecl), asyncAltAttr},
+                  false)) {
+            return {false, call};
+          }
+          ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+          ctx.Diags.diagnose(asyncAltAttr->AsyncFunctionDecl->getLoc(),
+                             diag::decl_declared_here,
+                             asyncAltAttr->AsyncFunctionDecl->getName());
+        }
+      }
+    }
+    return {true, expr};
+  }
+};
+
+} // namespace
+
+void swift::checkFunctionAsyncUsage(AbstractFunctionDecl *decl) {
+  if (!decl->isAsyncContext())
+    return;
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  BraceStmt *body = decl->getBody();
+  if (body)
+    body->walk(checker);
+}
+
+void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  for (Expr *init : decl->initializers()) {
+    if (auto closure = dyn_cast_or_null<ClosureExpr>(init))
+      closure->walk(checker);
+  }
 }
 
 //===----------------------------------------------------------------------===//
