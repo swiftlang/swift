@@ -101,7 +101,7 @@ void AsyncTask::completeFuture(AsyncContext *context) {
       reinterpret_cast<char *>(context) - sizeof(FutureAsyncContextPrefix));
   bool hadErrorResult = false;
   auto errorObject = asyncContextPrefix->errorResult;
-  printf("asyncTask::completeFuture errorObject: %p\n", errorObject);
+//   printf("asyncTask::completeFuture errorObject: %p\n", errorObject);
   fragment->getError() = errorObject;
   if (errorObject) {
     hadErrorResult = true;
@@ -179,9 +179,25 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   free(task);
 }
 
-static void dummyVTableFunction(void) {
-  abort();
+static ExecutorRef executorForEnqueuedJob(Job *job) {
+  void *jobQueue = job->SchedulerPrivate[Job::DispatchQueueIndex];
+  if (jobQueue == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
+    return ExecutorRef::generic();
+  else if (jobQueue == DISPATCH_QUEUE_MAIN_EXECUTOR)
+    return ExecutorRef::mainExecutor();
+  else
+    swift_unreachable("jobQueue was not a known value.");
 }
+
+static void jobInvoke(void *obj, void *unused, uint32_t flags) {
+  (void)unused;
+  Job *job = reinterpret_cast<Job *>(obj);
+
+  swift_job_run(job, executorForEnqueuedJob(job));
+}
+
+// Magic constant to identify Swift Job vtables to Dispatch.
+static const unsigned long dispatchSwiftObjectType = 1;
 
 FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
   {
@@ -194,7 +210,8 @@ FullMetadata<DispatchClassMetadata> swift::jobHeapMetadata = {
   },
   {
     MetadataKind::Job,
-    dummyVTableFunction
+    dispatchSwiftObjectType,
+    jobInvoke
   }
 };
 
@@ -210,7 +227,8 @@ static FullMetadata<DispatchClassMetadata> taskHeapMetadata = {
   },
   {
     MetadataKind::Task,
-    dummyVTableFunction
+    dispatchSwiftObjectType,
+    jobInvoke
   }
 };
 

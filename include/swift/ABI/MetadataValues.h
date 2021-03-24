@@ -1212,6 +1212,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
+
+  /// Dispatch integration.
+  const uint16_t DispatchInvokeFunction = 0xf493; // = 62611
 }
 
 /// The number of arguments that will be passed directly to a generic
