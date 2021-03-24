@@ -131,12 +131,6 @@ void swift::initializeTypeMetadataRecordLookup() {
 void swift::initializeDynamicReplacementLookup() {
 }
 
-// This is only used for backward deployment hooks, which we currently only support for
-// MachO. Add a stub here to make sure it still compiles.
-void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
-  return nullptr;
-}
-
 SWIFT_RUNTIME_EXPORT
 const swift::MetadataSections *swift_getMetadataSection(size_t index) {
   #ifndef NDEBUG

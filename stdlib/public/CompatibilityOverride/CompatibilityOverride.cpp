@@ -14,14 +14,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
-
 #include "CompatibilityOverride.h"
 
-#include "ImageInspection.h"
+#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
+
+#include "../runtime/ImageInspection.h"
 #include "swift/Runtime/Once.h"
 #include <assert.h>
 #include <atomic>
+#include <mach-o/getsect.h>
 #include <type_traits>
 
 using namespace swift;
@@ -42,11 +43,30 @@ struct OverrideSection {
   
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 };
 
 static_assert(std::is_pod<OverrideSection>::value,
               "OverrideSection has a set layout and must be POD.");
+
+// We only support mach-o for overrides, so the implementation of lookupSection
+// can be mach-o specific.
+#if __POINTER_WIDTH__ == 64
+using mach_header_platform = mach_header_64;
+#else
+using mach_header_platform = mach_header;
+#endif
+
+extern "C" mach_header_platform *_NSGetMachExecuteHeader();
+static void *lookupSection(const char *segment, const char *section,
+                           size_t *outSize) {
+  unsigned long size;
+  auto *executableHeader = _NSGetMachExecuteHeader();
+  uint8_t *data = getsectiondata(executableHeader, segment, section, &size);
+  if (outSize != nullptr && data != nullptr)
+    *outSize = size;
+  return static_cast<void *>(data);
+}
 
 static OverrideSection *getOverrideSectionPtr() {
   static OverrideSection *OverrideSectionPtr;
@@ -54,7 +74,7 @@ static OverrideSection *getOverrideSectionPtr() {
   swift_once(&Predicate, [](void *) {
     size_t Size;
     OverrideSectionPtr = static_cast<OverrideSection *>(
-                             lookupSection("__DATA", "__swift54_hooks", &Size));
+        lookupSection("__DATA", COMPATIBILITY_OVERRIDE_SECTION_NAME, &Size));
     if (Size < sizeof(OverrideSection))
       OverrideSectionPtr = nullptr;
   }, nullptr);
@@ -69,6 +89,6 @@ static OverrideSection *getOverrideSectionPtr() {
       return nullptr;                                               \
     return Section->name;                                           \
   }
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
 #endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
