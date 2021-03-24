@@ -3777,12 +3777,10 @@ static Type resolveDependentMemberTypes(
       return concreteType;
 
     // Map the type parameter to an equivalence class.
-    auto equivClass = resolved.getEquivalenceClass(builder);
-    if (!equivClass)
-      return ErrorType::get(Type(type));
+    auto equivClass = resolved.getEquivalenceClassIfPresent();
 
     // If there is a concrete type in this equivalence class, use that.
-    if (equivClass->concreteType) {
+    if (equivClass && equivClass->concreteType) {
       // .. unless it's recursive.
       if (equivClass->recursiveConcreteType)
         return ErrorType::get(Type(type));
@@ -3797,7 +3795,7 @@ static Type resolveDependentMemberTypes(
                                          resolutionKind);
     }
 
-    return equivClass->getAnchor(builder, builder.getGenericParams());
+    return resolved.getDependentType(builder);
   });
 }
 
