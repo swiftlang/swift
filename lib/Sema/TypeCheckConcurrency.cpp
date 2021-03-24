@@ -2186,6 +2186,13 @@ namespace {
         LLVM_FALLTHROUGH;
 
       case ActorIsolationRestriction::GlobalActor:
+        // If we are within an initializer and are referencing a stored
+        // property on "self", we are not crossing actors.
+        if (isa<ConstructorDecl>(getDeclContext()) &&
+            isa<VarDecl>(member) && cast<VarDecl>(member)->hasStorage() &&
+            getReferencedSelf(base))
+          return false;
+
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
             isolation.isCrossActor, context);
@@ -2688,8 +2695,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Instance members and initializers can infer isolation from their context.
-  if (value->isInstanceMember() || isa<ConstructorDecl>(value)) {
+  // Instance members infer isolation from their context.
+  if (value->isInstanceMember()) {
     // If the declaration is in an extension that has one of the isolation
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
