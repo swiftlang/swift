@@ -2516,47 +2516,15 @@ public:
     return Type();
   }
 
-  void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
-                     DynamicLookupInfo dynamicLookupInfo) {
-    if (!VD->hasName())
-      return;
+  void analyzeActorIsolation(
+      const ValueDecl *VD, Type T, bool &implicitlyAsync,
+      Optional<CodeCompletionResult::NotRecommendedReason> &NotRecommended) {
+    auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
 
-    const Identifier Name = VD->getName();
-    assert(!Name.empty() && "name should not be empty");
-
-    CommandWordsPairs Pairs;
-    CodeCompletionResultBuilder Builder(
-        Sink, CodeCompletionResult::ResultKind::Declaration,
-        getSemanticContext(VD, Reason, dynamicLookupInfo), expectedTypeContext);
-    Builder.setAssociatedDecl(VD);
-    addLeadingDot(Builder);
-    addValueBaseName(Builder, Name);
-    setClangDeclKeywords(VD, Pairs, Builder);
-
-    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
-    // "not recommended" in its own getter.
-    if (Kind == LookupKind::ValueInDeclContext) {
-      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
-        if (accessor->getStorage() == VD && accessor->isGetter())
-          NotRecommended = CodeCompletionResult::NoReason;
-      }
-    }
-
-    if (!VD->hasInterfaceType())
-      return;
-
-    // Add a type annotation.
-    Type VarType = getTypeOfMember(VD, dynamicLookupInfo);
-
-    bool implicitlyAsync = false;
-    auto isolation = getActorIsolation(const_cast<VarDecl *>(VD));
     switch (isolation.getKind()) {
     case ActorIsolation::ActorInstance: {
       if (IsCrossActorReference) {
         implicitlyAsync = true;
-        if (!isSendableType(CurrDeclContext, VarType)) {
-          NotRecommended = CodeCompletionResult::CrossActorReference;
-        }
         // TODO: 'NotRecommended' if this is a r-value reference.
       }
       break;
@@ -2568,15 +2536,74 @@ public:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
     case ActorIsolation::IndependentUnsafe:
-      break;
+      return;
     }
 
+    // If the reference is 'async', all types must be 'Sendable'.
+    if (implicitlyAsync && T) {
+      if (isa<VarDecl>(VD)) {
+        if (!isSendableType(CurrDeclContext, T)) {
+          NotRecommended = CodeCompletionResult::CrossActorReference;
+        }
+      } else {
+        assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
+        // Check if the result and the param types are all 'Sendable'.
+        auto *AFT = T->castTo<AnyFunctionType>();
+        if (!isSendableType(CurrDeclContext, AFT->getResult())) {
+          NotRecommended = CodeCompletionResult::CrossActorReference;
+        } else {
+          for (auto &param : AFT->getParams()) {
+            Type paramType = param.getPlainType();
+            if (!isSendableType(CurrDeclContext, paramType)) {
+              NotRecommended = CodeCompletionResult::CrossActorReference;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
+                     DynamicLookupInfo dynamicLookupInfo) {
+    if (!VD->hasName())
+      return;
+
+    const Identifier Name = VD->getName();
+    assert(!Name.empty() && "name should not be empty");
+
+    Type VarType;
+    if (VD->hasInterfaceType())
+      VarType = getTypeOfMember(VD, dynamicLookupInfo);
+
+    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
+    // "not recommended" in its own getter.
+    if (Kind == LookupKind::ValueInDeclContext) {
+      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
+        if (accessor->getStorage() == VD && accessor->isGetter())
+          NotRecommended = CodeCompletionResult::NoReason;
+      }
+    }
+    bool implicitlyAsync = false;
+    analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
     if (!NotRecommended && implicitlyAsync && !CanCurrDeclContextHandleAsync) {
       NotRecommended = CodeCompletionResult::InvalidContext;
     }
 
+    CommandWordsPairs Pairs;
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        getSemanticContext(VD, Reason, dynamicLookupInfo), expectedTypeContext);
+    Builder.setAssociatedDecl(VD);
+    addLeadingDot(Builder);
+    addValueBaseName(Builder, Name);
+    setClangDeclKeywords(VD, Pairs, Builder);
+
     if (NotRecommended)
       Builder.setNotRecommended(*NotRecommended);
+
+    if (!VarType)
+      return;
 
     if (auto *PD = dyn_cast<ParamDecl>(VD)) {
       if (Name != Ctx.Id_self && PD->isInOut()) {
@@ -3013,38 +3040,7 @@ public:
 
     Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
     bool implictlyAsync = false;
-    auto isolation = getActorIsolation(const_cast<FuncDecl *>(FD));
-    switch (isolation.getKind()) {
-    case ActorIsolation::ActorInstance: {
-      if (IsCrossActorReference) {
-        implictlyAsync = true;
-
-        // Check if the result and the param types are all concurrent values.
-        if (AFT) {
-          if (!isSendableType(CurrDeclContext, AFT->getResult())) {
-            NotRecommended = CodeCompletionResult::CrossActorReference;
-          } else {
-            for (auto &param : AFT->getParams()) {
-              Type paramType = param.getPlainType();
-              if (!isSendableType(CurrDeclContext, paramType)) {
-                NotRecommended = CodeCompletionResult::CrossActorReference;
-                break;
-              }
-            }
-          }
-        }
-      }
-      break;
-    }
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      // TODO: implement.
-      break;
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Independent:
-    case ActorIsolation::IndependentUnsafe:
-      break;
-    }
+    analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
 
     if (!NotRecommended && !IsImplicitlyCurriedInstanceMethod &&
         ((AFT && AFT->isAsync()) || implictlyAsync) &&
@@ -3300,36 +3296,7 @@ public:
 
     Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
     bool implictlyAsync = false;
-    auto isolation = getActorIsolation(const_cast<SubscriptDecl *>(SD));
-    switch (isolation.getKind()) {
-    case ActorIsolation::ActorInstance: {
-      if (IsCrossActorReference) {
-        implictlyAsync = true;
-
-        // Check if the result and the param types are all concurrent values.
-        if (!isSendableType(CurrDeclContext, subscriptType->getResult())) {
-          NotRecommended = CodeCompletionResult::CrossActorReference;
-        } else {
-          for (auto &param : subscriptType->getParams()) {
-            Type paramType = param.getPlainType();
-            if (!isSendableType(CurrDeclContext, paramType))
-              NotRecommended = CodeCompletionResult::CrossActorReference;
-          }
-        }
-
-        // TODO: 'NotRecommended' if this is a r-value reference.
-      }
-      break;
-    }
-    case ActorIsolation::GlobalActor:
-    case ActorIsolation::GlobalActorUnsafe:
-      // TODO: implement.
-      break;
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Independent:
-    case ActorIsolation::IndependentUnsafe:
-      break;
-    }
+    analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
 
     if (!NotRecommended && implictlyAsync && !CanCurrDeclContextHandleAsync) {
       NotRecommended = CodeCompletionResult::InvalidContext;
