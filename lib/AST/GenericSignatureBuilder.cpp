@@ -6973,43 +6973,30 @@ void GenericSignatureBuilder::checkConformanceConstraints(
 }
 
 void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
-  SmallVector<ExplicitRequirement, 2> redundantRequirements;
-
-  for (auto pair : Impl->RedundantRequirements) {
-    auto *source = pair.first.getSource();
+  for (const auto &req : Impl->ExplicitRequirements) {
+    auto *source = req.getSource();
+    auto loc = source->getLoc();
 
     // Don't diagnose anything without a source location.
-    if (source->getLoc().isInvalid())
+    if (loc.isInvalid())
       continue;
 
-    // Don't diagnose redundant inferred requirements.
+    // Don't diagnose inferred requirements.
     if (source->isInferredRequirement())
+      continue;
+
+    // Check if its actually redundant.
+    auto found = Impl->RedundantRequirements.find(req);
+    if (found == Impl->RedundantRequirements.end())
       continue;
 
     // Don't diagnose explicit requirements that are implied by
     // inferred requirements.
-    if (llvm::all_of(pair.second,
+    if (llvm::all_of(found->second,
                      [&](const ExplicitRequirement &otherReq) {
                        return otherReq.getSource()->isInferredRequirement();
                      }))
       continue;
-
-    redundantRequirements.push_back(pair.first);
-  }
-
-  auto &SM = Context.SourceMgr;
-
-  std::sort(redundantRequirements.begin(), redundantRequirements.end(),
-            [&](ExplicitRequirement lhs, ExplicitRequirement rhs) {
-              return compareSourceLocs(SM,
-                                       lhs.getSource()->getLoc(),
-                                       rhs.getSource()->getLoc());
-            });
-
-  for (const auto &req : redundantRequirements) {
-    auto *source = req.getSource();
-    auto loc = source->getLoc();
-    assert(loc.isValid());
 
     auto subjectType = getSugaredDependentType(source->getStoredType(),
                                                getGenericParams());
@@ -7039,7 +7026,7 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
       Context.Diags.diagnose(loc, diag::redundant_conformance_constraint,
                              subjectType, proto);
 
-      for (auto otherReq : Impl->RedundantRequirements[req]) {
+      for (auto otherReq : found->second) {
         auto *otherSource = otherReq.getSource();
         auto otherLoc = otherSource->getLoc();
         if (otherLoc.isInvalid())
