@@ -4030,6 +4030,51 @@ bool GenericSignatureBuilder::areInSameEquivalenceClass(Type type1,
     == resolveEquivalenceClass(type2, ArchetypeResolutionKind::WellFormed);
 }
 
+Type GenericSignatureBuilder::getCanonicalTypeInContext(Type type,
+                           TypeArrayView<GenericTypeParamType> genericParams) {
+  // All the contextual canonicality rules apply to type parameters, so if the
+  // type doesn't involve any type parameters, it's already canonical.
+  if (!type->hasTypeParameter())
+    return type;
+
+  // Replace non-canonical type parameters.
+  return type.transformRec([&](TypeBase *component) -> Optional<Type> {
+    if (!isa<GenericTypeParamType>(component) &&
+        !isa<DependentMemberType>(component))
+      return None;
+
+    // Find the equivalence class for this dependent type.
+    auto resolved = maybeResolveEquivalenceClass(
+                      Type(component),
+                      ArchetypeResolutionKind::CompleteWellFormed,
+                      /*wantExactPotentialArchetype=*/false);
+    if (!resolved) return None;
+
+    if (auto concrete = resolved.getAsConcreteType())
+      return getCanonicalTypeInContext(concrete, genericParams);
+
+    auto equivClass = resolved.getEquivalenceClass(*this);
+    if (!equivClass) return None;
+
+    // If there is a concrete type in this equivalence class, use that.
+    if (auto concrete = equivClass->concreteType) {
+      // .. unless it's recursive.
+      if (equivClass->recursiveConcreteType)
+        return ErrorType::get(Type(type));
+
+      // Prevent recursive substitution.
+      equivClass->recursiveConcreteType = true;
+      SWIFT_DEFER {
+        equivClass->recursiveConcreteType = false;
+      };
+
+      return getCanonicalTypeInContext(concrete, genericParams);
+    }
+
+    return equivClass->getAnchor(*this, genericParams);
+  });
+}
+
 TypeArrayView<GenericTypeParamType>
 GenericSignatureBuilder::getGenericParams() const {
   return TypeArrayView<GenericTypeParamType>(Impl->GenericParams);
