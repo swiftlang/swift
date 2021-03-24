@@ -97,9 +97,9 @@ extension SIMD {
   
   /// Returns a Boolean value indicating whether two vectors are equal.
   @_transparent
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
+  public static func ==(a: Self, b: Self) -> Bool {
     var result = true
-    for i in lhs.indices { result = result && lhs[i] == rhs[i] }
+    for i in a.indices { result = result && a[i] == b[i] }
     return result
   }
   
@@ -154,18 +154,18 @@ extension SIMD {
   
   /// A vector mask with the result of a pointwise equality comparison.
   @_transparent
-  public static func .==(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
+  public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     var result = SIMDMask<MaskStorage>()
-    for i in result.indices { result[i] = lhs[i] == rhs[i] }
+    for i in result.indices { result[i] = a[i] == b[i] }
     return result
   }
   
   /// Returns a vector mask with the result of a pointwise inequality
   /// comparison.
   @_transparent
-  public static func .!=(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
+  public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     var result = SIMDMask<MaskStorage>()
-    for i in result.indices { result[i] = lhs[i] != rhs[i] }
+    for i in result.indices { result[i] = a[i] != b[i] }
     return result
   }
   
@@ -319,18 +319,18 @@ extension SIMD where Scalar: Comparable {
   /// Returns a vector mask with the result of a pointwise less than
   /// comparison.
   @_transparent
-  public static func .<(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
+  public static func .<(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     var result = SIMDMask<MaskStorage>()
-    for i in result.indices { result[i] = lhs[i] < rhs[i] }
+    for i in result.indices { result[i] = a[i] < b[i] }
     return result
   }
   
   /// Returns a vector mask with the result of a pointwise less than or equal
   /// comparison.
   @_transparent
-  public static func .<=(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
+  public static func .<=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     var result = SIMDMask<MaskStorage>()
-    for i in result.indices { result[i] = lhs[i] <= rhs[i] }
+    for i in result.indices { result[i] = a[i] <= b[i] }
     return result
   }
   
@@ -352,26 +352,26 @@ extension SIMD where Scalar: Comparable {
 extension SIMD {
   /// Returns a vector mask with the result of a pointwise equality comparison.
   @_transparent
-  public static func .==(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> {
-    return Self(repeating: lhs) .== rhs
+  public static func .==(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    return Self(repeating: a) .== b
   }
 
   /// Returns a vector mask with the result of a pointwise inequality comparison.
   @_transparent
-  public static func .!=(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> {
-    return Self(repeating: lhs) .!= rhs
+  public static func .!=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    return Self(repeating: a) .!= b
   }
 
   /// Returns a vector mask with the result of a pointwise equality comparison.
   @_transparent
-  public static func .==(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> {
-    return lhs .== Self(repeating: rhs)
+  public static func .==(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    return a .== Self(repeating: b)
   }
 
   /// Returns a vector mask with the result of a pointwise inequality comparison.
   @_transparent
-  public static func .!=(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> {
-    return lhs .!= Self(repeating: rhs)
+  public static func .!=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    return a .!= Self(repeating: b)
   }
   
   /// Replaces elements of this vector with `other` in the lanes where `mask`
@@ -402,69 +402,69 @@ extension SIMD where Scalar: Comparable {
   /// Returns a vector mask with the result of a pointwise greater than or
   /// equal comparison.
   @_transparent
-  public static func .>=(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
-    return rhs .<= lhs
+  public static func .>=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
+    return b .<= a
   }
 
   /// Returns a vector mask with the result of a pointwise greater than
   /// comparison.
   @_transparent
-  public static func .>(lhs: Self, rhs: Self) -> SIMDMask<MaskStorage> {
-    return rhs .< lhs
+  public static func .>(a: Self, b: Self) -> SIMDMask<MaskStorage> {
+    return b .< a
   }
 
   /// Returns a vector mask with the result of a pointwise less than comparison.
   @_transparent
-  public static func .<(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> {
-    return Self(repeating: lhs) .< rhs
+  public static func .<(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    return Self(repeating: a) .< b
   }
 
   /// Returns a vector mask with the result of a pointwise less than or equal
   /// comparison.
   @_transparent
-  public static func .<=(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> {
-    return Self(repeating: lhs) .<= rhs
+  public static func .<=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    return Self(repeating: a) .<= b
   }
 
   /// Returns a vector mask with the result of a pointwise greater than or
   /// equal comparison.
   @_transparent
-  public static func .>=(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> {
-    return Self(repeating: lhs) .>= rhs
+  public static func .>=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    return Self(repeating: a) .>= b
   }
 
   /// Returns a vector mask with the result of a pointwise greater than
   /// comparison.
   @_transparent
-  public static func .>(lhs: Scalar, rhs: Self) -> SIMDMask<MaskStorage> {
-    return Self(repeating: lhs) .> rhs
+  public static func .>(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    return Self(repeating: a) .> b
   }
 
   /// Returns a vector mask with the result of a pointwise less than comparison.
   @_transparent
-  public static func .<(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> {
-    return lhs .< Self(repeating: rhs)
+  public static func .<(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    return a .< Self(repeating: b)
   }
 
   /// Returns a vector mask with the result of a pointwise less than or equal
   /// comparison.
   @_transparent
-  public static func .<=(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> {
-    return lhs .<= Self(repeating: rhs)
+  public static func .<=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    return a .<= Self(repeating: b)
   }
   
   /// Returns a vector mask with the result of a pointwise greater than or
   /// equal comparison.
   @_transparent
-  public static func .>=(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> {
-    return lhs .>= Self(repeating: rhs)
+  public static func .>=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    return a .>= Self(repeating: b)
   }
   
   /// Returns a vector mask with the result of a pointwise greater than
   /// comparison.
   @_transparent
-  public static func .>(lhs: Self, rhs: Scalar) -> SIMDMask<MaskStorage> {
-    return lhs .> Self(repeating: rhs)
+  public static func .>(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    return a .> Self(repeating: b)
   }
   
   @_alwaysEmitIntoClient
@@ -691,79 +691,79 @@ extension SIMD where Scalar: FixedWidthInteger {
   }
   
   @_transparent
-  public static prefix func ~(rhs: Self) -> Self {
+  public static prefix func ~(a: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = ~rhs[i] }
+    for i in result.indices { result[i] = ~a[i] }
     return result
   }
   
   @_transparent
-  public static func &(lhs: Self, rhs: Self) -> Self {
+  public static func &(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] & rhs[i] }
+    for i in result.indices { result[i] = a[i] & b[i] }
     return result
   }
   
   @_transparent
-  public static func ^(lhs: Self, rhs: Self) -> Self {
+  public static func ^(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] ^ rhs[i] }
+    for i in result.indices { result[i] = a[i] ^ b[i] }
     return result
   }
   
   @_transparent
-  public static func |(lhs: Self, rhs: Self) -> Self {
+  public static func |(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] | rhs[i] }
+    for i in result.indices { result[i] = a[i] | b[i] }
     return result
   }
   
   @_transparent
-  public static func &<<(lhs: Self, rhs: Self) -> Self {
+  public static func &<<(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] &<< rhs[i] }
+    for i in result.indices { result[i] = a[i] &<< b[i] }
     return result
   }
   
   @_transparent
-  public static func &>>(lhs: Self, rhs: Self) -> Self {
+  public static func &>>(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] &>> rhs[i] }
+    for i in result.indices { result[i] = a[i] &>> b[i] }
     return result
   }
   
   @_transparent
-  public static func &+(lhs: Self, rhs: Self) -> Self {
+  public static func &+(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] &+ rhs[i] }
+    for i in result.indices { result[i] = a[i] &+ b[i] }
     return result
   }
   
   @_transparent
-  public static func &-(lhs: Self, rhs: Self) -> Self {
+  public static func &-(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] &- rhs[i] }
+    for i in result.indices { result[i] = a[i] &- b[i] }
     return result
   }
   
   @_transparent
-  public static func &*(lhs: Self, rhs: Self) -> Self {
+  public static func &*(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] &* rhs[i] }
+    for i in result.indices { result[i] = a[i] &* b[i] }
     return result
   }
   
   @_transparent
-  public static func /(lhs: Self, rhs: Self) -> Self {
+  public static func /(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] / rhs[i] }
+    for i in result.indices { result[i] = a[i] / b[i] }
     return result
   }
   
   @_transparent
-  public static func %(lhs: Self, rhs: Self) -> Self {
+  public static func %(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] % rhs[i] }
+    for i in result.indices { result[i] = a[i] % b[i] }
     return result
   }
   
@@ -781,37 +781,37 @@ extension SIMD where Scalar: FixedWidthInteger {
 //  be replaced with @_semantics to lower directly to vector IR nodes.
 extension SIMD where Scalar: FloatingPoint {
   @_transparent
-  public static func +(lhs: Self, rhs: Self) -> Self {
+  public static func +(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] + rhs[i] }
+    for i in result.indices { result[i] = a[i] + b[i] }
     return result
   }
   
   @_transparent
-  public static func -(lhs: Self, rhs: Self) -> Self {
+  public static func -(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] - rhs[i] }
+    for i in result.indices { result[i] = a[i] - b[i] }
     return result
   }
   
   @_transparent
-  public static func *(lhs: Self, rhs: Self) -> Self {
+  public static func *(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] * rhs[i] }
+    for i in result.indices { result[i] = a[i] * b[i] }
     return result
   }
   
   @_transparent
-  public static func /(lhs: Self, rhs: Self) -> Self {
+  public static func /(a: Self, b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = lhs[i] / rhs[i] }
+    for i in result.indices { result[i] = a[i] / b[i] }
     return result
   }
   
   @_transparent
-  public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
+  public func addingProduct(_ a: Self, _ b: Self) -> Self {
     var result = Self()
-    for i in result.indices { result[i] = self[i].addingProduct(lhs[i], rhs[i]) }
+    for i in result.indices { result[i] = self[i].addingProduct(a[i], b[i]) }
     return result
   }
   
@@ -856,23 +856,23 @@ extension SIMD where Scalar: FloatingPoint {
 
 extension SIMDMask {
   @_transparent
-  public static prefix func .!(rhs: SIMDMask) -> SIMDMask {
-    return SIMDMask(~rhs._storage)
+  public static prefix func .!(a: SIMDMask) -> SIMDMask {
+    return SIMDMask(~a._storage)
   }
   
   @_transparent
-  public static func .&(lhs: SIMDMask, rhs: SIMDMask) -> SIMDMask {
-    return SIMDMask(lhs._storage & rhs._storage)
+  public static func .&(a: SIMDMask, b: SIMDMask) -> SIMDMask {
+    return SIMDMask(a._storage & b._storage)
   }
   
   @_transparent
-  public static func .^(lhs: SIMDMask, rhs: SIMDMask) -> SIMDMask {
-    return SIMDMask(lhs._storage ^ rhs._storage)
+  public static func .^(a: SIMDMask, b: SIMDMask) -> SIMDMask {
+    return SIMDMask(a._storage ^ b._storage)
   }
   
   @_transparent
-  public static func .|(lhs: SIMDMask, rhs: SIMDMask) -> SIMDMask {
-    return SIMDMask(lhs._storage | rhs._storage)
+  public static func .|(a: SIMDMask, b: SIMDMask) -> SIMDMask {
+    return SIMDMask(a._storage | b._storage)
   }
 }
 
@@ -881,277 +881,277 @@ extension SIMDMask {
 extension SIMD where Scalar: FixedWidthInteger {
   
   @_transparent
-  public static func &(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) & rhs
+  public static func &(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) & b
   }
   
   @_transparent
-  public static func ^(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) ^ rhs
+  public static func ^(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) ^ b
   }
   
   @_transparent
-  public static func |(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) | rhs
+  public static func |(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) | b
   }
   
   @_transparent
-  public static func &<<(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) &<< rhs
+  public static func &<<(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) &<< b
   }
   
   @_transparent
-  public static func &>>(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) &>> rhs
+  public static func &>>(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) &>> b
   }
   
   @_transparent
-  public static func &+(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) &+ rhs
+  public static func &+(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) &+ b
   }
   
   @_transparent
-  public static func &-(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) &- rhs
+  public static func &-(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) &- b
   }
   
   @_transparent
-  public static func &*(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) &* rhs
+  public static func &*(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) &* b
   }
   
   @_transparent
-  public static func /(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) / rhs
+  public static func /(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) / b
   }
   
   @_transparent
-  public static func %(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) % rhs
+  public static func %(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) % b
   }
   
   @_transparent
-  public static func &(lhs: Self, rhs: Scalar) -> Self {
-    return lhs & Self(repeating: rhs)
+  public static func &(a: Self, b: Scalar) -> Self {
+    return a & Self(repeating: b)
   }
   
   @_transparent
-  public static func ^(lhs: Self, rhs: Scalar) -> Self {
-    return lhs ^ Self(repeating: rhs)
+  public static func ^(a: Self, b: Scalar) -> Self {
+    return a ^ Self(repeating: b)
   }
   
   @_transparent
-  public static func |(lhs: Self, rhs: Scalar) -> Self {
-    return lhs | Self(repeating: rhs)
+  public static func |(a: Self, b: Scalar) -> Self {
+    return a | Self(repeating: b)
   }
   
   @_transparent
-  public static func &<<(lhs: Self, rhs: Scalar) -> Self {
-    return lhs &<< Self(repeating: rhs)
+  public static func &<<(a: Self, b: Scalar) -> Self {
+    return a &<< Self(repeating: b)
   }
   
   @_transparent
-  public static func &>>(lhs: Self, rhs: Scalar) -> Self {
-    return lhs &>> Self(repeating: rhs)
+  public static func &>>(a: Self, b: Scalar) -> Self {
+    return a &>> Self(repeating: b)
   }
   
   @_transparent
-  public static func &+(lhs: Self, rhs: Scalar) -> Self {
-    return lhs &+ Self(repeating: rhs)
+  public static func &+(a: Self, b: Scalar) -> Self {
+    return a &+ Self(repeating: b)
   }
   
   @_transparent
-  public static func &-(lhs: Self, rhs: Scalar) -> Self {
-    return lhs &- Self(repeating: rhs)
+  public static func &-(a: Self, b: Scalar) -> Self {
+    return a &- Self(repeating: b)
   }
   
   @_transparent
-  public static func &*(lhs: Self, rhs: Scalar) -> Self {
-    return lhs &* Self(repeating: rhs)
+  public static func &*(a: Self, b: Scalar) -> Self {
+    return a &* Self(repeating: b)
   }
   
   @_transparent
-  public static func /(lhs: Self, rhs: Scalar) -> Self {
-    return lhs / Self(repeating: rhs)
+  public static func /(a: Self, b: Scalar) -> Self {
+    return a / Self(repeating: b)
   }
   
   @_transparent
-  public static func %(lhs: Self, rhs: Scalar) -> Self {
-    return lhs % Self(repeating: rhs)
+  public static func %(a: Self, b: Scalar) -> Self {
+    return a % Self(repeating: b)
   }
   
   @_transparent
-  public static func &=(lhs: inout Self, rhs: Self) {
-    lhs = lhs & rhs
+  public static func &=(a: inout Self, b: Self) {
+    a = a & b
   }
   
   @_transparent
-  public static func ^=(lhs: inout Self, rhs: Self) {
-    lhs = lhs ^ rhs
+  public static func ^=(a: inout Self, b: Self) {
+    a = a ^ b
   }
   
   @_transparent
-  public static func |=(lhs: inout Self, rhs: Self) {
-    lhs = lhs | rhs
+  public static func |=(a: inout Self, b: Self) {
+    a = a | b
   }
   
   @_transparent
-  public static func &<<=(lhs: inout Self, rhs: Self) {
-    lhs = lhs &<< rhs
+  public static func &<<=(a: inout Self, b: Self) {
+    a = a &<< b
   }
   
   @_transparent
-  public static func &>>=(lhs: inout Self, rhs: Self) {
-    lhs = lhs &>> rhs
+  public static func &>>=(a: inout Self, b: Self) {
+    a = a &>> b
   }
   
   @_transparent
-  public static func &+=(lhs: inout Self, rhs: Self) {
-    lhs = lhs &+ rhs
+  public static func &+=(a: inout Self, b: Self) {
+    a = a &+ b
   }
   
   @_transparent
-  public static func &-=(lhs: inout Self, rhs: Self) {
-    lhs = lhs &- rhs
+  public static func &-=(a: inout Self, b: Self) {
+    a = a &- b
   }
   
   @_transparent
-  public static func &*=(lhs: inout Self, rhs: Self) {
-    lhs = lhs &* rhs
+  public static func &*=(a: inout Self, b: Self) {
+    a = a &* b
   }
   
   @_transparent
-  public static func /=(lhs: inout Self, rhs: Self) {
-    lhs = lhs / rhs
+  public static func /=(a: inout Self, b: Self) {
+    a = a / b
   }
   
   @_transparent
-  public static func %=(lhs: inout Self, rhs: Self) {
-    lhs = lhs % rhs
+  public static func %=(a: inout Self, b: Self) {
+    a = a % b
   }
   
   @_transparent
-  public static func &=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs & rhs
+  public static func &=(a: inout Self, b: Scalar) {
+    a = a & b
   }
   
   @_transparent
-  public static func ^=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs ^ rhs
+  public static func ^=(a: inout Self, b: Scalar) {
+    a = a ^ b
   }
   
   @_transparent
-  public static func |=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs | rhs
+  public static func |=(a: inout Self, b: Scalar) {
+    a = a | b
   }
   
   @_transparent
-  public static func &<<=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs &<< rhs
+  public static func &<<=(a: inout Self, b: Scalar) {
+    a = a &<< b
   }
   
   @_transparent
-  public static func &>>=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs &>> rhs
+  public static func &>>=(a: inout Self, b: Scalar) {
+    a = a &>> b
   }
   
   @_transparent
-  public static func &+=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs &+ rhs
+  public static func &+=(a: inout Self, b: Scalar) {
+    a = a &+ b
   }
   
   @_transparent
-  public static func &-=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs &- rhs
+  public static func &-=(a: inout Self, b: Scalar) {
+    a = a &- b
   }
   
   @_transparent
-  public static func &*=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs &* rhs
+  public static func &*=(a: inout Self, b: Scalar) {
+    a = a &* b
   }
   
   @_transparent
-  public static func /=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs / rhs
+  public static func /=(a: inout Self, b: Scalar) {
+    a = a / b
   }
   
   @_transparent
-  public static func %=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs % rhs
+  public static func %=(a: inout Self, b: Scalar) {
+    a = a % b
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+' instead")
-  public static func +(lhs: Self, rhs: Self) -> Self {
+  public static func +(a: Self, b: Self) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-' instead")
-  public static func -(lhs: Self, rhs: Self) -> Self {
+  public static func -(a: Self, b: Self) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*' instead")
-  public static func *(lhs: Self, rhs: Self) -> Self {
+  public static func *(a: Self, b: Self) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+' instead")
-  public static func +(lhs: Self, rhs: Scalar) -> Self {
+  public static func +(a: Self, b: Scalar) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-' instead")
-  public static func -(lhs: Self, rhs: Scalar) -> Self {
+  public static func -(a: Self, b: Scalar) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*' instead")
-  public static func *(lhs: Self, rhs: Scalar) -> Self {
+  public static func *(a: Self, b: Scalar) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+' instead")
-  public static func +(lhs: Scalar, rhs: Self) -> Self {
+  public static func +(a: Scalar, b: Self) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-' instead")
-  public static func -(lhs: Scalar, rhs: Self) -> Self {
+  public static func -(a: Scalar, b: Self) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*' instead")
-  public static func *(lhs: Scalar, rhs: Self) -> Self {
+  public static func *(a: Scalar, b: Self) -> Self {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+=' instead")
-  public static func +=(lhs: inout Self, rhs: Self) {
+  public static func +=(a: inout Self, b: Self) {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-=' instead")
-  public static func -=(lhs: inout Self, rhs: Self) {
+  public static func -=(a: inout Self, b: Self) {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead")
-  public static func *=(lhs: inout Self, rhs: Self) {
+  public static func *=(a: inout Self, b: Self) {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&+=' instead")
-  public static func +=(lhs: inout Self, rhs: Scalar) {
+  public static func +=(a: inout Self, b: Scalar) {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&-=' instead")
-  public static func -=(lhs: inout Self, rhs: Scalar) {
+  public static func -=(a: inout Self, b: Scalar) {
     fatalError()
   }
   
   @available(*, unavailable, message: "integer vector types do not support checked arithmetic; use the wrapping operator '&*=' instead")
-  public static func *=(lhs: inout Self, rhs: Scalar) {
+  public static func *=(a: inout Self, b: Scalar) {
     fatalError()
   }
 }
@@ -1159,113 +1159,113 @@ extension SIMD where Scalar: FixedWidthInteger {
 extension SIMD where Scalar: FloatingPoint {
   
   @_transparent
-  public static prefix func -(rhs: Self) -> Self {
-    return 0 - rhs
+  public static prefix func -(a: Self) -> Self {
+    return 0 - a
   }
   
   @_transparent
-  public static func +(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) + rhs
+  public static func +(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) + b
   }
   
   @_transparent
-  public static func -(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) - rhs
+  public static func -(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) - b
   }
   
   @_transparent
-  public static func *(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) * rhs
+  public static func *(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) * b
   }
   
   @_transparent
-  public static func /(lhs: Scalar, rhs: Self) -> Self {
-    return Self(repeating: lhs) / rhs
+  public static func /(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) / b
   }
   
   @_transparent
-  public static func +(lhs: Self, rhs: Scalar) -> Self {
-    return lhs + Self(repeating: rhs)
+  public static func +(a: Self, b: Scalar) -> Self {
+    return a + Self(repeating: b)
   }
   
   @_transparent
-  public static func -(lhs: Self, rhs: Scalar) -> Self {
-    return lhs - Self(repeating: rhs)
+  public static func -(a: Self, b: Scalar) -> Self {
+    return a - Self(repeating: b)
   }
   
   @_transparent
-  public static func *(lhs: Self, rhs: Scalar) -> Self {
-    return lhs * Self(repeating: rhs)
+  public static func *(a: Self, b: Scalar) -> Self {
+    return a * Self(repeating: b)
   }
   
   @_transparent
-  public static func /(lhs: Self, rhs: Scalar) -> Self {
-    return lhs / Self(repeating: rhs)
+  public static func /(a: Self, b: Scalar) -> Self {
+    return a / Self(repeating: b)
   }
   
   @_transparent
-  public static func +=(lhs: inout Self, rhs: Self) {
-    lhs = lhs + rhs
+  public static func +=(a: inout Self, b: Self) {
+    a = a + b
   }
   
   @_transparent
-  public static func -=(lhs: inout Self, rhs: Self) {
-    lhs = lhs - rhs
+  public static func -=(a: inout Self, b: Self) {
+    a = a - b
   }
   
   @_transparent
-  public static func *=(lhs: inout Self, rhs: Self) {
-    lhs = lhs * rhs
+  public static func *=(a: inout Self, b: Self) {
+    a = a * b
   }
   
   @_transparent
-  public static func /=(lhs: inout Self, rhs: Self) {
-    lhs = lhs / rhs
+  public static func /=(a: inout Self, b: Self) {
+    a = a / b
   }
   
   @_transparent
-  public static func +=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs + rhs
+  public static func +=(a: inout Self, b: Scalar) {
+    a = a + b
   }
   
   @_transparent
-  public static func -=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs - rhs
+  public static func -=(a: inout Self, b: Scalar) {
+    a = a - b
   }
   
   @_transparent
-  public static func *=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs * rhs
+  public static func *=(a: inout Self, b: Scalar) {
+    a = a * b
   }
   
   @_transparent
-  public static func /=(lhs: inout Self, rhs: Scalar) {
-    lhs = lhs / rhs
+  public static func /=(a: inout Self, b: Scalar) {
+    a = a / b
   }
   
   @_transparent
-  public func addingProduct(_ lhs: Scalar, _ rhs: Self) -> Self {
-    return self.addingProduct(Self(repeating: lhs), rhs)
+  public func addingProduct(_ a: Scalar, _ b: Self) -> Self {
+    return self.addingProduct(Self(repeating: a), b)
   }
   
   @_transparent
-  public func addingProduct(_ lhs: Self, _ rhs: Scalar) -> Self {
-    return self.addingProduct(lhs, Self(repeating: rhs))
+  public func addingProduct(_ a: Self, _ b: Scalar) -> Self {
+    return self.addingProduct(a, Self(repeating: b))
   }
   
   @_transparent
-  public mutating func addProduct(_ lhs: Self, _ rhs: Self) {
-    self = self.addingProduct(lhs, rhs)
+  public mutating func addProduct(_ a: Self, _ b: Self) {
+    self = self.addingProduct(a, b)
   }
   
   @_transparent
-  public mutating func addProduct(_ lhs: Scalar, _ rhs: Self) {
-    self = self.addingProduct(lhs, rhs)
+  public mutating func addProduct(_ a: Scalar, _ b: Self) {
+    self = self.addingProduct(a, b)
   }
   
   @_transparent
-  public mutating func addProduct(_ lhs: Self, _ rhs: Scalar) {
-    self = self.addingProduct(lhs, rhs)
+  public mutating func addProduct(_ a: Self, _ b: Scalar) {
+    self = self.addingProduct(a, b)
   }
   
   @_transparent
@@ -1281,63 +1281,63 @@ extension SIMD where Scalar: FloatingPoint {
 
 extension SIMDMask {
   @_transparent
-  public static func .&(lhs: Bool, rhs: SIMDMask) -> SIMDMask {
-    return SIMDMask(repeating: lhs) .& rhs
+  public static func .&(a: Bool, b: SIMDMask) -> SIMDMask {
+    return SIMDMask(repeating: a) .& b
   }
   
   @_transparent
-  public static func .^(lhs: Bool, rhs: SIMDMask) -> SIMDMask {
-    return SIMDMask(repeating: lhs) .^ rhs
+  public static func .^(a: Bool, b: SIMDMask) -> SIMDMask {
+    return SIMDMask(repeating: a) .^ b
   }
   
   @_transparent
-  public static func .|(lhs: Bool, rhs: SIMDMask) -> SIMDMask {
-    return SIMDMask(repeating: lhs) .| rhs
+  public static func .|(a: Bool, b: SIMDMask) -> SIMDMask {
+    return SIMDMask(repeating: a) .| b
   }
   
   @_transparent
-  public static func .&(lhs: SIMDMask, rhs: Bool) -> SIMDMask {
-    return lhs .& SIMDMask(repeating: rhs)
+  public static func .&(a: SIMDMask, b: Bool) -> SIMDMask {
+    return a .& SIMDMask(repeating: b)
   }
   
   @_transparent
-  public static func .^(lhs: SIMDMask, rhs: Bool) -> SIMDMask {
-    return lhs .^ SIMDMask(repeating: rhs)
+  public static func .^(a: SIMDMask, b: Bool) -> SIMDMask {
+    return a .^ SIMDMask(repeating: b)
   }
   
   @_transparent
-  public static func .|(lhs: SIMDMask, rhs: Bool) -> SIMDMask {
-    return lhs .| SIMDMask(repeating: rhs)
+  public static func .|(a: SIMDMask, b: Bool) -> SIMDMask {
+    return a .| SIMDMask(repeating: b)
   }
   
   @_transparent
-  public static func .&=(lhs: inout SIMDMask, rhs: SIMDMask) {
-    lhs = lhs .& rhs
+  public static func .&=(a: inout SIMDMask, b: SIMDMask) {
+    a = a .& b
   }
   
   @_transparent
-  public static func .^=(lhs: inout SIMDMask, rhs: SIMDMask) {
-    lhs = lhs .^ rhs
+  public static func .^=(a: inout SIMDMask, b: SIMDMask) {
+    a = a .^ b
   }
   
   @_transparent
-  public static func .|=(lhs: inout SIMDMask, rhs: SIMDMask) {
-    lhs = lhs .| rhs
+  public static func .|=(a: inout SIMDMask, b: SIMDMask) {
+    a = a .| b
   }
   
   @_transparent
-  public static func .&=(lhs: inout SIMDMask, rhs: Bool) {
-    lhs = lhs .& rhs
+  public static func .&=(a: inout SIMDMask, b: Bool) {
+    a = a .& b
   }
   
   @_transparent
-  public static func .^=(lhs: inout SIMDMask, rhs: Bool) {
-    lhs = lhs .^ rhs
+  public static func .^=(a: inout SIMDMask, b: Bool) {
+    a = a .^ b
   }
   
   @_transparent
-  public static func .|=(lhs: inout SIMDMask, rhs: Bool) {
-    lhs = lhs .| rhs
+  public static func .|=(a: inout SIMDMask, b: Bool) {
+    a = a .| b
   }
 }
 
@@ -1413,12 +1413,12 @@ where T: SIMD, T.Scalar: FloatingPoint {
 // Break the ambiguity between AdditiveArithmetic and SIMD for += and -=
 extension SIMD where Self: AdditiveArithmetic, Self.Scalar: FloatingPoint {
   @_alwaysEmitIntoClient
-  public static func +=(lhs: inout Self, rhs: Self) {
-    lhs = lhs + rhs
+  public static func +=(a: inout Self, b: Self) {
+    a = a + b
   }
 
   @_alwaysEmitIntoClient
-  public static func -=(lhs: inout Self, rhs: Self) {
-    lhs = lhs - rhs
+  public static func -=(a: inout Self, b: Self) {
+    a = a - b
   }
 }
