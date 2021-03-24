@@ -697,6 +697,12 @@ struct GenericSignatureBuilder::Implementation {
   /// Whether there were any errors.
   bool HadAnyError = false;
 
+  /// All explicit non-same type requirements that were added to the builder.
+  SmallVector<ExplicitRequirement, 2> ExplicitRequirements;
+
+  /// All explicit same-type requirements that were added to the builder.
+  SmallVector<Requirement, 2> ExplicitSameTypeRequirements;
+
   /// A mapping of redundant explicit requirements to the best root requirement
   /// that implies them.
   using RedundantRequirementMap =
@@ -4500,6 +4506,11 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
                                FloatingRequirementSource source) {
   auto resolvedSource = source.getSource(*this, type);
 
+  if (!resolvedSource->isDerivedRequirement()) {
+    Impl->ExplicitRequirements.emplace_back(RequirementKind::Conformance,
+                                            resolvedSource, proto);
+  }
+
   // Add the conformance requirement, bailing out earlier if we've already
   // seen it.
   auto equivClass = type.getEquivalenceClass(*this);
@@ -4515,6 +4526,13 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
                                              ResolvedType type,
                                              LayoutConstraint layout,
                                              FloatingRequirementSource source) {
+  auto resolvedSource = source.getSource(*this, type);
+
+  if (!resolvedSource->isDerivedRequirement()) {
+    Impl->ExplicitRequirements.emplace_back(RequirementKind::Layout,
+                                            resolvedSource, layout);
+  }
+
   auto equivClass = type.getEquivalenceClass(*this);
 
   // Update the layout in the equivalence class, if we didn't have one already.
@@ -4533,7 +4551,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
 
   // Record this layout constraint.
   equivClass->layoutConstraints.push_back({type.getUnresolvedType(),
-    layout, source.getSource(*this, type)});
+                                           layout, resolvedSource});
   equivClass->modified(*this);
   ++NumLayoutConstraints;
   if (!anyChanges) ++NumLayoutConstraintsExtra;
@@ -4650,6 +4668,11 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
                                             Type superclass,
                                             FloatingRequirementSource source) {
   auto resolvedSource = source.getSource(*this, type);
+
+  if (!resolvedSource->isDerivedRequirement()) {
+    Impl->ExplicitRequirements.emplace_back(RequirementKind::Superclass,
+                                            resolvedSource, superclass);
+  }
 
   // Record the constraint.
   auto equivClass = type.getEquivalenceClass(*this);
@@ -4843,6 +4866,11 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
 
   Type depType1 = type1.getDependentType(*this);
   Type depType2 = type2.getDependentType(*this);
+
+  if (!source->isDerivedRequirement()) {
+    Impl->ExplicitSameTypeRequirements.emplace_back(RequirementKind::SameType,
+                                                    depType1, depType2);
+  }
 
   // Record the same-type constraint, and bail out if it was already known.
   auto equivClass = type1.getEquivalenceClassIfPresent();
@@ -5068,6 +5096,12 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                            ResolvedType type,
                                            Type concrete,
                                            const RequirementSource *source) {
+  if (!source->isDerivedRequirement()) {
+    Impl->ExplicitSameTypeRequirements.emplace_back(RequirementKind::SameType,
+                                                    type.getDependentType(*this),
+                                                    concrete);
+  }
+
   auto equivClass = type.getEquivalenceClass(*this);
 
   // Record the concrete type and its source.
