@@ -989,10 +989,11 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (!ctx.hadError()) {
     emitLoadedModuleTraceForAllPrimariesIfNeeded(
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
-    
-    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
 
     dumpAPIIfNeeded(Instance);
+  }
+  if (!ctx.hadError() || opts.AllowModuleWithCompilerErrors) {
+    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
   }
 
   // Verify reference dependencies of the current compilation job. Note this

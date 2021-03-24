@@ -6808,8 +6808,8 @@ const ParamDecl *swift::getParameterAt(const ValueDecl *source,
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
   assert(getDeclContext()->isTypeContext());
   auto Ty = getInterfaceType();
-  if (Ty->hasError())
-    return ErrorType::get(getASTContext());
+  if (Ty->is<ErrorType>())
+    return Ty;
   return Ty->castTo<AnyFunctionType>()->getResult();
 }
 
