@@ -783,16 +783,6 @@ namespace {
     DeclContext *CurDC;
     ConstraintSystemPhase CurrPhase;
 
-    static const unsigned numEditorPlaceholderVariables = 2;
-
-    /// A buffer of type variables used for editor placeholders. We only
-    /// use a small number of these (rotating through), to prevent expressions
-    /// with a large number of editor placeholders from flooding the constraint
-    /// system with type variables.
-    TypeVariableType *editorPlaceholderVariables[numEditorPlaceholderVariables]
-      = { nullptr, nullptr };
-    unsigned currentEditorPlaceholderVariable = 0;
-
     /// A map from each UnresolvedMemberExpr to the respective (implicit) base
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
@@ -3033,35 +3023,23 @@ namespace {
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
+      auto *locator = CS.getConstraintLocator(E);
+
       if (auto *placeholderRepr = E->getPlaceholderTypeRepr()) {
         // Let's try to use specified type, if that's impossible,
         // fallback to a type variable.
         if (auto preferredTy = resolveTypeReferenceInExpression(
-                placeholderRepr, TypeResolverContext::InExpression,
-                CS.getConstraintLocator(E)))
+                placeholderRepr, TypeResolverContext::InExpression, locator))
           return preferredTy;
       }
 
-      auto locator = CS.getConstraintLocator(E);
-
       // A placeholder may have any type, but default to Void type if
       // otherwise unconstrained.
-      auto &placeholderTy
-        = editorPlaceholderVariables[currentEditorPlaceholderVariable];
-      if (!placeholderTy) {
-        placeholderTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+      auto *placeholderTy =
+          CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-        CS.addConstraint(ConstraintKind::Defaultable,
-                         placeholderTy,
-                         TupleType::getEmpty(CS.getASTContext()),
-                         locator);
-      }
-
-      // Move to the next placeholder variable.
-      // FIXME: Cycling type variables like this is unsound.
-      currentEditorPlaceholderVariable
-        = (currentEditorPlaceholderVariable + 1) %
-            numEditorPlaceholderVariables;
+      CS.addConstraint(ConstraintKind::Defaultable, placeholderTy,
+                       TupleType::getEmpty(CS.getASTContext()), locator);
 
       return placeholderTy;
     }
