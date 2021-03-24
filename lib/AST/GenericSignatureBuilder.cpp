@@ -693,6 +693,9 @@ struct GenericSignatureBuilder::Implementation {
   /// The set of computed redundant explicit requirements.
   llvm::DenseSet<ExplicitRequirement> RedundantRequirements;
 
+  /// FIXME: Hack to work around a small number of minimization bugs.
+  bool HadAnyRedundantConstraints = false;
+
 #ifndef NDEBUG
   /// Whether we've already computed redundant requiremnts.
   bool computedRedundantRequirements = false;
@@ -6730,6 +6733,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
     case ConstraintRelation::Redundant:
       // If this requirement is not derived or inferred (but has a useful
       // location) complain that it is redundant.
+      Impl->HadAnyRedundantConstraints = true;
       if (constraint.source->shouldDiagnoseRedundancy(true) &&
           representativeConstraint &&
           representativeConstraint->source->shouldDiagnoseRedundancy(false)) {
@@ -8131,7 +8135,10 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // will produce the same thing.
   //
   // We cannot do this when there were errors.
-  if (allowBuilderToMove && !Impl->HadAnyError) {
+  // FIXME: The HadAnyRedundantConstraints bit is a hack because we are
+  // over-minimizing.
+  if (allowBuilderToMove && !Impl->HadAnyError &&
+      !Impl->HadAnyRedundantConstraints) {
     // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));
