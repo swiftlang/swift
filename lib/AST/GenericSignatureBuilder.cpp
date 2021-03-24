@@ -7981,26 +7981,6 @@ bool GenericSignatureBuilder::isRedundantExplicitRequirement(
   return (redundantReqs.find(req) != redundantReqs.end());
 }
 
-namespace {
-  template<typename T>
-  bool hasNonRedundantRequirementSource(ArrayRef<Constraint<T>> constraints,
-                                        RequirementKind kind,
-                                        GenericSignatureBuilder &builder) {
-    for (auto constraint : constraints) {
-      if (constraint.source->isDerivedRequirement())
-        continue;
-
-      auto req = ExplicitRequirement::fromExplicitConstraint(kind, constraint);
-      if (builder.isRedundantExplicitRequirement(req))
-        continue;
-
-      return true;
-    }
-
-    return false;
-  }
-} // end anonymous namespace
-
 static Optional<Requirement> createRequirement(RequirementKind kind,
                                                Type depTy,
                                                RequirementRHS rhs,
@@ -8079,7 +8059,29 @@ void GenericSignatureBuilder::enumerateRequirements(
       requirements.push_back(*req);
   };
 
-  // Collect all of the subject types that will be involved in constraints.
+  // Collect all non-same type requirements.
+  for (auto &req : Impl->ExplicitRequirements) {
+    if (isRedundantExplicitRequirement(req))
+      continue;
+
+    auto depTy = getCanonicalTypeInContext(
+        req.getSource()->getStoredType(), { });
+
+    // FIXME: This should be an assert once we ensure that concrete
+    // same-type requirements always mark other requirements on the
+    // same subject type as redundant or conflicting.
+    if (!depTy->isTypeParameter())
+      continue;
+
+    auto rhs = req.getRHS();
+    if (auto constraintType = rhs.dyn_cast<Type>()) {
+      rhs = getCanonicalTypeInContext(constraintType, genericParams);
+    }
+
+    recordRequirement(req.getKind(), depTy, rhs);
+  }
+
+  // Collect all same type requirements.
   for (auto &equivClass : Impl->EquivalenceClasses) {
     if (equivClass.derivedSameTypeComponents.empty()) {
       checkSameTypeConstraints(genericParams, &equivClass);
@@ -8127,8 +8129,6 @@ void GenericSignatureBuilder::enumerateRequirements(
         continue;
       }
 
-      std::function<void()> deferredSameTypeRequirement;
-
       // If we're at the last anchor in the component, do nothing;
       if (i + 1 != equivClass.derivedSameTypeComponents.size()) {
         // Form a same-type constraint from this anchor within the component
@@ -8136,58 +8136,9 @@ void GenericSignatureBuilder::enumerateRequirements(
         // FIXME: Distinguish between explicit and inferred here?
         auto &nextComponent = equivClass.derivedSameTypeComponents[i + 1];
         Type otherSubjectType = nextComponent.type;
-        deferredSameTypeRequirement =
-          [&recordRequirement, subjectType, otherSubjectType] {
-            recordRequirement(RequirementKind::SameType,
-                              subjectType, otherSubjectType);
-          };
-      }
 
-      SWIFT_DEFER {
-        if (deferredSameTypeRequirement) deferredSameTypeRequirement();
-      };
-
-      // If this is not the first component anchor in its equivalence class,
-      // we're done.
-      if (i > 0)
-        continue;
-
-      // If we have a superclass, produce a superclass requirement
-      if (auto superclass = equivClass.superclass) {
-        superclass = getCanonicalTypeInContext(superclass, genericParams);
-
-        if (!equivClass.recursiveSuperclassType &&
-            hasNonRedundantRequirementSource<Type>(
-              equivClass.superclassConstraints,
-              RequirementKind::Superclass, *this)) {
-          recordRequirement(RequirementKind::Superclass,
-                            subjectType, superclass);
-        }
-      }
-
-      // If we have a layout constraint, produce a layout requirement.
-      if (equivClass.layout) {
-        if (hasNonRedundantRequirementSource<LayoutConstraint>(
-              equivClass.layoutConstraints,
-              RequirementKind::Layout, *this)) {
-          recordRequirement(RequirementKind::Layout,
-                            subjectType, equivClass.layout);
-        }
-      }
-
-      // Enumerate conformance requirements.
-      SmallVector<ProtocolDecl *, 4> protocols;
-
-      for (const auto &conforms : equivClass.conformsTo) {
-        if (hasNonRedundantRequirementSource<ProtocolDecl *>(
-              conforms.second, RequirementKind::Conformance, *this)) {
-          protocols.push_back(conforms.first);
-        }
-      }
-
-      // Enumerate the conformance requirements.
-      for (auto proto : protocols) {
-        recordRequirement(RequirementKind::Conformance, subjectType, proto);
+        recordRequirement(RequirementKind::SameType,
+                          subjectType, otherSubjectType);
       }
     }
   }
