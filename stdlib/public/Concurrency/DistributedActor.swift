@@ -132,7 +132,7 @@ public enum ActorResolved<Act: DistributedActor> {
 /***************************** Actor Address **********************************/
 /******************************************************************************/
 
-public struct ActorAddress: Codable, Sendable, Equatable {
+public struct ActorAddress: Codable, Sendable, Equatable, Hashable {
   /// Uniquely specifies the actor transport and the protocol used by it.
   ///
   /// E.g. "xpc", "specific-clustering-protocol" etc.
