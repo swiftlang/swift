@@ -1100,16 +1100,21 @@ public:
 
   ParserStatus parseTypeAttributeList(ParamDecl::Specifier &Specifier,
                                       SourceLoc &SpecifierLoc,
+                                      SourceLoc &IsolatedLoc,
                                       TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
         (Tok.is(tok::identifier) &&
          (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned"))))
-      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
+          Tok.getRawText().equals("__owned") ||
+          Tok.isContextualKeyword("isolated"))))
+      return parseTypeAttributeListPresent(
+          Specifier, SpecifierLoc, IsolatedLoc, Attributes);
     return makeParserSuccess();
   }
+
   ParserStatus parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                              SourceLoc &SpecifierLoc,
+                                             SourceLoc &IsolatedLoc,
                                              TypeAttributes &Attributes);
 
   bool parseConventionAttributeInternal(bool justChecking,
@@ -1268,7 +1273,8 @@ public:
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
                                  ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc);
+                                 SourceLoc SpecifierLoc,
+                                 SourceLoc IsolatedLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
@@ -1326,6 +1332,9 @@ public:
 
     /// The second name, the presence of which is indicated by \c SecondNameLoc.
     Identifier SecondName;
+
+    /// The location of the 'isolated' keyword, if present.
+    SourceLoc IsolatedLoc;
 
     /// The type following the ':'.
     TypeRepr *Type = nullptr;

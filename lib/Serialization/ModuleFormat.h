@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 614; // add subminor and build in user module version
+const uint16_t SWIFTMODULE_VERSION_MINOR = 615; // isolated parameters
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1022,6 +1022,7 @@ namespace decls_block {
     BCFixed<1>,          // autoclosure?
     BCFixed<1>,          // non-ephemeral?
     ValueOwnershipField, // inout, shared or owned?
+    BCFixed<1>,          // isolated
     BCFixed<1>           // noDerivative?
   >;
 

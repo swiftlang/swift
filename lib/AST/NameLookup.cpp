@@ -2253,6 +2253,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
+  case TypeReprKind::Isolated:
   case TypeReprKind::Metatype:
   case TypeReprKind::Owned:
   case TypeReprKind::Protocol:
