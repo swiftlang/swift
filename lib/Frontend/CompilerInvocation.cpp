@@ -331,6 +331,13 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     Args.hasArg(OPT_experimental_spi_imports);
   Opts.DebugPrintInvalidSyntax |=
     Args.hasArg(OPT_debug_emit_invalid_swiftinterface_syntax);
+
+  if (const Arg *A = Args.getLastArg(OPT_library_level)) {
+    StringRef contents = A->getValue();
+    if (contents == "spi") {
+      Opts.PrintSPIs = true;
+    }
+  }
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
