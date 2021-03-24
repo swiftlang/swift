@@ -3829,6 +3829,22 @@ static Type substituteConcreteType(Type parentType,
   auto subMap = parentType->getContextSubstitutionMap(
       dc->getParentModule(), dc);
 
+  // If the type has unresolved DependentMemberTypes, we can't use
+  // Type::subst() if a generic parameter is replaced with a concrete
+  // type. Instead, perform a "shallow" substitution where we replace
+  // generic parameter types but leave DependentMemberTypes as-is.
+  // This means we will end up back in maybeResolveEquivalenceClass(),
+  // where we will perform the name lookup required to resolve any
+  // DependentMemberTypes with a concrete base.
+  if (type->findUnresolvedDependentMemberType()) {
+    return type.transform([&](Type t) {
+      if (t->is<GenericTypeParamType>()) {
+        return t.subst(subMap);
+      }
+      return t;
+    });
+  }
+
   return type.subst(subMap);
 }
 
