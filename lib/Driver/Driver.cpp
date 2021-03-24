@@ -2945,9 +2945,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseObjectiveCHeaderOutputPath(C, OutputMap, workingDirectory,
                                      Output.get());
   
-  if (C.getArgs().hasArg(options::OPT_emit_symbol_graph)) {
+  if (C.getArgs().hasArg(options::OPT_emit_symbol_graph))
     chooseSymbolGraphOutputPath(C, OutputMap, workingDirectory, Output.get());
-  }
 
   // 4. Construct a Job which produces the right CommandOutput.
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, C, std::move(InputJobs),
