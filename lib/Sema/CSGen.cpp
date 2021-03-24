@@ -3034,10 +3034,12 @@ namespace {
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       if (auto *placeholderRepr = E->getPlaceholderTypeRepr()) {
-        // Just resolve the referenced type.
-        return resolveTypeReferenceInExpression(
-            placeholderRepr, TypeResolverContext::InExpression,
-            CS.getConstraintLocator(E));
+        // Let's try to use specified type, if that's impossible,
+        // fallback to a type variable.
+        if (auto preferredTy = resolveTypeReferenceInExpression(
+                placeholderRepr, TypeResolverContext::InExpression,
+                CS.getConstraintLocator(E)))
+          return preferredTy;
       }
 
       auto locator = CS.getConstraintLocator(E);
