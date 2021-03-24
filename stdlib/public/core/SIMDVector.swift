@@ -153,6 +153,14 @@ extension SIMD {
   }
   
   /// A vector mask with the result of a pointwise equality comparison.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in result.indices {
+  ///   result[i] = a[i] == b[i]
+  /// }
+  /// ```
   @_transparent
   public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     var result = SIMDMask<MaskStorage>()
@@ -160,8 +168,15 @@ extension SIMD {
     return result
   }
   
-  /// Returns a vector mask with the result of a pointwise inequality
-  /// comparison.
+  /// A vector mask with the result of a pointwise inequality comparison.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in result.indices {
+  ///   result[i] = a[i] != b[i]
+  /// }
+  /// ```
   @_transparent
   public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     var result = SIMDMask<MaskStorage>()
@@ -171,6 +186,13 @@ extension SIMD {
   
   /// Replaces elements of this vector with elements of `other` in the lanes
   /// where `mask` is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in indices {
+  ///   if mask[i] { self[i] = other[i] }
+  /// }
+  /// ```
   @_transparent
   public mutating func replace(with other: Self, where mask: SIMDMask<MaskStorage>) {
     for i in indices { self[i] = mask[i] ? other[i] : self[i] }
@@ -376,6 +398,13 @@ extension SIMD {
   
   /// Replaces elements of this vector with `other` in the lanes where `mask`
   /// is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in indices {
+  ///   if mask[i] { self[i] = other }
+  /// }
+  /// ```
   @_transparent
   public mutating func replace(with other: Scalar, where mask: SIMDMask<MaskStorage>) {
     replace(with: Self(repeating: other), where: mask)
@@ -383,6 +412,14 @@ extension SIMD {
   
   /// Returns a copy of this vector, with elements replaced by elements of
   /// `other` in the lanes where `mask` is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = Self()
+  /// for i in indices {
+  ///   result[i] = mask[i] ? other[i] : self[i]
+  /// }
+  /// ```
   @_transparent
   public func replacing(with other: Self, where mask: SIMDMask<MaskStorage>) -> Self {
     var result = self
@@ -392,6 +429,14 @@ extension SIMD {
   
   /// Returns a copy of this vector, with elements `other` in the lanes where
   /// `mask` is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = Self()
+  /// for i in indices {
+  ///   result[i] = mask[i] ? other : self[i]
+  /// }
+  /// ```
   @_transparent
   public func replacing(with other: Scalar, where mask: SIMDMask<MaskStorage>) -> Self {
     return replacing(with: Self(repeating: other), where: mask)
@@ -855,21 +900,63 @@ extension SIMD where Scalar: FloatingPoint {
 }
 
 extension SIMDMask {
+  /// A vector mask that is the pointwise logical negation of the input.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<${Vector}>()
+  /// for i in result.indices {
+  ///   result[i] = !a[i]
+  /// }
+  /// ```
   @_transparent
   public static prefix func .!(a: SIMDMask) -> SIMDMask {
     return SIMDMask(~a._storage)
   }
   
+  /// A vector mask that is the pointwise logical conjunction of the inputs.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<${Vector}>()
+  /// for i in result.indices {
+  ///   result[i] = a[i] && b[i]
+  /// }
+  /// ```
+  ///
+  /// Note that unlike the scalar `&&` operator, the SIMD `.&` operator
+  /// always fully evaluates both arguments.
   @_transparent
   public static func .&(a: SIMDMask, b: SIMDMask) -> SIMDMask {
     return SIMDMask(a._storage & b._storage)
   }
   
+  /// A vector mask that is the pointwise exclusive or of the inputs.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<${Vector}>()
+  /// for i in result.indices {
+  ///   result[i] = a[i] != b[i]
+  /// }
+  /// ```
   @_transparent
   public static func .^(a: SIMDMask, b: SIMDMask) -> SIMDMask {
     return SIMDMask(a._storage ^ b._storage)
   }
   
+  /// A vector mask that is the pointwise logical disjunction of the inputs.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<${Vector}>()
+  /// for i in result.indices {
+  ///   result[i] = a[i] || b[i]
+  /// }
+  /// ```
+  ///
+  /// Note that unlike the scalar `||` operator, the SIMD `.|` operator
+  /// always fully evaluates both arguments.
   @_transparent
   public static func .|(a: SIMDMask, b: SIMDMask) -> SIMDMask {
     return SIMDMask(a._storage | b._storage)
@@ -1280,61 +1367,121 @@ extension SIMD where Scalar: FloatingPoint {
 }
 
 extension SIMDMask {
+  /// A vector mask that is the pointwise logical conjunction of the inputs.
+  ///
+  /// Equivalent to `a ? b : SIMDMask(repeating: false)`.
   @_transparent
   public static func .&(a: Bool, b: SIMDMask) -> SIMDMask {
     return SIMDMask(repeating: a) .& b
   }
   
+  /// A vector mask that is the pointwise exclusive or of the inputs.
+  ///
+  /// Equivalent to `a ? .!b : b`.
   @_transparent
   public static func .^(a: Bool, b: SIMDMask) -> SIMDMask {
     return SIMDMask(repeating: a) .^ b
   }
   
+  /// A vector mask that is the pointwise logical disjunction of the inputs.
+  ///
+  /// Equivalent to `a ? SIMDMask(repeating: true) : b`.
   @_transparent
   public static func .|(a: Bool, b: SIMDMask) -> SIMDMask {
     return SIMDMask(repeating: a) .| b
   }
   
+  /// A vector mask that is the pointwise logical conjunction of the inputs.
+  ///
+  /// Equivalent to `b ? a : SIMDMask(repeating: false)`.
   @_transparent
   public static func .&(a: SIMDMask, b: Bool) -> SIMDMask {
     return a .& SIMDMask(repeating: b)
   }
   
+  /// A vector mask that is the pointwise exclusive or of the inputs.
+  ///
+  /// Equivalent to `b ? .!a : a`.
   @_transparent
   public static func .^(a: SIMDMask, b: Bool) -> SIMDMask {
     return a .^ SIMDMask(repeating: b)
   }
   
+  /// A vector mask that is the pointwise logical disjunction of the inputs.
+  ///
+  /// Equivalent to `b ? SIMDMask(repeating: true) : a`
   @_transparent
   public static func .|(a: SIMDMask, b: Bool) -> SIMDMask {
     return a .| SIMDMask(repeating: b)
   }
   
+  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in a.indices {
+  ///   a[i] = a[i] && b[i]
+  /// }
+  /// ```
   @_transparent
   public static func .&=(a: inout SIMDMask, b: SIMDMask) {
     a = a .& b
   }
   
+  /// Replaces `a` with the pointwise exclusive or of `a` and `b`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in a.indices {
+  ///   a[i] = a[i] != b[i]
+  /// }
+  /// ```
   @_transparent
   public static func .^=(a: inout SIMDMask, b: SIMDMask) {
     a = a .^ b
   }
   
+  /// Replaces `a` with the pointwise logical disjunction of `a` and `b`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in a.indices {
+  ///   a[i] = a[i] || b[i]
+  /// }
+  /// ```
   @_transparent
   public static func .|=(a: inout SIMDMask, b: SIMDMask) {
     a = a .| b
   }
   
+  /// Replaces `a` with the pointwise logical conjuction of `a` and `b`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// if !b { a = SIMDMask(repeating: false) }
+  /// ```
   @_transparent
   public static func .&=(a: inout SIMDMask, b: Bool) {
     a = a .& b
   }
   
+  /// Replaces `a` with the pointwise exclusive or of `a` and `b`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// if b { a = .!a }
+  /// ```
   @_transparent
   public static func .^=(a: inout SIMDMask, b: Bool) {
     a = a .^ b
   }
   
+  /// Replaces `a` with the pointwise logical disjunction of `a` and `b`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// if b { a = SIMDMask(repeating: true) }
+  /// ```
   @_transparent
   public static func .|=(a: inout SIMDMask, b: Bool) {
     a = a .| b
