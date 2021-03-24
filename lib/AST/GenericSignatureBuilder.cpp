@@ -3759,8 +3759,7 @@ GenericSignatureBuilder::lookupConformance(CanType dependentType,
 static Type resolveDependentMemberTypes(
                                 GenericSignatureBuilder &builder,
                                 Type type,
-                                ArchetypeResolutionKind resolutionKind
-                                  = ArchetypeResolutionKind::WellFormed) {
+                                ArchetypeResolutionKind resolutionKind) {
   if (!type->hasTypeParameter()) return type;
 
   return type.transformRec([&resolutionKind,
@@ -6195,7 +6194,7 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
 
     if (equivClass.concreteType) {
       Type resolvedConcreteType =
-        resolveDependentMemberTypes(*this, equivClass.concreteType);
+        getCanonicalTypeInContext(equivClass.concreteType, { });
       graph.addConstraintsFromEquivClass(
           *this, equivClass.concreteTypeConstraints,
           RequirementKind::SameType,
@@ -6216,7 +6215,7 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
             if (t->isEqual(resolvedConcreteType))
               return false;
 
-            auto resolvedType = resolveDependentMemberTypes(*this, t);
+            auto resolvedType = getCanonicalTypeInContext(t, { });
             if (resolvedType->isEqual(resolvedConcreteType))
               return false;
 
@@ -6228,7 +6227,7 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
     if (equivClass.superclass) {
       // Resolve any thus-far-unresolved dependent types.
       Type resolvedSuperclass =
-        resolveDependentMemberTypes(*this, equivClass.superclass);
+        getCanonicalTypeInContext(equivClass.superclass, { });
       graph.addConstraintsFromEquivClass(
           *this, equivClass.superclassConstraints,
           RequirementKind::Superclass,
@@ -6249,7 +6248,7 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
             if (t->isEqual(resolvedSuperclass))
               return false;
 
-            Type resolvedType = resolveDependentMemberTypes(*this, t);
+            Type resolvedType = getCanonicalTypeInContext(t, { });
             if (resolvedType->isEqual(resolvedSuperclass))
               return false;
 
@@ -7812,7 +7811,7 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
                               EquivalenceClass *equivClass) {
   // Resolve any thus-far-unresolved dependent types.
   Type resolvedConcreteType =
-    resolveDependentMemberTypes(*this, equivClass->concreteType);
+    getCanonicalTypeInContext(equivClass->concreteType, genericParams);
 
   checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints, RequirementKind::SameType,
@@ -7820,8 +7819,7 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
       if (constraint.value->isEqual(resolvedConcreteType))
         return true;
 
-      auto resolvedType =
-        resolveDependentMemberTypes(*this, constraint.value);
+      auto resolvedType = getCanonicalTypeInContext(constraint.value, { });
       return resolvedType->isEqual(resolvedConcreteType);
     },
     [&](const Constraint<Type> &constraint) {
@@ -7854,7 +7852,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
 
   // Resolve any thus-far-unresolved dependent types.
   Type resolvedSuperclass =
-    resolveDependentMemberTypes(*this, equivClass->superclass);
+    getCanonicalTypeInContext(equivClass->superclass, genericParams);
 
   auto representativeConstraint =
     checkConstraintList<Type>(
@@ -7864,7 +7862,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
           return true;
 
         Type resolvedType =
-          resolveDependentMemberTypes(*this, constraint.value);
+          getCanonicalTypeInContext(constraint.value, { });
         return resolvedType->isEqual(resolvedSuperclass);
       },
       [&](const Constraint<Type> &constraint) {
@@ -7888,7 +7886,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
   // FIXME: Substitute into the concrete type.
   if (equivClass->concreteType) {
     Type resolvedConcreteType =
-      resolveDependentMemberTypes(*this, equivClass->concreteType);
+      getCanonicalTypeInContext(equivClass->concreteType, genericParams);
     auto existing = equivClass->findAnyConcreteConstraintAsWritten();
     // Make sure the concrete type fulfills the superclass requirement.
     if (!equivClass->superclass->isExactSuperclassOf(resolvedConcreteType)){
