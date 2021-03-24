@@ -124,8 +124,6 @@ STATISTIC(NumRewriteRhsSimplifiedToLhs,
           "# of rewrite rule right-hand sides simplified to lhs (and removed)");
 STATISTIC(NumRewriteRulesRedundant,
           "# of rewrite rules that are redundant (and removed)");
-STATISTIC(NumSignaturesRebuiltWithoutRedundantRequirements,
-          "# of generic signatures which had a concretized conformance requirement");
 
 namespace  {
 
@@ -4647,7 +4645,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                                unresolvedHandling);
   }
 
-  // If the resolved subject is concrete, there may be things we can infer (if it
+  // If the resolved subject is a type, there may be things we can infer (if it
   // conditionally conforms to the protocol), and we can probably perform
   // diagnostics here.
   if (auto subjectType = resolvedSubject.getAsConcreteType()) {
@@ -8174,60 +8172,9 @@ static void checkGenericSignature(CanGenericSignature canSig,
 }
 #endif
 
-bool GenericSignatureBuilder::hasExplicitConformancesImpliedByConcrete() const {
-  for (auto pair : Impl->RedundantRequirements) {
-    if (pair.first.getKind() != RequirementKind::Conformance)
-      continue;
-
-    for (auto impliedByReq : pair.second) {
-      if (impliedByReq.getKind() == RequirementKind::Superclass)
-        return true;
-
-      if (impliedByReq.getKind() == RequirementKind::SameType)
-        return true;
-    }
-  }
-
-  return false;
-}
-
-static Type stripBoundDependentMemberTypes(Type t) {
-  if (auto *depMemTy = t->getAs<DependentMemberType>()) {
-    return DependentMemberType::get(
-      stripBoundDependentMemberTypes(depMemTy->getBase()),
-      depMemTy->getName());
-  }
-
-  return t;
-}
-
-static Requirement stripBoundDependentMemberTypes(Requirement req) {
-  auto subjectType = stripBoundDependentMemberTypes(req.getFirstType());
-
-  switch (req.getKind()) {
-  case RequirementKind::Conformance:
-    return Requirement(RequirementKind::Conformance, subjectType,
-                       req.getSecondType());
-
-  case RequirementKind::Superclass:
-  case RequirementKind::SameType:
-    return Requirement(req.getKind(), subjectType,
-                       req.getSecondType().transform([](Type t) {
-                         return stripBoundDependentMemberTypes(t);
-                       }));
-
-  case RequirementKind::Layout:
-    return Requirement(RequirementKind::Conformance, subjectType,
-                       req.getLayoutConstraint());
-  }
-
-  llvm_unreachable("Bad requirement kind");
-}
-
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
-                                          bool buildingRequirementSignature,
-                                          bool rebuildingWithoutRedundantConformances) && {
+                                          bool allowBuilderToMove) && {
   // Finalize the builder, producing any necessary diagnostics.
   finalize(getGenericParams(), allowConcreteGenericParams);
 
@@ -8237,43 +8184,6 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
 
   // Form the generic signature.
   auto sig = GenericSignature::get(getGenericParams(), requirements);
-
-  // If any of our explicit conformance requirements were implied by
-  // superclass or concrete same-type requirements, we have to build the
-  // signature again, since dropping the redundant conformance requirements
-  // changes the canonical type computation.
-  //
-  // However, if we already diagnosed an error, don't do this, because
-  // we might end up emitting duplicate diagnostics.
-  //
-  // Also, don't do this when building a requirement signature.
-  if (!buildingRequirementSignature &&
-      !Impl->HadAnyError &&
-      hasExplicitConformancesImpliedByConcrete()) {
-    NumSignaturesRebuiltWithoutRedundantRequirements++;
-
-    if (rebuildingWithoutRedundantConformances) {
-      llvm::errs() << "Rebuilt signature still has "
-                   << "redundant conformance requirements: ";
-      llvm::errs() << sig << "\n";
-      abort();
-    }
-
-    GenericSignatureBuilder newBuilder(Context);
-
-    for (auto param : sig->getGenericParams())
-      newBuilder.addGenericParameter(param);
-
-    for (auto &req : sig->getRequirements()) {
-      newBuilder.addRequirement(stripBoundDependentMemberTypes(req),
-                                FloatingRequirementSource::forAbstract(), nullptr);
-    }
-
-    return std::move(newBuilder).computeGenericSignature(
-        allowConcreteGenericParams,
-        buildingRequirementSignature,
-        /*rebuildingWithoutRedundantConformances=*/true);
-  }
 
 #ifndef NDEBUG
   if (!Impl->HadAnyError) {
@@ -8286,9 +8196,7 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // will produce the same thing.
   //
   // We cannot do this when there were errors.
-  //
-  // Also, we cannot do this when building a requirement signature.
-  if (!buildingRequirementSignature && !Impl->HadAnyError) {
+  if (allowBuilderToMove && !Impl->HadAnyError) {
     // Register this generic signature builder as the canonical builder for the
     // given signature.
     Context.registerGenericSignatureBuilder(sig, std::move(*this));

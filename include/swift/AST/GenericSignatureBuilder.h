@@ -620,8 +620,7 @@ public:
   /// generic signature builder no longer has valid state.
   GenericSignature computeGenericSignature(
                       bool allowConcreteGenericParams = false,
-                      bool buildingRequirementSignature = false,
-                      bool rebuildingWithoutRedundantConformances = false) &&;
+                      bool allowBuilderToMove = true) &&;
 
   /// Compute the requirement signature for the given protocol.
   static GenericSignature computeRequirementSignature(ProtocolDecl *proto);
@@ -645,8 +644,6 @@ public:
 
 private:
   void computeRedundantRequirements();
-
-  bool hasExplicitConformancesImpliedByConcrete() const;
 
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.

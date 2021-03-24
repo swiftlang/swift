@@ -939,7 +939,7 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
 
   auto reqSignature = std::move(builder).computeGenericSignature(
                         /*allowConcreteGenericParams=*/false,
-                        /*buildingRequirementSignature=*/true);
+                        /*allowBuilderToMove=*/false);
   return reqSignature->getRequirements();
 }
 
