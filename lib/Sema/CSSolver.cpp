@@ -1877,6 +1877,7 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
   SmallVector<unsigned, 4> concreteOverloads;
   SmallVector<unsigned, 4> numericOverloads;
   SmallVector<unsigned, 4> sequenceOverloads;
+  SmallVector<unsigned, 4> simdOverloads;
   SmallVector<unsigned, 4> otherGenericOverloads;
 
   auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, KnownProtocolKind kind) -> bool {
@@ -1898,7 +1899,10 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
     unsigned index = *iter;
     auto *decl = Choices[index]->getOverloadChoice().getDecl();
     auto *nominal = decl->getDeclContext()->getSelfNominalTypeDecl();
-    if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
+
+    if (isSIMDOperator(decl)) {
+      simdOverloads.push_back(index);
+    } else if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
       concreteOverloads.push_back(index);
     } else if (refinesOrConformsTo(nominal, KnownProtocolKind::AdditiveArithmetic)) {
       numericOverloads.push_back(index);
@@ -1955,11 +1959,20 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
       sequenceOverloads.clear();
       break;
     }
+
+    if (TypeChecker::conformsToKnownProtocol(
+            argType, KnownProtocolKind::SIMD,
+            CS.DC->getParentModule())) {
+      first = std::copy(simdOverloads.begin(), simdOverloads.end(), first);
+      simdOverloads.clear();
+      break;
+    }
   }
 
   first = std::copy(otherGenericOverloads.begin(), otherGenericOverloads.end(), first);
   first = std::copy(numericOverloads.begin(), numericOverloads.end(), first);
   first = std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
+  first = std::copy(simdOverloads.begin(), simdOverloads.end(), first);
 }
 
 void DisjunctionChoiceProducer::partitionDisjunction(
@@ -2044,7 +2057,8 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (isOperatorDisjunction(Disjunction)) {
+  if (isOperatorDisjunction(Disjunction) &&
+      !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
         simdOperators.push_back(index);
