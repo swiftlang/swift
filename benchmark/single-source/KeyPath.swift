@@ -28,16 +28,16 @@ public func run_KeyPath(N: Int) {
 func testFixedArrayKeyPath10(_ fixedSizeArray10_in: FixedSizeArray10<Double>, iters: Int) {
     var fixedSizeArray10 = fixedSizeArray10_in
     
-    let kp0 = FixedSizeArray10<Double>.getKeypathToElement(index: 0)
-    let kp1 = FixedSizeArray10<Double>.getKeypathToElement(index: 1)
-    let kp2 = FixedSizeArray10<Double>.getKeypathToElement(index: 2)
-    let kp3 = FixedSizeArray10<Double>.getKeypathToElement(index: 3)
-    let kp4 = FixedSizeArray10<Double>.getKeypathToElement(index: 4)
-    let kp5 = FixedSizeArray10<Double>.getKeypathToElement(index: 5)
-    let kp6 = FixedSizeArray10<Double>.getKeypathToElement(index: 6)
-    let kp7 = FixedSizeArray10<Double>.getKeypathToElement(index: 7)
-    let kp8 = FixedSizeArray10<Double>.getKeypathToElement(index: 8)
-    let kp9 = FixedSizeArray10<Double>.getKeypathToElement(index: 9)
+    let kp0 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 0))
+    let kp1 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 1))
+    let kp2 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 2))
+    let kp3 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 3))
+    let kp4 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 4))
+    let kp5 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 5))
+    let kp6 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 6))
+    let kp7 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 7))
+    let kp8 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 8))
+    let kp9 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 9))
     
     for n in 0..<iters {
         fixedSizeArray10[keyPath: kp5] += fixedSizeArray10[keyPath: kp1] + Double(n)
@@ -151,4 +151,8 @@ public struct FixedSizeArray10<Element>: Sequence, IteratorProtocol {
 
 func initializeFixedSizeArray10() -> FixedSizeArray10<Double> {
     return FixedSizeArray10<Double>(element0: 0, element1: 1, element2: 2, element3: 3, element4: 4, element5: 5, element6: 6, element7: 7, element8: 8, element9: 9)
+}
+
+func identity(_ inputKeypath: WritableKeyPath<FixedSizeArray10<Element>, Element>) -> WritableKeyPath<FixedSizeArray10<Element>, Element> {
+    return inputKeypath
 }
