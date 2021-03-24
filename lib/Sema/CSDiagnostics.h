@@ -1079,6 +1079,17 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidPropertyWrapperType final : public FailureDiagnostic {
+  Type wrapperType;
+
+public:
+  InvalidPropertyWrapperType(const Solution &solution, Type wrapper,
+                             ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
+
+  bool diagnoseAsError() override;
+};
+
 class InvalidProjectedValueArgument final : public FailureDiagnostic {
   Type wrapperType;
   ParamDecl *param;

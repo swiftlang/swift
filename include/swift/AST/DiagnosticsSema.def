@@ -5575,7 +5575,8 @@ ERROR(property_wrapper_param_not_supported,none,
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (Identifier))
 ERROR(invalid_projection_argument,none,
-      "cannot use property wrapper projection argument", ())
+      "cannot use property wrapper projection %select{argument|parameter}0",
+      (bool))
 NOTE(property_wrapper_param_no_wrapper,none,
      "parameter %0 does not have an attached property wrapper", (Identifier))
 NOTE(property_wrapper_param_attr_arg,none,

@@ -122,6 +122,10 @@ enum class FixKind : uint8_t {
   /// the storage or property wrapper.
   UseWrappedValue,
 
+  /// Allow a type that is not a property wrapper to be used as a property
+  /// wrapper.
+  AllowInvalidPropertyWrapperType,
+
   /// Remove the '$' prefix from an argument label or parameter name.
   RemoveProjectedValueArgument,
 
@@ -978,6 +982,25 @@ public:
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
                                  Type base, Type wrapper,
                                  ConstraintLocator *locator);
+};
+
+class AllowInvalidPropertyWrapperType final : public ConstraintFix {
+  Type wrapperType;
+
+  AllowInvalidPropertyWrapperType(ConstraintSystem &cs, Type wrapperType,
+                                  ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInvalidPropertyWrapperType, locator),
+        wrapperType(wrapperType) {}
+
+public:
+  static AllowInvalidPropertyWrapperType *create(ConstraintSystem &cs, Type wrapperType,
+                                                 ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "allow invalid property wrapper type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
 };
 
 class RemoveProjectedValueArgument final : public ConstraintFix {

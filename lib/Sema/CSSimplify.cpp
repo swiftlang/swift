@@ -8127,23 +8127,23 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
   }
 
   ConstraintFix *fix = nullptr;
+  auto *wrappedVar = getAsDecl<VarDecl>(locator.getAnchor());
+  assert(wrappedVar && wrappedVar->hasAttachedPropertyWrapper());
 
   // The wrapper type must be a property wrapper.
-  auto *nominal = wrapperType->getAnyNominal();
+  auto *nominal = wrapperType->getDesugaredType()->getAnyNominal();
   if (!(nominal && nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())) {
-    if (auto *paramDecl = getAsDecl<ParamDecl>(locator.getAnchor())) {
-      fix = RemoveProjectedValueArgument::create(*this, wrapperType, paramDecl,
-                                                 getConstraintLocator(paramDecl));
-    } else {
-      return SolutionKind::Error;
-    }
+    fix = AllowInvalidPropertyWrapperType::create(*this, wrapperType,
+                                                  getConstraintLocator(locator));
   }
 
   auto typeInfo = nominal->getPropertyWrapperTypeInfo();
-  if (!(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
-    if (auto *paramDecl = getAsDecl<ParamDecl>(locator.getAnchor())) {
-      fix = RemoveProjectedValueArgument::create(*this, wrapperType, paramDecl,
-                                                 getConstraintLocator(paramDecl));
+
+  // Implicit property wrappers must support projected-value initialization.
+  if (!fix && wrappedVar->hasImplicitPropertyWrapper()) {
+    if (!(typeInfo.projectedValueVar && typeInfo.hasProjectedValueInit)) {
+      fix = RemoveProjectedValueArgument::create(*this, wrapperType, cast<ParamDecl>(wrappedVar),
+                                                 getConstraintLocator(locator));
     }
   }
 
@@ -10833,6 +10833,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipUnhandledConstructInResultBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
+  case FixKind::AllowInvalidPropertyWrapperType:
   case FixKind::RemoveProjectedValueArgument:
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseRawValue:

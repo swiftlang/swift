@@ -646,6 +646,17 @@ UseWrappedValue *UseWrappedValue::create(ConstraintSystem &cs,
       UseWrappedValue(cs, propertyWrapper, base, wrapper, locator);
 }
 
+bool AllowInvalidPropertyWrapperType::diagnose(const Solution &solution, bool asNote) const {
+  InvalidPropertyWrapperType failure(solution, wrapperType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInvalidPropertyWrapperType *
+AllowInvalidPropertyWrapperType::create(ConstraintSystem &cs, Type wrapperType,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowInvalidPropertyWrapperType(cs, wrapperType, locator);
+}
+
 bool RemoveProjectedValueArgument::diagnose(const Solution &solution, bool asNote) const {
   InvalidProjectedValueArgument failure(solution, wrapperType, param, getLocator());
   return failure.diagnose(asNote);

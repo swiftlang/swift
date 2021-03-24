@@ -3312,20 +3312,33 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
   return true;
 }
 
-bool InvalidProjectedValueArgument::diagnoseAsError() {
-  if (param->hasImplicitPropertyWrapper()) {
-    emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
-  } else {
-    emitDiagnostic(diag::invalid_projection_argument);
+bool InvalidPropertyWrapperType::diagnoseAsError() {
+  // The property wrapper constraint is currently only used for
+  // implicit property wrappers on closure parameters.
+  auto *wrappedVar = getAsDecl<VarDecl>(getAnchor());
+  assert(wrappedVar->hasImplicitPropertyWrapper());
 
-    if (!param->hasAttachedPropertyWrapper()) {
-      param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
-    } else if (param->getAttachedPropertyWrappers().front()->getArg()) {
-      param->diagnose(diag::property_wrapper_param_attr_arg);
+  emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
+  return true;
+}
+
+bool InvalidProjectedValueArgument::diagnoseAsError() {
+  emitDiagnostic(diag::invalid_projection_argument, param->hasImplicitPropertyWrapper());
+
+  if (!param->hasAttachedPropertyWrapper()) {
+    param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
+  } else if (!param->hasImplicitPropertyWrapper() &&
+             param->getAttachedPropertyWrappers().front()->getArg()) {
+    param->diagnose(diag::property_wrapper_param_attr_arg);
+  } else {
+    Type backingType;
+    if (param->hasImplicitPropertyWrapper()) {
+      backingType = getType(param->getPropertyWrapperBackingProperty());
     } else {
-      auto backingType = param->getPropertyWrapperBackingPropertyType();
-      param->diagnose(diag::property_wrapper_no_init_projected_value, backingType);
+      backingType = param->getPropertyWrapperBackingPropertyType();
     }
+
+    param->diagnose(diag::property_wrapper_no_init_projected_value, backingType);
   }
 
   return true;

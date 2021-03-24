@@ -41,6 +41,12 @@ func testNoProjection(message: String) {
 
   // expected-error@+1 {{cannot use property wrapper projection argument}}
   takesNoProjectionWrapper($value: message)
+
+  // expected-error@+2 {{cannot use property wrapper projection parameter}}
+  // expected-note@+1 {{property wrapper type 'NoProjection<Int>' does not support initialization from a projected value}}
+  let _: (NoProjection<Int>) -> Int = { $value in
+    return value
+  }
 }
 
 struct Projection<T> {
