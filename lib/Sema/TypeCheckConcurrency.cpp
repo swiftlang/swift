@@ -290,18 +290,18 @@ bool IsActorRequest::evaluate(
 
 bool IsDefaultActorRequest::evaluate(
     Evaluator &evaluator, ClassDecl *classDecl) const {
-  // If the class isn't an actor class, it's not a default actor.
+  // If the class isn't an actor, it's not a default actor.
   if (!classDecl->isActor())
     return false;
 
-  // If there is a superclass, and it's an actor class, we defer
+  // If there is a superclass, and it's an actor, we defer
   // the decision to it.
   if (auto superclassDecl = classDecl->getSuperclassDecl()) {
     // If the superclass is an actor, we inherit its default-actor-ness.
     if (superclassDecl->isActor())
       return superclassDecl->isDefaultActor();
 
-    // If the superclass is not an actor class, it can only be
+    // If the superclass is not an actor, it can only be
     // a default actor if it's NSObject.  (For now, other classes simply
     // can't be actors at all.)  We don't need to diagnose this; we
     // should've done that already in isActor().
@@ -522,7 +522,7 @@ GlobalActorAttributeRequest::evaluate(
     // Nominal types are okay...
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
       if (classDecl->isActor()) {
-        // ... except for actor classes.
+        // ... except for actors.
         nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return None;

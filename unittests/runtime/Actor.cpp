@@ -85,7 +85,7 @@ static void run(llvm::function_ref<void()> fn) {
 
 namespace {
 
-/// A simple actor class.
+/// A simple actor.
 class TestActor : public DefaultActor {
 public:
   TestActor();
