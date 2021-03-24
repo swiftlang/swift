@@ -8031,6 +8031,45 @@ static Optional<Requirement> createRequirement(RequirementKind kind,
   }
 }
 
+/// Determine the canonical ordering of requirements.
+static unsigned getRequirementKindOrder(RequirementKind kind) {
+  switch (kind) {
+  case RequirementKind::Conformance: return 2;
+  case RequirementKind::Superclass: return 0;
+  case RequirementKind::SameType: return 3;
+  case RequirementKind::Layout: return 1;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+static int compareRequirements(const Requirement *lhsPtr,
+                               const Requirement *rhsPtr) {
+  auto &lhs = *lhsPtr;
+  auto &rhs = *rhsPtr;
+
+  int compareLHS =
+    compareDependentTypes(lhs.getFirstType(), rhs.getFirstType());
+
+  if (compareLHS != 0)
+    return compareLHS;
+
+  int compareKind = (getRequirementKindOrder(lhs.getKind()) -
+                     getRequirementKindOrder(rhs.getKind()));
+
+  if (compareKind != 0)
+    return compareKind;
+
+  // We should only have multiple conformance requirements.
+  assert(lhs.getKind() == RequirementKind::Conformance);
+
+  int compareProtos =
+    TypeDecl::compare(lhs.getProtocolDecl(), rhs.getProtocolDecl());
+
+  assert(compareProtos != 0 && "Duplicate conformance requirement");
+
+  return compareProtos;
+}
+
 void GenericSignatureBuilder::enumerateRequirements(
                    TypeArrayView<GenericTypeParamType> genericParams,
                    SmallVectorImpl<Requirement> &requirements) {
@@ -8195,17 +8234,6 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature sig) {
 
 #ifndef NDEBUG
 
-/// Determine the canonical ordering of requirements.
-static unsigned getRequirementKindOrder(RequirementKind kind) {
-  switch (kind) {
-  case RequirementKind::Conformance: return 2;
-  case RequirementKind::Superclass: return 0;
-  case RequirementKind::SameType: return 3;
-  case RequirementKind::Layout: return 1;
-  }
-  llvm_unreachable("unhandled kind");
-}
-
 static void checkGenericSignature(CanGenericSignature canSig,
                                   GenericSignatureBuilder &builder) {
   PrettyStackTraceGenericSignature debugStack("checking", canSig);
@@ -8293,25 +8321,8 @@ static void checkGenericSignature(CanGenericSignature canSig,
       }
     }
 
-    // From here on, we only care about cases where the previous and current
-    // requirements have the same left-hand side.
-    if (compareLHS != 0) continue;
-
-    // Check ordering of requirement kinds.
-    assert((getRequirementKindOrder(prevReqt.getKind()) <=
-            getRequirementKindOrder(reqt.getKind())) &&
-           "Requirements for a given kind are out-of-order");
-
-    // From here on, we only care about the same requirement kind.
-    if (prevReqt.getKind() != reqt.getKind()) continue;
-
-    assert(reqt.getKind() == RequirementKind::Conformance &&
-           "Only conformance requirements can have multiples");
-
-    auto prevProto = prevReqt.getProtocolDecl();
-    auto proto = reqt.getProtocolDecl();
-    assert(TypeDecl::compare(prevProto, proto) < 0 &&
-           "Out-of-order conformance requirements");
+    assert(compareRequirements(&prevReqt, &reqt) < 0 &&
+           "Out-of-order requirements");
   }
 }
 #endif
