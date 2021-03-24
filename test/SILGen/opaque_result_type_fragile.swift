@@ -13,10 +13,10 @@ public func testInternalView() {
   // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE11passThroughQryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out τ_0_0
   _ = v.passThrough()
 
-  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF", 0) 🦸<τ_0_0>
+  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF", 0) __<τ_0_0>
   _ = v.wrapWithInternalView()
 
-  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF", 0) 🦸<τ_0_0>
+  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF", 0) __<τ_0_0>
   _ = v.wrapWithInternalGenericView()
 
   // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE014wrapWithPublicF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out PublicView
@@ -32,10 +32,10 @@ public func testPublicView() {
   // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE11passThroughQryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out τ_0_0
   _ = v.passThrough()
 
-  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF", 0) 🦸<τ_0_0>
+  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE016wrapWithInternalF0QryF", 0) __<τ_0_0>
   _ = v.wrapWithInternalView()
 
-  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF", 0) 🦸<τ_0_0>
+  // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out @_opaqueReturnTypeOf("$s32opaque_result_type_fragile_other4ViewPAAE023wrapWithInternalGenericF0QryF", 0) __<τ_0_0>
   _ = v.wrapWithInternalGenericView()
 
   // CHECK: function_ref @$s32opaque_result_type_fragile_other4ViewPAAE014wrapWithPublicF0QryF : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @out PublicView

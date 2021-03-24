@@ -17,7 +17,7 @@ func opaqueResult(_ x: Float) -> some Differentiable { x }
 // 2.      While evaluating request ExecuteSILPipelineRequest(Run pipelines { Guaranteed Passes } on SIL for main.main)
 // 3.      While running pass #15 SILModuleTransform "Differentiation".
 // 4.      While processing // differentiability witness for opaqueResult(_:)
-// sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @$s4main12opaqueResultyQrSfF : $@convention(thin) (Float) -> @out @_opaqueReturnTypeOf("$s4main12opaqueResultyQrSfF", 0) 🦸 {
+// sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] @$s4main12opaqueResultyQrSfF : $@convention(thin) (Float) -> @out @_opaqueReturnTypeOf("$s4main12opaqueResultyQrSfF", 0) __ {
 // }
 //  on SIL function "@$s4main12opaqueResultyQrSfF".
 //  for 'opaqueResult(_:)' (at swift/test/AutoDiff/compiler_crashers/sr12656-differentiation-opaque-result-type.swift:13:1)
