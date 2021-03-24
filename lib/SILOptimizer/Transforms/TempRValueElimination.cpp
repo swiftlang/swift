@@ -367,19 +367,27 @@ bool TempRValueOptPass::extendAccessScopes(
 
   for (SILInstruction &inst : make_range(begin, end)) {
     if (auto *endAccess = dyn_cast<EndAccessInst>(&inst)) {
+      // To keep things simple, we can just move a single end_access. Also, we
+      // cannot move an end_access over a (non-aliasing) end_access.
+      if (endAccessToMove)
+        return false;
       // Is this the end of an access scope of the copy-source?
       if (!aa->isNoAlias(copySrc, endAccess->getSource())) {
-        // To keep things simple, we can just move a single end_access.
-        if (endAccessToMove)
-          return false;
+        assert(endAccess->getBeginAccess()->getAccessKind() ==
+                 SILAccessKind::Read &&
+               "a may-write end_access should not be in the copysrc lifetime");
         endAccessToMove = endAccess;
       }
     } else if (endAccessToMove) {
       // We cannot move an end_access over a begin_access. This would destroy
       // the proper nesting of accesses.
-      if (isa<BeginAccessInst>(&inst))
+      if (isa<BeginAccessInst>(&inst) || isa<BeginUnpairedAccessInst>(inst))
         return false;
       // Don't extend a read-access scope over a (potential) write.
+      // Note that inst can be a function call containing other access scopes.
+      // But doing the mayWriteToMemory check, we know that the function can
+      // only contain read accesses (to the same memory location). So it's fine
+      // to move endAccessToMove even over such a function call.
       if (aa->mayWriteToMemory(&inst, endAccessToMove->getSource()))
         return false;
     }

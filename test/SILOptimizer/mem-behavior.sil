@@ -12,6 +12,14 @@ class X {
   init()
 }
 
+class C {
+  @_hasStorage @_hasInitialValue final let prop: Builtin.Int32 { get }
+}
+
+class Parent {
+  @_hasStorage var child: C { get set }
+}
+
 sil @unknown_func : $@convention(thin) (Int32, @in Int32) -> ()
 sil @single_indirect_arg : $@convention(thin) (@in Int32) -> Int32
 sil @single_indirect_arg_and_error : $@convention(thin) (@in Int32) -> (Int32, @error Error)
@@ -43,11 +51,11 @@ bb0(%0 : $Builtin.RawPointer):
 }
 
 // CHECK-LABEL: @call_unknown_func
-// CHECK:     PAIR #1.
+// CHECK:     PAIR #0.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
 // CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
 // CHECK-NEXT:  r=1,w=1
-// CHECK:     PAIR #2.
+// CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
 // CHECK-NEXT:   %2 = argument of bb0 : $*Int32
 // CHECK-NEXT:  r=0,w=0
@@ -61,11 +69,11 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 }
 
 // CHECK-LABEL: @call_store_to_int_not_aliased
-// CHECK:     PAIR #1.
+// CHECK:     PAIR #0.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
 // CHECK-NEXT:  r=0,w=1
-// CHECK:     PAIR #2.
+// CHECK:     PAIR #1.
 // CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %2 = argument of bb0 : $*Int32
 // CHECK-NEXT:  r=0,w=0
@@ -79,11 +87,11 @@ bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
 }
 
 // CHECK-LABEL: @call_store_to_int_aliased
-// CHECK:     PAIR #3.
+// CHECK:     PAIR #0.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %3 = ref_element_addr %1 : $X, #X.a{{.*}}             // user: %6
 // CHECK-NEXT:  r=0,w=1
-// CHECK:     PAIR #4.
+// CHECK:     PAIR #1.
 // CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %4 = ref_element_addr %2 : $X, #X.a
 // CHECK-NEXT:  r=0,w=1
@@ -108,7 +116,7 @@ bb0(%0 : $X, %1 : $X):
 }
 
 // CHECK-LABEL: @allocstack_apply_no_side_effect
-// CHECK:     PAIR #1
+// CHECK:     PAIR #0
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
 // CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                         // user: %5
 // CHECK-NEXT:  r=0,w=0
@@ -123,7 +131,7 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: @allocstack_apply_side_effect
-// CHECK: PAIR #1.
+// CHECK: PAIR #0.
 // CHECK-NEXT:   %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
 // CHECK-NEXT:   %1 = alloc_stack $Int32
 // CHECK-NEXT:  r=0,w=1
@@ -139,7 +147,7 @@ bb0(%0 : $Int32):
 }
 
 // CHECK-LABEL: @allocstack_apply_no_escaping
-// CHECK: PAIR #1.
+// CHECK: PAIR #0.
 // CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
 // CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                    // users: %7, %5
 // CHECK-NEXT:  r=0,w=0
@@ -172,11 +180,11 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL:  @allocstack_and_copyaddr
-// CHECK:        PAIR #0.
+// CHECK:        PAIR #2.
 // CHECK-NEXT:     %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=1
-// CHECK:        PAIR #1.
+// CHECK:        PAIR #3.
 // CHECK-NEXT:     %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
 // CHECK-NEXT:     %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=0,w=0
@@ -191,11 +199,11 @@ bb0(%0 : $*Int32):
 }
 
 // CHECK-LABEL:  @inout_and_copyaddr
-// CHECK:        PAIR #0.
+// CHECK:        PAIR #2.
 // CHECK-NEXT:       %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=1
-// CHECK:        PAIR #1.
+// CHECK:        PAIR #3.
 // CHECK-NEXT:       %4 = apply %3(%0) : $@convention(thin) (@in Int32) -> Int32
 // CHECK-NEXT:     %1 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=0,w=0
@@ -208,15 +216,15 @@ bb0(%0 : $*Int32, %1 : $*Int32):
 }
 
 // CHECK-LABEL:  @esacping_allocstack_and_copyaddr
-// CHECK:        PAIR #0.
+// CHECK:        PAIR #3.
 // CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=1
-// CHECK:        PAIR #1.
+// CHECK:        PAIR #4.
 // CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
 // CHECK-NEXT:       %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=1,w=1
-// CHECK:        PAIR #2.
+// CHECK:        PAIR #5.
 // CHECK-NEXT:       %5 = apply %4(%0, %3) : $@convention(thin) (@in Int32, Builtin.RawPointer) -> Int32
 // CHECK-NEXT:       %3 = address_to_pointer %1 : $*Int32 to $Builtin.RawPointer
 // CHECK-NEXT:     r=1,w=1
@@ -232,7 +240,7 @@ bb0(%0 : $*Int32):
 }
 
 // CHECK-LABEL:  @escaping_allocstack_to_known_function
-// CHECK:        PAIR #1.
+// CHECK:        PAIR #2.
 // CHECK-NEXT:       %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UInt8 // user: %7
 // CHECK-NEXT:       %1 = alloc_stack $UInt8                         // users: %6, %3, %2
 // CHECK-NEXT:     r=1,w=0
@@ -248,11 +256,11 @@ bb0(%0 : $UInt8):
 }
 
 // CHECK-LABEL:  @tryapply_allocstack_and_copyaddr
-// CHECK:        PAIR #0.
+// CHECK:        PAIR #2.
 // CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error Error), normal bb1, error bb2
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=1
-// CHECK:        PAIR #1.
+// CHECK:        PAIR #3.
 // CHECK-NEXT:       try_apply %3(%0) : $@convention(thin) (@in Int32) -> (Int32, @error Error), normal bb1, error bb2
 // CHECK-NEXT:       %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=0,w=0
@@ -270,27 +278,27 @@ bb2(%8 : $Error):
 }
 
 // CHECK-LABEL:  @beginapply_allocstack_and_copyaddr
-// CHECK:        PAIR #0.
+// CHECK:        PAIR #2.
 // CHECK-NEXT:       (%4, %5) = begin_apply %3(%0) : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=1
-// CHECK:        PAIR #1.
+// CHECK:        PAIR #3.
 // CHECK-NEXT:       (%4, %5) = begin_apply %3(%0) : $@yield_once @convention(thin) (@in Int32) -> @yields Int32
 // CHECK-NEXT:       %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=0,w=0
-// CHECK:        PAIR #3.
-// CHECK-NEXT:       end_apply %5
-// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
-// CHECK-NEXT:     r=1,w=1
 // CHECK:        PAIR #4.
 // CHECK-NEXT:       end_apply %5
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=1,w=1
+// CHECK:        PAIR #5.
+// CHECK-NEXT:       end_apply %5
 // CHECK-NEXT:       %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=0,w=0
-// CHECK:        PAIR #8.
+// CHECK:        PAIR #6.
 // CHECK-NEXT:       abort_apply %5
 // CHECK-NEXT:     %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:     r=1,w=1
-// CHECK:        PAIR #9.
+// CHECK:        PAIR #7.
 // CHECK-NEXT:       abort_apply %5
 // CHECK-NEXT:       %1 = alloc_stack $Int32
 // CHECK-NEXT:     r=0,w=0
@@ -311,7 +319,7 @@ bb2:
 }
 
 // CHECK-LABEL: @refelementaddr_and_reference
-// CHECK:       PAIR #1.
+// CHECK:       PAIR #0.
 // CHECK-NEXT:      %3 = apply %2(%0) : $@convention(thin) (@guaranteed X) -> Int32
 // CHECK-NEXT:      %1 = ref_element_addr %0 : $X, #X.a
 // CHECK-NEXT:    r=1,w=1
@@ -324,7 +332,7 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL: @apply_and_begin_access
-// CHECK:       PAIR #0.
+// CHECK:       PAIR #8.
 // CHECK-NEXT:      %6 = apply %5(%1) : $@convention(thin) (@in Int32) -> Int32
 // CHECK-NEXT:    %0 = argument of bb0 : $*Int32
 // CHECK-NEXT:    r=0,w=0
@@ -415,3 +423,297 @@ bb0(%0 : $*Int):
   %3 = tuple()
   return %3 : $()
 }
+
+// Check the memory behavior of a read-only load relative to an
+// unknown instruction with side effects.
+//
+// CHECK-LABEL: @testLetSideEffects
+//
+// The store does not affect the let-load (ref_element_addr).
+// CHECK: PAIR #2.
+// CHECK-NEXT:    %6 = begin_access [modify] [static] %1 : $*Builtin.Int32
+// CHECK-NEXT:    %10 = ref_element_addr %9 : $C, #C.prop
+// CHECK-NEXT:  r=0,w=0
+//
+// Any unknown instructions with side effects does affect the let-load.
+// CHECK: PAIR #18.
+// CHECK-NEXT:     end_borrow %{{.*}} : $C
+// CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
+// CHECK-NEXT:   r=1,w=1
+// CHECK: PAIR #30.
+// CHECK-NEXT:     destroy_value %0 : $Parent
+// CHECK-NEXT:     ref_element_addr %{{.*}} : $C, #C.prop
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @testLetSideEffects : $@convention(thin) (@owned Parent, @inout Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : @owned $Parent, %1 : $*Builtin.Int32):
+  %borrow1 = begin_borrow %0 : $Parent
+  %childAdr = ref_element_addr %borrow1 : $Parent, #Parent.child
+  %child = load_borrow %childAdr : $*C
+
+  %three = integer_literal $Builtin.Int32, 3
+  %access = begin_access [modify] [static] %1 : $*Builtin.Int32
+  store %three to [trivial] %access : $*Builtin.Int32
+  end_access %access : $*Builtin.Int32
+
+  %borrow2 = begin_borrow %child : $C
+  %propAdr = ref_element_addr %borrow2 : $C, #C.prop
+  %val = load [trivial] %propAdr : $*Builtin.Int32
+  end_borrow %borrow2 : $C
+  end_borrow %child : $C
+  end_borrow %borrow1 : $Parent
+  destroy_value %0 : $Parent
+  return %val : $Builtin.Int32
+}
+
+// Check the memory behavior of access markers.
+//
+// CHECK-LABEL: @testReadWriteAccess
+// CHECK: PAIR #0.
+// CHECK-NEXT:     %{{.*}} = begin_access [read] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:     %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=0
+// CHECK: PAIR #1.
+// CHECK-NEXT:     %{{.*}} = begin_access [read] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:     %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=0
+// CHECK: PAIR #5.
+// CHECK-NEXT:     end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:   %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=0
+// CHECK: PAIR #6.
+// CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:    %{{.*}} = begin_access [read] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:  r=1,w=0
+// CHECK: PAIR #7.
+// CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:    %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:  r=1,w=0
+// CHECK: PAIR #8.
+// CHECK-NEXT:    %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:  r=1,w=1
+// CHECK: PAIR #9.
+// CHECK-NEXT:    %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:    %{{.*}} = begin_access [read] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:  r=1,w=1
+// CHECK: PAIR #13.
+// CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:  r=1,w=1
+// CHECK: PAIR #14.
+// CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:    %{{.*}} = begin_access [read] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:  r=1,w=1
+// CHECK: PAIR #15.
+// CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:    %{{.*}} = begin_access [modify] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:  r=1,w=1
+sil [ossa] @testReadWriteAccess : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32):
+  %read = begin_access [read] [static] %0 : $*Builtin.Int32
+  %val = load [trivial] %read : $*Builtin.Int32
+  end_access %read : $*Builtin.Int32
+  %three = integer_literal $Builtin.Int32, 3
+  %write = begin_access [modify] [static] %0 : $*Builtin.Int32
+  store %three to [trivial] %write : $*Builtin.Int32
+  end_access %write : $*Builtin.Int32
+  return %val : $Builtin.Int32
+}
+
+// CHECK-LABEL: @testDeinitAccess
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %1 = begin_access [deinit] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:     %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:    end_access %1 : $*Builtin.Int32
+// CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @testDeinitAccess : $@convention(thin) (@in Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = begin_access [deinit] [static] %0 : $*Builtin.Int32
+  end_access %1 : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @testInitAccess
+// CHECK: PAIR #0.
+// CHECK-NEXT:     %{{.*}} = begin_access [init] [static] %0 : $*Builtin.Int32
+// CHECK-NEXT:     %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:   r=0,w=1
+// CHECK: PAIR #3.
+// CHECK-NEXT:    end_access %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:    %0 = argument of bb0 : $*Builtin.Int32
+// CHECK-NEXT:  r=0,w=1
+sil [ossa] @testInitAccess : $@convention(thin) (Builtin.Int32) -> @out Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  %init = begin_access [init] [static] %0 : $*Builtin.Int32
+  store %1 to [trivial] %init : $*Builtin.Int32
+  end_access %init : $*Builtin.Int32
+  %val = load [trivial] %0 : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @testLoadTake
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   %2 = load [take] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:   %2 = load [take] %0 : $*C
+// CHECK-NEXT:   %1 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @testLoadTake : $@convention(thin) (@in C, @in_guaranteed C) -> @owned C {
+bb0(%0 : $*C, %1 : $*C):
+  %2 = load [take] %0 : $*C
+  return %2 : $C
+}
+
+// ===-----------------------------------------------------------------------===
+// Test the effect of a [deinit] access on a global 'let'
+//
+// Test <rdar://60046018> Assert: (v->getType().isAddress()), getAccessedAddress
+
+sil_global hidden [let] @globalC : $C
+
+// CHECK-LABEL: @testDeinitInstVsNonAddressValue
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     load %{{.*}} : $*C
+// CHECK-NEXT:     begin_access [deinit] [static] %{{.*}} : $*Builtin.Int32
+// CHECK-NEXT:   r=1,w=0
+sil hidden @testDeinitInstVsNonAddressValue : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = global_addr @globalC : $*C
+  %2 = load %1 : $*C
+  %3 = ref_element_addr %2 : $C, #C.prop
+  %4 = load %3 : $*Builtin.Int32
+  %5 = ref_element_addr %0 : $C, #C.prop
+  %6 = begin_access [deinit] [static] %5 : $*Builtin.Int32
+  end_access %6 : $*Builtin.Int32
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// ===-----------------------------------------------------------------------===
+// Test that isLetAccess does not assert on nested access markers with
+// interprosed projections.
+
+struct Int64Wrapper {
+  var val : Int64
+}
+
+// CHECK-LABEL: @testNestedAccessWithInterposedProjection
+// CHECK: PAIR #2.
+// CHECK:     %1 = begin_access [modify] [static] %0 : $*Int64Wrapper // users: %7, %2
+// CHECK:     %3 = begin_access [read] [static] %2 : $*Int64  // users: %6, %4
+// CHECK:   r=1,w=1
+// CHECK: PAIR #3.
+sil @testNestedAccessWithInterposedProjection : $@convention(thin) (@inout Int64Wrapper) -> () {
+bb0(%0 : $*Int64Wrapper):
+  %1 = begin_access [modify] [static] %0 : $*Int64Wrapper
+  %2 = struct_element_addr %1 : $*Int64Wrapper, #Int64Wrapper.val
+  %3 = begin_access [read] [static] %2 : $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64._value
+  %5 = load %4 : $*Builtin.Int64
+  end_access %3 : $*Int64
+  end_access %1 : $*Int64Wrapper
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @test_copy_addr_initialize
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:    copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:    %1 = argument of bb0 : $*C
+// CHECK-NEXT:    r=1,w=0
+// CHECK:      PAIR #2.
+// CHECK-NEXT:   copy_addr %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %2 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+sil @test_copy_addr_initialize : $@convention(thin) (@inout C, @inout C) -> @out C {
+bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  copy_addr %1 to [initialization] %0 : $*C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @test_copy_addr_assign
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   copy_addr %1 to %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:    copy_addr %1 to %0 : $*C
+// CHECK-NEXT:    %1 = argument of bb0 : $*C
+// CHECK-NEXT:    r=1,w=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:   copy_addr %1 to %0 : $*C
+// CHECK-NEXT:   %2 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1
+sil @test_copy_addr_assign : $@convention(thin) (@inout C, @inout C, @inout C) -> () {
+bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  copy_addr %1 to %0 : $*C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @test_copy_addr_take
+// CHECK:      PAIR #0.
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=1
+// CHECK:      PAIR #1.
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %1 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #2.
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0 : $*C
+// CHECK-NEXT:   %2 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+sil @test_copy_addr_take : $@convention(thin) (@in C, @inout C) -> @out C {
+bb0(%0 : $*C, %1 : $*C, %2: $*C):
+  copy_addr [take] %1 to [initialization] %0 : $*C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: @test_destroy_value
+// CHECK: PAIR #0.
+// CHECK-NEXT:     %1 = load [copy] %0 : $*C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=1,w=0
+// CHECK: PAIR #1.
+// CHECK-NEXT:     destroy_value %1 : $C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_destroy_value : $@convention(thin) (@in C) -> () {
+bb0 (%0 : $*C):
+  %1 = load [copy] %0 : $*C
+  destroy_value %1 : $C
+  destroy_addr %0 : $*C
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: @test_copy_value
+// CHECK: PAIR #1.
+// CHECK-NEXT:     %2 = copy_value %1 : $C
+// CHECK-NEXT:   %0 = argument of bb0 : $*C
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_copy_value : $@convention(thin) (@in C) -> () {
+bb0 (%0 : $*C):
+  %1 = load [copy] %0 : $*C
+  %2 = copy_value %1 : $C
+  destroy_value %1 : $C
+  destroy_value %2 : $C
+  destroy_addr %0 : $*C
+  %3 = tuple()
+  return %3 : $()
+}
+
