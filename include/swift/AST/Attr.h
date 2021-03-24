@@ -163,14 +163,6 @@ protected:
       kind : NumActorIndependentKindBits
     );
 
-    SWIFT_INLINE_BITFIELD(DistributedActorAttr, DeclAttribute, NumDistributedActorKindBits,
-      kind : NumDistributedActorKindBits
-    );
-
-    SWIFT_INLINE_BITFIELD(DistributedActorIndependentAttr, DeclAttribute, NumDistributedActorIndependentKindBits,
-      kind : NumDistributedActorIndependentKindBits
-    );
-
     SWIFT_INLINE_BITFIELD(OptimizeAttr, DeclAttribute, NumOptimizationModeBits,
       mode : NumOptimizationModeBits
     );
@@ -1237,56 +1229,6 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ActorIndependent;
   }
-};
-
-/// Represents an distributed decl attribute.
-class DistributedActorAttr : public DeclAttribute {
-public:
-    DistributedActorAttr(SourceLoc atLoc, SourceRange range, DistributedActorKind kind)
-        : DeclAttribute(DAK_DistributedActor, atLoc, range, /*Implicit=*/false) {
-      Bits.DistributedActorAttr.kind = unsigned(kind);
-    }
-
-    DistributedActorAttr(DistributedActorKind kind, bool IsImplicit=false)
-        : DistributedActorAttr(SourceLoc(), SourceRange(), kind) {
-      setImplicit(IsImplicit);
-    }
-
-    DistributedActorKind getKind() const {
-      return DistributedActorKind(Bits.DistributedActorAttr.kind);
-    }
-
-    static bool classof(const DeclAttribute *DA) {
-      return DA->getKind() == DAK_DistributedActor;
-    }
-};
-
-/// Represents an _distributedActorIndependent decl attribute.
-class DistributedActorIndependentAttr : public DeclAttribute {
-public:
-    DistributedActorIndependentAttr(SourceLoc atLoc, SourceRange range,
-                                    DistributedActorIndependentKind kind)
-        : DeclAttribute(DAK_DistributedActorIndependent, atLoc, range, /*Implicit=*/false) {
-      Bits.DistributedActorIndependentAttr.kind = unsigned(kind);
-    }
-
-    DistributedActorIndependentAttr(bool IsImplicit=false)
-        : DistributedActorIndependentAttr(DistributedActorIndependentKind::Default,
-                                          IsImplicit) {}
-
-    DistributedActorIndependentAttr(DistributedActorIndependentKind kind,
-                                    bool IsImplicit=false)
-        : DistributedActorIndependentAttr(SourceLoc(), SourceRange(), kind) {
-      setImplicit(IsImplicit);
-    }
-
-    DistributedActorIndependentKind getKind() const {
-      return DistributedActorIndependentKind(Bits.DistributedActorIndependentAttr.kind);
-    }
-
-    static bool classof(const DeclAttribute *DA) {
-      return DA->getKind() == DAK_DistributedActorIndependent;
-    }
 };
 
 /// Defines the attribute that we use to model documentation comments.

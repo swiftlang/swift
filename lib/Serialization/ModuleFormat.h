@@ -1850,13 +1850,6 @@ namespace decls_block {
     BCFixed<1>  // unsafe flag
   >;
 
-  using DistributedActorDeclAttrLayout = BCRecordLayout<
-    DistributedActor_DECL_ATTR,
-    BCFixed<1>  // default flag
-  >;
-  using DistributedActorIndependentDeclAttrLayout
-    = BCRecordLayout<DistributedActor_DECL_ATTR>;
-
   using OptimizeDeclAttrLayout = BCRecordLayout<
     Optimize_DECL_ATTR,
     BCFixed<2>  // optimize value
