@@ -3752,8 +3752,9 @@ namespace {
       // any instantiation errors.
       for (auto member : decl->decls()) {
         if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
-          Impl.getClangSema()
-            .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
+          if (varDecl->getTemplateInstantiationPattern())
+            Impl.getClangSema()
+              .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
         }
       }
 
