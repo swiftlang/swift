@@ -5103,9 +5103,7 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
   return addSameTypeRequirement(paOrT1, paOrT2, source, unresolvedHandling,
                                 [&](Type type1, Type type2) {
       Impl->HadAnyError = true;
-      if (source.getLoc().isValid() &&
-          !type1->hasError() &&
-          !type2->hasError()) {
+      if (source.getLoc().isValid()) {
         Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                        type1, type2);
       }
@@ -5286,9 +5284,7 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
         UnresolvedHandlingKind::GenerateConstraints,
         [&](Type type1, Type type2) {
           Impl->HadAnyError = true;
-          if (source.getLoc().isValid() &&
-              !type1->hasError() &&
-              !type2->hasError()) {
+          if (source.getLoc().isValid()) {
             Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                            type1, type2);
           }
