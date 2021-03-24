@@ -36,7 +36,8 @@ using namespace swift::syntax;
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        const TypeAttributes &attrs,
                                        ParamDecl::Specifier specifier,
-                                       SourceLoc specifierLoc) {
+                                       SourceLoc specifierLoc,
+                                       SourceLoc isolatedLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty()) {
     ty = new (Context) AttributedTypeRepr(attrs, ty);
@@ -57,6 +58,11 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     case ParamDecl::Specifier::Default:
       break;
     }
+  }
+
+  // Apply 'isolated'.
+  if (isolatedLoc.isValid()) {
+    ty = new (Context) IsolatedTypeRepr(ty, isolatedLoc);
   }
 
   return ty;
@@ -311,7 +317,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                      LAngleLoc, Args, RAngleLoc);
   return makeParserResult(applyAttributeToType(repr, attrs,
                                                ParamDecl::Specifier::Owned,
-                                               SourceLoc()));
+                                               SourceLoc(), SourceLoc()));
 }
 
 
@@ -334,8 +340,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   // Parse attributes.
   ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
+  SourceLoc isolatedLoc;
   TypeAttributes attrs;
-  status |= parseTypeAttributeList(specifier, specifierLoc, attrs);
+  status |= parseTypeAttributeList(specifier, specifierLoc, isolatedLoc, attrs);
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -532,11 +539,12 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     if (tyR)
       tyR->walk(walker);
   }
-  if (specifierLoc.isValid() || !attrs.empty())
+  if (specifierLoc.isValid() || isolatedLoc.isValid() || !attrs.empty())
     SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
-  return makeParserResult(status, applyAttributeToType(tyR, attrs, specifier,
-                                                       specifierLoc));
+  return makeParserResult(
+      status,
+      applyAttributeToType(tyR, attrs, specifier, specifierLoc, isolatedLoc));
 }
 
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {

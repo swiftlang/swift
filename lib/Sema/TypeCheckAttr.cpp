@@ -291,7 +291,9 @@ public:
   void visitReasyncAttr(ReasyncAttr *attr);
   void visitNonisolatedAttr(NonisolatedAttr *attr);
   void visitCompletionHandlerAsyncAttr(CompletionHandlerAsyncAttr *attr);
+  void visitIsolatedAttr(IsolatedAttr *attr);
 };
+
 } // end anonymous namespace
 
 void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
@@ -5611,6 +5613,15 @@ void AttributeChecker::visitReasyncAttr(ReasyncAttr *attr) {
 
   diagnose(attr->getLocation(), diag::reasync_without_async_parameter);
   attr->setInvalid();
+}
+
+void AttributeChecker::visitIsolatedAttr(IsolatedAttr *attr) {
+  auto *param = cast<ParamDecl>(D);
+  auto type = param->getType();
+  if (!type->isActorType() && !type->hasError()) {
+    diagnose(attr->getLocation(), diag::isolated_param_non_actor, type);
+    attr->setInvalid();
+  }
 }
 
 namespace {

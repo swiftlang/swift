@@ -238,26 +238,35 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
     }
     
-    // ('inout' | '__shared' | '__owned')?
+    // ('inout' | '__shared' | '__owned' | isolated)?
     bool hasSpecifier = false;
     while (Tok.is(tok::kw_inout) ||
-           (Tok.is(tok::identifier) &&
-            (Tok.getRawText().equals("__shared") ||
-             Tok.getRawText().equals("__owned")))) {
+           Tok.isContextualKeyword("__shared") ||
+           Tok.isContextualKeyword("__owned") ||
+           Tok.isContextualKeyword("isolated")) {
+      if (Tok.isContextualKeyword("isolated")) {
+        if (param.IsolatedLoc.isValid()) {
+          diagnose(Tok, diag::parameter_specifier_repeated)
+            .fixItRemove(Tok.getLoc());
+          consumeToken();
+        } else {
+          param.IsolatedLoc = consumeToken();
+        }
+        continue;
+      }
+
       if (!hasSpecifier) {
         if (Tok.is(tok::kw_inout)) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::InOut;
           param.SpecifierLoc = consumeToken();
-        } else if (Tok.is(tok::identifier) &&
-                   Tok.getRawText().equals("__shared")) {
+        } else if (Tok.isContextualKeyword("__shared")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::Shared;
           param.SpecifierLoc = consumeToken();
-        } else if (Tok.is(tok::identifier) &&
-                   Tok.getRawText().equals("__owned")) {
+        } else if (Tok.isContextualKeyword("__owned")) {
           // This case is handled later when mapping to ParamDecls for
           // better fixits.
           param.SpecifierKind = ParamDecl::Specifier::Owned;
@@ -541,6 +550,13 @@ mapParsedParameters(Parser &parser,
                                                              "__owned",
                                                              parsingEnumElt);
       }
+
+      if (paramInfo.IsolatedLoc.isValid()) {
+        type = new (parser.Context) IsolatedTypeRepr(
+            type, paramInfo.IsolatedLoc);
+        param->setIsolated();
+      }
+
       param->setTypeRepr(type);
 
       // If there is `@autoclosure` attribute associated with the type
