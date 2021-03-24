@@ -8013,10 +8013,36 @@ namespace {
 
     return false;
   }
-
-  using SameTypeComponentRef = std::pair<EquivalenceClass *, unsigned>;
-
 } // end anonymous namespace
+
+static Optional<Requirement> createRequirement(RequirementKind kind,
+                                               Type depTy,
+                                               RequirementRHS rhs,
+                           TypeArrayView<GenericTypeParamType> genericParams) {
+
+  depTy = getSugaredDependentType(depTy, genericParams);
+
+  if (auto type = rhs.dyn_cast<Type>()) {
+    if (type->hasError())
+      return None;
+
+    // Drop requirements involving concrete types containing
+    // unresolved associated types.
+    if (type->findUnresolvedDependentMemberType())
+      return None;
+
+    if (type->isTypeParameter())
+      type = getSugaredDependentType(type, genericParams);
+
+    return Requirement(kind, depTy, type);
+  } else if (auto *proto = rhs.dyn_cast<ProtocolDecl *>()) {
+    auto type = proto->getDeclaredInterfaceType();
+    return Requirement(kind, depTy, type);
+  } else {
+    auto layoutConstraint = rhs.get<LayoutConstraint>();
+    return Requirement(kind, depTy, layoutConstraint);
+  }
+}
 
 void GenericSignatureBuilder::enumerateRequirements(
                    TypeArrayView<GenericTypeParamType> genericParams,
@@ -8024,150 +8050,121 @@ void GenericSignatureBuilder::enumerateRequirements(
   auto recordRequirement = [&](RequirementKind kind,
                                Type depTy,
                                RequirementRHS rhs) {
-    depTy = getSugaredDependentType(depTy, genericParams);
-
-    if (auto type = rhs.dyn_cast<Type>()) {
-      if (type->hasError())
-        return;
-
-      // Drop requirements involving concrete types containing
-      // unresolved associated types.
-      if (type->findUnresolvedDependentMemberType()) {
-        assert(Impl->HadAnyError);
-        return;
-      }
-
-      if (type->isTypeParameter())
-        type = getSugaredDependentType(type, genericParams);
-
-      requirements.push_back(Requirement(kind, depTy, type));
-    } else if (auto *proto = rhs.dyn_cast<ProtocolDecl *>()) {
-      auto type = proto->getDeclaredInterfaceType();
-      requirements.push_back(Requirement(kind, depTy, type));
-    } else {
-      auto layoutConstraint = rhs.get<LayoutConstraint>();
-      requirements.push_back(Requirement(kind, depTy, layoutConstraint));
-      return;
-    }
+    if (auto req = createRequirement(kind, depTy, rhs, genericParams))
+      requirements.push_back(*req);
   };
 
   // Collect all of the subject types that will be involved in constraints.
-  SmallVector<SameTypeComponentRef, 8> subjects;
   for (auto &equivClass : Impl->EquivalenceClasses) {
     if (equivClass.derivedSameTypeComponents.empty()) {
-      checkSameTypeConstraints(getGenericParams(), &equivClass);
+      checkSameTypeConstraints(genericParams, &equivClass);
     }
 
-    for (unsigned i : indices(equivClass.derivedSameTypeComponents))
-      subjects.push_back({&equivClass, i});
-  }
+    for (unsigned i : indices(equivClass.derivedSameTypeComponents)) {
+      // Dig out the subject type and its corresponding component.
+      auto &component = equivClass.derivedSameTypeComponents[i];
+      Type subjectType = component.type;
 
-  for (const auto &subject : subjects) {
-    // Dig out the subject type and its corresponding component.
-    auto equivClass = subject.first;
-    auto &component = equivClass->derivedSameTypeComponents[subject.second];
-    Type subjectType = component.type;
+      assert(!subjectType->hasError());
+      assert(!subjectType->findUnresolvedDependentMemberType());
 
-    assert(!subjectType->hasError());
-    assert(!subjectType->findUnresolvedDependentMemberType());
+      // If this equivalence class is bound to a concrete type, equate the
+      // anchor with a concrete type.
+      if (Type concreteType = equivClass.concreteType) {
+        // If the parent of this anchor is also a concrete type, don't
+        // create a requirement.
+        if (!subjectType->is<GenericTypeParamType>() &&
+            maybeResolveEquivalenceClass(
+              subjectType->castTo<DependentMemberType>()->getBase(),
+              ArchetypeResolutionKind::WellFormed,
+              /*wantExactPotentialArchetype=*/false)
+              .getEquivalenceClass(*this)->concreteType)
+          continue;
 
-    // If this equivalence class is bound to a concrete type, equate the
-    // anchor with a concrete type.
-    if (Type concreteType = equivClass->concreteType) {
-      // If the parent of this anchor is also a concrete type, don't
-      // create a requirement.
-      if (!subjectType->is<GenericTypeParamType>() &&
-          maybeResolveEquivalenceClass(
-            subjectType->castTo<DependentMemberType>()->getBase(),
-            ArchetypeResolutionKind::WellFormed,
-            /*wantExactPotentialArchetype=*/false)
-            .getEquivalenceClass(*this)->concreteType)
-        continue;
+        // Drop recursive and invalid concrete-type constraints.
+        if (equivClass.recursiveConcreteType ||
+            equivClass.invalidConcreteType)
+          continue;
 
-      // Drop recursive and invalid concrete-type constraints.
-      if (equivClass->recursiveConcreteType ||
-          equivClass->invalidConcreteType)
-        continue;
-
-      // Filter out derived requirements... except for concrete-type
-      // requirements on generic parameters. The exception is due to
-      // the canonicalization of generic signatures, which never
-      // eliminates generic parameters even when they have been
-      // mapped to a concrete type.
-      if (subjectType->is<GenericTypeParamType>() ||
-          component.concreteTypeSource == nullptr ||
-          !component.concreteTypeSource->isDerivedRequirement()) {
-        recordRequirement(RequirementKind::SameType,
-                          subjectType, concreteType);
-      }
-      continue;
-    }
-
-    std::function<void()> deferredSameTypeRequirement;
-
-    // If we're at the last anchor in the component, do nothing;
-    if (subject.second + 1 != equivClass->derivedSameTypeComponents.size()) {
-      // Form a same-type constraint from this anchor within the component
-      // to the next.
-      // FIXME: Distinguish between explicit and inferred here?
-      auto &nextComponent =
-        equivClass->derivedSameTypeComponents[subject.second + 1];
-      Type otherSubjectType = nextComponent.type;
-      deferredSameTypeRequirement =
-        [&recordRequirement, subjectType, otherSubjectType] {
+        // Filter out derived requirements... except for concrete-type
+        // requirements on generic parameters. The exception is due to
+        // the canonicalization of generic signatures, which never
+        // eliminates generic parameters even when they have been
+        // mapped to a concrete type.
+        if (subjectType->is<GenericTypeParamType>() ||
+            component.concreteTypeSource == nullptr ||
+            !component.concreteTypeSource->isDerivedRequirement()) {
           recordRequirement(RequirementKind::SameType,
-                            subjectType, otherSubjectType);
-        };
-    }
-
-    SWIFT_DEFER {
-      if (deferredSameTypeRequirement) deferredSameTypeRequirement();
-    };
-
-    // If this is not the first component anchor in its equivalence class,
-    // we're done.
-    if (subject.second > 0)
-      continue;
-
-    // If we have a superclass, produce a superclass requirement
-    if (equivClass->superclass &&
-        !equivClass->recursiveSuperclassType &&
-        !equivClass->superclass->hasError()) {
-      if (hasNonRedundantRequirementSource<Type>(
-            equivClass->superclassConstraints,
-            RequirementKind::Superclass, *this)) {
-        recordRequirement(RequirementKind::Superclass,
-                          subjectType, equivClass->superclass);
+                            subjectType, concreteType);
+        }
+        continue;
       }
-    }
 
-    // If we have a layout constraint, produce a layout requirement.
-    if (equivClass->layout) {
-      if (hasNonRedundantRequirementSource<LayoutConstraint>(
-            equivClass->layoutConstraints,
-            RequirementKind::Layout, *this)) {
-        recordRequirement(RequirementKind::Layout,
-                          subjectType, equivClass->layout);
+      std::function<void()> deferredSameTypeRequirement;
+
+      // If we're at the last anchor in the component, do nothing;
+      if (i + 1 != equivClass.derivedSameTypeComponents.size()) {
+        // Form a same-type constraint from this anchor within the component
+        // to the next.
+        // FIXME: Distinguish between explicit and inferred here?
+        auto &nextComponent = equivClass.derivedSameTypeComponents[i + 1];
+        Type otherSubjectType = nextComponent.type;
+        deferredSameTypeRequirement =
+          [&recordRequirement, subjectType, otherSubjectType] {
+            recordRequirement(RequirementKind::SameType,
+                              subjectType, otherSubjectType);
+          };
       }
-    }
 
-    // Enumerate conformance requirements.
-    SmallVector<ProtocolDecl *, 4> protocols;
+      SWIFT_DEFER {
+        if (deferredSameTypeRequirement) deferredSameTypeRequirement();
+      };
 
-    for (const auto &conforms : equivClass->conformsTo) {
-      if (hasNonRedundantRequirementSource<ProtocolDecl *>(
-            conforms.second, RequirementKind::Conformance, *this)) {
-        protocols.push_back(conforms.first);
+      // If this is not the first component anchor in its equivalence class,
+      // we're done.
+      if (i > 0)
+        continue;
+
+      // If we have a superclass, produce a superclass requirement
+      if (equivClass.superclass &&
+          !equivClass.recursiveSuperclassType &&
+          !equivClass.superclass->hasError()) {
+        if (hasNonRedundantRequirementSource<Type>(
+              equivClass.superclassConstraints,
+              RequirementKind::Superclass, *this)) {
+          recordRequirement(RequirementKind::Superclass,
+                            subjectType, equivClass.superclass);
+        }
       }
-    }
 
-    // Sort the protocols in canonical order.
-    llvm::array_pod_sort(protocols.begin(), protocols.end(), 
-                         TypeDecl::compare);
+      // If we have a layout constraint, produce a layout requirement.
+      if (equivClass.layout) {
+        if (hasNonRedundantRequirementSource<LayoutConstraint>(
+              equivClass.layoutConstraints,
+              RequirementKind::Layout, *this)) {
+          recordRequirement(RequirementKind::Layout,
+                            subjectType, equivClass.layout);
+        }
+      }
 
-    // Enumerate the conformance requirements.
-    for (auto proto : protocols) {
-      recordRequirement(RequirementKind::Conformance, subjectType, proto);
+      // Enumerate conformance requirements.
+      SmallVector<ProtocolDecl *, 4> protocols;
+
+      for (const auto &conforms : equivClass.conformsTo) {
+        if (hasNonRedundantRequirementSource<ProtocolDecl *>(
+              conforms.second, RequirementKind::Conformance, *this)) {
+          protocols.push_back(conforms.first);
+        }
+      }
+
+      // Sort the protocols in canonical order.
+      llvm::array_pod_sort(protocols.begin(), protocols.end(), 
+                           TypeDecl::compare);
+
+      // Enumerate the conformance requirements.
+      for (auto proto : protocols) {
+        recordRequirement(RequirementKind::Conformance, subjectType, proto);
+      }
     }
   }
 
