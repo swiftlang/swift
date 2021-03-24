@@ -198,7 +198,7 @@ public:
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        const SILDebugScope *DS, bool InCoroContext = false);
+                        const SILDebugScope *DS);
 
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
@@ -2377,7 +2377,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   for (llvm::Value *Piece : Storage) {
     SmallVector<uint64_t, 3> Operands;
-    if (Indirection == IndirectValue || Indirection == CoroIndirectValue)
+    if (Indirection == IndirectValue)
       Operands.push_back(llvm::dwarf::DW_OP_deref);
 
     if (IsPiece) {
@@ -2399,9 +2399,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       Operands.push_back(SizeInBits);
     }
     emitDbgIntrinsic(Builder, Piece, Var, DBuilder.createExpression(Operands),
-                     Line, Loc.column, Scope, DS,
-                     Indirection == CoroDirectValue ||
-                         Indirection == CoroIndirectValue);
+                     Line, Loc.column, Scope, DS);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
@@ -2427,7 +2425,7 @@ static bool pointsIntoAlloca(llvm::Value *Storage) {
 void IRGenDebugInfoImpl::emitDbgIntrinsic(
     IRBuilder &Builder, llvm::Value *Storage, llvm::DILocalVariable *Var,
     llvm::DIExpression *Expr, unsigned Line, unsigned Col,
-    llvm::DILocalScope *Scope, const SILDebugScope *DS, bool InCoroContext) {
+    llvm::DILocalScope *Scope, const SILDebugScope *DS) {
   // Set the location/scope of the intrinsic.
   auto *InlinedAt = createInlinedAt(DS);
   auto DL =
@@ -2454,23 +2452,11 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     // limited, so using a dbg.addr instead of a dbg.declare would be more
     // appropriate.
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-  } else if (InCoroContext) {
-    // Function arguments in async functions are emitted without a shadow copy
-    // (that would interfer with coroutine splitting) but with a dbg.declare to
-    // give CoroSplit.cpp license to emit a shadow copy for them pointing inside
-    // the Swift Context argument that is valid throughout the function.
-    auto &EntryBlock = BB->getParent()->getEntryBlock();
-    if (auto *InsertBefore = &*EntryBlock.getFirstInsertionPt())
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, InsertBefore);
-    else
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, &EntryBlock);
-  } else {
-    if (pointsIntoAlloca(Storage))
-      DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
-    else
-      // Insert a dbg.value at the current insertion point.
-      DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
-  }
+  } else if (pointsIntoAlloca(Storage))
+    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
+  else
+    // Insert a dbg.value at the current insertion point.
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
@@ -2546,8 +2532,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
-                          IGF.isAsync() ? CoroDirectValue : DirectValue,
-                          ArtificialValue);
+                          DirectValue, ArtificialValue);
 }
 
 SILLocation::FilenameAndLocation IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
@@ -2650,10 +2635,9 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                                       llvm::DILocalVariable *Var,
                                       llvm::DIExpression *Expr, unsigned Line,
                                       unsigned Col, llvm::DILocalScope *Scope,
-                                      const SILDebugScope *DS,
-                                      bool InCoroContext) {
+                                      const SILDebugScope *DS) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitDbgIntrinsic(
-      Builder, Storage, Var, Expr, Line, Col, Scope, DS, InCoroContext);
+      Builder, Storage, Var, Expr, Line, Col, Scope, DS);
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(

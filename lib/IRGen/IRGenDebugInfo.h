@@ -40,9 +40,7 @@ class IRGenModule;
 
 enum IndirectionKind {
   DirectValue,
-  IndirectValue,
-  CoroDirectValue,
-  CoroIndirectValue
+  IndirectValue
 };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
@@ -149,7 +147,7 @@ public:
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
                         llvm::DILocalVariable *Var, llvm::DIExpression *Expr,
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
-                        const SILDebugScope *DS, bool InCoroContext = false);
+                        const SILDebugScope *DS);
 
   enum { NotHeapAllocated = false };
   
