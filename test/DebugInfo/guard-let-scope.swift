@@ -11,3 +11,13 @@ func f(c: AnyObject?) {
   }
   print(x)
 }
+
+// Check that we don't crash with a verifier error on this.
+protocol P {}
+
+public func testit(_ x: AnyObject) -> Bool {
+  guard let _ = x as? P else {
+    return false
+  }
+  fatalError()
+}
