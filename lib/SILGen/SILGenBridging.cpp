@@ -1984,7 +1984,7 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   auto returnBB = createBasicBlock();
 
   auto methodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
-                                                      native);
+                                                      thunk);
   auto derivativeFnSILTy = SILType::getPrimitiveObjectType(methodTy);
   auto silFnType = derivativeFnSILTy.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
@@ -2068,13 +2068,16 @@ void SILGenFunction::emitDistributedThunk(SILDeclRef thunk) {
   {
     B.emitBlock(isLocalBB);
 
+    auto nativeMethodTy = SGM.Types.getConstantOverrideType(getTypeExpansionContext(),
+                                                            native);
+    auto nativeFnSILTy = SILType::getPrimitiveObjectType(nativeMethodTy);
+    auto nativeSilFnType = nativeFnSILTy.castTo<SILFunctionType>();
+
     SILValue nativeFn = emitClassMethodRef(
-          loc, params[params.size() - 1], native, methodTy);
+          loc, params[params.size() - 1], native, nativeMethodTy);
     auto subs = F.getForwardingSubstitutionMap();
 
-    CanSILFunctionType silFnType = derivativeFnSILTy.castTo<SILFunctionType>();
-
-    if (silFnType->hasErrorResult()) {
+    if (nativeSilFnType->hasErrorResult()) {
       B.createTryApply(loc, nativeFn, subs, params, localReturnBB, localErrorBB);
     } else {
       auto result = B.createApply(loc, nativeFn, subs, params);

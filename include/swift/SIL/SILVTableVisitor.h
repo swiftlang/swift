@@ -45,10 +45,6 @@ template <class T> class SILVTableVisitor {
     SILDeclRef constant(fd, SILDeclRef::Kind::Func);
     maybeAddEntry(constant);
 
-    if (fd->getAttrs().hasAttribute<DistributedActorAttr>()) {
-      maybeAddEntry(constant.asDistributed());
-    }
-
     maybeAddAutoDiffDerivativeMethods(constant);
   }
 

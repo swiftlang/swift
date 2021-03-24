@@ -38,6 +38,9 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   if (method->hasForcedStaticDispatch())
     return MethodDispatch::Static;
 
+  if (method->getAttrs().hasAttribute<DistributedActorAttr>())
+    return MethodDispatch::Static;
+
   // Import-as-member declarations are always statically referenced.
   if (method->isImportAsMember())
     return MethodDispatch::Static;
@@ -912,6 +915,8 @@ bool SILDeclRef::requiresNewVTableEntry() const {
       return true;
   if (!hasDecl())
     return false;
+  if (isDistributedThunk())
+    return false;
   auto fnDecl = dyn_cast<AbstractFunctionDecl>(getDecl());
   if (!fnDecl)
     return false;
@@ -943,6 +948,10 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // accessor for a property that overrides an ObjC decl, or if it is an
     // @NSManaged property, then it won't be in the vtable.
     if (overridden.getDecl()->hasClangNode())
+      return SILDeclRef();
+
+    // Distributed thunks are not in the vtable.
+    if (isDistributedThunk())
       return SILDeclRef();
     
     // An @objc convenience initializer can be "overridden" in the sense that
@@ -1212,6 +1221,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
   // generic class can't be a dynamic replacement.
   if (isForeign && hasDecl() && getDecl()->isNativeMethodReplacement())
     return false;
+  if (isDistributedThunk())
+    return false;
   if (kind == SILDeclRef::Kind::Destroyer ||
       kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
@@ -1226,6 +1237,9 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
   // The non-foreign entry of a @dynamicReplacement(for:) of @objc method in a
   // generic class can't be a dynamically replaced.
   if (!isForeign && hasDecl() && getDecl()->isNativeMethodReplacement())
+    return false;
+
+  if (isDistributedThunk())
     return false;
 
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
@@ -1263,6 +1277,8 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
 }
 
 bool SILDeclRef::hasAsync() const {
+  if (isDistributedThunk())
+    return true;
   if (hasDecl()) {
     if (auto afd = dyn_cast<AbstractFunctionDecl>(getDecl())) {
       return afd->hasAsync();
