@@ -270,6 +270,7 @@ public:
     struct CachedNestedType {
       unsigned numConformancesPresent;
       CanType superclassPresent;
+      CanType concreteTypePresent;
       llvm::TinyPtrVector<TypeDecl *> types;
     };
 

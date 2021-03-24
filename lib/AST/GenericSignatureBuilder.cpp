@@ -2124,7 +2124,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   if (cached != nestedTypeNameCache.end() &&
       cached->second.numConformancesPresent == conformsTo.size() &&
       (!superclass ||
-       cached->second.superclassPresent == superclass->getCanonicalType())) {
+       cached->second.superclassPresent == superclass->getCanonicalType()) &&
+      (!concreteType ||
+        cached->second.concreteTypePresent == concreteType->getCanonicalType())) {
     ++NumNestedTypeCacheHits;
     return populateResult(cached->second);
   }
@@ -2176,6 +2178,8 @@ TypeDecl *EquivalenceClass::lookupNestedType(
   entry.numConformancesPresent = conformsTo.size();
   entry.superclassPresent =
     superclass ? superclass->getCanonicalType() : CanType();
+  entry.concreteTypePresent =
+    concreteType ? concreteType->getCanonicalType() : CanType();
   if (bestAssocType) {
     entry.types.push_back(bestAssocType);
     entry.types.insert(entry.types.end(),
