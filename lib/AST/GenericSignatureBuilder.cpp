@@ -616,11 +616,6 @@ public:
 
     return true;
   }
-
-  friend bool operator!=(const ExplicitRequirement &lhs,
-                         const ExplicitRequirement &rhs) {
-    return !(lhs == rhs);
-  }
 };
 
 namespace llvm {
@@ -695,13 +690,8 @@ struct GenericSignatureBuilder::Implementation {
   /// Whether there were any errors.
   bool HadAnyError = false;
 
-  /// A mapping of redundant explicit requirements to the best root requirement
-  /// that implies them.
-  using RedundantRequirementMap =
-      llvm::DenseMap<ExplicitRequirement,
-                     llvm::SmallDenseSet<ExplicitRequirement, 2>>;
-
-  RedundantRequirementMap RedundantRequirements;
+  /// The set of computed redundant explicit requirements.
+  llvm::DenseSet<ExplicitRequirement> RedundantRequirements;
 
 #ifndef NDEBUG
   /// Whether we've already computed redundant requiremnts.
@@ -5634,8 +5624,8 @@ class RedundantRequirementGraph {
 
   SmallVector<Vertex, 2> vertices;
 
-  ComponentID componentCount = 0;
-  VertexID vertexCount = 0;
+  ComponentID nextComponent = 0;
+  VertexID nextIndex = 0;
 
   SmallVector<VertexID, 2> stack;
 
@@ -5794,11 +5784,11 @@ private:
   void strongConnect(VertexID v) {
     // Set the depth index for v to the smallest unused index.
     assert(vertices[v].index == Vertex::UndefinedIndex);
-    vertices[v].index = vertexCount;
+    vertices[v].index = nextIndex;
     assert(vertices[v].lowLink == Vertex::UndefinedIndex);
-    vertices[v].lowLink = vertexCount;
+    vertices[v].lowLink = nextIndex;
 
-    vertexCount++;
+    nextIndex++;
 
     stack.push_back(v);
     assert(!vertices[v].onStack);
@@ -5836,60 +5826,40 @@ private:
         vertices[w].onStack = false;
         assert(vertices[w].component == Vertex::UndefinedComponent);
 
-        vertices[w].component = componentCount;
+        vertices[w].component = nextComponent;
       } while (v != w);
 
-      componentCount++;
+      nextComponent++;
     }
   }
 
 public:
-  using RedundantRequirementMap =
-      llvm::DenseMap<ExplicitRequirement,
-                     llvm::SmallDenseSet<ExplicitRequirement, 2>>;
-
   void computeRedundantRequirements(SourceManager &SM,
-                                    RedundantRequirementMap &redundant) {
+                         llvm::DenseSet<ExplicitRequirement> &redundant) {
     // First, compute SCCs.
     computeSCCs();
 
-    // The set of edges pointing to each connected component.
-    SmallVector<SmallVector<ComponentID, 2>, 2> inboundComponentEdges;
-    inboundComponentEdges.resize(componentCount);
+    // The number of edges from other connected components to this one.
+    SmallVector<unsigned, 2> inboundComponentEdges;
+    inboundComponentEdges.resize(nextComponent);
 
-    // The set of edges originating from this connected component.
-    SmallVector<SmallVector<ComponentID, 2>, 2> outboundComponentEdges;
-    outboundComponentEdges.resize(componentCount);
-
-    // Visit all vertices and build the adjacency sets for the connected
-    // component graph.
+    // Visit all vertices and count inter-component edges.
     for (const auto &vertex : vertices) {
       assert(vertex.component != Vertex::UndefinedComponent);
       for (auto successor : vertex.successors) {
         ComponentID otherComponent = vertices[successor].component;
-        if (vertex.component != otherComponent) {
-          inboundComponentEdges[otherComponent].push_back(vertex.component);
-          outboundComponentEdges[vertex.component].push_back(otherComponent);
-        }
+        if (vertex.component != otherComponent)
+          ++inboundComponentEdges[otherComponent];
       }
     }
 
-    auto isRootComponent = [&](ComponentID component) -> bool {
-      return inboundComponentEdges[component].empty();
-    };
-
-    // The set of root components.
-    llvm::SmallDenseSet<ComponentID, 2> rootComponents;
-
-    // The best explicit requirement for each root component.
+    // The best explicit requirement for each root SCC.
     SmallVector<Optional<ExplicitRequirement>, 2> bestExplicitReq;
-    bestExplicitReq.resize(componentCount);
+    bestExplicitReq.resize(nextComponent);
 
-    // Visit all vertices and find the best requirement for each root component.
+    // Visit all vertices and find the best requirement for each root SCC.
     for (const auto &vertex : vertices) {
-      if (isRootComponent(vertex.component)) {
-        rootComponents.insert(vertex.component);
-
+      if (inboundComponentEdges[vertex.component] == 0) {
         // If this vertex is part of a root SCC, see if the requirement is
         // better than the one we have so far.
         auto &best = bestExplicitReq[vertex.component];
@@ -5898,61 +5868,26 @@ public:
       }
     }
 
-    // The set of root components that each component is reachable from.
-    SmallVector<llvm::SmallDenseSet<ComponentID, 2>, 2> reachableFromRoot;
-    reachableFromRoot.resize(componentCount);
-
-    // Traverse the graph of connected components starting from the roots.
-    for (auto rootComponent : rootComponents) {
-      SmallVector<ComponentID, 2> worklist;
-
-      auto addToWorklist = [&](ComponentID nextComponent) {
-        if (!reachableFromRoot[nextComponent].count(rootComponent))
-          worklist.push_back(nextComponent);
-      };
-
-      addToWorklist(rootComponent);
-
-      while (!worklist.empty()) {
-        auto component = worklist.back();
-        worklist.pop_back();
-
-        reachableFromRoot[component].insert(rootComponent);
-
-        for (auto nextComponent : outboundComponentEdges[component])
-          addToWorklist(nextComponent);
-      }
-    }
-
-    // Compute the mapping of redundant requirements to the best root
-    // requirement that implies them.
+    // Compute the set of redundant requirements.
     for (const auto &vertex : vertices) {
-      if (isRootComponent(vertex.component)) {
-        // A root component is reachable from itself, and itself only.
-        assert(reachableFromRoot[vertex.component].size() == 1);
-        assert(reachableFromRoot[vertex.component].count(vertex.component) == 1);
+      if (inboundComponentEdges[vertex.component] == 0) {
+        // We have a root SCC. This requirement is redundant unless
+        // it is the best requirement for this SCC.
+        auto best = bestExplicitReq[vertex.component];
+        assert(best.hasValue() &&
+               "Did not record best requirement for root SCC?");
+
+        if (vertex.req == *best)
+          continue;
       } else {
+        // We have a non-root SCC. This requirement is always
+        // redundant.
         assert(!bestExplicitReq[vertex.component].hasValue() &&
                "Recorded best requirement for non-root SCC?");
       }
 
-      // We have a non-root component. This requirement is always
-      // redundant.
-      auto reachableFromRootSet = reachableFromRoot[vertex.component];
-      assert(reachableFromRootSet.size() > 0);
-
-      for (auto rootComponent : reachableFromRootSet) {
-        assert(isRootComponent(rootComponent));
-
-        auto best = bestExplicitReq[rootComponent];
-        assert(best.hasValue() &&
-               "Did not record best requirement for root SCC?");
-
-        assert(vertex.req != *best || vertex.component == rootComponent);
-        if (vertex.req != *best) {
-          redundant[vertex.req].insert(*best);
-        }
-      }
+      auto inserted = redundant.insert(vertex.req);
+      assert(inserted.second && "Saw the same vertex twice?");
     }
   }
 
