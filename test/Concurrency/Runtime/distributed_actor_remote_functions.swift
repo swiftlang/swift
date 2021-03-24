@@ -15,27 +15,27 @@ distributed actor SomeSpecificDistributedActor {
     "local(\(#function))"
   }
 
-//  distributed func helloAsync() async -> String {
-//    "local(\(#function))"
-//  }
-//
-//  distributed func helloThrows() throws -> String {
-//    "local(\(#function))"
-//  }
-//
-//  distributed func hello() -> String {
-//    "local(\(#function))"
-//  }
-//
-//  // === errors
-//
-//  distributed func helloThrowsImplBoom() throws -> String {
-//    throw Boom()
-//  }
-//
-//  distributed func helloThrowsTransportBoom() throws -> String {
-//    "local(\(#function))"
-//  }
+  distributed func helloAsync() async -> String {
+   "local(\(#function))"
+  }
+
+  distributed func helloThrows() throws -> String {
+   "local(\(#function))"
+  }
+
+  distributed func hello() -> String {
+   "local(\(#function))"
+  }
+
+ // === errors
+
+ distributed func helloThrowsImplBoom() throws -> String {
+   throw Boom()
+ }
+
+ distributed func helloThrowsTransportBoom() throws -> String {
+   "local(\(#function))"
+ }
 
 }
 
@@ -45,27 +45,27 @@ extension SomeSpecificDistributedActor {
     return "remote(\(#function)) (address: \(actor.actorAddress))"
   }
 
-//  static func _remote_helloAsync(actor: SomeSpecificDistributedActor) async throws -> String {
-//    return "remote(\(#function)) (address: \(actor.actorAddress))"
-//  }
-//
-//  static func _remote_helloThrows(actor: SomeSpecificDistributedActor) async throws -> String {
-//    return "remote(\(#function)) (address: \(actor.actorAddress))"
-//  }
-//
-//  static func _remote_hello(actor: SomeSpecificDistributedActor) async throws -> String {
-//    return "remote(\(#function)) (address: \(actor.actorAddress))"
-//  }
-//
-//  // === errors
-//
-//  static func _remote_helloThrowsImplBoom(actor: SomeSpecificDistributedActor) async throws -> String {
-//    return "remote(\(#function)) (address: \(actor.actorAddress))"
-//  }
-//
-//  static func _remote_helloThrowsTransportBoom(actor: SomeSpecificDistributedActor) async throws -> String {
-//    throw Boom()
-//  }
+  static func _remote_helloAsync(actor: SomeSpecificDistributedActor) async throws -> String {
+    return "remote(\(#function)) (address: \(actor.actorAddress))"
+  }
+
+  static func _remote_helloThrows(actor: SomeSpecificDistributedActor) async throws -> String {
+    return "remote(\(#function)) (address: \(actor.actorAddress))"
+  }
+
+  static func _remote_hello(actor: SomeSpecificDistributedActor) async throws -> String {
+    return "remote(\(#function)) (address: \(actor.actorAddress))"
+  }
+
+  // === errors
+
+  static func _remote_helloThrowsImplBoom(actor: SomeSpecificDistributedActor) async throws -> String {
+    throw Boom()
+  }
+
+  static func _remote_helloThrowsTransportBoom(actor: SomeSpecificDistributedActor) async throws -> String {
+    throw Boom()
+  }
 }
 
 // ==== Fake Transport ---------------------------------------------------------
@@ -102,29 +102,31 @@ func test_remote_invoke() async {
     let h1 = try! await actor.helloAsyncThrows()
     print("\(personality) - helloAsyncThrows: \(h1)")
 
-//    let h2 = try! await remote.helloAsync()
-//    print("\(personality) - helloAsync: \(h2)")
-//
-//    let h3 = try! await remote.helloThrows()
-//    print("\(personality) - helloThrows: \(h3)")
-//
-//    let h4 = try! await remote.hello()
-//    print("\(personality) - hello: \(h4)")
-//
-//    // error throws
-//    do {
-//      try await remote.helloThrowsTransportBoom()
-//      preconditionFailure("Should have thrown")
-//    } catch {
-//      print("\(personality) - helloThrowsTransportBoom: \(error)")
-//    }
-//
-//    do {
-//      try await remote.helloThrowsImplBoom()
-//      preconditionFailure("Should have thrown")
-//    } catch {
-//      print("\(personality) - helloThrowsImplBoom: \(error)")
-//    }
+    let h2 = try! await actor.helloAsync()
+    print("\(personality) - helloAsync: \(h2)")
+
+    let h3 = try! await actor.helloThrows()
+    print("\(personality) - helloThrows: \(h3)")
+
+    let h4 = try! await actor.hello()
+    print("\(personality) - hello: \(h4)")
+
+    // error throws
+    if __isRemoteActor(actor) {
+      do {
+        _ = try await actor.helloThrowsTransportBoom()
+        preconditionFailure("Should have thrown")
+      } catch {
+        print("\(personality) - helloThrowsTransportBoom: \(error)")
+      }
+
+      do {
+        _ = try await actor.helloThrowsImplBoom()
+        preconditionFailure("Should have thrown")
+      } catch {
+        print("\(personality) - helloThrowsImplBoom: \(error)")
+      }
+    }
   }
 
   let remote = try! SomeSpecificDistributedActor(resolve: address, using: transport)
@@ -137,12 +139,20 @@ func test_remote_invoke() async {
   // CHECK: local isRemote: false
   await check(actor: local)
   // CHECK: local - helloAsyncThrows: local(helloAsyncThrows())
+  // CHECK: local - helloAsync: local(helloAsync())
+  // CHECK: local - helloThrows: local(helloThrows())
+  // CHECK: local - hello: local(hello())
 
 
   print("remote isRemote: \(__isRemoteActor(remote))")
   // CHECK: remote isRemote: true
   await check(actor: remote)
   // CHECK: remote - helloAsyncThrows: remote(_remote_helloAsyncThrows(actor:))
+  // CHECK: remote - helloAsync: remote(_remote_helloAsync(actor:))
+  // CHECK: remote - helloThrows: remote(_remote_helloThrows(actor:))
+  // CHECK: remote - hello: remote(_remote_hello(actor:))
+  // CHECK: remote - helloThrowsTransportBoom: Boom()
+  // CHECK: remote - helloThrowsImplBoom: Boom()
 
   print(local)
   print(remote)

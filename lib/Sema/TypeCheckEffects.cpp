@@ -2345,7 +2345,7 @@ private:
 
   ShouldRecurse_t checkDeclRef(DeclRefExpr *E) {
     if (E->isImplicitlyAsync()) {
-      checkThrowAsyncSite(E, /*requiresTry=*/false,
+      checkThrowAsyncSite(E, /*requiresTry=*/E->isImplicitlyThrows(),
             Classification::forUnconditional(EffectKind::Async,
                                              PotentialEffectReason::forApply()),
                           Context::Property);

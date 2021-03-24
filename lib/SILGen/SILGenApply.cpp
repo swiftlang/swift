@@ -1112,9 +1112,14 @@ public:
     }
 
     // Otherwise, we have a statically-dispatched call.
-    auto constant = SILDeclRef(e->getDecl())
-      .asForeign(!isConstructorWithGeneratedAllocatorThunk(e->getDecl())
-                 && requiresForeignEntryPoint(e->getDecl()));
+    auto constant = SILDeclRef(e->getDecl());
+    if (e->getDecl()->getAttrs().hasAttribute<DistributedActorAttr>()) {
+      constant = constant.asDistributed(true);
+    } else {
+      constant = constant.asForeign(
+                   !isConstructorWithGeneratedAllocatorThunk(e->getDecl())
+                   && requiresForeignEntryPoint(e->getDecl()));
+    }
 
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     if (afd->getDeclContext()->isLocalContext() &&
