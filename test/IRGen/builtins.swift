@@ -166,6 +166,12 @@ func vector_bitcast_test(_ src: Builtin.Vec16xInt8) -> Builtin.Int16 {
   return Builtin.bitcast_Vec16xInt1_Int16(mask) // CHECK: bitcast
 }
 
+func vector_bitcast_test_ii(_ src: Builtin.Int16) -> Builtin.Vec16xInt8 {
+  // CHECK: vector_bitcast_test_ii
+  let v16x1 = Builtin.bitcast_Int16_Vec16xInt1(src) // CHECK: bitcast
+  return Builtin.sext_Vec16xInt1_Vec16xInt8(v16x1)   // CHECK: sext
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test
