@@ -764,7 +764,7 @@ static bool isSendableClosure(const AbstractClosureExpr *closure) {
 }
 
 /// Determine whether the given type is suitable as a concurrent value type.
-static bool isSendableType(const DeclContext *dc, Type type) {
+bool swift::isSendableType(const DeclContext *dc, Type type) {
   class IsSendable : public TypeVisitor<IsSendable, bool> {
     DeclContext *dc;
     ProtocolDecl *SendableProto;
