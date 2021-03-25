@@ -8313,6 +8313,14 @@ static void checkGenericSignature(CanGenericSignature canSig,
       }
     }
 
+    // If we have a concrete same-type requirement, we shouldn't have any
+    // other requirements on the same type.
+    if (reqt.getKind() == RequirementKind::SameType &&
+        !reqt.getSecondType()->isTypeParameter()) {
+      assert(compareLHS < 0 &&
+             "Concrete subject type should not have any other requirements");
+    }
+
     assert(compareRequirements(&prevReqt, &reqt) < 0 &&
            "Out-of-order requirements");
   }
