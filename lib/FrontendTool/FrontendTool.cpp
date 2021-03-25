@@ -640,7 +640,10 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   //
   // FIXME: It seems more appropriate for the driver to notice the early-exit
   // and react by always enqueuing the jobs it dropped in the other waves.
-  if (Instance.getDiags().hadAnyError())
+  //
+  // We will output a module if allowing errors, so ignore that case.
+  if (Instance.getDiags().hadAnyError() &&
+      !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
     return;
 
   for (auto *SF : Instance.getPrimarySourceFiles()) {
