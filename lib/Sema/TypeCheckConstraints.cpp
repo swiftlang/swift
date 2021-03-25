@@ -35,14 +35,14 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <iterator>
 #include <map>
 #include <memory>
-#include <utility>
 #include <tuple>
+#include <utility>
 
 using namespace swift;
 using namespace constraints;
@@ -538,12 +538,14 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       }
     }
   }
-  
+
   if (hadError)
     PBD->setInvalid();
 
   PBD->setInitializerChecked(patternNumber);
-  
+
+  checkPatternBindingDeclAsyncUsage(PBD);
+
   return hadError;
 }
 

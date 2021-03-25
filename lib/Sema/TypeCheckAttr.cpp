@@ -5609,7 +5609,18 @@ void TypeChecker::checkClosureAttributes(ClosureExpr *closure) {
 
 void AttributeChecker::visitCompletionHandlerAsyncAttr(
     CompletionHandlerAsyncAttr *attr) {
+  AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D);
+  if (!AFD)
+    return;
 
+  evaluateOrDefault(Ctx.evaluator,
+                    TypeCheckCompletionHandlerAsyncAttrRequest{AFD, attr}, {});
+}
+
+bool TypeCheckCompletionHandlerAsyncAttrRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *attachedFunctionDecl,
+    CompletionHandlerAsyncAttr *attr) const {
+  auto &Diags = attachedFunctionDecl->getASTContext().Diags;
   // Check phases:
   //  1. Attached function shouldn't be async and should have enough args
   //     to have a completion handler
@@ -5621,30 +5632,29 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
   //      - Do some sanity checking on types
 
   // Phase 1: Typecheck the function the attribute is attached to
-  auto attachedFunctionDecl = cast<AbstractFunctionDecl>(D);
   if (attachedFunctionDecl->hasAsync()) {
-    diagnose(attr->getLocation(),
-             diag::attr_completion_handler_async_handler_not_func, attr);
-    diagnose(attachedFunctionDecl->getAsyncLoc(),
-             diag::note_attr_function_declared_async);
-    return;
+    Diags.diagnose(attr->getLocation(),
+                   diag::attr_completion_handler_async_handler_not_func, attr);
+    Diags.diagnose(attachedFunctionDecl->getAsyncLoc(),
+                   diag::note_attr_function_declared_async);
+    return false;
   }
 
   const ParameterList *attachedFunctionParams =
       attachedFunctionDecl->getParameters();
   assert(attachedFunctionParams && "Attached function has no parameter list");
   if (attachedFunctionParams->size() == 0) {
-    diagnose(attr->getLocation(),
-             diag::attr_completion_handler_async_handler_not_func, attr);
-    return;
+    Diags.diagnose(attr->getLocation(),
+                   diag::attr_completion_handler_async_handler_not_func, attr);
+    return false;
   }
   size_t completionHandlerIndex = attr->CompletionHandlerIndexLoc.isValid()
                                       ? attr->CompletionHandlerIndex
                                       : attachedFunctionParams->size() - 1;
   if (attachedFunctionParams->size() < completionHandlerIndex) {
-    diagnose(attr->CompletionHandlerIndexLoc,
-             diag::attr_completion_handler_async_handler_out_of_range);
-    return;
+    Diags.diagnose(attr->CompletionHandlerIndexLoc,
+                   diag::attr_completion_handler_async_handler_out_of_range);
+    return false;
   }
 
   // Phase 2: Typecheck the completion handler
@@ -5654,14 +5664,17 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     AnyFunctionType *handlerType =
         completionHandlerParamDecl->getType()->getAs<AnyFunctionType>();
     if (!handlerType) {
-      diagnose(attr->getLocation(),
-               diag::attr_completion_handler_async_handler_not_func, attr);
-      diagnose(completionHandlerParamDecl->getTypeRepr()->getLoc(),
-               diag::note_attr_completion_handler_async_type_is_not_function,
-               completionHandlerParamDecl->getType())
+      Diags.diagnose(attr->getLocation(),
+                     diag::attr_completion_handler_async_handler_not_func,
+                     attr);
+      Diags
+          .diagnose(
+              completionHandlerParamDecl->getTypeRepr()->getLoc(),
+              diag::note_attr_completion_handler_async_type_is_not_function,
+              completionHandlerParamDecl->getType())
           .highlight(
               completionHandlerParamDecl->getTypeRepr()->getSourceRange());
-      return;
+      return false;
     }
 
     auto handlerTypeRepr =
@@ -5678,27 +5691,31 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     const bool hasError = missingVoid | hasAutoclosure | !hasEscaping;
 
     if (hasError) {
-      diagnose(attr->getLocation(),
-               diag::attr_completion_handler_async_handler_not_func, attr);
+      Diags.diagnose(attr->getLocation(),
+                     diag::attr_completion_handler_async_handler_not_func,
+                     attr);
 
       if (missingVoid)
-        diagnose(completionHandlerParamDecl->getLoc(),
-                 diag::note_attr_completion_function_must_return_void)
+        Diags
+            .diagnose(completionHandlerParamDecl->getLoc(),
+                      diag::note_attr_completion_function_must_return_void)
             .highlight(
                 completionHandlerParamDecl->getTypeRepr()->getSourceRange());
 
       if (!hasEscaping)
-        diagnose(completionHandlerParamDecl->getLoc(),
-                 diag::note_attr_completion_handler_async_handler_attr_req,
-                 true, "escaping")
+        Diags
+            .diagnose(completionHandlerParamDecl->getLoc(),
+                      diag::note_attr_completion_handler_async_handler_attr_req,
+                      true, "escaping")
             .highlight(
                 completionHandlerParamDecl->getTypeRepr()->getSourceRange());
 
       if (hasAutoclosure)
-        diagnose(handlerTypeAttrs->getLoc(TAK_autoclosure),
-                 diag::note_attr_completion_handler_async_handler_attr_req,
-                 false, "autoclosure");
-      return;
+        Diags.diagnose(
+            handlerTypeAttrs->getLoc(TAK_autoclosure),
+            diag::note_attr_completion_handler_async_handler_attr_req, false,
+            "autoclosure");
+      return false;
     }
   }
 
@@ -5747,21 +5764,23 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     }
 
     if (candidates.empty()) {
-      diagnose(attr->AsyncFunctionNameLoc,
-               diag::attr_completion_handler_async_no_suitable_function,
-               attr->getAsyncFunctionName());
-      return;
+      Diags.diagnose(attr->AsyncFunctionNameLoc,
+                     diag::attr_completion_handler_async_no_suitable_function,
+                     attr->getAsyncFunctionName());
+      return false;
     } else if (candidates.size() > 1) {
-      diagnose(attr->AsyncFunctionNameLoc,
-               diag::attr_completion_handler_async_ambiguous_function, attr,
-               attr->getAsyncFunctionName());
+      Diags.diagnose(attr->AsyncFunctionNameLoc,
+                     diag::attr_completion_handler_async_ambiguous_function,
+                     attr, attr->getAsyncFunctionName());
 
       for (AbstractFunctionDecl *candidate : candidates) {
-        diagnose(candidate->getLoc(), diag::decl_declared_here,
-                 candidate->getName());
+        Diags.diagnose(candidate->getLoc(), diag::decl_declared_here,
+                       candidate->getName());
       }
-      return;
+      return false;
     }
     attr->AsyncFunctionDecl = candidates.front();
   }
+
+  return true;
 }

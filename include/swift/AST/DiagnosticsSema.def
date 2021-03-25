@@ -3377,6 +3377,9 @@ ERROR(attr_completion_handler_async_ambiguous_function,none,
 ERROR(attr_completion_handler_async_no_suitable_function,none,
       "no corresponding async function named %0", (DeclNameRef))
 
+WARNING(warn_use_async_alternative,none,
+        "consider using asynchronous alternative function",())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
 //------------------------------------------------------------------------------
