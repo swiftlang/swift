@@ -75,10 +75,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBTYPE_1 | %FileCheck %s -check-prefix=SUBTYPE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBTYPE_2 | %FileCheck %s -check-prefix=SUBTYPE_2
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_1 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_2 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_3 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_U
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1 -check-prefix=GENERIC_1_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_1 | %FileCheck %s -check-prefix=GENERIC_1_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_2 | %FileCheck %s -check-prefix=GENERIC_1_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_3 | %FileCheck %s -check-prefix=GENERIC_1_U
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_4 | %FileCheck %s -check-prefix=GENERIC_1_INT
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_CLOSURE_1 | %FileCheck %s -check-prefix=STATIC_CLOSURE_1
 

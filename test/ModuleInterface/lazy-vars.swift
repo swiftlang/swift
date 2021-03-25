@@ -6,10 +6,10 @@
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules -emit-module-interface-path - %t/Test.swiftmodule -module-name Test | %FileCheck %s --check-prefix CHECK --check-prefix NONRESILIENT
 
 // RUN: %target-swift-frontend -typecheck -module-name TestResilient -emit-module-interface-path %t/TestResilient.swiftinterface -enable-library-evolution %s
-// RUN: %FileCheck %s < %t/TestResilient.swiftinterface --check-prefix CHECK --check-prefix RESILIENT
+// RUN: %FileCheck %s < %t/TestResilient.swiftinterface
 
 // RUN: %target-swift-frontend -compile-module-from-interface %t/TestResilient.swiftinterface -o %t/TestResilient.swiftmodule
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules -emit-module-interface-path - %t/TestResilient.swiftmodule -module-name TestResilient | %FileCheck %s --check-prefix CHECK --check-prefix RESILIENT
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules -emit-module-interface-path - %t/TestResilient.swiftmodule -module-name TestResilient | %FileCheck %s
 
 // CHECK: @frozen public struct HasLazyVarsFixedLayout {
 // CHECK-NEXT: public var foo: Swift.Int {
