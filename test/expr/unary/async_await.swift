@@ -23,7 +23,6 @@ func test2(
 }
 
 func test3() { // expected-note{{add 'async' to function 'test3()' to make it asynchronous}} {{13-13= async}}
-  // expected-note@-1{{add '@asyncHandler' to function 'test3()' to create an implicit asynchronous context}}{{1-1=@asyncHandler }}
   _ = await getInt() // expected-error{{'async' call in a function that does not support concurrency}}
 }
 
@@ -190,8 +189,7 @@ func testAsyncLet() async throws {
   _ = await x5
 }
 
-// expected-note@+2 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}} {{30-30= async}}
-// expected-note@+1 4{{add '@asyncHandler' to function 'testAsyncLetOutOfAsync()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
+// expected-note@+1 4{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}} {{30-30= async}}
 func testAsyncLetOutOfAsync() {
   async let x = 1 // expected-error{{'async let' in a function that does not support concurrency}}
   // FIXME: expected-error@-1{{'async' call in a function that does not support concurrency}}

@@ -4314,6 +4314,8 @@ ERROR(asynchandler_noescape_closure_parameter,none,
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())
+ERROR(asynchandler_removed,none,
+      "'@asyncHandler' has been removed from the language", ())
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "

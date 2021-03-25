@@ -5389,6 +5389,11 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 }
 
 void AttributeChecker::visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
+  if (!Ctx.LangOpts.EnableExperimentalAsyncHandler) {
+    diagnoseAndRemoveAttr(attr, diag::asynchandler_removed);
+    return;
+  }
+
   auto func = dyn_cast<FuncDecl>(D);
   if (!func) {
     diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
