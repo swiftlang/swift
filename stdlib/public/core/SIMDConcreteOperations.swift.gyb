@@ -204,6 +204,22 @@ extension SIMDMask where Storage == ${Vector} {
   public func replacing(with other: Self, where mask: Self) -> Self {
     (self .& .!mask) .| (other .& mask)
   }
+  
+  /// Returns a vector mask with `true` or `false` randomly assigned in each
+  /// lane, using the given generator as a source for randomness.
+  @_alwaysEmitIntoClient
+  public static func random<T: RandomNumberGenerator>(using generator: inout T) -> Self {
+    let data = Builtin.truncOrBitCast_Int64_Int${storageN}(generator.next()._value)
+    return Self(Builtin.bitcast_Int${storageN}_Vec${storageN}xInt1(data))
+  }
+  
+  /// Returns a vector mask with `true` or `false` randomly assigned in each
+  /// lane.
+  @_alwaysEmitIntoClient
+  public static func random() -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(using: &g)
+  }
 }
 
 %  end
