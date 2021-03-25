@@ -277,6 +277,10 @@ extension Task.Group {
   /// invoking the `group.next()` function in a loop, meaning that results
   /// are returned in *completion order*.
   ///
+  /// This iterator terminates after all tasks have completed successfully, or
+  /// after any task completes by throwing an error. If a task completes by
+  /// throwing an error, no further task results are returned.
+  ///
   /// - SeeAlso: `TaskGroup.next()`
   public struct GroupIterator: AsyncIteratorProtocol {
     public typealias Element = TaskResult
@@ -284,6 +288,9 @@ extension Task.Group {
     @usableFromInline
     var group: Task.Group<TaskResult>
 
+    @usableFromInline
+    var finished: Bool = false
+    
     // no public constructors
     init(group: Task.Group<TaskResult>) {
       self.group = group
@@ -291,10 +298,21 @@ extension Task.Group {
 
     /// - SeeAlso: `TaskGroup.next()` for a detailed discussion its semantics.
     public mutating func next() async throws -> Element? {
-      try await group.next()
+      guard !finished else { return nil }
+      do {
+        guard let element = try await group.next() else {
+          finished = true
+          return nil
+        }
+        return element
+      } catch {
+        finished = true
+        throw error
+      }
     }
 
     public mutating func cancel() {
+      finished = true
       group.cancelAll()
     }
   }
