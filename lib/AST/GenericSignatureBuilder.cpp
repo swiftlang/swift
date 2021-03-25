@@ -698,7 +698,7 @@ struct GenericSignatureBuilder::Implementation {
   bool HadAnyError = false;
 
   /// All explicit non-same type requirements that were added to the builder.
-  SmallVector<ExplicitRequirement, 2> ExplicitRequirements;
+  SmallSetVector<ExplicitRequirement, 2> ExplicitRequirements;
 
   /// All explicit same-type requirements that were added to the builder.
   SmallVector<Requirement, 2> ExplicitSameTypeRequirements;
@@ -4507,8 +4507,9 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   auto resolvedSource = source.getSource(*this, type);
 
   if (!resolvedSource->isDerivedRequirement()) {
-    Impl->ExplicitRequirements.emplace_back(RequirementKind::Conformance,
-                                            resolvedSource, proto);
+    Impl->ExplicitRequirements.insert(
+        ExplicitRequirement(RequirementKind::Conformance,
+                            resolvedSource, proto));
   }
 
   // Add the conformance requirement, bailing out earlier if we've already
@@ -4529,8 +4530,9 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
   auto resolvedSource = source.getSource(*this, type);
 
   if (!resolvedSource->isDerivedRequirement()) {
-    Impl->ExplicitRequirements.emplace_back(RequirementKind::Layout,
-                                            resolvedSource, layout);
+    Impl->ExplicitRequirements.insert(
+        ExplicitRequirement(RequirementKind::Layout,
+                            resolvedSource, layout));
   }
 
   auto equivClass = type.getEquivalenceClass(*this);
@@ -4670,8 +4672,9 @@ ConstraintResult GenericSignatureBuilder::addSuperclassRequirementDirect(
   auto resolvedSource = source.getSource(*this, type);
 
   if (!resolvedSource->isDerivedRequirement()) {
-    Impl->ExplicitRequirements.emplace_back(RequirementKind::Superclass,
-                                            resolvedSource, superclass);
+    Impl->ExplicitRequirements.insert(
+        ExplicitRequirement(RequirementKind::Superclass,
+                            resolvedSource, superclass));
   }
 
   // Record the constraint.
