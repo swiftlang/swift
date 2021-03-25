@@ -1,0 +1,4 @@
+module CircularLibrary {
+  umbrella header "CircularLibrary.h"
+  export *
+}
