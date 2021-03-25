@@ -2607,21 +2607,22 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
     concreteSource = concreteSource->viaConcrete(*this, concrete);
   } else {
     concreteSource = concreteSource->viaConcrete(*this, conformance);
-    equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
+  }
 
-    // Only infer conditional requirements from explicit sources.
-    bool hasExplicitSource = llvm::any_of(
-        equivClass->concreteTypeConstraints,
-        [](const ConcreteConstraint &constraint) {
-          return (!constraint.source->isDerivedRequirement() &&
-                  constraint.source->getLoc().isValid());
-        });
+  equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
 
-    if (hasExplicitSource) {
-      if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
-                                     concreteSource->getLoc()))
-        return nullptr;
-    }
+  // Only infer conditional requirements from explicit sources.
+  bool hasExplicitSource = llvm::any_of(
+      equivClass->concreteTypeConstraints,
+      [](const ConcreteConstraint &constraint) {
+        return (!constraint.source->isDerivedRequirement() &&
+                constraint.source->getLoc().isValid());
+      });
+
+  if (hasExplicitSource) {
+    if (addConditionalRequirements(conformance, /*inferForModule=*/nullptr,
+                                   concreteSource->getLoc()))
+      return nullptr;
   }
 
   return concreteSource;
