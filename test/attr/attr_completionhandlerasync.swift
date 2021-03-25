@@ -61,6 +61,7 @@ struct SomeStruct: SomeProto {
   @completionHandlerAsync("protoFunc", completionHandlerIndex: 0)
   func protoFunc(continuation: @escaping () -> Void) {}
 
+  // expected-note@+1{{'structFunc()' declared here}}
   func structFunc() async { }
 
   @completionHandlerAsync("structFunc", completionHandlerIndex: 0)
@@ -178,7 +179,15 @@ let asyncGlobalClosure = { () async -> () in
 }
 
 class ClassCallingAsyncStuff {
-  // expected-note@+1 3 {{'asyncFunc()' declared here}}
+  struct NestedStruct {
+    @completionHandlerAsync("structFunc()")
+    func structCompFunc(handler: @escaping () -> ()) { }
+
+    // expected-note@+1{{'structFunc()' declared here}}
+    func structFunc() async {}
+  }
+
+  // expected-note@+1 4 {{'asyncFunc()' declared here}}
   func asyncFunc() async {}
 
   @completionHandlerAsync("asyncFunc()")
@@ -204,5 +213,21 @@ class ClassCallingAsyncStuff {
   func instanceFunc(other: ClassCallingAsyncStuff) async {
     // expected-error@+1{{cannot find 'c' in scope}}
     c.compHandlerFunc() { }
+
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.compHandlerFunc() { }
   }
+
+  func structFunc(other: NestedStruct) async {
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.structCompFunc() { }
+  }
+
+  func structFunc(other: SomeStruct) async {
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.structFunc() { }
+  }
+
+  // no warning
+  let funFunc = goodFunc1
 }
