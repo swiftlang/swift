@@ -180,10 +180,10 @@ class C3 {
   var C1I = C1()
   var C2I = C2()
   func f1() {
-    foo2(C1I, #^OVERLOAD1?xfail=FIXME^#)
+    foo2(C1I, #^OVERLOAD1^#)
   }
   func f2() {
-    foo2(C2I, #^OVERLOAD2?xfail=FIXME^#)
+    foo2(C2I, #^OVERLOAD2^#)
   }
   func f3() {
     foo2(C1I, b1: #^OVERLOAD3^#)
@@ -207,11 +207,11 @@ class C3 {
 }
 
 // OVERLOAD1: Begin completions, 1 items
-// OVERLOAD1-NEXT: Keyword/ExprSpecific:               b1: [#Argument name#]; name=b1:
+// OVERLOAD1-NEXT: Pattern/Local/Flair[ArgLabels]: {#b1: C2#}[#C2#]; name=b1: C2
 // OVERLOAD1-NEXT: End completions
 
 // OVERLOAD2: Begin completions, 1 items
-// OVERLOAD2-NEXT: Keyword/ExprSpecific:               b2: [#Argument name#]; name=b2:
+// OVERLOAD2-NEXT: Pattern/Local/Flair[ArgLabels]: {#b2: C1#}[#C1#]; name=b2: C1
 // OVERLOAD2-NEXT: End completions
 
 // OVERLOAD3: Begin completions
@@ -253,8 +253,8 @@ extension C3 {
 
   func f7(obj: C3) {
     let _ = obj.hasError(#^HASERROR1^#
-    let _ = obj.hasError(a1: #^HASERROR2^#
-    let _ = obj.hasError(a1: IC1, #^HASERROR3^#
+    let _ = obj.hasError(a1: #^HASERROR2?xfail=FIXME^#
+    let _ = obj.hasError(a1: IC1, #^HASERROR3?xfail=FIXME^#
     let _ = obj.hasError(a1: IC1, b1: #^HASERROR4^#
   }
 }
@@ -992,8 +992,10 @@ struct Rdar77867723 {
   }
   func test2 {
     self.fn(eee: .up, #^OVERLOAD_LABEL2^#)
-// OVERLOAD_LABEL2: Begin completions, 2 items
+// OVERLOAD_LABEL2: Begin completions, 4 items
+// OVERLOAD_LABEL2-DAG: Pattern/Local/Flair[ArgLabels]:               {#aaa: Horizontal#}[#Horizontal#];
 // OVERLOAD_LABEL2-DAG: Pattern/Local/Flair[ArgLabels]:               {#bbb: Vertical#}[#Vertical#];
+// OVERLOAD_LABEL2-DAG: Pattern/Local/Flair[ArgLabels]:               {#ccc: Vertical#}[#Vertical#];
 // OVERLOAD_LABEL2-DAG: Pattern/Local/Flair[ArgLabels]:               {#ddd: Horizontal#}[#Horizontal#];
 // OVERLOAD_LABEL2: End completions
   }
@@ -1014,4 +1016,96 @@ func test_SR14737() {
 // GENERIC_INIT_IN_INVALID-DAG: Pattern/Local/Flair[ArgLabels]:     {#onlyInt: Bool#}[#Bool#];
 // GENERIC_INIT_IN_INVALID: End completions
   }
+}
+
+func testArgsAfterCompletion() {
+  enum A { case a }
+  enum B { case b }
+
+  let localA = A.a
+  let localB = B.b
+
+  func overloaded(x: Int, _ first: A, _ second: B) {}
+  func overloaded(x: Int, _ first: B, _ second: A) {}
+
+  overloaded(x: 1, .#^VALID_UNRESOLVED^#, localB)
+
+  // VALID_UNRESOLVED: Begin completions, 2 items
+  // VALID_UNRESOLVED-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Identical]: a[#A#]; name=a
+  // VALID_UNRESOLVED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(self: A)
+  // VALID_UNRESOLVED: End completions
+
+  overloaded(x: 1, #^VALID_GLOBAL^#, localB)
+  // VALID_GLOBAL: Begin completions
+  // VALID_GLOBAL-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: localA[#A#]; name=localA
+  // VALID_GLOBAL-DAG: Decl[LocalVar]/Local: localB[#B#]; name=localB
+  // VALID_GLOBAL: End completions
+
+  func overloadedLabel(x: Int, firstA: A, second: B) {}
+  func overloadedLabel(x: Int, firstB: B, second: A) {}
+
+  overloadedLabel(x: 1, #^VALID_LABEL^#, second: localB)
+  // VALID_LABEL: Begin completions, 1 items
+  // VALID_LABEL: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA: A
+  // VALID_LABEL: End completions
+
+  overloadedLabel(x: 1, #^INVALID_LABEL^#, wrongLabelRightType: localB)
+  // INVALID_LABEL: Begin completions, 2 items
+  // INVALID_LABEL-DAG: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA: A
+  // INVALID_LABEL-DAG: Pattern/Local/Flair[ArgLabels]: {#firstB: B#}[#B#]; name=firstB: B
+  // INVALID_LABEL: End completions
+
+  overloadedLabel(x: 1, #^INVALID_LABEL_TYPE?check=INVALID_LABEL^#, wrongLabelWrongType: 2) // invalid
+
+  func overloadedArity(x: Int, firstA: A, second: B, third: Double) {}
+  func overloadedArity(x: Int, firstB: B, second: A) {}
+
+  overloadedArity(x: 1, #^VALID_ARITY^#, second: localB, third: 4.5)
+  // VALID_ARITY: Begin completions, 1 items
+  // VALID_ARITY: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA: A
+  // VALID_ARITY: End completions
+
+  overloadedArity(x: 1, #^INVALID_ARITY^#, wrong: localB)
+  // INVALID_ARITY: Begin completions, 2 items
+  // INVALID_ARITY-DAG: Pattern/Local/Flair[ArgLabels]: {#firstA: A#}[#A#]; name=firstA: A
+  // INVALID_ARITY-DAG: Pattern/Local/Flair[ArgLabels]: {#firstB: B#}[#B#]; name=firstB: B
+  // INVALID_ARITY: End completions
+
+  // type mismatch in 'second' vs extra arg 'third'.
+  overloadedArity(x: 1, #^INVALID_ARITY_TYPE?check=INVALID_ARITY^#, second: localA, third: 2.5)
+  overloadedArity(x: 1, #^INVALID_ARITY_TYPE_2?check=INVALID_ARITY^#, second: localA, third: "wrong")
+
+  func overloadedDefaulted(x: Int, p: A) {}
+  func overloadedDefaulted(x: Int, y: A = A.a, z: A = A.a) {}
+
+  overloadedDefaulted(x: 1, #^VALID_DEFAULTED^#)
+  // VALID_DEFAULTED: Begin completions, 3 items
+  // VALID_DEFAULTED-DAG: Pattern/Local/Flair[ArgLabels]: {#p: A#}[#A#]; name=p: A
+  // VALID_DEFAULTED-DAG: Pattern/Local/Flair[ArgLabels]: {#y: A#}[#A#]; name=y: A
+  // VALID_DEFAULTED-DAG: Pattern/Local/Flair[ArgLabels]: {#z: A#}[#A#]; name=z: A
+  // VALID_DEFAULTED: End completions
+
+  overloadedDefaulted(x: 1, #^VALID_DEFAULTED_AFTER^#, z: localA)
+  // VALID_DEFAULTED_AFTER: Begin completions, 1 items
+  // VALID_DEFAULTED_AFTER-DAG: Pattern/Local/Flair[ArgLabels]: {#y: A#}[#A#]; name=y: A
+  // VALID_DEFAULTED_AFTER: End completions
+
+  overloadedDefaulted(x: 1, #^INVALID_DEFAULTED?check=VALID_DEFAULTED^#, w: "hello")
+  overloadedDefaulted(x: 1, #^INVALID_DEFAULTED_TYPO?check=VALID_DEFAULTED^#, zz: localA)
+  overloadedDefaulted(x: 1, #^INVALID_DEFAULTED_TYPO_TYPE?check=VALID_DEFAULTED^#, zz: "hello")
+
+  overloadedDefaulted(x: 1, #^INVALID_DEFAULTED_TYPE^#, z: localB)
+  // INVALID_DEFAULTED_TYPE: Begin completions, 2 items
+  // INVALID_DEFAULTED_TYPE-DAG: Pattern/Local/Flair[ArgLabels]: {#p: A#}[#A#]; name=p: A
+  // INVALID_DEFAULTED_TYPE-DAG: Pattern/Local/Flair[ArgLabels]: {#y: A#}[#A#]; name=y: A
+  // INVALID_DEFAULTED_TYPE: End completions
+
+  func overloadedGeneric<T: Equatable>(x: Int, y: String, z: T, y: T) {}
+  func overloadedGeneric(x: Int, p: String, q: Int) {}
+  struct MissingConformance {}
+  overloadedGeneric(x: 1, #^INVALID_MISSINGCONFORMANCE^#, z: MissingConformance(), y: MissingConformance())
+  // FIXME: This should also suggest y.
+  // INVALID_MISSINGCONFORMANCE: Begin completions, 1 item
+  // INVALID_MISSINGCONFORMANCE: Pattern/Local/Flair[ArgLabels]: {#p: String#}[#String#]; name=p: String
+  // INVALID_MISSINGCONFORMANCE: End completions
 }

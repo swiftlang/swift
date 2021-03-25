@@ -42,6 +42,8 @@ MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
 bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
 
+bool MatchCallArgumentListener::invalidArgumentsAfterCompletion() { return true; }
+
 Optional<unsigned>
 MatchCallArgumentListener::missingArgument(unsigned paramIdx,
                                            unsigned argInsertIdx) {
@@ -167,8 +169,8 @@ static bool areConservativelyCompatibleArgumentLabels(
 
   return matchCallArguments(args, params, paramInfo,
                             unlabeledTrailingClosureArgIndex,
-                            /*allow fixes*/ false, listener,
-                            None).hasValue();
+                            /*completionInfo*/None, /*allow fixes*/ false,
+                            listener, None).hasValue();
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -253,11 +255,21 @@ static bool anyParameterRequiresArgument(
   return false;
 }
 
+static bool isCodeCompletionTypeVar(Type type) {
+  if (auto *TVT = type->getAs<TypeVariableType>()) {
+    if (TVT->getImpl().isCodeCompletionToken())
+      return true;
+  }
+  return false;
+}
+
+
 static bool matchCallArgumentsImpl(
     SmallVectorImpl<AnyFunctionType::Param> &args,
     ArrayRef<AnyFunctionType::Param> params,
     const ParameterListInfo &paramInfo,
     Optional<unsigned> unlabeledTrailingClosureArgIndex,
+    Optional<CompletionArgInfo> completionInfo,
     bool allowFixes,
     TrailingClosureMatching trailingClosureMatching,
     MatchCallArgumentListener &listener,
@@ -340,6 +352,16 @@ static bool matchCallArgumentsImpl(
     if (numClaimedArgs == numArgs)
       return None;
 
+    // If the next arg is a code completion token with no label, and we're using
+    // the new solver-based code completion (to avoid affecting the AST used by
+    // unmigrated completion kinds) claim it without complaining about the
+    // missing label. Completion will suggest the label in such cases.
+    if (completionInfo && nextArgIdx < numArgs &&
+        args[nextArgIdx].getLabel().empty()) {
+      if (isCodeCompletionTypeVar(args[nextArgIdx].getPlainType()))
+        return claim(paramLabel, nextArgIdx, /*ignoreNameMismatch*/true);
+    }
+
     // Go hunting for an unclaimed argument whose name does match.
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
@@ -382,6 +404,14 @@ static bool matchCallArgumentsImpl(
         if (argLabel.empty())
           continue;
 
+        // We don't allow out-of-order matching beyond the completion location.
+        // Arguments after the completion position must all be valid for any to
+        // be bound. If any are invalid we ignore all of them, proceeding as if
+        // the completion was the last argument, as the user may be re-writing
+        // the callsite rather than updating an argument in an existing one.
+        if (completionInfo && completionInfo->isBefore(i))
+          continue;
+
         potentiallyOutOfOrder = true;
       }
 
@@ -391,6 +421,13 @@ static bool matchCallArgumentsImpl(
 
     // If we're not supposed to attempt any fixes, we're done.
     if (!allowFixes)
+      return None;
+
+    // Also don't attempt any fixes if this argument is after the completion
+    // position. Arguments after the completion position must all be valid to
+    // be considered. If any are invalid we ignore them, as the user may be
+    // re-writing the callsite rather than updating an argument.
+    if (completionInfo && completionInfo->isBefore(nextArgIdx))
       return None;
 
     // Several things could have gone wrong here, and we'll check for each
@@ -590,6 +627,12 @@ static bool matchCallArgumentsImpl(
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
     for (auto argIdx : indices(args)) {
       if (claimedArgs[argIdx]) continue;
+
+      // We don't allow arguments after the completion position to be claimed
+      // during recovery, so skip them.
+      if (completionInfo && completionInfo->isBefore(argIdx))
+        continue;
+
       if (!args[argIdx].getLabel().empty())
         unclaimedNamedArgs.push_back(argIdx);
     }
@@ -666,6 +709,12 @@ static bool matchCallArgumentsImpl(
           continue;
 
         bindNextParameter(paramIdx, nextArgIdx, true);
+
+        // Don't allow arguments after the completion position to be claimed
+        // during recovery. We ignore them if they are invalid, as the user may
+        // may be re-writing the callsite rather than updating an argument.
+        if (completionInfo && completionInfo->isBefore(nextArgIdx))
+          break;
       }
     }
 
@@ -679,10 +728,16 @@ static bool matchCallArgumentsImpl(
           continue;
 
         // If parameter has a default value, we don't really
-        // now if label doesn't match because it's incorrect
+        // know if label doesn't match because it's incorrect
         // or argument belongs to some other parameter, so
         // we just leave this parameter unfulfilled.
         if (paramInfo.hasDefaultArgument(i))
+          continue;
+
+        // Don't allow arguments after the completion position to be claimed
+        // during recovery. We ignore them if they are invalid, as the user may
+        // may be re-writing the callsite rather than updating an argument.
+        if (completionInfo && completionInfo->isBefore(i))
           continue;
 
         // Looks like there was no parameter claimed at the same
@@ -695,11 +750,69 @@ static bool matchCallArgumentsImpl(
     // If we still haven't claimed all of the arguments,
     // fail if there is no recovery.
     if (numClaimedArgs != numArgs) {
+      bool unclaimedArgAfterCompletion = false;
       for (auto index : indices(claimedArgs)) {
         if (claimedArgs[index])
           continue;
 
+        // Avoid reporting individual extra arguments after the completion
+        // position. They are reported via a single callback below.
+        if (completionInfo && completionInfo->isBefore(index)) {
+          unclaimedArgAfterCompletion = true;
+          continue;
+        }
+
         if (listener.extraArgument(index))
+          return true;
+      }
+
+      if (unclaimedArgAfterCompletion) {
+        // There were invalid arguments after the completion position. The
+        // user may be intending to rewrite the callsite (rather than update an
+        // argument) so proceed as if all arguments after the completion
+        // position (even those already bound) weren't present. This prevents
+        // this solution being penalized based on the exact number and kind
+        // of issues those arguments contain.
+        unsigned afterIdx = completionInfo->completionIdx + 1;
+
+        auto argsBegin = args.begin() + afterIdx;
+        if (argsBegin != args.end())
+          args.erase(argsBegin, args.end());
+        numArgs = args.size();
+
+        if (!actualArgNames.empty()) {
+          auto actualNamesBegin = actualArgNames.begin() + afterIdx;
+          if (actualNamesBegin != actualArgNames.end())
+            actualArgNames.erase(actualNamesBegin, actualArgNames.end());
+        }
+
+        auto claimedBegin = claimedArgs.begin() + afterIdx;
+        if (claimedBegin != claimedArgs.end())
+          claimedArgs.erase(claimedBegin, claimedArgs.end());
+        numClaimedArgs = llvm::count_if(claimedArgs, [](bool claimed){
+          return claimed;
+        });
+
+        for (auto &params: llvm::reverse(parameterBindings)) {
+          if (params.empty())
+            continue;
+          if (!completionInfo->isBefore(params.back()))
+            break;
+          if (completionInfo->isBefore(params.front())) {
+            params.clear();
+            haveUnfulfilledParams = true;
+          } else {
+            llvm::erase_if(params, [&](unsigned argIdx) {
+              return completionInfo->isBefore(argIdx);
+            });
+          }
+        }
+
+        // Report that post-completion args where ignored. This allows us to
+        // rank overloads that didn't require dropping the args higher, while
+        // still treating all overloads that did equally, regardless of how
+        // many args were dropped or what issues they would otherwise trigger.
+        if (listener.invalidArgumentsAfterCompletion())
           return true;
       }
     }
@@ -837,6 +950,12 @@ static bool matchCallArgumentsImpl(
           // - The argument is unnamed, in which case we try to fix the
           //   problem by adding the name.
           } else if (argumentLabel.empty()) {
+            // If the argument is the code completion token, the label will be
+            // offered in the completion results, so it shouldn't be considered
+            // missing.
+            Type argTy = args[fromArgIdx].getPlainType();
+            if (completionInfo && isCodeCompletionTypeVar(argTy))
+              continue;
             hadLabelMismatch = true;
             if (listener.missingLabel(paramIdx))
               return true;
@@ -935,6 +1054,7 @@ constraints::matchCallArguments(
     ArrayRef<AnyFunctionType::Param> params,
     const ParameterListInfo &paramInfo,
     Optional<unsigned> unlabeledTrailingClosureArgIndex,
+    Optional<CompletionArgInfo> completionInfo,
     bool allowFixes,
     MatchCallArgumentListener &listener,
     Optional<TrailingClosureMatching> trailingClosureMatching) {
@@ -946,7 +1066,7 @@ constraints::matchCallArguments(
     SmallVector<ParamBinding, 4> paramBindings;
     if (matchCallArgumentsImpl(
             args, params, paramInfo, unlabeledTrailingClosureArgIndex,
-            allowFixes, scanDirection, listener, paramBindings))
+            completionInfo, allowFixes, scanDirection, listener, paramBindings))
       return None;
 
     return MatchCallArgumentResult{
@@ -968,14 +1088,16 @@ constraints::matchCallArguments(
   // Try the forward direction first.
   SmallVector<ParamBinding, 4> forwardParamBindings;
   bool forwardFailed = matchCallArgumentsImpl(
-      args, params, paramInfo, unlabeledTrailingClosureArgIndex, allowFixes,
-      TrailingClosureMatching::Forward, noOpListener, forwardParamBindings);
+      args, params, paramInfo, unlabeledTrailingClosureArgIndex, completionInfo,
+      allowFixes, TrailingClosureMatching::Forward, noOpListener,
+      forwardParamBindings);
 
   // Try the backward direction.
   SmallVector<ParamBinding, 4> backwardParamBindings;
   bool backwardFailed = matchCallArgumentsImpl(
-      args, params, paramInfo, unlabeledTrailingClosureArgIndex, allowFixes,
-      TrailingClosureMatching::Backward, noOpListener, backwardParamBindings);
+      args, params, paramInfo, unlabeledTrailingClosureArgIndex, completionInfo,
+      allowFixes, TrailingClosureMatching::Backward, noOpListener,
+      backwardParamBindings);
 
   // If at least one of them failed, or they produced the same results, run
   // call argument matching again with the real visitor.
@@ -999,35 +1121,30 @@ constraints::matchCallArguments(
   };
 }
 
-struct CompletionArgInfo {
-  unsigned completionIdx;
-  Optional<unsigned> firstTrailingIdx;
+bool CompletionArgInfo::allowsMissingArgAt(unsigned argInsertIdx,
+                                              AnyFunctionType::Param param) {
+  // If the argument is before or at the index of the argument containing the
+  // completion, the user would likely have already written it if they
+  // intended this overload.
+  if (completionIdx >= argInsertIdx)
+    return false;
 
-  bool isAllowableMissingArg(unsigned argInsertIdx,
-                             AnyFunctionType::Param param) {
-    // If the argument is before or at the index of the argument containing the
-    // completion, the user would likely have already written it if they
-    // intended this overload.
-    if (completionIdx >= argInsertIdx)
+  // If the argument is after the first trailing closure, the user can only
+  // continue on to write more trailing arguments, so only allow this overload
+  // if the missing argument is of function type.
+  if (firstTrailingIdx && argInsertIdx > *firstTrailingIdx) {
+    if (param.isInOut())
       return false;
 
-    // If the argument is after the first trailing closure, the user can only
-    // continue on to write more trailing arguments, so only allow this overload
-    // if the missing argument is of function type.
-    if (firstTrailingIdx && argInsertIdx > *firstTrailingIdx) {
-      if (param.isInOut())
-        return false;
-
-      Type expectedTy = param.getPlainType()->lookThroughAllOptionalTypes();
-      return expectedTy->is<FunctionType>() || expectedTy->isAny() ||
-          expectedTy->isTypeVariableOrMember();
-    }
-    return true;
+    Type expectedTy = param.getPlainType()->lookThroughAllOptionalTypes();
+    return expectedTy->is<FunctionType>() || expectedTy->isAny() ||
+        expectedTy->isTypeVariableOrMember();
   }
-};
+  return true;
+}
 
-static Optional<CompletionArgInfo>
-getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
+Optional<CompletionArgInfo>
+constraints::getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
   Expr *arg = nullptr;
   if (auto *CE = getAsExpr<CallExpr>(anchor))
     arg = CE->getArg();
@@ -1042,11 +1159,11 @@ getCompletionArgInfo(ASTNode anchor, ConstraintSystem &CS) {
   auto trailingIdx = arg->getUnlabeledTrailingClosureIndexOfPackedArgument();
   if (auto *PE = dyn_cast<ParenExpr>(arg)) {
     if (CS.containsCodeCompletionLoc(PE->getSubExpr()))
-      return CompletionArgInfo{ 0, trailingIdx };
+      return CompletionArgInfo{ 0, trailingIdx, 1};
   } else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
     for (unsigned i: indices(TE->getElements())) {
       if (CS.containsCodeCompletionLoc(TE->getElement(i)))
-        return CompletionArgInfo{ i, trailingIdx };
+        return CompletionArgInfo{ i, trailingIdx, TE->getNumElements() };
     }
   }
   return None;
@@ -1093,7 +1210,7 @@ public:
       if (!CompletionArgInfo)
         CompletionArgInfo = getCompletionArgInfo(Locator.getAnchor(), CS);
       isAfterCodeCompletionLoc = CompletionArgInfo &&
-        CompletionArgInfo->isAllowableMissingArg(argInsertIdx, param);
+        CompletionArgInfo->allowsMissingArgAt(argInsertIdx, param);
     }
 
     auto *argLoc = CS.getConstraintLocator(
@@ -1125,6 +1242,15 @@ public:
       return true;
 
     ExtraArguments.push_back(std::make_pair(argIdx, Arguments[argIdx]));
+    return false;
+  }
+
+  bool invalidArgumentsAfterCompletion() override {
+    assert(CS.isForCodeCompletion());
+    // This is only triggered when solving for code completion (which doesn't
+    // produce diagnostics) so no need to record a fix for this. Still increase
+    // the score to penalize this solution though.
+    CS.increaseScore(SK_Fix);
     return false;
   }
 
@@ -1328,9 +1454,12 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   {
     ArgumentFailureTracker listener(cs, argsWithLabels, params, locator);
+    Optional<CompletionArgInfo> completionInfo = None;
+    if (cs.isForCodeCompletion())
+      completionInfo = getCompletionArgInfo(locator.getAnchor(), cs);
     auto callArgumentMatch = constraints::matchCallArguments(
         argsWithLabels, params, paramInfo,
-        argInfo->UnlabeledTrailingClosureIndex,
+        argInfo->UnlabeledTrailingClosureIndex, completionInfo,
         cs.shouldAttemptFixes(), listener, trailingClosureMatching);
     if (!callArgumentMatch)
       return cs.getTypeMatchFailure(locator);
@@ -7026,7 +7155,8 @@ static bool isForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
   if (auto *SE = getAsExpr<SubscriptExpr>(locator->getAnchor())) {
     auto *indexExpr = SE->getIndex();
     return isa<ParenExpr>(indexExpr) &&
-           isa<KeyPathExpr>(indexExpr->getSemanticsProvidingExpr());
+           (isa<KeyPathExpr>(indexExpr->getSemanticsProvidingExpr()) ||
+            isa<CodeCompletionExpr>(indexExpr->getSemanticsProvidingExpr()));
   }
   return false;
 }
@@ -9733,6 +9863,14 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
     return matchTypes(resultTy, valueTy, ConstraintKind::Bind,
                       subflags, locator);
   }
+
+  if (keyPathTy->isPlaceholder()) {
+    if (rootTy->hasTypeVariable())
+      recordAnyTypeVarAsPotentialHole(rootTy);
+    if (valueTy->hasTypeVariable())
+      recordAnyTypeVarAsPotentialHole(valueTy);
+    return SolutionKind::Solved;
+  }
   
   if (auto bgt = keyPathTy->getAs<BoundGenericType>()) {
     // We have the key path type. Match it to the other ends of the constraint.
@@ -11268,6 +11406,41 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
       << "(attempting fix ";
     fix->print(log);
     log << ")\n";
+  }
+
+  // If this fix is in a call argument after the argument containing the code
+  // completion location, give a fixed penalty with the same impact as that for
+  // the fix to ignore all arguments after the completion position when matching
+  // arguments based on labels.
+  if (isForCodeCompletion()) {
+
+    auto getArgAndAnchor = [&](ConstraintLocator *loc) -> Optional<std::pair<unsigned, ASTNode>> {
+      SmallVector<LocatorPathElt, 8> path;
+      auto anchor = loc->getAnchor();
+      if (auto applyArg = loc->findLast<LocatorPathElt::ApplyArgToParam>())
+        return std::make_pair(applyArg->getArgIdx(), anchor);
+      return None;
+    };
+    auto *loc = fix->getLocator();
+    loc->dump(this);
+    auto completionInfo = getCompletionArgInfo(loc->getAnchor(), *this);
+    auto argAndAnchor = getArgAndAnchor(loc);
+    if (completionInfo && argAndAnchor &&
+        completionInfo->isBefore(argAndAnchor->first)) {
+      // Make sure we only penalize issues in arguments after the argument
+      // containing the completion position once.
+      bool isFirst = llvm::all_of(getFixes(), [&](const ConstraintFix *fix) {
+        if (auto fixArgAndAnchor = getArgAndAnchor(fix->getLocator()))
+          return !completionInfo->isBefore(fixArgAndAnchor->first) ||
+              fixArgAndAnchor->second != argAndAnchor->second ||
+              fixArgAndAnchor->first > argAndAnchor->first;
+        return true;
+      });
+
+      if (!isFirst)
+        return false;
+      impact = 1;
+    }
   }
 
   // Record the fix.

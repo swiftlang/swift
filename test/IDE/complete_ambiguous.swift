@@ -473,3 +473,88 @@ func testBestSolutionGeneric() {
 // BEST_SOLUTION_FILTER_GEN-DAG: Keyword[self]/CurrNominal:     self[#Test1#]; name=self
 // BEST_SOLUTION_FILTER_GEN: End completions
 
+func testAmbiguousArgs() {
+  struct A {
+    func someFunc(a: Int, b: Int) -> A { return self }
+    func variadic(y: Int, x: Int...)
+  }
+
+  struct B {
+    func someFunc(a: Int, c: String = "", d: String = "") {}
+  }
+
+  func overloaded() -> A { return A() }
+  func overloaded() -> B { return B() }
+
+  let localInt = 10
+  let localString = "Hello"
+
+  overloaded().someFunc(a: 2, #^ARG_NO_LABEL^#)
+
+  // ARG_NO_LABEL: Begin completions, 3 items
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#b: Int#}[#Int#]; name=b: Int
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
+  // ARG_NO_LABEL-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d: String
+  // ARG_NO_LABEL: End completions
+
+  overloaded().someFunc(a: 2, b: #^ARG_LABEL^#)
+
+  // ARG_LABEL: Begin completions
+  // ARG_LABEL-DAG: Decl[LocalVar]/Local:                          localString[#String#]; name=localString
+  // ARG_LABEL-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]:  localInt[#Int#]; name=localInt
+  // ARG_LABEL: End completions
+
+  overloaded().someFunc(a: 2, c: "Foo", #^ARG_NO_LABEL2^#)
+
+  // ARG_NO_LABEL2: Begin completions, 1 item
+  // ARG_NO_LABEL2: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d: String
+  // ARG_NO_LABEL2: End completions
+
+  overloaded().someFunc(a: 2, wrongLabel: "Foo", #^ARG_NO_LABEL_PREV_WRONG^#)
+
+  // ARG_NO_LABEL_PREV_WRONG: Begin completions, 2 items
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
+  // ARG_NO_LABEL_PREV_WRONG-DAG: Pattern/Local/Flair[ArgLabels]:     {#d: String#}[#String#]; name=d: String
+  // ARG_NO_LABEL_PREV_WRONG: End completions
+
+  overloaded().someFunc(a: 2, d: "Foo", #^ARG_NO_LABEL_OUT_OF_ORDER^#)
+  // ARG_NO_LABEL_OUT_OF_ORDER: Begin completions
+  // ARG_NO_LABEL_OUT_OF_ORDER-NOT: name=d: String
+  // ARG_NO_LABEL_OUT_OF_ORDER: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
+  // ARG_NO_LABEL_OUT_OF_ORDER-NOT: name=d: String
+  // ARG_NO_LABEL_OUT_OF_ORDER: End completions
+
+  func noArgs() {}
+  noArgs(12, #^ARG_EXTRANEOUS^#)
+  // ARG_EXTRANEOUS: Begin completions
+  // ARG_EXTRANEOUS-DAG: localInt
+  // ARG_EXTRANEOUS-DAG: localString
+  // ARG_EXTRANEOUS: End completions
+
+  overloaded().someFunc(a: 2, #^LATER_ARGS^#, d: "foo")
+  // LATER_ARGS: Begin completions, 1 item
+  // LATER_ARGS: Pattern/Local/Flair[ArgLabels]:     {#c: String#}[#String#]; name=c: String
+  // LATER_ARGS: End completions
+
+  overloaded().someFunc(a: 2, #^LATER_ARGS_WRONG^#, k: 4.5)
+  // LATER_ARGS_WRONG: Begin completions, 3 items
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#b: Int#}[#Int#]; name=b: Int
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#c: String#}[#String#]; name=c: String
+  // LATER_ARGS_WRONG-DAG: Pattern/Local/Flair[ArgLabels]: {#d: String#}[#String#]; name=d: String
+  // LATER_ARGS_WRONG-DAG: End completions
+
+
+  overloaded().variadic(y: 2, #^INITIAL_VARARG^#, 4)
+  // INITIAL_VARARG: Begin completions, 1 item
+  // INITIAL_VARARG: Pattern/Local/Flair[ArgLabels]: {#x: Int...#}[#Int#]; name=x: Int...
+  // INITIAL VARARG: End completions
+
+  overloaded().variadic(y: 2, x: 2, #^NONINITIAL_VARARG^#)
+  // NONINITIAL_VARARG: Begin completions
+  // NONINITIAL_VARARG-NOT: name=x:
+  // NONINITIAL_VARARG: Decl[LocalVar]/Local/TypeRelation[Identical]:  localInt[#Int#]; name=localInt
+  // NONINITIAL_VARARG-NOT: name=x:
+  // NONINITIAL_VARARG: End completions
+
+}
+

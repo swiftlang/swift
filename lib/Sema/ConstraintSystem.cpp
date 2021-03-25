@@ -2888,7 +2888,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     refType = subscriptTy;
 
     // Increase the score so that actual subscripts get preference.
-    increaseScore(SK_KeyPathSubscript);
+    // ...except if we're solving for code completion and the index expression
+    // contains the completion location
+    auto SE = getAsExpr<SubscriptExpr>(locator->getAnchor());
+    if (!isForCodeCompletion() ||
+        (SE && !containsCodeCompletionLoc(SE->getIndex()))) {
+      increaseScore(SK_KeyPathSubscript);
+    }
     break;
   }
   }
