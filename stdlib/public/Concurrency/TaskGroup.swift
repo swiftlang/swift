@@ -124,7 +124,7 @@ extension Task {
     @discardableResult
     public mutating func add(
       overridingPriority priorityOverride: Priority? = nil,
-      operation: @Sendable @escaping () async throws -> TaskResult
+      operation: __owned @Sendable @escaping () async throws -> TaskResult
     ) async -> Bool {
       let canAdd = _taskGroupAddPendingTask(group: _group)
 
