@@ -1131,8 +1131,8 @@ public:
     return subIGF.Builder.CreateCall(fnPtr.getAsFunction(subIGF),
                                      args.claimAll());
   }
-  // [FIXME: swiftasynccc] This call should be marked musttail.
   void createReturn(llvm::CallInst *call) override {
+    call->setTailCallKind(IGM.AsyncTailCallKind);
     subIGF.Builder.CreateRetVoid();
   }
   void end() override {
