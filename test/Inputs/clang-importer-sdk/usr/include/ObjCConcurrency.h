@@ -144,4 +144,7 @@ __attribute__((__swift_attr__("@MainActor(unsafe)")))
 -(void)onButtonPress;
 @end
 
+// Do something concurrently, but without escaping.
+void doSomethingConcurrently(__attribute__((noescape)) __attribute__((swift_attr("@Sendable"))) void (^block)(void));
+
 #pragma clang assume_nonnull end

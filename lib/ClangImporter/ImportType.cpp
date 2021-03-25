@@ -1739,6 +1739,15 @@ Type ClangImporter::Implementation::applyParamAttributes(
 
       continue;
     }
+
+    // Map @Sendable.
+    if (swiftAttr->getAttribute() == "@Sendable") {
+      type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
+        return extInfo.withConcurrent();
+      });
+
+      continue;
+    }
   }
 
   return type;
