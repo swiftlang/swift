@@ -4051,12 +4051,29 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     anchor = apply->getFn();
   }
 
-  if (argLabel.hasDollarPrefix() && (!param || !param->hasAttachedPropertyWrapper())) {
+  auto supportsProjectedValueInit = [&](ParamDecl *param) -> bool {
+    if (!param->hasAttachedPropertyWrapper())
+      return false;
+
+    if (param->hasImplicitPropertyWrapper())
+      return true;
+
+    if (param->getAttachedPropertyWrappers().front()->getArg())
+      return false;
+
+    auto wrapperInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+    return wrapperInfo.projectedValueVar && wrapperInfo.hasProjectedValueInit;
+  };
+
+  if (argLabel.hasDollarPrefix() && (!param || !supportsProjectedValueInit(param))) {
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    addConstraint(matchKind, paramType, wrapperType, locator);
-    auto *fix = AddPropertyWrapperAttribute::create(*this, wrapperType, getConstraintLocator(locator));
+    if (paramType->hasTypeVariable())
+      recordPotentialHole(paramType);
+
+    auto *loc = getConstraintLocator(locator);
+    auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
 
@@ -4065,32 +4082,12 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
   PropertyWrapperInitKind initKind;
   if (argLabel.hasDollarPrefix()) {
-    auto attemptProjectedValueFix = [&](ConstraintFix *fix) -> ConstraintSystem::TypeMatchResult {
-      if (shouldAttemptFixes()) {
-        if (paramType->hasTypeVariable())
-          recordPotentialHole(paramType);
-
-        if (!recordFix(fix))
-          return getTypeMatchSuccess();
-      }
-
-      return getTypeMatchFailure(locator);
-    };
-
-    auto typeInfo = wrapperType->getAnyNominal()->getPropertyWrapperTypeInfo();
-    if (!typeInfo.projectedValueVar) {
-      auto *fix = AddProjectedValue::create(*this, wrapperType, getConstraintLocator(locator));
-      return attemptProjectedValueFix(fix);
-    }
-
     Type projectionType = computeProjectedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, projectionType, locator);
-
-    if (!param->hasImplicitPropertyWrapper() &&
-        param->getAttachedPropertyWrappers().front()->getArg()) {
-      auto *fix = UseWrappedValue::create(*this, param, /*base=*/Type(), wrapperType,
-                                          getConstraintLocator(locator));
-      return attemptProjectedValueFix(fix);
+    if (param->hasImplicitPropertyWrapper()) {
+      auto wrappedValueType = getType(param->getPropertyWrapperWrappedValueVar());
+      addConstraint(ConstraintKind::PropertyWrapper, projectionType, wrappedValueType,
+                    getConstraintLocator(param));
     }
 
     initKind = PropertyWrapperInitKind::ProjectedValue;

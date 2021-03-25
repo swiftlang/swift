@@ -1079,24 +1079,26 @@ public:
   bool diagnoseAsError() override;
 };
 
-class MissingProjectedValueFailure final : public FailureDiagnostic {
+class InvalidPropertyWrapperType final : public FailureDiagnostic {
   Type wrapperType;
 
 public:
-  MissingProjectedValueFailure(const Solution &solution, Type wrapper,
-                               ConstraintLocator *locator)
+  InvalidPropertyWrapperType(const Solution &solution, Type wrapper,
+                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
 
   bool diagnoseAsError() override;
 };
 
-class MissingPropertyWrapperAttributeFailure final : public FailureDiagnostic {
+class InvalidProjectedValueArgument final : public FailureDiagnostic {
   Type wrapperType;
+  ParamDecl *param;
 
 public:
-  MissingPropertyWrapperAttributeFailure(const Solution &solution, Type wrapper,
-                                         ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
+  InvalidProjectedValueArgument(const Solution &solution, Type wrapper,
+                                ParamDecl *param, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)),
+        param(param) {}
 
   bool diagnoseAsError() override;
 };

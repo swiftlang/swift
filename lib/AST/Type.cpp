@@ -967,7 +967,7 @@ ParameterListInfo::ParameterListInfo(
     }
 
     if (param->hasAttachedPropertyWrapper()) {
-      propertyWrappers[i] = param;
+      propertyWrappers.set(i);
     }
   }
 }
@@ -983,9 +983,8 @@ bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
       acceptsUnlabeledTrailingClosures[paramIdx];
 }
 
-const ParamDecl *
-ParameterListInfo::getPropertyWrapperParam(unsigned paramIdx) const {
-  return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : nullptr;
+bool ParameterListInfo::hasExternalPropertyWrapper(unsigned paramIdx) const {
+  return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : false;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
