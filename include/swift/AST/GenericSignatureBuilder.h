@@ -614,6 +614,10 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   void inferRequirements(ModuleDecl &module, ParameterList *params);
 
+  GenericSignature rebuildSignatureWithoutRedundantRequirements(
+                      bool allowConcreteGenericParams,
+                      bool buildingRequirementSignature) &&;
+
   /// Finalize the set of requirements and compute the generic
   /// signature.
   ///
