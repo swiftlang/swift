@@ -701,7 +701,10 @@ extension SIMDMask {
   @inlinable
   public static func random<T: RandomNumberGenerator>(using generator: inout T) -> SIMDMask {
     var result = SIMDMask()
-    for i in result.indices { result[i] = Bool.random(using: &generator) }
+    let bits: UInt64 = generator.next()
+    for i in result.indices {
+      result[i] = bits & (1 &<< i) != 0
+    }
     return result
   }
   
