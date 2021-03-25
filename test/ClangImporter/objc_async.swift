@@ -5,6 +5,8 @@
 import Foundation
 import ObjCConcurrency
 
+@MainActor func onlyOnMainActor() { }
+
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
   let _: Bool = await slowServer.checkAvailability()
@@ -49,6 +51,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
 
   _ = await slowServer.operations()
+
+  _ = await slowServer.runOnMainThread()
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
@@ -63,6 +67,11 @@ func testSlowServerSynchronous(slowServer: SlowServer) {
 
   let s = slowServer.operations
   _ = s + []
+
+  slowServer.runOnMainThread { s in
+    print(s)
+    onlyOnMainActor() // okay because runOnMainThread has a @MainActor closure
+  }
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {

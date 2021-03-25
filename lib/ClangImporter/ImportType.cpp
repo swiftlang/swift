@@ -1695,26 +1695,50 @@ ImportedType ClangImporter::Implementation::importPropertyType(
 
 /// Apply an attribute to a function type.
 static Type applyToFunctionType(
-    Type type, llvm::function_ref<Type(FunctionType *)> transform) {
+    Type type, llvm::function_ref<ASTExtInfo(ASTExtInfo)> transform) {
   // Recurse into optional types.
   if (Type objectType = type->getOptionalObjectType()) {
     return OptionalType::get(applyToFunctionType(objectType, transform));
   }
 
   // Apply @noescape to function types.
-  if (auto funcType = type->getAs<FunctionType>())
-    return transform(funcType);
+  if (auto funcType = type->getAs<FunctionType>()) {
+    return FunctionType::get(funcType->getParams(), funcType->getResult(),
+                             transform(funcType->getExtInfo()));
+  }
 
   return type;
 }
 
-static Type applyParamAttributes(const clang::ParmVarDecl *param, Type type) {
-  // Map __attribute__((noescape)) to @noescape.
-  if (param->hasAttr<clang::NoEscapeAttr>()) {
-    type = applyToFunctionType(type, [](FunctionType *funcType) {
-      return FunctionType::get(funcType->getParams(), funcType->getResult(),
-                               funcType->getExtInfo().withNoEscape());
-    });
+Type ClangImporter::Implementation::applyParamAttributes(
+    const clang::ParmVarDecl *param, Type type) {
+  if (!param->hasAttrs())
+    return type;
+
+  for (auto attr : param->getAttrs()) {
+    // Map __attribute__((noescape)) to @noescape.
+    if (isa<clang::NoEscapeAttr>(attr)) {
+      type = applyToFunctionType(type, [](ASTExtInfo extInfo) {
+        return extInfo.withNoEscape();
+      });
+
+      continue;
+    }
+
+    auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
+    if (!swiftAttr)
+      continue;
+
+    // Map the main-actor attribute.
+    if (isMainActorAttr(SwiftContext, swiftAttr)) {
+      if (Type mainActor = getMainActorType()) {
+        type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
+          return extInfo.withGlobalActor(mainActor);
+        });
+      }
+
+      continue;
+    }
   }
 
   return type;

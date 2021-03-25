@@ -3,6 +3,8 @@
 
 #pragma clang assume_nonnull begin
 
+#define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
+
 @protocol ServiceProvider
 @property(readonly) NSArray<NSString *> *allOperations;
 -(void)allOperationsWithCompletionHandler:(void (^)(NSArray<NSString *> *))completion;
@@ -66,6 +68,9 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 -(void)doSomethingFlaggyWithCompletionHandler:(void (^)(BOOL, NSString *_Nullable, NSError *_Nullable))completionHandler __attribute__((swift_async_error(nonzero_argument, 1)));
 -(void)doSomethingZeroFlaggyWithCompletionHandler:(void (^)(NSString *_Nullable, BOOL, NSError *_Nullable))completionHandler __attribute__((swift_async_error(zero_argument, 2)));
 -(void)doSomethingMultiResultFlaggyWithCompletionHandler:(void (^)(BOOL, NSString *_Nullable, NSError *_Nullable, NSString *_Nullable))completionHandler __attribute__((swift_async_error(zero_argument, 1)));
+
+
+-(void)runOnMainThreadWithCompletionHandler:(MAIN_ACTOR void (^ _Nullable)(NSString *))completion;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

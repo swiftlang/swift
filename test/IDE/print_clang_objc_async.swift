@@ -26,6 +26,8 @@ import _Concurrency
 // CHECK-DAG:     func doSomethingFun(_ operation: String) async
 // CHECK-DAG:     func dance(_ step: String) async -> String
 // CHECK-DAG:     func __leap(_ height: Int) async -> String
+// CHECK-DAG:     func runOnMainThread(completionHandler completion: (@MainActor (String) -> Void)? = nil)
+// CHECK-DAG:     func runOnMainThread() async -> String
 // CHECK: {{^[}]$}}
 
 // CHECK-LABEL: protocol RefrigeratorDelegate

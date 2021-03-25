@@ -830,6 +830,8 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type);
+
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
   Decl *importDeclCached(const clang::NamedDecl *ClangDecl, Version version,
@@ -1561,6 +1563,14 @@ public:
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
 };
+
+/// Determines whether the given swift_attr attribute describes the main
+/// actor.
+///
+/// \returns None if this is not a main-actor attribute, and a Boolean
+/// indicating whether (unsafe) was provided in the attribute otherwise.
+Optional<bool> isMainActorAttr(
+    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr);
 
 }
 }
