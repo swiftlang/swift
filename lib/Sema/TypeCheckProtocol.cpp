@@ -5271,7 +5271,7 @@ canSuppressPotentialWitnessWarningWithNonObjC(ValueDecl *requirement,
 
   // ... but not explicitly.
   if (auto attr = witness->getAttrs().getAttribute<ObjCAttr>()) {
-    if (!attr->isImplicit()) return false;
+    if (!attr->isImplicit() || attr->getAddedByAccessNote()) return false;
   }
 
   // And not because it has to be for overriding.

@@ -1184,6 +1184,12 @@ UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
                            SmallVectorImpl<ValueDecl *> *allResults = nullptr);
+
+/// Forces all changes specified by the module's access notes file to be
+/// applied to this declaration. It is safe to call this function more than
+/// once.
+void applyAccessNote(ValueDecl *VD);
+
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

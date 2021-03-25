@@ -54,6 +54,9 @@ swift::behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx) {
       return DiagnosticBehavior::Unspecified;
     return DiagnosticBehavior::Ignore;
 
+  case ObjCReason::ExplicitlyObjCByAccessNote:
+    return DiagnosticBehavior::Remark;
+
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
   case ObjCReason::ElementOfObjCEnum:
@@ -79,6 +82,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
   case ObjCReason::MemberOfObjCExtension:
+  case ObjCReason::ExplicitlyObjCByAccessNote:
     return static_cast<unsigned>(reason);
 
   case ObjCReason::MemberOfObjCSubclass:
@@ -113,6 +117,10 @@ static void describeObjCReason(const ValueDecl *VD, ObjCReason Reason) {
                 VD->getDescriptiveKind(), requirement->getName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())
                   ->getName());
+  }
+  else if (Reason == ObjCReason::ExplicitlyObjCByAccessNote) {
+    // FIXME: Look up the Reason string in the access note and emit a note that
+    // includes it
   }
 }
 
@@ -1119,6 +1127,13 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
   return classDecl->checkAncestry(AncestryFlags::ObjCMembers);
 }
 
+ObjCReason swift::objCReasonForObjCAttr(const ObjCAttr *attr) {
+  if (attr->getAddedByAccessNote())
+    return ObjCReason::ExplicitlyObjCByAccessNote;
+
+  return ObjCReason::ExplicitlyObjC;
+}
+
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
@@ -1126,6 +1141,13 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
   auto ancestry = CD->checkAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
+    auto reason = objCReasonForObjCAttr(attr);
+    auto behavior = behaviorLimitForObjCReason(reason, ctx);
+
+    SourceLoc attrLoc = attr->getLocation();
+    if (attrLoc.isInvalid())
+      attrLoc = CD->getLoc();
+
     if (ancestry.contains(AncestryFlags::Generic)) {
       if (attr->hasName() && !CD->isGenericContext()) {
         // @objc with a name on a non-generic subclass of a generic class is
@@ -1135,8 +1157,9 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
         return None;
       }
 
-      ctx.Diags.diagnose(attr->getLocation(), diag::objc_for_generic_class)
-        .fixItRemove(attr->getRangeWithAt());
+      ctx.Diags.diagnose(attrLoc, diag::objc_for_generic_class)
+        .fixItRemove(attr->getRangeWithAt())
+        .limitBehavior(behavior);
     }
 
     // If the class has resilient ancestry, @objc just controls the runtime
@@ -1155,12 +1178,13 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
       auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
       auto range = getMinOSVersionForClassStubs(target);
       auto *ancestor = getResilientAncestor(CD->getParentModule(), CD);
-      ctx.Diags.diagnose(attr->getLocation(),
+      ctx.Diags.diagnose(attrLoc,
                          diag::objc_for_resilient_class,
                          ancestor->getName(),
                          platform,
                          range.getLowerEndpoint())
-        .fixItRemove(attr->getRangeWithAt());
+        .fixItRemove(attr->getRangeWithAt())
+        .limitBehavior(behavior);
     }
 
     // Only allow ObjC-rooted classes to be @objc.
@@ -1168,9 +1192,10 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     if (ancestry.contains(AncestryFlags::ObjC) &&
         !ancestry.contains(AncestryFlags::ClangImported)) {
       if (ctx.LangOpts.EnableObjCAttrRequiresFoundation) {
-        ctx.Diags.diagnose(attr->getLocation(),
+        ctx.Diags.diagnose(attrLoc,
                            diag::invalid_objc_swift_rooted_class)
-          .fixItRemove(attr->getRangeWithAt());
+          .fixItRemove(attr->getRangeWithAt())
+          .limitBehavior(behavior);
         // If the user has not spelled out a superclass, offer to insert
         // 'NSObject'. We could also offer to replace the existing superclass,
         // but that's a touch aggressive.
@@ -1178,20 +1203,23 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
            auto nameEndLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr,
                                                         CD->getNameLoc());
            CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
-             .fixItInsert(nameEndLoc, ": NSObject");
+             .fixItInsert(nameEndLoc, ": NSObject")
+             .limitBehavior(behavior);
          } else if (CD->getSuperclass().isNull()) {
            CD->diagnose(diag::invalid_objc_swift_root_class_insert_nsobject)
-             .fixItInsert(CD->getInherited().front().getLoc(), "NSObject, ");
+             .fixItInsert(CD->getInherited().front().getLoc(), "NSObject, ")
+             .limitBehavior(behavior);
          }
       }
 
       if (!ctx.LangOpts.EnableObjCInterop) {
-        ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-          .fixItRemove(attr->getRangeWithAt());
+        ctx.Diags.diagnose(attrLoc, diag::objc_interop_disabled)
+          .fixItRemove(attr->getRangeWithAt())
+          .limitBehavior(behavior);
       }
     }
 
-    return ObjCReason(ObjCReason::ExplicitlyObjC);
+    return reason;
   }
 
   if (ancestry.contains(AncestryFlags::ObjC)) {
@@ -1272,8 +1300,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   };
 
   // explicitly declared @objc.
-  if (VD->getAttrs().hasAttribute<ObjCAttr>())
-    return ObjCReason(ObjCReason::ExplicitlyObjC);
+  if (auto attr = VD->getAttrs().getAttribute<ObjCAttr>())
+    return objCReasonForObjCAttr(attr);
   // Getter or setter for an @objc property or subscript.
   if (auto accessor = dyn_cast<AccessorDecl>(VD)) {
     if (accessor->getAccessorKind() == AccessorKind::Get ||
@@ -1468,7 +1496,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   DiagnosticStateRAII diagState(VD->getASTContext().Diags);
 
   // Access notes may add attributes that affect this calculus.
-  (void)evaluateOrDefault(evaluator, ApplyAccessNoteRequest{VD}, {});
+  TypeChecker::applyAccessNote(VD);
 
   auto dc = VD->getDeclContext();
   Optional<ObjCReason> isObjC;
@@ -1486,18 +1514,19 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
     if (isEnumObjC(enumDecl))
-      isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+      isObjC = objCReasonForObjCAttr(
+                                 enumDecl->getAttrs().getAttribute<ObjCAttr>());
   } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
     // Enum elements can be @objc so long as the containing enum is @objc.
     if (enumElement->getParentEnum()->isObjC()) {
-      if (enumElement->getAttrs().hasAttribute<ObjCAttr>())
-        isObjC = ObjCReason::ExplicitlyObjC;
+      if (auto attr = enumElement->getAttrs().getAttribute<ObjCAttr>())
+        isObjC = objCReasonForObjCAttr(attr);
       else
         isObjC = ObjCReason::ElementOfObjCEnum;
     }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
-    if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+    if (auto attr = proto->getAttrs().getAttribute<ObjCAttr>()) {
+      isObjC = objCReasonForObjCAttr(attr);
 
       // If the protocol is @objc, it may only refine other @objc protocols.
       // FIXME: Revisit this restriction.
@@ -1573,8 +1602,9 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
 
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
 
-  /// Set the @objc name.
   ASTContext &ctx = decl->getASTContext();
+
+  /// Set the @objc name.
   auto setObjCName = [&](ObjCSelector selector) {
     // If there already is an @objc attribute, update its name.
     if (attr) {
@@ -1598,13 +1628,18 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
         // Determine whether there is a name conflict.
         bool shouldFixName = !attr || !attr->hasName();
         if (attr && attr->hasName() && *attr->getName() != overriddenSelector) {
+          auto reason = objCReasonForObjCAttr(attr);
+          auto behavior = behaviorLimitForObjCReason(reason, ctx);
+
           // If the user explicitly wrote the incorrect name, complain.
           if (!attr->isNameImplicit()) {
             {
-              auto diag = ctx.Diags.diagnose(
-                            attr->AtLoc,
-                            diag::objc_override_method_selector_mismatch,
-                            *attr->getName(), overriddenSelector);
+              auto diag = std::move(
+                              ctx.Diags.diagnose(
+                                attr->AtLoc,
+                                diag::objc_override_method_selector_mismatch,
+                                *attr->getName(), overriddenSelector)
+                      .limitBehavior(behavior));
               fixDeclarationObjCName(diag, decl, attr->getName(),
                                      overriddenSelector);
             }
@@ -1632,15 +1667,24 @@ static ObjCSelector inferObjCName(ValueDecl *decl) {
         bool shouldFixName = !attr || !attr->hasName();
         if (attr && attr->hasName() &&
             *attr->getName() != overriddenNameAsSel) {
+          auto reason = objCReasonForObjCAttr(attr);
+          auto behavior = behaviorLimitForObjCReason(reason, ctx);
+
           // If the user explicitly wrote the wrong name, complain.
           if (!attr->isNameImplicit()) {
-            ctx.Diags.diagnose(attr->AtLoc,
+            SourceLoc diagLoc = attr->AtLoc, firstNameLoc;
+            if (diagLoc.isInvalid())
+              diagLoc = decl->getLoc();
+            if (!attr->getNameLocs().empty())
+              firstNameLoc = attr->getNameLocs().front();
+            ctx.Diags.diagnose(diagLoc,
                         diag::objc_override_property_name_mismatch,
                         attr->getName()->getSelectorPieces()[0],
                         overriddenName)
-              .fixItReplaceChars(attr->getNameLocs().front(),
+              .fixItReplaceChars(firstNameLoc,
                                  attr->getRParenLoc(),
-                                 overriddenName.str());
+                                 overriddenName.str())
+              .limitBehavior(behavior);
             overridden->diagnose(diag::overridden_here);
           }
 

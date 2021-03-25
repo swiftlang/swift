@@ -47,13 +47,16 @@ using namespace swift;
 namespace {
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
-  void diagnoseAndRemoveAttr(DiagnosticEngine &Diags, Decl *D,
-                             DeclAttribute *attr, ArgTypes &&...Args) {
+  InFlightDiagnostic
+  diagnoseAndRemoveAttr(DiagnosticEngine &Diags, Decl *D, DeclAttribute *attr,
+                        ArgTypes &&...Args) {
+    attr->setInvalid();
+
     assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
 #ifndef NDEBUG
-      if (!loc.isValid()) {
+      if (!loc.isValid() && !attr->getAddedByAccessNote()) {
         llvm::errs() << "Attribute '";
         attr->print(llvm::errs());
         llvm::errs() << "' has invalid location, failed to diagnose!\n";
@@ -64,12 +67,11 @@ namespace {
         loc = D->getLoc();
       }
       if (loc.isValid()) {
-        Diags.diagnose(loc, std::forward<ArgTypes>(Args)...)
-          .fixItRemove(attr->getRangeWithAt());
+        return std::move(Diags.diagnose(loc, std::forward<ArgTypes>(Args)...)
+                            .fixItRemove(attr->getRangeWithAt()));
       }
     }
-
-    attr->setInvalid();
+    return InFlightDiagnostic();
   }
 
 /// This visits each attribute on a decl.  The visitor should return true if
@@ -83,9 +85,10 @@ public:
 
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
-  void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
-    ::diagnoseAndRemoveAttr(Ctx.Diags, D, attr,
-                            std::forward<ArgTypes>(Args)...);
+  InFlightDiagnostic diagnoseAndRemoveAttr(DeclAttribute *attr,
+                                           ArgTypes &&...Args) {
+    return ::diagnoseAndRemoveAttr(Ctx.Diags, D, attr,
+                                   std::forward<ArgTypes>(Args)...);
   }
 
   template <typename... ArgTypes>
@@ -936,7 +939,8 @@ static bool checkObjCDeclContext(Decl *D) {
   return false;
 }
 
-static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
+static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
+                                              DiagnosticBehavior behavior) {
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
 
@@ -948,7 +952,8 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
 
   if (!ctx.LangOpts.EnableObjCInterop) {
     ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-      .fixItRemove(attr->getRangeWithAt());
+      .fixItRemove(attr->getRangeWithAt())
+      .limitBehavior(behavior);
     return;
   }
 
@@ -968,10 +973,14 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
   ctx.Diags.diagnose(attr->getLocation(),
                      diag::attr_used_without_required_module, attr,
                      ctx.Id_Foundation)
-    .highlight(attr->getRangeWithAt());
+    .highlight(attr->getRangeWithAt())
+    .limitBehavior(behavior);
 }
 
 void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
+  auto reason = objCReasonForObjCAttr(attr);
+  auto behavior = behaviorLimitForObjCReason(reason, Ctx);
+
   // Only certain decls can be ObjC.
   Optional<Diag<>> error;
   if (isa<ClassDecl>(D) ||
@@ -1007,7 +1016,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
   }
 
   if (error) {
-    diagnoseAndRemoveAttr(attr, *error);
+    diagnoseAndRemoveAttr(attr, *error).limitBehavior(behavior);
     return;
   }
 
@@ -1021,21 +1030,32 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
       // names. Complain and recover by chopping off everything
       // after the first name.
       if (objcName->getNumArgs() > 0) {
-        SourceLoc firstNameLoc = attr->getNameLocs().front();
-        SourceLoc afterFirstNameLoc =
-          Lexer::getLocForEndOfToken(Ctx.SourceMgr, firstNameLoc);
+        SourceLoc firstNameLoc, afterFirstNameLoc;
+        if (!attr->getNameLocs().empty()) {
+          firstNameLoc = attr->getNameLocs().front();
+          afterFirstNameLoc =
+            Lexer::getLocForEndOfToken(Ctx.SourceMgr, firstNameLoc);
+        }
+        else {
+          firstNameLoc = D->getLoc();
+        }
         diagnose(firstNameLoc, diag::objc_name_req_nullary,
                  D->getDescriptiveKind())
-          .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc());
+          .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc())
+          .limitBehavior(behavior);
         const_cast<ObjCAttr *>(attr)->setName(
           ObjCSelector(Ctx, 0, objcName->getSelectorPieces()[0]),
           /*implicit=*/false);
       }
     } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
-      diagnose(attr->getLParenLoc(),
+      SourceLoc diagLoc = attr->getLParenLoc();
+      if (diagLoc.isInvalid())
+        diagLoc = D->getLoc();
+      diagnose(diagLoc,
                isa<SubscriptDecl>(D)
                  ? diag::objc_name_subscript
-                 : diag::objc_name_deinit);
+                 : diag::objc_name_deinit)
+          .limitBehavior(behavior);
       const_cast<ObjCAttr *>(attr)->clearName();
     } else {
       auto func = cast<AbstractFunctionDecl>(D);
@@ -1063,14 +1083,18 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
 
       unsigned numArgumentNames = objcName->getNumArgs();
       if (numArgumentNames != numParameters) {
-        diagnose(attr->getNameLocs().front(),
+        SourceLoc firstNameLoc = func->getLoc();
+        if (!attr->getNameLocs().empty())
+          firstNameLoc = attr->getNameLocs().front();
+        diagnose(firstNameLoc,
                  diag::objc_name_func_mismatch,
                  isa<FuncDecl>(func),
                  numArgumentNames,
                  numArgumentNames != 1,
                  numParameters,
                  numParameters != 1,
-                 func->hasThrows());
+                 func->hasThrows())
+            .limitBehavior(behavior);
         D->getAttrs().add(
           ObjCAttr::createUnnamed(Ctx, attr->AtLoc,  attr->Range.Start));
         D->getAttrs().removeAttribute(attr);
@@ -1078,11 +1102,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     }
   } else if (isa<EnumElementDecl>(D)) {
     // Enum elements require names.
-    diagnoseAndRemoveAttr(attr, diag::objc_enum_case_req_name);
+    diagnoseAndRemoveAttr(attr, diag::objc_enum_case_req_name)
+        .limitBehavior(behavior);
   }
 
   // Diagnose an @objc attribute used without importing Foundation.
-  diagnoseObjCAttrWithoutFoundation(attr, D);
+  diagnoseObjCAttrWithoutFoundation(attr, D, behavior);
 }
 
 void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
@@ -1130,6 +1155,9 @@ void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
+  if (auto VD = dyn_cast<ValueDecl>(D))
+    TypeChecker::applyAccessNote(VD);
+
   AttributeChecker Checker(D);
   // We need to check all OriginallyDefinedInAttr relative to each other, so
   // collect them and check in batch later.
@@ -1174,13 +1202,20 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     default: break;
     }
 
+    DiagnosticBehavior behavior = attr->getAddedByAccessNote()
+                                ? DiagnosticBehavior::Remark
+                                : DiagnosticBehavior::Unspecified;
+
     if (!OnlyKind.empty())
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
-                                    attr, OnlyKind);
+                                    attr, OnlyKind)
+          .limitBehavior(behavior);
     else if (attr->isDeclModifier())
-      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr)
+          .limitBehavior(behavior);
     else
-      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr)
+          .limitBehavior(behavior);
   }
   Checker.checkOriginalDefinedInAttrs(D, ODIAttrs);
 }
