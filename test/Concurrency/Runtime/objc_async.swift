@@ -7,10 +7,6 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// This test is flaky and crashes sometimes, mostly when testing with swift_test_mode_optimize.
-// REQUIRES: rdar75783864
-
-
 @main struct Main {
   static func main() async {
   let butt = Butt()
