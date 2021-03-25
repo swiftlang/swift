@@ -1693,17 +1693,28 @@ ImportedType ClangImporter::Implementation::importPropertyType(
                     Bridgeability::Full, optionality);
 }
 
-/// Apply the @noescape attribute
-static Type applyNoEscape(Type type) {
+/// Apply an attribute to a function type.
+static Type applyToFunctionType(
+    Type type, llvm::function_ref<Type(FunctionType *)> transform) {
   // Recurse into optional types.
   if (Type objectType = type->getOptionalObjectType()) {
-    return OptionalType::get(applyNoEscape(objectType));
+    return OptionalType::get(applyToFunctionType(objectType, transform));
   }
 
   // Apply @noescape to function types.
-  if (auto funcType = type->getAs<FunctionType>()) {
-    return FunctionType::get(funcType->getParams(), funcType->getResult(),
-                             funcType->getExtInfo().withNoEscape());
+  if (auto funcType = type->getAs<FunctionType>())
+    return transform(funcType);
+
+  return type;
+}
+
+static Type applyParamAttributes(const clang::ParmVarDecl *param, Type type) {
+  // Map __attribute__((noescape)) to @noescape.
+  if (param->hasAttr<clang::NoEscapeAttr>()) {
+    type = applyToFunctionType(type, [](FunctionType *funcType) {
+      return FunctionType::get(funcType->getParams(), funcType->getResult(),
+                               funcType->getExtInfo().withNoEscape());
+    });
   }
 
   return type;
@@ -1883,13 +1894,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       swiftParamTy = importedType.getType();
     }
 
-    // Map __attribute__((noescape)) to @noescape.
-    if (param->hasAttr<clang::NoEscapeAttr>()) {
-      Type newParamTy = applyNoEscape(swiftParamTy);
-      if (newParamTy.getPointer() != swiftParamTy.getPointer()) {
-        swiftParamTy = newParamTy;
-      }
-    }
+    // Apply attributes to the type.
+    swiftParamTy = applyParamAttributes(param, swiftParamTy);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -2384,15 +2390,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
       llvm_unreachable("async info computed incorrectly?");
     }
 
-    // Map __attribute__((noescape)) to @noescape.
-    bool addNoEscapeAttr = false;
-    if (param->hasAttr<clang::NoEscapeAttr>()) {
-      Type newParamTy = applyNoEscape(swiftParamTy);
-      if (newParamTy.getPointer() != swiftParamTy.getPointer()) {
-        swiftParamTy = newParamTy;
-        addNoEscapeAttr = true;
-      }
-    }
+    // Apply Clang attributes to the parameter type.
+    swiftParamTy = applyParamAttributes(param, swiftParamTy);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
