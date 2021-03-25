@@ -377,7 +377,7 @@ extension Task {
   @discardableResult
   public static func runDetached<T>(
     priority: Priority = .default,
-    operation: @Sendable @escaping () async -> T
+    operation: __owned @Sendable @escaping () async -> T
     // TODO: Allow inheriting task-locals?
   ) -> Handle<T, Never> {
     // Set up the job flags for a new task.
@@ -430,7 +430,7 @@ extension Task {
   @discardableResult
   public static func runDetached<T, Failure>(
     priority: Priority = .default,
-    operation: @Sendable @escaping () async throws -> T
+    operation: __owned @Sendable @escaping () async throws -> T
   ) -> Handle<T, Failure> {
     // Set up the job flags for a new task.
     var flags = JobFlags()
