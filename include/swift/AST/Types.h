@@ -3329,7 +3329,7 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 struct ParameterListInfo {
   SmallBitVector defaultArguments;
   SmallBitVector acceptsUnlabeledTrailingClosures;
-  SmallVector<const ParamDecl *, 4> propertyWrappers;
+  SmallBitVector propertyWrappers;
 
 public:
   ParameterListInfo() { }
@@ -3346,7 +3346,7 @@ public:
 
   /// The ParamDecl at the given index if the parameter has an applied
   /// property wrapper.
-  const ParamDecl *getPropertyWrapperParam(unsigned paramIdx) const;
+  bool hasExternalPropertyWrapper(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {

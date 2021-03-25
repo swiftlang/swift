@@ -4323,7 +4323,7 @@ ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
 ERROR(actor_with_nonactor_superclass,none,
-      "actor class cannot inherit from non-actor class %0", (DeclName))
+      "actor cannot inherit from non-actor class %0", (DeclName))
 
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
@@ -4500,7 +4500,7 @@ ERROR(multiple_global_actors,none,
 ERROR(global_actor_disallowed,none,
       "%0 cannot have a global actor", (DescriptiveDeclKind))
 ERROR(global_actor_on_actor_class,none,
-      "actor class %0 cannot have a global actor", (Identifier))
+      "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
@@ -5581,16 +5581,16 @@ ERROR(property_wrapper_param_not_supported,none,
       (DescriptiveDeclKind))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (Identifier))
-ERROR(property_wrapper_param_no_projection,none,
-      "cannot use property wrapper projection parameter; "
-      "wrapper %0 does not have a 'projectedValue'", (Type))
-ERROR(property_wrapper_param_no_wrapper,none,
-      "cannot use property wrapper projection argument; "
-      "parameter does not have an attached property wrapper",
-      ())
-ERROR(property_wrapper_param_projection_invalid,none,
-      "cannot use property wrapper projection argument; "
-      "pass wrapped value type %0 instead", (Type))
+ERROR(invalid_projection_argument,none,
+      "cannot use property wrapper projection %select{argument|parameter}0",
+      (bool))
+NOTE(property_wrapper_param_no_wrapper,none,
+     "parameter %0 does not have an attached property wrapper", (Identifier))
+NOTE(property_wrapper_param_attr_arg,none,
+     "property wrapper has arguments in the wrapper attribute", ())
+NOTE(property_wrapper_no_init_projected_value,none,
+     "property wrapper type %0 does not support initialization from a "
+     "projected value", (Type))
 ERROR(property_wrapper_param_mutating,none,
       "property wrapper applied to parameter must have a nonmutating "
       "'wrappedValue' getter", ())

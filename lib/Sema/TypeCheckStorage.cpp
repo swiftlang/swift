@@ -118,7 +118,7 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
     }
   }
 
-  // If this is an actor class, check conformance to the Actor protocol to
+  // If this is an actor, check conformance to the Actor protocol to
   // ensure that the actor storage will get created (if needed).
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->isActor()) {

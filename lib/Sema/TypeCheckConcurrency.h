@@ -132,7 +132,7 @@ public:
     return data.actorType;
   }
 
-  /// Retrieve the actor class that the declaration is within.
+  /// Retrieve the actor that the declaration is within.
   Type getGlobalActor() const {
     assert(kind == GlobalActor || kind == GlobalActorUnsafe);
     return Type(data.globalActor);

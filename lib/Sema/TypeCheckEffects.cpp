@@ -2598,6 +2598,10 @@ private:
       auto classification = classifier.classifyConformance(
           S->getSequenceConformance(), EffectKind::Throws);
       auto throwsKind = classification.getConditionalKind(EffectKind::Throws);
+
+      if (throwsKind != ConditionalEffectKind::None)
+        Flags.set(ContextFlags::HasAnyThrowSite);
+
       if (!CurContext.handlesThrows(throwsKind))
         CurContext.diagnoseUnhandledThrowStmt(Ctx.Diags, S);
     }
@@ -2605,6 +2609,10 @@ private:
     auto classification = classifier.classifyConformance(
         S->getSequenceConformance(), EffectKind::Async);
     auto asyncKind = classification.getConditionalKind(EffectKind::Async);
+
+    if (asyncKind != ConditionalEffectKind::None)
+      Flags.set(ContextFlags::HasAnyAsyncSite);
+
     if (!CurContext.handlesAsync(asyncKind))
       CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, S, Context::Unspecified);
 

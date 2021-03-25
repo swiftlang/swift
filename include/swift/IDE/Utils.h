@@ -164,6 +164,11 @@ struct ResolvedCursorInfo {
   Type ContainerType;
   Stmt *TrailingStmt = nullptr;
   Expr *TrailingExpr = nullptr;
+  /// If this is a call, whether it is "dynamic", see ide::isDynamicCall.
+  bool IsDynamic = false;
+  /// If this is a call, the types of the base (multiple in the case of
+  /// protocol composition).
+  SmallVector<NominalTypeDecl *, 1> ReceiverTypes;
 
   ResolvedCursorInfo() = default;
   ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
@@ -174,12 +179,9 @@ struct ResolvedCursorInfo {
       lhs.Loc.getOpaquePointerValue() == rhs.Loc.getOpaquePointerValue();
   }
 
-  void setValueRef(ValueDecl *ValueD,
-                   TypeDecl *CtorTyRef,
-                   ExtensionDecl *ExtTyRef,
-                   bool IsRef,
-                   Type Ty,
-                   Type ContainerType) {
+  void setValueRef(ValueDecl *ValueD, TypeDecl *CtorTyRef,
+                   ExtensionDecl *ExtTyRef, bool IsRef,
+                   Type Ty, Type ContainerType) {
     Kind = CursorInfoKind::ValueRef;
     this->ValueD = ValueD;
     this->CtorTyRef = CtorTyRef;
@@ -620,6 +622,23 @@ ClangNode extensionGetClangNode(const ExtensionDecl *ext);
 /// include a second level of function application for a 'self.' expression,
 /// or a curry thunk, etc.
 std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr);
+
+/// Whether the last expression in \p ExprStack is being called.
+bool isBeingCalled(ArrayRef<Expr*> ExprStack);
+
+/// The base of the last expression in \p ExprStack (which may look up the
+/// stack in eg. the case of a `DotSyntaxCallExpr`).
+Expr *getBase(ArrayRef<Expr *> ExprStack);
+
+/// Assuming that we have a call, returns whether or not it is "dynamic" based
+/// on its base expression and decl of the callee. Note that this is not
+/// Swift's "dynamic" modifier (`ValueDecl::isDynamic`), but rathar "can call a
+/// function in a conformance/subclass".
+bool isDynamicCall(Expr *Base, ValueDecl *D);
+
+/// Adds the resolved nominal types of \p Base to \p Types.
+void getReceiverType(Expr *Base,
+                     SmallVectorImpl<NominalTypeDecl *> &Types);
 
 } // namespace ide
 } // namespace swift

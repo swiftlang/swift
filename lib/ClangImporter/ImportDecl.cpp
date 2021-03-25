@@ -3725,6 +3725,14 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
+      // Before we go any further, check if we've already got tens of thousands
+      // of specializations. If so, it means we're likely instantiating a very
+      // deep/complex template, or we've run into an infinite loop. In either
+      // case, its not worth the compile time, so bail.
+      // TODO: this could be configurable at some point.
+      if (llvm::size(decl->getSpecializedTemplate()->specializations()) > 10000)
+        return nullptr;
+
       // `Sema::isCompleteType` will try to instantiate the class template as a
       // side-effect and we rely on this here. `decl->getDefinition()` can
       // return nullptr before the call to sema and return its definition
@@ -3752,8 +3760,9 @@ namespace {
       // any instantiation errors.
       for (auto member : decl->decls()) {
         if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
-          Impl.getClangSema()
-            .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
+          if (varDecl->getTemplateInstantiationPattern())
+            Impl.getClangSema()
+              .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
         }
       }
 
@@ -8188,8 +8197,6 @@ void ClangImporter::Implementation::importAttributes(
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
           attr->setArgIsUnsafe(isUnsafe);
-          if (isUnsafe)
-            attr->setImplicit();
           MappedDecl->getAttrs().add(attr);
         }
 

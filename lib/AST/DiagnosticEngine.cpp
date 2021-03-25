@@ -1115,12 +1115,10 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 llvm::StringRef
 DiagnosticEngine::diagnosticStringFor(const DiagID id,
-                                      bool printDiagnosticName) {
-  // TODO: Print diagnostic names from `localization`.
-  if (printDiagnosticName) {
-    return debugDiagnosticStrings[(unsigned)id];
-  }
-  auto defaultMessage = diagnosticStrings[(unsigned)id];
+                                      bool printDiagnosticNames) {
+  auto defaultMessage = printDiagnosticNames
+                            ? debugDiagnosticStrings[(unsigned)id]
+                            : diagnosticStrings[(unsigned)id];
   if (localization) {
     auto localizedMessage =
         localization.get()->getMessageOr(id, defaultMessage);

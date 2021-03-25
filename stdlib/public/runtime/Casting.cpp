@@ -17,7 +17,7 @@
 
 #include "swift/Runtime/Casting.h"
 #include "../SwiftShims/RuntimeShims.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
@@ -1478,5 +1478,5 @@ HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
 #endif
 
 #define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 

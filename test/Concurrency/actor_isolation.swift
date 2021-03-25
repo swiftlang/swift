@@ -651,10 +651,10 @@ class SomeClassWithInits {
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated()
+    self.isolated() // expected-error{{'isolated()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
   }
 
-  func isolated() { }
+  func isolated() { } // expected-note{{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
 
   func hasDetached() {
     Task.runDetached {
@@ -666,6 +666,10 @@ class SomeClassWithInits {
       print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
     }
   }
+}
+
+func outsideSomeClassWithInits() {
+  _ = SomeClassWithInits() // okay, initializer is not isolated
 }
 
 // ----------------------------------------------------------------------

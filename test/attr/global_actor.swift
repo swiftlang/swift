@@ -83,7 +83,7 @@ class SomeClass {
 
 @GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
 
-@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor class 'ActorInTooManyPlaces' cannot have a global actor}}
+@GA1 actor ActorInTooManyPlaces { } // expected-error{{actor 'ActorInTooManyPlaces' cannot have a global actor}}
 
 @GA1 @OtherGlobalActor func twoGlobalActors() { } // expected-error{{declaration can not have multiple global actor attributes ('OtherGlobalActor' and 'GA1')}}
 

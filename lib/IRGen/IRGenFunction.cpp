@@ -601,8 +601,11 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
                             contResultAddr->getType()->getPointerElementType()),
                         Address(contResultAddr, pointerAlignment));
   }
-  // FIXME: 
-  //   continuation_context.resumeExecutor = // current executor
+  auto executorAddr =
+    Builder.CreateStructGEP(continuationContext.getAddress(), 4);
+  auto executor = Builder.CreateCall(IGM.getTaskGetCurrentExecutorFn(), {});
+  executorAddr = Builder.CreateBitCast(executorAddr, executor->getType()->getPointerTo());
+  Builder.CreateStore(executor, executorAddr, pointerAlignment);
 
   // Fill the current task (i.e the continuation) with the continuation
   // information.

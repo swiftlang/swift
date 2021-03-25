@@ -5158,7 +5158,11 @@ public:
                           ->castTo<GenericTypeParamType>()
                           ->getIndex();
       
-      Printer << u8") \U0001F9B8";
+      // The identifier after the closing parenthesis is irrelevant and can be
+      // anything. It just needs to be there for the @_opaqueReturnTypeOf
+      // attribute to apply to, but the attribute alone references the opaque
+      // type.
+      Printer << ") __";
       printGenericArgs(T->getSubstitutions().getReplacementTypes());
       return;
     }

@@ -2012,6 +2012,9 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
                                  SynthesizeMainFunctionRequest{D},
                                  nullptr);
 
+  if (!func)
+    return;
+
   // Register the func as the main decl in the module. If there are multiples
   // they will be diagnosed.
   if (file->registerMainDecl(func, attr->getLocation()))

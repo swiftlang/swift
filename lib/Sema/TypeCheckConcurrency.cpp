@@ -290,18 +290,18 @@ bool IsActorRequest::evaluate(
 
 bool IsDefaultActorRequest::evaluate(
     Evaluator &evaluator, ClassDecl *classDecl) const {
-  // If the class isn't an actor class, it's not a default actor.
+  // If the class isn't an actor, it's not a default actor.
   if (!classDecl->isActor())
     return false;
 
-  // If there is a superclass, and it's an actor class, we defer
+  // If there is a superclass, and it's an actor, we defer
   // the decision to it.
   if (auto superclassDecl = classDecl->getSuperclassDecl()) {
     // If the superclass is an actor, we inherit its default-actor-ness.
     if (superclassDecl->isActor())
       return superclassDecl->isDefaultActor();
 
-    // If the superclass is not an actor class, it can only be
+    // If the superclass is not an actor, it can only be
     // a default actor if it's NSObject.  (For now, other classes simply
     // can't be actors at all.)  We don't need to diagnose this; we
     // should've done that already in isActor().
@@ -522,7 +522,7 @@ GlobalActorAttributeRequest::evaluate(
     // Nominal types are okay...
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
       if (classDecl->isActor()) {
-        // ... except for actor classes.
+        // ... except for actors.
         nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
             .highlight(globalActorAttr->getRangeWithAt());
         return None;
@@ -2186,6 +2186,13 @@ namespace {
         LLVM_FALLTHROUGH;
 
       case ActorIsolationRestriction::GlobalActor:
+        // If we are within an initializer and are referencing a stored
+        // property on "self", we are not crossing actors.
+        if (isa<ConstructorDecl>(getDeclContext()) &&
+            isa<VarDecl>(member) && cast<VarDecl>(member)->hasStorage() &&
+            getReferencedSelf(base))
+          return false;
+
         return checkGlobalActorReference(
             memberRef, memberLoc, isolation.getGlobalActor(),
             isolation.isCrossActor, context);
@@ -2383,11 +2390,11 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
     }
   }
 
-    // If the declaration is explicitly marked 'nonisolated', report it as
-    // independent.
-    if (nonisolatedAttr) {
-      return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
-    }
+  // If the declaration is explicitly marked 'nonisolated', report it as
+  // independent.
+  if (nonisolatedAttr) {
+    return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
+  }
 
   // If the declaration is explicitly marked @actorIndependent, report it as
   // independent.
@@ -2562,8 +2569,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Function used when returning an inferred isolation.
-  auto inferredIsolation = [&](
-      ActorIsolation inferred, bool propagateUnsafe = false) {
+  auto inferredIsolation = [&](ActorIsolation inferred) {
     // Add an implicit attribute to capture the actor isolation that was
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
@@ -2576,13 +2582,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
       break;
 
     case ActorIsolation::GlobalActorUnsafe:
-      if (!propagateUnsafe && !value->hasClangNode()) {
-        // Don't infer unsafe global actor isolation.
-        return ActorIsolation::forUnspecified();
-      }
-
-      LLVM_FALLTHROUGH;
-
     case ActorIsolation::GlobalActor: {
       auto typeExpr = TypeExpr::createImplicit(inferred.getGlobalActor(), ctx);
       auto attr = CustomAttr::create(
@@ -2631,7 +2630,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (auto wrappedValue = wrapperInfo.valueVar) {
         if (auto isolation = getActorIsolation(wrappedValue))
-          return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+          return inferredIsolation(isolation);
       }
     }
 
@@ -2645,7 +2644,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
           if (!isa<ClassDecl>(backingNominal) ||
               !cast<ClassDecl>(backingNominal)->isActor()) {
             if (auto isolation = getActorIsolation(backingNominal))
-              return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+              return inferredIsolation(isolation);
           }
         }
       }
@@ -2659,7 +2658,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
               originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
         if (auto projectedValue = wrapperInfo.projectedValueVar) {
           if (auto isolation = getActorIsolation(projectedValue))
-            return inferredIsolation(isolation, /*propagateUnsafe=*/true);
+            return inferredIsolation(isolation);
         }
       }
     }
@@ -2669,8 +2668,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // If the declaration witnesses a protocol requirement that is isolated,
     // use that.
     if (auto witnessedIsolation = getIsolationFromWitnessedRequirements(value)) {
-      if (auto inferred = inferredIsolation(
-              *witnessedIsolation, /*propagateUnsafe=*/defaultIsolation))
+      if (auto inferred = inferredIsolation(*witnessedIsolation))
         return inferred;
     }
 
@@ -2697,8 +2695,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Instance members and initializers can infer isolation from their context.
-  if (value->isInstanceMember() || isa<ConstructorDecl>(value)) {
+  // Instance members infer isolation from their context.
+  if (value->isInstanceMember()) {
     // If the declaration is in an extension that has one of the isolation
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
@@ -2710,10 +2708,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // If the declaration is in a nominal type (or extension thereof) that
     // has isolation, use that.
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto selfTypeIsolation = getActorIsolation(selfTypeDecl);
-      if (!selfTypeIsolation.isUnspecified()) {
+      if (auto selfTypeIsolation = getActorIsolation(selfTypeDecl))
         return inferredIsolation(selfTypeIsolation);
-      }
     }
   }
 

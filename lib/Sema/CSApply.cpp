@@ -5953,7 +5953,8 @@ Expr *ExprRewriter::coerceCallArguments(
       return true;
     };
 
-    if (auto *param = paramInfo.getPropertyWrapperParam(paramIdx)) {
+    if (paramInfo.hasExternalPropertyWrapper(paramIdx)) {
+      auto *param = getParameterAt(callee.getDecl(), paramIdx);
       auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
       auto wrapperType = solution.simplifyType(appliedWrapper.wrapperType);
       auto initKind = appliedWrapper.initKind;

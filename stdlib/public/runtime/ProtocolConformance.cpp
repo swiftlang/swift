@@ -27,7 +27,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
 
@@ -1124,4 +1124,4 @@ const Metadata *swift::findConformingSuperclass(
 }
 
 #define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

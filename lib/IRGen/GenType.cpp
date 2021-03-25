@@ -2095,7 +2095,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinDefaultActorStorage: {
     // Builtin.DefaultActorStorage represents the extra storage
-    // (beyond the heap header) of a default actor class.  It is
+    // (beyond the heap header) of a default actor.  It is
     // fixed-size and totally opaque.
     auto numWords = NumWords_DefaultActor;
 

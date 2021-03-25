@@ -834,7 +834,6 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   }
   unsigned DeclEnd = SS.size();
 
-
   SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
   unsigned SymbolGraphBegin = SS.size();
   if (SymbolGraph) {
@@ -949,6 +948,14 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     RelDeclsStream.endPiece();
   });
 
+  DelayedStringRetriever ReceiverUSRsStream(SS);
+  for (auto *ReceiverTy : TheTok.ReceiverTypes) {
+    ReceiverUSRsStream.startPiece();
+    if (SwiftLangSupport::printUSR(ReceiverTy, OS))
+      ReceiverUSRsStream.startPiece();
+    ReceiverUSRsStream.endPiece();
+  }
+
   ASTContext &Ctx = VD->getASTContext();
 
   ClangImporter *Importer = static_cast<ClangImporter*>(
@@ -1026,6 +1033,9 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   SmallVector<StringRef, 4> AnnotatedRelatedDecls;
   RelDeclsStream.retrieve([&](StringRef S) { AnnotatedRelatedDecls.push_back(S); });
 
+  SmallVector<StringRef, 4> ReceiverUSRs;
+  ReceiverUSRsStream.retrieve([&](StringRef S) { ReceiverUSRs.push_back(S); });
+
   SmallVector<RefactoringInfo, 4> RefactoringInfoBuffer;
   for (unsigned I = 0, N = RefactoringIds.size(); I < N; I ++) {
     RefactoringInfoBuffer.push_back({RefactoringIds[I], RefactoringNameOS[I],
@@ -1065,6 +1075,8 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   Info.ParentNameOffset = getParamParentNameOffset(VD, CursorLoc);
   Info.SymbolGraph = SymbolGraphJSON;
   Info.ParentContexts = llvm::makeArrayRef(Parents);
+  Info.IsDynamic = TheTok.IsDynamic;
+  Info.ReceiverUSRs = ReceiverUSRs;
   Receiver(RequestResult<CursorInfoData>::fromResult(Info));
   return true;
 }
