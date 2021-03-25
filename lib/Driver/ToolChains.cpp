@@ -574,11 +574,6 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       options::
           OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
 
-  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
-    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
-    context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
-  }
-
   return II;
 }
 
@@ -656,6 +651,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_IndexUnitOutputPath:
+  case file_types::TY_SymbolGraphOutputPath:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -797,6 +793,8 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SwiftModuleSummaryFile,
                    "-emit-module-summary-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SymbolGraphOutputPath,
+                   "-emit-symbol-graph-dir");
 }
 
 ToolChain::InvocationInfo
@@ -914,6 +912,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftOverlayFile:
     case file_types::TY_IndexUnitOutputPath:
+    case file_types::TY_SymbolGraphOutputPath:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
