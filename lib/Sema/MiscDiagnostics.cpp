@@ -4629,6 +4629,9 @@ public:
   bool walkToDeclPre(Decl *D) override { return !isa<PatternBindingDecl>(D); }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (expr->getType().isNull())
+      return {false, expr}; // Something failed to typecheck, bail out
+
     if (ClosureExpr *closure = dyn_cast<ClosureExpr>(expr))
       return {closure->isBodyAsync(), closure};
 

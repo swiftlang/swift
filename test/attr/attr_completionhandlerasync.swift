@@ -200,4 +200,9 @@ class ClassCallingAsyncStuff {
       }
     }
   }
+
+  func instanceFunc(other: ClassCallingAsyncStuff) async {
+    // expected-error@+1{{cannot find 'c' in scope}}
+    c.compHandlerFunc() { }
+  }
 }
