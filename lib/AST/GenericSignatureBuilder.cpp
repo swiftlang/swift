@@ -7860,8 +7860,6 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     diag::same_type_conflict,
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
-
-  equivClass->concreteType = resolvedConcreteType;
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
@@ -7897,9 +7895,6 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       diag::requires_superclass_conflict,
       diag::redundant_superclass_constraint,
       diag::superclass_redundancy_here);
-
-  // Record the resolved superclass type.
-  equivClass->superclass = resolvedSuperclass;
 
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.
@@ -8097,6 +8092,8 @@ void GenericSignatureBuilder::enumerateRequirements(
       // If this equivalence class is bound to a concrete type, equate the
       // anchor with a concrete type.
       if (Type concreteType = equivClass.concreteType) {
+        concreteType = getCanonicalTypeInContext(concreteType, genericParams);
+
         // If the parent of this anchor is also a concrete type, don't
         // create a requirement.
         if (!subjectType->is<GenericTypeParamType>() &&
@@ -8152,14 +8149,15 @@ void GenericSignatureBuilder::enumerateRequirements(
         continue;
 
       // If we have a superclass, produce a superclass requirement
-      if (equivClass.superclass &&
-          !equivClass.recursiveSuperclassType &&
-          !equivClass.superclass->hasError()) {
-        if (hasNonRedundantRequirementSource<Type>(
+      if (auto superclass = equivClass.superclass) {
+        superclass = getCanonicalTypeInContext(superclass, genericParams);
+
+        if (!equivClass.recursiveSuperclassType &&
+            hasNonRedundantRequirementSource<Type>(
               equivClass.superclassConstraints,
               RequirementKind::Superclass, *this)) {
           recordRequirement(RequirementKind::Superclass,
-                            subjectType, equivClass.superclass);
+                            subjectType, superclass);
         }
       }
 
