@@ -256,9 +256,6 @@ namespace swift {
     /// Enable inference of Sendable conformances for public types.
     bool EnableInferPublicSendable = false;
 
-    /// Enable experimental derivation of `Codable` for enums.
-    bool EnableExperimentalEnumCodableDerivation = false;
-
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
 
