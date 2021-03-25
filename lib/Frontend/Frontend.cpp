@@ -307,6 +307,7 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
         Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                              filename, result.getError().message());
         hadError |= true;
+        continue;
       }
 
       auto bufferID = SourceMgr.addNewSourceBuffer(std::move(result.get()));
