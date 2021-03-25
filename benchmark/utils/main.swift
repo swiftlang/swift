@@ -156,6 +156,7 @@ import ReduceInto
 import RemoveWhere
 import ReversedCollections
 import RomanNumbers
+import SIMDRandomMask
 import SIMDReduceInteger
 import SequenceAlgos
 import SetTests
@@ -353,6 +354,7 @@ registerBenchmark(ReduceInto)
 registerBenchmark(RemoveWhere)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
+registerBenchmark(SIMDRandomMask)
 registerBenchmark(SIMDReduceInteger)
 registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
