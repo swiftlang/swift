@@ -556,6 +556,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
     if (Arg.getKind() == DiagnosticArgumentKind::Type) {
       type = Arg.getAsType()->getWithoutParens();
+      if (type.isNull()) {
+        // FIXME: We should never receive a nullptr here, but this is causing
+        // crashes (rdar://75740683). Remove once ParenType never contains
+        // nullptr as the underlying type.
+        Out << "<null>";
+        break;
+      }
       if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
@@ -563,6 +570,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
     } else {
       assert(Arg.getKind() == DiagnosticArgumentKind::FullyQualifiedType);
       type = Arg.getAsFullyQualifiedType().getType()->getWithoutParens();
+      if (type.isNull()) {
+        // FIXME: We should never receive a nullptr here, but this is causing
+        // crashes (rdar://75740683). Remove once ParenType never contains
+        // nullptr as the underlying type.
+        Out << "<null>";
+        break;
+      }
       if (type->getASTContext().TypeCheckerOpts.PrintFullConvention)
         printOptions.PrintFunctionRepresentationAttrs =
             PrintOptions::FunctionRepresentationMode::Full;
