@@ -210,7 +210,9 @@ extension SIMDMask where Storage == ${Vector} {
   @_alwaysEmitIntoClient
   public static func random<T: RandomNumberGenerator>(using generator: inout T) -> Self {
     let data = Builtin.truncOrBitCast_Int64_Int${storageN}(generator.next()._value)
-    return Self(Builtin.bitcast_Int${storageN}_Vec${storageN}xInt1(data))
+    return Self(${MaskExt}(
+      Builtin.bitcast_Int${storageN}_Vec${storageN}xInt1(data)
+    ))
   }
   
   /// Returns a vector mask with `true` or `false` randomly assigned in each
