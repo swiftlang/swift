@@ -7972,10 +7972,6 @@ Type ClangImporter::Implementation::getMainActorType() {
     return type;
   };
 
-  if (!SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    return finish(Type());
-  }
-
   auto module = SwiftContext.getLoadedModule(SwiftContext.Id_Concurrency);
   if (!module)
     return finish(Type());

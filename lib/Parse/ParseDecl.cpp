@@ -3595,7 +3595,7 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
       if (Kind == DAK_Count)
         break;
 
-      if (Kind == DAK_Actor && shouldParseExperimentalConcurrency()) {
+      if (Kind == DAK_Actor) {
         // If the next token is a startOfSwiftDecl, we are part of the modifier
         // list and should consume the actor token (e.g, actor public class Foo)
         // otherwise, it's the decl keyword (e.g. actor Foo) and shouldn't be.
@@ -4066,8 +4066,7 @@ bool Parser::isStartOfSwiftDecl() {
     return isStartOfSwiftDecl();
   }
 
-  if (shouldParseExperimentalConcurrency() &&
-      Tok.isContextualKeyword("actor")) {
+  if (Tok.isContextualKeyword("actor")) {
     if (Tok2.is(tok::identifier)) // actor Foo {}
       return true;
     BacktrackingScope Scope(*this);
@@ -4419,8 +4418,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
   // Obvious nonsense.
   default:
 
-    if (shouldParseExperimentalConcurrency() &&
-        Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
+    if (Tok.isContextualKeyword("actor") && peekToken().is(tok::identifier)) {
       DeclParsingContext.setCreateSyntax(SyntaxKind::ClassDecl);
       DeclResult = parseDeclClass(Flags, Attributes);
       break;

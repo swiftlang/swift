@@ -579,8 +579,8 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
 
 DECL_ATTR(actorIndependent, ActorIndependent,
   OnClass | OnStruct | OnEnum | OnExtension | OnFunc | OnConstructor |
-  OnVar | OnSubscript | ConcurrencyOnly |
-  ABIBreakingToAdd | ABIBreakingToRemove |
+  OnVar | OnSubscript |
+  ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   103)
 
@@ -596,7 +596,7 @@ SIMPLE_DECL_ATTR(_specializeExtension, SpecializeExtension,
   105)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
-  DeclModifier | OnVar | OnFunc | ConcurrencyOnly |
+  DeclModifier | OnVar | OnFunc |
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   106)
@@ -625,14 +625,13 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   110)
 
 DECL_ATTR(completionHandlerAsync, CompletionHandlerAsync,
-  OnAbstractFunction | ConcurrencyOnly |
+  OnAbstractFunction |
   ABIStableToAdd | ABIStableToRemove |
   APIStableToAdd | APIStableToRemove,
   111)
 
 CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
   DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript |
-  ConcurrencyOnly |
   ABIStableToAdd | ABIStableToRemove |
   APIBreakingToAdd | APIStableToRemove,
   112)
