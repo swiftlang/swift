@@ -7107,7 +7107,7 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
           continue;
 
         Context.Diags.diagnose(otherLoc, diag::redundant_conformance_here,
-                               1, subjectType, proto);
+                               subjectType, proto);
       }
 
       break;
