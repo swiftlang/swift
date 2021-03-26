@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch)
+// REQUIRES: concurrency
 
 class Canary {
   deinit {
