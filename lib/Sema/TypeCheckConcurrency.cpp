@@ -676,7 +676,6 @@ ActorIsolationRestriction ActorIsolationRestriction::forDeclaration(
     }
 
     case ActorIsolation::Independent:
-    case ActorIsolation::IndependentUnsafe:
       // Actor-independent have no restrictions on their access.
       return forUnrestricted();
 
@@ -1557,7 +1556,6 @@ namespace {
       switch (auto isolation = getActorIsolationOfContext(dc)) {
       case ActorIsolation::ActorInstance:
       case ActorIsolation::Independent:
-      case ActorIsolation::IndependentUnsafe:
       case ActorIsolation::Unspecified:
         return isolation;
 
@@ -1732,10 +1730,6 @@ namespace {
         noteIsolatedActorMember(value, context);
         return true;
       }
-
-      case ActorIsolation::IndependentUnsafe:
-        // Allow unrestricted use of something in a global actor.
-        return false;
 
       case ActorIsolation::Independent: {
         auto result = tryMarkImplicitlyAsync(loc, valueRef, context);
@@ -2107,7 +2101,6 @@ namespace {
 
             return false;
 
-          case ActorIsolation::IndependentUnsafe:
           case ActorIsolation::Unspecified:
             return false;
 
@@ -2220,7 +2213,6 @@ namespace {
       // We must have parent isolation determined to get here.
       switch (parentIsolation) {
       case ActorIsolation::Independent:
-      case ActorIsolation::IndependentUnsafe:
       case ActorIsolation::Unspecified:
         return ClosureActorIsolation::forIndependent();
 
@@ -2372,13 +2364,13 @@ static Optional<ActorIsolation> getIsolationFromAttributes(
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
-    return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
+    return ActorIsolation::forIndependent();
   }
 
   // If the declaration is explicitly marked @actorIndependent, report it as
   // independent.
   if (independentAttr) {
-    return ActorIsolation::forIndependent(independentAttr->getKind());
+    return ActorIsolation::forIndependent();
   }
 
   // If the declaration is marked with a global actor, report it as being
@@ -2446,7 +2438,6 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
       case ActorIsolation::GlobalActor:
       case ActorIsolation::GlobalActorUnsafe:
       case ActorIsolation::Independent:
-      case ActorIsolation::IndependentUnsafe:
         break;
       }
 
@@ -2471,7 +2462,6 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
         llvm_unreachable("protocol requirements cannot be actor instances");
 
       case ActorIsolation::Independent:
-      case ActorIsolation::IndependentUnsafe:
         // We only need one @actorIndependent.
         if (sawActorIndependent)
           return true;
@@ -2533,8 +2523,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
   // A @Sendable function is assumed to be actor-independent.
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
     if (func->isSendable()) {
-      defaultIsolation = ActorIsolation::forIndependent(
-          ActorIndependentKind::Safe);
+      defaultIsolation = ActorIsolation::forIndependent();
     }
   }
 
@@ -2553,8 +2542,6 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
     switch (inferred) {
-    // FIXME: if the context is 'unsafe', is it fine to infer the 'safe' one?
-    case ActorIsolation::IndependentUnsafe:
     case ActorIsolation::Independent:
       value->getAttrs().add(new (ctx) ActorIndependentAttr(
                               ActorIndependentKind::Safe, /*IsImplicit=*/true));
@@ -2727,12 +2714,6 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (isolation == overriddenIsolation)
     return;
 
-  // If the overridden declaration is @actorIndependent(unsafe) and the
-  // overriding declaration has been placed in a global actor, allow it.
-  if (overriddenIsolation.getKind() == ActorIsolation::IndependentUnsafe &&
-      isolation.isGlobalActor())
-    return;
-
   // If the overridden declaration is from Objective-C with no actor annotation,
   // and the overriding declaration has been placed in a global actor, allow it.
   if (overridden->hasClangNode() && !overriddenIsolation &&
@@ -2744,7 +2725,6 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
   if (overriddenIsolation == ActorIsolation::GlobalActorUnsafe) {
     switch (isolation) {
     case ActorIsolation::Independent:
-    case ActorIsolation::IndependentUnsafe:
     case ActorIsolation::Unspecified:
       return;
 
@@ -2773,7 +2753,6 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Independent:
-    case ActorIsolation::IndependentUnsafe:
       // Diagnose below.
       break;
 
