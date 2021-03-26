@@ -270,7 +270,7 @@ struct X18: P18, P17 {
 }
 
 // CHECK-LABEL: .X19.foo@
-// CHECK: Generic signature: <T, U where T == X18>
+// CHECK: Generic signature: <T, U where T == X18.A>
 struct X19<T: P18> where T == T.A {
   func foo<U>(_: U) where T == X18 { }
 }

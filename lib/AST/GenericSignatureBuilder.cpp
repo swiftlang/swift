@@ -7860,8 +7860,6 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     diag::same_type_conflict,
     diag::redundant_same_type_to_concrete,
     diag::same_type_redundancy_here);
-
-  equivClass->concreteType = resolvedConcreteType;
 }
 
 void GenericSignatureBuilder::checkSuperclassConstraints(
@@ -7897,9 +7895,6 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       diag::requires_superclass_conflict,
       diag::redundant_superclass_constraint,
       diag::superclass_redundancy_here);
-
-  // Record the resolved superclass type.
-  equivClass->superclass = resolvedSuperclass;
 
   // If we have a concrete type, check it.
   // FIXME: Substitute into the concrete type.
@@ -8097,6 +8092,8 @@ void GenericSignatureBuilder::enumerateRequirements(
       // If this equivalence class is bound to a concrete type, equate the
       // anchor with a concrete type.
       if (Type concreteType = equivClass.concreteType) {
+        concreteType = getCanonicalTypeInContext(concreteType, genericParams);
+
         // If the parent of this anchor is also a concrete type, don't
         // create a requirement.
         if (!subjectType->is<GenericTypeParamType>() &&
@@ -8152,14 +8149,15 @@ void GenericSignatureBuilder::enumerateRequirements(
         continue;
 
       // If we have a superclass, produce a superclass requirement
-      if (equivClass.superclass &&
-          !equivClass.recursiveSuperclassType &&
-          !equivClass.superclass->hasError()) {
-        if (hasNonRedundantRequirementSource<Type>(
+      if (auto superclass = equivClass.superclass) {
+        superclass = getCanonicalTypeInContext(superclass, genericParams);
+
+        if (!equivClass.recursiveSuperclassType &&
+            hasNonRedundantRequirementSource<Type>(
               equivClass.superclassConstraints,
               RequirementKind::Superclass, *this)) {
           recordRequirement(RequirementKind::Superclass,
-                            subjectType, equivClass.superclass);
+                            subjectType, superclass);
         }
       }
 
@@ -8183,10 +8181,6 @@ void GenericSignatureBuilder::enumerateRequirements(
         }
       }
 
-      // Sort the protocols in canonical order.
-      llvm::array_pod_sort(protocols.begin(), protocols.end(), 
-                           TypeDecl::compare);
-
       // Enumerate the conformance requirements.
       for (auto proto : protocols) {
         recordRequirement(RequirementKind::Conformance, subjectType, proto);
@@ -8194,14 +8188,9 @@ void GenericSignatureBuilder::enumerateRequirements(
     }
   }
 
-  // Sort the subject types in canonical order. This needs to be a stable sort
-  // so that the relative order of requirements that have the same subject type
-  // is preserved.
-  std::stable_sort(requirements.begin(), requirements.end(),
-                   [](const Requirement &lhs, const Requirement &rhs) {
-    return compareDependentTypes(lhs.getFirstType(),
-                                 rhs.getFirstType()) < 0;
-  });
+  // Sort the requirements in canonical order.
+  llvm::array_pod_sort(requirements.begin(), requirements.end(),
+                       compareRequirements);
 }
 
 void GenericSignatureBuilder::dump() {
@@ -8377,6 +8366,80 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
   llvm_unreachable("Bad requirement kind");
 }
 
+GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequirements(
+                                          bool allowConcreteGenericParams,
+                                          bool buildingRequirementSignature) && {
+  NumSignaturesRebuiltWithoutRedundantRequirements++;
+
+  GenericSignatureBuilder newBuilder(Context);
+
+  for (auto param : getGenericParams())
+    newBuilder.addGenericParameter(param);
+
+  auto newSource = FloatingRequirementSource::forAbstract();
+
+  for (const auto &req : Impl->ExplicitRequirements) {
+    assert(req.getKind() != RequirementKind::SameType &&
+           "Should not see same-type requirement here");
+
+    if (isRedundantExplicitRequirement(req))
+      continue;
+
+    auto subjectType = req.getSource()->getStoredType();
+    subjectType = stripBoundDependentMemberTypes(subjectType);
+    subjectType =
+        resolveDependentMemberTypes(*this, subjectType,
+                                    ArchetypeResolutionKind::WellFormed);
+
+    if (auto optReq = createRequirement(req.getKind(), subjectType, req.getRHS(),
+                                        getGenericParams())) {
+      auto newReq = stripBoundDependentMemberTypes(*optReq);
+      newBuilder.addRequirement(newReq, newSource, nullptr);
+    }
+  }
+
+  for (const auto &req : Impl->ExplicitSameTypeRequirements) {
+    auto resolveType = [this](Type t) -> Type {
+      t = stripBoundDependentMemberTypes(t);
+      if (t->is<GenericTypeParamType>()) {
+        return t;
+      } else if (auto *depMemTy = t->getAs<DependentMemberType>()) {
+        auto resolvedBaseTy =
+            resolveDependentMemberTypes(*this, depMemTy->getBase(),
+                                        ArchetypeResolutionKind::WellFormed);
+
+
+        if (resolvedBaseTy->isTypeParameter()) {
+          return DependentMemberType::get(resolvedBaseTy, depMemTy->getName());
+        } else {
+          return resolveDependentMemberTypes(*this, t,
+                                             ArchetypeResolutionKind::WellFormed);
+        }
+      } else {
+        return t;
+      }
+    };
+
+    auto subjectType = resolveType(req.getFirstType());
+    auto constraintType = resolveType(req.getSecondType());
+
+    auto newReq = stripBoundDependentMemberTypes(
+        Requirement(RequirementKind::SameType,
+                    subjectType, constraintType));
+
+    newBuilder.addRequirement(newReq, newSource, nullptr);
+  }
+
+  // Wipe out the internal state of the old builder, since we don't need it anymore.
+  Impl.reset();
+
+  // Build a new signature using the new builder.
+  return std::move(newBuilder).computeGenericSignature(
+      allowConcreteGenericParams,
+      buildingRequirementSignature,
+      /*rebuildingWithoutRedundantConformances=*/true);
+}
+
 GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           bool allowConcreteGenericParams,
                                           bool buildingRequirementSignature,
@@ -8384,12 +8447,16 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // Finalize the builder, producing any necessary diagnostics.
   finalize(getGenericParams(), allowConcreteGenericParams);
 
-  // Collect the requirements placed on the generic parameter types.
-  SmallVector<Requirement, 4> requirements;
-  enumerateRequirements(getGenericParams(), requirements);
+  if (rebuildingWithoutRedundantConformances) {
+    assert(!buildingRequirementSignature &&
+           "Rebuilding a requirement signature?");
 
-  // Form the generic signature.
-  auto sig = GenericSignature::get(getGenericParams(), requirements);
+    assert(!Impl->HadAnyError &&
+           "Rebuilt signature had errors");
+
+    assert(!hasExplicitConformancesImpliedByConcrete() &&
+           "Rebuilt signature still had redundant conformance requirements");
+  }
 
   // If any of our explicit conformance requirements were implied by
   // superclass or concrete same-type requirements, we have to build the
@@ -8400,33 +8467,21 @@ GenericSignature GenericSignatureBuilder::computeGenericSignature(
   // we might end up emitting duplicate diagnostics.
   //
   // Also, don't do this when building a requirement signature.
-  if (!buildingRequirementSignature &&
+  if (!rebuildingWithoutRedundantConformances &&
+      !buildingRequirementSignature &&
       !Impl->HadAnyError &&
       hasExplicitConformancesImpliedByConcrete()) {
-    NumSignaturesRebuiltWithoutRedundantRequirements++;
-
-    if (rebuildingWithoutRedundantConformances) {
-      llvm::errs() << "Rebuilt signature still has "
-                   << "redundant conformance requirements: ";
-      llvm::errs() << sig << "\n";
-      abort();
-    }
-
-    GenericSignatureBuilder newBuilder(Context);
-
-    for (auto param : sig->getGenericParams())
-      newBuilder.addGenericParameter(param);
-
-    for (auto &req : sig->getRequirements()) {
-      newBuilder.addRequirement(stripBoundDependentMemberTypes(req),
-                                FloatingRequirementSource::forAbstract(), nullptr);
-    }
-
-    return std::move(newBuilder).computeGenericSignature(
+    return std::move(*this).rebuildSignatureWithoutRedundantRequirements(
         allowConcreteGenericParams,
-        buildingRequirementSignature,
-        /*rebuildingWithoutRedundantConformances=*/true);
+        buildingRequirementSignature);
   }
+
+  // Collect the requirements placed on the generic parameter types.
+  SmallVector<Requirement, 4> requirements;
+  enumerateRequirements(getGenericParams(), requirements);
+
+  // Form the generic signature.
+  auto sig = GenericSignature::get(getGenericParams(), requirements);
 
 #ifndef NDEBUG
   if (!Impl->HadAnyError) {
@@ -8537,9 +8592,6 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
       context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_minimal,
                              reqString, sig->getAsString());
     }
-
-    // Canonicalize the signature to check that it is canonical.
-    (void)newSig.getCanonicalSignature();
   }
 }
 
