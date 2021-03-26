@@ -653,6 +653,8 @@ private:
 
   void diagnoseRedundantRequirements() const;
 
+  void diagnoseConflictingConcreteTypeRequirements() const;
+
   bool hasExplicitConformancesImpliedByConcrete() const;
 
   /// Describes the relationship between a given constraint and
