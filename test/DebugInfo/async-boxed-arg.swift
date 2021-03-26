@@ -5,10 +5,10 @@
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Collection {
   public func f() async throws {
-    return await try Task.withGroup(resultType: Element.self) { group in
+    return await try withTaskGroup(of: Element.self) { group in
       var i = self.startIndex
       func doit() async throws {
-        await group.add { [i] in
+        await group.spawn { [i] in
           return self[i]
         }
       }

@@ -10,8 +10,8 @@
 import Dispatch
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-func test_runDetached_cancel_while_child_running() async {
-  let h: Task.Handle<Bool, Error> = Task.runDetached {
+func test_spawnDetached_cancel_while_child_running() async {
+  let h: Task.Handle<Bool, Error> = spawnDetached {
     async let childCancelled: Bool = { () -> Bool in
       await Task.sleep(3_000_000_000)
       return Task.isCancelled
@@ -36,6 +36,6 @@ func test_runDetached_cancel_while_child_running() async {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
-    await test_runDetached_cancel_while_child_running()
+    await test_spawnDetached_cancel_while_child_running()
   }
 }

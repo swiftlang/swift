@@ -21,8 +21,8 @@ func boom() async throws -> Int {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_throws() async {
-  let got: Int = await Task.withGroup(resultType: Int.self) { group in
-    await group.add { try await boom()  }
+  let got: Int = try await withThrowingTaskGroup(of: Int.self) { group in
+    await group.spawn { try await boom()  }
 
     do {
       while let r = try await group.next() {
@@ -34,7 +34,7 @@ func test_taskGroup_throws() async {
       let gc = group.isCancelled
       print("group cancelled: \(gc)")
 
-      await group.add { () async -> Int in
+      await group.spawn { () async -> Int in
         let c = Task.isCancelled
         print("task 3 (cancelled: \(c))")
         return 3

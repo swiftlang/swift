@@ -21,12 +21,12 @@ func asyncThrowsOnCancel() async throws -> Int {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_add() async throws -> Int {
-  try await Task.withGroup(resultType: Int.self) { group in
-    await group.add {
+  try await withTaskGroup(of: Int.self) { group in
+    await group.spawn {
       await asyncFunc()
     }
 
-    await group.add {
+    await group.spawn {
       await asyncFunc()
     }
 
@@ -50,10 +50,10 @@ func boom() async throws -> Int { throw Boom() }
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func first_allMustSucceed() async throws {
 
-  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
-    await group.add { await work() }
-    await group.add { await work() }
-    await group.add { try await boom() }
+  let first: Int = try await withTaskGroup(of: Int.self) { group in
+    await group.spawn { await work() }
+    await group.spawn { await work() }
+    await group.spawn { try await boom() }
 
     if let first = try await group.next() {
       return first
@@ -71,10 +71,10 @@ func first_ignoreFailures() async throws {
   @Sendable func work() async -> Int { 42 }
   @Sendable func boom() async throws -> Int { throw Boom() }
 
-  let first: Int = try await Task.withGroup(resultType: Int.self) { group in
-    await group.add { await work() }
-    await group.add { await work() }
-    await group.add {
+  let first: Int = try await withTaskGroup(of: Int.self) { group in
+    await group.spawn { await work() }
+    await group.spawn { await work() }
+    await group.spawn {
       do {
         return try await boom()
       } catch {
@@ -119,9 +119,9 @@ func test_taskGroup_quorum_thenCancel() async {
   ///
   /// - Returns: `true` iff `N/2 + 1` followers return `.yay`, `false` otherwise.
   func gatherQuorum(followers: [Follower]) async -> Bool {
-    try! await Task.withGroup(resultType: Vote.self) { group in
+    try! await withTaskGroup(of: Vote.self) { group in
       for follower in followers {
-        await group.add { try await follower.vote() }
+        await group.spawn { try await follower.vote() }
       }
 
       defer {
@@ -171,7 +171,7 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
       return []
     }
 
-    return try await Task.withGroup(resultType: (Int, T).self) { group in
+    return try await withTaskGroup(of: (Int, T).self) { group in
       var result = ContiguousArray<T>()
       result.reserveCapacity(n)
 
@@ -179,7 +179,7 @@ extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendab
       var submitted = 0
 
       func submitNext() async throws {
-        await group.add { [submitted,i] in
+        await group.spawn { [submitted,i] in
           let value = try await transform(self[i])
           return (submitted, value)
         }

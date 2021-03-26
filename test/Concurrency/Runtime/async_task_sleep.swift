@@ -32,7 +32,7 @@ import Dispatch
 
   static func testSleepDoesNotBlock() async {
     // FIXME: Should run on main executor
-    let task = Task.runDetached {
+    let task = spawnDetached {
       print("Run first")
     }
 

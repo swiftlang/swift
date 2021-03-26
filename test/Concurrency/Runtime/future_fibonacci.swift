@@ -26,11 +26,11 @@ func asyncFib(_ n: Int) async -> Int {
     return n
   }
 
-  let first = Task.runDetached {
+  let first = spawnDetached {
     await asyncFib(n - 2)
   }
 
-  let second = Task.runDetached {
+  let second = spawnDetached {
     await asyncFib(n - 1)
   }
 

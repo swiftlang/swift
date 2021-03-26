@@ -25,7 +25,9 @@ extension Task {
   ///
   /// - SeeAlso: `checkCancellation()`
   public static var isCancelled: Bool {
-     Task.unsafeCurrent?.isCancelled ?? false
+     withUnsafeCurrentTask { task in
+       task?.isCancelled ?? false
+     }
   }
 
   /// Returns `true` if the task is cancelled, and should stop executing.

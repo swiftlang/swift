@@ -11,9 +11,34 @@
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_is_asyncSequence() async {
-  let sum: Int = try! await Task.withGroup(resultType: Int.self) { group in
+  print(#function)
+
+  let sum = await withTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      await group.add {
+      await group.spawn {
+        print("add \(n)")
+        return n
+      }
+    }
+
+    var sum = 0
+    for await r in group { // here
+      print("next: \(r)")
+      sum += r
+    }
+
+    return sum
+  }
+
+  print("result: \(sum)")
+}
+
+func test_throwingTaskGroup_is_asyncSequence() async throws {
+  print(#function)
+
+  let sum = try await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
+    for n in 1...10 {
+      await group.spawn {
         print("add \(n)")
         return n
       }
@@ -28,16 +53,18 @@ func test_taskGroup_is_asyncSequence() async {
     return sum
   }
 
-  // CHECK: result: 55
   print("result: \(sum)")
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
-  static func main()
+  static func main() async {
+    await test_taskGroup_is_asyncSequence()
+    // CHECK: test_taskGroup_is_asyncSequence()
+    // CHECK: result: 55
 
-async {
-  await test_taskGroup_is_asyncSequence()
-}
-
+    try! await test_throwingTaskGroup_is_asyncSequence()
+    // CHECK: test_throwingTaskGroup_is_asyncSequence()
+    // CHECK: result: 55
+  }
 }

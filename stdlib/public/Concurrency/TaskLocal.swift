@@ -74,14 +74,15 @@ extension Task {
   /// - Parameter keyPath: key path to the `TaskLocalKey` to be used for lookup
   /// - Returns: the value bound to the key, or its default value it if was not
   ///            bound in the current (or any parent) tasks.
-  public static func local<Key>(_ keyPath: KeyPath<TaskLocalValues, Key>)
-    -> Key.Value where Key: TaskLocalKey {
-    guard let unsafeTask = Task.unsafeCurrent else {
+  public static func local<Key>(
+    _ keyPath: KeyPath<TaskLocalValues, Key>
+  ) -> Key.Value where Key: TaskLocalKey {
+    guard let task = Task.current else {
       return Key.defaultValue
     }
 
     let value = _taskLocalValueGet(
-      unsafeTask._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
+      task._task, keyType: Key.self, inheritance: Key.inherit.rawValue)
     guard let rawValue = value else {
       return Key.defaultValue
     }
@@ -105,7 +106,7 @@ extension Task {
     boundTo value: Key.Value,
     operation: () async throws -> BodyResult
   ) async rethrows -> BodyResult where Key: TaskLocalKey {
-    let _task = Task.unsafeCurrent!._task // !-safe, guaranteed to have task available inside async function
+    let _task = Task.current!._task // !-safe, guaranteed to have task available inside async function
 
     _taskLocalValuePush(_task, keyType: Key.self, value: value)
     defer { _taskLocalValuePop(_task) }

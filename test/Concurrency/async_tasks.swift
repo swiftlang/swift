@@ -84,7 +84,7 @@ func test_unsafeThrowingContinuations() async throws {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_detached() async throws {
-  let handle = Task.runDetached() {
+  let handle = spawnDetached() {
     await someAsyncFunc() // able to call async functions
   }
 
@@ -94,7 +94,7 @@ func test_detached() async throws {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_detached_throwing() async -> String {
-  let handle: Task.Handle<String, Error> = Task.runDetached() {
+  let handle: Task.Handle<String, Error> = spawnDetached() {
     try await someThrowingAsyncFunc() // able to call async functions
   }
 

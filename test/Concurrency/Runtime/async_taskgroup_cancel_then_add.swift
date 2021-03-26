@@ -18,24 +18,24 @@ func asyncEcho(_ value: Int) async -> Int {
 func test_taskGroup_cancel_then_add() async {
   // CHECK: test_taskGroup_cancel_then_add
   print("\(#function)")
-  let result: Int = try! await Task.withGroup(resultType: Int.self) { group in
+  let result: Int = await withTaskGroup(of: Int.self) { group in
 
-    let addedFirst = await group.add { 1 }
+    let addedFirst = await group.spawn { 1 }
     print("added first: \(addedFirst)") // CHECK: added first: true
 
-    let one = try! await group.next()!
+    let one = await group.next()!
     print("next first: \(one)") // CHECK: next first: 1
 
     group.cancelAll()
     print("cancelAll")
 
-    let addedSecond = await group.add { 1 }
+    let addedSecond = await group.spawn { 1 }
     print("added second: \(addedSecond)") // CHECK: added second: false
 
-    let none = try! await group.next()
+    let none = await group.next()
     print("next second: \(none)") // CHECK: next second: nil
 
-    return (one ?? 0) + (none ?? 0)
+    return one + (none ?? 0)
   }
 
   print("result: \(result)") // CHECK: result: 1

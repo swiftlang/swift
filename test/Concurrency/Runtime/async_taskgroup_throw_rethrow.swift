@@ -19,10 +19,10 @@ func boom() async throws -> Int { throw Boom() }
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_throws_rethrows() async {
   do {
-    let got = try await Task.withGroup(resultType: Int.self) { (group) async throws -> Int in
-      await group.add { await echo(1) }
-      await group.add { await echo(2) }
-      await group.add { try await boom() }
+    let got = try await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
+      await group.spawn { await echo(1) }
+      await group.spawn { await echo(2) }
+      await group.spawn { try await boom() }
 
       do {
         while let r = try await group.next() {
