@@ -2259,6 +2259,8 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
   /// Is \p modulePath from System/Library/PrivateFrameworks/?
   auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
+    if (!ctx.LangOpts.Target.isOSDarwin()) return false;
+
     namespace path = llvm::sys::path;
     SmallString<128> scratch;
     scratch = ctx.SearchPathOpts.SDKPath;

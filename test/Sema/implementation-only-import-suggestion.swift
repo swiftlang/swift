@@ -1,4 +1,5 @@
 // RUN: %empty-directory(%t)
+// REQUIRES: VENDOR=apple
 
 /// Expect warnings when building a public client.
 // RUN: %target-swift-frontend -sdk %S/Inputs/public-private-sdk -typecheck -module-cache-path %t %s \
