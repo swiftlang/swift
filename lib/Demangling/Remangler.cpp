@@ -1258,26 +1258,6 @@ void Remangler::mangleFunctionType(Node *node) {
   Buffer << 'c';
 }
 
-void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XF";
-}
-
-void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XG";
-}
-
-void Remangler::mangleLinearFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XH";
-}
-
-void Remangler::mangleEscapingLinearFunctionType(Node *node) {
-  mangleFunctionSignature(node);
-  Buffer << "XI";
-}
-
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "WG";
@@ -2491,6 +2471,10 @@ void Remangler::mangleConcurrentFunctionType(Node *node) {
 
 void Remangler::mangleAsyncAnnotation(Node *node) {
   Buffer << 'Y';
+}
+
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  Buffer << 'j' << (char)node->getIndex(); // differentiability kind
 }
 
 void Remangler::mangleThrowsAnnotation(Node *node) {

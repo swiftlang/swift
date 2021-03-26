@@ -793,6 +793,7 @@ recur:
     case 'h': return createType(createWithChild(Node::Kind::Shared,
                                                 popTypeAndGetChild()));
     case 'i': return demangleSubscript();
+    case 'j': return demangleDifferentiableFunctionType();
     case 'l': return demangleGenericSignature(/*hasParamCounts*/ false);
     case 'm': return createType(createWithChild(Node::Kind::Metatype,
                                                 popNode(Node::Kind::Type)));
@@ -1257,6 +1258,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   addChild(FuncType, popNode(Node::Kind::ThrowsAnnotation));
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
+  addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
 
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
@@ -1297,6 +1299,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::AsyncAnnotation)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::DifferentiableFunctionType)
     ++FirstChildIdx;
   auto ParameterType = FuncType->getChild(FirstChildIdx);
 
@@ -2632,6 +2637,19 @@ NodePointer Demangler::demangleIndexSubset() {
   return createNode(Node::Kind::IndexSubset, str);
 }
 
+NodePointer Demangler::demangleDifferentiableFunctionType() {
+  MangledDifferentiabilityKind kind;
+  switch (auto c = nextChar()) {
+  case 'f': kind = MangledDifferentiabilityKind::Forward; break;
+  case 'r': kind = MangledDifferentiabilityKind::Reverse; break;
+  case 'd': kind = MangledDifferentiabilityKind::Normal; break;
+  case 'l': kind = MangledDifferentiabilityKind::Linear; break;
+  default: return nullptr;
+  }
+  return createNode(
+      Node::Kind::DifferentiableFunctionType, (Node::IndexType)kind);
+}
+
 std::string Demangler::demangleBridgedMethodParams() {
   if (nextIf('_'))
     return std::string();
@@ -3084,14 +3102,6 @@ NodePointer Demangler::demangleSpecialType() {
       default:
         return nullptr;
       }
-    case 'F':
-      return popFunctionType(Node::Kind::DifferentiableFunctionType);
-    case 'G':
-      return popFunctionType(Node::Kind::EscapingDifferentiableFunctionType);
-    case 'H':
-      return popFunctionType(Node::Kind::LinearFunctionType);
-    case 'I':
-      return popFunctionType(Node::Kind::EscapingLinearFunctionType);
     case 'o':
       return createType(createWithChild(Node::Kind::Unowned,
                                         popNode(Node::Kind::Type)));

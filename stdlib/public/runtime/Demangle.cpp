@@ -569,6 +569,32 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     if (func->isAsync())
       funcNode->addChild(Dem.createNode(Node::Kind::AsyncAnnotation), Dem);
+
+    switch (func->getDifferentiabilityKind().Value) {
+    case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+      break;
+    case FunctionMetadataDifferentiabilityKind::Forward:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Forward), Dem);
+      break;
+    case FunctionMetadataDifferentiabilityKind::Reverse:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Reverse), Dem);
+      break;
+    case FunctionMetadataDifferentiabilityKind::Normal:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Normal), Dem);
+      break;
+    case FunctionMetadataDifferentiabilityKind::Linear:
+      funcNode->addChild(Dem.createNode(
+          Node::Kind::DifferentiableFunctionType,
+          (Node::IndexType)MangledDifferentiabilityKind::Linear), Dem);
+      break;
+    }
+
     funcNode->addChild(parameters, Dem);
     funcNode->addChild(result, Dem);
     return funcNode;
