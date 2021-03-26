@@ -647,6 +647,15 @@ template<> struct DenseMapInfo<swift::GenericSignatureBuilder::ExplicitRequireme
 
 }
 
+namespace {
+  struct ConflictingConcreteTypeRequirement {
+    ExplicitRequirement concreteTypeRequirement;
+    ExplicitRequirement otherRequirement;
+    Type resolvedConcreteType;
+    RequirementRHS otherRHS;
+  };
+}
+
 struct GenericSignatureBuilder::Implementation {
   /// Allocator.
   llvm::BumpPtrAllocator Allocator;
@@ -715,6 +724,11 @@ struct GenericSignatureBuilder::Implementation {
   /// there are two unrelated superclass requirements on the same type,
   /// the second one is recorded here. Built by computeRedundantRequirements().
   llvm::DenseMap<ExplicitRequirement, RequirementRHS> ConflictingRequirements;
+
+  /// Pairs of conflicting concrete type vs. superclass/layout/conformance
+  /// requirements.
+  std::vector<ConflictingConcreteTypeRequirement>
+      ConflictingConcreteTypeRequirements;
 
 #ifndef NDEBUG
   /// Whether we've already computed redundant requiremnts.
@@ -5775,10 +5789,25 @@ class RedundantRequirementGraph {
 
 public:
   template<typename T>
-  void addConstraintsFromEquivClass(
+  void handleConstraintsImpliedByConcrete(
       RequirementKind kind,
-      SmallVectorImpl<Constraint<T>> &exact,
-      SmallVectorImpl<Constraint<T>> &lessSpecific) {
+      const SmallVectorImpl<Constraint<T>> &impliedByConcrete,
+      const Optional<ExplicitRequirement> &concreteTypeRequirement) {
+    for (auto constraint : impliedByConcrete) {
+      if (constraint.source->isDerivedNonRootRequirement())
+        continue;
+
+      auto req = ExplicitRequirement::fromExplicitConstraint(kind, constraint);
+      addEdge(*concreteTypeRequirement, req);
+    }
+  }
+
+  template<typename T>
+  Optional<ExplicitRequirement>
+  addConstraintsFromEquivClass(
+      RequirementKind kind,
+      const SmallVectorImpl<Constraint<T>> &exact,
+      const SmallVectorImpl<Constraint<T>> &lessSpecific) {
     // The set of 'redundant explicit requirements', which are known to be less
     // specific than some other explicit requirements. An example is a type
     // parameter with multiple superclass constraints:
@@ -5843,6 +5872,13 @@ public:
       redundantExplicitReqs.push_back(req);
     }
 
+    // Get the "best" explicit requirement that implies the rest.
+    Optional<ExplicitRequirement> result;
+    if (!rootReqs.empty())
+      result = rootReqs[0];
+    else if (!explicitReqs.empty())
+      result = explicitReqs[0];
+
     // If all requirements are derived, there is nothing to do.
     if (explicitReqs.empty()) {
       if (!redundantExplicitReqs.empty()) {
@@ -5853,7 +5889,7 @@ public:
           }
         }
       }
-      return;
+      return result;
     }
 
     // If there are multiple most specific explicit requirements, they will form a cycle.
@@ -5876,6 +5912,8 @@ public:
     for (auto rootReq : rootReqs) {
       addEdge(rootReq, explicitReqs[0]);
     }
+
+    return result;
   }
 
 private:
@@ -6241,8 +6279,11 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
                                          exact, lessSpecific);
     }
 
+    Type resolvedConcreteType;
+    Optional<ExplicitRequirement> concreteTypeRequirement;
+
     if (equivClass.concreteType) {
-      Type resolvedConcreteType =
+      resolvedConcreteType =
         getCanonicalTypeInContext(equivClass.concreteType, { });
 
       SmallVector<Constraint<Type>, 2> exact;
@@ -6285,17 +6326,22 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
         lessSpecific.push_back(constraint);
       }
 
-      graph.addConstraintsFromEquivClass(RequirementKind::SameType,
-                                         exact, lessSpecific);
+      concreteTypeRequirement =
+          graph.addConstraintsFromEquivClass(RequirementKind::SameType,
+                                             exact, lessSpecific);
     }
+
+    Type resolvedSuperclass;
+    Optional<ExplicitRequirement> superclassRequirement;
 
     if (equivClass.superclass) {
       // Resolve any thus-far-unresolved dependent types.
-      Type resolvedSuperclass =
-        getCanonicalTypeInContext(equivClass.superclass, { });
+      resolvedSuperclass =
+        getCanonicalTypeInContext(equivClass.superclass, getGenericParams());
 
       SmallVector<Constraint<Type>, 2> exact;
       SmallVector<Constraint<Type>, 2> lessSpecific;
+      SmallVector<Constraint<Type>, 2> impliedByConcrete;
 
       for (const auto &constraint : equivClass.superclassConstraints) {
         auto *source = constraint.source;
@@ -6311,6 +6357,12 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
 
         if (derivedViaConcrete)
           continue;
+
+        if (resolvedConcreteType) {
+          Type resolvedType = getCanonicalTypeInContext(t, { });
+          if (resolvedType->isExactSuperclassOf(resolvedConcreteType))
+            impliedByConcrete.push_back(constraint);
+        }
 
         if (t->isEqual(resolvedSuperclass)) {
           exact.push_back(constraint);
@@ -6333,12 +6385,16 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
               std::make_pair(req, resolvedSuperclass));
         }
 
-        // FIXME: Check for a conflict via the concrete type.
         lessSpecific.push_back(constraint);
       }
 
-      graph.addConstraintsFromEquivClass(RequirementKind::Superclass,
-                                         exact, lessSpecific);
+      superclassRequirement =
+          graph.addConstraintsFromEquivClass(RequirementKind::Superclass,
+                                             exact, lessSpecific);
+
+      graph.handleConstraintsImpliedByConcrete(RequirementKind::Superclass,
+                                               impliedByConcrete,
+                                               concreteTypeRequirement);
     }
 
     if (equivClass.layout) {
@@ -6382,6 +6438,14 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
       graph.addConstraintsFromEquivClass(RequirementKind::Layout,
                                          exact, lessSpecific);
     }
+
+    if (resolvedConcreteType && resolvedSuperclass) {
+      if (!resolvedSuperclass->isExactSuperclassOf(resolvedConcreteType)) {
+        Impl->ConflictingConcreteTypeRequirements.push_back(
+            {*concreteTypeRequirement, *superclassRequirement,
+             resolvedConcreteType, resolvedSuperclass});
+      }
+    }
   }
 
   auto &SM = getASTContext().SourceMgr;
@@ -6403,6 +6467,7 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
 
   computeRedundantRequirements();
   diagnoseRedundantRequirements();
+  diagnoseConflictingConcreteTypeRequirements();
 
   assert(!Impl->finalized && "Already finalized builder");
 #ifndef NDEBUG
@@ -7151,10 +7216,89 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
       break;
     }
 
-    case RequirementKind::Superclass:
+    case RequirementKind::Superclass: {
+      auto superclass = req.getRHS().get<Type>();
+
+      auto conflict = Impl->ConflictingRequirements.find(req);
+      if (conflict != Impl->ConflictingRequirements.end()) {
+        Impl->HadAnyError = true;
+
+        auto otherSuperclass = conflict->second.get<Type>();
+
+        Context.Diags.diagnose(loc, diag::conflicting_superclass_constraints,
+                               subjectType, superclass, otherSuperclass);
+
+        for (auto otherReq : found->second) {
+          auto *otherSource = otherReq.getSource();
+          auto otherLoc = otherSource->getLoc();
+          if (otherLoc.isInvalid())
+            continue;
+
+          Context.Diags.diagnose(otherLoc, diag::conflicting_superclass_constraint,
+                                 subjectType, otherSuperclass);
+        }
+      } else {
+        Context.Diags.diagnose(loc, diag::redundant_superclass_constraint,
+                               subjectType, superclass);
+
+        for (auto otherReq : found->second) {
+          auto *otherSource = otherReq.getSource();
+          auto otherLoc = otherSource->getLoc();
+          if (otherLoc.isInvalid())
+            continue;
+
+          Context.Diags.diagnose(otherLoc, diag::superclass_redundancy_here,
+                                 subjectType, superclass);
+        }
+      }
+
+      break;
+    }
+
     case RequirementKind::SameType:
       // TODO
       break;
+    }
+  }
+}
+
+void GenericSignatureBuilder::diagnoseConflictingConcreteTypeRequirements() const {
+  for (auto pair : Impl->ConflictingConcreteTypeRequirements) {
+    SourceLoc loc = pair.concreteTypeRequirement.getSource()->getLoc();
+    SourceLoc otherLoc = pair.otherRequirement.getSource()->getLoc();
+
+    Type otherRHS = pair.otherRHS.get<Type>();
+
+    if (loc.isInvalid() && otherLoc.isInvalid())
+      continue;
+
+    auto subjectType = pair.concreteTypeRequirement.getSource()->getStoredType();
+    SourceLoc subjectLoc = (loc.isInvalid() ? otherLoc : loc);
+
+    Impl->HadAnyError = true;
+
+    switch (pair.otherRequirement.getKind()) {
+    case RequirementKind::Superclass: {
+      Context.Diags.diagnose(subjectLoc, diag::type_does_not_inherit,
+                             subjectType, pair.resolvedConcreteType, otherRHS);
+
+      if (otherLoc.isValid()) {
+        Context.Diags.diagnose(otherLoc, diag::superclass_redundancy_here,
+                               subjectType, otherRHS);
+      }
+
+      break;
+    }
+
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+    case RequirementKind::SameType:
+      llvm_unreachable("TODO");
+    }
+
+    if (loc.isValid()) {
+      Context.Diags.diagnose(loc, diag::same_type_redundancy_here,
+                             1, subjectType, pair.resolvedConcreteType);
     }
   }
 }
@@ -7978,81 +8122,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                               EquivalenceClass *equivClass) {
   assert(equivClass->superclass && "No superclass constraint?");
 
-  // Resolve any thus-far-unresolved dependent types.
-  Type resolvedSuperclass =
-    getCanonicalTypeInContext(equivClass->superclass, genericParams);
-
-  auto representativeConstraint =
-    checkConstraintList<Type>(
-      genericParams, equivClass->superclassConstraints, RequirementKind::Superclass,
-      [&](const ConcreteConstraint &constraint) {
-        if (constraint.value->isEqual(resolvedSuperclass))
-          return true;
-
-        Type resolvedType =
-          getCanonicalTypeInContext(constraint.value, { });
-        return resolvedType->isEqual(resolvedSuperclass);
-      },
-      [&](const Constraint<Type> &constraint) {
-        Type superclass = constraint.value;
-
-        // If this class is a superclass of the "best"
-        if (superclass->isExactSuperclassOf(resolvedSuperclass))
-          return ConstraintRelation::Redundant;
-
-        // Otherwise, it conflicts.
-        return ConstraintRelation::Conflicting;
-      },
-      diag::requires_superclass_conflict,
-      diag::redundant_superclass_constraint,
-      diag::superclass_redundancy_here);
-
-  // If we have a concrete type, check it.
-  // FIXME: Substitute into the concrete type.
-  if (equivClass->concreteType) {
-    Type resolvedConcreteType =
-      getCanonicalTypeInContext(equivClass->concreteType, genericParams);
-    auto existing = equivClass->findAnyConcreteConstraintAsWritten();
-    // Make sure the concrete type fulfills the superclass requirement.
-    if (!equivClass->superclass->isExactSuperclassOf(resolvedConcreteType)){
-      Impl->HadAnyError = true;
-      if (existing) {
-        Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,
-                       existing->getSubjectDependentType(getGenericParams()),
-                       existing->value, equivClass->superclass);
-
-        if (representativeConstraint.source->getLoc().isValid()) {
-          Diags.diagnose(representativeConstraint.source->getLoc(),
-                         diag::superclass_redundancy_here,
-                         representativeConstraint.source->classifyDiagKind(),
-                         representativeConstraint.getSubjectDependentType(
-                                                              genericParams),
-                         equivClass->superclass);
-        }
-      } else if (representativeConstraint.source->getLoc().isValid()) {
-        Diags.diagnose(representativeConstraint.source->getLoc(),
-                       diag::type_does_not_inherit,
-                       representativeConstraint.getSubjectDependentType(
-                                                              genericParams),
-                       resolvedConcreteType, equivClass->superclass);
-      }
-    } else if (representativeConstraint.source->shouldDiagnoseRedundancy(true)
-               && existing &&
-               existing->source->shouldDiagnoseRedundancy(false)) {
-      // It does fulfill the requirement; diagnose the redundancy.
-      Diags.diagnose(representativeConstraint.source->getLoc(),
-                     diag::redundant_superclass_constraint,
-                     representativeConstraint.getSubjectDependentType(
-                                                              genericParams),
-                     representativeConstraint.value);
-
-      Diags.diagnose(existing->source->getLoc(),
-                     diag::same_type_redundancy_here,
-                     existing->source->classifyDiagKind(),
-                     existing->getSubjectDependentType(genericParams),
-                     existing->value);
-    }
-  }
+  removeSelfDerived(*this, equivClass->superclassConstraints, /*proto=*/nullptr);
 }
 
 void GenericSignatureBuilder::checkLayoutConstraints(
