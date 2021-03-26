@@ -1,6 +1,15 @@
 include(macCatalystUtils)
 include(SwiftUtils)
 
+function(_compute_lto_swift_flag option out_var)
+  string(TOLOWER "${option}" lowercase_option)
+  if (lowercase_option STREQUAL "full")
+    set(${out_var} "-lto=llvm-full" PARENT_SCOPE)
+  elseif (lowercase_option STREQUAL "thin")
+    set(${out_var} "-lto=llvm-thin" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
@@ -42,7 +51,7 @@ function(handle_swift_sources
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC"
       "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;MACCATALYST_BUILD_FLAVOR"
-      "DEPENDS;COMPILE_FLAGS;MODULE_NAME"
+      "DEPENDS;COMPILE_FLAGS;MODULE_NAME;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
   translate_flag(${SWIFTSOURCES_IS_STDLIB} "IS_STDLIB" IS_STDLIB_arg)
@@ -107,7 +116,12 @@ function(handle_swift_sources
     if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
       list(APPEND swift_compile_flags "-save-optimization-record=bitstream")
     endif()
-
+    if (SWIFTSOURCES_ENABLE_LTO)
+      _compute_lto_swift_flag("${SWIFTSOURCES_ENABLE_LTO}" _lto_flag_out)
+      if (_lto_flag_out)
+        list(APPEND swift_compile_flags "${_lto_flag_out}")
+      endif()
+    endif()
     _compile_swift_files(
         dependency_target
         module_dependency_target
