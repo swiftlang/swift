@@ -338,7 +338,8 @@ bool swift_task_isCancelled(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 CancellationNotificationStatusRecord*
 swift_task_addCancellationHandler(
-    CancellationNotificationStatusRecord::FunctionType handler);
+    CancellationNotificationStatusRecord::FunctionType handler,
+    void *handlerContext);
 
 /// Remove the passed cancellation record from the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

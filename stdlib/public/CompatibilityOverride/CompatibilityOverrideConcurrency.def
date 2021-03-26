@@ -132,8 +132,9 @@ OVERRIDE_TASK(continuation_throwingResumeWithError, void,
 OVERRIDE_TASK(task_addCancellationHandler,
               CancellationNotificationStatusRecord *,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
-              (CancellationNotificationStatusRecord::FunctionType handler),
-              (handler))
+              (CancellationNotificationStatusRecord::FunctionType handler,
+               void *context),
+              (handler, context))
 
 OVERRIDE_TASK(task_removeCancellationHandler, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
