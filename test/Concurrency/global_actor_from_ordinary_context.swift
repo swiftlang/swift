@@ -47,7 +47,6 @@ func referenceGlobalActor2() {
 }
 
 
-// expected-note@+2 {{add '@asyncHandler' to function 'referenceAsyncGlobalActor()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
 // expected-note@+1 {{add 'async' to function 'referenceAsyncGlobalActor()' to make it asynchronous}} {{33-33= async}}
 func referenceAsyncGlobalActor() {
   let y = asyncGlobalActFn

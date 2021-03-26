@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler -warn-concurrency
 // REQUIRES: concurrency
 
 let immutableGlobal: String = "hello"
