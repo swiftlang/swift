@@ -4124,6 +4124,13 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
       continue;
     }
 
+    // There are no subtitutions to apply if the type is still unbound,
+    // continue looking into the parent.
+    if (auto unboundGeneric = baseTy->getAs<UnboundGenericType>()) {
+      baseTy = unboundGeneric->getParent();
+      continue;
+    }
+
     // Assert and break to avoid hanging if we get an unexpected baseTy.
     assert(0 && "Bad base type");
     break;
