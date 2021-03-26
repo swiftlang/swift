@@ -1597,6 +1597,10 @@ private:
     os << " */";
   }
 
+  void visitErrorType(ErrorType *Ty, Optional<OptionalTypeKind> optionalKind) {
+    os << "/* error */id";
+  }
+
   bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
     ASTContext &ctx = getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
