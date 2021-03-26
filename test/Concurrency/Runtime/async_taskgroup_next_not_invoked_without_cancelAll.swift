@@ -16,7 +16,7 @@ func test_skipCallingNext() async {
   let result = try! await withTaskGroup(of: Int.self) { (group) async -> Int in
     for n in numbers {
       print("group.spawn { \(n) }")
-      await group.spawn { () async -> Int in
+      group.spawn { () async -> Int in
         await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("  inside group.spawn { \(n) } (canceled: \(c))")

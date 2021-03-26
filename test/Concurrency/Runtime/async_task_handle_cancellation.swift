@@ -12,7 +12,7 @@
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
-    let handle = spawnDetached {
+    let handle = detach {
       while (!Task.isCancelled) { // no need for await here, yay
         print("waiting")
       }

@@ -17,7 +17,7 @@ func test_sum_nextOnCompleted() async {
   let sum = try! await withTaskGroup(of: Int.self) {
     (group) async -> Int in
     for n in numbers {
-      await group.spawn {
+      group.spawn {
         () async -> Int in
         print("  complete group.spawn { \(n) }")
         return n

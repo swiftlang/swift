@@ -51,7 +51,7 @@ func groups() async {
 
   // no value in parent, value in child
   let x1: Int = try! await withTaskGroup(of: Int.self) { group in
-    await group.spawn {
+    group.spawn {
       printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
       // inside the child task, set a value
       await Task.withLocal(\.number, boundTo: 1) {
@@ -71,7 +71,7 @@ func groups() async {
 
     let x2: Int = try! await withTaskGroup(of: Int.self) { group in
       printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
-      await group.spawn {
+      group.spawn {
         printTaskLocal(\.number) // CHECK: NumberKey: 2 {{.*}}
 
         async let childInsideGroupChild: () = printTaskLocal(\.number)

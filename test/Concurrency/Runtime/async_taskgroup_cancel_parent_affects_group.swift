@@ -17,9 +17,9 @@ func asyncEcho(_ value: Int) async -> Int {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_cancel_parent_affects_group() async {
 
-  let x = spawnDetached {
+  let x = detach {
     await withTaskGroup(of: Int.self, returning: Void.self) { group in
-      await group.spawn {
+      group.spawn {
         await Task.sleep(3_000_000_000)
         let c = Task.isCancelled
         print("group task isCancelled: \(c)")

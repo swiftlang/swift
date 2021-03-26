@@ -61,10 +61,8 @@ import Swift
 /// - if the body returns normally:
 ///   - the group will await any not yet complete tasks,
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
-/// - if the body throws:
-///   - all tasks remaining in the group will be automatically cancelled.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func withTaskGroup<ChildTaskResult, GroupResult>(
+public func withTaskGroup<ChildTaskResult: Sendable, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
@@ -144,7 +142,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
 /// - if the body throws:
 ///   - all tasks remaining in the group will be automatically cancelled.
-public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+public func withThrowingTaskGroup<ChildTaskResult: Sendable, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
   body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
@@ -191,7 +189,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// A task group serves as storage for dynamically spawned tasks.
 ///
 /// It is created by the `withTaskGroup` function.
-public struct TaskGroup<ChildTaskResult> {
+public struct TaskGroup<ChildTaskResult: Sendable> {
 
   private let _task: Builtin.NativeObject
   /// Group task into which child tasks offer their results,
@@ -225,13 +223,13 @@ public struct TaskGroup<ChildTaskResult> {
   @discardableResult
   public mutating func spawn(
     overridingPriority priorityOverride: Task.Priority? = nil,
-    operation: @Sendable @escaping () async -> ChildTaskResult
-  ) async -> Bool {
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Self.Spawned {
     let canAdd = _taskGroupAddPendingTask(group: _group)
     
     guard canAdd else {
       // the group is cancelled and is not accepting any new work
-      return false
+      return Spawned(handle: nil)
     }
     
     // Set up the job flags for a new task.
@@ -252,7 +250,22 @@ public struct TaskGroup<ChildTaskResult> {
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
     
-    return true
+    return Spawned(handle: Task.Handle(childTask))
+  }
+
+  public struct Spawned: Sendable {
+    /// Returns `true` if the task was successfully spawned in the task group,
+    /// `false` otherwise which means that the group was already cancelled and
+    /// refused to accept spawn a new child task.
+    public var successfully: Bool { handle != nil }
+
+    /// Task handle for the spawned task group child task,
+    /// or `nil` if it was not spawned successfully.
+    public let handle: Task.Handle<ChildTaskResult, Never>?
+
+    init(handle: Task.Handle<ChildTaskResult, Never>?) {
+      self.handle = handle
+    }
   }
   
   /// Wait for the a child task that was added to the group to complete,
@@ -296,8 +309,8 @@ public struct TaskGroup<ChildTaskResult> {
   /// Order of values returned by next() is *completion order*, and not
   /// submission order. I.e. if tasks are added to the group one after another:
   ///
-  ///     await group.spawn { 1 }
-  ///     await group.spawn { 2 }
+  ///     group.spawn { 1 }
+  ///     group.spawn { 2 }
   ///
   ///     print(await group.next())
   ///     /// Prints "1" OR "2"
@@ -388,7 +401,7 @@ public struct TaskGroup<ChildTaskResult> {
 /// child tasks.
 ///
 /// It is created by the `withTaskGroup` function.
-public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
+public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   private let _task: Builtin.NativeObject
   /// Group task into which child tasks offer their results,
@@ -423,12 +436,12 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   public mutating func spawn(
     overridingPriority priorityOverride: Task.Priority? = nil,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
-  ) async -> Bool {
+  ) -> Self.Spawned {
     let canAdd = _taskGroupAddPendingTask(group: _group)
 
     guard canAdd else {
       // the group is cancelled and is not accepting any new work
-      return false
+      return Spawned(handle: nil)
     }
 
     // Set up the job flags for a new task.
@@ -449,7 +462,22 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
 
-    return true
+    return Spawned(handle: Task.Handle(childTask))
+  }
+
+  public struct Spawned: Sendable  {
+    /// Returns `true` if the task was successfully spawned in the task group,
+    /// `false` otherwise which means that the group was already cancelled and
+    /// refused to accept spawn a new child task.
+    public var successfully: Bool { handle != nil }
+
+    /// Task handle for the spawned task group child task,
+    /// or `nil` if it was not spawned successfully.
+    public let handle: Task.Handle<ChildTaskResult, Error>?
+
+    init(handle: Task.Handle<ChildTaskResult, Error>?) {
+      self.handle = handle
+    }
   }
 
   /// Wait for the a child task that was added to the group to complete,
@@ -493,8 +521,8 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
   /// Order of values returned by next() is *completion order*, and not
   /// submission order. I.e. if tasks are added to the group one after another:
   ///
-  ///     await group.spawn { 1 }
-  ///     await group.spawn { 2 }
+  ///     group.spawn { 1 }
+  ///     group.spawn { 2 }
   ///
   ///     print(await group.next())
   ///     /// Prints "1" OR "2"
@@ -517,6 +545,29 @@ public struct ThrowingTaskGroup<ChildTaskResult, Failure: Error> {
     #endif
 
     return try await _taskGroupWaitNext(group: _group)
+  }
+
+  /// - SeeAlso: `next()`
+  public mutating func nextResult() async throws -> Result<ChildTaskResult, Failure>? {
+    #if NDEBUG
+    let callingTask = Builtin.getCurrentAsyncTask() // can't inline into the assert sadly
+    assert(unsafeBitCast(callingTask, to: size_t.self) ==
+      unsafeBitCast(_task, to: size_t.self),
+      """
+      group.next() invoked from task other than the task which created the group! \
+      This means the group must have illegally escaped the withTaskGroup{} scope.
+      """)
+    #endif
+
+    do {
+      guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
+        return nil
+      }
+
+      return .success(success)
+    } catch {
+      return .failure(error as! Failure) // as!-safe, because we are only allowed to throw Failure (Error)
+    }
   }
 
   /// Query whether the group has any remaining tasks.
@@ -650,6 +701,7 @@ extension ThrowingTaskGroup: AsyncSequence {
 
     /// - SeeAlso: `ThrowingTaskGroup.next()` for a detailed discussion its semantics.
     public mutating func next() async throws -> Element? {
+      guard !finished else { return nil }
       do {
         guard let element = try await group.next() else {
           finished = true

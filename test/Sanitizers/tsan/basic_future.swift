@@ -30,7 +30,7 @@ func testSimple(
 
   var completed = false
 
-  let taskHandle: Task.Handle<String, Error> = spawnDetached {
+  let taskHandle: Task.Handle<String, Error> = detach {
     let greeting = await formGreeting(name: name)
 
     // If the intent is to test suspending, wait a bit so the second task

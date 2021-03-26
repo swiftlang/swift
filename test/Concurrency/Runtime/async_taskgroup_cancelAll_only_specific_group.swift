@@ -21,7 +21,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
   async let g1: Int = withTaskGroup(of: Int.self) { group in
 
     for i in 1...5 {
-      await group.spawn {
+      group.spawn {
         await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("add: \(i) (cancelled: \(c))")
@@ -46,7 +46,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
   // The cancellation os g2 should have no impact on g1
   let g2: Int = try! await withTaskGroup(of: Int.self) { group in
     for i in 1...3 {
-      await group.spawn {
+      group.spawn {
         await Task.sleep(1_000_000_000)
         let c = Task.isCancelled
         print("g1 task \(i) (cancelled: \(c))")

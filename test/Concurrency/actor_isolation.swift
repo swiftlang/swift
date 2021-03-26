@@ -706,7 +706,7 @@ class SomeClassWithInits {
   }
 
   func hasDetached() {
-    spawnDetached {
+    detach {
       // okay
       await self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
       self.isolated() // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}

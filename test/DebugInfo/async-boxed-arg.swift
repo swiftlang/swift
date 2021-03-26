@@ -8,7 +8,7 @@ extension Collection {
     return await try withTaskGroup(of: Element.self) { group in
       var i = self.startIndex
       func doit() async throws {
-        await group.spawn { [i] in
+        group.spawn { [i] in
           return self[i]
         }
       }

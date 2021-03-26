@@ -26,7 +26,7 @@ struct App {
         var n = 0
         for _ in 1...NUM_TASKS {
             let c = Capture()
-            let r = spawnDetached {
+            let r = detach {
                 c.doSomething()
             }
             await r.get()

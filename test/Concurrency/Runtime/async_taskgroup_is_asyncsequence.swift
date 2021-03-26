@@ -15,7 +15,7 @@ func test_taskGroup_is_asyncSequence() async {
 
   let sum = await withTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      await group.spawn {
+      group.spawn {
         print("add \(n)")
         return n
       }
@@ -38,7 +38,7 @@ func test_throwingTaskGroup_is_asyncSequence() async throws {
 
   let sum = try await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      await group.spawn {
+      group.spawn {
         print("add \(n)")
         return n
       }

@@ -17,7 +17,7 @@ func test_detach() async {
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
   // task.
-  await spawnDetached(priority: .userInitiated) {
+  await detach(priority: .userInitiated) {
     let a2 = Task.currentPriority
     print("a2: \(a2)") // CHECK: a2: userInitiated
   }.get()
@@ -35,16 +35,16 @@ func test_multiple_lo_indirectly_escalated() async {
     }
   }
 
-  let z = spawnDetached(priority: .background) {
+  let z = detach(priority: .background) {
     await loopUntil(priority: .userInitiated)
   }
-  let x = spawnDetached(priority: .background) {
+  let x = detach(priority: .background) {
     _ = await z // waiting on `z`, but it won't complete since we're also background
     await loopUntil(priority: .userInitiated)
   }
 
   // detach, don't wait
-  spawnDetached(priority: .userInitiated) {
+  detach(priority: .userInitiated) {
     await x // escalates x, which waits on z, so z also escalates
   }
 

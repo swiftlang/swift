@@ -3,6 +3,7 @@
 // REQUIRES: concurrency
 // XFAIL: linux
 // XFAIL: windows
+
 struct Boom: Error {}
 
 func boom() async throws -> Int {
@@ -10,12 +11,10 @@ func boom() async throws -> Int {
 }
 
 func test_taskGroup_next() async {
-  let sum: Int = await Task.withGroup(resultType: Int.self) { group in
+  let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      await group.add {
-        return n.isMultiple(of: 3)
-          ? try await boom()
-          : n
+      group.spawn {
+        return n.isMultiple(of: 3) ? try await boom() : n
       }
     }
 
@@ -42,12 +41,10 @@ func test_taskGroup_next() async {
 }
 
 func test_taskGroup_for_in() async {
-  let sum: Int = await Task.withGroup(resultType: Int.self) { group in
+  let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      await group.add {
-        return n.isMultiple(of: 3)
-          ? try await boom()
-          : n
+      group.spawn {
+        return n.isMultiple(of: 3) ? try await boom() : n
       }
     }
 
@@ -74,12 +71,10 @@ func test_taskGroup_for_in() async {
 }
 
 func test_taskGroup_asyncIterator() async {
-  let sum: Int = await Task.withGroup(resultType: Int.self) { group in
+  let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      await group.add {
-        return n.isMultiple(of: 3)
-          ? try await boom()
-        : n
+      group.spawn {
+        return n.isMultiple(of: 3) ? try await boom() : n
       }
     }
 

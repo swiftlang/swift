@@ -26,11 +26,11 @@ func asyncFib(_ n: Int) async -> Int {
     return n
   }
 
-  let first = spawnDetached {
+  let first = detach {
     await asyncFib(n - 2)
   }
 
-  let second = spawnDetached {
+  let second = detach {
     await asyncFib(n - 1)
   }
 

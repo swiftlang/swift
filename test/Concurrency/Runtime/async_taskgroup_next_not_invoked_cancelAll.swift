@@ -16,7 +16,7 @@ func test_skipCallingNext_butInvokeCancelAll() async {
   let result = try! await withTaskGroup(of: Int.self) { (group) async -> Int in
     for n in numbers {
       print("group.spawn { \(n) }")
-      await group.spawn { [group] () async -> Int in
+      group.spawn { [group] () async -> Int in
         await Task.sleep(1_000_000_000)
         print("  inside group.spawn { \(n) }")
         print("  inside group.spawn { \(n) } (group cancelled: \(group.isCancelled))")

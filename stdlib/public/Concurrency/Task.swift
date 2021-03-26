@@ -105,7 +105,7 @@ extension Task {
   /// ### Priority inheritance
   /// Child tasks automatically inherit their parent task's priority.
   ///
-  /// Detached tasks (created by `spawnDetached`) DO NOT inherit task priority,
+  /// Detached tasks (created by `detach`) DO NOT inherit task priority,
   /// as they are "detached" from their parent tasks after all.
   ///
   /// ### Priority elevation
@@ -150,7 +150,7 @@ extension Task {
   /// i.e. the task will run regardless of the handle still being present or not.
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
-  public struct Handle<Success, Failure: Error> {
+  public struct Handle<Success, Failure: Error>: Sendable {
     internal let _task: Builtin.NativeObject
 
     internal init(_ task: Builtin.NativeObject) {
@@ -395,7 +395,7 @@ extension Task {
 ///     throw the error the operation has thrown when awaited on.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
-public func spawnDetached<T>(
+public func detach<T>(
   priority: Task.Priority = .default,
   operation: __owned @Sendable @escaping () async -> T
 ) -> Task.Handle<T, Never> {
@@ -447,7 +447,7 @@ public func spawnDetached<T>(
 ///     tasks result or `cancel` it. If the operation fails the handle will
 ///     throw the error the operation has thrown when awaited on.
 @discardableResult
-public func spawnDetached<T, Failure>(
+public func detach<T, Failure>(
   priority: Task.Priority = .default,
   operation: __owned @Sendable @escaping () async throws -> T
 ) -> Task.Handle<T, Failure> {
@@ -472,7 +472,7 @@ public func spawnDetached<T, Failure>(
 // TODO: remove this?
 public func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @Sendable () async -> ()
-  spawnDetached(
+  detach(
     operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)
   )
 }
@@ -629,7 +629,7 @@ public func _asyncMainDrainQueue() -> Never
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 #if os(Windows)
-  spawnDetached {
+  detach {
     do {
       try await asyncFun()
       exit(0)
@@ -647,7 +647,7 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
     }
   }
 
-  spawnDetached {
+  detach {
     await _doMain(asyncFun)
     exit(0)
   }
@@ -705,12 +705,12 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-  // TODO: We can probably do better than spawnDetached
+  // TODO: We can probably do better than detach
   // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other
   // situations.
 #if compiler(>=5.5) && $Sendable
-  spawnDetached { await body() }
+  detach { await body() }
 #endif
 }
 

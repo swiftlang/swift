@@ -21,7 +21,7 @@ func test_taskGroup_isEmpty() async {
     // CHECK: before add: isEmpty=true
     print("before add: isEmpty=\(group.isEmpty)")
 
-    await group.spawn {
+    group.spawn {
       await Task.sleep(2_000_000_000)
       return await asyncEcho(1)
     }
