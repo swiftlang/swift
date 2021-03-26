@@ -745,6 +745,79 @@ static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
   return false;
 }
 
+/// Get index of \p CCExpr in \p Params. Note that the position in \p Params may
+/// be different than the position in \p Args if there are defaulted arguments
+/// in \p Params which don't occur in \p Args.
+///
+/// \returns \c true if success, \c false if \p CCExpr is not a part of \p Args.
+static bool getPositionInParams(DeclContext &DC, Expr *Args, Expr *CCExpr,
+                                ArrayRef<AnyFunctionType::Param> Params,
+                                unsigned &PosInParams) {
+  if (isa<ParenExpr>(Args)) {
+    PosInParams = 0;
+    return true;
+  }
+
+  auto *tuple = dyn_cast<TupleExpr>(Args);
+  if (!tuple) {
+    return false;
+  }
+
+  auto &SM = DC.getASTContext().SourceMgr;
+  PosInParams = 0;
+  unsigned PosInArgs = 0;
+  bool LastParamWasVariadic = false;
+  // We advance PosInArgs until we find argument that is after the code
+  // completion token, which is when we stop.
+  // For each argument, we try to find a matching parameter either by matching
+  // argument labels, in which case PosInParams may be advanced by more than 1,
+  // or by advancing PosInParams and PosInArgs both by 1.
+  for (; PosInArgs < tuple->getNumElements(); ++PosInArgs) {
+    if (!SM.isBeforeInBuffer(tuple->getElement(PosInArgs)->getEndLoc(),
+                             CCExpr->getStartLoc())) {
+      // The arg is after the code completion position. Stop.
+      break;
+    }
+
+    auto ArgName = tuple->getElementName(PosInArgs);
+    // If the last parameter we matched was variadic, we claim all following
+    // unlabeled arguments for that variadic parameter -> advance PosInArgs but
+    // not PosInParams.
+    if (LastParamWasVariadic && ArgName.empty()) {
+      continue;
+    } else {
+      LastParamWasVariadic = false;
+    }
+
+    // Look for a matching parameter label.
+    bool FoundLabelMatch = false;
+    for (unsigned i = PosInParams; i < Params.size(); ++i) {
+      if (Params[i].getLabel() == ArgName) {
+        // We have found a label match. Advance the position in the params
+        // to point to the param after the one with this label.
+        PosInParams = i + 1;
+        FoundLabelMatch = true;
+        if (Params[i].isVariadic()) {
+          LastParamWasVariadic = true;
+        }
+        break;
+      }
+    }
+
+    if (!FoundLabelMatch) {
+      // We haven't found a matching argument label. Assume the current one is
+      // named incorrectly and advance by one.
+      ++PosInParams;
+    }
+  }
+  if (PosInArgs < tuple->getNumElements() && PosInParams < Params.size()) {
+    // We didn't search until the end, so we found a position in Params. Success
+    return true;
+  } else {
+    return false;
+  }
+}
+
 /// Given an expression and its context, the analyzer tries to figure out the
 /// expected type of the expression by analyzing its context.
 class ExprContextAnalyzer {
@@ -791,14 +864,12 @@ class ExprContextAnalyzer {
     PossibleCallees.assign(Candidates.begin(), Candidates.end());
 
     // Determine the position of code completion token in call argument.
-    unsigned Position;
+    unsigned PositionInArgs;
     bool HasName;
-    if (!getPositionInArgs(*DC, Arg, ParsedExpr, Position, HasName))
+    if (!getPositionInArgs(*DC, Arg, ParsedExpr, PositionInArgs, HasName))
       return false;
 
     // Collect possible types (or labels) at the position.
-    // FIXME: Take variadic and optional parameters into account. We need to do
-    //        something equivalent to 'constraints::matchCallArguments'
     {
       bool MayNeedName = !HasName && !E->isImplicit() &&
                          (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
@@ -811,13 +882,22 @@ class ExprContextAnalyzer {
           memberDC = typeAndDecl.Decl->getInnermostDeclContext();
 
         auto Params = typeAndDecl.Type->getParams();
+        unsigned PositionInParams;
+        if (!getPositionInParams(*DC, Arg, ParsedExpr, Params,
+                                 PositionInParams)) {
+          // If the argument doesn't have a matching position in the parameters,
+          // indicate that with optional nullptr param.
+          if (seenArgs.insert({Identifier(), CanType()}).second)
+            recordPossibleParam(nullptr, /*isRequired=*/false);
+          continue;
+        }
         ParameterList *paramList = nullptr;
         if (auto VD = typeAndDecl.Decl) {
           paramList = getParameterList(VD);
           if (paramList && paramList->size() != Params.size())
             paramList = nullptr;
         }
-        for (auto Pos = Position; Pos < Params.size(); ++Pos) {
+        for (auto Pos = PositionInParams; Pos < Params.size(); ++Pos) {
           const auto &paramType = Params[Pos];
           Type ty = paramType.getPlainType();
           if (memberDC && ty->hasTypeParameter())
@@ -842,12 +922,6 @@ class ExprContextAnalyzer {
           }
           if (!canSkip)
             break;
-        }
-        // If the argument position is out of expeceted number, indicate that
-        // with optional nullptr param.
-        if (Position >= Params.size()) {
-          if (seenArgs.insert({Identifier(), CanType()}).second)
-            recordPossibleParam(nullptr, /*isRequired=*/false);
         }
       }
     }

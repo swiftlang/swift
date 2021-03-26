@@ -423,6 +423,13 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 /// of the function, set the result type of the expression to that sugar type.
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
+/// Type check a \c StmtConditionElement.
+/// Sets \p isFalsable to \c true if the condition might evaluate to \c false,
+/// otherwise leaves \p isFalsable untouched.
+/// \returns \c true if there was an error type checking, \c false otherwise.
+bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
+                                   DeclContext *dc);
+
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 

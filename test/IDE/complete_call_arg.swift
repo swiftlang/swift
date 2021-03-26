@@ -116,6 +116,10 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LABEL_IN_SELF_DOT_INIT | %FileCheck %s -check-prefix=LABEL_IN_SELF_DOT_INIT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MISSING_REQUIRED_PARAM | %FileCheck %s -check-prefix=MISSING_REQUIRED_PARAM
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NAMED_PARAMETER_WITH_LEADING_VARIADIC | %FileCheck %s -check-prefix=NAMED_PARAMETER_WITH_LEADING_VARIADIC
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -700,9 +704,7 @@ func testStaticMemberCall() {
 // STATIC_METHOD_SECOND: End completions
 
   let _ = TestStaticMemberCall.create2(1, arg3: 2, #^STATIC_METHOD_SKIPPED^#)
-// STATIC_METHOD_SKIPPED: Begin completions, 2 items
-// FIXME: 'arg3' shouldn't be suggested.
-// STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
+// STATIC_METHOD_SKIPPED: Begin completions, 1 item
 // STATIC_METHOD_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // STATIC_METHOD_SKIPPED: End completions
 
@@ -739,9 +741,7 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SECOND: End completions
 
   let _: TestStaticMemberCall = .create2(1, arg3: 2, #^IMPLICIT_MEMBER_SKIPPED^#)
-// IMPLICIT_MEMBER_SKIPPED: Begin completions, 2 items
-// FIXME: 'arg3' shouldn't be suggested.
-// IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg3: Int#}[#Int#];
+// IMPLICIT_MEMBER_SKIPPED: Begin completions, 1 item
 // IMPLICIT_MEMBER_SKIPPED: Pattern/ExprSpecific: {#arg4: Int#}[#Int#];
 // IMPLICIT_MEMBER_SKIPPED: End completions
 
@@ -921,5 +921,29 @@ func testLabelsInSelfDotInit() {
 // LABEL_IN_SELF_DOT_INIT-DAG: Pattern/ExprSpecific:               {#b: Int#}[#Int#]
 // LABEL_IN_SELF_DOT_INIT: End completions
     }
+  }
+}
+
+func testMissingRequiredParameter() {
+  class C {
+    func foo(x: Int, y: Int, z: Int)  {}
+  }
+  func test(c: C) {
+    c.foo(y: 1, #^MISSING_REQUIRED_PARAM^#)
+// MISSING_REQUIRED_PARAM: Begin completions, 1 item
+// MISSING_REQUIRED_PARAM-DAG: Pattern/ExprSpecific:               {#z: Int#}[#Int#]
+// MISSING_REQUIRED_PARAM: End completions
+  }
+}
+
+func testAfterVariadic() {
+  class C {
+    func foo(x: Int..., y: Int, z: Int)  {}
+  }
+  func test(c: C) {
+    c.foo(x: 10, 20, 30, y: 40, #^NAMED_PARAMETER_WITH_LEADING_VARIADIC^#)
+// NAMED_PARAMETER_WITH_LEADING_VARIADIC: Begin completions, 1 item
+// NAMED_PARAMETER_WITH_LEADING_VARIADIC-DAG: Pattern/ExprSpecific:               {#z: Int#}[#Int#]
+// NAMED_PARAMETER_WITH_LEADING_VARIADIC: End completions
   }
 }
