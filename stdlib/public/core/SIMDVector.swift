@@ -360,12 +360,26 @@ extension SIMD where Scalar: Comparable {
   }
   
   /// The least element in the vector.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// indices.reduce(into: Scalar.max) {
+  ///   $0 = min($0, self[$1])
+  /// }
+  /// ```
   @_alwaysEmitIntoClient
   public func min() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Swift.min($0, self[$1]) }
   }
   
   /// The greatest element in the vector.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// indices.reduce(into: Scalar.min) {
+  ///   $0 = max($0, self[$1])
+  /// }
+  /// ```
   @_alwaysEmitIntoClient
   public func max() -> Scalar {
     return indices.reduce(into: self[0]) { $0 = Swift.max($0, self[$1]) }
@@ -821,7 +835,12 @@ extension SIMD where Scalar: FixedWidthInteger {
   /// Returns the sum of the scalars in the vector, computed with wrapping
   /// addition.
   ///
-  /// Equivalent to `indices.reduce(into: 0) { $0 &+= self[$1] }`.
+  /// Equivalent to:
+  /// ```
+  /// indices.reduce(into: 0) {
+  ///   $0 &+= self[$1]
+  /// }
+  /// ```
   @_alwaysEmitIntoClient
   public func wrappedSum() -> Scalar {
     return indices.reduce(into: 0) { $0 &+= self[$1] }
