@@ -93,7 +93,6 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   case ActorIsolation::GlobalActor:
   case ActorIsolation::GlobalActorUnsafe:
   case ActorIsolation::Independent:
-  case ActorIsolation::IndependentUnsafe:
   case ActorIsolation::Unspecified:
     break;
   }

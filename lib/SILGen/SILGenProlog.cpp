@@ -473,7 +473,6 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
     switch (actorIsolation.getKind()) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Independent:
-      case ActorIsolation::IndependentUnsafe:
       case ActorIsolation::GlobalActorUnsafe:
         break;
 
@@ -566,7 +565,6 @@ ExecutorBreadcrumb SILGenFunction::emitHopToTargetActor(SILLocation loc,
   switch (actorIso.getKind()) {
   case ActorIsolation::Unspecified:
   case ActorIsolation::Independent:
-  case ActorIsolation::IndependentUnsafe:
     break;
 
   case ActorIsolation::ActorInstance: {

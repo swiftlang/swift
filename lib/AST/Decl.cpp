@@ -8034,7 +8034,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
   if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
     switch (auto isolation = closure->getActorIsolation()) {
     case ClosureActorIsolation::Independent:
-      return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
+      return ActorIsolation::forIndependent();
 
     case ClosureActorIsolation::GlobalActor: {
       return ActorIsolation::forGlobalActor(
