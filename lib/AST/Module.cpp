@@ -2257,12 +2257,14 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
 
-  /// Is \p path from System/Library/PrivateFrameworks/?
-  auto fromPrivateFrameworks = [&](StringRef path) -> bool {
-    auto sep = llvm::sys::path::get_separator();
-    auto privateFrameworksPath = llvm::Twine(ctx.SearchPathOpts.SDKPath) +
-      sep + "System" + sep + "Library" + sep + "PrivateFrameworks" + sep;
-    return hasPrefix(path, privateFrameworksPath.str());
+  /// Is \p modulePath from System/Library/PrivateFrameworks/?
+  auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
+    namespace path = llvm::sys::path;
+    SmallString<128> scratch;
+    scratch = ctx.SearchPathOpts.SDKPath;
+    path::append(scratch, "System", "Library", "PrivateFrameworks");
+    return hasPrefix(path::begin(modulePath), path::end(modulePath),
+                     path::begin(scratch), path::end(scratch));
   };
 
   if (module->isNonSwiftModule()) {
