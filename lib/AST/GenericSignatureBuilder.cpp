@@ -6470,14 +6470,16 @@ GenericSignatureBuilder::finalize(TypeArrayView<GenericTypeParamType> genericPar
     checkLayoutConstraints(genericParams, &equivClass);
   };
 
-  // FIXME: Expand all conformance requirements. This is expensive :(
-  for (auto &equivClass : Impl->EquivalenceClasses) {
+  if (!Impl->ExplicitSameTypeRequirements.empty()) {
+    // FIXME: Expand all conformance requirements. This is expensive :(
+    for (auto &equivClass : Impl->EquivalenceClasses) {
       expandSameTypeConstraints(*this, &equivClass);
-  }
+    }
 
-  // Check same-type constraints.
-  for (auto &equivClass : Impl->EquivalenceClasses) {
-    checkSameTypeConstraints(genericParams, &equivClass);
+    // Check same-type constraints.
+    for (auto &equivClass : Impl->EquivalenceClasses) {
+      checkSameTypeConstraints(genericParams, &equivClass);
+    }
   }
 
   // Check for generic parameters which have been made concrete or equated
@@ -8082,63 +8084,65 @@ void GenericSignatureBuilder::enumerateRequirements(
   }
 
   // Collect all same type requirements.
-  for (auto &equivClass : Impl->EquivalenceClasses) {
-    if (equivClass.derivedSameTypeComponents.empty()) {
-      checkSameTypeConstraints(genericParams, &equivClass);
-    }
-
-    for (unsigned i : indices(equivClass.derivedSameTypeComponents)) {
-      // Dig out the subject type and its corresponding component.
-      auto &component = equivClass.derivedSameTypeComponents[i];
-      Type subjectType = component.type;
-
-      assert(!subjectType->hasError());
-      assert(!subjectType->findUnresolvedDependentMemberType());
-
-      // If this equivalence class is bound to a concrete type, equate the
-      // anchor with a concrete type.
-      if (Type concreteType = equivClass.concreteType) {
-        concreteType = getCanonicalTypeInContext(concreteType, genericParams);
-
-        // If the parent of this anchor is also a concrete type, don't
-        // create a requirement.
-        if (!subjectType->is<GenericTypeParamType>() &&
-            maybeResolveEquivalenceClass(
-              subjectType->castTo<DependentMemberType>()->getBase(),
-              ArchetypeResolutionKind::WellFormed,
-              /*wantExactPotentialArchetype=*/false)
-              .getEquivalenceClass(*this)->concreteType)
-          continue;
-
-        // Drop recursive and invalid concrete-type constraints.
-        if (equivClass.recursiveConcreteType ||
-            equivClass.invalidConcreteType)
-          continue;
-
-        // Filter out derived requirements... except for concrete-type
-        // requirements on generic parameters. The exception is due to
-        // the canonicalization of generic signatures, which never
-        // eliminates generic parameters even when they have been
-        // mapped to a concrete type.
-        if (subjectType->is<GenericTypeParamType>() ||
-            component.concreteTypeSource == nullptr ||
-            !component.concreteTypeSource->isDerivedRequirement()) {
-          recordRequirement(RequirementKind::SameType,
-                            subjectType, concreteType);
-        }
-        continue;
+  if (!Impl->ExplicitSameTypeRequirements.empty()) {
+    for (auto &equivClass : Impl->EquivalenceClasses) {
+      if (equivClass.derivedSameTypeComponents.empty()) {
+        checkSameTypeConstraints(genericParams, &equivClass);
       }
 
-      // If we're at the last anchor in the component, do nothing;
-      if (i + 1 != equivClass.derivedSameTypeComponents.size()) {
-        // Form a same-type constraint from this anchor within the component
-        // to the next.
-        // FIXME: Distinguish between explicit and inferred here?
-        auto &nextComponent = equivClass.derivedSameTypeComponents[i + 1];
-        Type otherSubjectType = nextComponent.type;
+      for (unsigned i : indices(equivClass.derivedSameTypeComponents)) {
+        // Dig out the subject type and its corresponding component.
+        auto &component = equivClass.derivedSameTypeComponents[i];
+        Type subjectType = component.type;
 
-        recordRequirement(RequirementKind::SameType,
-                          subjectType, otherSubjectType);
+        assert(!subjectType->hasError());
+        assert(!subjectType->findUnresolvedDependentMemberType());
+
+        // If this equivalence class is bound to a concrete type, equate the
+        // anchor with a concrete type.
+        if (Type concreteType = equivClass.concreteType) {
+          concreteType = getCanonicalTypeInContext(concreteType, genericParams);
+
+          // If the parent of this anchor is also a concrete type, don't
+          // create a requirement.
+          if (!subjectType->is<GenericTypeParamType>() &&
+              maybeResolveEquivalenceClass(
+                subjectType->castTo<DependentMemberType>()->getBase(),
+                ArchetypeResolutionKind::WellFormed,
+                /*wantExactPotentialArchetype=*/false)
+                .getEquivalenceClass(*this)->concreteType)
+            continue;
+
+          // Drop recursive and invalid concrete-type constraints.
+          if (equivClass.recursiveConcreteType ||
+              equivClass.invalidConcreteType)
+            continue;
+
+          // Filter out derived requirements... except for concrete-type
+          // requirements on generic parameters. The exception is due to
+          // the canonicalization of generic signatures, which never
+          // eliminates generic parameters even when they have been
+          // mapped to a concrete type.
+          if (subjectType->is<GenericTypeParamType>() ||
+              component.concreteTypeSource == nullptr ||
+              !component.concreteTypeSource->isDerivedRequirement()) {
+            recordRequirement(RequirementKind::SameType,
+                              subjectType, concreteType);
+          }
+          continue;
+        }
+
+        // If we're at the last anchor in the component, do nothing;
+        if (i + 1 != equivClass.derivedSameTypeComponents.size()) {
+          // Form a same-type constraint from this anchor within the component
+          // to the next.
+          // FIXME: Distinguish between explicit and inferred here?
+          auto &nextComponent = equivClass.derivedSameTypeComponents[i + 1];
+          Type otherSubjectType = nextComponent.type;
+
+          recordRequirement(RequirementKind::SameType,
+                            subjectType, otherSubjectType);
+        }
       }
     }
   }
