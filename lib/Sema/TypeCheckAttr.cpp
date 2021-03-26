@@ -5614,6 +5614,10 @@ public:
     // Nothing else to check.
   }
 
+  void visitActorIndependentAttr(ActorIndependentAttr *attr) {
+    // Nothing else to check.
+  }
+
   void visitCustomAttr(CustomAttr *attr) {
     // Check whether this custom attribute is the global actor attribute.
     auto globalActorAttr = evaluateOrDefault(

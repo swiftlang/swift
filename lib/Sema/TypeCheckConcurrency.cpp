@@ -1566,22 +1566,8 @@ namespace {
 
       auto dc = const_cast<DeclContext *>(constDC);
       while (!dc->isModuleScopeContext()) {
-        if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-          // If this closure has specific isolation, use it.
-          auto closureIsolation = getActorIsolationOfContext(dc);
-          if (closureIsolation != ActorIsolation::Independent)
-            return closureIsolation;
-
-          // Look through non-escaping closures.
-          if (auto type = closure->getType()) {
-            if (auto fnType = type->getAs<AnyFunctionType>()) {
-              if (fnType->isNoEscape()) {
-                dc = closure->getParent();
-                continue;
-              }
-            }
-          }
-        }
+        if (auto closure = dyn_cast<AbstractClosureExpr>(dc))
+          return getActorIsolationOfContext(dc);
 
         // Functions have actor isolation defined on them.
         if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
@@ -2243,6 +2229,9 @@ namespace {
         AbstractClosureExpr *closure) {
       // If the closure specifies a global actor, use it.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (explicitClosure->getAttrs().hasAttribute<ActorIndependentAttr>())
+          return ClosureActorIsolation::forIndependent();
+
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
           return ClosureActorIsolation::forGlobalActor(globalActorType);
       }

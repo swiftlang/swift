@@ -45,6 +45,8 @@ struct SomeGlobalActor {
 
 func someAsyncFunc() async { }
 
+@SomeGlobalActor func getGlobal7() -> Int { 7 }
+
 // CHECK-LABEL: someGlobalActorFunc
 @SomeGlobalActor func someGlobalActorFunc() async {
   // CHECK: acceptAsyncClosure
@@ -66,5 +68,4 @@ func someAsyncFunc() async { }
   // CHECK: closure_expr
   // CHECK-NOT:actor-isolated
   acceptEscapingAsyncClosure { () async in print("hello") }
-
 }

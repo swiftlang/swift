@@ -61,12 +61,12 @@ func callGlobalActor() {
 
 func fromClosure() {
   { () -> Void in
-    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated context}}
     let x = syncGlobActorFn
     x()
   }()
 
-  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
   let _ = { syncGlobActorFn() }()
 }
 
