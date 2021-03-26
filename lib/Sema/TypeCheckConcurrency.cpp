@@ -1944,6 +1944,12 @@ namespace {
             LLVM_FALLTHROUGH; // otherwise, perform checking
 
           case ActorIsolationRestriction::GlobalActor:
+            // Disable global actor checking for now.
+            if (!ctx.LangOpts.isSwiftVersionAtLeast(6))
+              break;
+
+            LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
+
           case ActorIsolationRestriction::CrossActorSelf:
             // 'let'-bound decls with this isolation are OK, just check them.
             if (auto wasLetBound = checkLetBoundVarDecl(component)) {
