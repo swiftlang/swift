@@ -603,7 +603,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     if (conformanceRef.hasEffect(EffectKind::Throws) &&
         stmt->getTryLoc().isInvalid()) {
       auto &diags = dc->getASTContext().Diags;
-      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled)
+      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled, "call")
         .fixItInsert(stmt->getAwaitLoc(), "try");
 
       return failed();

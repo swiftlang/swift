@@ -2122,6 +2122,30 @@ AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) con
     nullptr);
 }
 
+AccessorDecl *AbstractStorageDecl::getEffectfulGetAccessor() const {
+    if (getAllAccessors().size() != 1)
+      return nullptr;
+
+    if (auto accessor = getAccessor(AccessorKind::Get))
+      if (accessor->hasAsync() || accessor->hasThrows())
+        return accessor;
+
+  return nullptr;
+}
+
+bool AbstractStorageDecl::isLessEffectfulThan(AbstractStorageDecl const* other,
+                                              EffectKind kind) const {
+  bool allowedByOther = false;
+  if (auto otherGetter = other->getEffectfulGetAccessor())
+    allowedByOther = otherGetter->hasEffect(kind);
+
+  if (auto getter = getEffectfulGetAccessor())
+    if (getter->hasEffect(kind) && !allowedByOther)
+      return false; // has the effect when other does not; it's more effectful!
+
+  return true; // OK
+}
+
 AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
   auto *accessor = getAccessor(kind);
   if (accessor && !accessor->isImplicit())
@@ -7420,6 +7444,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        AbstractStorageDecl *storage,
                                        SourceLoc staticLoc,
                                        StaticSpellingKind staticSpelling,
+                                       bool async, SourceLoc asyncLoc,
                                        bool throws, SourceLoc throwsLoc,
                                        GenericParamList *genericParams,
                                        DeclContext *parent,
@@ -7432,7 +7457,7 @@ AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                                      !clangNode.isNull());
   auto D = ::new (buffer)
       AccessorDecl(declLoc, accessorKeywordLoc, accessorKind,
-                   storage, staticLoc, staticSpelling, throws, throwsLoc,
+                   storage, staticLoc, staticSpelling, async, asyncLoc, throws, throwsLoc,
                    hasImplicitSelfDecl, genericParams, parent);
   if (clangNode)
     D->setClangNode(clangNode);
@@ -7446,12 +7471,12 @@ AccessorDecl *
 AccessorDecl::createDeserialized(ASTContext &ctx, AccessorKind accessorKind,
                                  AbstractStorageDecl *storage,
                                  StaticSpellingKind staticSpelling,
-                                 bool throws, GenericParamList *genericParams,
+                                 bool async, bool throws, GenericParamList *genericParams,
                                  Type fnRetType, DeclContext *parent) {
   assert(fnRetType && "Deserialized result type must not be null");
   auto *const D = AccessorDecl::createImpl(
       ctx, SourceLoc(), SourceLoc(), accessorKind, storage, SourceLoc(),
-      staticSpelling, throws, SourceLoc(), genericParams, parent, ClangNode());
+      staticSpelling, async, SourceLoc(), throws, SourceLoc(), genericParams, parent, ClangNode());
   D->setResultInterfaceType(fnRetType);
   return D;
 }
@@ -7463,6 +7488,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    AbstractStorageDecl *storage,
                                    SourceLoc staticLoc,
                                    StaticSpellingKind staticSpelling,
+                                   bool async, SourceLoc asyncLoc,
                                    bool throws, SourceLoc throwsLoc,
                                    GenericParamList *genericParams,
                                    ParameterList * bodyParams,
@@ -7471,7 +7497,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
                                    ClangNode clangNode) {
   auto *D = AccessorDecl::createImpl(
       ctx, declLoc, accessorKeywordLoc, accessorKind, storage,
-      staticLoc, staticSpelling, throws, throwsLoc,
+      staticLoc, staticSpelling, async, asyncLoc, throws, throwsLoc,
       genericParams, parent, clangNode);
   D->setParameters(bodyParams);
   D->setResultInterfaceType(fnRetType);

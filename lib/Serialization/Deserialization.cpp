@@ -3157,7 +3157,8 @@ public:
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
                                               isStatic, rawStaticSpelling, isObjC,
                                               rawMutModifier,
-                                              hasForcedStaticDispatch, throws,
+                                              hasForcedStaticDispatch,
+                                              async, throws,
                                               genericSigID,
                                               resultInterfaceTypeID,
                                               isIUO,
@@ -3275,7 +3276,7 @@ public:
     } else {
       auto *accessor = AccessorDecl::createDeserialized(
           ctx, accessorKind, storage, staticSpelling.getValue(),
-          /*Throws=*/throws, genericParams, resultType, DC);
+          async, throws, genericParams, resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
