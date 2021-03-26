@@ -2425,15 +2425,17 @@ NOTE(superclass_redundancy_here,none,
      (unsigned, Type, Type))
 
 ERROR(conflicting_layout_constraints,none,
-      "%select{generic parameter |protocol |}0%1 has conflicting "
-      "constraints %2 and %3",
-      (unsigned, Type, LayoutConstraint, LayoutConstraint))
+      "type %0 has conflicting constraints %1 and %2",
+      (Type, LayoutConstraint, LayoutConstraint))
+NOTE(conflicting_layout_constraint, none,
+     "constraint conflicts with %0 : %1",
+     (Type, LayoutConstraint))
 WARNING(redundant_layout_constraint,none,
-        "redundant constraint %0 : %1", (Type, LayoutConstraint))
+        "redundant constraint %0 : %1",
+        (Type, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-     "constraint %1 : %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, LayoutConstraint))
+     "constraint %0 : %1 implied here",
+     (Type, LayoutConstraint))
 
 WARNING(redundant_same_type_constraint,none,
         "redundant same-type constraint %0 == %1", (Type, Type))

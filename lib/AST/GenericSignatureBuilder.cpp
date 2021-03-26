@@ -7113,8 +7113,45 @@ void GenericSignatureBuilder::diagnoseRedundantRequirements() const {
       break;
     }
 
+    case RequirementKind::Layout: {
+      auto layout = req.getRHS().get<LayoutConstraint>();
+
+      auto conflict = Impl->ConflictingRequirements.find(req);
+      if (conflict != Impl->ConflictingRequirements.end()) {
+        Impl->HadAnyError = true;
+
+        auto otherLayout = conflict->second.get<LayoutConstraint>();
+        Context.Diags.diagnose(loc, diag::conflicting_layout_constraints,
+                               subjectType, layout, otherLayout);
+
+        for (auto otherReq : found->second) {
+          auto *otherSource = otherReq.getSource();
+          auto otherLoc = otherSource->getLoc();
+          if (otherLoc.isInvalid())
+            continue;
+
+          Context.Diags.diagnose(otherLoc, diag::conflicting_layout_constraint,
+                                 subjectType, otherLayout);
+        }
+      } else {
+        Context.Diags.diagnose(loc, diag::redundant_layout_constraint,
+                               subjectType, layout);
+
+        for (auto otherReq : found->second) {
+          auto *otherSource = otherReq.getSource();
+          auto otherLoc = otherSource->getLoc();
+          if (otherLoc.isInvalid())
+            continue;
+
+          Context.Diags.diagnose(otherLoc, diag::previous_layout_constraint,
+                                 subjectType, layout);
+        }
+      }
+
+      break;
+    }
+
     case RequirementKind::Superclass:
-    case RequirementKind::Layout:
     case RequirementKind::SameType:
       // TODO
       break;
@@ -8023,24 +8060,7 @@ void GenericSignatureBuilder::checkLayoutConstraints(
                               EquivalenceClass *equivClass) {
   if (!equivClass->layout) return;
 
-  checkConstraintList<LayoutConstraint>(
-    genericParams, equivClass->layoutConstraints, RequirementKind::Layout,
-    [&](const Constraint<LayoutConstraint> &constraint) {
-      return constraint.value == equivClass->layout;
-    },
-    [&](const Constraint<LayoutConstraint> &constraint) {
-      auto layout = constraint.value;
-
-      // If the layout constraints are mergable, i.e. compatible,
-      // it is a redundancy.
-      if (layout.merge(equivClass->layout)->isKnownLayout())
-        return ConstraintRelation::Redundant;
-
-      return ConstraintRelation::Conflicting;
-    },
-    diag::conflicting_layout_constraints,
-    diag::redundant_layout_constraint,
-    diag::previous_layout_constraint);
+  removeSelfDerived(*this, equivClass->layoutConstraints, /*proto=*/nullptr);
 }
 
 bool GenericSignatureBuilder::isRedundantExplicitRequirement(
