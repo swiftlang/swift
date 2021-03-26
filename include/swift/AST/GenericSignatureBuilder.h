@@ -270,6 +270,7 @@ public:
     struct CachedNestedType {
       unsigned numConformancesPresent;
       CanType superclassPresent;
+      CanType concreteTypePresent;
       llvm::TinyPtrVector<TypeDecl *> types;
     };
 
@@ -613,6 +614,10 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   void inferRequirements(ModuleDecl &module, ParameterList *params);
 
+  GenericSignature rebuildSignatureWithoutRedundantRequirements(
+                      bool allowConcreteGenericParams,
+                      bool buildingRequirementSignature) &&;
+
   /// Finalize the set of requirements and compute the generic
   /// signature.
   ///
@@ -792,6 +797,13 @@ public:
 
   /// Simplify the given dependent type down to its canonical representation.
   Type getCanonicalTypeParameter(Type type);
+
+  /// Replace any non-canonical dependent types in the given type with their
+  /// canonical representation. This is not a canonical type in the AST sense;
+  /// type sugar is preserved. The GenericSignature::getCanonicalTypeInContext()
+  /// method combines this with a subsequent getCanonicalType() call.
+  Type getCanonicalTypeInContext(Type type,
+                            TypeArrayView<GenericTypeParamType> genericParams);
 
   /// Verify the correctness of the given generic signature.
   ///

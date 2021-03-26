@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -debug-generic-signatures -emit-ir %s 2>&1 | %FileCheck %s
 
 public protocol DefaultInitializable {
   init()
@@ -74,6 +75,7 @@ public extension GeneralAdjacencyList {
   }
 }
 
+// CHECK-LABEL: Generic signature: <Spine, VertexIDToIndex where Spine : RangeReplaceableCollection, VertexIDToIndex == IdentityVertexIDToIndex<Spine>, Spine.Element : AdjacencyVertex_, Spine.Index == Spine.Element.Edges.Element.VertexID, Spine.Element.Edges : BidirectionalCollection, Spine.Element.Edges : RangeReplaceableCollection>
 public extension GeneralAdjacencyList
   where VertexIDToIndex == IdentityVertexIDToIndex<Spine>,
         Spine: RangeReplaceableCollection,

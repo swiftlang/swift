@@ -156,7 +156,9 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
   
-  if (opts.EmitSymbolGraph) {
+  if (!outs.SymbolGraphOutputDir.empty()) {
+    serializationOpts.SymbolGraphOutputDir = outs.SymbolGraphOutputDir;
+  } else if (opts.EmitSymbolGraph) {
     if (!opts.SymbolGraphOutputDir.empty()) {
       serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
     } else {

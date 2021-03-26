@@ -238,7 +238,6 @@ Type getExplicitGlobalActor(ClosureExpr *closure);
 /// \returns true if an error occurred.
 bool checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check);
-
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

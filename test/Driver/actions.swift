@@ -6,7 +6,7 @@
 // BASIC-COFF: 2: link, {1}, image
 // BASIC-ELF: 2: swift-autolink-extract, {1}, autolink
 // BASIC-ELF: 3: link, {1, 2}, image
-// BASIC-MACHO: 2: link, {1}, image
+// BASIC-macho: 2: link, {1}, image
 
 // RUN: %swiftc_driver -driver-print-actions -c %s 2>&1 | %FileCheck %s -check-prefix=BASICC
 // BASICC: 0: input, "{{.*}}actions.swift", swift
@@ -53,7 +53,7 @@
 // EXEC-AND-MODULE-COFF: 3: link, {1}, image
 // EXEC-AND-MODULE-ELF: 3: swift-autolink-extract, {1}, autolink
 // EXEC-AND-MODULE-ELF: 4: link, {1, 3}, image
-// EXEC-AND-MODULE-MACHO: 3: link, {1}, image
+// EXEC-AND-MODULE-macho: 3: link, {1}, image
 
 // RUN: %swiftc_driver -driver-print-actions -g %s 2>&1 | %FileCheck %s -check-prefix=DEBUG -check-prefix DEBUG-%target-object-format
 // RUN: %swiftc_driver -driver-print-actions -gnone -g %s 2>&1 | %FileCheck %s -check-prefix=DEBUG -check-prefix DEBUG-%target-object-format
@@ -64,7 +64,7 @@
 // DEBUG-COFF: 4: line, {1, 3}, image
 // DEBUG-ELF: 3: modulewrap, {2}, object
 // DEBUG-ELF: 4: line, {1, 3}, image
-// DEBUG-MACHO: 3: link, {1, 2}, image
+// DEBUG-macho: 3: link, {1, 2}, image
 
 // RUN: %swiftc_driver -driver-print-actions -gnone %s 2>&1 | %FileCheck %s -check-prefix=BASIC
 // RUN: %swiftc_driver -driver-print-actions -g -gnone %s 2>&1 | %FileCheck %s -check-prefix=BASIC

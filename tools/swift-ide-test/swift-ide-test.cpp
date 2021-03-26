@@ -751,6 +751,10 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
 
+static llvm::cl::list<std::string>
+AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
+                llvm::cl::cat(Category));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -3871,6 +3875,10 @@ int main(int argc, char *argv[]) {
     // Honor the *last* -module-cache-path specified.
     InitInvok.getClangImporterOptions().ModuleCachePath =
         options::ModuleCachePath[options::ModuleCachePath.size()-1];
+  }
+  if (!options::AccessNotesPath.empty()) {
+    InitInvok.getFrontendOptions().AccessNotesPath =
+        options::AccessNotesPath[options::AccessNotesPath.size()-1];
   }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;

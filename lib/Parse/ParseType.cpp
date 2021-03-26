@@ -1410,9 +1410,10 @@ bool Parser::canParseType() {
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
-      if (!canParseTypeIdentifier())
-        return false;
-      break;
+  case tok::code_complete:
+    if (!canParseTypeIdentifier())
+      return false;
+    break;
   case tok::kw_protocol: // Deprecated composition syntax
   case tok::identifier:
     if (!canParseTypeIdentifierOrTypeComposition())
@@ -1500,7 +1501,7 @@ bool Parser::canParseTypeIdentifierOrTypeComposition() {
 
 bool Parser::canParseSimpleTypeIdentifier() {
   // Parse an identifier.
-  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any, tok::code_complete))
     return false;
   consumeToken();
 

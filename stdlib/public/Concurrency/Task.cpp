@@ -791,12 +791,13 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
 SWIFT_CC(swift)
 static CancellationNotificationStatusRecord*
 swift_task_addCancellationHandlerImpl(
-    CancellationNotificationStatusRecord::FunctionType handler) {
+    CancellationNotificationStatusRecord::FunctionType handler,
+    void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
   auto *record =
       new (allocation) CancellationNotificationStatusRecord(
-          handler, /*arg=*/nullptr);
+          handler, context);
 
   swift_task_addStatusRecord(record);
   return record;

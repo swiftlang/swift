@@ -158,6 +158,11 @@ void swift::addAsyncNotes(AbstractFunctionDecl const* func) {
 
 bool IsAsyncHandlerRequest::evaluate(
     Evaluator &evaluator, FuncDecl *func) const {
+  // Turn off @asyncHandler when not specifically enabled.
+  if (!func->getASTContext().LangOpts.EnableExperimentalAsyncHandler) {
+    return false;
+  }
+
   // Check whether the attribute was explicitly specified.
   if (auto attr = func->getAttrs().getAttribute<AsyncHandlerAttr>()) {
     // Check for well-formedness.
@@ -231,6 +236,11 @@ bool IsAsyncHandlerRequest::evaluate(
 
 bool CanBeAsyncHandlerRequest::evaluate(
     Evaluator &evaluator, FuncDecl *func) const {
+  // Turn off @asyncHandler when not specifically enabled.
+  if (!func->getASTContext().LangOpts.EnableExperimentalAsyncHandler) {
+    return false;
+  }
+
   return !checkAsyncHandler(func, /*diagnose=*/false);
 }
 
@@ -764,7 +774,7 @@ static bool isSendableClosure(const AbstractClosureExpr *closure) {
 }
 
 /// Determine whether the given type is suitable as a concurrent value type.
-static bool isSendableType(const DeclContext *dc, Type type) {
+bool swift::isSendableType(const DeclContext *dc, Type type) {
   class IsSendable : public TypeVisitor<IsSendable, bool> {
     DeclContext *dc;
     ProtocolDecl *SendableProto;
@@ -1534,69 +1544,21 @@ namespace {
     }
 
     /// Get the actor isolation of the innermost relevant context.
-    ActorIsolation getInnermostIsolatedContext(const DeclContext *constDC) {
-      // Retrieve the actor isolation for a declaration somewhere in our
-      // declaration context chain and map it into our own context so that
-      // the types can be compared.
-      auto getActorIsolation = [constDC](ValueDecl *value) {
-        switch (auto isolation = swift::getActorIsolation(value)) {
-        case ActorIsolation::ActorInstance:
-        case ActorIsolation::Independent:
-        case ActorIsolation::IndependentUnsafe:
-        case ActorIsolation::Unspecified:
-          return isolation;
+    ActorIsolation getInnermostIsolatedContext(DeclContext *dc) {
+      // Retrieve the actor isolation of the context.
+      switch (auto isolation = getActorIsolationOfContext(dc)) {
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::Independent:
+      case ActorIsolation::IndependentUnsafe:
+      case ActorIsolation::Unspecified:
+        return isolation;
 
-        case ActorIsolation::GlobalActor:
-        case ActorIsolation::GlobalActorUnsafe:
-          return ActorIsolation::forGlobalActor(
-              constDC->mapTypeIntoContext(isolation.getGlobalActor()),
-              isolation == ActorIsolation::GlobalActorUnsafe);
-        }
-      };
-
-      auto dc = const_cast<DeclContext *>(constDC);
-      while (!dc->isModuleScopeContext()) {
-        if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-          // If this closure has specific isolation, use it.
-          auto closureIsolation = getActorIsolationOfContext(dc);
-          if (closureIsolation != ActorIsolation::Independent)
-            return closureIsolation;
-
-          // Look through non-escaping closures.
-          if (auto type = closure->getType()) {
-            if (auto fnType = type->getAs<AnyFunctionType>()) {
-              if (fnType->isNoEscape()) {
-                dc = closure->getParent();
-                continue;
-              }
-            }
-          }
-        }
-
-        // Functions have actor isolation defined on them.
-        if (auto func = dyn_cast<AbstractFunctionDecl>(dc))
-          return getActorIsolation(func);
-
-        // Subscripts have actor isolation defined on them.
-        if (auto subscript = dyn_cast<SubscriptDecl>(dc))
-          return getActorIsolation(subscript);
-
-        // Pattern binding declarations have actor isolation defined on their
-        // properties, if any.
-        if (auto init = dyn_cast<PatternBindingInitializer>(dc)) {
-          auto var = init->getBinding()->getAnchoringVarDecl(
-              init->getBindingIndex());
-          if (var)
-            return getActorIsolation(var);
-
-          return ActorIsolation::forUnspecified();
-        }
-
-        return ActorIsolation::forUnspecified();
+      case ActorIsolation::GlobalActor:
+      case ActorIsolation::GlobalActorUnsafe:
+        return ActorIsolation::forGlobalActor(
+            dc->mapTypeIntoContext(isolation.getGlobalActor()),
+            isolation == ActorIsolation::GlobalActorUnsafe);
       }
-
-      // At module scope, actor independence with safety is assumed.
-      return ActorIsolation::forIndependent(ActorIndependentKind::Safe);
     }
 
     bool isInAsynchronousContext() const {
@@ -1708,7 +1670,7 @@ namespace {
         bool isCrossActor,
         Expr *context) {
       ValueDecl *value = valueRef.getDecl();
-      auto declContext = getDeclContext();
+      auto declContext = const_cast<DeclContext *>(getDeclContext());
 
       // Check whether we are within the same isolation context, in which
       // case there is nothing further to check,
@@ -1944,6 +1906,12 @@ namespace {
             LLVM_FALLTHROUGH; // otherwise, perform checking
 
           case ActorIsolationRestriction::GlobalActor:
+            // Disable global actor checking for now.
+            if (!ctx.LangOpts.isSwiftVersionAtLeast(6))
+              break;
+
+            LLVM_FALLTHROUGH; // otherwise, it's invalid so diagnose it.
+
           case ActorIsolationRestriction::CrossActorSelf:
             // 'let'-bound decls with this isolation are OK, just check them.
             if (auto wasLetBound = checkLetBoundVarDecl(component)) {
@@ -2227,6 +2195,9 @@ namespace {
         AbstractClosureExpr *closure) {
       // If the closure specifies a global actor, use it.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (explicitClosure->getAttrs().hasAttribute<ActorIndependentAttr>())
+          return ClosureActorIsolation::forIndependent();
+
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
           return ClosureActorIsolation::forGlobalActor(globalActorType);
       }

@@ -3481,8 +3481,9 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
-    // Anything within the inout isn't a parameter anymore.
+  if (isa<InOutTypeRepr>(repr)
+      && !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
+    // Anything within an inout isn't a parameter anymore.
     options.setContext(None);
   }
 

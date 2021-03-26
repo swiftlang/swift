@@ -35,6 +35,16 @@
 // CHECK-WMO-NOT: Handled
 
 
+// RUN: %swiftc_driver -save-temps -driver-print-jobs -c %S/Inputs/lib.swift -module-name lib -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -whole-module-optimization -emit-module -emit-symbol-graph -emit-symbol-graph-dir %t 2>&1 | tee %t/forWMOFilelistCapture | %FileCheck -check-prefix=CHECK-WMO-SYM-FILELIST %s
+// RUN: grep -e ' -supplementary-output-file-map ' %t/forWMOFilelistCapture | tail -1 | sed 's/.*-supplementary-output-file-map //' | sed 's/ .*//' > %t/supplementary-output
+// RUN: cat $(cat %t/supplementary-output) | %FileCheck -check-prefix CHECK-WMO-SYM-SUPP %s
+
+// CHECK-WMO-SYM-FILELIST: swift
+// CHECK-WMO-SYM-FILELIST-DAG: -supplementary-output-file-map
+
+// CHECK-WMO-SYM-SUPP: symbol-graph-output-path
+
+
 // RUN: %empty-directory(%t/bin)
 // RUN: ln -s %S/Inputs/filelists/fake-ld.py %t/bin/ld
 
@@ -77,8 +87,8 @@
 // RUN: echo "int dummy;" >%t/a.cpp
 // RUN: %target-clang -c %t/a.cpp -o %t/a.o
 // RUN: %swiftc_driver -save-temps -driver-print-jobs %S/../Inputs/empty.swift %t/a.o -lto=llvm-full -target x86_64-apple-macosx10.9 -driver-filelist-threshold=0 -o filelist 2>&1 | tee %t/forFilelistCapture | %FileCheck -check-prefix FILELIST %s
-// RUN: tail -2 %t/forFilelistCapture | head -1 | sed 's/.*-output-filelist //' | sed 's/ .*//' > %t/output-filelist
-// RUN: tail -1 %t/forFilelistCapture | sed 's/.*-filelist //' | sed 's/ .*//' > %t/input-filelist
+// RUN: grep -e ' -output-filelist ' %t/forFilelistCapture | tail -1 | sed 's/.*-output-filelist //' | sed 's/ .*//' > %t/output-filelist
+// RUN: grep -e ' -filelist ' %t/forFilelistCapture | tail -1 | sed 's/.*-filelist //' | sed 's/ .*//' > %t/input-filelist
 // RUN: cat $(cat %t/output-filelist) | %FileCheck -check-prefix OUTPUT-FILELIST-CONTENTS %s
 // RUN: cat $(cat %t/input-filelist)  | %FileCheck -check-prefix INPUT-FILELIST-CONTENTS %s
 

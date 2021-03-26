@@ -3377,6 +3377,9 @@ ERROR(attr_completion_handler_async_ambiguous_function,none,
 ERROR(attr_completion_handler_async_no_suitable_function,none,
       "no corresponding async function named %0", (DeclNameRef))
 
+WARNING(warn_use_async_alternative,none,
+        "consider using asynchronous alternative function",())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
 //------------------------------------------------------------------------------
@@ -4311,6 +4314,8 @@ ERROR(asynchandler_noescape_closure_parameter,none,
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())
+ERROR(asynchandler_removed,none,
+      "'@asyncHandler' has been removed from the language", ())
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "
@@ -4827,7 +4832,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "

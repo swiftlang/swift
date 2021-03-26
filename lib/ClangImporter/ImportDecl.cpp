@@ -8018,6 +8018,19 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   return *sourceFile;
 }
 
+Optional<bool> swift::importer::isMainActorAttr(
+    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr) {
+  if (swiftAttr->getAttribute() == "@MainActor" ||
+      swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
+      swiftAttr->getAttribute() == "@UIActor") {
+    bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
+        !ctx.LangOpts.isSwiftVersionAtLeast(6);
+    return isUnsafe;
+  }
+
+  return None;
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -8188,11 +8201,8 @@ void ClangImporter::Implementation::importAttributes(
     if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
       // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
-      if (swiftAttr->getAttribute() == "@MainActor" ||
-          swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
-          swiftAttr->getAttribute() == "@UIActor") {
-        bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
-            !C.LangOpts.isSwiftVersionAtLeast(6);
+      if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
+        bool isUnsafe = *isMainActor;
         if (Type mainActorType = getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);

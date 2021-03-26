@@ -26,6 +26,8 @@ import _Concurrency
 // CHECK-DAG:     func doSomethingFun(_ operation: String) async
 // CHECK-DAG:     func dance(_ step: String) async -> String
 // CHECK-DAG:     func __leap(_ height: Int) async -> String
+// CHECK-DAG:     func runOnMainThread(completionHandler completion: (@MainActor (String) -> Void)? = nil)
+// CHECK-DAG:     func runOnMainThread() async -> String
 // CHECK: {{^[}]$}}
 
 // CHECK-LABEL: protocol RefrigeratorDelegate
@@ -38,10 +40,12 @@ import _Concurrency
 
 // CHECK-LABEL: protocol ProtocolWithSwiftAttributes {
 // CHECK-NEXT: @actorIndependent func independentMethod()
-// CHECK-NEXT: @asyncHandler func asyncHandlerMethod()
+// CHECK-NEXT: func asyncHandlerMethod()
 // CHECK-NEXT: {{^}}  @MainActor func mainActorMethod()
 // CHECK-NEXT: {{^}}  @MainActor func uiActorMethod()
 // CHECK-NEXT: {{^}}  optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
 
 // CHECK: {{^}}var MAGIC_NUMBER: Int32 { get }
+
+// CHECK: func doSomethingConcurrently(_ block: @Sendable () -> Void)

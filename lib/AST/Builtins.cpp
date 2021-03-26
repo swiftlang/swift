@@ -586,6 +586,14 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
               BIT->isFixedWidth() &&
               BIT->getFixedWidth() == Vec->getNumElements())
             break;
+    // And IntN -> VecNxInt1 for SIMDMask random generators.
+    if (auto *Vec = CheckOutput->getAs<BuiltinVectorType>())
+      if (auto *BIT = CheckInput->getAs<BuiltinIntegerType>())
+        if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
+          if (Element->getFixedWidth() == 1 &&
+              BIT->isFixedWidth() &&
+              BIT->getFixedWidth() == Vec->getNumElements())
+            break;
 
     // FIXME: Implement bitcast typechecking.
     llvm_unreachable("Bitcast not supported yet!");

@@ -1,18 +1,24 @@
 // REQUIRES: concurrency
 
 // RUN: %target-typecheck-verify-swift -enable-experimental-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -parse-as-library
 
 // ===================
 // Parsing
 // ===================
 
-func asyncFunc() async -> Int { }
+// expected-note@+1 4 {{'asyncFunc' declared here}}
+func asyncFunc(_ text: String) async -> Int { }
 
-@completionHandlerAsync("asyncFunc()", completionHandlerIndex: 1)
+@completionHandlerAsync("asyncFunc(_:)", completionHandlerIndex: 1)
 func goodFunc1(value: String, completionHandler: @escaping (Int) -> Void) {}
 
-@completionHandlerAsync("asyncFunc()")
+@completionHandlerAsync("asyncFunc(_:)")
 func goodFunc2(value: String, completionHandler: @escaping (Int) -> Void) {}
+
+// expected-error@+1{{no corresponding async function named 'asyncFunc()'}}
+@completionHandlerAsync("asyncFunc()")
+func badFunc(value: String, completionHandler: @escaping (Int) -> Void) {}
 
 // expected-error@+1:24{{expected '(' in 'completionHandlerAsync' attribute}}
 @completionHandlerAsync
@@ -55,6 +61,7 @@ struct SomeStruct: SomeProto {
   @completionHandlerAsync("protoFunc", completionHandlerIndex: 0)
   func protoFunc(continuation: @escaping () -> Void) {}
 
+  // expected-note@+1{{'structFunc()' declared here}}
   func structFunc() async { }
 
   @completionHandlerAsync("structFunc", completionHandlerIndex: 0)
@@ -137,3 +144,90 @@ func matchingAsyncFunc(value: String) async {} // expected-note{{'matchingAsyncF
 // expected-error@+1:25{{ambiguous '@completionHandlerAsync' async function 'matchingAsyncFunc(value:)'}}
 @completionHandlerAsync("matchingAsyncFunc(value:)")
 func typecheckFunc9(handler: @escaping () -> Void) {}
+
+// Suggest using async alternative function in async context
+
+func asyncContext() async {
+  // expected-warning@+1:3{{consider using asynchronous alternative function}}
+  goodFunc1(value: "Hello") { _ in }
+
+  let _ = {
+    // No warning or error since we're in a sync context here
+    goodFunc1(value: "Hello") { _ in }
+  }
+
+  let _ = { () async -> () in
+    let _ = await asyncFunc("Hello World")
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    goodFunc1(value: "Hello") { _ in }
+  }
+
+  let _ = await asyncFunc("World")
+
+  // This doesn't get the warning because the completionHandlerAsync failed to
+  // resolve the decl name
+  badFunc(value: "Hello") { _ in }
+}
+
+func syncContext() {
+  goodFunc1(value: "Hello") { _ in }
+}
+
+let asyncGlobalClosure = { () async -> () in
+  // expected-warning@+1:3{{consider using asynchronous alternative function}}
+  goodFunc1(value: "neat") { _ in }
+}
+
+class ClassCallingAsyncStuff {
+  struct NestedStruct {
+    @completionHandlerAsync("structFunc()")
+    func structCompFunc(handler: @escaping () -> ()) { }
+
+    // expected-note@+1{{'structFunc()' declared here}}
+    func structFunc() async {}
+  }
+
+  // expected-note@+1 4 {{'asyncFunc()' declared here}}
+  func asyncFunc() async {}
+
+  @completionHandlerAsync("asyncFunc()")
+  func compHandlerFunc(handler: @escaping () -> ()) {}
+
+  @completionHandlerAsync("asyncFunc()")
+  func compAsyncHandlerFunc(handler: @escaping () async -> ()) {}
+
+  func async1() async {
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    goodFunc1(value: "hi") { _ in }
+
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    compAsyncHandlerFunc() { [self] () async -> () in
+      // expected-warning@+1{{consider using asynchronous alternative function}}
+      compAsyncHandlerFunc() { [self] () async -> () in
+        // expected-warning@+1{{consider using asynchronous alternative function}}
+        compHandlerFunc() { print("foo") }
+      }
+    }
+  }
+
+  func instanceFunc(other: ClassCallingAsyncStuff) async {
+    // expected-error@+1{{cannot find 'c' in scope}}
+    c.compHandlerFunc() { }
+
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.compHandlerFunc() { }
+  }
+
+  func structFunc(other: NestedStruct) async {
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.structCompFunc() { }
+  }
+
+  func structFunc(other: SomeStruct) async {
+    // expected-warning@+1{{consider using asynchronous alternative function}}
+    other.structFunc() { }
+  }
+
+  // no warning
+  let funFunc = goodFunc1
+}
