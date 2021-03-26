@@ -704,12 +704,17 @@ struct GenericSignatureBuilder::Implementation {
   SmallVector<Requirement, 2> ExplicitSameTypeRequirements;
 
   /// A mapping of redundant explicit requirements to the best root requirement
-  /// that implies them.
+  /// that implies them. Built by computeRedundantRequirements().
   using RedundantRequirementMap =
       llvm::DenseMap<ExplicitRequirement,
                      llvm::SmallDenseSet<ExplicitRequirement, 2>>;
 
   RedundantRequirementMap RedundantRequirements;
+
+  /// Requirements which conflict with other requirements, for example if a
+  /// there are two unrelated superclass requirements on the same type,
+  /// the second one is recorded here. Built by computeRedundantRequirements().
+  llvm::DenseMap<ExplicitRequirement, RequirementRHS> ConflictingRequirements;
 
 #ifndef NDEBUG
   /// Whether we've already computed redundant requiremnts.
@@ -5769,12 +5774,11 @@ class RedundantRequirementGraph {
   SmallVector<VertexID, 2> stack;
 
 public:
-  template<typename T, typename Fn>
+  template<typename T>
   void addConstraintsFromEquivClass(
-      GenericSignatureBuilder &builder,
-      const std::vector<Constraint<T>> &constraints,
       RequirementKind kind,
-      Fn filter) {
+      SmallVectorImpl<Constraint<T>> &exact,
+      SmallVectorImpl<Constraint<T>> &lessSpecific) {
     // The set of 'redundant explicit requirements', which are known to be less
     // specific than some other explicit requirements. An example is a type
     // parameter with multiple superclass constraints:
@@ -5802,15 +5806,8 @@ public:
     // These 'root requirements' imply the 'explicit requirements'.
     SmallVector<ExplicitRequirement, 1> rootReqs;
 
-    for (auto constraint : constraints) {
-      auto *source = constraint.source;
-
-      if (source->isDerivedNonRootRequirement()) {
-        // If the derived requirement was filtered by our predicate, it doesn't
-        // make our explicit requirements redundant.
-        if (filter(constraint))
-          continue;
-
+    for (auto constraint : exact) {
+      if (constraint.source->isDerivedNonRootRequirement()) {
         auto req = ExplicitRequirement::fromDerivedConstraint(kind, constraint);
 
         rootReqs.push_back(req);
@@ -5825,14 +5822,25 @@ public:
 #endif
         (void) v;
 
-        // If the explicit requirement was filtered by our predicate, it doesn't
-        // make the other explicit requirements redundant.
-        if (filter(constraint)) {
-          redundantExplicitReqs.push_back(req);
-        } else {
-          explicitReqs.push_back(req);
-        }
+        explicitReqs.push_back(req);
       }
+    }
+
+    for (auto constraint : lessSpecific) {
+      if (constraint.source->isDerivedNonRootRequirement())
+        continue;
+
+      auto req = ExplicitRequirement::fromExplicitConstraint(kind, constraint);
+
+      VertexID v = addVertex(req);
+#ifndef NDEBUG
+      // Record that we saw an actual explicit requirement rooted at this vertex,
+      // for verification purposes.
+      vertices[v].sawVertex = true;
+#endif
+      (void) v;
+
+      redundantExplicitReqs.push_back(req);
     }
 
     // If all requirements are derived, there is nothing to do.
@@ -6208,111 +6216,171 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
   // source.
   for (auto &equivClass : Impl->EquivalenceClasses) {
     for (auto &entry : equivClass.conformsTo) {
-      graph.addConstraintsFromEquivClass(
-          *this, entry.second,
-          RequirementKind::Conformance,
-          [&](Constraint<ProtocolDecl *> constraint) -> bool {
-            auto *source = constraint.source;
+      SmallVector<Constraint<ProtocolDecl *>, 2> exact;
+      SmallVector<Constraint<ProtocolDecl *>, 2> lessSpecific;
 
-            bool derivedViaConcrete = false;
-            if (source->getMinimalConformanceSource(
-                *this, constraint.getSubjectDependentType({ }), entry.first,
-                derivedViaConcrete)
-                != source)
-              return true;
+      for (const auto &constraint : entry.second) {
+        auto *source = constraint.source;
 
-            if (derivedViaConcrete)
-              return true;
+        // FIXME: Remove this check.
+        bool derivedViaConcrete = false;
+        if (source->getMinimalConformanceSource(
+            *this, constraint.getSubjectDependentType({ }), entry.first,
+            derivedViaConcrete)
+            != source)
+          continue;
 
-            return false;
-          });
+        if (derivedViaConcrete)
+          continue;
+
+        // FIXME: Check for a conflict via the concrete type.
+        exact.push_back(constraint);
+      }
+
+      graph.addConstraintsFromEquivClass(RequirementKind::Conformance,
+                                         exact, lessSpecific);
     }
 
     if (equivClass.concreteType) {
       Type resolvedConcreteType =
         getCanonicalTypeInContext(equivClass.concreteType, { });
-      graph.addConstraintsFromEquivClass(
-          *this, equivClass.concreteTypeConstraints,
-          RequirementKind::SameType,
-          [&](Constraint<Type> constraint) -> bool {
-            auto *source = constraint.source;
-            Type t = constraint.value;
 
-            bool derivedViaConcrete = false;
-            if (source->getMinimalConformanceSource(
-                *this, constraint.getSubjectDependentType({ }), nullptr,
-                derivedViaConcrete)
-                != source)
-              return true;
+      SmallVector<Constraint<Type>, 2> exact;
+      SmallVector<Constraint<Type>, 2> lessSpecific;
 
-            if (derivedViaConcrete)
-              return true;
+      for (const auto &constraint : equivClass.concreteTypeConstraints) {
+        auto *source = constraint.source;
+        Type t = constraint.value;
 
-            if (t->isEqual(resolvedConcreteType))
-              return false;
+        // FIXME: Remove this check.
+        bool derivedViaConcrete = false;
+        if (source->getMinimalConformanceSource(
+            *this, constraint.getSubjectDependentType({ }), nullptr,
+            derivedViaConcrete)
+            != source)
+          continue;
 
-            auto resolvedType = getCanonicalTypeInContext(t, { });
-            if (resolvedType->isEqual(resolvedConcreteType))
-              return false;
+        if (derivedViaConcrete)
+          continue;
 
-            // We have a less-specific constraint.
-            return true;
-          });
+        if (t->isEqual(resolvedConcreteType)) {
+          exact.push_back(constraint);
+          continue;
+        }
+
+        auto resolvedType = getCanonicalTypeInContext(t, { });
+        if (resolvedType->isEqual(resolvedConcreteType)) {
+          exact.push_back(constraint);
+        }
+
+        // Record the conflict.
+        if (!source->isDerivedRequirement()) {
+          auto req =
+              ExplicitRequirement::fromExplicitConstraint(
+                  RequirementKind::SameType, constraint);
+          Impl->ConflictingRequirements.insert(
+              std::make_pair(req, resolvedConcreteType));
+        }
+
+        lessSpecific.push_back(constraint);
+      }
+
+      graph.addConstraintsFromEquivClass(RequirementKind::SameType,
+                                         exact, lessSpecific);
     }
 
     if (equivClass.superclass) {
       // Resolve any thus-far-unresolved dependent types.
       Type resolvedSuperclass =
         getCanonicalTypeInContext(equivClass.superclass, { });
-      graph.addConstraintsFromEquivClass(
-          *this, equivClass.superclassConstraints,
-          RequirementKind::Superclass,
-          [&](Constraint<Type> constraint) -> bool {
-            auto *source = constraint.source;
-            Type t = constraint.value;
 
-            bool derivedViaConcrete = false;
-            if (source->getMinimalConformanceSource(
-                *this, constraint.getSubjectDependentType({ }), nullptr,
-                derivedViaConcrete)
-                != source)
-              return true;
+      SmallVector<Constraint<Type>, 2> exact;
+      SmallVector<Constraint<Type>, 2> lessSpecific;
 
-            if (derivedViaConcrete)
-              return true;
+      for (const auto &constraint : equivClass.superclassConstraints) {
+        auto *source = constraint.source;
+        Type t = constraint.value;
 
-            if (t->isEqual(resolvedSuperclass))
-              return false;
+        // FIXME: Remove this check.
+        bool derivedViaConcrete = false;
+        if (source->getMinimalConformanceSource(
+            *this, constraint.getSubjectDependentType({ }), nullptr,
+            derivedViaConcrete)
+            != source)
+          continue;
 
-            Type resolvedType = getCanonicalTypeInContext(t, { });
-            if (resolvedType->isEqual(resolvedSuperclass))
-              return false;
+        if (derivedViaConcrete)
+          continue;
 
-            // We have a less-specific constraint.
-            return true;
-          });
+        if (t->isEqual(resolvedSuperclass)) {
+          exact.push_back(constraint);
+          continue;
+        }
+
+        Type resolvedType = getCanonicalTypeInContext(t, { });
+        if (resolvedType->isEqual(resolvedSuperclass)) {
+          exact.push_back(constraint);
+          continue;
+        }
+
+        // Check for a conflict.
+        if (!source->isDerivedRequirement() &&
+            !resolvedType->isExactSuperclassOf(resolvedSuperclass)) {
+          auto req =
+              ExplicitRequirement::fromExplicitConstraint(
+                  RequirementKind::Superclass, constraint);
+          Impl->ConflictingRequirements.insert(
+              std::make_pair(req, resolvedSuperclass));
+        }
+
+        // FIXME: Check for a conflict via the concrete type.
+        lessSpecific.push_back(constraint);
+      }
+
+      graph.addConstraintsFromEquivClass(RequirementKind::Superclass,
+                                         exact, lessSpecific);
     }
 
     if (equivClass.layout) {
-      graph.addConstraintsFromEquivClass(
-          *this, equivClass.layoutConstraints,
-          RequirementKind::Layout,
-          [&](Constraint<LayoutConstraint> constraint) -> bool {
-            auto *source = constraint.source;
-            auto layout = constraint.value;
+      SmallVector<Constraint<LayoutConstraint>, 2> exact;
+      SmallVector<Constraint<LayoutConstraint>, 2> lessSpecific;
 
-            bool derivedViaConcrete = false;
-            if (source->getMinimalConformanceSource(
-                *this, constraint.getSubjectDependentType({ }), nullptr,
-                derivedViaConcrete)
-                != source)
-              return true;
+      for (const auto &constraint : equivClass.layoutConstraints) {
+        auto *source = constraint.source;
+        auto layout = constraint.value;
 
-            if (derivedViaConcrete)
-              return true;
+        // FIXME: Remove this check.
+        bool derivedViaConcrete = false;
+        if (source->getMinimalConformanceSource(
+            *this, constraint.getSubjectDependentType({ }), nullptr,
+            derivedViaConcrete)
+            != source)
+          continue;
 
-            return layout != equivClass.layout;
-          });
+        if (derivedViaConcrete)
+          continue;
+
+        if (layout == equivClass.layout) {
+          exact.push_back(constraint);
+          continue;
+        }
+
+        // Check for a conflict.
+        if (!source->isDerivedRequirement() &&
+            !layout.merge(equivClass.layout)->isKnownLayout()) {
+          auto req =
+              ExplicitRequirement::fromExplicitConstraint(
+                  RequirementKind::Layout, constraint);
+          Impl->ConflictingRequirements.insert(
+              std::make_pair(req, equivClass.layout));
+        }
+
+        // FIXME: Check for a conflict via the concrete type.
+        lessSpecific.push_back(constraint);
+      }
+
+      graph.addConstraintsFromEquivClass(RequirementKind::Layout,
+                                         exact, lessSpecific);
     }
   }
 
