@@ -196,7 +196,7 @@ struct MyGlobalActor {
 // expected-note@-3{{mutation of this var is only permitted within the actor}}
 
 // expected-error@+2{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-// expected-error@+1{{var 'number' isolated to global actor 'MyGlobalActor' can not be used 'inout' from this context}}
+// expected-error@+1{{var 'number' isolated to global actor 'MyGlobalActor' can not be used 'inout' from a non-isolated context}}
 let _ = Task.runDetached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
 
 // attempt to pass global state owned by the global actor to another async function

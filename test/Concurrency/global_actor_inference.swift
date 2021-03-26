@@ -426,3 +426,14 @@ struct HasWrapperOnUnsafeActor {
     synced = 17
   }
 }
+
+// ----------------------------------------------------------------------
+// Actor-independent closures
+// ----------------------------------------------------------------------
+@SomeGlobalActor func getGlobal7() -> Int { 7 } // expected-note{{calls to global function 'getGlobal7()' from outside of its actor context are implicitly asynchronous}}
+func acceptClosure<T>(_: () -> T) { }
+
+@SomeGlobalActor func someGlobalActorFunc() async {
+  acceptClosure { getGlobal7() } // okay
+  acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{global function 'getGlobal7()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
+}
