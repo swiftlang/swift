@@ -675,3 +675,41 @@ do {
     throw MyError.boom
   }
 }
+
+struct TuplifiedStructWithInvalidClosure {
+  var condition: Bool
+
+  @TupleBuilder var unknownParameter: some Any {
+    if let cond = condition {
+      let _ = { (arg: UnknownType) in // expected-error {{cannot find type 'UnknownType' in scope}}
+      }
+      42
+    } else {
+      0
+    }
+  }
+
+  @TupleBuilder var unknownResult: some Any {
+    if let cond = condition {
+      let _ = { () -> UnknownType in // expected-error {{cannot find type 'UnknownType' in scope}}
+      }
+      42
+    } else {
+      0
+    }
+  }
+
+  @TupleBuilder var multipleLevelsDeep: some Any {
+    if let cond = condition {
+      switch MyError.boom {
+      case .boom:
+        let _ = { () -> UnknownType in // expected-error {{cannot find type 'UnknownType' in scope}}
+        }
+      }
+
+      42
+    } else {
+      0
+    }
+  }
+}
