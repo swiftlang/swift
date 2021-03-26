@@ -319,6 +319,18 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
 void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
                                        const JobContext &context) const {
   llvm::SmallString<128> LTOLibPath;
+  llvm::sys::path::append(LTOLibPath, getDriver().getSwiftProgramPath());
+
+  llvm::sys::path::remove_filename(LTOLibPath); // 'swift'
+  llvm::sys::path::remove_filename(LTOLibPath); // 'bin'
+  llvm::sys::path::append(LTOLibPath, "lib", "libLTO.dylib");
+
+  if (llvm::sys::fs::exists(LTOLibPath)) {
+    Arguments.push_back("-lto_library");
+    Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
+    return;
+  }
+  LTOLibPath.clear();
   if (findXcodeClangLibPath("libLTO.dylib", LTOLibPath)) {
     Arguments.push_back("-lto_library");
     Arguments.push_back(context.Args.MakeArgString(LTOLibPath));
