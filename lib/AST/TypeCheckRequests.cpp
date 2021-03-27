@@ -485,22 +485,28 @@ bool AttachedPropertyWrapperTypeRequest::isCached() const {
 
 bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() &&
+         !(isa<ParamDecl>(var) && isa<ClosureExpr>(var->getDeclContext()));
 }
 
-bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
+bool PropertyWrapperAuxiliaryVariablesRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
+}
+
+bool PropertyWrapperInitializerInfoRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
 
 bool PropertyWrapperMutabilityRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
 
 bool PropertyWrapperLValuenessRequest::isCached() const {
   auto var = std::get<0>(getStorage());
-  return !var->getAttrs().isEmpty();
+  return !var->getAttrs().isEmpty() || var->hasImplicitPropertyWrapper();
 }
 
 void swift::simple_display(
@@ -515,10 +521,21 @@ void swift::simple_display(
 
 void swift::simple_display(
     llvm::raw_ostream &out,
-    const PropertyWrapperBackingPropertyInfo &backingInfo) {
+    const PropertyWrapperInitializerInfo &initInfo) {
+  out << "{";
+  if (initInfo.hasInitFromWrappedValue())
+    initInfo.getInitFromWrappedValue()->dump(out);
+  if (initInfo.hasInitFromProjectedValue())
+    initInfo.getInitFromProjectedValue()->dump(out);
+  out << " }";
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const PropertyWrapperAuxiliaryVariables &auxiliaryVars) {
   out << "{ ";
-  if (backingInfo.backingVar)
-    backingInfo.backingVar->dumpRef(out);
+  if (auxiliaryVars.backingVar)
+    auxiliaryVars.backingVar->dumpRef(out);
   out << " }";
 }
 
@@ -1005,7 +1022,7 @@ void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->hasHole() && "Type hole in interface type");
+    assert(!type->hasPlaceholder() && "Type placeholder in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
     assert(!type->hasArchetype() && "Archetype in interface type");
   }
@@ -1509,11 +1526,11 @@ bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
   case ActorInstance:
   case Independent:
-  case IndependentUnsafe:
   case Unspecified:
     return false;
 
   case GlobalActor:
+  case GlobalActorUnsafe:
     return getGlobalActor()->hasTypeParameter();
   }
   llvm_unreachable("unhandled actor isolation kind!");
@@ -1523,12 +1540,13 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
   case Independent:
-  case IndependentUnsafe:
   case Unspecified:
     return *this;
 
   case GlobalActor:
-    return forGlobalActor(getGlobalActor().subst(subs));
+  case GlobalActorUnsafe:
+    return forGlobalActor(
+        getGlobalActor().subst(subs), kind == GlobalActorUnsafe);
   }
   llvm_unreachable("unhandled actor isolation kind!");
 }
@@ -1544,17 +1562,17 @@ void swift::simple_display(
       out << "actor-independent";
       break;
 
-    case ActorIsolation::IndependentUnsafe:
-      out << "actor-independent (unsafe)";
-      break;
-
     case ActorIsolation::Unspecified:
       out << "unspecified actor isolation";
       break;
 
     case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
       out << "actor-isolated to global actor "
           << state.getGlobalActor().getString();
+
+      if (state == ActorIsolation::GlobalActorUnsafe)
+        out << "(unsafe)";
       break;
   }
 }

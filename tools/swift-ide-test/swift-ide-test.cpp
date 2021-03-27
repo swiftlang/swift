@@ -379,12 +379,6 @@ ObjCForwardDeclarations("enable-objc-forward-declarations",
     llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-InferImportAsMember("enable-infer-import-as-member",
-    llvm::cl::desc("Infer when a global could be imported as a member"),
-    llvm::cl::cat(Category),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 EnableSwift3ObjCInference("enable-swift3-objc-inference",
     llvm::cl::desc("Enable Swift 3's @objc inference rules"),
     llvm::cl::cat(Category),
@@ -396,11 +390,6 @@ DisableObjCAttrRequiresFoundationModule(
     llvm::cl::desc("Allow @objc to be used freely"),
     llvm::cl::cat(Category),
     llvm::cl::init(false));
-
-static llvm::cl::opt<bool> EnableExperimentalPrespecialization(
-    "enable-experimental-prespecialization",
-    llvm::cl::desc("Enable experimental prespecialization"),
-    llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 PrintStats("print-stats",
@@ -761,6 +750,10 @@ static llvm::cl::opt<bool>
 EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
+
+static llvm::cl::list<std::string>
+AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
+                llvm::cl::cat(Category));
 
 } // namespace options
 
@@ -2522,10 +2515,12 @@ static void printModuleMetadata(ModuleDecl *MD) {
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
   });
   MD->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
-    OS << "filepath=" << info.FilePath << "; ";
-    OS << "hash=" << info.InterfaceHash.getRawValue() << "; ";
-    OS << "mtime=" << info.LastModified << "; ";
-    OS << "size=" << info.FileSize;
+    OS << "filepath=" << info.getFilePath() << "; ";
+    OS << "hash=" << info.getInterfaceHashIncludingTypeMembers().getRawValue() << "; ";
+    OS << "hashExcludingTypeMembers="
+       << info.getInterfaceHashExcludingTypeMembers().getRawValue() << "; ";
+    OS << "mtime=" << info.getLastModified() << "; ";
+    OS << "size=" << info.getFileSize();
     OS << "\n";
   });
 }
@@ -3881,6 +3876,10 @@ int main(int argc, char *argv[]) {
     InitInvok.getClangImporterOptions().ModuleCachePath =
         options::ModuleCachePath[options::ModuleCachePath.size()-1];
   }
+  if (!options::AccessNotesPath.empty()) {
+    InitInvok.getFrontendOptions().AccessNotesPath =
+        options::AccessNotesPath[options::AccessNotesPath.size()-1];
+  }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
   InitInvok.setImportSearchPaths(options::ImportPaths);
@@ -3904,14 +3903,10 @@ int main(int argc, char *argv[]) {
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=
       options::CodeCompleteCallPatternHeuristics;
-  InitInvok.getLangOptions().InferImportAsMember |=
-    options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
-  InitInvok.getClangImporterOptions().InferImportAsMember |=
-    options::InferImportAsMember;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
@@ -3920,8 +3915,6 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-  InitInvok.getLangOptions().EnableExperimentalPrespecialization =
-      options::EnableExperimentalPrespecialization;
   InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
     options::DebugForbidTypecheckPrefix;
   InitInvok.getTypeCheckerOptions().DebugConstraintSolver =

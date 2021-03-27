@@ -154,6 +154,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
+  P.addDiagnoseLifetimeIssues();
 
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
@@ -344,12 +345,16 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Run devirtualizer after the specializer, because many
   // class_method/witness_method instructions may use concrete types now.
   P.addDevirtualizer();
+  P.addARCSequenceOpts();
 
-  // We earlier eliminated ownership if we are not compiling the stdlib. Now
-  // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
-  P.addCopyPropagation();
-  P.addSemanticARCOpts();
-  P.addNonTransparentFunctionOwnershipModelEliminator();
+  if (P.getOptions().EnableOSSAModules) {
+    // We earlier eliminated ownership if we are not compiling the stdlib. Now
+    // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
+  }
 
   switch (OpLevel) {
   case OptimizationLevelKind::HighLevel:
@@ -365,6 +370,14 @@ void addFunctionPasses(SILPassPipelinePlan &P,
     // Inlines everything
     P.addLateInliner();
     break;
+  }
+
+  // Clean up Semantic ARC before we perform additional post-inliner opts.
+  if (P.getOptions().EnableOSSAModules) {
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
   }
 
   // Promote stack allocations to values and eliminate redundant
@@ -425,6 +438,14 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addRetainSinking();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
+
+  // Run a final round of ARC opts when ownership is enabled.
+  if (P.getOptions().EnableOSSAModules) {
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
+  }
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
@@ -456,7 +477,9 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries.
   P.addTempRValueOpt();
   // Cleanup after SILGen: remove unneeded borrows/copies.
-  P.addCopyPropagation();
+  if (!P.getOptions().DisableCopyPropagation) {
+    P.addCopyPropagation();
+  }
   P.addSemanticARCOpts();
 
   // Devirtualizes differentiability witnesses into functions that reference them.
@@ -474,7 +497,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
     return;
 
-  P.addNonStdlibNonTransparentFunctionOwnershipModelEliminator();
+  if (!P.getOptions().EnableOSSAModules)
+    P.addNonTransparentFunctionOwnershipModelEliminator();
 
   // Start by linking in referenced functions from other modules.
   P.addPerformanceSILLinker();
@@ -513,7 +537,6 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   // FIXME: update EagerSpecializer to be a function pass!
   P.addEagerSpecializer();
 
-  // stdlib ownership model elimination is done within addFunctionPasses
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 
   addHighLevelLoopOptPasses(P);
@@ -729,6 +752,7 @@ SILPassPipelinePlan::getIRGenPreparePassPipeline(const SILOptions &Options) {
   // Insert SIL passes to run during IRGen.
   // Hoist generic alloc_stack instructions to the entry block to enable better
   // llvm-ir generation for dynamic alloca instructions.
+  P.addPartialApplyLowering();
   P.addAllocStackHoisting();
   P.addLoadableByAddress();
 
@@ -763,11 +787,18 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   //
   // FIXME: When *not* emitting a .swiftmodule, skip the high-level function
   // pipeline to save compile time.
-  //
-  // NOTE: Ownership is now stripped within this function for the stdlib.
   addHighLevelFunctionPipeline(P);
 
   addHighLevelModulePipeline(P);
+
+  // Run one last copy propagation/semantic arc opts run before serialization/us
+  // lowering ownership.
+  if (P.getOptions().EnableOSSAModules) {
+    if (!P.getOptions().DisableCopyPropagation) {
+      P.addCopyPropagation();
+    }
+    P.addSemanticARCOpts();
+  }
 
   addSerializePipeline(P);
   if (Options.StopOptimizationAfterSerialization)
@@ -815,7 +846,13 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  P.addGuaranteedARCOpts();
+  if (!P.getOptions().DisableCopyPropagation) {
+    // MandatoryCopyPropagation should only be run at -Onone, not -O.
+    P.addMandatoryCopyPropagation();
+  }
+  // TODO: MandatoryARCOpts should be subsumed by CopyPropagation. There should
+  // be no need to run another analysis of copies at -Onone.
+  P.addMandatoryARCOpts();
 
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");

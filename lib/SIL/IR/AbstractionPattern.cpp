@@ -132,7 +132,9 @@ AbstractionPattern::EncodedForeignInfo::encode(
   if (foreignAsync.hasValue()) {
     return EncodedForeignInfo(EncodedForeignInfo::Async,
                               foreignAsync->completionHandlerParamIndex(),
-                              foreignAsync->completionHandlerErrorParamIndex());
+                              foreignAsync->completionHandlerErrorParamIndex(),
+                              foreignAsync->completionHandlerFlagParamIndex(),
+                              foreignAsync->completionHandlerFlagIsErrorOnZero());
   } else if (foreignError.hasValue()) {
     return EncodedForeignInfo(EncodedForeignInfo::Error,
                               foreignError->getErrorParameterIndex(),
@@ -174,13 +176,13 @@ AbstractionPattern
 AbstractionPattern::getCurriedCXXMethod(CanType origType,
                                         const AbstractFunctionDecl *function) {
   auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXMethod(origType, clangMethod);
+  return getCurriedCXXMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
 AbstractionPattern AbstractionPattern::getCurriedCXXOperatorMethod(
     CanType origType, const AbstractFunctionDecl *function) {
   auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
-  return getCurriedCXXOperatorMethod(origType, clangMethod);
+  return getCurriedCXXOperatorMethod(origType, clangMethod, function->getImportAsMemberStatus());
 }
 
 AbstractionPattern
@@ -404,11 +406,17 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
       
   case Kind::ObjCCompletionHandlerArgumentsType: {
     // Match up the tuple element with the parameter from the Clang block type,
-    // skipping the error parameter index if any.
+    // skipping the error parameter and flag indexes if any.
     auto callback = cast<clang::FunctionProtoType>(getClangType());
     auto errorIndex = getEncodedForeignInfo()
       .getAsyncCompletionHandlerErrorParamIndex();
-    unsigned paramIndex = index + (errorIndex && index >= *errorIndex);
+    auto flagIndex = getEncodedForeignInfo()
+      .getAsyncCompletionHandlerErrorFlagParamIndex();
+    unsigned paramIndex = index;
+    if (errorIndex && paramIndex >= *errorIndex)
+      ++paramIndex;
+    if (flagIndex && paramIndex >= *flagIndex)
+      ++paramIndex;
     return AbstractionPattern(getGenericSignature(),
                               getCanTupleElementType(getType(), index),
                               callback->getParamType(paramIndex).getTypePtr());
@@ -521,11 +529,12 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                                       getImportAsMemberStatus());
   case Kind::CurriedCXXMethodType:
     return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
-                                      getResultType(getType()), getCXXMethod());
+                                      getResultType(getType()), getCXXMethod(),
+                                      getImportAsMemberStatus());
   case Kind::CurriedCXXOperatorMethodType:
     return getPartialCurriedCXXOperatorMethod(
         getGenericSignatureForFunctionComponent(), getResultType(getType()),
-        getCXXMethod());
+        getCXXMethod(), getImportAsMemberStatus());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType: {
     // If this is a foreign async function, the result type comes from the
@@ -544,12 +553,18 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
       // any.
       
       auto callbackErrorIndex = getEncodedForeignInfo()
-                                  .getAsyncCompletionHandlerErrorParamIndex();
+                                    .getAsyncCompletionHandlerErrorParamIndex();
+      auto callbackErrorFlagIndex = getEncodedForeignInfo()
+                                .getAsyncCompletionHandlerErrorFlagParamIndex();
       assert((!callbackErrorIndex.hasValue()
               || callbackParamTy->getNumParams() > *callbackErrorIndex)
              && "completion handler has invalid error param index?!");
+      assert((!callbackErrorFlagIndex.hasValue()
+              || callbackParamTy->getNumParams() > *callbackErrorFlagIndex)
+             && "completion handler has invalid error param index?!");
       unsigned numNonErrorParams
-        = callbackParamTy->getNumParams() - callbackErrorIndex.hasValue();
+        = callbackParamTy->getNumParams() - callbackErrorIndex.hasValue()
+                                          - callbackErrorFlagIndex.hasValue();
             
       switch (numNonErrorParams) {
       case 0:
@@ -560,8 +575,13 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
       case 1: {
         // If there's a single argument, abstract it according to its formal type
         // in the ObjC signature.
-        unsigned callbackResultIndex
-          = callbackErrorIndex && *callbackErrorIndex == 0;
+        unsigned callbackResultIndex = 0;
+        if (callbackErrorIndex && callbackResultIndex >= *callbackErrorIndex)
+          ++callbackResultIndex;
+        if (callbackErrorFlagIndex
+            && callbackResultIndex >= *callbackErrorFlagIndex)
+          ++callbackResultIndex;
+
         auto clangResultType = callbackParamTy
           ->getParamType(callbackResultIndex)
           .getTypePtr();
@@ -608,7 +628,15 @@ AbstractionPattern::getObjCMethodAsyncCompletionHandlerType(
     auto callbackParamTy = getObjCMethod()->parameters()[paramIndex]
                                           ->getType().getTypePtr();
     
-    return AbstractionPattern(swiftCompletionHandlerType, callbackParamTy);
+    CanGenericSignature patternSig;
+    if (auto origSig = getGenericSignature()) {
+      patternSig = origSig;
+    } else if (auto genFnTy = dyn_cast<GenericFunctionType>(getType())) {
+      patternSig = genFnTy->getGenericSignature()->getCanonicalSignature();
+    }
+    
+    return AbstractionPattern(patternSig,
+                              swiftCompletionHandlerType, callbackParamTy);
   }
   case Kind::Opaque:
   case Kind::OpaqueFunction:
@@ -726,10 +754,19 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     auto paramType = params[index].getParameterType();
 
-    // The first parameter holds the left-hand-side operand, which gets passed
-    // to the C++ function as the this pointer.
-    if (index == 0)
-      return getCXXMethodSelfPattern(paramType);
+    // See importer::isImportedAsStatic
+    bool isStatic = getImportAsMemberStatus().isStatic();
+    if (isStatic) {
+      // The first parameter holds the left-hand-side operand, which gets passed
+      // to the C++ function as the this pointer.
+      if (index == 0)
+        return getCXXMethodSelfPattern(paramType);
+    } else {
+      // The last parameter is 'self'.
+      if (getKind() == Kind::CXXOperatorMethodType &&
+          index == params.size() - 1)
+        return getCXXMethodSelfPattern(params.back().getParameterType());
+    }
 
     // A parameter of type () does not correspond to a Clang parameter.
     if (paramType->isVoid())
@@ -739,7 +776,7 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto methodType = getCXXMethod()->getType().getTypePtr();
     return AbstractionPattern(
         getGenericSignatureForFunctionComponent(), paramType,
-        getClangFunctionParameterType(methodType, index - 1));
+        getClangFunctionParameterType(methodType, index - (isStatic ? 1 : 0)));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
@@ -1023,7 +1060,14 @@ void AbstractionPattern::print(raw_ostream &out) const {
     case EncodedForeignInfo::IsAsync:
       out << ", completionHandlerParameter=" << errorInfo.getAsyncCompletionHandlerParamIndex();
       if (auto errorParam = errorInfo.getAsyncCompletionHandlerErrorParamIndex()) {
-        out << " (errorParam=" << *errorParam << ')';
+        out << " (errorParam=" << *errorParam;
+        if (auto errorFlag = errorInfo.getAsyncCompletionHandlerErrorFlagParamIndex()) {
+          out << ", errorFlagParam=" << *errorFlag
+              << (errorInfo.isCompletionErrorFlagZeroOnError()
+                    ? ", zeroOnError"
+                    : ", nonzeroOnError");
+        }
+        out << ')';
       }
     }
     out << ", ";

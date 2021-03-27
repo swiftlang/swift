@@ -27,7 +27,9 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 
 namespace swift {
 
@@ -142,6 +144,9 @@ template <class Inst> Inst *peerThroughFunctionConversions(SILValue value) {
   return nullptr;
 }
 
+Optional<std::pair<SILDebugLocation, SILDebugVariable>>
+findDebugLocationAndVariable(SILValue originalValue);
+
 //===----------------------------------------------------------------------===//
 // Diagnostic utilities
 //===----------------------------------------------------------------------===//
@@ -189,12 +194,6 @@ SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 /// a tuple type. Otherwise, add this value directly to `results`.
 void extractAllElements(SILValue value, SILBuilder &builder,
                         SmallVectorImpl<SILValue> &results);
-
-/// Emit a zero value into the given buffer access by calling
-/// `AdditiveArithmetic.zero`. The given type must conform to
-/// `AdditiveArithmetic`.
-void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
-                        SILValue bufferAccess, SILLocation loc);
 
 /// Emit a `Builtin.Word` value that represents the given type's memory layout
 /// size.
@@ -250,8 +249,8 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
 /// \param parameterIndices must be lowered to SIL.
 /// \param resultIndices must be lowered to SIL.
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
-    SILModule &module, SILFunction *original, IndexSubset *parameterIndices,
-    IndexSubset *resultIndices);
+    SILModule &module, SILFunction *original, DifferentiabilityKind kind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices);
 
 } // end namespace autodiff
 

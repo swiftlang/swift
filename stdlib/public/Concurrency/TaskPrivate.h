@@ -21,10 +21,12 @@
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Error.h"
 
 namespace swift {
 
 class AsyncTask;
+class TaskGroup;
 
 /// Initialize the task-local allocator in the given task.
 void _swift_task_alloc_initialize(AsyncTask *task);
@@ -32,11 +34,25 @@ void _swift_task_alloc_initialize(AsyncTask *task);
 /// Destroy the task-local allocator in the given task.
 void _swift_task_alloc_destroy(AsyncTask *task);
 
+/// Allocate task-local memory on behalf of a specific task,
+/// not necessarily the current one.  Generally this should only be
+/// done on behalf of a child task.
+void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
+
+/// dellocate task-local memory on behalf of a specific task,
+/// not necessarily the current one.  Generally this should only be
+/// done on behalf of a child task.
+void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
+
+/// Given that we've already set the right executor as the active
+/// executor, run the given job.  This does additional bookkeeping
+/// related to the active task.
+void runJobInEstablishedExecutorContext(Job *job);
+
+/// Clear the active task reference for the current thread.
+AsyncTask *_swift_task_clearCurrent();
+
 #if defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
-#define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
-#elif !__APPLE__
-// FIXME: this is a terrible workaround for our temporary
-// inability to link libdispatch.
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 1
 #else
 #define SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR 0
@@ -50,94 +66,80 @@ void donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
                                        void *context);
 #endif
 
+/// release() establishes a happens-before relation with a preceding acquire()
+/// on the same address.
+void _swift_tsan_acquire(void *addr);
+void _swift_tsan_release(void *addr);
+
 // ==== ------------------------------------------------------------------------
-// TODO: this was moved from Task.cpp to share it with TaskGroup.cpp, where else better place to put it?
 
 namespace {
 
-/// An asynchronous context within a task that describes a general "Future".
-/// task.
+/// The layout of a context to call one of the following functions:
 ///
-/// This type matches the ABI of a function `<T> () async throws -> T`, which
-/// is the type used by `Task.runDetached` and `Task.group.add` to create
-/// futures.
+///   @_silgen_name("swift_task_future_wait")
+///   func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
+///
+///   @_silgen_name("swift_task_future_wait_throwing")
+///   func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
+///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
-  // Error result is always present.
-  SwiftError *errorResult = nullptr;
+  SwiftError *errorResult;
 
-  // No indirect results.
+  OpaqueValue *successResultPointer;
 
-  TaskFutureWaitResult result;
+  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
+      asyncResumeEntryPoint;
 
-  // FIXME: Currently, this is always here, but it isn't technically
-  // necessary.
-  void* Self;
+  void fillWithSuccess(AsyncTask::FutureFragment *future) {
+    fillWithSuccess(future->getStoragePtr(), future->getResultType(),
+                    successResultPointer);
+  }
+  void fillWithSuccess(OpaqueValue *src, const Metadata *successType,
+                       OpaqueValue *result) {
+    successType->vw_initializeWithCopy(result, src);
+  }
 
-  // Arguments.
-  AsyncTask *task;
-
-  using AsyncContext::AsyncContext;
+  void fillWithError(AsyncTask::FutureFragment *future) {
+    fillWithError(future->getError());
+  }
+  void fillWithError(SwiftError *error) {
+    errorResult = error;
+    swift_errorRetain(error);
+  }
 };
 
-}
+/// The layout of a frame to call the following function:
+///
+///   @_silgen_name("swift_taskGroup_wait_next_throwing")
+///   func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+///
+class TaskGroupNextAsyncContext : public AsyncContext {
+public:
+  SwiftError *errorResult;
 
-/// Run the given task, providing it with the result of the future.
-static void runTaskWithFutureResult(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncTask::FutureFragment *futureFragment, bool hadErrorResult) {
-  auto waitingTaskContext =
-      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
+  OpaqueValue *successResultPointer;
 
-  waitingTaskContext->result.hadErrorResult = hadErrorResult;
-  if (hadErrorResult) {
-    waitingTaskContext->result.storage =
-        reinterpret_cast<OpaqueValue *>(futureFragment->getError());
-  } else {
-    waitingTaskContext->result.storage = futureFragment->getStoragePtr();
+  AsyncVoidClosureResumeEntryPoint *__ptrauth_swift_task_resume_function
+      asyncResumeEntryPoint;
+
+  // Arguments.
+  TaskGroup *group;
+
+  const Metadata *successType;
+
+  void fillWithSuccess(OpaqueValue *src, const Metadata *successType) {
+    successType->vw_initializeWithCopy(successResultPointer, src);
   }
 
-  // TODO: schedule this task on the executor rather than running it directly.
-  waitingTask->run(executor);
-}
-
-/// Run the given task, providing it with the result of the future.
-static void runTaskWithGroupPollResult(
-    AsyncTask *waitingTask, ExecutorRef executor,
-    AsyncTask::GroupFragment::GroupPollResult result) {
-  auto waitingTaskContext =
-      static_cast<TaskFutureWaitAsyncContext *>(waitingTask->ResumeContext);
-
-  // Was it an error or successful return?
-  waitingTaskContext->result.hadErrorResult =
-      result.status == AsyncTask::GroupFragment::GroupPollStatus::Error;
-
-  // Extract the stored value into the waiting task's result storage:
-  switch (result.status) {
-    case AsyncTask::GroupFragment::GroupPollStatus::Success:
-      waitingTaskContext->result.storage = result.storage;
-      break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Error:
-      waitingTaskContext->result.storage =
-        reinterpret_cast<OpaqueValue *>(result.storage);
-      break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Empty:
-      // return a `nil` here (as result of the `group.next()`)
-      waitingTaskContext->result.storage = nullptr;
-      break;
-    case AsyncTask::GroupFragment::GroupPollStatus::Waiting:
-      assert(false && "Must not attempt to run with a Waiting result.");
+  void fillWithError(SwiftError *error) {
+    errorResult = error;
+    swift_errorRetain(error);
   }
+};
 
-  // TODO: schedule this task on the executor rather than running it directly.
-  waitingTask->run(executor);
-
-  // TODO: Not entirely sure when to release; we synchronously run the code above so we can't before
-  // if we need to, release the now completed task so it can be destroyed
-//  if (result.retainedTask) {
-//    swift_release(result.retainedTask);
-//  }
-}
+} // end anonymous namespace
 
 } // end namespace swift
 

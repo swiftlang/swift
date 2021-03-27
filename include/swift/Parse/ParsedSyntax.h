@@ -26,7 +26,7 @@ public:
     : RawNode(std::move(rawNode)) {}
 
   const ParsedRawSyntaxNode &getRaw() const { return RawNode; }
-  ParsedRawSyntaxNode takeRaw() { return std::move(RawNode); }
+  ParsedRawSyntaxNode &&takeRaw() { return std::move(RawNode); }
   syntax::SyntaxKind getKind() const { return RawNode.getKind(); }
 
   /// Returns true if the syntax node is of the given type.
@@ -41,10 +41,6 @@ public:
   T castTo() && {
     assert(is<T>() && "castTo<T>() node of incompatible type!");
     return T(std::move(RawNode));
-  }
-
-  ParsedSyntax copyDeferred() const {
-    return ParsedSyntax { RawNode.copyDeferred() };
   }
 
   static bool kindof(syntax::SyntaxKind Kind) {

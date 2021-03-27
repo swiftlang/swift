@@ -40,6 +40,7 @@
 #include "swift/Basic/TopCollection.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/DenseMap.h"
@@ -56,26 +57,6 @@
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckStmt"
-
-#ifndef NDEBUG
-/// Determine whether the given context is for the backing property of a
-/// property wrapper.
-static bool isPropertyWrapperBackingInitContext(DeclContext *dc) {
-  auto initContext = dyn_cast<Initializer>(dc);
-  if (!initContext) return false;
-
-  auto patternInitContext = dyn_cast<PatternBindingInitializer>(initContext);
-  if (!patternInitContext) return false;
-
-  auto binding = patternInitContext->getBinding();
-  if (!binding) return false;
-
-  auto singleVar = binding->getSingleVar();
-  if (!singleVar) return false;
-
-  return singleVar->getOriginalWrappedProperty() != nullptr;
-}
-#endif
 
 namespace {
   class ContextualizeClosures : public ASTWalker {
@@ -128,20 +109,7 @@ namespace {
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        // In the repl, the parent top-level context may have been re-written.
-        if (CE->getParent() != ParentDC) {
-          if ((CE->getParent()->getContextKind() !=
-                    ParentDC->getContextKind()) ||
-              ParentDC->getContextKind() != DeclContextKind::TopLevelCodeDecl) {
-            // If a closure is nested within an auto closure, we'll need to update
-            // its parent to the auto closure parent.
-            assert((ParentDC->getContextKind() ==
-                      DeclContextKind::AbstractClosureExpr ||
-                    isPropertyWrapperBackingInitContext(ParentDC)) &&
-                   "Incorrect parent decl context for closure");
-            CE->setParent(ParentDC);
-          }
-        }
+        CE->setParent(ParentDC);
 
         // If the closure was type checked within its enclosing context,
         // we need to walk into it with a new sequence.
@@ -451,6 +419,89 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
   return nullptr;
 }
 
+bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
+                                                bool &isFalsable,
+                                                DeclContext *dc) {
+  auto &Context = dc->getASTContext();
+  if (elt.getKind() == StmtConditionElement::CK_Availability) {
+    isFalsable = true;
+
+    // Reject inlinable code using availability macros.
+    PoundAvailableInfo *info = elt.getAvailability();
+    if (auto *decl = dc->getAsDecl()) {
+      if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
+          decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+        for (auto queries : info->getQueries())
+          if (auto availSpec =
+                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
+            if (availSpec->getMacroLoc().isValid()) {
+              Context.Diags.diagnose(
+                  availSpec->getMacroLoc(),
+                  swift::diag::availability_macro_in_inlinable,
+                  decl->getDescriptiveKind());
+              break;
+            }
+    }
+
+    return false;
+  }
+
+  if (auto E = elt.getBooleanOrNull()) {
+    assert(!E->getType() && "the bool condition is already type checked");
+    bool hadError = TypeChecker::typeCheckCondition(E, dc);
+    elt.setBoolean(E);
+    isFalsable = true;
+    return hadError;
+  }
+  assert(elt.getKind() != StmtConditionElement::CK_Boolean);
+
+  // This is cleanup goop run on the various paths where type checking of the
+  // pattern binding fails.
+  auto typeCheckPatternFailed = [&] {
+    elt.getPattern()->setType(ErrorType::get(Context));
+    elt.getInitializer()->setType(ErrorType::get(Context));
+
+    elt.getPattern()->forEachVariable([&](VarDecl *var) {
+      // Don't change the type of a variable that we've been able to
+      // compute a type for.
+      if (var->hasInterfaceType() && !var->isInvalid())
+        return;
+      var->setInvalid();
+    });
+  };
+
+  // Resolve the pattern.
+  assert(!elt.getPattern()->hasType() &&
+         "the pattern binding condition is already type checked");
+  auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
+                                              /*isStmtCondition*/ true);
+  if (!pattern) {
+    typeCheckPatternFailed();
+    return true;
+  }
+  elt.setPattern(pattern);
+
+  TypeChecker::diagnoseDuplicateBoundVars(pattern);
+
+  // Check the pattern, it allows unspecified types because the pattern can
+  // provide type information.
+  auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+  Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+  if (patternType->hasError()) {
+    typeCheckPatternFailed();
+    return true;
+  }
+
+  // If the pattern didn't get a type, it's because we ran into some
+  // unknown types along the way. We'll need to check the initializer.
+  auto init = elt.getInitializer();
+  bool hadError = TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
+  elt.setPattern(pattern);
+  elt.setInitializer(init);
+  isFalsable |= pattern->isRefutablePattern();
+  return hadError;
+}
+
 /// Type check the given 'if', 'while', or 'guard' statement condition.
 ///
 /// \param stmt The conditional statement to type-check, which will be modified
@@ -459,88 +510,12 @@ static LabeledStmt *findBreakOrContinueStmtTarget(
 /// \returns true if an error occurred, false otherwise.
 static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
                                            DeclContext *dc) {
-  auto &Context = dc->getASTContext();
   bool hadError = false;
   bool hadAnyFalsable = false;
   auto cond = stmt->getCond();
   for (auto &elt : cond) {
-    if (elt.getKind() == StmtConditionElement::CK_Availability) {
-      hadAnyFalsable = true;
-
-      // Reject inlinable code using availability macros.
-      PoundAvailableInfo *info = elt.getAvailability();
-      if (auto *decl = dc->getAsDecl()) {
-        if (decl->getAttrs().hasAttribute<InlinableAttr>() ||
-            decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
-          for (auto queries : info->getQueries())
-            if (auto availSpec =
-                  dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries))
-              if (availSpec->getMacroLoc().isValid()) {
-                Context.Diags.diagnose(
-                    availSpec->getMacroLoc(),
-                    swift::diag::availability_macro_in_inlinable,
-                    decl->getDescriptiveKind());
-                break;
-              }
-      }
-
-      continue;
-    }
-
-    if (auto E = elt.getBooleanOrNull()) {
-      assert(!E->getType() && "the bool condition is already type checked");
-      hadError |= TypeChecker::typeCheckCondition(E, dc);
-      elt.setBoolean(E);
-      hadAnyFalsable = true;
-      continue;
-    }
-    assert(elt.getKind() != StmtConditionElement::CK_Boolean);
-
-    // This is cleanup goop run on the various paths where type checking of the
-    // pattern binding fails.
-    auto typeCheckPatternFailed = [&] {
-      hadError = true;
-      elt.getPattern()->setType(ErrorType::get(Context));
-      elt.getInitializer()->setType(ErrorType::get(Context));
-
-      elt.getPattern()->forEachVariable([&](VarDecl *var) {
-        // Don't change the type of a variable that we've been able to
-        // compute a type for.
-        if (var->hasInterfaceType() && !var->isInvalid())
-          return;
-        var->setInvalid();
-      });
-    };
-
-    // Resolve the pattern.
-    assert(!elt.getPattern()->hasType() &&
-           "the pattern binding condition is already type checked");
-    auto *pattern = TypeChecker::resolvePattern(elt.getPattern(), dc,
-                                                /*isStmtCondition*/ true);
-    if (!pattern) {
-      typeCheckPatternFailed();
-      continue;
-    }
-    elt.setPattern(pattern);
-
-    TypeChecker::diagnoseDuplicateBoundVars(pattern);
-
-    // Check the pattern, it allows unspecified types because the pattern can
-    // provide type information.
-    auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
-    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
-    if (patternType->hasError()) {
-      typeCheckPatternFailed();
-      continue;
-    }
-
-    // If the pattern didn't get a type, it's because we ran into some
-    // unknown types along the way. We'll need to check the initializer.
-    auto init = elt.getInitializer();
-    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
-    elt.setPattern(pattern);
-    elt.setInitializer(init);
-    hadAnyFalsable |= pattern->isRefutablePattern();
+    hadError |=
+        TypeChecker::typeCheckStmtConditionElement(elt, hadAnyFalsable, dc);
   }
 
   // If the binding is not refutable, and there *is* an else, reject it as
@@ -2070,6 +2045,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   TypeChecker::computeCaptures(AFD);
   if (!AFD->getDeclContext()->isLocalContext()) {
     checkFunctionActorIsolation(AFD);
+    checkFunctionAsyncUsage(AFD);
     TypeChecker::checkFunctionEffects(AFD);
   }
 
@@ -2077,6 +2053,7 @@ TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
+  TypeChecker::checkClosureAttributes(closure);
   TypeChecker::checkParameterList(closure->getParameters(), closure);
 
   BraceStmt *body = closure->getBody();

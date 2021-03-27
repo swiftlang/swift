@@ -22,13 +22,18 @@ struct Point {
   }
 }
 
-actor class TestActor {
-  // expected-note@+1{{mutable state is only available within the actor instance}}
+actor TestActor {
+  // expected-note@+1{{mutation of this property is only permitted within the actor}}
   var position = Point(x: 0, y: 0)
   var nextPosition = Point(x: 0, y: 1)
   var value1: Int = 0
   var value2: Int = 1
   var points: [Point] = []
+
+  subscript(x : inout Int) -> Int { // expected-error {{'inout' must not be used on subscript parameters}}
+    x += 1
+    return x
+  }
 }
 
 func modifyAsynchronously(_ foo: inout Int) async { foo += 1 }
@@ -122,7 +127,7 @@ extension TestActor {
 }
 
 // Check implicit async testing
-actor class DifferentActor {
+actor DifferentActor {
   func modify(_ state: inout Int) {}
 }
 
@@ -144,7 +149,7 @@ extension TestActor {
   }
 }
 
-actor class MyActor {
+actor MyActor {
   var points: [Point] = []
   var int: Int = 0
   var maybeInt: Int?
@@ -169,10 +174,10 @@ actor class MyActor {
 
     // This warning is emitted because this fails to typecheck before the
     // async-ness is attached.
-    // expected-warning@+2{{no calls to 'async' functions occur within 'await' expression}}
+    // expected-warning@+2{{no 'async' operations occur within 'await' expression}}
     // expected-error@+1{{cannot pass immutable value of type 'Int' as inout argument}}
     await modifyAsynchronously(&(maybePoint?.z)!)
-    // expected-error@+2{{actor-isolated property 'position' can only be referenced inside the actor}}
+    // expected-error@+2{{actor-isolated property 'position' can only be used 'inout' from inside the actor}}
     // expected-error@+1{{actor-isolated property 'myActor' cannot be passed 'inout' to 'async' function call}}
     await modifyAsynchronously(&myActor.position.x)
   }
@@ -188,10 +193,10 @@ struct MyGlobalActor {
 @MyGlobalActor var number: Int = 0
 // expected-note@-1{{var declared here}}
 // expected-note@-2{{var declared here}}
-// expected-note@-3{{mutable state is only available within the actor instance}}
+// expected-note@-3{{mutation of this var is only permitted within the actor}}
 
 // expected-error@+2{{actor-isolated var 'number' cannot be passed 'inout' to 'async' function call}}
-// expected-error@+1{{var 'number' isolated to global actor 'MyGlobalActor' can not be referenced from this context}}
+// expected-error@+1{{var 'number' isolated to global actor 'MyGlobalActor' can not be used 'inout' from a non-isolated context}}
 let _ = Task.runDetached { await { (_ foo: inout Int) async in foo += 1 }(&number) }
 
 // attempt to pass global state owned by the global actor to another async function

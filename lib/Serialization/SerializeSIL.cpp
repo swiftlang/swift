@@ -94,6 +94,22 @@ static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
   llvm_unreachable("bad cast consumption kind");
 }
 
+static unsigned
+toStableDifferentiabilityKind(swift::DifferentiabilityKind kind) {
+  switch (kind) {
+  case swift::DifferentiabilityKind::NonDifferentiable:
+    return (unsigned)serialization::DifferentiabilityKind::NonDifferentiable;
+  case swift::DifferentiabilityKind::Forward:
+    return (unsigned)serialization::DifferentiabilityKind::Forward;
+  case swift::DifferentiabilityKind::Reverse:
+    return (unsigned)serialization::DifferentiabilityKind::Reverse;
+  case swift::DifferentiabilityKind::Normal:
+    return (unsigned)serialization::DifferentiabilityKind::Normal;
+  case swift::DifferentiabilityKind::Linear:
+    return (unsigned)serialization::DifferentiabilityKind::Linear;
+  }
+}
+
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
@@ -1005,7 +1021,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
                              SILAbbrCodes[SILInstApplyLayout::Code],
-                             SIL_BUILTIN,
+                             SIL_BUILTIN, 0,
                              S.addSubstitutionMapRef(BI->getSubstitutions()),
                              S.addTypeRef(BI->getType().getASTType()),
                              (unsigned)BI->getType().getCategory(),
@@ -1026,7 +1042,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code],
-        AI->isNonThrowing() ? SIL_NON_THROWING_APPLY : SIL_APPLY,
+        SIL_APPLY,
+        unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -1046,8 +1063,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(addValueRef(Arg));
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code],
-        AI->isNonThrowing() ? SIL_NON_THROWING_BEGIN_APPLY : SIL_BEGIN_APPLY,
+        SILAbbrCodes[SILInstApplyLayout::Code], SIL_BEGIN_APPLY,
+        unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -1071,6 +1088,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_TRY_APPLY,
+        unsigned(AI->getApplyOptions().toRaw()),
         S.addSubstitutionMapRef(AI->getSubstitutionMap()),
         S.addTypeRef(AI->getCallee()->getType().getASTType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -1086,6 +1104,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstApplyLayout::Code], SIL_PARTIAL_APPLY,
+        0,
         S.addSubstitutionMapRef(PAI->getSubstitutionMap()),
         S.addTypeRef(PAI->getCallee()->getType().getASTType()),
         S.addTypeRef(PAI->getType().getASTType()),
@@ -1383,6 +1402,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(SILValue(UOCI).getOwnershipKind());
     } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
       Attr = IEC->getVerificationType();
+    } else if (auto *DVI = dyn_cast<DestroyValueInst>(&SI)) {
+      Attr = DVI->poisonRefs();
     } else if (auto *BCMI = dyn_cast<BeginCOWMutationInst>(&SI)) {
       Attr = BCMI->isNative();
     } else if (auto *ECMI = dyn_cast<EndCOWMutationInst>(&SI)) {
@@ -2320,8 +2341,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *witness = dwfi->getWitness();
     DifferentiabilityWitnessesToEmit.insert(witness);
     Mangle::ASTMangler mangler;
-    auto mangledKey =
-        mangler.mangleSILDifferentiabilityWitnessKey(witness->getKey());
+    auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+        witness->getOriginalFunction()->getName(), witness->getKind(),
+        witness->getConfig());
     auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
     // We only store the type when the instruction has an explicit type.
     bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
@@ -2632,7 +2654,8 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
 void SILSerializer::writeSILDifferentiabilityWitness(
     const SILDifferentiabilityWitness &dw) {
   Mangle::ASTMangler mangler;
-  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(dw.getKey());
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitness(
+      dw.getOriginalFunction()->getName(), dw.getKind(), dw.getConfig());
   size_t nameLength = mangledKey.size();
   char *stringStorage =
       static_cast<char *>(StringTable.Allocate(nameLength, 1));
@@ -2670,6 +2693,7 @@ void SILSerializer::writeSILDifferentiabilityWitness(
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
       addSILFunctionRef(original), toStableSILLinkage(dw.getLinkage()),
       dw.isDeclaration(), dw.isSerialized(),
+      toStableDifferentiabilityKind(dw.getKind()),
       S.addGenericSignatureRef(dw.getDerivativeGenericSignature()), jvpID,
       vjpID, dw.getParameterIndices()->getNumIndices(),
       dw.getResultIndices()->getNumIndices(), parameterAndResultIndices);

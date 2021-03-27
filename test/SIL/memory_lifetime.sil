@@ -394,3 +394,248 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil [ossa] @test_switch_enum_addr : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  switch_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  destroy_addr %2 : $*T
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_switch_enum : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  %1 = load_borrow %0 : $*Optional<T>
+  switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : $T):
+  end_borrow %1 : $Optional<T>
+  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  destroy_addr %2 : $*T
+  br bb3
+
+bb2:
+  end_borrow %1 : $Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_init_enum : $@convention(thin) (@in_guaranteed T) -> @out Optional<T> {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  inject_enum_addr %0 : $*Optional<T>, #Optional.none!enumelt
+  br bb3
+
+bb2:
+  %5 = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [initialization] %5 : $*T
+  inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $Optional<T>
+  %2 = enum $Optional<T>, #Optional.some!enumelt, %0 : $T
+  store %2 to [init] %1 : $*Optional<T>
+  destroy_addr %1 : $*Optional<T>
+  %3 = enum $Optional<T>, #Optional.none!enumelt
+  store %3 to [trivial] %1 : $*Optional<T>
+  dealloc_stack %1 : $*Optional<T>
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_select_enum_addr : $@convention(thin) (@in_guaranteed Optional<T>) -> Builtin.Int1 {
+bb0(%0 : $*Optional<T>):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = select_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: %1, case #Optional.none!enumelt: %2 : $Builtin.Int1
+  return %3 : $Builtin.Int1
+}
+
+sil [ossa] @closure : $@convention(thin) (@in_guaranteed T) -> () 
+
+sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 :  $*T):
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_escaping_closure : $@convention(thin) (@in T) -> () {
+bb0(%0 :  $*T):
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  destroy_value %pa : $@callee_owned () -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_cast_br_take_always : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br take_always U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_cast_br_take_on_success : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br take_on_success U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  destroy_addr %0 : $*U
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_cast_br_copy_on_success : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br copy_on_success U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %0 : $*U
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  destroy_addr %0 : $*U
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_unconditional_checked_cast : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unconditional_checked_cast_addr U in %0 : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_unchecked_ref_cast : $@convention(thin) <U : AnyObject, V : AnyObject> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unchecked_ref_cast_addr U in %0 : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}
+
+protocol P {}
+
+sil [ossa] @test_existentials : $@convention(thin) <U: P> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $P
+  %i = init_existential_addr %s : $*P, $U
+  copy_addr %0 to [initialization] %i : $*U
+  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  copy_addr %o to [initialization] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  destroy_addr %s : $*P
+  dealloc_stack %s : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_init_two_existentials : $@convention(thin) <U: P, V: P> (@in_guaranteed U, @in_guaranteed V) -> () {
+bb0(%0 : $*U, %1 : $*V):
+  %s = alloc_stack $P
+  %t = init_existential_addr %s : $*P, $U
+  copy_addr %0 to [initialization] %t : $*U
+  destroy_addr %s : $*P
+  %v = init_existential_addr %s : $*P, $V
+  copy_addr %1 to [initialization] %v : $*V
+  destroy_addr %s : $*P
+  dealloc_stack %s : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_existential_metatype : $@convention(thin) (@in_guaranteed P) -> () {
+bb0(%0 : $*P):
+  %714 = existential_metatype $@thick P.Type, %0 : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_value_metatype : $@convention(thin) <U> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %1 = value_metatype $@thick U.Type, %0 : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_is_unique : $@convention(thin) (@in T) -> () {
+bb0(%0 : $*T):
+  %1 = is_unique %0 : $*T
+  destroy_addr %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_fix_lifetime : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  fix_lifetime %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @test_ignore_empty_types : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed (Int, ((), ()))) -> Int) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (@in_guaranteed (Int, ((), ()))) -> Int):
+  %2 = alloc_stack $(Int, ((), ()))
+  %3 = tuple_element_addr %2 : $*(Int, ((), ())), 0
+  store %0 to [trivial] %3 : $*Int
+  %5 = apply %1(%2) : $@callee_guaranteed (@in_guaranteed (Int, ((), ()))) -> Int
+  dealloc_stack %2 : $*(Int, ((), ()))
+  return %5 : $Int
+}

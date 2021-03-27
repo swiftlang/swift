@@ -140,6 +140,6 @@ extension KeyValuePairs: CustomDebugStringConvertible {
   }
 }
 
-// TODO: Remove UnsafeConcurrentValue when we have tuples conforming
-extension KeyValuePairs: ConcurrentValue, UnsafeConcurrentValue
-    where Key: ConcurrentValue, Value: ConcurrentValue { }
+// TODO: Remove UnsafeSendable when we have tuples conforming
+extension KeyValuePairs: Sendable, UnsafeSendable
+    where Key: Sendable, Value: Sendable { }

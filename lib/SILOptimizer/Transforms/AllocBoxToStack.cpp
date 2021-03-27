@@ -18,7 +18,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -978,16 +978,19 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
   case ApplySiteKind::ApplyInst:
     return Builder.createApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
+        Apply.getApplyOptions(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
   case ApplySiteKind::BeginApplyInst:
     return Builder.createBeginApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
+        Apply.getApplyOptions(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
   case ApplySiteKind::TryApplyInst: {
     auto TAI = cast<TryApplyInst>(Apply);
     return Builder.createTryApply(
         Apply.getLoc(), FunctionRef, Apply.getSubstitutionMap(), Args,
         TAI->getNormalBB(), TAI->getErrorBB(),
+        TAI->getApplyOptions(),
         GenericSpecializationInformation::create(ApplyInst, Builder));
   }
   }

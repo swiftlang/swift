@@ -41,6 +41,10 @@ namespace swift {
 class FileUnit;
 class ModuleDecl;
 
+namespace apigen {
+class API;
+} // end namespace apigen
+
 class TBDGenDescriptor final {
   using FileOrModule = llvm::PointerUnion<FileUnit *, ModuleDecl *>;
   FileOrModule Input;
@@ -118,6 +122,21 @@ private:
   // Evaluation.
   std::vector<std::string>
   evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
+};
+
+/// Retrieve API information for a file or module.
+class APIGenRequest
+    : public SimpleRequest<APIGenRequest,
+                           apigen::API(TBDGenDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  apigen::API evaluate(Evaluator &evaluator, TBDGenDescriptor desc) const;
 };
 
 /// Describes the origin of a particular symbol, including the stage of

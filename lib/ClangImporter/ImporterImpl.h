@@ -334,7 +334,6 @@ public:
   ASTContext &SwiftContext;
 
   const bool ImportForwardDeclarations;
-  const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
@@ -747,6 +746,30 @@ public:
                       bool fullyQualified,
                       llvm::raw_ostream &os);
 
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(std::forward<Args>(args)...);
+  }
+
+  /// Emit a diagnostic, taking care not to interrupt a diagnostic that's
+  /// already in flight.
+  template<typename ...Args>
+  void diagnose(SourceLoc loc, Args &&...args) {
+    // If we're in the middle of pretty-printing, suppress diagnostics.
+    if (SwiftContext.Diags.isPrettyPrintingDecl()) {
+      return;
+    }
+
+    SwiftContext.Diags.diagnose(loc, std::forward<Args>(args)...);
+  }
+
   /// Import the given Clang identifier into Swift.
   ///
   /// \param identifier The Clang identifier to map into Swift.
@@ -806,6 +829,8 @@ public:
   /// being imported into, which may affect info from API notes.
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
+
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1462,12 +1487,20 @@ public:
 
 namespace importer {
 
+/// Whether this is a forward declaration of a type. We ignore forward
+/// declarations in certain cases, and instead process the real declarations.
+bool isForwardDeclOfType(const clang::Decl *decl);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
 /// Identifies certain UIKit constants that used to have overlay equivalents,
 /// but are now renamed using the swift_name attribute.
 bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
+/// \returns true if this operator should be made a static function
+/// even if imported as a non-static member function.
+bool isImportedAsStatic(clang::OverloadedOperatorKind op);
 
 /// Add command-line arguments for a normal import of Clang code.
 void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
@@ -1509,16 +1542,14 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ASTContext &swiftCtx;
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
-  const bool inferImportAsMember;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail, bool inferIAM)
+                           const PlatformAvailability &avail)
       : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        inferImportAsMember(inferIAM) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;
@@ -1532,6 +1563,14 @@ public:
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
 };
+
+/// Determines whether the given swift_attr attribute describes the main
+/// actor.
+///
+/// \returns None if this is not a main-actor attribute, and a Boolean
+/// indicating whether (unsafe) was provided in the attribute otherwise.
+Optional<bool> isMainActorAttr(
+    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr);
 
 }
 }

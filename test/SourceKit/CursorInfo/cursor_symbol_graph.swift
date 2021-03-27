@@ -126,29 +126,6 @@ enum MyEnum {
 // CHECKX:         "uri": "{{.*}}cursor_symbol_graph.swift"
 // CHECKX:       },
 // CHECKX:       "names": {
-// CHECKX:         "navigator": [
-// CHECKX:           {
-// CHECKX:             "kind": "keyword",
-// CHECKX:             "spelling": "let"
-// CHECKX:           },
-// CHECKX:           {
-// CHECKX:             "kind": "text",
-// CHECKX:             "spelling": " "
-// CHECKX:           },
-// CHECKX:           {
-// CHECKX:             "kind": "identifier",
-// CHECKX:             "spelling": "x"
-// CHECKX:           },
-// CHECKX:           {
-// CHECKX:             "kind": "text",
-// CHECKX:             "spelling": ": "
-// CHECKX:           },
-// CHECKX:           {
-// CHECKX:             "kind": "typeIdentifier",
-// CHECKX:             "preciseIdentifier": "s:Si",
-// CHECKX:             "spelling": "Int"
-// CHECKX:           }
-// CHECKX:         ],
 // CHECKX:         "subHeading": [
 // CHECKX:           {
 // CHECKX:             "kind": "keyword",
@@ -294,29 +271,6 @@ enum MyEnum {
 // CHECKY:         "uri": "{{.*}}cursor_symbol_graph.swift"
 // CHECKY:       },
 // CHECKY:       "names": {
-// CHECKY:         "navigator": [
-// CHECKY:           {
-// CHECKY:             "kind": "keyword",
-// CHECKY:             "spelling": "var"
-// CHECKY:           },
-// CHECKY:           {
-// CHECKY:             "kind": "text",
-// CHECKY:             "spelling": " "
-// CHECKY:           },
-// CHECKY:           {
-// CHECKY:             "kind": "identifier",
-// CHECKY:             "spelling": "y"
-// CHECKY:           },
-// CHECKY:           {
-// CHECKY:             "kind": "text",
-// CHECKY:             "spelling": ": "
-// CHECKY:           },
-// CHECKY:           {
-// CHECKY:             "kind": "typeIdentifier",
-// CHECKY:             "preciseIdentifier": "s:SS",
-// CHECKY:             "spelling": "String"
-// CHECKY:           }
-// CHECKY:         ],
 // CHECKY:         "subHeading": [
 // CHECKY:           {
 // CHECKY:             "kind": "keyword",
@@ -639,44 +593,6 @@ enum MyEnum {
 // CHECKBAR_ALL:         "uri": "{{.*}}cursor_symbol_graph.swift"
 // CHECKBAR_ALL:       },
 // CHECKBAR_ALL:       "names": {
-// CHECKBAR_ALL:         "navigator": [
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "keyword",
-// CHECKBAR_ALL:             "spelling": "func"
-// CHECKBAR_ALL:           },
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "text",
-// CHECKBAR_ALL:             "spelling": " "
-// CHECKBAR_ALL:           },
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "identifier",
-// CHECKBAR_ALL:             "spelling": "bar"
-// CHECKBAR_ALL:           },
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "text",
-// CHECKBAR_ALL:             "spelling": "("
-// CHECKBAR_ALL:           },
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "externalParam",
-// CHECKBAR_ALL:             "spelling": "x"
-// CHECKBAR_ALL:           },
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "text",
-// CHECKBAR_ALL:             "spelling": ": "
-// CHECKBAR_ALL:           },
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "typeIdentifier",
-// CHECKBAR_GEN:             "spelling": "T"
-// CHECKBAR_INT:             "preciseIdentifier": "s:Si",
-// CHECKBAR_INT:             "spelling": "Int"
-// CHECKBAR_STR:             "preciseIdentifier": "s:SS",
-// CHECKBAR_STR:             "spelling": "String"
-// CHECKBAR_ALL:           },
-// CHECKBAR_ALL:           {
-// CHECKBAR_ALL:             "kind": "text",
-// CHECKBAR_ALL:             "spelling": ")"
-// CHECKBAR_ALL:           }
-// CHECKBAR_ALL:         ],
 // CHECKBAR_ALL:         "subHeading": [
 // CHECKBAR_ALL:           {
 // CHECKBAR_ALL:             "kind": "keyword",
@@ -815,20 +731,6 @@ enum MyEnum {
 // CHECKCASE:         "uri": "{{.*}}cursor_symbol_graph.swift"
 // CHECKCASE:       },
 // CHECKCASE:       "names": {
-// CHECKCASE:         "navigator": [
-// CHECKCASE:           {
-// CHECKCASE:             "kind": "keyword",
-// CHECKCASE:             "spelling": "case"
-// CHECKCASE:           },
-// CHECKCASE:           {
-// CHECKCASE:             "kind": "text",
-// CHECKCASE:             "spelling": " "
-// CHECKCASE:           },
-// CHECKCASE:           {
-// CHECKCASE:             "kind": "identifier",
-// CHECKCASE:             "spelling": "someCase"
-// CHECKCASE:           }
-// CHECKCASE:         ],
 // CHECKCASE:         "subHeading": [
 // CHECKCASE:           {
 // CHECKCASE:             "kind": "keyword",
@@ -843,7 +745,7 @@ enum MyEnum {
 // CHECKCASE:             "spelling": "someCase"
 // CHECKCASE:           }
 // CHECKCASE:         ],
-// CHECKCASE:         "title": "someCase"
+// CHECKCASE:         "title": "MyEnum.someCase"
 // CHECKCASE:       },
 // CHECKCASE:       "pathComponents": [
 // CHECKCASE:         "MyEnum",

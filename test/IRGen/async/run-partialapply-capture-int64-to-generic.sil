@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t)
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
@@ -19,14 +19,14 @@ import _Concurrency
 sil public_external @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil public_external @printInt32 : $@convention(thin) (Int32) -> ()
 
-sil @partial_apply_dynamic_with_out_param : $@async @convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T {
-bb0(%x : $Int32, %f : $@async @callee_owned (Int32) -> @out T):
-  %p = partial_apply %f(%x) : $@async @callee_owned (Int32) -> @out T
-  return %p : $@async @callee_owned () -> @out T
+sil @partial_apply_dynamic_with_out_param : $@async @convention(thin) <T> (Int32, @owned @async @callee_guaranteed (Int32) -> @out T) -> @async @callee_guaranteed () -> @out T {
+bb0(%x : $Int32, %f : $@async @callee_guaranteed (Int32) -> @out T):
+  %p = partial_apply [callee_guaranteed] %f(%x) : $@async @callee_guaranteed (Int32) -> @out T
+  return %p : $@async @callee_guaranteed () -> @out T
 }
 
-// CHECK-LL: define internal swiftcc void @"$sTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
-// CHECK-LL: define internal swiftcc void @"$s6calleeTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s36partial_apply_dynamic_with_out_paramTw_TA"(
+// CHECK-LL: define internal swift{{(tail)?}}cc void @"$s6calleeTA"(
 sil @callee : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T {
 entry(%out_t : $*T, %x : $Int32, %in_t : $*T):
   %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -43,14 +43,14 @@ sil @test_case : $@convention(thin) @async () -> () {
   %first = struct $Int32 (%first_literal : $Builtin.Int32)
   %first_addr = alloc_stack $Int32
   store %first to %first_addr : $*Int32
-  %callee1 = partial_apply %callee<Int32>(%first_addr) : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T
-  %partialApplier = function_ref @partial_apply_dynamic_with_out_param : $@async @convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T
+  %callee1 = partial_apply [callee_guaranteed] %callee<Int32>(%first_addr) : $@async @convention(thin) <T> (Int32, @in_guaranteed T) -> @out T
+  %partialApplier = function_ref @partial_apply_dynamic_with_out_param : $@async @convention(thin) <T> (Int32, @owned @async @callee_guaranteed (Int32) -> @out T) -> @async @callee_guaranteed () -> @out T
   %second_literal = integer_literal $Builtin.Int32, 6789
   %second = struct $Int32 (%second_literal : $Builtin.Int32)
-  %callee2 = apply %partialApplier<Int32>(%second, %callee1) : $@async @convention(thin) <T> (Int32, @owned @async @callee_owned (Int32) -> @out T) -> @async @callee_owned () -> @out T
+  %callee2 = apply %partialApplier<Int32>(%second, %callee1) : $@async @convention(thin) <T> (Int32, @owned @async @callee_guaranteed (Int32) -> @out T) -> @async @callee_guaranteed () -> @out T
 
   %result_addr = alloc_stack $Int32
-  %result = apply %callee2(%result_addr) : $@async @callee_owned () -> @out Int32
+  %result = apply %callee2(%result_addr) : $@async @callee_guaranteed () -> @out Int32
 
   %printGeneric = function_ref @printGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %printGeneric_result = apply %printGeneric<Int32>(%result_addr) : $@convention(thin) <T> (@in_guaranteed T) -> () // CHECK: 1
@@ -63,16 +63,23 @@ sil @test_case : $@convention(thin) @async () -> () {
 }
 
 // Defined in _Concurrency
-sil @$s12_Concurrency13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+sil @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+
+sil @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error {
+bb0(%0 :$@async @callee_guaranteed () -> ()):
+  %void = apply %0() : $@async @callee_guaranteed () -> ()
+  return %void : $()
+}
 
 // main
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
-  %test_case = convert_function %test_case_nothrow : $@convention(thin) @async () -> () to $@convention(thin) @async () -> @error Error
-  %thick_test_case = thin_to_thick_function %test_case : $@convention(thin) @async () -> @error Error to $@callee_guaranteed @async () -> @error Error
-  %runAsyncMain = function_ref @$s12_Concurrency13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
-  %result = apply %runAsyncMain(%thick_test_case) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
+  %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %throwing = partial_apply [callee_guaranteed] %thunk(%thick_test_case) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %runAsyncMain = function_ref @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %result = apply %runAsyncMain(%throwing) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
   %out_literal = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%out_literal : $Builtin.Int32)
   return %out : $Int32

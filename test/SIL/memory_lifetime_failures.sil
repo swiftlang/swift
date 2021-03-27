@@ -168,3 +168,373 @@ bb0(%0 : $Int):
   return %3 : $Int
 }
 
+// CHECK: SIL memory lifetime failure in @test_switch_enum_addr: memory is initialized at function return but shouldn't
+sil [ossa] @test_switch_enum_addr : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  switch_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_switch_enum: memory is initialized at function return but shouldn't
+sil [ossa] @test_switch_enum : $@convention(thin) (@in Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  %1 = load_borrow %0 : $*Optional<T>
+  switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : $T):
+  end_borrow %1 : $Optional<T>
+  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  br bb3
+
+bb2:
+  end_borrow %1 : $Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_init_enum: indirect argument is not alive at function return
+sil [ossa] @test_init_enum : $@convention(thin) (@in_guaranteed T) -> @out Optional<T> {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  inject_enum_addr %0 : $*Optional<T>, #Optional.none!enumelt
+  br bb3
+
+bb2:
+  %5 = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_to_enum: memory is initialized, but shouldn't
+sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $Optional<T>
+  %2 = enum $Optional<T>, #Optional.none!enumelt
+  store %2 to [trivial] %1 : $*Optional<T>
+  destroy_addr %1 : $*Optional<T>
+  %3 = enum $Optional<T>, #Optional.some!enumelt, %0 : $T
+  store %3 to [init] %1 : $*Optional<T>
+  dealloc_stack %1 : $*Optional<T>
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_select_enum_addr: memory is not initialized, but should
+sil [ossa] @test_select_enum_addr : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = select_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: %1, case #Optional.none!enumelt: %2 : $Builtin.Int1
+  dealloc_stack %0 : $*Optional<T>
+  return %3 : $Builtin.Int1
+}
+
+sil [ossa] @closure : $@convention(thin) (@in_guaranteed T) -> () 
+
+// CHECK: SIL memory lifetime failure in @test_non_escaping_closure: memory is initialized at function return but shouldn't
+sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in T) -> () {
+bb0(%0 :  $*T):
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_escaping_closure: indirect argument is not alive at function return
+sil [ossa] @test_escaping_closure : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 :  $*T):
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  destroy_value %pa : $@callee_owned () -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_destroy: memory is not initialized, but should
+sil [ossa] @test_store_borrow_destroy : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  destroy_addr %s : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @func_with_inout_param : $@convention(thin) (@inout T) -> ()
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_inout: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_inout : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  %f = function_ref @func_with_inout_param : $@convention(thin) (@inout T) -> ()
+  %a = apply %f(%s) : $@convention(thin) (@inout T) -> ()
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_store: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_store : $@convention(thin) (@guaranteed T, @owned T) -> () {
+bb0(%0 :  @guaranteed $T, %1 : @owned $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  store %1 to [assign] %s : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_load: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_load : $@convention(thin) (@guaranteed T) -> @owned T {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %0 to %s : $*T
+  %res = load [take] %s : $*T
+  dealloc_stack %s : $*T
+  return %res : $T
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_copy_src: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_copy_src : $@convention(thin) (@guaranteed T) -> @out T {
+bb0(%0 :  $*T, %1 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %1 to %s : $*T
+  copy_addr [take] %s to [initialization] %0 : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_copy_dst: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_copy_dst : $@convention(thin) (@in_guaranteed T, @guaranteed T) -> () {
+bb0(%0 :  $*T, %1 :  @guaranteed $T):
+  %s = alloc_stack $T
+  store_borrow %1 to %s : $*T
+  copy_addr %0 to %s : $*T
+  dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_init_enum: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_init_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
+bb0(%0 :  @guaranteed $Optional<T>):
+  %s = alloc_stack $Optional<T>
+  store_borrow %0 to %s : $*Optional<T>
+  %ie = init_enum_data_addr %s : $*Optional<T>, #Optional.some!enumelt
+  dealloc_stack %s : $*Optional<T>
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_store_borrow_take_enum: store-borrow location cannot be written
+sil [ossa] @test_store_borrow_take_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
+bb0(%0 :  @guaranteed $Optional<T>):
+  %s = alloc_stack $Optional<T>
+  store_borrow %0 to %s : $*Optional<T>
+  %ue = unchecked_take_enum_data_addr %s : $*Optional<T>, #Optional.some!enumelt
+  dealloc_stack %s : $*Optional<T>
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_cast_br_take_always: memory is not initialized, but should
+sil [ossa] @test_cast_br_take_always : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br take_always U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  destroy_addr %0 : $*U
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_cast_br_take_on_success: lifetime mismatch in predecessors
+sil [ossa] @test_cast_br_take_on_success : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br take_on_success U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_cast_br_copy_on_success: lifetime mismatch in predecessors
+sil [ossa] @test_cast_br_copy_on_success : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  checked_cast_addr_br copy_on_success U in %0 : $*U to V in %s : $*V, bb1, bb2
+bb1:
+  destroy_addr %s : $*V
+  br bb3
+bb2:
+  destroy_addr %0 : $*U
+  br bb3
+bb3:
+  dealloc_stack %s : $*V
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_1: memory is initialized, but shouldn't
+sil [ossa] @test_unconditional_checked_cast_1 : $@convention(thin) <U, V> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unconditional_checked_cast_addr U in %0 : $*U to V in %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_unconditional_checked_cast_2: memory is not initialized, but should
+sil [ossa] @test_unconditional_checked_cast_2 : $@convention(thin) <U, V> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %u = alloc_stack $U
+  %s = alloc_stack $V
+  unconditional_checked_cast_addr U in %u : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  dealloc_stack %u : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_1: memory is initialized, but shouldn't
+sil [ossa] @test_unchecked_ref_cast_1 : $@convention(thin) <U : AnyObject, V : AnyObject> (@in U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $V
+  unchecked_ref_cast_addr U in %0 : $*U to V in %s : $*V
+  dealloc_stack %s : $*V
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_unchecked_ref_cast_2: memory is not initialized, but should
+sil [ossa] @test_unchecked_ref_cast_2 : $@convention(thin) <U : AnyObject, V : AnyObject> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %u = alloc_stack $U
+  %s = alloc_stack $V
+  unchecked_ref_cast_addr U in %u : $*U to V in %s : $*V
+  destroy_addr %s : $*V
+  dealloc_stack %s : $*V
+  dealloc_stack %u : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+protocol P {}
+
+// CHECK: SIL memory lifetime failure in @test_init_existential: memory is not initialized, but should
+sil [ossa] @test_init_existential : $@convention(thin) <U: P> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $P
+  %i = init_existential_addr %s : $*P, $U
+  destroy_addr %s : $*P
+  dealloc_stack %s : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_open_existential: memory is not initialized, but should
+sil [ossa] @test_open_existential : $@convention(thin) <U: P> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %s = alloc_stack $P
+  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  copy_addr %o to [initialization] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  destroy_addr %s : $*P
+  dealloc_stack %s : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_existential_metatype: memory is not initialized, but should
+sil [ossa] @test_existential_metatype : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $P
+  %714 = existential_metatype $@thick P.Type, %0 : $*P
+  dealloc_stack %0 : $*P
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_value_metatype: memory is not initialized, but should
+sil [ossa] @test_value_metatype : $@convention(thin) <U> (@in_guaranteed U) -> () {
+bb0(%0 : $*U):
+  %1 = alloc_stack $U
+  %2 = value_metatype $@thick U.Type, %1 : $*U
+  dealloc_stack %1 : $*U
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_is_unique: memory is not initialized, but should
+sil [ossa] @test_is_unique : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $T
+  %1 = is_unique %0 : $*T
+  dealloc_stack %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_fix_lifetime: memory is not initialized, but should
+sil [ossa] @test_fix_lifetime : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $T
+  fix_lifetime %0 : $*T
+  dealloc_stack %0 : $*T
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil @modify_bool : $@convention(thin) (@inout_aliasable Bool) -> ()
+
+// CHECK: SIL memory lifetime failure in @test_trivial_alloc_stack: memory is not initialized, but should
+sil [ossa] @test_trivial_alloc_stack : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $Bool
+  store %0 to [trivial] %1 : $*Bool
+  dealloc_stack %1 : $*Bool
+  %8 = function_ref @modify_bool : $@convention(thin) (@inout_aliasable Bool) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@inout_aliasable Bool) -> ()
+  %10 = tuple ()
+  return %10 : $()
+}

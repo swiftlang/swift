@@ -1,87 +1,57 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
+// UNSUPPORTED: OS=windows-msvc
 
-import Dispatch
+struct Boom: Error {}
+struct IgnoredBoom: Error {}
 
-struct Boom: Error {
-}
+func one() async -> Int { 1 }
 
-struct IgnoredBoom: Error {
-}
-
-func one()
-
-async -> Int {
-  1
-}
-
-func boom()
-
-async throws -> Int {
+func boom() async throws -> Int {
   throw Boom()
 }
 
 func test_taskGroup_throws() async {
-  do {
-    let got = try await Task.withGroup(resultType: Int.self) {
-      group async throws -> Int in
-      await group.add { await one() }
-      await group.add { try await boom()  }
+  let got: Int = await Task.withGroup(resultType: Int.self) { group in
+    await group.add { try await boom()  }
 
-      do {
-        while let r = try await group.next() {
-          print("next: \(r)")
-        }
-      } catch {
-        print("error caught in group: \(error)")
+    do {
+      while let r = try await group.next() {
+        print("next: \(r)")
+      }
+    } catch {
+      print("error caught in group: \(error)")
 
-        await group.add { () async -> Int in
-          print("task 3 (cancelled: \(await Task.isCancelled()))")
-          return 3
-        }
+      let gc = group.isCancelled
+      print("group cancelled: \(gc)")
 
-        guard let got = try! await group.next() else {
-          print("task group failed to get 3 (:\(#line))")
-          return 0
-        }
-
-        print("task group next: \(got)")
-
-        if got == 1 {
-          // the previous 1 completed before the 3 we just submitted,
-          // we still want to see that three so let's await for it
-          guard let third = try! await group.next() else {
-            print("task group failed to get 3 (:\(#line))")
-            return got
-          }
-
-          print("task group returning normally: \(third)")
-          return third
-        } else {
-          print("task group returning normally: \(got)")
-          return got
-        }
+      await group.add { () async -> Int in
+        let c = Task.isCancelled
+        print("task 3 (cancelled: \(c))")
+        return 3
       }
 
-      fatalError("Should have thrown and handled inside the catch block")
+      guard let third = try! await group.next() else {
+        print("task group failed to get 3")
+        return 0
+      }
+
+      print("task group returning normally: \(third)")
+      return third
     }
 
-    // Optionally, we may get the first result back before the failure:
-    // COM: next: 1
-    // CHECK: error caught in group: Boom()
-    // CHECK: task 3 (cancelled: false)
-    // CHECK: task group returning normally: 3
-    // CHECK: got: 3
-
-    print("got: \(got)")
-  } catch {
-    print("rethrown: \(error)")
-    fatalError("Expected recovered result, but got error: \(error)")
+    fatalError("Should have thrown and handled inside the catch block")
   }
+
+  // CHECK: error caught in group: Boom()
+  // CHECK: group cancelled: false
+  // CHECK: task 3 (cancelled: false)
+  // CHECK: task group returning normally: 3
+  // CHECK: got: 3
+
+  print("got: \(got)")
 }
 
 

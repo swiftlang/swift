@@ -49,6 +49,8 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
 #include "clang/AST/DeclTemplate.h"
+#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -812,6 +814,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, ARE_PRIVATE_IMPORTS_ENABLED);
   BLOCK_RECORD(options_block, RESILIENCE_STRATEGY);
   BLOCK_RECORD(options_block, IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED);
+  BLOCK_RECORD(options_block, MODULE_ABI_NAME);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -997,6 +1000,11 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::IsAllowModuleWithCompilerErrorsEnabledLayout
             AllowErrors(Out);
         AllowErrors.emit(ScratchRecord);
+      }
+
+      if (M->getABIName() != M->getName()) {
+        options_block::ModuleABINameLayout ABIName(Out);
+        ABIName.emit(ScratchRecord, M->getABIName().str());
       }
 
       if (options.SerializeOptionsForDebugging) {
@@ -2530,7 +2538,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<CustomAttr>(DA);
       CustomDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        theAttr->isImplicit(),
-                                       S.addTypeRef(theAttr->getType()));
+                                       S.addTypeRef(theAttr->getType()),
+                                       theAttr->isArgUnsafe());
       return;
     }
 
@@ -2610,6 +2619,21 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, paramIndicesVector);
+      return;
+    }
+
+    case DAK_CompletionHandlerAsync: {
+      auto *attr = cast<CompletionHandlerAsyncAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[CompletionHandlerAsyncDeclAttrLayout::Code];
+
+      assert(attr->AsyncFunctionDecl &&
+             "Serializing unresolved completion handler async function decl");
+      auto asyncFuncDeclID = S.addDeclRef(attr->AsyncFunctionDecl);
+
+      CompletionHandlerAsyncDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->CompletionHandlerIndex,
+          asyncFuncDeclID);
       return;
     }
     }
@@ -2716,11 +2740,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     TypeID completionHandlerTypeID = S.addTypeRef(fac.completionHandlerType());
     unsigned rawErrorParameterIndex = fac.completionHandlerErrorParamIndex()
       .map([](unsigned index) { return index + 1; }).getValueOr(0);
+    unsigned rawErrorFlagParameterIndex = fac.completionHandlerFlagParamIndex()
+      .map([](unsigned index) { return index + 1; }).getValueOr(0);
     auto abbrCode = S.DeclTypeAbbrCodes[ForeignAsyncConventionLayout::Code];
     ForeignAsyncConventionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                              completionHandlerTypeID,
                                              fac.completionHandlerParamIndex(),
-                                             rawErrorParameterIndex);
+                                             rawErrorParameterIndex,
+                                             rawErrorFlagParameterIndex,
+                                             fac.completionHandlerFlagIsErrorOnZero());
   }
 
   void writeGenericParams(const GenericParamList *genericParams) {
@@ -2976,6 +3004,9 @@ public:
   }
 
   void visit(const Decl *D) {
+    if (D->isInvalid())
+      writeDeclErrorFlag();
+
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(D, Attr);
@@ -2988,6 +3019,12 @@ public:
     }
 
     DeclVisitor<DeclSerializer>::visit(const_cast<Decl *>(D));
+  }
+
+  void writeDeclErrorFlag() {
+    using namespace decls_block;
+    unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorFlagLayout::Code];
+    ErrorFlagLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
   }
 
   void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
@@ -3124,10 +3161,14 @@ public:
     auto associativity = getRawStableAssociativity(group->getAssociativity());
 
     SmallVector<DeclID, 8> relations;
-    for (auto &rel : group->getHigherThan())
+    for (auto &rel : group->getHigherThan()) {
+      assert(rel.Group && "Undiagnosed invalid precedence group!");
       relations.push_back(S.addDeclRef(rel.Group));
-    for (auto &rel : group->getLowerThan())
+    }
+    for (auto &rel : group->getLowerThan()) {
+      assert(rel.Group && "Undiagnosed invalid precedence group!");
       relations.push_back(S.addDeclRef(rel.Group));
+    }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[PrecedenceGroupLayout::Code];
     PrecedenceGroupLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3397,6 +3438,7 @@ public:
                             contextID.getOpaqueValue(),
                             theClass->isImplicit(),
                             theClass->isObjC(),
+                            theClass->isExplicitActor(),
                             mutableClass->inheritsSuperclassInitializers(),
                             mutableClass->hasMissingDesignatedInitializers(),
                             S.addGenericSignatureRef(
@@ -3480,7 +3522,7 @@ public:
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
 
-    if (auto backingInfo = var->getPropertyWrapperBackingPropertyInfo()) {
+    if (auto backingInfo = var->getPropertyWrapperAuxiliaryVariables()) {
       if (backingInfo.backingVar) {
         ++numBackingProperties;
         arrayFields.push_back(S.addDeclRef(backingInfo.backingVar));
@@ -3682,6 +3724,7 @@ public:
                                uint8_t(getStableSelfAccessKind(
                                                   fn->getSelfAccessKind())),
                                fn->hasForcedStaticDispatch(),
+                               fn->hasAsync(),
                                fn->hasThrows(),
                                S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),
@@ -4102,8 +4145,8 @@ public:
     llvm_unreachable("should not serialize an UnresolvedType");
   }
 
-  void visitHoleType(const HoleType *) {
-    llvm_unreachable("should not serialize a HoleType");
+  void visitPlaceholderType(const PlaceholderType *) {
+    llvm_unreachable("should not serialize a PlaceholderType");
   }
 
   void visitModuleType(const ModuleType *) {
@@ -4316,6 +4359,7 @@ public:
       S.getASTContext().LangOpts.UseClangFunctionTypes
       ? S.addClangTypeRef(fnTy->getClangTypeInfo().getType())
       : ClangTypeID(0);
+    auto globalActor = S.addTypeRef(fnTy->getGlobalActor());
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4323,10 +4367,11 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         clangType,
         fnTy->isNoEscape(),
-        fnTy->isConcurrent(),
+        fnTy->isSendable(),
         fnTy->isAsync(),
         fnTy->isThrowing(),
-        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
+        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
+        globalActor);
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -4339,8 +4384,9 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-        fnTy->isConcurrent(), fnTy->isAsync(), fnTy->isThrowing(),
+        fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
+        S.addTypeRef(fnTy->getGlobalActor()),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -4417,7 +4463,7 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isConcurrent(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
@@ -4649,6 +4695,8 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<UnboundGenericTypeLayout>();
   registerDeclTypeAbbr<OptionalTypeLayout>();
   registerDeclTypeAbbr<DynamicSelfTypeLayout>();
+
+  registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();
@@ -5456,7 +5504,7 @@ void Serializer::writeToStream(
     S.writeInputBlock(options);
     S.writeSIL(SILMod, options.SerializeAllSIL);
     S.writeAST(DC);
-    if (options.ExperimentalCrossModuleIncrementalInfo && DepGraph) {
+    if (!options.DisableCrossModuleIncrementalInfo && DepGraph) {
       fine_grained_dependencies::writeFineGrainedDependencyGraph(
           S.Out, *DepGraph, fine_grained_dependencies::Purpose::ForSwiftModule);
     }
@@ -5572,5 +5620,21 @@ void swift::serialize(ModuleOrSourceFile DC,
       writeSourceInfoToStream(out, DC);
       return false;
     });
+  }
+
+  if (!options.SymbolGraphOutputDir.empty()) {
+    if (DC.is<ModuleDecl *>()) {
+      auto *M = DC.get<ModuleDecl*>();
+      FrontendStatsTracer tracer(getContext(DC).Stats,
+                                 "Serialization, symbolgraph");
+      symbolgraphgen::SymbolGraphOptions SGOpts {
+        options.SymbolGraphOutputDir,
+        M->getASTContext().LangOpts.Target,
+        /* PrettyPrint */false,
+        AccessLevel::Public,
+        /*EmitSynthesizedMembers*/true,
+      };
+      symbolgraphgen::emitSymbolGraphForModule(M, SGOpts);
+    }
   }
 }

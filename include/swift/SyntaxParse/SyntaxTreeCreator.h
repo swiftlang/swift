@@ -18,7 +18,6 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
-  class RawSyntaxTokenCache;
   class SourceManager;
   class SyntaxParsingCache;
   class SourceFile;
@@ -34,7 +33,7 @@ class SourceFileSyntax;
 ///
 /// It also handles caching re-usable RawSyntax objects and skipping parsed
 /// nodes via consulting a \c SyntaxParsingCache.
-class SyntaxTreeCreator: public SyntaxParseActions {
+class SyntaxTreeCreator final : public SyntaxParseActions {
   SourceManager &SM;
   unsigned BufferID;
   RC<syntax::SyntaxArena> Arena;
@@ -48,10 +47,6 @@ class SyntaxTreeCreator: public SyntaxParseActions {
   /// A cache of nodes that can be reused when creating the current syntax
   /// tree.
   SyntaxParsingCache *SyntaxCache;
-
-  /// Tokens nodes that have already been created and may be reused in other
-  /// parts of the syntax tree.
-  std::unique_ptr<RawSyntaxTokenCache> TokenCache;
 
 public:
   SyntaxTreeCreator(SourceManager &SM, unsigned bufferID,
@@ -69,14 +64,33 @@ private:
 
   OpaqueSyntaxNode recordMissingToken(tok tokenKind, SourceLoc loc) override;
 
-  OpaqueSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
-                                   ArrayRef<OpaqueSyntaxNode> elements,
-                                   CharSourceRange range) override;
-
-  void discardRecordedNode(OpaqueSyntaxNode node) override;
+  OpaqueSyntaxNode
+  recordRawSyntax(syntax::SyntaxKind kind,
+                  ArrayRef<OpaqueSyntaxNode> elements) override;
 
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;
+
+  OpaqueSyntaxNode makeDeferredToken(tok tokenKind, StringRef leadingTrivia,
+                                     StringRef trailingTrivia,
+                                     CharSourceRange range,
+                                     bool isMissing) override;
+
+  OpaqueSyntaxNode makeDeferredLayout(
+      syntax::SyntaxKind k, bool IsMissing,
+      const MutableArrayRef<ParsedRawSyntaxNode> &children) override;
+
+  OpaqueSyntaxNode recordDeferredToken(OpaqueSyntaxNode deferred) override;
+  OpaqueSyntaxNode recordDeferredLayout(OpaqueSyntaxNode deferred) override;
+
+  DeferredNodeInfo getDeferredChild(OpaqueSyntaxNode node,
+                                    size_t ChildIndex) const override;
+
+  CharSourceRange getDeferredChildRange(OpaqueSyntaxNode node,
+                                        size_t ChildIndex,
+                                        SourceLoc StartLoc) const override;
+
+  size_t getDeferredNumChildren(OpaqueSyntaxNode node) override;
 };
 
 } // end namespace swift

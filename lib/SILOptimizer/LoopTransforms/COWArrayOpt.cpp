@@ -25,7 +25,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -105,6 +105,7 @@ class COWArrayOpt {
   RCIdentityFunctionInfo *RCIA;
   SILFunction *Function;
   SILLoop *Loop;
+  Optional<SmallVector<SILBasicBlock *, 8>> LoopExitingBlocks;
   SILBasicBlock *Preheader;
   DominanceInfo *DomTree;
   bool HasChanged = false;
@@ -195,6 +196,16 @@ private:
       return inst->getOperand(0);
     return cast<SingleValueInstruction>(inst);
   }
+
+  ArrayRef<SILBasicBlock *> getLoopExitingBlocks() const {
+    if (!LoopExitingBlocks) {
+      auto *self = const_cast<COWArrayOpt *>(this);
+      self->LoopExitingBlocks.emplace();
+      Loop->getExitingBlocks(*self->LoopExitingBlocks);
+    }
+    return *LoopExitingBlocks;
+  }
+
 };
 } // end anonymous namespace
 
@@ -990,9 +1001,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
 }
 
 bool COWArrayOpt::dominatesExitingBlocks(SILBasicBlock *BB) {
-  llvm::SmallVector<SILBasicBlock *, 8> ExitingBlocks;
-  Loop->getExitingBlocks(ExitingBlocks);
-  for (SILBasicBlock *Exiting : ExitingBlocks) {
+  for (SILBasicBlock *Exiting : getLoopExitingBlocks()) {
     if (!DomTree->dominates(BB, Exiting))
       return false;
   }

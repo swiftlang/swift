@@ -53,6 +53,7 @@
 ///
 ///===----------------------------------------------------------------------===///
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Concurrency.h"
 #include "TaskPrivate.h"
 
@@ -61,14 +62,39 @@
 using namespace swift;
 
 SWIFT_CC(swift)
-void (*swift::swift_task_enqueueGlobal_hook)(Job *job) = nullptr;
+void (*swift::swift_task_enqueueGlobal_hook)(
+    Job *job, swift_task_enqueueGlobal_original original) = nullptr;
+
+SWIFT_CC(swift)
+void (*swift::swift_task_enqueueGlobalWithDelay_hook)(
+    unsigned long long delay, Job *job,
+    swift_task_enqueueGlobalWithDelay_original original) = nullptr;
+
+SWIFT_CC(swift)
+void (*swift::swift_task_enqueueMainExecutor_hook)(
+    Job *job, swift_task_enqueueMainExecutor_original original) = nullptr;
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+
+#include <chrono>
+#include <thread>
+
 static Job *JobQueue = nullptr;
+
+class DelayedJob {
+public:
+  Job *job;
+  unsigned long long when;
+  DelayedJob *next;
+
+  DelayedJob(Job *job, unsigned long long when) : job(job), when(when), next(nullptr) {}
+};
+
+static DelayedJob *DelayedJobQueue = nullptr;
 
 /// Get the next-in-queue storage slot.
 static Job *&nextInQueue(Job *cur) {
-  return reinterpret_cast<Job*&>(cur->SchedulerPrivate);
+  return reinterpret_cast<Job*&>(&cur->SchedulerPrivate[NextWaitingTaskIndex]);
 }
 
 /// Insert a job into the cooperative global queue.
@@ -89,13 +115,58 @@ static void insertIntoJobQueue(Job *newJob) {
   *position = newJob;
 }
 
+static unsigned long long currentNanos() {
+  auto now = std::chrono::steady_clock::now();
+  auto nowNanos = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
+  auto value = std::chrono::duration_cast<std::chrono::nanoseconds>(nowNanos.time_since_epoch());
+  return value.count();
+}
+
+/// Insert a job into the cooperative global queue.
+static void insertIntoDelayedJobQueue(unsigned long long delay, Job *job) {
+  DelayedJob **position = &DelayedJobQueue;
+  DelayedJob *newJob = new DelayedJob(job, currentNanos() + delay);
+
+  while (auto cur = *position) {
+    // If we find a job with lower priority, insert here.
+    if (cur->when > newJob->when) {
+      newJob->next = cur;
+      *position = newJob;
+      return;
+    }
+
+    // Otherwise, keep advancing through the queue.
+    position = &cur->next;
+  }
+  *position = newJob;
+}
+
 /// Claim the next job from the cooperative global queue.
 static Job *claimNextFromJobQueue() {
-  if (auto job = JobQueue) {
-    JobQueue = nextInQueue(job);
-    return job;
+  // Check delayed jobs first
+  while (true) {
+    if (auto delayedJob = DelayedJobQueue) {
+      if (delayedJob->when < currentNanos()) {
+        DelayedJobQueue = delayedJob->next;
+        auto job = delayedJob->job;
+        
+        delete delayedJob;
+
+        return job;
+      }
+    }
+    if (auto job = JobQueue) {
+      JobQueue = nextInQueue(job);
+      return job;
+    }
+    // there are only delayed jobs left, but they are not ready,
+    // so we sleep until the first one is
+    if (auto delayedJob = DelayedJobQueue) {
+      std::this_thread::sleep_for(std::chrono::nanoseconds(delayedJob->when - currentNanos()));
+      continue;
+    }
+    return nullptr;
   }
-  return nullptr;
 }
 
 void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
@@ -112,7 +183,7 @@ void swift::donateThreadToGlobalExecutorUntil(bool (*condition)(void *),
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
   Job *job = (Job*) _job;
-  job->run(ExecutorRef::generic());
+  swift_job_run(job, ExecutorRef::generic());
 }
 
 /// A specialized version of __swift_run_job to execute the job on the main
@@ -120,17 +191,41 @@ static void __swift_run_job(void *_job) {
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
 static void __swift_run_job_main_executor(void *_job) {
   Job *job = (Job*) _job;
-  job->run(ExecutorRef::mainExecutor());
+  swift_job_run(job, ExecutorRef::mainExecutor());
+}
+
+static constexpr size_t globalQueueCacheCount =
+    static_cast<size_t>(JobPriority::UserInteractive) + 1;
+static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
+
+static dispatch_queue_t getGlobalQueue(JobPriority priority) {
+  size_t numericPriority = static_cast<size_t>(priority);
+  if (numericPriority >= globalQueueCacheCount)
+    fatalError(0, "invalid job priority %#zx");
+
+  auto *ptr = &globalQueueCache[numericPriority];
+  auto queue = ptr->load(std::memory_order_relaxed);
+  if (SWIFT_LIKELY(queue))
+    return queue;
+
+  // If we don't have a queue cached for this priority, cache it now. This may
+  // race with other threads doing this at the same time for this priority, but
+  // that's OK, they'll all end up writing the same value.
+  queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
+                                    /*flags*/ 0);
+
+  // Unconditionally store it back in the cache. If we raced with another
+  // thread, we'll just overwrite the entry with the same value.
+  ptr->store(queue, std::memory_order_relaxed);
+
+  return queue;
 }
 
 #endif
 
-void swift::swift_task_enqueueGlobal(Job *job) {
+SWIFT_CC(swift)
+static void swift_task_enqueueGlobalImpl(Job *job) {
   assert(job && "no job provided");
-
-  // If the hook is defined, use it.
-  if (swift_task_enqueueGlobal_hook)
-    return swift_task_enqueueGlobal_hook(job);
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   insertIntoJobQueue(job);
@@ -169,18 +264,53 @@ void swift::swift_task_enqueueGlobal(Job *job) {
 
   JobPriority priority = job->getPriority();
 
-  // TODO: cache this to avoid the extra call
-  auto queue = dispatch_get_global_queue((dispatch_qos_class_t) priority,
-                                         /*flags*/ 0);
+  auto queue = getGlobalQueue(priority);
 
   dispatch_async_f(queue, dispatchContext, dispatchFunction);
 #endif
 }
 
+void swift::swift_task_enqueueGlobal(Job *job) {
+  if (swift_task_enqueueGlobal_hook)
+    swift_task_enqueueGlobal_hook(job, swift_task_enqueueGlobal);
+  else
+    swift_task_enqueueGlobalImpl(job);
+}
+
+SWIFT_CC(swift)
+static void swift_task_enqueueGlobalWithDelayImpl(unsigned long long delay,
+                                                  Job *job) {
+  assert(job && "no job provided");
+
+#if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
+  insertIntoDelayedJobQueue(delay, job);
+#else
+
+  dispatch_function_t dispatchFunction = &__swift_run_job;
+  void *dispatchContext = job;
+
+  JobPriority priority = job->getPriority();
+
+  auto queue = getGlobalQueue(priority);
+
+  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
+  dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
+#endif
+}
+
+void swift::swift_task_enqueueGlobalWithDelay(unsigned long long delay,
+                                              Job *job) {
+  if (swift_task_enqueueGlobalWithDelay_hook)
+    swift_task_enqueueGlobalWithDelay_hook(
+        delay, job, swift_task_enqueueGlobalWithDelayImpl);
+  else
+    swift_task_enqueueGlobalWithDelayImpl(delay, job);
+}
 
 /// Enqueues a task on the main executor.
 /// FIXME: only exists for the quick-and-dirty MainActor implementation.
-void swift::swift_task_enqueueMainExecutor(Job *job) {
+SWIFT_CC(swift)
+static void swift_task_enqueueMainExecutorImpl(Job *job) {
   assert(job && "no job provided");
 
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
@@ -190,11 +320,21 @@ void swift::swift_task_enqueueMainExecutor(Job *job) {
   dispatch_function_t dispatchFunction = &__swift_run_job_main_executor;
   void *dispatchContext = job;
 
-  // TODO: cache this to avoid the extra call
+  // This is an inline function that compiles down to a pointer to a global.
   auto mainQueue = dispatch_get_main_queue();
 
   dispatch_async_f(mainQueue, dispatchContext, dispatchFunction);
 
 #endif
-
 }
+
+void swift::swift_task_enqueueMainExecutor(Job *job) {
+  if (swift_task_enqueueMainExecutor_hook)
+    swift_task_enqueueMainExecutor_hook(job,
+                                        swift_task_enqueueMainExecutorImpl);
+  else
+    swift_task_enqueueMainExecutorImpl(job);
+}
+
+#define OVERRIDE_GLOBAL_EXECUTOR COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

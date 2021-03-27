@@ -40,8 +40,11 @@ static StringRef getScoreKindName(ScoreKind kind) {
   case SK_Unavailable:
     return "use of an unavailable declaration";
 
-  case SK_AsyncSyncMismatch:
-    return "async/synchronous mismatch";
+  case SK_AsyncInSyncMismatch:
+    return "async-in-synchronous mismatch";
+
+  case SK_SyncInAsync:
+    return "sync-in-asynchronous";
 
   case SK_ForwardTrailingClosure:
     return "forward scan when matching a trailing closure";
@@ -81,6 +84,9 @@ static StringRef getScoreKindName(ScoreKind kind) {
 
   case SK_ValueToPointerConversion:
     return "value-to-pointer conversion";
+
+  case SK_FunctionToAutoClosureConversion:
+    return "function to autoclosure parameter";
   }
 }
 
@@ -754,13 +760,47 @@ static void addKeyPathDynamicMemberOverloads(
   }
 }
 
+SolutionCompareResult compareSolutionsForCodeCompletion(
+    ConstraintSystem &cs, ArrayRef<Solution> solutions, unsigned idx1,
+    unsigned idx2) {
+
+  // When solving for code completion we can't consider one solution worse than
+  // another according to the same rules as regular compilation. For example,
+  // with the code below:
+  //
+  //  func foo(_ x: Int) -> Int {}
+  //  func foo<T>(_ x: T) -> String {}
+  //  foo(3).<complete here> // Still want solutions with for both foo
+  //                         // overloads - String and Int members are both
+  //                         // valid here.
+  //
+  // the comparison for regular compilation considers the solution with the more
+  // specialized `foo` overload `foo(_: Int)` to be better than the solution
+  // with the generic overload `foo(_: T)` even though both are otherwise
+  // viable. For code completion purposes offering members of 'String' based
+  // on the solution with the generic overload is equally as import as offering
+  // members of 'Int' as choosing one of those completions will then result in
+  // regular compilation resolving the call to the generic overload instead.
+
+  if (solutions[idx1].getFixedScore() == solutions[idx2].getFixedScore())
+    return SolutionCompareResult::Incomparable;
+  return solutions[idx1].getFixedScore() < solutions[idx2].getFixedScore()
+             ? SolutionCompareResult::Better
+             : SolutionCompareResult::Worse;
+}
+
+
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
-    const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
+    const SolutionDiff &diff, unsigned idx1, unsigned idx2,
+    bool isForCodeCompletion) {
   if (cs.isDebugMode()) {
     llvm::errs().indent(cs.solverState->depth * 2)
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
   }
+
+  if (isForCodeCompletion)
+    return compareSolutionsForCodeCompletion(cs, solutions, idx1, idx2);
 
   // Whether the solutions are identical.
   bool identical = true;
@@ -797,7 +837,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   SmallVector<SolutionDiff::OverloadDiff, 4> overloadDiff(diff.overloads);
   // Single type of keypath dynamic member lookup could refer to different
-  // member overlaods, we have to do a pair-wise comparison in such cases
+  // member overloads, we have to do a pair-wise comparison in such cases
   // otherwise ranking would miss some viable information e.g.
   // `_ = arr[0..<3]` could refer to subscript through writable or read-only
   // key path and each of them could also pick overload which returns `Slice<T>`
@@ -1297,7 +1337,8 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   SmallVector<bool, 16> losers(viable.size(), false);
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
-    switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
+    switch (compareSolutions(*this, viable, diff, i, bestIdx,
+                             isForCodeCompletion())) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1321,7 +1362,8 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     if (i == bestIdx)
       continue;
 
-    switch (compareSolutions(*this, viable, diff, bestIdx, i)) {
+    switch (compareSolutions(*this, viable, diff, bestIdx, i,
+                             isForCodeCompletion())) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1373,7 +1415,8 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       if (losers[j])
         continue;
 
-      switch (compareSolutions(*this, viable, diff, i, j)) {
+      switch (compareSolutions(*this, viable, diff, i, j,
+                               isForCodeCompletion())) {
       case SolutionCompareResult::Identical:
         // FIXME: Dub one of these the loser arbitrarily?
         break;

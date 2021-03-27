@@ -385,8 +385,17 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
-  Opts.EnableExperimentalConcurrentValueChecking |=
-    Args.hasArg(OPT_enable_experimental_concurrent_value_checking);
+  Opts.EnableInferPublicSendable |=
+    Args.hasFlag(OPT_enable_infer_public_concurrent_value,
+                 OPT_disable_infer_public_concurrent_value,
+                 false);
+  Opts.EnableExperimentalAsyncHandler |=
+    Args.hasArg(OPT_enable_experimental_async_handler);
+  Opts.EnableExperimentalFlowSensitiveConcurrentCaptures |=
+    Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures);
+
+  Opts.EnableExperimentalEnumCodableDerivation |=
+      Args.hasArg(OPT_enable_experimental_enum_codable_derivation);
 
   Opts.DisableImplicitConcurrencyModuleImport |=
     Args.hasArg(OPT_disable_implicit_concurrency_module_import);
@@ -480,8 +489,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // This can be enabled independently of the playground transform.
   Opts.PCMacro |= Args.hasArg(OPT_pc_macro);
 
-  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
-
   Opts.EnableThrowWithoutTry |= Args.hasArg(OPT_enable_throw_without_try);
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_foundation_module,
@@ -489,9 +496,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableObjCAttrRequiresFoundation
       = A->getOption().matches(OPT_enable_objc_attr_requires_foundation_module);
   }
-
-  Opts.EnableExperimentalPrespecialization |=
-      Args.hasArg(OPT_enable_experimental_prespecialization);
 
   if (auto A = Args.getLastArg(OPT_enable_testable_attr_requires_testable_module,
                                OPT_disable_testable_attr_requires_testable_module)) {
@@ -544,6 +548,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
     }
   }
+
+  Opts.WarnConcurrency |= Args.hasArg(OPT_warn_concurrency);
 
   Opts.WarnImplicitOverrides =
     Args.hasArg(OPT_warn_implicit_overrides);
@@ -681,6 +687,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // If we are doing index-while-building, configure lexing and parsing to
   // remember comments.
   if (!FrontendOpts.IndexStorePath.empty()) {
+    Opts.AttachCommentsToDecls = true;
+  }
+
+  // If we are emitting a symbol graph file, configure lexing and parsing to
+  // remember comments.
+  if (FrontendOpts.EmitSymbolGraph) {
     Opts.AttachCommentsToDecls = true;
   }
 
@@ -857,7 +869,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
                           {"-working-directory", workingDirectory.str()});
   }
 
-  Opts.InferImportAsMember |= Args.hasArg(OPT_enable_infer_import_as_member);
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))
@@ -1179,7 +1190,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
+  Opts.EnableCopyPropagation |= Args.hasArg(OPT_enable_copy_propagation);
+  Opts.DisableCopyPropagation |= Args.hasArg(OPT_disable_copy_propagation);
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
+  Opts.EnableOSSAModules |= Args.hasArg(OPT_enable_ossa_modules);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.EnableSpeculativeDevirtualization |= Args.hasArg(OPT_enable_spec_devirt);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);

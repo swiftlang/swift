@@ -44,16 +44,16 @@ extension Optional: Differentiable where Wrapped: Differentiable {
       }
     }
 
-    public mutating func move(along direction: TangentVector) {
-      if let value = direction.value {
-        self.value?.move(along: value)
+    public mutating func move(by offset: TangentVector) {
+      if let value = offset.value {
+        self.value?.move(by: value)
       }
     }
   }
 
-  public mutating func move(along direction: TangentVector) {
-    if let value = direction.value {
-      self?.move(along: value)
+  public mutating func move(by offset: TangentVector) {
+    if let value = offset.value {
+      self?.move(by: value)
     }
   }
 }

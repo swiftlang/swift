@@ -22,7 +22,7 @@ public struct PartialAsyncTask {
 }
 
 @frozen
-public struct UnsafeContinuation<T> {
+public struct UnsafeContinuation<T, E: Error> {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
   @_alwaysEmitIntoClient
@@ -30,32 +30,87 @@ public struct UnsafeContinuation<T> {
     self.context = context
   }
 
+  @usableFromInline
   @_silgen_name("swift_continuation_resume")
-  public func resume(returning value: __owned T)
-}
+  internal func _resume(returning value: __owned T)
 
-extension UnsafeContinuation where T == Void {
-  @inlinable
-  public func resume() {
-    self.resume(returning: ())
-  }
-}
-
-@frozen
-public struct UnsafeThrowingContinuation<T> {
-  @usableFromInline internal var context: Builtin.RawUnsafeContinuation
-
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point.
+  ///
+  /// - Parameter value: The value to return from the continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will result in undefined behavior.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
   @_alwaysEmitIntoClient
-  internal init(_ context: Builtin.RawUnsafeContinuation) {
-    self.context = context
+  public func resume(returning value: __owned T) where E == Never {
+    self._resume(returning: value)
   }
 
+  @usableFromInline
   @_silgen_name("swift_continuation_throwingResume")
-  public func resume(returning: __owned T)
-  @_silgen_name("swift_continuation_throwingResumeWithError")
-  public func resume(throwing: __owned Error)
+  internal func _resume(returningToThrowingFunction: __owned T)
 
-  public func resume<E: Error>(with result: Result<T, E>) {
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point.
+  ///
+  /// - Parameter value: The value to return from the continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will result in undefined behavior.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume(returning value: __owned T) {
+    self._resume(returningToThrowingFunction: value)
+  }
+
+  @usableFromInline
+  @_silgen_name("swift_continuation_throwingResumeWithError")
+  internal func _resume(throwing: __owned Error)
+
+  /// Resume the task awaiting the continuation by having it throw an error
+  /// from its suspension point.
+  ///
+  /// - Parameter error: The error to throw from the continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will result in undefined behavior.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume(throwing error: __owned E) {
+    self._resume(throwing: error)
+  }
+}
+
+extension UnsafeContinuation {
+  /// Resume the task awaiting the continuation by having it either
+  /// return normally or throw an error based on the state of the given
+  /// `Result` value.
+  ///
+  /// - Parameter result: A value to either return or throw from the
+  ///   continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
     switch result {
       case .success(let val):
         self.resume(returning: val)
@@ -63,22 +118,53 @@ public struct UnsafeThrowingContinuation<T> {
         self.resume(throwing: err)
     }
   }
-}
 
-extension UnsafeThrowingContinuation where T == Void {
-  @inlinable
-  public func resume() {
+  /// Resume the task awaiting the continuation by having it either
+  /// return normally or throw an error based on the state of the given
+  /// `Result` value.
+  ///
+  /// - Parameter result: A value to either return or throw from the
+  ///   continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume(with result: Result<T, E>) {
+    switch result {
+      case .success(let val):
+        self.resume(returning: val)
+      case .failure(let err):
+        self.resume(throwing: err)
+    }
+  }
+
+  /// Resume the task awaiting the continuation by having it return normally
+  /// from its suspension point.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume() where T == Void {
     self.resume(returning: ())
   }
 }
 
 #if _runtime(_ObjC)
 
-// Intrinsics used by SILGen to resume or fail continuations
-// for
+// Intrinsics used by SILGen to resume or fail continuations.
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeContinuation<T>(
-  _ continuation: UnsafeContinuation<T>,
+  _ continuation: UnsafeContinuation<T, Never>,
   _ value: __owned T
 ) {
   continuation.resume(returning: value)
@@ -86,7 +172,7 @@ internal func _resumeUnsafeContinuation<T>(
 
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuation<T>(
-  _ continuation: UnsafeThrowingContinuation<T>,
+  _ continuation: UnsafeContinuation<T, Error>,
   _ value: __owned T
 ) {
   continuation.resume(returning: value)
@@ -94,7 +180,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
 
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
-  _ continuation: UnsafeThrowingContinuation<T>,
+  _ continuation: UnsafeContinuation<T, Error>,
   _ error: __owned Error
 ) {
   continuation.resume(throwing: error)
@@ -107,10 +193,10 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// The continuation will not begin executing until the operation function returns.
 @_alwaysEmitIntoClient
 public func withUnsafeContinuation<T>(
-  _ fn: (UnsafeContinuation<T>) -> Void
+  _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> T {
   return await Builtin.withUnsafeContinuation {
-    fn(UnsafeContinuation<T>($0))
+    fn(UnsafeContinuation<T, Never>($0))
   }
 }
 
@@ -119,9 +205,12 @@ public func withUnsafeContinuation<T>(
 /// The continuation will not begin executing until the operation function returns.
 @_alwaysEmitIntoClient
 public func withUnsafeThrowingContinuation<T>(
-  _ fn: (UnsafeThrowingContinuation<T>) -> Void
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> T {
   return try await Builtin.withUnsafeThrowingContinuation {
-    fn(UnsafeThrowingContinuation<T>($0))
+    fn(UnsafeContinuation<T, Error>($0))
   }
 }
+
+@available(*, deprecated, message: "please use UnsafeContination<..., Error>")
+public typealias UnsafeThrowingContinuation<T> = UnsafeContinuation<T, Error>

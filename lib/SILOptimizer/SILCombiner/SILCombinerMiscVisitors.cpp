@@ -19,7 +19,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
@@ -2181,6 +2181,18 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   return NewInst;
 }
 
+/// Returns true if \p val is a literal instruction or a struct of a literal
+/// instruction.
+/// What we want to catch here is a UnsafePointer<Int8> of a string literal.
+static bool isLiteral(SILValue val) {
+  while (auto *str = dyn_cast<StructInst>(val)) {
+    if (str->getNumOperands() != 1)
+      return false;
+    val = str->getOperand(0);
+  }
+  return isa<LiteralInst>(val);
+}
+
 SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   auto base = lookThroughOwnershipInsts(mdi->getBase());
 
@@ -2242,6 +2254,14 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
       }
     }
   }
+  
+  if (isLiteral(mdi->getValue())) {
+    // A literal lives forever, so no mark_dependence is needed.
+    // This pattern can occur after StringOptimization when a utf8CString of
+    // a literal is replace by the string_literal itself.
+    replaceInstUsesWith(*mdi, mdi->getValue());
+    return eraseInstFromFunction(*mdi);
+  }
 
   return nullptr;
 }
@@ -2261,5 +2281,42 @@ SILCombiner::visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *cboi) {
     }
   }
 
+  return nullptr;
+}
+
+/// Returns true if reference counting and debug_value users of a global_value
+/// can be deleted.
+static bool checkGlobalValueUsers(SILValue val,
+                                  SmallVectorImpl<SILInstruction *> &toDelete) {
+  for (Operand *use : val->getUses()) {
+    SILInstruction *user = use->getUser();
+    if (isa<RefCountingInst>(user) || isa<DebugValueInst>(user)) {
+      toDelete.push_back(user);
+      continue;
+    }
+    if (auto *upCast = dyn_cast<UpcastInst>(user)) {
+      if (!checkGlobalValueUsers(upCast, toDelete))
+        return false;
+      continue;
+    }
+    // Projection instructions don't access the object header, so they don't
+    // prevent deleting reference counting instructions.
+    if (isa<RefElementAddrInst>(user) || isa<RefTailAddrInst>(user))
+      continue;
+    return false;
+  }
+  return true;
+}
+
+SILInstruction *
+SILCombiner::visitGlobalValueInst(GlobalValueInst *globalValue) {
+  // Delete all reference count instructions on a global_value if the only other
+  // users are projections (ref_element_addr and ref_tail_addr).
+  SmallVector<SILInstruction *, 8> toDelete;
+  if (!checkGlobalValueUsers(globalValue, toDelete))
+    return nullptr;
+  for (SILInstruction *inst : toDelete) {
+    eraseInstFromFunction(*inst);
+  }
   return nullptr;
 }

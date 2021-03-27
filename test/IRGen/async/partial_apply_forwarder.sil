@@ -1,11 +1,12 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
-// RUN: %target-swift-frontend -enable-experimental-concurrency -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
+// RUN: %target-swift-frontend -enable-experimental-concurrency -g -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
+// RUN: %target-swift-frontend -enable-experimental-concurrency -g -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
 
 // REQUIRES: concurrency
 
 sil_stage canonical
 
 import Builtin
+import Swift
 
 public protocol P {}
 public class C : P {}
@@ -21,36 +22,41 @@ public protocol Observer {
   associatedtype Result
 }
 
-sil hidden @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_owned (@in O) -> () {
+sil hidden @witness_method : $@async @convention(thin) <S where S : Observable><O where O : Observer, S.Result == O.Result> (@in S) -> @owned @async @callee_guaranteed (@in O) -> () {
 bb0(%0 : $*S):
   %1 = witness_method $S, #Observable.subscribe : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
-  %2 = partial_apply %1<S, O>(%0) : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
-  return %2 : $@async @callee_owned (@in O) -> ()
+  %2 = partial_apply [callee_guaranteed] %1<S, O>(%0) : $@async @convention(witness_method: Observable) <τ_0_0 where τ_0_0 : Observable><τ_1_0 where τ_1_0 : Observer, τ_0_0.Result == τ_1_0.Result> (@in τ_1_0, @in_guaranteed τ_0_0) -> ()
+  return %2 : $@async @callee_guaranteed (@in O) -> ()
 }
 
-// CHECK-LABEL: define internal swiftcc void @"$s23unspecialized_uncurriedTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-
-sil hidden @specialized_curried : $@async @convention(thin) (@owned E) -> @owned @async @callee_owned () -> @owned D<C> {
+sil hidden @specialized_curried : $@async @convention(thin) (@owned E) -> @owned @async @callee_guaranteed () -> @owned D<C> {
 bb0(%0 : $E):
   %1 = function_ref @unspecialized_uncurried : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
-  %2 = partial_apply %1<C>(%0) : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
-  return %2 : $@async @callee_owned () -> @owned D<C>
+  %2 = partial_apply [callee_guaranteed] %1<C>(%0) : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
+  return %2 : $@async @callee_guaranteed () -> @owned D<C>
 }
 
-sil hidden_external @unspecialized_uncurried : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
+sil hidden @unspecialized_uncurried : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0> {
+entry(%e : $E):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 
-// CHECK-LABEL: define internal swiftcc void @"$s7takingPTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-sil hidden_external @takingP : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+sil hidden_external @takingP : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () {
+entry(%p : $*τ_0_0):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 sil hidden @reabstract_context : $@async @convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %6 = alloc_stack $C
   store %0 to %6 : $*C
   %8 = function_ref @takingP : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %9 = partial_apply %8<C>(%6) : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %9 = partial_apply [callee_guaranteed] %8<C>(%6) : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %6 : $*C
-  strong_release %9 : $@async @callee_owned() -> ()
+  strong_release %9 : $@async @callee_guaranteed() -> ()
   %10 = tuple ()
   return %10 : $()
 }
@@ -67,47 +73,57 @@ public class WeakBox<T> {}
 
 public struct EmptyType {}
 
-sil hidden_external @takingQ : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
-sil hidden_external @takingQAndEmpty : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>, EmptyType) -> ()
-sil hidden_external @takingEmptyAndQ : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (EmptyType, @owned WeakBox<τ_0_0>) -> ()
+sil hidden @takingQ : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> () {
+entry(%b : $WeakBox<τ_0_0>):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+sil hidden @takingQAndEmpty : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (@owned WeakBox<τ_0_0>, EmptyType) -> () {
+entry(%b : $WeakBox<τ_0_0>, %e : $EmptyType):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+sil hidden @takingEmptyAndQ : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (EmptyType, @owned WeakBox<τ_0_0>) -> () {
+entry(%e : $EmptyType, %b : $WeakBox<τ_0_0>):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bind_polymorphic_param_from_context(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s7takingQTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context(
 
-sil public @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_owned () -> () {
+sil public @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_guaranteed () -> () {
 bb0(%0 : $*τ_0_1):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
   %8 = function_ref @takingQ : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
-  %9 = partial_apply %8<BaseProducer<τ_0_1>>(%1) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
-  return %9 : $@async @callee_owned () -> ()
+  %9 = partial_apply [callee_guaranteed] %8<BaseProducer<τ_0_1>>(%1) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  return %9 : $@async @callee_guaranteed () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bind_polymorphic_param_from_context_2(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-sil public @bind_polymorphic_param_from_context_2 : $@async @convention(thin) <τ_0_1>(@in τ_0_1, EmptyType) -> @owned @async @callee_owned () -> () {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context_2(
+sil public @bind_polymorphic_param_from_context_2 : $@async @convention(thin) <τ_0_1>(@in τ_0_1, EmptyType) -> @owned @async @callee_guaranteed () -> () {
 bb0(%0 : $*τ_0_1, %2: $EmptyType):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
   %8 = function_ref @takingQAndEmpty : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>, EmptyType) -> ()
-  %9 = partial_apply %8<BaseProducer<τ_0_1>>(%1, %2) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>, EmptyType) -> ()
-  return %9 : $@async @callee_owned () -> ()
+  %9 = partial_apply [callee_guaranteed] %8<BaseProducer<τ_0_1>>(%1, %2) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>, EmptyType) -> ()
+  return %9 : $@async @callee_guaranteed () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bind_polymorphic_param_from_context_3(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-sil public @bind_polymorphic_param_from_context_3 : $@async @convention(thin) <τ_0_1>(@in τ_0_1, EmptyType) -> @owned @async @callee_owned () -> () {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context_3(
+sil public @bind_polymorphic_param_from_context_3 : $@async @convention(thin) <τ_0_1>(@in τ_0_1, EmptyType) -> @owned @async @callee_guaranteed () -> () {
 bb0(%0 : $*τ_0_1, %2: $EmptyType):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
   %8 = function_ref @takingEmptyAndQ : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (EmptyType, @owned WeakBox<τ_0_0>) -> ()
-  %9 = partial_apply %8<BaseProducer<τ_0_1>>(%2, %1) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (EmptyType, @owned WeakBox<τ_0_0>) -> ()
-  return %9 : $@async @callee_owned () -> ()
+  %9 = partial_apply [callee_guaranteed] %8<BaseProducer<τ_0_1>>(%2, %1) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (EmptyType, @owned WeakBox<τ_0_0>) -> ()
+  return %9 : $@async @callee_guaranteed () -> ()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bind_polymorphic_param_from_forwarder_parameter(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s7takingQTA.19"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_forwarder_parameter(
 
 sil public @bind_polymorphic_param_from_forwarder_parameter : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> () {
 bb0(%0 : $*τ_0_1):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
   %8 = function_ref @takingQ : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
-  %9 = partial_apply %8<BaseProducer<τ_0_1>>() : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
+  %9 = partial_apply [callee_guaranteed] %8<BaseProducer<τ_0_1>>() : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (@owned WeakBox<τ_0_0>) -> ()
   %10 = tuple ()
   return %10 : $()
 }
@@ -116,16 +132,19 @@ struct S {
   var x : Builtin.Int64
 }
 
-sil hidden_external @takingQAndS : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
+sil hidden @takingQAndS : $@async @convention(thin) <τ_0_0 where  τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> () {
+entry(%s : $S, %b : $WeakBox<τ_0_0>):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bind_polymorphic_param_from_context_with_layout(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s11takingQAndSTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-sil public @bind_polymorphic_param_from_context_with_layout : $@async @convention(thin) <τ_0_1>(@in τ_0_1, S) -> @owned @async @callee_owned () -> () {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context_with_layout(
+sil public @bind_polymorphic_param_from_context_with_layout : $@async @convention(thin) <τ_0_1>(@in τ_0_1, S) -> @owned @async @callee_guaranteed () -> () {
 bb0(%0 : $*τ_0_1, %1: $S):
   %2 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
   %8 = function_ref @takingQAndS : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
-  %9 = partial_apply %8<BaseProducer<τ_0_1>>(%1, %2) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
-  return %9 : $@async @callee_owned () -> ()
+  %9 = partial_apply [callee_guaranteed] %8<BaseProducer<τ_0_1>>(%1, %2) : $@async @convention(thin) <τ_0_0 where τ_0_0 : Q> (S, @owned WeakBox<τ_0_0>) -> ()
+  return %9 : $@async @callee_guaranteed () -> ()
 }
 
 public class Empty<T> {}
@@ -150,8 +169,7 @@ bb0:
   return %1 : $@async @callee_guaranteed (Empty<S>) -> (@owned Empty<S>, @owned @async @callee_guaranteed (Empty<S>) -> @owned Empty<S>)
 }
 
-// CHECK-LABEL: define hidden swiftcc void @specializes_closure_returning_closure(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
-// CHECK-LABEL: define internal swiftcc void @"$s15returns_closureTA"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]+}} {
+// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @specializes_closure_returning_closure(
 protocol MyEquatable {
   static func isEqual (lhs: Self, rhs: Self) -> Builtin.Int1
 }
@@ -179,8 +197,16 @@ extension Outer : MyEquatable where Value : MyEquatable {
 public struct Outermost<Value> {
 }
 
-sil @$closure : $@async @convention(method) <Value where Value : MyEquatable> (Outer<Value>, Outer<Value>, @thin Outer<Value>.Type) -> Builtin.Int1
-sil @$closure2 : $@async @convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1
+sil @$closure : $@async @convention(method) <Value where Value : MyEquatable> (Outer<Value>, Outer<Value>, @thin Outer<Value>.Type) -> Builtin.Int1 {
+entry(%o1 : $Outer<Value>, %o2 : $Outer<Value>, %ot : $@thin Outer<Value>.Type):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
+sil @$closure2 : $@async @convention(method) <Value where Value : MyEquatable> (Outermost<Value>, Outermost<Value>, @thin Outermost<Value>.Type) -> Builtin.Int1 {
+entry(%o1 : $Outermost<Value>, %o2 : $Outermost<Value>, %t : $@thin Outermost<Value>.Type):
+  %0 = builtin "int_trap"() : $Never
+  unreachable
+}
 
 sil @$dont_crash_test_capture_specialized_conditional_conformance : $@async @convention(thin) <Element where Element : MyExtended> (Outer<Inner<Element>>) -> () {
 bb0(%0 : $Outer<Inner<Element>>):
@@ -229,3 +255,10 @@ sil_vtable D {}
 sil_vtable E {}
 sil_vtable Empty {}
 sil_witness_table C: P module main {}
+
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s23unspecialized_uncurriedTA"(
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingPTA"(
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA"(
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA.{{[0-9]+}}"(
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s11takingQAndSTA"(
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s15returns_closureTA"(

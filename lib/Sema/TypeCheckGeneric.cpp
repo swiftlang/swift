@@ -132,8 +132,10 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
   // type. Pass along the error type if resolving the repr failed.
   auto constraintType = TypeResolution::forInterface(
                             dc, TypeResolverContext::GenericRequirement,
-                            // Unbound generics are meaningless in opaque types.
-                            /*unboundTyOpener*/ nullptr)
+                            // Unbound generics and placeholders are meaningless
+                            // in opaque types.
+                            /*unboundTyOpener*/ nullptr,
+                            /*placeholderHandler*/ nullptr)
                             .resolveType(repr->getConstraint());
 
   if (constraintType->hasError())
@@ -257,7 +259,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
 
       // The conformance of 'Self' to the protocol is okay.
       if (req.getKind() == RequirementKind::Conformance &&
-          req.getSecondType()->getAs<ProtocolType>()->getDecl() == proto &&
+          req.getProtocolDecl() == proto &&
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
@@ -666,7 +668,8 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
       const auto resolution =
           TypeResolution::forStructural(GC, baseOptions,
-                                        /*unboundTyOpener*/ nullptr);
+                                        /*unboundTyOpener*/ nullptr,
+                                        /*placeholderHandler*/ nullptr);
       auto params = func ? func->getParameters() : subscr->getIndices();
       for (auto param : *params) {
         auto *typeRepr = param->getTypeRepr();
@@ -910,12 +913,14 @@ RequirementRequest::evaluate(Evaluator &evaluator,
   switch (stage) {
   case TypeResolutionStage::Structural:
     resolution = TypeResolution::forStructural(owner.dc, options,
-                                               /*unboundTyOpener*/ nullptr);
+                                               /*unboundTyOpener*/ nullptr,
+                                               /*placeholderHandler*/ nullptr);
     break;
 
   case TypeResolutionStage::Interface:
     resolution = TypeResolution::forInterface(owner.dc, options,
-                                              /*unboundTyOpener*/ nullptr);
+                                              /*unboundTyOpener*/ nullptr,
+                                              /*placeholderHandler*/ nullptr);
     break;
 
   case TypeResolutionStage::Contextual:
@@ -961,9 +966,11 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(ctx);
   }
 
-  const auto type = TypeResolution::forStructural(typeAlias, options,
-                                                  /*unboundTyOpener*/ nullptr)
-                        .resolveType(underlyingTypeRepr);
+  const auto type =
+      TypeResolution::forStructural(typeAlias, options,
+                                    /*unboundTyOpener*/ nullptr,
+                                    /*placeholderHandler*/ nullptr)
+          .resolveType(underlyingTypeRepr);
 
   auto genericSig = typeAlias->getGenericSignature();
   SubstitutionMap subs;

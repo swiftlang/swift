@@ -121,13 +121,13 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
   return ProtocolType::get(PD, parent, Context);
 }
 
-PotentialBindings SemaTest::inferBindings(ConstraintSystem &cs,
-                                          TypeVariableType *typeVar) {
-  llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> cache;
+BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
+                                   TypeVariableType *typeVar) {
+  llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
 
   for (auto *typeVar : cs.getTypeVariables()) {
     if (!typeVar->getImpl().hasRepresentativeOrFixed())
-      cache.insert({typeVar, cs.inferBindingsFor(typeVar, /*finalize=*/false)});
+      cache.insert({typeVar, cs.getBindingsFor(typeVar, /*finalize=*/false)});
   }
 
   for (auto *typeVar : cs.getTypeVariables()) {

@@ -18,6 +18,7 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Markup/Markup.h"
+#include "swift/SymbolGraphGen/PathComponent.h"
 
 namespace swift {
 namespace symbolgraphgen {
@@ -33,6 +34,8 @@ class Symbol {
   const ValueDecl *VD;
   Type BaseType;
   const NominalTypeDecl *SynthesizedBaseTypeDecl;
+
+  std::pair<StringRef, StringRef> getKind(const ValueDecl *VD) const;
 
   void serializeKind(StringRef Identifier, StringRef DisplayName,
                      llvm::json::OStream &OS) const;
@@ -95,7 +98,7 @@ public:
     return SynthesizedBaseTypeDecl;
   }
 
-  void getPathComponents(SmallVectorImpl<SmallString<32>> &Components) const;
+  void getPathComponents(SmallVectorImpl<PathComponent> &Components) const;
 
   /// Print the symbol path to an output stream.
   void printPath(llvm::raw_ostream &OS) const;

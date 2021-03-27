@@ -16,17 +16,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines the SyntaxFactory, one of the most important client-facing
-// types in lib/Syntax and likely to be very commonly used.
-//
-// Effectively a namespace, SyntaxFactory is never instantiated, but is *the*
-// one-stop shop for making new Syntax nodes. Putting all of these into a
-// collection of static methods provides a single point of API lookup for
-// clients' convenience and also allows the library to hide all of the
-// constructors for all Syntax nodes, as the SyntaxFactory is friend to all.
-//
-//===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/SyntaxFactory.h"
 #include "swift/Syntax/SyntaxNodes.h"
@@ -38,19 +27,17 @@
 using namespace swift;
 using namespace swift::syntax;
 
-TokenSyntax SyntaxFactory::makeToken(tok Kind, OwnedString Text,
+TokenSyntax SyntaxFactory::makeToken(tok Kind, StringRef Text,
                                      StringRef LeadingTrivia,
                                      StringRef TrailingTrivia,
-                                     SourcePresence Presence,
-                                     const RC<SyntaxArena> &Arena) {
+                                     SourcePresence Presence) {
   return makeRoot<TokenSyntax>(RawSyntax::makeAndCalcLength(Kind, Text, 
     LeadingTrivia, TrailingTrivia, Presence, Arena));
 }
 
 UnknownSyntax
-SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
-                                 const RC<SyntaxArena> &Arena) {
-  std::vector<RC<RawSyntax>> Layout;
+SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
+  std::vector<const RawSyntax *> Layout;
   Layout.reserve(Tokens.size());
   for (auto &Token : Tokens) {
     Layout.push_back(Token.getRaw());
@@ -64,7 +51,8 @@ Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
   switch(Kind) {
 % for node in SYNTAX_NODES:
 %   if node.is_syntax_collection():
-  case SyntaxKind::${node.syntax_kind}: return makeBlank${node.syntax_kind}();
+  case SyntaxKind::${node.syntax_kind}:
+    return makeBlank${node.syntax_kind}();
 %   end
 % end
   default: break;
@@ -111,7 +99,7 @@ bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
 }
 
 bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
-                                                  const RC<RawSyntax> &Member) {
+                                                  const RawSyntax *Member) {
   return canServeAsCollectionMemberRaw(CollectionKind, Member->getKind());
 }
 
@@ -120,15 +108,16 @@ canServeAsCollectionMember(SyntaxKind CollectionKind, Syntax Member) {
   return canServeAsCollectionMemberRaw(CollectionKind, Member.getRaw());
 }
 
-RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
-                                       llvm::ArrayRef<RC<RawSyntax>> Elements,
-                                       const RC<SyntaxArena> &Arena) {
+const RawSyntax *SyntaxFactory::createRaw(
+  SyntaxKind Kind,
+  llvm::ArrayRef<const RawSyntax *> Elements
+) {
   switch (Kind) {
 % for node in SYNTAX_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
 %   child_count = len(node.children)
-    RC<RawSyntax> Layout[${child_count}];
+    const RawSyntax *Layout[${child_count}];
     unsigned I = 0;
 %   for (child_idx, child) in enumerate(node.children):
     // child[${child_idx}] ${child.name}
@@ -146,14 +135,14 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
 %   end
     if (I != Elements.size())
       return nullptr;
-    return RawSyntax::makeAndCalcLength(Kind, Layout, SourcePresence::Present, 
+    return RawSyntax::makeAndCalcLength(Kind, Layout, SourcePresence::Present,
                                         Arena);
 % elif node.is_syntax_collection():
     for (auto &E : Elements) {
       if (!canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E))
         return nullptr;
     }
-    return RawSyntax::makeAndCalcLength(Kind, Elements, SourcePresence::Present, 
+    return RawSyntax::makeAndCalcLength(Kind, Elements, SourcePresence::Present,
                                         Arena);
 % else:
     return nullptr;
@@ -166,14 +155,13 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
 }
 
 Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
-                                             llvm::ArrayRef<Syntax> Elements,
-                                             const RC<SyntaxArena> &Arena) {
-  std::vector<RC<RawSyntax>> Layout;
+                                             llvm::ArrayRef<Syntax> Elements) {
+  std::vector<const RawSyntax *> Layout;
   Layout.reserve(Elements.size());
   for (auto &E : Elements)
     Layout.emplace_back(E.getRaw());
 
-  if (auto Raw = createRaw(Kind, Layout, Arena))
+  if (auto Raw = createRaw(Kind, Layout))
     return makeRoot<Syntax>(Raw);
   else
     return None;
@@ -189,8 +177,7 @@ Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
 %         child_params.append("%s %s" % (param_type, child.name))
 %     child_params = ', '.join(child_params)
 ${node.name}
-SyntaxFactory::make${node.syntax_kind}(${child_params},
-                                       const RC<SyntaxArena> &Arena) {
+SyntaxFactory::make${node.syntax_kind}(${child_params}) {
   auto Raw = RawSyntax::makeAndCalcLength(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
@@ -205,9 +192,8 @@ SyntaxFactory::make${node.syntax_kind}(${child_params},
 %   elif node.is_syntax_collection():
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(
-    const std::vector<${node.collection_element_type}> &elements,
-    const RC<SyntaxArena> &Arena) {
-  std::vector<RC<RawSyntax>> layout;
+    const std::vector<${node.collection_element_type}> &elements) {
+  std::vector<const RawSyntax *> layout;
   layout.reserve(elements.size());
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
@@ -219,7 +205,7 @@ SyntaxFactory::make${node.syntax_kind}(
 %   end
 
 ${node.name}
-SyntaxFactory::makeBlank${node.syntax_kind}(const RC<SyntaxArena> &Arena) {
+SyntaxFactory::makeBlank${node.syntax_kind}() {
   auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %   for child in node.children:
 %       if child.is_optional:
@@ -237,109 +223,86 @@ SyntaxFactory::makeBlank${node.syntax_kind}(const RC<SyntaxArena> &Arena) {
 %   if token.is_keyword:
   TokenSyntax
   SyntaxFactory::make${token.name}Keyword(StringRef LeadingTrivia,
-                                          StringRef TrailingTrivia,
-                                          const RC<SyntaxArena> &Arena) {
-    return makeToken(tok::${token.kind},
-                     OwnedString::makeUnowned("${token.text}"),
-                     LeadingTrivia, TrailingTrivia,
-                     SourcePresence::Present, Arena);
+                                          StringRef TrailingTrivia) {
+    return makeToken(tok::${token.kind}, "${token.text}", LeadingTrivia,
+                     TrailingTrivia, SourcePresence::Present);
   }
 %   elif token.text:
   TokenSyntax
   SyntaxFactory::make${token.name}Token(StringRef LeadingTrivia,
-                                        StringRef TrailingTrivia,
-                                        const RC<SyntaxArena> &Arena) {
-    return makeToken(tok::${token.kind},
-                     OwnedString::makeUnowned("${token.text}"),
-                     LeadingTrivia, TrailingTrivia,
-                     SourcePresence::Present, Arena);
+                                        StringRef TrailingTrivia) {
+    return makeToken(tok::${token.kind}, "${token.text}", LeadingTrivia,
+                     TrailingTrivia, SourcePresence::Present);
   }
 %   else:
   TokenSyntax
-  SyntaxFactory::make${token.name}(OwnedString Text,
+  SyntaxFactory::make${token.name}(StringRef Text,
                                    StringRef LeadingTrivia,
-                                   StringRef TrailingTrivia,
-                                   const RC<SyntaxArena> &Arena) {
-    return makeToken(tok::${token.kind}, Text,
-                     LeadingTrivia, TrailingTrivia,
-                     SourcePresence::Present, Arena);
+                                   StringRef TrailingTrivia) {
+    return makeToken(tok::${token.kind}, Text, LeadingTrivia, TrailingTrivia,
+                     SourcePresence::Present);
   }
 %   end
 % end
 
-TupleTypeSyntax SyntaxFactory::makeVoidTupleType(const RC<SyntaxArena> &Arena) {
-  return makeTupleType(makeLeftParenToken({}, {}, Arena),
-                       makeBlankTupleTypeElementList(Arena),
-                       makeRightParenToken({}, {}, Arena),
-                       Arena);
+TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
+  return makeTupleType(makeLeftParenToken({}, {}),
+                       makeBlankTupleTypeElementList(),
+                       makeRightParenToken({}, {}));
 }
 
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(llvm::Optional<TokenSyntax> Label,
                                     llvm::Optional<TokenSyntax> Colon,
                                     TypeSyntax Type,
-                                    llvm::Optional<TokenSyntax> TrailingComma,
-                                    const RC<SyntaxArena> &Arena) {
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
   return makeTupleTypeElement(None, Label, None, Colon, Type, None, None,
-                              TrailingComma, Arena);
+                              TrailingComma);
 }
 
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(TypeSyntax Type,
-                                    llvm::Optional<TokenSyntax> TrailingComma,
-                                    const RC<SyntaxArena> &Arena) {
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
   return makeTupleTypeElement(None, None, None, None, Type, None, None,
-                              TrailingComma, Arena);
+                              TrailingComma);
 }
 
 GenericParameterSyntax
 SyntaxFactory::makeGenericParameter(TokenSyntax Name,
-                                    llvm::Optional<TokenSyntax> TrailingComma,
-                                    const RC<SyntaxArena> &Arena) {
-  return makeGenericParameter(None, Name, None, None, TrailingComma, Arena);
+                                    llvm::Optional<TokenSyntax> TrailingComma) {
+  return makeGenericParameter(None, Name, None, None, TrailingComma);
 }
 
-TypeSyntax SyntaxFactory::makeTypeIdentifier(OwnedString TypeName,
+TypeSyntax SyntaxFactory::makeTypeIdentifier(StringRef TypeName,
                                              StringRef LeadingTrivia,
-                                             StringRef TrailingTrivia,
-                                             const RC<SyntaxArena> &Arena) {
+                                             StringRef TrailingTrivia) {
   auto identifier =
-      makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia, Arena);
-  return makeSimpleTypeIdentifier(identifier, None, Arena);
+      makeIdentifier(TypeName, LeadingTrivia, TrailingTrivia);
+  return makeSimpleTypeIdentifier(identifier, None);
 }
 
 TypeSyntax SyntaxFactory::makeAnyTypeIdentifier(StringRef LeadingTrivia,
-                                                StringRef TrailingTrivia,
-                                                const RC<SyntaxArena> &Arena) {
-  return makeTypeIdentifier(OwnedString::makeUnowned("Any"), LeadingTrivia,
-                            TrailingTrivia, Arena);
+                                                StringRef TrailingTrivia) {
+  return makeTypeIdentifier("Any", LeadingTrivia, TrailingTrivia);
 }
 
 TypeSyntax SyntaxFactory::makeSelfTypeIdentifier(StringRef LeadingTrivia,
-                                                 StringRef TrailingTrivia,
-                                                 const RC<SyntaxArena> &Arena) {
-  return makeTypeIdentifier(OwnedString::makeUnowned("Self"),
-                            LeadingTrivia, TrailingTrivia, Arena);
+                                                 StringRef TrailingTrivia) {
+  return makeTypeIdentifier("Self", LeadingTrivia, TrailingTrivia);
 }
 
 TokenSyntax SyntaxFactory::makeTypeToken(StringRef LeadingTrivia,
-                                         StringRef TrailingTrivia,
-                                         const RC<SyntaxArena> &Arena) {
-  return makeIdentifier(OwnedString::makeUnowned("Type"),
-                        LeadingTrivia, TrailingTrivia, Arena);
+                                         StringRef TrailingTrivia) {
+  return makeIdentifier("Type", LeadingTrivia, TrailingTrivia);
 }
 
 TokenSyntax SyntaxFactory::makeProtocolToken(StringRef LeadingTrivia,
-                                             StringRef TrailingTrivia,
-                                             const RC<SyntaxArena> &Arena) {
-  return makeIdentifier(OwnedString::makeUnowned("Protocol"),
-                        LeadingTrivia, TrailingTrivia, Arena);
+                                             StringRef TrailingTrivia) {
+  return makeIdentifier("Protocol", LeadingTrivia, TrailingTrivia);
 }
 
 TokenSyntax SyntaxFactory::makeEqualityOperator(StringRef LeadingTrivia,
-                                                StringRef TrailingTrivia,
-                                                const RC<SyntaxArena> &Arena) {
-  return makeToken(tok::oper_binary_spaced, OwnedString::makeUnowned("=="),
-                   LeadingTrivia, TrailingTrivia, SourcePresence::Present,
-                   Arena);
+                                                StringRef TrailingTrivia) {
+  return makeToken(tok::oper_binary_spaced, "==", LeadingTrivia, TrailingTrivia, 
+                   SourcePresence::Present);
 }

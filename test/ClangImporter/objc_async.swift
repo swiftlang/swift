@@ -1,9 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency -enable-experimental-async-handler %s -verify
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
+
+@MainActor func onlyOnMainActor() { }
 
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
@@ -45,8 +47,12 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
   slowServer.repeatTrick("jump") // expected-error{{missing argument for parameter 'completionHandler' in call}}
 
-  _ = try await slowServer.oldAPI(); // expected-error{{'oldAPI()' is unavailable in macOS: APIs deprecated as of macOS 10.14 and earlier are not imported as 'async'}}
   _ = try await slowServer.someAsyncMethod()
+
+
+  _ = await slowServer.operations()
+
+  _ = await slowServer.runOnMainThread()
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
@@ -58,6 +64,14 @@ func testSlowServerSynchronous(slowServer: SlowServer) {
   slowServer.dance("jig") { s in print(s + "") }
   slowServer.leap(17) { s in print(s + "") }
   slowServer.repeatTrick("jump") { i in print(i + 1) }
+
+  let s = slowServer.operations
+  _ = s + []
+
+  slowServer.runOnMainThread { s in
+    print(s)
+    onlyOnMainActor() // okay because runOnMainThread has a @MainActor closure
+  }
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {
@@ -68,14 +82,26 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
   _ = slowServer.allOperations
 }
 
+func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicitly non-concurrent}}
+  doSomethingConcurrently(fn)
+  // expected-error@-1{{passing non-concurrent parameter 'fn' to function expecting a @Sendable closure}}
+
+  var x = 17
+  doSomethingConcurrently {
+    print(x) // expected-error{{reference to captured var 'x' in concurrently-executing code}}
+    x = x + 1 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+    // expected-error@-1{{reference to captured var 'x' in concurrently-executing code}}
+  }
+}
+
 // Check import of attributes
 func globalAsync() async { }
 
-actor class MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
+actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   func independentMethod() {
-    syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from an '@actorIndependent' context}}
+    syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from a non-isolated context}}
   }
 
   func asyncHandlerMethod() {
@@ -83,6 +109,41 @@ actor class MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   }
 
   func mainActorMethod() {
-    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from context of global actor 'MainActor'}}
+    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from synchronous context of global actor 'MainActor'}}
   }
+
+  func uiActorMethod() { }
+}
+
+// Sendable conformance inference for imported types.
+func acceptCV<T: Sendable>(_: T) { }
+func testCV(r: NSRange) {
+  acceptCV(r)
+}
+
+// Global actor (unsafe) isolation.
+
+actor SomeActor { }
+
+@globalActor
+struct SomeGlobalActor {
+  static let shared = SomeActor()
+}
+
+class MyButton : NXButton {
+  @MainActor func testMain() {
+    onButtonPress() // okay
+  }
+
+  @SomeGlobalActor func testOther() {
+    onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
+  }
+
+  func test() {
+    onButtonPress() // okay
+  }
+}
+
+func testButtons(mb: MyButton) {
+  mb.onButtonPress()
 }

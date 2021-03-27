@@ -311,6 +311,8 @@ class Remangler : public RemanglerBase {
 
   void mangleKeyPathThunkHelper(Node *node, StringRef op);
 
+  void mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op);
+
 #define NODE(ID)                                                        \
   void mangle##ID(Node *node);
 #define CONTEXT_NODE(ID)                                                \
@@ -526,6 +528,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
       if (!fullSubstitutionMap)
         break;
 
@@ -818,8 +821,12 @@ void Remangler::manglePredefinedObjCAsyncCompletionHandlerImpl(Node *node) {
 }
 
 void Remangler::mangleObjCAsyncCompletionHandlerImpl(Node *node) {
-  mangleChildNodes(node);
+  mangleChildNode(node, 0);
+  mangleChildNode(node, 1);
+  if (node->getNumChildren() == 4)
+    mangleChildNode(node, 3);
   Buffer << "Tz";
+  mangleChildNode(node, 2);
 }
 
 void Remangler::mangleDeallocator(Node *node) {
@@ -1389,6 +1396,9 @@ void Remangler::mangleGlobal(Node *node) {
       case Node::Kind::DynamicallyReplaceableFunctionImpl:
       case Node::Kind::DynamicallyReplaceableFunctionVar:
       case Node::Kind::AsyncFunctionPointer:
+      case Node::Kind::AsyncNonconstantPartialApplyThunk:
+      case Node::Kind::AsyncAwaitResumePartialFunction:
+      case Node::Kind::AsyncSuspendResumePartialFunction:
         mangleInReverseOrder = true;
         break;
       default:
@@ -1593,7 +1603,7 @@ void Remangler::mangleImplFunctionType(Node *node) {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
                         .Case("@yield_once", 'A')
                         .Case("@yield_many", 'G')
-                        .Case("@concurrent", 'h')
+                        .Case("@Sendable", 'h')
                         .Case("@async", 'H')
                         .Default(0);
         assert(FuncAttr && "invalid impl function attribute");
@@ -1700,6 +1710,11 @@ void Remangler::mangleInitializer(Node *node) {
 void Remangler::manglePropertyWrapperBackingInitializer(Node *node) {
   mangleChildNodes(node);
   Buffer << "fP";
+}
+
+void Remangler::manglePropertyWrapperInitFromProjectedValue(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "fW";
 }
 
 void Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node) {
@@ -1890,6 +1905,21 @@ void Remangler::mangleDynamicallyReplaceableFunctionKey(Node *node) {
 
 void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
+}
+
+void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
+  Buffer << "Tw";
+  mangleChildNode(node, 0);
+}
+
+void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
+  Buffer << "TQ";
+  mangleChildNode(node, 0);
+}
+
+void Remangler::mangleAsyncSuspendResumePartialFunction(Node *node) {
+  Buffer << "TY";
+  mangleChildNode(node, 0);
 }
 
 void Remangler::manglePostfixOperator(Node *node) {
@@ -2114,12 +2144,12 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   Buffer << "Ty";
 }
 
-void Remangler::mangleAutoDiffFunction(Node *node) {
+void Remangler::mangleAutoDiffFunctionOrSimpleThunk(Node *node, StringRef op) {
   auto childIt = node->begin();
-  mangle(*childIt++); // original
-  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
-    mangleDependentGenericSignature(*childIt++);
-  Buffer << "TJ";
+  while (childIt != node->end() &&
+         (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
+    mangle(*childIt++);
+  Buffer << op;
   mangle(*childIt++); // kind
   mangle(*childIt++); // parameter indices
   Buffer << 'p';
@@ -2127,8 +2157,55 @@ void Remangler::mangleAutoDiffFunction(Node *node) {
   Buffer << 'r';
 }
 
+void Remangler::mangleAutoDiffFunction(Node *node) {
+  mangleAutoDiffFunctionOrSimpleThunk(node, "TJ");
+}
+
+void Remangler::mangleAutoDiffDerivativeVTableThunk(Node *node) {
+  mangleAutoDiffFunctionOrSimpleThunk(node, "TJV");
+}
+
+void Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node) {
+  auto childIt = node->begin();
+  mangle(*childIt++); // from type
+  mangle(*childIt++); // to type
+  if ((*childIt)->getKind() == Node::Kind::DependentGenericSignature)
+    mangleDependentGenericSignature(*childIt++);
+  Buffer << "TJO";
+  mangle(*childIt++); // kind
+}
+
+void Remangler::mangleAutoDiffSubsetParametersThunk(Node *node) {
+  auto childIt = node->begin();
+  while (childIt != node->end() &&
+         (*childIt)->getKind() != Node::Kind::AutoDiffFunctionKind)
+    mangle(*childIt++);
+  Buffer << "TJS";
+  mangle(*childIt++); // kind
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
+  mangle(*childIt++); // to parameter indices
+  Buffer << 'P';
+}
+
 void Remangler::mangleAutoDiffFunctionKind(Node *node) {
   Buffer << (char)node->getIndex();
+}
+
+void Remangler::mangleDifferentiabilityWitness(Node *node) {
+  auto childIt = node->begin();
+  while (childIt != node->end() && (*childIt)->getKind() != Node::Kind::Index)
+    mangle(*childIt++);
+  if (node->getLastChild()->getKind() ==
+          Node::Kind::DependentGenericSignature)
+    mangle(node->getLastChild());
+  Buffer << "WJ" << (char)(*childIt++)->getIndex();
+  mangle(*childIt++); // parameter indices
+  Buffer << 'p';
+  mangle(*childIt++); // result indices
+  Buffer << 'r';
 }
 
 void Remangler::mangleIndexSubset(Node *node) {
@@ -2747,6 +2824,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Getter:
     case Node::Kind::Setter:
@@ -2787,6 +2865,7 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
     case Node::Kind::PropertyWrapperBackingInitializer:
+    case Node::Kind::PropertyWrapperInitFromProjectedValue:
     case Node::Kind::DefaultArgumentInitializer:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;

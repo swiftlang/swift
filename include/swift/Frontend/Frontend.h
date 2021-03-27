@@ -467,7 +467,9 @@ public:
   DiagnosticEngine &getDiags() { return Diagnostics; }
   const DiagnosticEngine &getDiags() const { return Diagnostics; }
 
-  llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+  llvm::vfs::FileSystem &getFileSystem() const {
+    return *SourceMgr.getFileSystem();
+  }
 
   ASTContext &getASTContext() { return *Context; }
   const ASTContext &getASTContext() const { return *Context; }

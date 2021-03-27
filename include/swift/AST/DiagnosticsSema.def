@@ -283,6 +283,10 @@ ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
       (Type, Type))
 
+ERROR(unsupported_closure_attr,none,
+      "%select{attribute |}0 '%1' is not supported on a closure",
+      (bool, StringRef))
+
 NOTE(suggest_expected_match,none,
      "%select{expected an argument list|produces result}0 of type '%1'",
      (bool, StringRef))
@@ -779,6 +783,19 @@ NOTE(serialization_compatibility_version_mismatch,none,
      "(this is supported but may expose additional compiler issues)",
      (StringRef, StringRef, StringRef))
 
+ERROR(serialization_invalid_decl,Fatal,
+      "deserialized invalid declaration %0 (%1) in module '%2'",
+      (DeclName, DescriptiveDeclKind, StringRef))
+ERROR(serialization_allowing_invalid_decl,none,
+      "allowing deserialization of invalid declaration %0 (%1) in module '%2'",
+      (DeclName, DescriptiveDeclKind, StringRef))
+ERROR(serialization_error_type,Fatal,
+      "deserialized error type '%0' in module '%1'",
+      (StringRef, StringRef))
+ERROR(serialization_allowing_error_type,none,
+      "allowing deserialization of error type '%0' in module '%1'",
+      (StringRef, StringRef))
+
 ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
@@ -843,6 +860,9 @@ NOTE(unspaced_binary_operators_candidate,none,
      (Identifier, Identifier, bool))
 ERROR(unspaced_unary_operator,none,
       "unary operators must not be juxtaposed; parenthesize inner expression",
+      ())
+ERROR(nonexistent_power_operator,none,
+      "no operator '**' is defined; did you mean 'pow(_:_:)'?",
       ())
 
 ERROR(cannot_find_in_scope,none,
@@ -1564,6 +1584,10 @@ WARNING(enum_frozen_nonpublic,none,
 ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 
+ERROR(effectful_not_representable_objc,none,
+      "%0 with 'throws' or 'async' is not representable in Objective-C",
+      (DescriptiveDeclKind))
+
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes| in protocol extensions}0"
@@ -1901,6 +1925,12 @@ ERROR(type_does_not_conform_owner,none,
 ERROR(type_does_not_conform_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 conform to %4",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(contextual_member_ref_on_protocol_requires_self_requirement,none,
+      "contextual member reference to %0 %1 requires "
+      "'Self' constraint in the protocol extension",
+      (DescriptiveDeclKind, DeclName))
+NOTE(missing_sametype_requirement_on_self,none,
+      "missing same-type requirement on 'Self'", ())
 ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
       "referencing %0 %1 on %2 requires that %3 be a class type",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
@@ -2225,6 +2255,9 @@ NOTE(protocol_witness_settable_conflict,none,
      "candidate is not settable, but protocol requires it", ())
 NOTE(protocol_witness_rethrows_conflict,none,
      "candidate is not 'rethrows', but protocol requires it", ())
+NOTE(protocol_witness_rethrows_by_conformance_conflict,none,
+     "candidate is 'rethrows' via a conformance, "
+     "but the protocol requirement is not from a '@rethrows' protocol", ())
 NOTE(protocol_witness_throws_conflict,none,
      "candidate throws, but protocol does not allow it", ())
 NOTE(protocol_witness_not_objc,none,
@@ -2571,6 +2604,10 @@ ERROR(override_class_declaration_in_extension,none,
 ERROR(override_throws,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
+// TODO: this really could be merged with the above.
+ERROR(override_with_more_effects,none,
+      "cannot override non-'%1' %0 with '%1' %0",
+      (DescriptiveDeclKind, StringRef))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
@@ -2868,16 +2905,16 @@ WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
       (/*propName*/ Identifier, /*propType*/ Type, /*nominalName*/ Identifier,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_immutable_wrapper_implicit_noderivative_fixit,none,
-      "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
+      "synthesis of the 'Differentiable.move(by:)' requirement for %1 "
       "requires 'wrappedValue' in property wrapper %0 to be mutable or have a "
-      "non-mutating 'move(along:)'; add an explicit '@noDerivative' attribute"
+      "non-mutating 'move(by:)'; add an explicit '@noDerivative' attribute"
       "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
       (/*wrapperType*/ Identifier, /*nominalName*/ Identifier,
        /*nominalCanDeriveAdditiveArithmetic*/ bool))
 WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
-      "synthesis of the 'Differentiable.move(along:)' requirement for %0 "
+      "synthesis of the 'Differentiable.move(by:)' requirement for %0 "
       "requires all stored properties not marked with `@noDerivative` to be "
-      "mutable or have a non-mutating 'move(along:)'; use 'var' instead, or "
+      "mutable or have a non-mutating 'move(by:)'; use 'var' instead, or "
       "add an explicit '@noDerivative' attribute "
       "%select{|, or conform %0 to 'AdditiveArithmetic'}1",
       (/*nominalName*/ Identifier, /*nominalCanDeriveAdditiveArithmetic*/ bool))
@@ -2907,6 +2944,13 @@ NOTE(decodable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)'?", ())
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
+NOTE(codable_enum_duplicate_case_name_here,none,
+     "cannot automatically synthesize %0 because %1 has duplicate "
+     "case name %2", (Type, Type, Identifier))
+NOTE(codable_enum_duplicate_parameter_name_here,none,
+     "cannot automatically synthesize %0 for %1 because "
+     "user defined parameter name %2 in %3 conflicts with "
+     "automatically generated parameter name", (Type, Type, Identifier, Identifier))
 
 WARNING(decodable_property_will_not_be_decoded, none,
         "immutable property will not be decoded because it is declared with "
@@ -2938,8 +2982,8 @@ ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
 
 ERROR(dynamic_self_invalid,none,
-      "covariant 'Self' can only appear as the type of a property, subscript or method result; "
-      "did you mean '%0'?", (StringRef))
+      "covariant 'Self' or 'Self?' can only appear as the type of a "
+      "property, subscript or method result; did you mean '%0'?", (StringRef))
 ERROR(dynamic_self_in_mutable_property,none,
       "mutable property cannot have covariant 'Self' type", ())
 ERROR(dynamic_self_in_stored_property,none,
@@ -2947,11 +2991,14 @@ ERROR(dynamic_self_in_stored_property,none,
 ERROR(dynamic_self_in_mutable_subscript,none,
       "mutable subscript cannot have covariant 'Self' type", ())
 ERROR(dynamic_self_invalid_property,none,
-      "covariant 'Self' can only appear at the top level of property type", ())
+      "covariant 'Self' or 'Self?' can only appear at the top level of "
+      "property type", ())
 ERROR(dynamic_self_invalid_subscript,none,
-      "covariant 'Self' can only appear at the top level of subscript element type", ())
+      "covariant 'Self' or 'Self?' can only appear at the top level of "
+      "subscript element type", ())
 ERROR(dynamic_self_invalid_method,none,
-      "covariant 'Self' can only appear at the top level of method result type", ())
+      "covariant 'Self' or 'Self?' can only appear at the top level of "
+      "method result type", ())
 ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 ERROR(dynamic_self_default_arg,none,
@@ -2994,8 +3041,12 @@ ERROR(override_rethrows_with_non_rethrows,none,
       "be 'rethrows'", (bool))
 ERROR(rethrows_without_throwing_parameter,none,
       "'rethrows' function must take a throwing function argument", ())
-ERROR(rethrows_attr_on_non_protocol,none,
-      "@rethrows may only be used on 'protocol' declarations", ())
+
+ERROR(override_reasync_with_non_reasync,none,
+      "override of 'reasync' %select{method|initializer}0 should also "
+      "be 'reasync'", (bool))
+ERROR(reasync_without_async_parameter,none,
+      "'reasync' function must take an 'async' function argument", ())
 
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
@@ -3213,6 +3264,17 @@ NOTE(derivative_attr_fix_access,none,
      "mark the derivative function as "
      "'%select{private|fileprivate|internal|@usableFromInline|@usableFromInline}0' "
      "to match the original function", (AccessLevel))
+ERROR(derivative_attr_static_method_mismatch_original,none,
+      "unexpected derivative function declaration; "
+      "%0 requires the derivative function %1 to be %select{an instance|a 'static'}2 method",
+      (/*original*/DeclName, /*derivative*/ DeclName,
+       /*originalIsStatic*/bool))
+NOTE(derivative_attr_static_method_mismatch_original_note,none,
+      "original function %0 is %select{an instance|a 'static'}1 method",
+      (/*original*/ DeclName, /*originalIsStatic*/bool))
+NOTE(derivative_attr_static_method_mismatch_fix,none,
+      "make derivative function %0 %select{an instance|a 'static'}1 method",
+      (/*derivative*/ DeclName, /*mustBeStatic*/bool))
 
 // @transpose
 ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
@@ -3230,6 +3292,17 @@ ERROR(transpose_attr_wrt_self_must_be_static,none,
 NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "the transpose is declared in %0 but the original function is declared in "
      "%1", (Type, Type))
+ERROR(transpose_attr_static_method_mismatch_original,none,
+      "unexpected transpose function declaration; "
+      "%0 requires the transpose function %1 to be %select{an instance|a 'static'}2 method",
+      (/*original*/DeclName, /*transpose*/ DeclName,
+       /*originalIsStatic*/bool))
+NOTE(transpose_attr_static_method_mismatch_original_note,none,
+      "original function %0 is %select{an instance|a 'static'}1 method",
+      (/*original*/ DeclName, /*originalIsStatic*/bool))
+NOTE(transpose_attr_static_method_mismatch_fix,none,
+      "make transpose function %0 %select{an instance|a 'static'}1 method",
+      (/*transpose*/ DeclName, /*mustBeStatic*/bool))
 
 // Automatic differentiation attributes
 ERROR(autodiff_attr_original_decl_ambiguous,none,
@@ -3284,6 +3357,36 @@ ERROR(diff_params_clause_cannot_diff_wrt_inout_parameter,none,
 ERROR(diff_params_clause_param_not_differentiable,none,
       "can only differentiate with respect to parameters that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+
+// completionHanderAsync attribute
+ERROR(attr_completion_handler_async_handler_not_func,none,
+      "'%0' should be attached to a non-async completion-handler function",
+      (DeclAttribute))
+
+NOTE(note_attr_function_declared_async,none,
+     "function declared async", ())
+
+NOTE(note_attr_completion_function_must_return_void,none,
+     "completion handler must return 'Void'", ())
+
+NOTE(note_attr_completion_handler_async_type_is_not_function,none,
+     "%0 is not a function type", (Type))
+
+NOTE(note_attr_completion_handler_async_handler_attr_req,none,
+     "completion handler must%select{ not|}0 be '@%1'",
+     (bool, StringRef))
+
+ERROR(attr_completion_handler_async_handler_out_of_range,none,
+      "completion handler index out of range of the function parameters", ())
+
+ERROR(attr_completion_handler_async_ambiguous_function,none,
+      "ambiguous '%0' async function %1", (DeclAttribute, DeclNameRef))
+
+ERROR(attr_completion_handler_async_no_suitable_function,none,
+      "no corresponding async function named %0", (DeclNameRef))
+
+WARNING(warn_use_async_alternative,none,
+        "consider using asynchronous alternative function",())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
@@ -3540,6 +3643,9 @@ ERROR(generic_type_requires_arguments,none,
 NOTE(descriptive_generic_type_declared_here,none,
      "%0 declared here", (StringRef))
 
+ERROR(placeholder_type_not_allowed,none,
+      "you cannot use a placeholder type here", ())
+
 WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
 
@@ -3737,24 +3843,27 @@ NOTE(generic_parameters_always_escaping,none,
 
 ERROR(passing_noattrfunc_to_attrfunc,none,
       "passing %select{non-escaping|non-concurrent}0 parameter %1 to function "
-      "expecting %select{an @escaping|a @concurrent}0 closure",
+      "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noespace_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
 ERROR(assigning_noattrfunc_to_attrfunc,none,
       "assigning %select{non-escaping|non-concurrent}0 parameter %1 to "
-      "%select{an @escaping|a @concurrent}0 closure",
+      "%select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(general_noattrfunc_to_attr,none,
       "using %select{non-escaping|non-concurrent}0 parameter %1 in a context "
-      "expecting %select{an @escaping|a @concurrent}0 closure",
+      "expecting %select{an @escaping|a @Sendable}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noattrfunc_to_type,none,
       "converting %select{non-escaping|non-concurrent function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
 
+ERROR(converting_func_loses_global_actor,none,
+      "converting function value of type %0 to %1 loses global actor %2",
+      (Type, Type, Type))
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
@@ -4049,21 +4158,21 @@ ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
 ERROR(try_unhandled,none,
       "errors thrown from here are not handled", ())
 ERROR(throwing_call_unhandled,none,
-      "call can throw, but the error is not handled", ())
+      "%0 can throw, but the error is not handled", (StringRef))
 ERROR(tryless_throwing_call_unhandled,none,
-      "call can throw, but it is not marked with 'try' and "
-      "the error is not handled", ())
+      "%0 can throw, but it is not marked with 'try' and "
+      "the error is not handled", (StringRef))
 ERROR(throw_in_nonthrowing_function,none,
       "error is not handled because the enclosing function "
       "is not declared 'throws'", ())
 
 ERROR(throwing_call_in_rethrows_function,none,
-      "call can throw, but the error is not handled; a function declared "
-      "'rethrows' may only throw if its parameter does", ())
+      "%0 can throw, but the error is not handled; a function declared "
+      "'rethrows' may only throw if its parameter does", (StringRef))
 ERROR(tryless_throwing_call_in_rethrows_function,none,
-      "call can throw, but it is not marked with 'try' and "
+      "%0 can throw, but it is not marked with 'try' and "
       "the error is not handled; a function declared "
-      "'rethrows' may only throw if its parameter does", ())
+      "'rethrows' may only throw if its parameter does", (StringRef))
 ERROR(throw_in_rethrows_function,none,
       "a function declared 'rethrows' may only throw if its parameter does", ())
 NOTE(because_rethrows_argument_throws,none,
@@ -4071,15 +4180,15 @@ NOTE(because_rethrows_argument_throws,none,
 NOTE(because_rethrows_default_argument_throws,none,
      "call is to 'rethrows' function, but a defaulted argument function"
      " can throw", ())
-NOTE(because_rethrows_default_conformance_throws,none,
+NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
-      "call can throw, but it is executed in a non-throwing "
-      "autoclosure",())
+      "%0 can throw, but it is executed in a non-throwing "
+      "autoclosure",(StringRef))
 ERROR(tryless_throwing_call_in_nonthrowing_autoclosure,none,
-      "call can throw, but it is not marked with 'try' and "
-      "it is executed in a non-throwing autoclosure",())
+      "%0 can throw, but it is not marked with 'try' and "
+      "it is executed in a non-throwing autoclosure",(StringRef))
 ERROR(throw_in_nonthrowing_autoclosure,none,
       "error is not handled because it is thrown in a non-throwing "
       "autoclosure", ())
@@ -4088,20 +4197,20 @@ ERROR(try_unhandled_in_nonexhaustive_catch,none,
       "errors thrown from here are not handled because the "
       "enclosing catch is not exhaustive", ())
 ERROR(throwing_call_in_nonexhaustive_catch,none,
-      "call can throw, but the enclosing catch is not exhaustive", ())
+      "%0 can throw, but the enclosing catch is not exhaustive", (StringRef))
 ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
-      "call can throw, but it is not marked with 'try' and "
-      "the enclosing catch is not exhaustive", ())
+      "%0 can throw, but it is not marked with 'try' and "
+      "the enclosing catch is not exhaustive", (StringRef))
 ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
-ERROR(throwing_call_in_illegal_context,none,
-      "call can throw, but errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
+ERROR(throwing_op_in_illegal_context,none,
+      "%1 can throw, but errors cannot be thrown out of "
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      (unsigned, StringRef))
 ERROR(throw_in_illegal_context,none,
       "errors cannot be thrown out of "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 
 ERROR(throwing_operator_without_try,none,
@@ -4112,6 +4221,10 @@ ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
 ERROR(throwing_async_let_without_try,none,
       "reading 'async let' can throw but is not marked with 'try'", ())
+ERROR(throwing_prop_access_without_try,none,
+      "property access can throw but is not marked with 'try'", ())
+ERROR(throwing_subscript_access_without_try,none,
+      "subscript access can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,
       "did you mean to use 'try'?", ())
 NOTE(note_error_to_optional,none,
@@ -4135,26 +4248,30 @@ ERROR(async_call_without_await_in_autoclosure,none,
 ERROR(async_call_without_await_in_async_let,none,
       "call is 'async' in an 'async let' initializer that is not marked "
       "with 'await'", ())
+ERROR(async_prop_access_without_await,none,
+      "property access is 'async' but is not marked with 'await'", ())
+ERROR(async_subscript_access_without_await,none,
+      "subscript access is 'async' but is not marked with 'await'", ())
 WARNING(no_async_in_await,none,
-        "no calls to 'async' functions occur within 'await' expression", ())
+        "no 'async' operations occur within 'await' expression", ())
 ERROR(async_call_in_illegal_context,none,
       "'async' call cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(await_in_illegal_context,none,
       "'await' operation cannot occur in "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
       (unsigned))
 ERROR(async_in_nonasync_function,none,
-      "%select{'async'|'await'|'async let'}0 in "
+      "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
       "%select{a function|an autoclosure}1 that does not support concurrency",
       (unsigned, bool))
 NOTE(note_add_async_to_function,none,
      "add 'async' to function %0 to make it asynchronous", (DeclName))
 NOTE(note_add_asynchandler_to_function,none,
      "add '@asyncHandler' to function %0 to create an implicit asynchronous context", (DeclName))
-NOTE(note_add_actorindependent_to_decl,none,
-     "add '@actorIndependent' to %0 to make this %1 independent of the actor",
+NOTE(note_add_nonisolated_to_decl,none,
+     "add 'nonisolated' to %0 to make this %1 not isolated to the actor",
      (DeclName, DescriptiveDeclKind))
 NOTE(note_add_globalactor_to_function,none,
      "add '@%0' to make %1 %2 part of global actor %3", 
@@ -4185,7 +4302,7 @@ ERROR(async_let_without_await,none,
       "reference to async let %0 is not marked with 'await'", (DeclName))
 ERROR(async_let_in_illegal_context,none,
       "async let %0 cannot be referenced in "
-      "%select{<<ERROR>>|a default argument|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
+      "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}1",
       (DeclName, unsigned))
 
 ERROR(asynchandler_non_func,none,
@@ -4209,6 +4326,8 @@ ERROR(asynchandler_noescape_closure_parameter,none,
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())
+ERROR(asynchandler_removed,none,
+      "'@asyncHandler' has been removed from the language", ())
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "
@@ -4221,16 +4340,16 @@ ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
 ERROR(actor_with_nonactor_superclass,none,
-      "actor class cannot inherit from non-actor class %0", (DeclName))
+      "actor cannot inherit from non-actor class %0", (DeclName))
 
 ERROR(actor_isolated_non_self_reference,none,
-        "actor-isolated %0 %1 can only be referenced "
-        "%select{inside the actor|on 'self'}2",
-        (DescriptiveDeclKind, DeclName, bool))
+        "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
+        "%select{from inside the actor|on 'self'}2",
+        (DescriptiveDeclKind, DeclName, bool, unsigned))
 ERROR(actor_isolated_self_independent_context,none,
-        "actor-isolated %0 %1 can not be referenced from an "
-        "'@actorIndependent' context",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}2 from a "
+        "non-isolated context",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_inout_state,none,
       "actor-isolated %0 %1 cannot be passed 'inout' to"
       "%select{| implicitly}2 'async' function call",
@@ -4239,20 +4358,21 @@ ERROR(actor_isolated_mutating_func,none,
       "cannot call mutating async function %0 on actor-isolated %1 %2",
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_global_actor_context,none,
-      "actor-isolated %0 %1 can not be referenced from context of global "
-      "actor %2",
-      (DescriptiveDeclKind, DeclName, Type))
+      "actor-isolated %0 %1 can not be %select{referenced|mutated|used 'inout'}3 "
+      "from%select{| synchronous}4 context of global actor %2",
+      (DescriptiveDeclKind, DeclName, Type, unsigned, bool))
 ERROR(global_actor_from_instance_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be referenced from actor %3",
-      (DescriptiveDeclKind, DeclName, Type, DeclName))
+      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
+      " from actor %3 %select{|in a synchronous context}5",
+      (DescriptiveDeclKind, DeclName, Type, DeclName, unsigned, bool))
 ERROR(global_actor_from_other_global_actor_context,none,
-      "%0 %1 isolated to global actor %2 can not be referenced from "
-      "different global actor %3",
-      (DescriptiveDeclKind, DeclName, Type, Type))
+      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
+      " from different global actor %3 %select{|in a synchronous context}5",
+      (DescriptiveDeclKind, DeclName, Type, Type, unsigned, bool))
 ERROR(global_actor_from_nonactor_context,none,
-      "%0 %1 isolated to global actor %2 can not be referenced from "
-      "%select{this|an '@actorIndependent'}3 context",
-      (DescriptiveDeclKind, DeclName, Type, bool))
+      "%0 %1 isolated to global actor %2 can not be %select{referenced|mutated|used 'inout'}4"
+      " from %select{this|a non-isolated}3%select{| synchronous}5 context",
+      (DescriptiveDeclKind, DeclName, Type, bool, unsigned, bool))
 ERROR(actor_isolated_partial_apply,none,
         "actor-isolated %0 %1 can not be partially applied",
         (DescriptiveDeclKind, DeclName))
@@ -4260,31 +4380,37 @@ ERROR(concurrent_access_local,none,
         "use of local %0 %1 in concurrently-executing code",
         (DescriptiveDeclKind, DeclName))
 ERROR(actor_isolated_from_concurrent_closure,none,
-        "actor-isolated %0 %1 cannot be referenced from a concurrent closure",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent closure",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_concurrent_function,none,
-        "actor-isolated %0 %1 cannot be referenced from a concurrent function",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from a concurrent function",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_async_let,none,
-        "actor-isolated %0 %1 cannot be referenced from 'async let' initializer",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from 'async let' initializer",
+        (DescriptiveDeclKind, DeclName, unsigned))
 ERROR(actor_isolated_from_escaping_closure,none,
-        "actor-isolated %0 %1 cannot be referenced from an '@escaping' closure",
-        (DescriptiveDeclKind, DeclName))
+        "actor-isolated %0 %1 cannot be %select{referenced|mutated|used 'inout'}2 from an '@escaping' closure",
+        (DescriptiveDeclKind, DeclName, unsigned))
+ERROR(actor_isolated_keypath_component,none,
+      "cannot form key path to actor-isolated %0 %1",
+      (DescriptiveDeclKind, DeclName))
+ERROR(effectful_keypath_component,none,
+      "cannot form key path to %0 with 'throws' or 'async'",
+      (DescriptiveDeclKind))
 ERROR(local_function_executed_concurrently,none,
-      "concurrently-executed %0 %1 must be marked as '@concurrent'",
+      "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
-ERROR(concurrent_mutation_of_local_capture,none,
-      "mutation of captured %0 %1 in concurrently-executing code",
-      (DescriptiveDeclKind, DeclName))
-NOTE(concurrent_access_here,none,
-     "access in concurrently-executed code here", ())
+ERROR(concurrent_access_of_local_capture,none,
+      "%select{mutation of|reference to}0 captured %1 %2 in "
+      "concurrently-executing code",
+      (bool, DescriptiveDeclKind, DeclName))
 NOTE(actor_isolated_sync_func,none,
      "calls to %0 %1 from outside of its actor context are "
      "implicitly asynchronous",
      (DescriptiveDeclKind, DeclName))
 NOTE(actor_mutable_state,none,
-     "mutable state is only available within the actor instance", ())
+     "mutation of this %0 is only permitted within the actor",
+     (DescriptiveDeclKind))
 WARNING(shared_mutable_state_access,none,
         "reference to %0 %1 is not concurrency-safe because it involves "
         "shared mutable state", (DescriptiveDeclKind, DeclName))
@@ -4305,30 +4431,39 @@ ERROR(global_actor_isolated_requirement_witness_conflict,none,
       (DescriptiveDeclKind, DeclName, Type, Identifier, Type))
 
 WARNING(non_concurrent_param_type,none,
-        "cannot pass argument of non-concurrent-value type %0 across actors",
+        "cannot pass argument of non-sendable type %0 across actors",
         (Type))
 WARNING(non_concurrent_result_type,none,
-        "cannot call function returning non-concurrent-value type %0 across "
+        "cannot call function returning non-sendable type %0 across "
         "actors", (Type))
 WARNING(non_concurrent_property_type,none,
-        "cannot use %0 %1 with a non-concurrent-value type %2 "
+        "cannot use %0 %1 with a non-sendable type %2 "
         "%select{across actors|from concurrently-executed code}3",
         (DescriptiveDeclKind, DeclName, Type, bool))
-WARNING(non_concurrent_function_type,none,
-        "`@concurrent` %select{function type|closure}0 has "
-        "non-concurrent-value %select{parameter|result}1 type %2",
-        (bool, bool, Type))
+WARNING(non_concurrent_keypath_capture,none,
+        "cannot form key path that captures non-sendable type %0",
+        (Type))
+WARNING(non_concurrent_keypath_access,none,
+        "cannot form key path that accesses non-sendable type %0",
+        (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %1|associated value %1}0 of "
-      "'ConcurrentValue'-conforming %2 %3 has non-concurrent-value type %4",
+      "'Sendable'-conforming %2 %3 has non-sendable type %4",
       (bool, DeclName, DescriptiveDeclKind, DeclName, Type))
 ERROR(concurrent_value_class_mutable_property,none,
-      "stored property %0 of 'ConcurrentValue'-conforming %1 %2 is mutable",
+      "stored property %0 of 'Sendable'-conforming %1 %2 is mutable",
       (DeclName, DescriptiveDeclKind, DeclName))
 ERROR(concurrent_value_outside_source_file,none,
-      "conformance 'ConcurrentValue' must occur in the same source file as "
-      "%0 %1; use 'UnsafeConcurrentValue' for retroactive conformance",
+      "conformance to 'Sendable' must occur in the same source file as "
+      "%0 %1; use 'UnsafeSendable' for retroactive conformance",
       (DescriptiveDeclKind, DeclName))
+ERROR(concurrent_value_nonfinal_class,none,
+      "non-final class %0 cannot conform to `Sendable`; "
+      "use `UnsafeSendable`", (DeclName))
+ERROR(concurrent_value_inherit,none,
+      "`Sendable` class %1 cannot inherit from another class"
+      "%select{| other than 'NSObject'}0",
+      (bool, DeclName))
 
 ERROR(actorindependent_let,none,
       "'@actorIndependent' is meaningless on 'let' declarations because "
@@ -4341,12 +4476,27 @@ ERROR(actorindependent_local_var,none,
       "'@actorIndependent' can not be applied to local variables",
       ())
 
+ERROR(nonisolated_let,none,
+      "'nonisolated' is meaningless on 'let' declarations because "
+      "they are immutable",
+      ())
+ERROR(nonisolated_mutable_storage,none,
+      "nonisolated' can not be applied to stored properties",
+      ())
+ERROR(nonisolated_local_var,none,
+      "'nonisolated' can not be applied to local variables",
+      ())
+
+ERROR(actor_instance_property_wrapper,none,
+      "%0 property in property wrapper type %1 cannot be isolated to "
+      "the actor instance; consider 'nonisolated'",
+      (Identifier, Identifier))
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
-ERROR(enqueue_partial_task_not_in_context,none,
-      "'enqueue(partialTask:)' can only be implemented in the definition of "
-      "actor class %0", (Type))
+ERROR(async_main_no_concurrency,none,
+      "'_Concurrency' module not imported, required for async main", ())
 
 ERROR(global_actor_missing_shared,none,
       "global actor %0 requires a static property 'shared' that produces an "
@@ -4370,16 +4520,15 @@ ERROR(multiple_global_actors,none,
 ERROR(global_actor_disallowed,none,
       "%0 cannot have a global actor", (DescriptiveDeclKind))
 ERROR(global_actor_on_actor_class,none,
-      "actor class %0 cannot have a global actor", (Identifier))
+      "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
-ERROR(global_actor_on_struct_property,none,
-      "stored property %0 of a struct cannot have a global actor", (DeclName))
-
+ERROR(global_actor_non_unsafe_init,none,
+      "global actor attribute %0 argument can only be '(unsafe)'", (Type))
+      
 ERROR(actor_isolation_multiple_attr,none,
       "%0 %1 has multiple actor-isolation attributes ('%2' and '%3')",
       (DescriptiveDeclKind, DeclName, StringRef, StringRef))
-
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %1 %2 has different actor isolation from %3 overridden declaration",
       (ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
@@ -4698,7 +4847,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "
@@ -5112,6 +5261,10 @@ ERROR(availability_stored_property_no_potential,
       none, "stored properties cannot be marked potentially unavailable with "
       "'@available'", ())
 
+ERROR(availability_enum_element_no_potential,
+      none, "enum cases with associated values cannot be marked potentially unavailable with "
+      "'@available'", ())
+
 ERROR(availability_protocol_requires_version,
       none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (Identifier, DeclName, StringRef, llvm::VersionTuple))
@@ -5277,21 +5430,17 @@ ERROR(specialize_missing_where_clause,none,
 ERROR(specialize_empty_where_clause,none,
       "empty 'where' clause in '_specialize' attribute", ())
 ERROR(specialize_attr_non_concrete_same_type_req,none,
-      "Only concrete type same-type requirements are supported by '_specialize' attribute", ())
+      "only concrete type same-type requirements are supported by '_specialize' attribute", ())
 ERROR(specialize_attr_only_generic_param_req,none,
-      "Only requirements on generic parameters are supported by '_specialize' attribute", ())
-ERROR(specialize_attr_only_one_concrete_same_type_req,none,
-      "Only one concrete type should be used in the same-type requirement in '_specialize' attribute", ())
-ERROR(specialize_attr_non_protocol_type_constraint_req,none,
-      "Only conformances to protocol types are supported by '_specialize' attribute", ())
+      "only requirements on generic parameters are supported by '_specialize' attribute", ())
 ERROR(specialize_attr_type_parameter_count_mismatch,none,
-      "%select{too many|too few}2 type parameters are specified "
-      "in '_specialize' attribute (got %1, but expected %0)",
-      (unsigned, unsigned, bool))
-ERROR(specialize_attr_missing_constraint,none,
-      "Missing constraint for %0 in '_specialize' attribute", (DeclName))
+      "too few generic parameters are specified "
+      "in '_specialize' attribute (got %0, but expected %1)",
+      (unsigned, unsigned))
+NOTE(specialize_attr_missing_constraint,none,
+      "missing constraint for %0 in '_specialize' attribute", (DeclName))
 ERROR(specialize_attr_unsupported_kind_of_req,none,
-      "Only same-type and layout requirements are supported by '_specialize' attribute", ())
+      "only same-type and layout requirements are supported by '_specialize' attribute", ())
 ERROR(specialize_target_function_not_found, none,
      "target function %0 could not be found", (DeclNameRef))
 ERROR(specialize_target_function_of_type_not_found, none,
@@ -5447,8 +5596,27 @@ ERROR(property_wrapper_dynamic_self_type, none,
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
       (Identifier))
+ERROR(property_wrapper_param_not_supported,none,
+      "property wrapper attribute on parameter not yet supported on %0",
+      (DescriptiveDeclKind))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (Identifier))
+ERROR(invalid_projection_argument,none,
+      "cannot use property wrapper projection %select{argument|parameter}0",
+      (bool))
+NOTE(property_wrapper_param_no_wrapper,none,
+     "parameter %0 does not have an attached property wrapper", (Identifier))
+NOTE(property_wrapper_param_attr_arg,none,
+     "property wrapper has arguments in the wrapper attribute", ())
+NOTE(property_wrapper_no_init_projected_value,none,
+     "property wrapper type %0 does not support initialization from a "
+     "projected value", (Type))
+ERROR(property_wrapper_param_mutating,none,
+      "property wrapper applied to parameter must have a nonmutating "
+      "'wrappedValue' getter", ())
+ERROR(invalid_implicit_property_wrapper,none,
+      "inferred projection type %0 is not a property wrapper",
+      (Type))
 
 ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "
@@ -5462,6 +5630,9 @@ ERROR(property_wrapper_let, none,
 ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
+ERROR(property_wrapper_effectful,none,
+    "property wrappers currently cannot define an 'async' or 'throws' accessor",
+    ())
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
@@ -5470,9 +5641,9 @@ ERROR(property_with_wrapper_conflict_attribute,none,
 ERROR(property_wrapper_not_single_var, none,
       "property wrapper can only apply to a single variable", ())
 ERROR(property_with_wrapper_in_bad_context,none,
-      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{|non-static|non-static}1 %2 %0 declared inside "
       "%select{a protocol|an extension|an enum}1 cannot have a wrapper",
-      (Identifier, int))
+      (Identifier, int, DescriptiveDeclKind))
 ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (Identifier))
@@ -5617,8 +5788,12 @@ ERROR(marker_protocol_requirement, none,
 ERROR(marker_protocol_inherit_nonmarker, none,
       "marker protocol %0 cannot inherit non-marker protocol %1",
       (DeclName, DeclName))
-ERROR(marker_protocol_value,none,
-      "marker protocol %0 can only be used in generic constraints", (DeclName))
+ERROR(marker_protocol_cast,none,
+      "marker protocol %0 cannot be used in a conditional cast", (DeclName))
+ERROR(marker_protocol_conditional_conformance,none,
+      "conditional conformance to non-marker protocol %0 cannot depend on "
+      "conformance of %1 to non-marker protocol %2",
+      (Identifier, Type, Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
@@ -5650,6 +5825,36 @@ ERROR(oslog_arg_must_be_type_member_access, none,
 ERROR(atomics_ordering_must_be_constant, none,
       "ordering argument must be a static method or property of %0",
       (Identifier))
+
+//------------------------------------------------------------------------------
+// MARK: access notes
+//------------------------------------------------------------------------------
+
+REMARK(attr_added_by_access_note, none,
+       "access note for %0 adds %select{attribute|modifier}1 '%2' to this %3",
+       (StringRef, bool, StringRef, DescriptiveDeclKind))
+NOTE(fixit_attr_added_by_access_note, none,
+     "add %select{attribute|modifier}0 explicitly to silence this warning",
+     (bool))
+
+REMARK(attr_removed_by_access_note, none,
+       "access note for %0 removes %select{attribute|modifier}1 '%2' from "
+       "this %3",
+       (StringRef, bool, StringRef, DescriptiveDeclKind))
+NOTE(fixit_attr_removed_by_access_note, none,
+     "remove %select{attribute|modifier}0 explicitly to silence this warning",
+     (bool))
+
+REMARK(attr_objc_name_changed_by_access_note, none,
+        "access note for %0 changes the '@objc' name of this %1 to %2",
+        (StringRef, DescriptiveDeclKind, ObjCSelector))
+NOTE(fixit_attr_objc_name_changed_by_access_note, none,
+     "change '@objc' name in source code explicitly to silence this warning",
+     ())
+REMARK(attr_objc_name_conflicts_with_access_note, none,
+       "access note for %0 changes the '@objc' name of this %1 to %2, but "
+       "source code specifies %3; the access note will be ignored",
+       (StringRef, DescriptiveDeclKind, ObjCSelector, ObjCSelector))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

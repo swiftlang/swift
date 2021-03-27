@@ -37,7 +37,6 @@ KNOWN_SDK_TYPE_DECL(ObjectiveC, ObjCBool, StructDecl, 0)
 
 // TODO(async): These might move to the stdlib module when concurrency is
 // standardized
-KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeContinuation, NominalTypeDecl, 1)
-KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeThrowingContinuation, NominalTypeDecl, 1)
+KNOWN_SDK_TYPE_DECL(Concurrency, UnsafeContinuation, NominalTypeDecl, 2)
 
 #undef KNOWN_SDK_TYPE_DECL

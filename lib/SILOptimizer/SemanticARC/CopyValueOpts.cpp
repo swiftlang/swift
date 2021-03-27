@@ -66,12 +66,11 @@ using namespace swift::semanticarc;
 // are within the borrow scope.
 //
 // TODO: This needs a better name.
-//
-// FIXME: CanonicalizeOSSALifetime replaces this once it supports borrows.
 bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(
     CopyValueInst *cvi) {
-  // For now, do not run this optimization. This is just to be careful.
-  if (ctx.onlyGuaranteedOpts)
+  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  // which knows how to preserve lifetimes for debugging.
+  if (ctx.onlyMandatoryOpts)
     return false;
 
   SmallVector<BorrowedValue, 4> borrowScopeIntroducers;
@@ -721,11 +720,11 @@ bool SemanticARCOptVisitor::tryJoiningCopyValueLiveRangeWithOperand(
 
 /// Given an owned value that is completely enclosed within its parent owned
 /// value and is not consumed, eliminate the copy.
-///
-/// FIXME: CanonicalizeOSSALifetime replaces this.
 bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
     CopyValueInst *cvi) {
-  if (ctx.onlyGuaranteedOpts)
+  // All mandatory copy optimization is handled by CanonicalizeOSSALifetime,
+  // which knows how to preserve lifetimes for debugging.
+  if (ctx.onlyMandatoryOpts)
     return false;
 
   auto originalValue = cvi->getOperand();

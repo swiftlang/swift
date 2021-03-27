@@ -111,6 +111,11 @@ BuiltinInst *SILGlobalVariable::getOffsetSubtract(const TupleExtractInst *TE,
 
 bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
                                                      SILModule &M) {
+  for (const Operand &op : I->getAllOperands()) {
+    // Rule out SILUndef and SILArgument.
+    if (!isa<SingleValueInstruction>(op.get()))
+      return false;
+  }
   switch (I->getKind()) {
     case SILInstructionKind::BuiltinInst: {
       auto *bi = cast<BuiltinInst>(I);

@@ -2,8 +2,8 @@
 
 import NonMemberInline
 
-var lhs = IntBox(value: 42)
-var rhs = IntBox(value: 23)
+var lhs = LoadableIntWrapper(value: 42)
+var rhs = LoadableIntWrapper(value: 23)
 
 let resultPlus = lhs + rhs
 let resultMinus = lhs - rhs
@@ -21,8 +21,8 @@ let resultExclaimEqual = lhs != rhs
 let resultLessEqual = lhs <= rhs
 let resultGreaterEqual = lhs >= rhs
 
-var lhsBool = BoolBox(value: true)
-var rhsBool = BoolBox(value: false)
+var lhsBool = LoadableBoolWrapper(value: true)
+var rhsBool = LoadableBoolWrapper(value: false)
 
 let resultAmpAmp = lhsBool && rhsBool
 let resultPipePipe = lhsBool && rhsBool

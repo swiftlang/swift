@@ -6,6 +6,7 @@ CHANGELOG
 
 | Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
+| [Swift 5.5](#swift-55) |            |             |
 | [Swift 5.4](#swift-54) |            |             |
 | [Swift 5.3](#swift-53) | 2020-09-16 | Xcode 12.0  |
 | [Swift 5.2](#swift-52) | 2020-03-24 | Xcode 11.4  |
@@ -25,8 +26,42 @@ CHANGELOG
 
 </details>
 
-Swift Next
-----------
+Swift 5.5
+---------
+
+* [SE-0299][]:
+
+  It is now possible to use leading-dot syntax in generic contexts to access static members of protocol extensions where `Self` is constrained to a fully concrete type:
+
+  ```swift
+  public protocol ToggleStyle { ... }
+
+  public struct DefaultToggleStyle: ToggleStyle { ... }
+
+  extension ToggleStyle where Self == DefaultToggleStyle {
+    public static var `default`: Self { .init() }
+  }
+
+  struct Toggle {
+    func applyToggle<T: ToggleStyle>(_ style: T) { ... }
+  }
+
+  Toggle(...).applyToggle(.default)
+  ```
+
+* Whenever a reference to `Self` does not impede the usage of a protocol as a value type, or a protocol member on a value of protocol type, the same is now true for references to `[Self]` and `[Key : Self]`:
+
+  ```swift
+  protocol Copyable {
+    func copy() -> Self
+    func copy(count: Int) -> [Self]
+  }
+
+  func test(c: Copyable) {
+    let copy: Copyable = c.copy() // OK
+    let copies: [Copyable] = c.copy(count: 5) // also OK
+  }
+  ```
 
 * [SE-0296][]:
 
@@ -61,10 +96,130 @@ Swift Next
   }
   ```
 
+* [SE-0297][]:
+
+  An Objective-C method that delivers its results asynchronously via a completion handler block will be translated into an `async` method that directly returns the result (or throws). For example, the following Objective-C method from [CloudKit](https://developer.apple.com/documentation/cloudkit/ckcontainer/1640387-fetchshareparticipantwithuserrec):
+
+  ```objc
+  - (void)fetchShareParticipantWithUserRecordID:(CKRecordID *)userRecordID
+      completionHandler:(void (^)(CKShareParticipant * _Nullable, NSError * _Nullable))completionHandler;
+  ```
+
+  will be translated into an `async throws` method that returns the participant instance:
+
+  ```swift
+  func fetchShareParticipant(
+      withUserRecordID userRecordID: CKRecord.ID
+  ) async throws -> CKShare.Participant
+  ```
+
+  Swift callers can invoke this `async` method within an `await` expression:
+
+  ```swift
+  guard let participant = try? await container.fetchShareParticipant(withUserRecordID: user) else {
+      return nil
+  }
+  ```
+
+* [SE-0298][]:
+
+  The "for" loop can be used to traverse asynchronous sequences in asynchronous code:
+
+	```swift
+  for try await line in myFile.lines() {
+    // Do something with each line
+  }
+	```
+
+  Asynchronous for loops use asynchronous sequences, defined by the protocol
+  `AsyncSequence` and its corresponding `AsyncIterator`.
+
 **Add new entries to the top of this section, not here!**
 
 Swift 5.4
 ---------
+
+* Protocol conformance checking now considers `where` clauses when evaluating if a `typealias` is a suitable witness for an associated type requirement. The following code is now rejected:
+
+  ```swift
+  protocol Holder {
+    associatedtype Contents
+  }
+
+  struct Box<T> : Holder {}
+  // error: type 'Box<T>' does not conform to protocol 'Holder'
+
+  extension Box where T : Hashable {
+    typealias Contents = T
+  }
+  ```
+
+  In most cases, the compiler would either crash or produce surprising results when making use of a `typealias` with an unsatisfied `where` clause, but it is possible that some previously-working code is now rejected. In the above example, the conformance can be fixed in one of various ways:
+
+  1) making it conditional (moving the `: Holder` from the definition of `Box` to the extension)
+  2) moving the `typealias` from the extension to the type itself
+  3) relaxing the `where` clause on the extension
+
+* Availability checking now rejects protocols that refine less available protocols. Previously, this was accepted by the compiler but could result in linker errors or runtime crashes:
+
+  ```swift
+  @available(macOS 11, *)
+  protocol Base {}
+
+  protocol Bad : Base {}
+  // error: 'Base' is only available in macOS 11 or newer
+
+  @available(macOS 11, *)
+  protocol Good : Base {} // OK
+  ```
+
+* The `@available` attribute is no longer permitted on generic parameters, where it had no effect:
+
+  ```swift
+  struct Bad<@available(macOS 11, *) T> {}
+  // error: '@available' attribute cannot be applied to this declaration
+
+  struct Good<T> {} // equivalent
+  ```
+
+* If a type is made to conform to a protocol via an extension, the availability of the extension is now taken into account when forming generic types that use this protocol conformance. For example, consider a `Box` type whose conformance to `Hashable` uses features only available on macOS 11:
+
+  ```swift
+  public struct Box {}
+
+  @available(macOS 11, *)
+  extension Box : Hashable {
+    func hash(into: inout Hasher) {
+      // call some new API to hash the value...
+    }
+  }
+
+  public func findBad(_: Set<Box>) -> Box {}
+  // warning: conformance of 'Box' to 'Hashable' is only available in macOS 11 or newer
+
+  @available(macOS 11, *)
+  public func findGood(_: Set<Box>) -> Box {} // OK
+  ```
+
+  In the above code, it is not valid for `findBad()` to take a `Set<Box>`, since `Set` requires that its element type conform to `Hashable`; however the conformance of `Box` to `Hashable` is not available prior to macOS 11.
+
+  Note that using an unavailable protocol conformance is a warning, not an error, to avoid potential source compatibility issues. This is because it was technically possible to write code in the past that made use of unavailable protocol conformances but worked anyway, if the optimizer had serendipitously eliminated all runtime dispatch through this conformance, or the code in question was entirely unreachable at runtime.
+
+  Protocol conformances can also be marked as completely unavailable or deprecated, by placing an appropriate `@available` attribute on the extension:
+
+  ```swift
+  @available(*, unavailable, message: "Not supported anymore")
+  extension Box : Hashable {}
+
+  @available(*, deprecated, message: "Suggest using something else")
+  extension Box : Hashable {}
+  ```
+
+  If a protocol conformance is defined on the type itself, it inherits availability from the type. You can move the protocol conformance to an extension if you need it to have narrower availability than the type.
+
+* When `swift` is run with no arguments, it starts a REPL (read eval print loop) that uses LLDB. The compiler also had a second REPL implementation, known as the "integrated REPL", formerly accessible by running `swift -frontend -repl`. The "integrated REPL" was only intended for use by compiler developers, and has now been removed.
+
+  Note that this does not take away the ability to put Swift code in a script and run it with `swift myScript.swift`. This so-called "script mode" is distinct from the integrated REPL, and continues to be supported.
 
 * Property wrappers now work in local contexts, making the following valid:
 
@@ -8227,6 +8382,9 @@ Swift 1.0
 [SE-0286]: <https://github.com/apple/swift-evolution/blob/main/proposals/0286-forward-scan-trailing-closures.md>
 [SE-0287]: <https://github.com/apple/swift-evolution/blob/main/proposals/0287-implicit-member-chains.md>
 [SE-0296]: <https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md>
+[SE-0297]: <https://github.com/apple/swift-evolution/blob/main/proposals/0297-concurrency-objc.md>
+[SE-0298]: <https://github.com/apple/swift-evolution/blob/main/proposals/0298-asyncsequence.md>
+[SE-0299]: <https://github.com/apple/swift-evolution/blob/main/proposals/0299-extend-generic-static-member-lookup.md>
 
 [SR-75]: <https://bugs.swift.org/browse/SR-75>
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

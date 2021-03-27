@@ -403,20 +403,17 @@ bb0(%0 : $*MutatingProto, %1 : $MStruct):
 }
 
 // CHECK-LABEL: sil [ossa] @dont_replace_copied_self_in_mutating_method_call2
-sil [ossa] @dont_replace_copied_self_in_mutating_method_call2 : $@convention(thin) (@thick MutatingProto.Type) -> (@out MutatingProto) {
-bb0(%0 : $*MutatingProto, %1 : $@thick MutatingProto.Type):
-  %alloc1 = alloc_stack $MutatingProto, let, name "p"
+sil [ossa] @dont_replace_copied_self_in_mutating_method_call2 : $@convention(thin) (@thick MutatingProto.Type, @in_guaranteed MutatingProto) -> (@out MutatingProto) {
+bb0(%0 : $*MutatingProto, %1 : $@thick MutatingProto.Type, %2 : $*MutatingProto):
   %openType = open_existential_metatype %1 : $@thick MutatingProto.Type to $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type
-  %initType =  init_existential_addr %alloc1 : $*MutatingProto, $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
   %alloc2 = alloc_stack $MutatingProto
-  copy_addr %alloc1 to [initialization] %alloc2 : $*MutatingProto
+  copy_addr %2 to [initialization] %alloc2 : $*MutatingProto
   %oeaddr = open_existential_addr mutable_access %alloc2 : $*MutatingProto to $*@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto
   %witmethod = witness_method $@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto, #MutatingProto.mutatingMethod : <Self where Self : MutatingProto> (inout Self) -> () -> (), %openType : $@thick (@opened("66A6DAFC-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto).Type : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   // CHECK: apply {{%.*}}<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>({{%.*}}) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> () // type-defs
   %apply = apply %witmethod<@opened("6E02DCF6-AF78-11E7-8F3B-28CFE9213F4F") MutatingProto>(%oeaddr) : $@convention(witness_method: MutatingProto) <τ_0_0 where τ_0_0 : MutatingProto> (@inout τ_0_0) -> ()
   copy_addr [take] %alloc2 to [initialization] %0 : $*MutatingProto
   dealloc_stack %alloc2 : $*MutatingProto
-  dealloc_stack %alloc1 : $*MutatingProto
   %27 = tuple ()
   return %27 : $()
 }
@@ -1108,7 +1105,7 @@ bb2:
 // CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil [ossa] @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
+sil [ossa] @test_existential_partial_apply_apply : $@convention(thin) (@in_guaranteed FakeProtocol) -> () {
 bb0(%0: $*FakeProtocol):
   %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
   %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method: FakeProtocol) <T where T : FakeProtocol> (@in_guaranteed T) -> ()

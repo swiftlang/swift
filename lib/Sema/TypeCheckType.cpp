@@ -63,16 +63,18 @@ using namespace swift;
 
 TypeResolution
 TypeResolution::forStructural(DeclContext *dc, TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener) {
+                              OpenUnboundGenericTypeFn unboundTyOpener,
+                              HandlePlaceholderTypeReprFn placeholderHandler) {
   return TypeResolution(dc, TypeResolutionStage::Structural, options,
-                        unboundTyOpener);
+                        unboundTyOpener, placeholderHandler);
 }
 
 TypeResolution
 TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
-                             OpenUnboundGenericTypeFn unboundTyOpener) {
+                             OpenUnboundGenericTypeFn unboundTyOpener,
+                             HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Interface, options,
-                        unboundTyOpener);
+                        unboundTyOpener, placeholderHandler);
   result.complete.genericSig = dc->getGenericSignatureOfContext();
   result.complete.builder = nullptr;
   return result;
@@ -80,23 +82,25 @@ TypeResolution::forInterface(DeclContext *dc, TypeResolutionOptions options,
 
 TypeResolution
 TypeResolution::forContextual(DeclContext *dc, TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener) {
+                              OpenUnboundGenericTypeFn unboundTyOpener,
+                              HandlePlaceholderTypeReprFn placeholderHandler) {
   return forContextual(dc, dc->getGenericEnvironmentOfContext(), options,
-                       unboundTyOpener);
+                       unboundTyOpener, placeholderHandler);
 }
 
 TypeResolution
 TypeResolution::forContextual(DeclContext *dc, GenericEnvironment *genericEnv,
                               TypeResolutionOptions options,
-                              OpenUnboundGenericTypeFn unboundTyOpener) {
+                              OpenUnboundGenericTypeFn unboundTyOpener,
+                              HandlePlaceholderTypeReprFn placeholderHandler) {
   TypeResolution result(dc, TypeResolutionStage::Contextual, options,
-                        unboundTyOpener);
+                        unboundTyOpener, placeholderHandler);
   result.genericEnv = genericEnv;
   return result;
 }
 
 TypeResolution TypeResolution::withOptions(TypeResolutionOptions opts) const {
-  TypeResolution result(dc, stage, opts, unboundTyOpener);
+  TypeResolution result(dc, stage, opts, unboundTyOpener, placeholderHandler);
   result.genericEnv = genericEnv;
   result.complete = complete;
   return result;
@@ -707,6 +711,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
       if (!options.is(TypeResolverContext::TypeAliasDecl)) {
         // If the resolution object carries an opener, attempt to open
         // the unbound generic type.
+        // TODO: We should be able to just open the generic arguments as N
+        // different PlaceholderTypes.
         if (const auto openerFn = resolution.getUnboundTypeOpener())
           if (const auto boundTy = openerFn(unboundTy))
             return boundTy;
@@ -1207,9 +1213,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       return I->second;
     }
 
-    diags.diagnose(L, diag::cannot_find_type_in_scope,
-                comp->getNameRef())
-      .highlight(R);
+    diags.diagnose(L, diag::cannot_find_type_in_scope, comp->getNameRef())
+        .highlight(R);
 
     return ErrorType::get(ctx);
   }
@@ -1815,7 +1820,8 @@ namespace {
                            bool concurrent = false,
                            const clang::Type *parsedClangFunctionType = nullptr,
                            DifferentiabilityKind diffKind =
-                               DifferentiabilityKind::NonDifferentiable);
+                               DifferentiabilityKind::NonDifferentiable,
+                           Type globalActor = Type());
     SmallVector<AnyFunctionType::Param, 8> resolveASTFunctionTypeParams(
         TupleTypeRepr *inputRepr, TypeResolutionOptions options,
         bool requiresMappingOut, DifferentiabilityKind diffKind);
@@ -2022,6 +2028,20 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
                                        : ErrorType::get(getASTContext());
   }
 
+  case TypeReprKind::Placeholder: {
+    // Fill in the placeholder if there's an appropriate handler.
+    if (const auto handlerFn = resolution.getPlaceholderHandler())
+      if (const auto ty = handlerFn(cast<PlaceholderTypeRepr>(repr)))
+        return ty;
+
+    // Complain if we're allowed to and bail out with an error.
+    if (!options.contains(TypeResolutionFlags::SilenceErrors))
+      getASTContext().Diags.diagnose(repr->getLoc(),
+                                     diag::placeholder_type_not_allowed);
+
+    return ErrorType::get(resolution.getASTContext());
+  }
+
   case TypeReprKind::Fixed:
     return cast<FixedTypeRepr>(repr)->getType();
   }
@@ -2069,6 +2089,46 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   bool isVariadicFunctionParam =
       options.is(TypeResolverContext::VariadicFunctionInput) &&
       !options.hasBase(TypeResolverContext::EnumElementDecl);
+
+  // Resolve global actor.
+  CustomAttr *globalActorAttr = nullptr;
+  Type globalActor;
+  if (isa<FunctionTypeRepr>(repr)) {
+    auto foundGlobalActor = checkGlobalActorAttributes(
+        repr->getLoc(), getDeclContext(),
+        std::vector<CustomAttr *>(
+          attrs.getCustomAttrs().begin(), attrs.getCustomAttrs().end()));
+    if (foundGlobalActor) {
+      globalActorAttr = foundGlobalActor->first;
+      globalActor = resolveType(globalActorAttr->getTypeRepr(), options);
+      if (globalActor->hasError())
+        globalActor = Type();
+    }
+  }
+
+  // Diagnose custom attributes that haven't been processed yet.
+  for (auto customAttr : attrs.getCustomAttrs()) {
+    // If this was the global actor we matched, ignore it.
+    if (globalActorAttr == customAttr)
+      continue;
+
+    // If this attribute was marked invalid, ignore it.
+    if (customAttr->isInvalid())
+      continue;
+
+    // Diagnose the attribute, because we don't yet handle custom type
+    // attributes.
+    std::string typeName;
+    if (auto typeRepr = customAttr->getTypeRepr()) {
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+    } else {
+      typeName = customAttr->getType().getString();
+    }
+
+    diagnose(customAttr->getLocation(), diag::unknown_attribute, typeName);
+    customAttr->setInvalid();
+  }
 
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
@@ -2151,7 +2211,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_differentiable, TAK_escaping, TAK_concurrent,
+    TAK_differentiable, TAK_escaping, TAK_Sendable,
     TAK_yield_once, TAK_yield_many, TAK_async
   };
 
@@ -2185,7 +2245,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
     }
   }
 
-  bool hasFunctionAttr =
+  bool hasFunctionAttr = globalActor ||
       llvm::any_of(FunctionAttrs, [&attrs](const TypeAttrKind &attr) {
         return attrs.has(attr);
       });
@@ -2292,7 +2352,7 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
 
       auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
           rep, attrs.has(TAK_pseudogeneric), attrs.has(TAK_noescape),
-          attrs.has(TAK_concurrent), attrs.has(TAK_async), diffKind,
+          attrs.has(TAK_Sendable), attrs.has(TAK_async), diffKind,
           parsedClangFunctionType);
 
       ty =
@@ -2339,21 +2399,11 @@ TypeResolver::resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
         }
       }
 
-      bool concurrent = false;
-      if (attrs.has(TAK_concurrent)) {
-        if (getASTContext().LangOpts.EnableExperimentalConcurrency) {
-          concurrent = true;
-        } else {
-          diagnoseInvalid(repr, attrs.getLoc(TAK_concurrent),
-                          diag::attr_requires_concurrency,
-                          TypeAttributes::getAttrName(TAK_concurrent),
-                          false);
-        }
-      }
+      bool concurrent = attrs.has(TAK_Sendable);
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
                                   concurrent, parsedClangFunctionType,
-                                  diffKind);
+                                  diffKind, globalActor);
       if (!ty || ty->hasError())
         return ty;
     }
@@ -2745,7 +2795,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     AnyFunctionType::Representation representation, bool noescape,
     bool concurrent, const clang::Type *parsedClangFunctionType,
-    DifferentiabilityKind diffKind) {
+    DifferentiabilityKind diffKind, Type globalActor) {
 
   Optional<llvm::SaveAndRestore<GenericParamList *>> saveGenericParams;
 
@@ -2798,7 +2848,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), diffKind,
-      /*clangFunctionType*/ nullptr);
+      /*clangFunctionType*/ nullptr, Type());
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -2809,6 +2859,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withConcurrent(concurrent)
                      .withAsync(repr->isAsync())
                      .withClangFunctionType(clangFnType)
+                     .withGlobalActor(globalActor)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
@@ -2822,14 +2873,6 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   
   if (fnTy->hasError())
     return fnTy;
-
-  // Concurrent function types must be composed of concurrent-safe parameter
-  // and result types.
-  if (concurrent && resolution.getStage() > TypeResolutionStage::Structural) {
-    (void)diagnoseNonConcurrentTypesInFunctionType(
-         fnTy, resolution.getDeclContext(), repr->getLoc(),
-         /*isClosure=*/false);
-  }
 
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.
@@ -2900,7 +2943,8 @@ NeverNullType TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     if (genericParams) {
       fieldResolution = TypeResolution::forContextual(
           getDeclContext(), genericEnv, options,
-          resolution.getUnboundTypeOpener());
+          resolution.getUnboundTypeOpener(),
+          resolution.getPlaceholderHandler());
     }
 
     TypeResolver fieldResolver{fieldResolution,
@@ -2985,7 +3029,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     if (componentTypeEnv) {
       functionResolution = TypeResolution::forContextual(
           getDeclContext(), componentTypeEnv, options,
-          resolution.getUnboundTypeOpener());
+          resolution.getUnboundTypeOpener(),
+          resolution.getPlaceholderHandler());
     }
     
     auto argsTuple = repr->getArgsTypeRepr();
@@ -3049,7 +3094,8 @@ NeverNullType TypeResolver::resolveSILFunctionType(
     if (genericEnv) {
       auto resolveSILParameters =
           TypeResolution::forContextual(getDeclContext(), genericEnv, options,
-                                        resolution.getUnboundTypeOpener());
+                                        resolution.getUnboundTypeOpener(),
+                                        resolution.getPlaceholderHandler());
       patternSubs = resolveSubstitutions(repr->getPatternGenericEnvironment(),
                                          repr->getPatternSubstitutions(),
                                          TypeResolver{resolveSILParameters,
@@ -3435,8 +3481,9 @@ TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  if (!isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
-    // Anything within the inout isn't a parameter anymore.
+  if (isa<InOutTypeRepr>(repr)
+      && !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getBase())) {
+    // Anything within an inout isn't a parameter anymore.
     options.setContext(None);
   }
 
@@ -3924,12 +3971,6 @@ public:
                            proto->getName());
         T->setInvalid();
       }
-      if (proto->isMarkerProtocol()) {
-        Ctx.Diags.diagnose(comp->getNameLoc(),
-                           diag::marker_protocol_value,
-                           proto->getName());
-        T->setInvalid();
-      }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
       type.findIf([&](Type type) -> bool {
@@ -3939,15 +3980,6 @@ public:
           auto layout = type->getExistentialLayout();
           for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
-
-            if (protoDecl->isMarkerProtocol()) {
-              Ctx.Diags.diagnose(comp->getNameLoc(),
-                                 diag::marker_protocol_value,
-                                 protoDecl->getName());
-              T->setInvalid();
-              continue;
-            }
-
             if (protoDecl->existentialTypeSupported())
               continue;
             
@@ -4049,7 +4081,8 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
     };
   }
 
-  const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener)
+  const auto type = TypeResolution::forContextual(dc, options, unboundTyOpener,
+                                                  /*placeholderHandler*/nullptr)
                         .resolveType(attr->getTypeRepr());
 
   // We always require the type to resolve to a nominal type. If the type was

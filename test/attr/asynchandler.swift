@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency
+// RUN: %target-swift-frontend -typecheck -verify %s -enable-experimental-concurrency -enable-experimental-async-handler
 
 // REQUIRES: concurrency
 
@@ -37,7 +37,7 @@ func asyncHandlerBad4(result: inout Int) { }
 func asyncHandlerBad5(result: () -> Int) { }
 // expected-error@-1{{non-escaping closure parameter is not allowed in '@asyncHandler' function}}
 
-actor class X {
+actor X {
   @asyncHandler func asyncHandlerMethod() { }
 
   @asyncHandler init() { }
@@ -60,11 +60,11 @@ class Y: P {
   // @asyncHandler is not inferred for classes
 
   func callback() {
-    // expected-note@-1{{add 'async' to function 'callback()' to make it asynchronous}} {{none}}
+    // expected-note@-1{{add 'async' to function 'callback()' to make it asynchronous}} {{18-18= async}}
     // expected-note@-2{{add '@asyncHandler' to function 'callback()' to create an implicit asynchronous context}} {{3-3=@asyncHandler }}
 
     // okay, it's an async context
-    let _ = await globalAsyncFunction() // expected-error{{'async' in a function that does not support concurrency}}
+    let _ = await globalAsyncFunction() // expected-error{{'async' call in a function that does not support concurrency}}
  }
 }
 

@@ -58,7 +58,7 @@ struct InstanceMethod : Differentiable {
     static func +(_: Self, _: Self) -> Self { fatalError() }
     static func -(_: Self, _: Self) -> Self { fatalError() }
   }
-  mutating func move(along direction: TangentVector) {}
+  mutating func move(by offset: TangentVector) {}
 }
 
 // CHECK: @differentiable(reverse, wrt: x where T : Differentiable)

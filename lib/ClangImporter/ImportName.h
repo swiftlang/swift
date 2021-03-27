@@ -116,18 +116,14 @@ public:
   ///
   /// This is the most useful order for importing compatibility stubs.
   void forEachOtherImportNameVersion(
-      bool withConcurrency,
       llvm::function_ref<void(ImportNameVersion)> action) const {
     assert(*this >= ImportNameVersion::swift2());
 
     ImportNameVersion nameVersion = *this;
     assert(!nameVersion.supportsConcurrency());
 
-    // If we've been asked to also consider concurrency, do so for the
-    // primary version (only).
-    if (withConcurrency) {
-      action(nameVersion.withConcurrency(true));
-    }
+    // Consider concurrency imports.
+    action(nameVersion.withConcurrency(true));
 
     while (nameVersion > ImportNameVersion::swift2()) {
       --nameVersion.rawValue;
@@ -357,8 +353,6 @@ class NameImporter {
   EnumInfoCache enumInfos;
   StringScratchSpace scratch;
 
-  const bool inferImportAsMember;
-
   // TODO: remove when we drop the options (i.e. import all names)
   using CacheKeyType =
       std::pair<const clang::NamedDecl *, ImportNameVersion>;
@@ -373,10 +367,9 @@ class NameImporter {
 
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               clang::Sema &cSema, bool inferIAM)
+               clang::Sema &cSema)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
-        enumInfos(clangSema.getPreprocessor()),
-        inferImportAsMember(inferIAM) {}
+        enumInfos(clangSema.getPreprocessor()) {}
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -418,8 +411,6 @@ public:
   }
 
   StringScratchSpace &getScratch() { return scratch; }
-
-  bool isInferImportAsMember() const { return inferImportAsMember; }
 
   EnumInfo getEnumInfo(const clang::EnumDecl *decl) {
     return enumInfos.getEnumInfo(decl);
@@ -472,6 +463,8 @@ private:
                       bool isInitializer,
                       Optional<unsigned> explicitCompletionHandlerParamIndex,
                       CustomAsyncName customName,
+                      Optional<unsigned> completionHandlerFlagParamIndex,
+                      bool completionHandlerFlagIsZeroOnError,
                       Optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,

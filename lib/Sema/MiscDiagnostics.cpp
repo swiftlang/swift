@@ -19,10 +19,12 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -65,6 +67,8 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Warn about promotions to optional in specific syntactic forms.
 ///   - Error about collection literals that default to Any collections in
 ///     invalid positions.
+///   - Marker protocols cannot occur as the type of an as? or is expression.
+///   - KeyPath expressions cannot refer to effectful properties / subscripts
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -147,6 +151,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         CallArgs.insert(DSE->getIndex());
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        // raise an error if this KeyPath contains an effectful member.
+        checkForEffectfulKeyPath(KPE);
+
         for (auto Comp : KPE->getComponents()) {
           if (auto *Arg = Comp.getIndexExpr())
             CallArgs.insert(Arg);
@@ -311,9 +318,50 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
       }
 
+      // Diagnose checked casts that involve marker protocols.
+      if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
+        checkCheckedCastExpr(cast);
+      }
+      
       return { true, E };
     }
 
+    /// Visit each component of the keypath and emit a diganostic if they
+    /// refer to a member that has effects.
+    void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
+      for (const auto &component : keyPath->getComponents()) {
+        if (component.hasDeclRef()) {
+          auto decl = component.getDeclRef().getDecl();
+          if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
+            if (auto getter = asd->getEffectfulGetAccessor()) {
+              Ctx.Diags.diagnose(component.getLoc(),
+                                 diag::effectful_keypath_component,
+                                 asd->getDescriptiveKind());
+              Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
+                                 asd->getDescriptiveKind());
+            }
+          }
+        }
+      }
+    }
+
+    void checkCheckedCastExpr(CheckedCastExpr *cast) {
+      if (!isa<ConditionalCheckedCastExpr>(cast) && !isa<IsExpr>(cast))
+        return;
+
+      Type castType = cast->getCastType();
+      if (!castType || !castType->isExistentialType())
+        return;
+
+      auto layout = castType->getExistentialLayout();
+      for (auto proto : layout.getProtocols()) {
+        if (proto->getDecl()->isMarkerProtocol()) {
+          Ctx.Diags.diagnose(cast->getLoc(), diag::marker_protocol_cast,
+                             proto->getDecl()->getName());
+        }
+      }
+    }
+    
     /// Visit the argument/s represented by either a ParenExpr or TupleExpr,
     /// unshuffling if needed. If any other kind of expression, will pass it
     /// straight back.
@@ -1461,14 +1509,31 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
             Closures.push_back(ACE);
         }
 
+    static bool isEnclosingSelfReference(VarDecl *var,
+                                   const AbstractClosureExpr *inClosure) {
+      if (var->isSelfParameter())
+        return true;
+
+      // Capture variables have a DC of the parent function.
+      if (inClosure && var->isSelfParamCapture() &&
+          var->getDeclContext() != inClosure->getParent())
+        return true;
+
+      return false;
+    }
+
     /// Return true if this is an implicit reference to self which is required
     /// to be explicit in an escaping closure. Metatype references and value
     /// type references are excluded.
-    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E) {
+    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E,
+                                   const AbstractClosureExpr *inClosure) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
 
-      if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()) ||
-          !cast<VarDecl>(DRE->getDecl())->isSelfParameter())
+      if (!DRE || !DRE->isImplicit())
+        return false;
+
+      auto var = dyn_cast<VarDecl>(DRE->getDecl());
+      if (!var || !isEnclosingSelfReference(var, inClosure))
         return false;
 
       // Defensive check for type. If the expression doesn't have type here, it
@@ -1544,7 +1609,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       
       SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase())) {
+        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase(), ACE)) {
           auto baseName = MRE->getMember().getDecl()->getBaseName();
           memberLoc = MRE->getLoc();
           Diags.diagnose(memberLoc,
@@ -1554,7 +1619,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase()) &&
+        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase(), ACE) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           memberLoc = DSCE->getLoc();
@@ -1569,7 +1634,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       }
       
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfParamUseLikelyToCauseCycle(E))
+      if (isImplicitSelfParamUseLikelyToCauseCycle(E, ACE))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
 
       return { true, E };
@@ -1806,28 +1871,45 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   llvm::SmallString<16> missingBuffer;
   llvm::SmallString<16> extraBuffer;
   for (unsigned i = 0; i != n; ++i) {
-    Identifier oldName;
+    // oldName and newName are
+    //  - None if i is out of bounds for the argument list
+    //  - nullptr for an argument without a label
+    //  - have a value if the argument has a label
+    Optional<Identifier> oldName;
     if (i < argList.args.size())
       oldName = argList.labels[i];
-    Identifier newName;
+    Optional<Identifier> newName;
     if (i < newNames.size())
       newName = newNames[i];
 
+    assert(oldName || newName && "We can't have oldName and newName out of "
+                                 "bounds, otherwise n would be smaller");
+
     if (oldName == newName ||
-        (argList.hasTrailingClosure && i == argList.args.size()-1 &&
+        (argList.hasTrailingClosure && i == argList.args.size() - 1 &&
          (numMissing > 0 || numExtra > 0 || numWrong > 0)))
       continue;
 
-    if (oldName.empty()) {
+    if (!oldName.hasValue() && newName.hasValue()) {
       ++numMissing;
-      missingBuffer += newName.str();
-      missingBuffer += ":";
-    } else if (newName.empty()) {
+      missingBuffer += newName->str();
+      missingBuffer += ':';
+    } else if (oldName.hasValue() && !newName.hasValue()) {
       ++numExtra;
-      extraBuffer += oldName.str();
+      extraBuffer += oldName->str();
       extraBuffer += ':';
-    } else
+    } else if (oldName->empty()) {
+      // In the cases from here onwards oldValue and newValue are not null
+      ++numMissing;
+      missingBuffer += newName->str();
+      missingBuffer += ":";
+    } else if (newName->empty()) {
+      ++numExtra;
+      extraBuffer += oldName->str();
+      extraBuffer += ':';
+    } else {
       ++numWrong;
+    }
   }
 
   // Emit the diagnostic.
@@ -2032,6 +2114,9 @@ static void diagnoseUnownedImmediateDeallocationImpl(ASTContext &ctx,
 
   if (varDecl->getDeclContext()->isTypeContext())
     storageKind = SK_Property;
+
+  // TODO: The DiagnoseLifetimeIssuesPass prints a similiar warning in this
+  // situation. We should only print one warning.
 
   ctx.Diags.diagnose(diagLoc, diag::unowned_assignment_immediate_deallocation,
                      varDecl->getName(), ownershipAttr->get(),
@@ -3427,39 +3512,6 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   }
 }
 
-static Optional<ObjCSelector>
-parseObjCSelector(ASTContext &ctx, StringRef string) {
-  // Find the first colon.
-  auto colonPos = string.find(':');
-
-  // If there is no colon, we have a nullary selector.
-  if (colonPos == StringRef::npos) {
-    if (string.empty() || !Lexer::isIdentifier(string)) return None;
-    return ObjCSelector(ctx, 0, { ctx.getIdentifier(string) });
-  }
-
-  SmallVector<Identifier, 2> pieces;
-  do {
-    // Check whether we have a valid selector piece.
-    auto piece = string.substr(0, colonPos);
-    if (piece.empty()) {
-      pieces.push_back(Identifier());
-    } else {
-      if (!Lexer::isIdentifier(piece)) return None;
-      pieces.push_back(ctx.getIdentifier(piece));
-    }
-
-    // Move to the next piece.
-    string = string.substr(colonPos+1);
-    colonPos = string.find(':');
-  } while (colonPos != StringRef::npos);
-
-  // If anything remains of the string, it's not a selector.
-  if (!string.empty()) return None;
-
-  return ObjCSelector(ctx, pieces.size(), pieces);
-}
-
 
 namespace {
 
@@ -3627,7 +3679,7 @@ public:
 
     // Try to parse the string literal as an Objective-C selector, and complain
     // if it isn't one.
-    auto selector = parseObjCSelector(Ctx, stringLiteral->getValue());
+    auto selector = ObjCSelector::parse(Ctx, stringLiteral->getValue());
     if (!selector) {
       auto diag = Ctx.Diags.diagnose(stringLiteral->getLoc(),
                                      diag::selector_literal_invalid);
@@ -4587,6 +4639,68 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
   ComparisonWithNaNFinder Walker(DC);
   const_cast<Expr *>(E)->walk(Walker);
+}
+
+namespace {
+
+class CompletionHandlerUsageChecker final : public ASTWalker {
+  ASTContext &ctx;
+
+public:
+  CompletionHandlerUsageChecker(ASTContext &ctx) : ctx(ctx) {}
+
+  bool walkToDeclPre(Decl *D) override { return !isa<PatternBindingDecl>(D); }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (expr->getType().isNull())
+      return {false, expr}; // Something failed to typecheck, bail out
+
+    if (ClosureExpr *closure = dyn_cast<ClosureExpr>(expr))
+      return {closure->isBodyAsync(), closure};
+
+    if (ApplyExpr *call = dyn_cast<ApplyExpr>(expr)) {
+      if (DeclRefExpr *fnDeclExpr = dyn_cast<DeclRefExpr>(call->getFn())) {
+        ValueDecl *fnDecl = fnDeclExpr->getDecl();
+        CompletionHandlerAsyncAttr *asyncAltAttr =
+            fnDecl->getAttrs().getAttribute<CompletionHandlerAsyncAttr>();
+        if (asyncAltAttr) {
+          // Ensure that the attribute typechecks,
+          // this also resolves the async function decl.
+          if (!evaluateOrDefault(
+                  ctx.evaluator,
+                  TypeCheckCompletionHandlerAsyncAttrRequest{
+                      cast<AbstractFunctionDecl>(fnDecl), asyncAltAttr},
+                  false)) {
+            return {false, call};
+          }
+          ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+          ctx.Diags.diagnose(asyncAltAttr->AsyncFunctionDecl->getLoc(),
+                             diag::decl_declared_here,
+                             asyncAltAttr->AsyncFunctionDecl->getName());
+        }
+      }
+    }
+    return {true, expr};
+  }
+};
+
+} // namespace
+
+void swift::checkFunctionAsyncUsage(AbstractFunctionDecl *decl) {
+  if (!decl->isAsyncContext())
+    return;
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  BraceStmt *body = decl->getBody();
+  if (body)
+    body->walk(checker);
+}
+
+void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  for (Expr *init : decl->initializers()) {
+    if (auto closure = dyn_cast_or_null<ClosureExpr>(init))
+      closure->walk(checker);
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -74,6 +74,8 @@ public:
     llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
+  ProtocolDecl *getProtocolDecl() const;
+
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;

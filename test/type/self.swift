@@ -5,7 +5,7 @@ struct S0<T> {
 }
 
 class C0<T> {
-  func foo(_ other: Self) { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
+  func foo(_ other: Self) { } // expected-error{{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 }
 
 enum E0<T> {
@@ -47,7 +47,7 @@ final class FinalMario : Mario {
 
 class A<T> {
   typealias _Self = Self
-  // expected-error@-1 {{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
+  // expected-error@-1 {{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
   let b: Int
   required init(a: Int) {
     print("\(Self.self).\(#function)")
@@ -55,7 +55,7 @@ class A<T> {
     b = a
   }
   static func z(n: Self? = nil) {
-    // expected-error@-1 {{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
+    // expected-error@-1 {{covariant 'Self' or 'Self?' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
     print("\(Self.self).\(#function)")
   }
   class func y() {
@@ -76,10 +76,6 @@ class A<T> {
     return copy
   }
 
-  var copied: Self {
-    let copy = Self.init(a: 11)
-    return copy
-  }
   subscript (i: Int) -> Self { // expected-error {{mutable subscript cannot have covariant 'Self' type}}
     get {
       return Self.init(a: i)
@@ -105,14 +101,6 @@ class B: A<Int> {
   override class func y() {
     print("override \(Self.self).\(#function)")
   }
-  override func copy() -> Self {
-    let copy = super.copy() as! Self // supported
-    return copy
-  }
-  override var copied: Self {
-    let copy = super.copied as! Self // unsupported
-    return copy
-  }
 }
 
 class C {
@@ -130,14 +118,14 @@ class C {
     // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
   }
   func h(j: () -> Self) -> () -> Self {
-    // expected-error@-1 {{covariant 'Self' can only appear at the top level of method result type}}
+    // expected-error@-1 {{covariant 'Self' or 'Self?' can only appear at the top level of method result type}}
     return { return self }
   }
   func i() -> (Self, Self) {}
-  // expected-error@-1 {{covariant 'Self' can only appear at the top level of method result type}}
+  // expected-error@-1 {{covariant 'Self' or 'Self?' can only appear at the top level of method result type}}
 
   func j() -> Self.Type {}
-  // expected-error@-1 {{covariant 'Self' can only appear at the top level of method result type}}
+  // expected-error@-1 {{covariant 'Self' or 'Self?' can only appear at the top level of method result type}}
 
   let p0: Self? // expected-error {{stored property cannot have covariant 'Self' type}}
   var p1: Self? // expected-error {{stored property cannot have covariant 'Self' type}}
@@ -313,4 +301,62 @@ class HasDynamicSelfProperty {
 // in a stored property initializer.
 class UsesDynamicSelfProperty {
   var c = HasDynamicSelfProperty().me
+}
+
+// Test that dynamic 'Self' gets substituted with the object type of the
+// associated 'self' parameter in 'super'-based invocations.
+do {
+  class A {
+    required init() {}
+
+    func method() -> Self { self }
+    var property: Self { self }
+    subscript() -> Self { self }
+
+    class func method() -> Self { self.init() }
+    class var property: Self { self.init() }
+    class subscript() -> Self { self.init() }
+  }
+
+  class B: A {
+    override func method() -> Self { super.method() }
+    override var property: Self { super.property }
+    override subscript() -> Self { super[] }
+
+    override class func method() -> Self {
+      // Constructors must always have dynamic 'Self' replaced with the base
+      // object type.
+      // FIXME: Statically dispatches to the superclass init, but constructs an
+      // object of the 'Self' type.
+      let _: Self = super.init() // expected-error {{cannot convert value of type 'A' to specified type 'Self'}}
+      return super.method()
+    }
+    override class var property: Self { super.property }
+    override class subscript() -> Self { super[] }
+  }
+
+  class C: B {}
+
+  class D: C {
+    func testWithStaticSelf() {
+      let _: Self = super.method() // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super.property // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super[] // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: () -> Self = super.method // expected-error {{cannot convert value of type '() -> D' to specified type '() -> Self'}}
+    }
+
+    static func testWithStaticSelfStatic() {
+      // Constructors must always have dynamic 'Self' replaced with the base
+      // object type.
+      // FIXME: Statically dispatches to the superclass init, but constructs an
+      // object of the 'Self' type.
+      let _: Self = super.init() // expected-error {{cannot convert value of type 'C' to specified type 'Self'}}
+      let _: Self = super.method() // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super.property // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: Self = super[] // expected-error {{cannot convert value of type 'D' to specified type 'Self'}}
+      let _: () -> Self = super.method
+      // expected-error@-1 {{partial application of 'super' instance method with metatype base is not allowed}}
+      // expected-error@-2 {{cannot convert value of type '(C) -> () -> D' to specified type '() -> Self'}}
+    }
+  }
 }

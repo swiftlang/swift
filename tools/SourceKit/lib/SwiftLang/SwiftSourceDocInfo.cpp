@@ -485,7 +485,7 @@ void SwiftLangSupport::printFullyAnnotatedSynthesizedDeclaration(
 }
 
 template <typename FnTy>
-void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
+static void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.
 
@@ -834,6 +834,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   }
   unsigned DeclEnd = SS.size();
 
+  SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
   unsigned SymbolGraphBegin = SS.size();
   if (SymbolGraph) {
     symbolgraphgen::SymbolGraphOptions Options {
@@ -845,10 +846,18 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     };
     llvm::raw_svector_ostream OS(SS);
     symbolgraphgen::printSymbolGraphForDecl(VD, BaseType,
-                                            InSynthesizedExtension,
-                                            Options, OS);
+                                            InSynthesizedExtension, Options, OS,
+                                            PathComponents);
   }
   unsigned SymbolGraphEnd = SS.size();
+
+  DelayedStringRetriever ParentUSRsOS(SS);
+  for (auto &Component: PathComponents) {
+    ParentUSRsOS.startPiece();
+    if (SwiftLangSupport::printUSR(Component.VD, OS))
+      ParentUSRsOS.startPiece(); // ignore any output if invalid
+    ParentUSRsOS.endPiece();
+  };
 
   unsigned FullDeclBegin = SS.size();
   {
@@ -939,6 +948,14 @@ static bool passCursorInfoForDecl(SourceFile* SF,
     RelDeclsStream.endPiece();
   });
 
+  DelayedStringRetriever ReceiverUSRsStream(SS);
+  for (auto *ReceiverTy : TheTok.ReceiverTypes) {
+    ReceiverUSRsStream.startPiece();
+    if (SwiftLangSupport::printUSR(ReceiverTy, OS))
+      ReceiverUSRsStream.startPiece();
+    ReceiverUSRsStream.endPiece();
+  }
+
   ASTContext &Ctx = VD->getASTContext();
 
   ClangImporter *Importer = static_cast<ClangImporter*>(
@@ -961,6 +978,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invoc))
     ModuleInterfaceName = IFaceGenRef->getDocumentName();
 
+  UIdent DeclLang = SwiftLangSupport::getUIDForDeclLanguage(VD);
   UIdent Kind = SwiftLangSupport::getUIDForDecl(VD, IsRef);
   StringRef Name = StringRef(SS.begin()+NameBegin, NameEnd-NameBegin);
   StringRef USR = StringRef(SS.begin()+USRBegin, USREnd-USRBegin);
@@ -982,6 +1000,15 @@ static bool passCursorInfoForDecl(SourceFile* SF,
                                         LocalizationEnd - LocalizationBegin);
   StringRef SymbolGraphJSON = StringRef(SS.begin()+SymbolGraphBegin,
                                         SymbolGraphEnd-SymbolGraphBegin);
+
+  SmallVector<ParentInfo, 4> Parents;
+  auto ParentIt = PathComponents.begin();
+  ParentUSRsOS.retrieve([&](StringRef ParentUSR) {
+    assert(ParentIt != PathComponents.end());
+    if (!ParentUSR.empty())
+      Parents.push_back({ParentIt->Title, ParentIt->Kind, ParentUSR});
+    ++ParentIt;
+  });
 
   // If VD is the syntehsized property wrapper backing storage (_foo) or
   // projected value ($foo) of a property (foo), base the location on that
@@ -1006,6 +1033,9 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   SmallVector<StringRef, 4> AnnotatedRelatedDecls;
   RelDeclsStream.retrieve([&](StringRef S) { AnnotatedRelatedDecls.push_back(S); });
 
+  SmallVector<StringRef, 4> ReceiverUSRs;
+  ReceiverUSRsStream.retrieve([&](StringRef S) { ReceiverUSRs.push_back(S); });
+
   SmallVector<RefactoringInfo, 4> RefactoringInfoBuffer;
   for (unsigned I = 0, N = RefactoringIds.size(); I < N; I ++) {
     RefactoringInfoBuffer.push_back({RefactoringIds[I], RefactoringNameOS[I],
@@ -1021,6 +1051,7 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   std::string TypeInterface;
 
   CursorInfoData Info;
+  Info.DeclarationLang = DeclLang;
   Info.Kind = Kind;
   Info.Name = Name;
   Info.USR = USR;
@@ -1043,6 +1074,9 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   Info.AvailableActions = llvm::makeArrayRef(RefactoringInfoBuffer);
   Info.ParentNameOffset = getParamParentNameOffset(VD, CursorLoc);
   Info.SymbolGraph = SymbolGraphJSON;
+  Info.ParentContexts = llvm::makeArrayRef(Parents);
+  Info.IsDynamic = TheTok.IsDynamic;
+  Info.ReceiverUSRs = ReceiverUSRs;
   Receiver(RequestResult<CursorInfoData>::fromResult(Info));
   return true;
 }

@@ -30,6 +30,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/FrontendOptions.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/Utils.h"
@@ -260,7 +261,7 @@ public:
 
 void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
   auto Interested = false;
-  for (auto C : D->getRawComment().Comments) {
+  for (auto C : D->getRawComment(/*SerializedOK=*/false).Comments) {
     if (containsInterestedWords(C.RawText, "-", /*AllowWhitespace*/true)) {
       Interested = true;
       break;
@@ -1760,7 +1761,7 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
 }
 
 /// Returns \c true if \p DC can handles async call.
-static bool canDeclContextHandlesAsync(const DeclContext *DC) {
+static bool canDeclContextHandleAsync(const DeclContext *DC) {
   if (auto *func = dyn_cast<AbstractFunctionDecl>(DC))
     return func->isAsyncContext();
 
@@ -1839,6 +1840,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   /// Expected types of the code completion expression.
   ExpectedTypeContext expectedTypeContext;
 
+  bool CanCurrDeclContextHandleAsync = false;
   bool HaveDot = false;
   bool IsUnwrappedOptional = false;
   SourceLoc DotLoc;
@@ -1854,6 +1856,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool IsSwiftKeyPathExpr = false;
   bool IsAfterSwiftKeyPathRoot = false;
   bool IsDynamicLookup = false;
+  bool IsCrossActorReference = false;
   bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
 
@@ -1986,6 +1989,7 @@ public:
       CurrentMethod = CurrDeclContext->getInnermostMethodContext();
       if (auto *FD = dyn_cast_or_null<FuncDecl>(CurrentMethod))
         InsideStaticMethod = FD->isStatic();
+      CanCurrDeclContextHandleAsync = canDeclContextHandleAsync(CurrDeclContext);
     }
   }
 
@@ -2512,6 +2516,53 @@ public:
     return Type();
   }
 
+  void analyzeActorIsolation(
+      const ValueDecl *VD, Type T, bool &implicitlyAsync,
+      Optional<CodeCompletionResult::NotRecommendedReason> &NotRecommended) {
+    auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
+
+    switch (isolation.getKind()) {
+    case ActorIsolation::ActorInstance: {
+      if (IsCrossActorReference) {
+        implicitlyAsync = true;
+        // TODO: 'NotRecommended' if this is a r-value reference.
+      }
+      break;
+    }
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      // TODO: Implement.
+      break;
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+      return;
+    }
+
+    // If the reference is 'async', all types must be 'Sendable'.
+    if (implicitlyAsync && T) {
+      if (isa<VarDecl>(VD)) {
+        if (!isSendableType(CurrDeclContext, T)) {
+          NotRecommended = CodeCompletionResult::CrossActorReference;
+        }
+      } else {
+        assert(isa<FuncDecl>(VD) || isa<SubscriptDecl>(VD));
+        // Check if the result and the param types are all 'Sendable'.
+        auto *AFT = T->castTo<AnyFunctionType>();
+        if (!isSendableType(CurrDeclContext, AFT->getResult())) {
+          NotRecommended = CodeCompletionResult::CrossActorReference;
+        } else {
+          for (auto &param : AFT->getParams()) {
+            Type paramType = param.getPlainType();
+            if (!isSendableType(CurrDeclContext, paramType)) {
+              NotRecommended = CodeCompletionResult::CrossActorReference;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo) {
     if (!VD->hasName())
@@ -2519,6 +2570,24 @@ public:
 
     const Identifier Name = VD->getName();
     assert(!Name.empty() && "name should not be empty");
+
+    Type VarType;
+    if (VD->hasInterfaceType())
+      VarType = getTypeOfMember(VD, dynamicLookupInfo);
+
+    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
+    // "not recommended" in its own getter.
+    if (Kind == LookupKind::ValueInDeclContext) {
+      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
+        if (accessor->getStorage() == VD && accessor->isGetter())
+          NotRecommended = CodeCompletionResult::NoReason;
+      }
+    }
+    bool implicitlyAsync = false;
+    analyzeActorIsolation(VD, VarType, implicitlyAsync, NotRecommended);
+    if (!NotRecommended && implicitlyAsync && !CanCurrDeclContextHandleAsync) {
+      NotRecommended = CodeCompletionResult::InvalidContext;
+    }
 
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
@@ -2529,19 +2598,12 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
-    // "not recommended" in its own getter.
-    if (Kind == LookupKind::ValueInDeclContext) {
-      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
-        if (accessor->getStorage() == VD && accessor->isGetter())
-          Builder.setNotRecommended(CodeCompletionResult::NoReason);
-      }
-    }
+    if (NotRecommended)
+      Builder.setNotRecommended(*NotRecommended);
 
-    if (!VD->hasInterfaceType())
+    if (!VarType)
       return;
 
-    // Add a type annotation.
-    Type VarType = getTypeOfMember(VD, dynamicLookupInfo);
     if (auto *PD = dyn_cast<ParamDecl>(VD)) {
       if (Name != Ctx.Id_self && PD->isInOut()) {
         // It is useful to show inout for function parameters.
@@ -2564,6 +2626,9 @@ public:
           Builder, VarType, genericSig, DynamicOrOptional);
     else
       addTypeAnnotation(Builder, VarType, genericSig);
+
+    if (implicitlyAsync)
+      Builder.addAnnotatedAsync();
 
     if (isUnresolvedMemberIdealType(VarType))
       Builder.setSemanticContext(SemanticContextKind::ExpressionSpecific);
@@ -2685,11 +2750,12 @@ public:
 
   static void addEffectsSpecifiers(CodeCompletionResultBuilder &Builder,
                              const AnyFunctionType *AFT,
-                             const AbstractFunctionDecl *AFD) {
+                             const AbstractFunctionDecl *AFD,
+                             bool forceAsync = false) {
     assert(AFT != nullptr);
 
     // 'async'.
-    if ((AFD && AFD->hasAsync()) || AFT->isAsync())
+    if (forceAsync || (AFD && AFD->hasAsync()) || AFT->isAsync())
       Builder.addAnnotatedAsync();
 
     // 'throws' or 'rethrows'.
@@ -2860,8 +2926,7 @@ public:
       else
         addTypeAnnotation(Builder, AFT->getResult(), genericSig);
 
-      if (AFT->isAsync() &&
-          !canDeclContextHandlesAsync(CurrDeclContext)) {
+      if (AFT->isAsync() && !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(
             CodeCompletionResult::NotRecommendedReason::InvalidContext);
       }
@@ -2972,6 +3037,16 @@ public:
     if (AFT && !IsImplicitlyCurriedInstanceMethod)
       trivialTrailingClosure = hasTrivialTrailingClosure(FD, AFT);
 
+    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
+    bool implictlyAsync = false;
+    analyzeActorIsolation(FD, AFT, implictlyAsync, NotRecommended);
+
+    if (!NotRecommended && !IsImplicitlyCurriedInstanceMethod &&
+        ((AFT && AFT->isAsync()) || implictlyAsync) &&
+        !CanCurrDeclContextHandleAsync) {
+      NotRecommended = CodeCompletionResult::InvalidContext;
+    }
+
     // Add the method, possibly including any default arguments.
     auto addMethodImpl = [&](bool includeDefaultArgs = true,
                              bool trivialTrailingClosure = false) {
@@ -2982,6 +3057,10 @@ public:
           expectedTypeContext);
       setClangDeclKeywords(FD, Pairs, Builder);
       Builder.setAssociatedDecl(FD);
+
+      if (NotRecommended)
+        Builder.setNotRecommended(*NotRecommended);
+
       addLeadingDot(Builder);
       addValueBaseName(Builder, Name);
       if (IsDynamicLookup)
@@ -3003,14 +3082,14 @@ public:
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
-        addEffectsSpecifiers(Builder, AFT, FD);
+        addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
       } else {
         Builder.addLeftParen();
         addCallArgumentPatterns(Builder, AFT, FD->getParameters(),
                                 FD->getGenericSignatureOfContext(),
                                 includeDefaultArgs);
         Builder.addRightParen();
-        addEffectsSpecifiers(Builder, AFT, FD);
+        addEffectsSpecifiers(Builder, AFT, FD, implictlyAsync);
       }
 
       // Build type annotation.
@@ -3074,13 +3153,6 @@ public:
           expectedTypeContext.requiresNonVoid() &&
           ResultType->isVoid()) {
         Builder.setExpectedTypeRelation(CodeCompletionResult::Invalid);
-      }
-
-      if (!IsImplicitlyCurriedInstanceMethod &&
-          AFT->isAsync() &&
-          !canDeclContextHandlesAsync(CurrDeclContext)) {
-        Builder.setNotRecommended(
-                CodeCompletionResult::NotRecommendedReason::InvalidContext);
       }
     };
 
@@ -3169,8 +3241,7 @@ public:
         addTypeAnnotation(Builder, *Result, CD->getGenericSignatureOfContext());
       }
 
-      if (ConstructorType->isAsync() &&
-          !canDeclContextHandlesAsync(CurrDeclContext)) {
+      if (ConstructorType->isAsync() && !CanCurrDeclContextHandleAsync) {
         Builder.setNotRecommended(
             CodeCompletionResult::NotRecommendedReason::InvalidContext);
       }
@@ -3222,12 +3293,23 @@ public:
     if (!subscriptType)
       return;
 
+    Optional<CodeCompletionResult::NotRecommendedReason> NotRecommended;
+    bool implictlyAsync = false;
+    analyzeActorIsolation(SD, subscriptType, implictlyAsync, NotRecommended);
+
+    if (!NotRecommended && implictlyAsync && !CanCurrDeclContextHandleAsync) {
+      NotRecommended = CodeCompletionResult::InvalidContext;
+    }
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(SD, Reason, dynamicLookupInfo), expectedTypeContext);
     Builder.setAssociatedDecl(SD);
     setClangDeclKeywords(SD, Pairs, Builder);
+
+    if (NotRecommended)
+      Builder.setNotRecommended(*NotRecommended);
 
     // '\TyName#^TOKEN^#' requires leading dot.
     if (!HaveDot && IsAfterSwiftKeyPathRoot)
@@ -3250,6 +3332,10 @@ public:
       // Optional<T> type.
       resultTy = OptionalType::get(resultTy);
     }
+
+    if (implictlyAsync)
+      Builder.addAnnotatedAsync();
+
     addTypeAnnotation(Builder, resultTy, SD->getGenericSignatureOfContext());
   }
 
@@ -3914,6 +4000,11 @@ public:
     if (!ExprType->getMetatypeInstanceType()->isAnyObject())
       if (ExprType->isAnyExistentialType())
         ExprType = OpenedArchetypeType::getAny(ExprType);
+
+    if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
+        ExprType->getAnyNominal()->isActor()) {
+      IsCrossActorReference = true;
+    }
 
     if (WasOptional)
       ExprType = OptionalType::get(ExprType);
@@ -7009,4 +7100,72 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
   }
 
   handleResults(context.takeResults());
+}
+
+//===----------------------------------------------------------------------===//
+// ImportDepth
+//===----------------------------------------------------------------------===//
+
+ImportDepth::ImportDepth(ASTContext &context,
+                         const FrontendOptions &frontendOptions) {
+  llvm::DenseSet<ModuleDecl *> seen;
+  std::deque<std::pair<ModuleDecl *, uint8_t>> worklist;
+
+  StringRef mainModule = frontendOptions.ModuleName;
+  auto *main = context.getLoadedModule(context.getIdentifier(mainModule));
+  assert(main && "missing main module");
+  worklist.emplace_back(main, uint8_t(0));
+
+  // Imports from -import-name such as Playground auxiliary sources are treated
+  // specially by applying import depth 0.
+  llvm::StringSet<> auxImports;
+  for (const auto &pair : frontendOptions.getImplicitImportModuleNames())
+    auxImports.insert(pair.first);
+
+  // Private imports from this module.
+  // FIXME: only the private imports from the current source file.
+  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
+  SmallVector<ImportedModule, 16> mainImports;
+  main->getImportedModules(mainImports,
+                           {ModuleDecl::ImportFilterKind::Default,
+                            ModuleDecl::ImportFilterKind::ImplementationOnly});
+  for (auto &import : mainImports) {
+    uint8_t depth = 1;
+    if (auxImports.count(import.importedModule->getName().str()))
+      depth = 0;
+    worklist.emplace_back(import.importedModule, depth);
+  }
+
+  // Fill depths with BFS over module imports.
+  while (!worklist.empty()) {
+    ModuleDecl *module;
+    uint8_t depth;
+    std::tie(module, depth) = worklist.front();
+    worklist.pop_front();
+
+    if (!seen.insert(module).second)
+      continue;
+
+    // Insert new module:depth mapping.
+    const clang::Module *CM = module->findUnderlyingClangModule();
+    if (CM) {
+      depths[CM->getFullModuleName()] = depth;
+    } else {
+      depths[module->getName().str()] = depth;
+    }
+
+    // Add imports to the worklist.
+    SmallVector<ImportedModule, 16> imports;
+    module->getImportedModules(imports);
+    for (auto &import : imports) {
+      uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap
+
+      // Implicitly imported sub-modules get the same depth as their parent.
+      if (const clang::Module *CMI =
+              import.importedModule->findUnderlyingClangModule())
+        if (CM && CMI->isSubModuleOf(CM))
+          next = depth;
+      worklist.emplace_back(import.importedModule, next);
+    }
+  }
 }

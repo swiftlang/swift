@@ -322,17 +322,6 @@ SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw)
   return SILValue();
 }
 
-SILValue
-InstSimplifier::
-visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
-  if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
-    if (UCCI->getType() == upcast->getOperand()->getType())
-      return upcast->getOperand();
-
-  return SILValue();
-}
-
 /// If the only use of a cast is a destroy, just destroy the cast operand.
 static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
   if (!Cast->hasUsesOfAnyResult())
@@ -341,14 +330,30 @@ static SILValue simplifyDeadCast(SingleValueInstruction *Cast) {
   for (Operand *op : Cast->getUses()) {
     switch (op->getUser()->getKind()) {
       case SILInstructionKind::DestroyValueInst:
+        break;
       case SILInstructionKind::StrongReleaseInst:
       case SILInstructionKind::StrongRetainInst:
+        // ref-casts can cast from an Optional<Classtype>. But strong_retain/
+        // strong_release don't accept an optional.
+        if (!Cast->getOperand(0)->getType().isReferenceCounted(Cast->getModule()))
+          return SILValue();
         break;
       default:
         return SILValue();
     }
   }
   return Cast->getOperand(0);
+}
+
+SILValue
+InstSimplifier::
+visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+  // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
+  if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
+    if (UCCI->getType() == upcast->getOperand()->getType())
+      return upcast->getOperand();
+
+  return simplifyDeadCast(UCCI);
 }
 
 SILValue

@@ -1189,15 +1189,17 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
     auto *var = PBD->getSingleVar();
     if (var && var->getDeclContext()->isLocalContext()) {
       if (auto *orig = var->getOriginalWrappedProperty()) {
-        auto wrapperInfo = orig->getPropertyWrapperBackingPropertyInfo();
-        Init = wrapperInfo.wrappedValuePlaceholder->getOriginalWrappedValue();
+        auto initInfo = orig->getPropertyWrapperInitializerInfo();
+        if (auto *placeholder = initInfo.getWrappedValuePlaceholder()) {
+          Init = placeholder->getOriginalWrappedValue();
 
-        auto value = emitRValue(Init);
-        emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
-                                                     getForwardingSubstitutionMap(),
-                                                     std::move(value))
-          .forwardInto(*this, SILLocation(PBD), initialization.get());
-        return;
+          auto value = emitRValue(Init);
+          emitApplyOfPropertyWrapperBackingInitializer(SILLocation(PBD), orig,
+                                                       getForwardingSubstitutionMap(),
+                                                       std::move(value))
+            .forwardInto(*this, SILLocation(PBD), initialization.get());
+          return;
+        }
       }
     }
 
@@ -1224,8 +1226,8 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   // no wrapper.
   if (D->getAttrs().hasAttribute<CustomAttr>()) {
     // Emit the property wrapper backing initializer if necessary.
-    auto wrapperInfo = D->getPropertyWrapperBackingPropertyInfo();
-    if (wrapperInfo && wrapperInfo.initializeFromOriginal)
+    auto initInfo = D->getPropertyWrapperInitializerInfo();
+    if (initInfo.hasInitFromWrappedValue())
       SGM.emitPropertyWrapperBackingInitializer(D);
   }
 

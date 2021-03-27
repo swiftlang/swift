@@ -646,7 +646,7 @@ public:
     // Apply the VJP.
     // The VJP should be specialized, so no substitution map is necessary.
     auto *vjpCall = getBuilder().createApply(loc, vjpValue, SubstitutionMap(),
-                                             vjpArgs, ai->isNonThrowing());
+                                             vjpArgs, ai->getApplyOptions());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
     builder.emitDestroyValueOperation(loc, vjpValue);
 
@@ -715,7 +715,8 @@ public:
         tai->getLoc(), getOpValue(tai->getCallee()),
         getOpSubstitutionMap(tai->getSubstitutionMap()), args,
         createTrampolineBasicBlock(tai, pbStructVal, tai->getNormalBB()),
-        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()));
+        createTrampolineBasicBlock(tai, pbStructVal, tai->getErrorBB()),
+        tai->getApplyOptions());
   }
 
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
@@ -979,7 +980,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
 
   Mangle::DifferentiationMangler mangler;
   auto pbName = mangler.mangleLinearMap(
-      original, AutoDiffLinearMapKind::Pullback, config);
+      original->getName(), AutoDiffLinearMapKind::Pullback, config);
   // Set pullback generic signature equal to VJP generic signature.
   // Do not use witness generic signature, which may have same-type requirements
   // binding all generic parameters to concrete types.

@@ -357,8 +357,29 @@ public protocol Sequence {
   /// in the same order.
   __consuming func _copyToContiguousArray() -> ContiguousArray<Element>
 
-  /// Copy `self` into an unsafe buffer, returning a partially-consumed
-  /// iterator with any elements that didn't fit remaining.
+  /// Copy `self` into an unsafe buffer, initializing its memory.
+  ///
+  /// The default implementation simply iterates over the elements of the
+  /// sequence, initializing the buffer one item at a time.
+  ///
+  /// For sequences whose elements are stored in contiguous chunks of memory,
+  /// it may be more efficient to copy them in bulk, using the
+  /// `UnsafeMutablePointer.initialize(from:count:)` method.
+  ///
+  /// - Parameter ptr: An unsafe buffer addressing uninitialized memory. The
+  ///    buffer must be of sufficient size to accommodate
+  ///    `source.underestimatedCount` elements. (Some implementations trap
+  ///    if given a buffer that's smaller than this.)
+  ///
+  /// - Returns: `(it, c)`, where `c` is the number of elements copied into the
+  ///    buffer, and `it` is a partially consumed iterator that can be used to
+  ///    retrieve elements that did not fit into the buffer (if any). (This can
+  ///    only happen if `underestimatedCount` turned out to be an actual
+  ///    underestimate, and the buffer did not contain enough space to hold the
+  ///    entire sequence.)
+  ///
+  ///    On return, the memory region in `buffer[0 ..< c]` is initialized to
+  ///    the first `c` elements in the sequence.
   __consuming func _copyContents(
     initializing ptr: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index)
@@ -1093,13 +1114,29 @@ extension Sequence {
 }
 
 extension Sequence {
-  /// Copies `self` into the supplied buffer.
+  /// Copy `self` into an unsafe buffer, initializing its memory.
   ///
-  /// - Precondition: The memory in `self` is uninitialized. The buffer must
-  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
+  /// The default implementation simply iterates over the elements of the
+  /// sequence, initializing the buffer one item at a time.
   ///
-  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
-  ///   initialized.
+  /// For sequences whose elements are stored in contiguous chunks of memory,
+  /// it may be more efficient to copy them in bulk, using the
+  /// `UnsafeMutablePointer.initialize(from:count:)` method.
+  ///
+  /// - Parameter ptr: An unsafe buffer addressing uninitialized memory. The
+  ///    buffer must be of sufficient size to accommodate
+  ///    `source.underestimatedCount` elements. (Some implementations trap
+  ///    if given a buffer that's smaller than this.)
+  ///
+  /// - Returns: `(it, c)`, where `c` is the number of elements copied into the
+  ///    buffer, and `it` is a partially consumed iterator that can be used to
+  ///    retrieve elements that did not fit into the buffer (if any). (This can
+  ///    only happen if `underestimatedCount` turned out to be an actual
+  ///    underestimate, and the buffer did not contain enough space to hold the
+  ///    entire sequence.)
+  ///
+  ///    On return, the memory region in `buffer[0 ..< c]` is initialized to
+  ///    the first `c` elements in the sequence.
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
@@ -1159,7 +1196,7 @@ extension IteratorSequence: IteratorProtocol, Sequence {
   }
 }
 
-extension IteratorSequence: ConcurrentValue where Base: ConcurrentValue { }
+extension IteratorSequence: Sendable where Base: Sendable { }
 
 /* FIXME: ideally for compatibility we would declare
 extension Sequence {

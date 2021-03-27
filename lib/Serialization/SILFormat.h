@@ -259,16 +259,17 @@ namespace sil_block {
 
   using DifferentiabilityWitnessLayout = BCRecordLayout<
     SIL_DIFFERENTIABILITY_WITNESS,
-    DeclIDField,             // Original function name
-    SILLinkageField,         // Linkage
-    BCFixed<1>,              // Is declaration?
-    BCFixed<1>,              // Is serialized?
-    GenericSignatureIDField, // Derivative function generic signature
-    DeclIDField,             // JVP function name
-    DeclIDField,             // VJP function name
-    BCVBR<8>,                // Number of parameter indices
-    BCVBR<8>,                // Number of result indices
-    BCArray<ValueIDField>    // Parameter and result indices
+    DeclIDField,                // Original function name
+    SILLinkageField,            // Linkage
+    BCFixed<1>,                 // Is declaration?
+    BCFixed<1>,                 // Is serialized?
+    DifferentiabilityKindField, // Differentiability kind
+    GenericSignatureIDField,    // Derivative function generic signature
+    DeclIDField,                // JVP function name
+    DeclIDField,                // VJP function name
+    BCVBR<8>,                   // Number of parameter indices
+    BCVBR<8>,                   // Number of result indices
+    BCArray<ValueIDField>       // Parameter and result indices
   >;
 
   using SILFunctionLayout =
@@ -366,14 +367,13 @@ namespace sil_block {
     SIL_PARTIAL_APPLY,
     SIL_BUILTIN,
     SIL_TRY_APPLY,
-    SIL_NON_THROWING_APPLY,
-    SIL_BEGIN_APPLY,
-    SIL_NON_THROWING_BEGIN_APPLY
+    SIL_BEGIN_APPLY
   };
 
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind
+    BCFixed<2>,           // ApplyOptions
     SubstitutionMapIDField,  // substitution map
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type

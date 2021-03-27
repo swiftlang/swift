@@ -20,6 +20,26 @@ internal class Klass2 : P {
   init()
 }
 
+internal class Klass3 {
+}
+
+extension Klass3 : P {
+  @inline(never) func foo() -> Int32
+}
+
+internal class Klass4 : Klass3 {
+  func foo() -> Int {
+    return 10
+  }
+}
+
+sil private [transparent] [thunk] @Klass4foo : $@convention(witness_method: P) (@in_guaranteed Klass4) -> Int32 {
+bb0(%0 : $*Klass4):
+  %1 = integer_literal $Builtin.Int32, 10
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  return %2 : $Int32
+}
+
 @inline(never) internal func wrap_foo_ncp(a: inout P, b: inout P) -> Int32
 
 @inline(never) func ncp()
@@ -113,6 +133,7 @@ bb0(%0 : $*P):
   %6 = open_existential_addr immutable_access %4 : $*P to $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P
   %7 = witness_method $@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %6 : $*@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
   %8 = apply %7<@opened("3CB58EC4-ECED-11E8-9798-D0817AD4059B") P>(%6) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  destroy_addr %4 : $*P
   dealloc_stack %4 : $*P
   return %8 : $Int32
 }
@@ -191,7 +212,9 @@ bb0(%0 : $*P, %1 : $*P):
   %19 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %19 : $Builtin.Int1
   %21 = struct $Int32 (%18 : $Builtin.Int32)
+  destroy_addr %9 : $*P
   dealloc_stack %9 : $*P
+  destroy_addr %4 : $*P
   dealloc_stack %4 : $*P
   return %21 : $Int32
 }
@@ -261,3 +284,31 @@ bb0(%0 : @guaranteed $PlotView):
   %v = tuple ()
   return %v : $()
 }
+
+// CHECK-LABEL: sil shared [ossa] @$s35testExistentialSpecializeGuaranteedTf4e_n : 
+// CHECK:  [[VAL1:%.*]] = init_existential_ref %0
+// CHECK:  [[VAL2:%.*]] = open_existential_ref [[VAL1]]
+// CHECK-LABEL: } // end sil function '$s35testExistentialSpecializeGuaranteedTf4e_n'
+sil hidden [ossa] @testExistentialSpecializeGuaranteed : $@convention(thin) (@guaranteed Klass3 & P) -> Int32 {
+bb0(%0 : @guaranteed $Klass3 & P):
+  %2 = open_existential_ref %0 : $Klass3 & P to $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F") Klass3 & P
+  %3 = alloc_stack $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F") Klass3 & P
+  %4 = store_borrow %2 to %3 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F") Klass3 & P
+  %5 = witness_method $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F") Klass3 & P, #P.foo : <Self where Self : P> (Self) -> () -> Int32, %2 : $@opened("77949BFA-77BC-11EB-BC0E-F2189810406F") Klass3 & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  %6 = apply %5<@opened("77949BFA-77BC-11EB-BC0E-F2189810406F") Klass3 & P>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
+  dealloc_stack %3 : $*@opened("77949BFA-77BC-11EB-BC0E-F2189810406F") Klass3 & P
+  return %6 : $Int32
+}
+
+sil hidden [ossa] @entrypoint : $@convention(thin) (@guaranteed Klass4) -> Int32 {
+bb0(%0 : @guaranteed $Klass4):
+  %1 = init_existential_ref %0 : $Klass4 : $Klass4, $Klass3 & P
+  %func = function_ref @testExistentialSpecializeGuaranteed : $@convention(thin) (@guaranteed Klass3 & P) -> Int32
+  %res = apply %func(%1) : $@convention(thin) (@guaranteed Klass3 & P) -> Int32
+  return %res : $Int32
+}
+
+sil_witness_table hidden Klass4: P module devirtualize_protocol_composition {
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int32 : @Klass4foo
+}
+

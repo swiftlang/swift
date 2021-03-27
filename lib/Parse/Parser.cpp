@@ -214,14 +214,14 @@ void Parser::performCodeCompletionSecondPassImpl(
   State->restoreCodeCompletionDelayedDeclState(info);
 }
 
-swift::Parser::BacktrackingScope::~BacktrackingScope() {
+swift::Parser::BacktrackingScopeImpl::~BacktrackingScopeImpl() {
   if (Backtrack) {
     P.backtrackToPosition(PP);
     DT.abort();
   }
 }
 
-void swift::Parser::BacktrackingScope::cancelBacktrack() {
+void swift::Parser::CancellableBacktrackingScope::cancelBacktrack() {
   if (!Backtrack)
     return;
 
@@ -321,11 +321,14 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
   return Tokens;
 }
 
-std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+std::vector<
+    std::pair<const syntax::RawSyntax *, syntax::AbsoluteOffsetPosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
-                          unsigned BufferID, unsigned Offset,
-                          unsigned EndOffset, DiagnosticEngine *Diags) {
-  std::vector<std::pair<RC<syntax::RawSyntax>, syntax::AbsoluteOffsetPosition>>
+                          unsigned BufferID, const RC<SyntaxArena> &Arena,
+                          unsigned Offset, unsigned EndOffset,
+                          DiagnosticEngine *Diags) {
+  std::vector<
+      std::pair<const syntax::RawSyntax *, syntax::AbsoluteOffsetPosition>>
       Tokens;
   syntax::AbsoluteOffsetPosition RunningPos(0);
 
@@ -336,12 +339,11 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, StringRef LeadingTrivia, StringRef TrailingTrivia) {
         CharSourceRange TokRange = Tok.getRange();
-        auto Text = OwnedString::makeRefCounted(Tok.getRawText());
         size_t TextLength = LeadingTrivia.size() + TokRange.getByteLength() +
                             TrailingTrivia.size();
-        auto ThisToken =
-            RawSyntax::make(Tok.getKind(), Text, TextLength, LeadingTrivia,
-                            TrailingTrivia, SourcePresence::Present);
+        auto ThisToken = RawSyntax::make(
+            Tok.getKind(), Tok.getRawText(), TextLength, LeadingTrivia,
+            TrailingTrivia, SourcePresence::Present, Arena);
 
         auto ThisTokenPos =
             RunningPos.advancedBy(ThisToken->getLeadingTriviaLength());
@@ -477,7 +479,8 @@ public:
     TokenKindChangeMap[Loc.getOpaquePointerValue()] = NewKind;
   }
 
-  void receive(Token Tok) override {
+  void receive(const Token &TokParam) override {
+    Token Tok = TokParam;
     // We filter out all tokens without valid location
     if(Tok.getLoc().isInvalid())
       return;
@@ -644,21 +647,22 @@ SourceLoc Parser::consumeStartingGreater() {
   return consumeStartingCharacterOfCurrentToken(tok::r_angle);
 }
 
-void Parser::skipSingle() {
+ParserStatus Parser::skipSingle() {
+  ParserStatus status;
   switch (Tok.getKind()) {
   case tok::l_paren:
     consumeToken();
-    skipUntil(tok::r_paren, tok::r_brace);
+    status |= skipUntil(tok::r_paren, tok::r_brace);
     consumeIf(tok::r_paren);
     break;
   case tok::l_brace:
     consumeToken();
-    skipUntil(tok::r_brace);
+    status |= skipUntil(tok::r_brace);
     consumeIf(tok::r_brace);
     break;
   case tok::l_square:
     consumeToken();
-    skipUntil(tok::r_square, tok::r_brace);
+    status |= skipUntil(tok::r_square, tok::r_brace);
     consumeIf(tok::r_square);
     break;
   case tok::pound_if:
@@ -666,27 +670,35 @@ void Parser::skipSingle() {
   case tok::pound_elseif:
     consumeToken();
     // skipUntil also implicitly stops at tok::pound_endif.
-    skipUntil(tok::pound_else, tok::pound_elseif);
+    status |= skipUntil(tok::pound_else, tok::pound_elseif);
       
     if (Tok.isAny(tok::pound_else, tok::pound_elseif))
-      skipSingle();
+      status |= skipSingle();
     else
       consumeIf(tok::pound_endif);
     break;
       
   default:
+    if (Tok.is(tok::code_complete))
+      status.setHasCodeCompletionAndIsError();
     consumeToken();
     break;
   }
+
+  return status;
 }
 
-void Parser::skipUntil(tok T1, tok T2) {
+ParserStatus Parser::skipUntil(tok T1, tok T2) {
+  ParserStatus status;
+
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
-  if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return;
+  if (T1 == tok::NUM_TOKENS && T2 == tok::NUM_TOKENS) return status;
 
   while (Tok.isNot(T1, T2, tok::eof, tok::pound_endif, tok::pound_else,
                    tok::pound_elseif))
-    skipSingle();
+    status |= skipSingle();
+
+  return status;
 }
 
 void Parser::skipUntilAnyOperator() {
@@ -780,8 +792,8 @@ void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
         if (possibleDeclStartsLine && !hasDelimiter) {
           break;
         }
-        
-        Parser::BacktrackingScope backtrack(*this);
+
+        Parser::CancellableBacktrackingScope backtrack(*this);
         // Consume the let or var
         consumeToken();
         
@@ -1417,36 +1429,35 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
     }
   } while (!parameters.empty());
 
-  // Drop the argument labels for a property accessor; they aren't used.
-  if (result.isPropertyAccessor())
-    result.ArgumentLabels.clear();
-
   return result;
 }
 
-DeclName ParsedDeclName::formDeclName(ASTContext &ctx) const {
-  return formDeclNameRef(ctx).getFullName();
+DeclName ParsedDeclName::formDeclName(ASTContext &ctx, bool isSubscript) const {
+  return formDeclNameRef(ctx, isSubscript).getFullName();
 }
 
-DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx) const {
+DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx,
+                                            bool isSubscript) const {
   return swift::formDeclNameRef(ctx, BaseName, ArgumentLabels, IsFunctionName,
-                                /*IsInitializer=*/true);
+                                /*IsInitializer=*/true, isSubscript);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
                              StringRef baseName,
                              ArrayRef<StringRef> argumentLabels,
                              bool isFunctionName,
-                             bool isInitializer) {
+                             bool isInitializer,
+                             bool isSubscript) {
   return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
-                         isInitializer).getFullName();
+                         isInitializer, isSubscript).getFullName();
 }
 
 DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
                                    StringRef baseName,
                                    ArrayRef<StringRef> argumentLabels,
                                    bool isFunctionName,
-                                   bool isInitializer) {
+                                   bool isInitializer,
+                                   bool isSubscript) {
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
     return DeclNameRef();
@@ -1454,12 +1465,17 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
     return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
-  DeclBaseName baseNameId = ((isInitializer && baseName == "init")
-                             ? DeclBaseName::createConstructor()
-                             : ctx.getIdentifier(baseName));
+  DeclBaseName baseNameId;
+  if (isInitializer && baseName == "init")
+    baseNameId = DeclBaseName::createConstructor();
+  else if (isSubscript && baseName == "subscript")
+    baseNameId = DeclBaseName::createSubscript();
+  else
+    baseNameId = ctx.getIdentifier(baseName);
 
   // For non-functions, just use the base name.
-  if (!isFunctionName) return DeclNameRef(baseNameId);
+  if (!isFunctionName && !baseNameId.isSubscript())
+    return DeclNameRef(baseNameId);
 
   // For functions, we need to form a complete name.
 

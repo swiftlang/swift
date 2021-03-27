@@ -119,25 +119,6 @@ func captureInClosure() {
 
 /// Regression tests
 
-func sr3210_crash() {
-  defer { // expected-error {{'defer' block captures 'b' before it is declared}}
-    print("\(b)") // expected-note {{captured here}}
-  }
-
-  return
-
-  let b = 2 // expected-note {{captured value declared here}}
-  // expected-warning@-1 {{code after 'return' will never be executed}}
-}
-
-func sr3210() {
-  defer {
-    print("\(b)")
-  }
-
-  let b = 2
-}
-
 class SR4812 {
   public func foo() {
     let bar = { [weak self] in

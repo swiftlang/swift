@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(PrintShims)) %S/../../Inputs/print-shims.swift -module-name PrintShims -emit-module -emit-module-path %t/PrintShims.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(PrintShims)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -emit-ir -I %t -L %t -lPrintShim | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g -parse-sil %s -module-name main -o %t/main -I %t -L %t -lPrintShims %target-rpath(%t) 
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/%target-library-name(PrintShims) | %FileCheck %s
 
@@ -20,7 +20,7 @@ import _Concurrency
 sil public_external @printBool : $@convention(thin) (Bool) -> ()
 
 // CHECK-LL: @genericEquatableAndGenericEquatableToBoolTu =
-// CHECK-LL: define hidden swiftcc void @genericEquatableAndGenericEquatableToBool(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @genericEquatableAndGenericEquatableToBool(
 sil hidden @genericEquatableAndGenericEquatableToBool : $@async @convention(thin) <T where T : Equatable> (@in_guaranteed T, @in_guaranteed T) -> Bool {
 bb0(%0 : $*T, %1 : $*T):
   %4 = metatype $@thick T.Type
@@ -58,16 +58,22 @@ sil @test_case : $@convention(thin) @async () -> () {
 }
 
 // Defined in _Concurrency
-sil @$s12_Concurrency13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+sil @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+sil @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error {
+bb0(%0 :$@async @callee_guaranteed () -> ()):
+  %void = apply %0() : $@async @callee_guaranteed () -> ()
+  return %void : $()
+}
 
 // main
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
   %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
-  %test_case = convert_function %test_case_nothrow : $@convention(thin) @async () -> () to $@convention(thin) @async () -> @error Error
-  %thick_test_case = thin_to_thick_function %test_case : $@convention(thin) @async () -> @error Error to $@callee_guaranteed @async () -> @error Error
-  %runAsyncMain = function_ref @$s12_Concurrency13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
-  %result = apply %runAsyncMain(%thick_test_case) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
+  %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %throwing = partial_apply [callee_guaranteed] %thunk(%thick_test_case) : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error
+  %runAsyncMain = function_ref @$ss13_runAsyncMainyyyyYKcF : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
+  %result = apply %runAsyncMain(%throwing) : $@convention(thin) (@guaranteed @async @callee_guaranteed () -> @error Error) -> ()
   %out_literal = integer_literal $Builtin.Int32, 0
   %out = struct $Int32 (%out_literal : $Builtin.Int32)
   return %out : $Int32

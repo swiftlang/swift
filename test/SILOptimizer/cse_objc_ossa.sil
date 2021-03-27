@@ -260,6 +260,7 @@ bb0(%0 : @owned $B, %1 : @owned $B):
   store %1 to [assign] %3 : $*B
   %7 = existential_metatype $@thick Any.Type, %2 : $*Any
   %99 = tuple (%5 : $@thick Any.Type, %7 : $@thick Any.Type)
+  destroy_addr %2 : $*Any
   dealloc_stack %2 : $*Any
   return %99 : $(@thick Any.Type, @thick Any.Type)
 }
@@ -325,3 +326,40 @@ sil_vtable Bar {
   #Bar.deinit!deallocator: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
 }
 
+// CHECK-LABEL: sil [ossa] @cse_value_metatype2 :
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK: destroy_value 
+// CHECK-LABEL: } // end sil function 'cse_value_metatype2'
+sil [ossa] @cse_value_metatype2 : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : @owned $T):
+  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
+  %copy = copy_value %0 : $T
+  %5 = value_metatype $@objc_metatype T.Type, %copy : $T
+  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
+  destroy_value %0 : $T
+  destroy_value %copy : $T
+  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
+  return %9 : $(AnyObject, AnyObject)
+}
+
+// CHECK-LABEL: sil [ossa] @cse_existential_metatype2 :
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK: destroy_value 
+// CHECK-LABEL: } // end sil function 'cse_existential_metatype2'
+sil [ossa] @cse_existential_metatype2 : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : @owned $XX):
+  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
+  %copy = copy_value %0 : $XX
+  %5 = existential_metatype $@objc_metatype XX.Type, %copy : $XX
+  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
+  destroy_value %0 : $XX
+  destroy_value %copy : $XX
+  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
+  return %7 : $(AnyObject, AnyObject)
+}

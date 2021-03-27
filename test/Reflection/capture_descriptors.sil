@@ -71,10 +71,11 @@ bb0(%i : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <U>):
   return %12 : $()
 }
 
-sil [ossa] @concrete_caller2 : $@convention(thin) () -> @owned @callee_guaranteed () -> () {
-bb0:
+sil [ossa] @concrete_caller2 : $@convention(thin) (Int) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : $Int):
   %f = function_ref @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   %i = alloc_stack $Int
+  store %0 to [trivial] %i : $*Int
   %b = alloc_box $<τ_0_0> { var τ_0_0 } <String>
   %c = partial_apply [callee_guaranteed] %f<Int, String>(%i, %b) : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> ()
   dealloc_stack %i : $*Int
@@ -111,10 +112,11 @@ bb0(%t : $*T):
   return %12 : $()
 }
 
-sil [ossa] @generic_caller3 : $@convention(thin) <A, B, C> () -> @owned @callee_guaranteed () -> () {
-bb0:
+sil [ossa] @generic_caller3 : $@convention(thin) <A, B, C> (@owned Optional<@callee_guaranteed @substituted <X, Y> (@in_guaranteed X) -> @out Y for <A, B>>) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : @owned $Optional<@callee_guaranteed @substituted <X, Y> (@in_guaranteed X) -> @out Y for <A, B>>):
   %f = function_ref @generic_callee3 : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
   %t = alloc_stack $Optional<@callee_guaranteed @substituted <X, Y> (@in_guaranteed X) -> @out Y for <A, B>>
+  store %0 to [init] %t : $*Optional<@callee_guaranteed @substituted <X, Y> (@in_guaranteed X) -> @out Y for <A, B>>
   %c = partial_apply [callee_guaranteed] %f<Optional<(A) -> B>, (B, (C) -> Int)>(%t) : $@convention(thin) <T, U> (@in_guaranteed T) -> ()
   dealloc_stack %t : $*Optional<@callee_guaranteed @substituted <X, Y> (@in_guaranteed X) -> @out Y for <A, B>>
   return %c : $@callee_guaranteed () -> ()

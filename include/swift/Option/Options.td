@@ -55,6 +55,12 @@ def ModuleInterfaceOption : OptionFlag;
 // for a supplementary output. E.g., `-emit-module` and `-emit-module-path`.
 def SupplementaryOutput : OptionFlag;
 
+// The option should be accepted by swift-api-extract.
+def SwiftAPIExtractOption : OptionFlag;
+
+// The option should be accepted by swift-symbolgraph-extract.
+def SwiftSymbolGraphExtractOption : OptionFlag;
+
 /////////
 // Options
 
@@ -169,7 +175,9 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption, SwiftIndentOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
+         SwiftIndentOption, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -191,16 +199,19 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
 
 def o : JoinedOrSeparate<["-"], "o">,
   Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
-         NoInteractiveOption, SwiftIndentOption, ArgumentIsPath]>,
+         NoInteractiveOption, SwiftIndentOption, ArgumentIsPath,
+         SwiftAPIExtractOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
-def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption, ArgumentIsPath]>,
+def sdk : Separate<["-"], "sdk">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ModuleInterfaceOption]>,
+def swift_version : Separate<["-"], "swift-version">,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
@@ -217,16 +228,18 @@ def tools_directory : Separate<["-"], "tools-directory">,
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
-def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption, ArgumentIsPath]>,
+def F : JoinedOrSeparate<["-"], "F">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<F>;
 
 def Fsystem : Separate<["-"], "Fsystem">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Add directory to system framework search path">;
 
-def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption, ArgumentIsPath]>,
+def I : JoinedOrSeparate<["-"], "I">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Add directory to the import search path">;
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
@@ -372,7 +385,8 @@ def localization_path : Separate<["-"], "localization-path">,
   MetaVarName<"<path>">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption]>,
   HelpText<"Specifies the Clang module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
@@ -393,7 +407,8 @@ def define_availability : Separate<["-"], "define-availability">,
   MetaVarName<"<macro>">;
 
 def module_name : Separate<["-"], "module-name">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
@@ -406,6 +421,9 @@ def module_link_name_EQ : Joined<["-"], "module-link-name=">,
 def autolink_force_load : Flag<["-"], "autolink-force-load">,
   Flags<[FrontendOption, ModuleInterfaceOption, HelpHidden]>,
   HelpText<"Force ld to link against this module even if no symbols are used">;
+def module_abi_name : Separate<["-"], "module-abi-name">,
+  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  HelpText<"ABI name to use for the contents of this module">;
 
 def emit_module : Flag<["-"], "emit-module">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
@@ -525,6 +543,13 @@ def lto : Joined<["-"], "lto=">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the LTO type to either 'llvm-thin' or 'llvm-full'">;
 
+def access_notes_path : Separate<["-"], "access-notes-path">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Specify YAML file to override attributes on Swift declarations in this module">;
+def access_notes_path_EQ : Joined<["-"], "access-notes-path=">,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  Alias<access_notes_path>;
+
 // Experimental feature options
 
 // Note: this flag will be removed when JVP/differential generation in the
@@ -561,12 +586,6 @@ def enable_experimental_cxx_interop :
 def experimental_cxx_stdlib :
   Separate<["-"], "experimental-cxx-stdlib">,
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
-
-def enable_experimental_cross_module_incremental_build :
-  Flag<["-"], "enable-experimental-cross-module-incremental-build">,
-  Flags<[FrontendOption]>,
-  HelpText<"(experimental) Enable cross-module incremental build metadata and "
-           "driver scheduling">;
 
 
 // Diagnostic control options
@@ -609,6 +628,11 @@ def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
 def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
+
+def warn_concurrency : Flag<["-"], "warn-concurrency">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about code that is unsafe according to the Swift Concurrency "
+           "model and will become ill-formed in a future language version">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -656,7 +680,8 @@ def framework : Separate<["-"], "framework">, Group<linker_option_Group>,
   HelpText<"Specifies a framework which should be linked against">;
 
 def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, SwiftAPIExtractOption,
+         SwiftSymbolGraphExtractOption]>,
   HelpText<"Add directory to library link search path">;
 def L_EQ : Joined<["-"], "L=">, Group<linker_option_Group>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -1003,7 +1028,7 @@ def num_threads : Separate<["-"], "num-threads">,
 def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 
-def Xcc : Separate<["-"], "Xcc">, Flags<[FrontendOption]>,
+def Xcc : Separate<["-"], "Xcc">, Flags<[FrontendOption, SwiftSymbolGraphExtractOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
@@ -1015,12 +1040,12 @@ def Xllvm : Separate<["-"], "Xllvm">,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to LLVM.">;
 
 def resource_dir : Separate<["-"], "resource-dir">,
-  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption, HelpHidden, ArgumentIsPath]>,
   MetaVarName<"</usr/lib/swift>">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption, SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
   HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
@@ -1099,15 +1124,17 @@ def emit_supported_features : Flag<["-"], "emit-supported-features">,
   HelpText<"Emit a JSON file including all supported compiler features">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def enable_request_based_incremental_dependencies : Flag<["-"],
-  "enable-request-based-incremental-dependencies">,
+def enable_incremental_imports :
+  Flag<["-"], "enable-incremental-imports">,
   Flags<[FrontendOption]>,
-  HelpText<"Enable request-based name tracking">;
+  HelpText<"Enable cross-module incremental build metadata and "
+           "driver scheduling for Swift modules">;
 
-def disable_request_based_incremental_dependencies : Flag<["-"],
-  "disable-request-based-incremental-dependencies">,
+def disable_incremental_imports :
+  Flag<["-"], "disable-incremental-imports">,
   Flags<[FrontendOption]>,
-  HelpText<"Disable request-based name tracking">;
+  HelpText<"Disable cross-module incremental build metadata and "
+           "driver scheduling for Swift modules">;
 
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
@@ -1120,6 +1147,10 @@ def index_file_path : Separate<["-"], "index-file-path">,
 def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
+
+def index_unit_output_path : Separate<["-"], "index-unit-output-path">,
+  Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
+  HelpText<"Use <path> as the output path in the produced index data.">;
 
 def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
   Flags<[NoInteractiveOption]>,
@@ -1139,7 +1170,7 @@ def working_directory_EQ : Joined<["-"], "working-directory=">,
 // VFS
 
 def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftAPIExtractOption]>,
   HelpText<"Add directory to VFS overlay file">;
 def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
   Alias<vfsoverlay>;
@@ -1158,5 +1189,35 @@ def disable_autolinking_runtime_compatibility_dynamic_replacements
       Flags<[ FrontendOption ]>,
       HelpText<"Do not use autolinking for the dynamic replacement runtime "
                "compatibility library">;
+
+def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         SupplementaryOutput, HelpHidden]>,
+  HelpText<"Emit a symbol graph">;
+
+def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath, SupplementaryOutput, HelpHidden]>,
+  HelpText<"Emit a symbol graph to directory <dir>">,
+  MetaVarName<"<dir>">;
+
+def pretty_print: Flag<["-"], "pretty-print">,
+  Flags<[SwiftAPIExtractOption, SwiftSymbolGraphExtractOption]>,
+  HelpText<"Pretty-print the output JSON">;
+
+// swift-symbolgraph-extract-only options
+def output_dir : Separate<["-"], "output-dir">,
+  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, ArgumentIsPath]>,
+  HelpText<"Symbol Graph JSON Output Directory (Required)">,
+  MetaVarName<"<dir>">;
+
+def skip_synthesized_members: Flag<[ "-" ], "skip-synthesized-members">,
+  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
+  HelpText<"Skip members inherited through classes or default implementations">;
+
+def minimum_access_level : Separate<["-"], "minimum-access-level">,
+  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
+  HelpText<"Include symbols with this access level or more">,
+  MetaVarName<"<level>">;
 
 include "FrontendOptions.td"

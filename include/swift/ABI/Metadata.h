@@ -1333,6 +1333,26 @@ public:
 };
 using ClassMetadata = TargetClassMetadata<InProcess>;
 
+/// The structure of class metadata that's compatible with dispatch objects.
+/// This includes Swift heap metadata, followed by the vtable entries that
+/// dispatch expects to see, with padding to place them at the expected offsets.
+template <typename Runtime>
+struct TargetDispatchClassMetadata : public TargetHeapMetadata<Runtime> {
+  using DummyVTableCall = void (*)(void);
+
+  TargetDispatchClassMetadata(MetadataKind Kind,
+                              DummyVTableCall DummyVTableEntry)
+      : TargetHeapMetadata<Runtime>(Kind), DummyVTableEntry(DummyVTableEntry) {}
+
+  TargetPointer<Runtime, void> Opaque;
+#if SWIFT_OBJC_INTEROP
+  TargetPointer<Runtime, void> OpaqueObjC[3];
+#endif
+
+  TargetSignedPointer<Runtime, DummyVTableCall> DummyVTableEntry;
+};
+using DispatchClassMetadata = TargetDispatchClassMetadata<InProcess>;
+
 /// The structure of metadata for heap-allocated local variables.
 /// This is non-type metadata.
 template <typename Runtime>
@@ -1637,7 +1657,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   }
   bool isAsync() const { return Flags.isAsync(); }
   bool isThrowing() const { return Flags.isThrowing(); }
-  bool isConcurrent() const { return Flags.isConcurrent(); }
+  bool isSendable() const { return Flags.isSendable(); }
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
   bool isEscaping() const { return Flags.isEscaping(); }
 

@@ -42,11 +42,16 @@ using namespace fine_grained_dependencies;
 // MARK: Emitting and reading SourceFileDepGraph
 //==============================================================================
 
-Optional<SourceFileDepGraph> SourceFileDepGraph::loadFromPath(StringRef path) {
+Optional<SourceFileDepGraph>
+SourceFileDepGraph::loadFromPath(StringRef path, const bool allowSwiftModule) {
+  const bool treatAsModule =
+      allowSwiftModule &&
+      path.endswith(file_types::getExtension(file_types::TY_SwiftModuleFile));
   auto bufferOrError = llvm::MemoryBuffer::getFile(path);
   if (!bufferOrError)
     return None;
-  return loadFromBuffer(*bufferOrError.get());
+  return treatAsModule ? loadFromSwiftModuleBuffer(*bufferOrError.get())
+                       : loadFromBuffer(*bufferOrError.get());
 }
 
 Optional<SourceFileDepGraph>
@@ -186,12 +191,9 @@ std::string DependencyKey::demangleTypeAsContext(StringRef s) {
 DependencyKey DependencyKey::createKeyForWholeSourceFile(DeclAspect aspect,
                                                          StringRef swiftDeps) {
   assert(!swiftDeps.empty());
-  const std::string context = DependencyKey::computeContextForProvidedEntity<
-      NodeKind::sourceFileProvide>(swiftDeps);
-  const std::string name =
-      DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
-          swiftDeps);
-  return DependencyKey(NodeKind::sourceFileProvide, aspect, context, name);
+  return DependencyKey::Builder(NodeKind::sourceFileProvide, aspect)
+      .withName(swiftDeps)
+      .build();
 }
 
 //==============================================================================

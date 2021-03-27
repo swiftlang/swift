@@ -28,7 +28,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -576,6 +576,18 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
   return LastStore;
 }
 
+/// Create a tuple value for an empty tuple or a tuple of empty tuples.
+SILValue createValueForEmptyTuple(SILType ty, SILInstruction *insertionPoint) {
+  auto tupleTy = ty.castTo<TupleType>();
+  SmallVector<SILValue, 4> elements;
+  for (unsigned idx = 0, end = tupleTy->getNumElements(); idx < end; ++ idx) {
+    SILType elementTy = ty.getTupleElementType(idx);
+    elements.push_back(createValueForEmptyTuple(elementTy, insertionPoint));
+  }
+  SILBuilder builder(insertionPoint);
+  return builder.createTuple(insertionPoint->getLoc(), ty, elements);
+}
+
 void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
   LLVM_DEBUG(llvm::dbgs() << "*** Promoting in-block: " << *ASI);
 
@@ -596,7 +608,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
       if (!RunningVal) {
         // Loading without a previous store is only acceptable if the type is
         // Void (= empty tuple) or a tuple of Voids.
-        RunningVal = SILUndef::get(ASI->getElementType(), *ASI->getFunction());
+        RunningVal = createValueForEmptyTuple(ASI->getElementType(), Inst);
       }
       replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
       ++NumInstRemoved;
@@ -1032,7 +1044,8 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
 bool MemoryToRegisters::run() {
   bool Changed = false;
 
-  F.verifyCriticalEdges();
+  if (F.getModule().getOptions().VerifyAll)
+    F.verifyCriticalEdges();
 
   // Compute dominator tree node levels for the function.
   DomTreeLevelMap DomTreeLevels;

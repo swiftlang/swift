@@ -158,6 +158,8 @@ set(SWIFT_BENCH_MODULES
     single-source/RemoveWhere
     single-source/ReversedCollections
     single-source/RomanNumbers
+    single-source/SIMDRandomMask
+    single-source/SIMDReduceInteger
     single-source/SequenceAlgos
     single-source/SetTests
     single-source/SevenBoom
@@ -179,6 +181,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringMatch
     single-source/StringRemoveDupes
     single-source/StringReplaceSubrange
+    single-source/StringSplitting
     single-source/StringSwitch
     single-source/StringTests
     single-source/StringWalk

@@ -114,8 +114,8 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) {
 }
 
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
-// expected-warning@-1{{redundant conformance constraint 'T.P3Assoc': 'P2'}}
-// expected-note@-2{{conformance constraint 'T.P3Assoc': 'P2' implied here}}
+// expected-warning@-1{{redundant conformance constraint 'U.P4Assoc': 'P2'}}
+// expected-note@-2{{conformance constraint 'U.P4Assoc': 'P2' implied here}}
 
 func inferSameType3<T : PCommonAssoc1>(_: T) where T.CommonAssoc : P1, T : PCommonAssoc2 {
 }
@@ -134,8 +134,8 @@ protocol P7 : P6 {
 
 // CHECK-LABEL: P7@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
-extension P7 where AssocP6.Element : P6, // expected-note{{conformance constraint 'Self.AssocP6.Element': 'P6' written here}}
-        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element': 'P6'}}
+extension P7 where AssocP6.Element : P6, // expected-note{{conformance constraint 'Self.AssocP7.AssocP6.Element': 'P6' implied here}}
+        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP7.AssocP6.Element': 'P6'}}
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
 }
@@ -270,7 +270,7 @@ struct X18: P18, P17 {
 }
 
 // CHECK-LABEL: .X19.foo@
-// CHECK: Generic signature: <T, U where T == X18>
+// CHECK: Generic signature: <T, U where T == X18.A>
 struct X19<T: P18> where T == T.A {
   func foo<U>(_: U) where T == X18 { }
 }

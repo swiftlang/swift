@@ -135,6 +135,8 @@ public:
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
   std::string mangleBackingInitializerEntity(const VarDecl *var,
                                              SymbolKind SKind = SymbolKind::Default);
+  std::string mangleInitFromProjectedValueEntity(const VarDecl *var,
+                                                 SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -171,9 +173,12 @@ public:
   /// predefined in the Swift runtime for the given type signature.
   std::string mangleObjCAsyncCompletionHandlerImpl(CanSILFunctionType BlockType,
                                                    CanType ResultType,
+                                                   CanGenericSignature Sig,
+                                                   Optional<bool> FlagParamIsZeroOnError,
                                                    bool predefined);
   
-  /// Mangle the derivative function (JVP/VJP) for the given:
+  /// Mangle the derivative function (JVP/VJP), or optionally its vtable entry
+  /// thunk, for the given:
   /// - Mangled original function declaration.
   /// - Derivative function kind.
   /// - Derivative function configuration: parameter/result indices and
@@ -181,7 +186,8 @@ public:
   std::string
   mangleAutoDiffDerivativeFunction(const AbstractFunctionDecl *originalAFD,
                                    AutoDiffDerivativeFunctionKind kind,
-                                   AutoDiffConfig config);
+                                   AutoDiffConfig config,
+                                   bool isVTableThunk = false);
 
   /// Mangle the linear map (differential/pullback) for the given:
   /// - Mangled original function declaration.
@@ -191,6 +197,20 @@ public:
   std::string mangleAutoDiffLinearMap(const AbstractFunctionDecl *originalAFD,
                                       AutoDiffLinearMapKind kind,
                                       AutoDiffConfig config);
+
+  /// Mangle the linear map self parameter reordering thunk the given:
+  /// - Mangled original function declaration.
+  /// - Linear map kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffSelfReorderingReabstractionThunk(
+      CanType fromType, CanType toType, GenericSignature signature,
+      AutoDiffLinearMapKind linearMapKind);
+
+  /// Mangle a SIL differentiability witness.
+  std::string mangleSILDifferentiabilityWitness(StringRef originalName,
+                                                DifferentiabilityKind kind,
+                                                AutoDiffConfig config);
 
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
@@ -204,14 +224,6 @@ public:
                                      StringRef origFnName, unsigned bbId,
                                      AutoDiffLinearMapKind linearMapKind,
                                      AutoDiffConfig config);
-
-  /// Mangle a SIL differentiability witness key:
-  /// - Mangled original function name.
-  /// - Parameter indices.
-  /// - Result indices.
-  /// - Derivative generic signature (optional).
-  std::string
-  mangleSILDifferentiabilityWitnessKey(SILDifferentiabilityWitnessKey key);
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature signature,
@@ -395,6 +407,7 @@ protected:
 
   void appendInitializerEntity(const VarDecl *var);
   void appendBackingInitializerEntity(const VarDecl *var);
+  void appendInitFromProjectedValueEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
                                  GenericSignature &genericSig,
@@ -438,7 +451,8 @@ protected:
 
   void beginManglingWithAutoDiffOriginalFunction(
       const AbstractFunctionDecl *afd);
-  void appendAutoDiffFunctionParts(char functionKindCode,
+  void appendAutoDiffFunctionParts(StringRef op, 
+                                   Demangle::AutoDiffFunctionKind kind,
                                    AutoDiffConfig config);
   void appendIndexSubset(IndexSubset *indexSubset);
 };

@@ -24,6 +24,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 
 namespace swift {
 namespace autodiff {
@@ -75,7 +76,7 @@ CanGenericSignature buildThunkSignature(SILFunction *fn, bool inheritGenericSig,
   builder.addRequirement(newRequirement, source, nullptr);
 
   auto genericSig = std::move(builder).computeGenericSignature(
-      SourceLoc(), /*allowConcreteGenericParams=*/true);
+      /*allowConcreteGenericParams=*/true);
   genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype =
@@ -424,8 +425,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   }
 
   auto *fnArg = thunk->getArgumentsWithoutIndirectResults().back();
-  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments,
-                                    /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -560,7 +560,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
     SILOptFunctionBuilder &fb, SILFunction *parentThunk,
     CanSILFunctionType origFnType, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
-    AutoDiffConfig desiredConfig, AutoDiffConfig actualConfig) {
+    AutoDiffConfig desiredConfig, AutoDiffConfig actualConfig,
+    ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
              << " from " << actualConfig << " to " << desiredConfig << '\n');
@@ -574,26 +575,14 @@ getOrCreateSubsetParametersThunkForLinearMap(
                                   /*withoutActuallyEscaping*/ true,
                                   DifferentiationThunkKind::Reabstraction);
 
-  // TODO(TF-685): Use more principled mangling for thunks.
-  std::string thunkName;
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    thunkName = "differential";
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    thunkName = "pullback";
-  }
-  Mangle::ASTMangler mangler;
+  Mangle::DifferentiationMangler mangler;
   auto fromInterfaceType =
       linearMapType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = targetType->mapTypeOutOfContext()->getCanonicalType();
-  CanType dynamicSelfType;
-  thunkName = "AD__" +
-              mangler.mangleReabstractionThunkHelper(
-                  thunkType, fromInterfaceType, toInterfaceType,
-                  dynamicSelfType, parentThunk->getModule().getSwiftModule()) +
-              "_" + desiredConfig.mangle() + "_" + thunkName;
-  thunkName += "_index_subset_thunk";
+
+  auto thunkName = mangler.mangleLinearMapSubsetParametersThunk(
+      fromInterfaceType, kind.getLinearMapKind(),
+      actualConfig.parameterIndices, actualConfig.resultIndices,
+      desiredConfig.parameterIndices);
 
   auto loc = parentThunk->getLocation();
   auto *thunk = fb.getOrCreateSharedFunction(
@@ -607,7 +596,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   thunk->setOwnershipEliminated();
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
-  SILBuilder builder(entry);
+  TangentBuilder builder(entry, adContext);
   createEntryArguments(thunk);
 
   // Get arguments.
@@ -626,7 +615,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     case TangentSpace::Kind::TangentVector: {
       auto *buf = builder.createAllocStack(loc, zeroSILObjType);
       localAllocations.push_back(buf);
-      emitZeroIntoBuffer(builder, zeroType, buf, loc);
+      builder.emitZeroIntoBuffer(loc, buf, IsInitialization);
       if (zeroSILType.isAddress()) {
         arguments.push_back(buf);
       } else {
@@ -745,8 +734,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
 
   // Get the linear map thunk argument and apply it.
   auto *linearMap = thunk->getArguments().back();
-  auto *ai = builder.createApply(loc, linearMap, SubstitutionMap(), arguments,
-                                 /*isNonThrowing*/ false);
+  auto *ai = builder.createApply(loc, linearMap, SubstitutionMap(), arguments);
 
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result.
@@ -811,7 +799,7 @@ std::pair<SILFunction *, SubstitutionMap>
 getOrCreateSubsetParametersThunkForDerivativeFunction(
     SILOptFunctionBuilder &fb, SILValue origFnOperand, SILValue derivativeFn,
     AutoDiffDerivativeFunctionKind kind, AutoDiffConfig desiredConfig,
-    AutoDiffConfig actualConfig) {
+    AutoDiffConfig actualConfig, ADContext &adContext) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for derivative function "
              << derivativeFn << " of the original function " << origFnOperand
@@ -861,26 +849,11 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
                    ->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  // TODO(TF-685): Use more principled mangling for thunks.
-  std::string thunkName;
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    thunkName = "jvp";
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    thunkName = "vjp";
-  }
-  Mangle::ASTMangler mangler;
-  auto fromInterfaceType =
-      derivativeFnType->mapTypeOutOfContext()->getCanonicalType();
-  auto toInterfaceType = targetType->mapTypeOutOfContext()->getCanonicalType();
-  CanType dynamicSelfType;
-  thunkName = "AD__orig_" + origName.str() + "_" +
-              mangler.mangleReabstractionThunkHelper(
-                  thunkType, fromInterfaceType, toInterfaceType,
-                  dynamicSelfType, module.getSwiftModule()) +
-              "_" + desiredConfig.mangle() + "_" + thunkName;
-  thunkName += "_subset_parameters_thunk";
+  Mangle::DifferentiationMangler mangler;
+  auto thunkName = mangler.mangleDerivativeFunctionSubsetParametersThunk(
+      origName, targetType->mapTypeOutOfContext()->getCanonicalType(),
+      kind, actualConfig.parameterIndices, actualConfig.resultIndices,
+      desiredConfig.parameterIndices);
 
   auto loc = origFnOperand.getLoc();
   auto *thunk = fb.getOrCreateSharedFunction(
@@ -940,8 +913,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   assert(arguments.size() ==
          derivativeFnType->getNumParameters() +
              derivativeFnType->getNumIndirectFormalResults());
-  auto *apply = builder.createApply(loc, assocRef, assocSubstMap, arguments,
-                                    /*isNonThrowing*/ false);
+  auto *apply = builder.createApply(loc, assocRef, assocSubstMap, arguments);
 
   // Extract all direct results.
   SmallVector<SILValue, 8> directResults;
@@ -965,7 +937,8 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   std::tie(linearMapThunk, linearMapSubs) =
       getOrCreateSubsetParametersThunkForLinearMap(
           fb, thunk, origFnType, unsubstLinearMapType,
-          unsubstLinearMapTargetType, kind, desiredConfig, actualConfig);
+          unsubstLinearMapTargetType, kind, desiredConfig, actualConfig,
+          adContext);
 
   auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
   SILValue thunkedLinearMap = linearMap;

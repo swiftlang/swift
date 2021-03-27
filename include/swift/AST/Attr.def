@@ -54,7 +54,7 @@ TYPE_ATTR(escaping)
 TYPE_ATTR(differentiable)
 TYPE_ATTR(noDerivative)
 TYPE_ATTR(async)
-TYPE_ATTR(concurrent)
+TYPE_ATTR(Sendable)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -353,25 +353,25 @@ SIMPLE_DECL_ATTR(testable, Testable,
 DECL_ATTR(_alignment, Alignment,
   OnStruct | OnEnum |
   UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   56)
 SIMPLE_DECL_ATTR(rethrows, Rethrows,
-  OnFunc | OnAccessor | OnConstructor |
+  OnFunc | OnConstructor |
   RejectByParser |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   57)
 SIMPLE_DECL_ATTR(rethrows, AtRethrows,
   OnProtocol |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   58)
 DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
   OnClass |
   UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   59)
 CONTEXTUAL_SIMPLE_DECL_ATTR(indirect, Indirect, DeclModifier |
   OnEnum | OnEnumElement |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   60)
 SIMPLE_DECL_ATTR(warn_unqualified_access, WarnUnqualifiedAccess,
   OnFunc | OnAccessor /*| OnVar*/ |
@@ -469,7 +469,7 @@ DECL_ATTR(_dynamicReplacement, DynamicReplacement,
 SIMPLE_DECL_ATTR(_borrowed, Borrowed,
   OnVar | OnSubscript | UserInaccessible |
   NotSerialized |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   81)
 DECL_ATTR(_private, PrivateImport,
   OnImport |
@@ -479,7 +479,7 @@ DECL_ATTR(_private, PrivateImport,
   82)
 SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   OnVar | OnSubscript | OnAbstractFunction | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  ABIBreakingToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   83)
 
 SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
@@ -570,6 +570,7 @@ SIMPLE_DECL_ATTR(asyncHandler, AsyncHandler,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   101)
 
+// TODO: Remove this once we don't need to support 'actor' as a modifier
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   DeclModifier | OnClass | ConcurrencyOnly |
   ABIBreakingToAdd | ABIBreakingToRemove |
@@ -579,7 +580,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
 DECL_ATTR(actorIndependent, ActorIndependent,
   OnClass | OnStruct | OnEnum | OnExtension | OnFunc | OnConstructor |
   OnVar | OnSubscript | ConcurrencyOnly |
-  ABIStableToAdd | ABIStableToRemove |
+  ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   103)
 
@@ -600,9 +601,9 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   APIBreakingToAdd | APIBreakingToRemove,
   106)
 
-SIMPLE_DECL_ATTR(concurrent, Concurrent,
-  OnFunc | OnConstructor | OnAccessor | ConcurrencyOnly |
-  ABIStableToAdd | ABIStableToRemove |
+SIMPLE_DECL_ATTR(Sendable, Sendable,
+  OnFunc | OnConstructor | OnAccessor |
+  ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   107)
 
@@ -611,6 +612,31 @@ SIMPLE_DECL_ATTR(_marker, Marker,
   ABIBreakingToAdd | ABIBreakingToRemove |
   APIBreakingToAdd | APIBreakingToRemove,
   108)
+
+SIMPLE_DECL_ATTR(reasync, Reasync,
+  OnFunc | OnConstructor |
+  RejectByParser |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  109)
+
+SIMPLE_DECL_ATTR(reasync, AtReasync,
+  OnProtocol | ConcurrencyOnly |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  110)
+
+DECL_ATTR(completionHandlerAsync, CompletionHandlerAsync,
+  OnAbstractFunction | ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIStableToAdd | APIStableToRemove,
+  111)
+
+CONTEXTUAL_SIMPLE_DECL_ATTR(nonisolated, Nonisolated,
+  DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript |
+  ConcurrencyOnly |
+  ABIStableToAdd | ABIStableToRemove |
+  APIBreakingToAdd | APIStableToRemove,
+  112)
+
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

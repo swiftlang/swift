@@ -89,6 +89,8 @@ class TempRValueOptPass : public SILFunctionTransform {
   bool
   checkTempObjectDestroy(AllocStackInst *tempObj, CopyAddrInst *copyInst);
 
+  bool extendAccessScopes(CopyAddrInst *copyInst, SILInstruction *lastUseInst);
+
   bool tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst);
   std::pair<SILBasicBlock::iterator, bool>
   tryOptimizeStoreIntoTemp(StoreInst *si);
@@ -167,12 +169,10 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
     //   %addr = begin_access [read]
     //      ... // there can be no writes to %addr here
     //   end_acess %addr   // <- This is where the use actually ends.
-    for (Operand *accessUse : beginAccess->getUses()) {
-      if (auto *endAccess = dyn_cast<EndAccessInst>(accessUse->getUser())) {
-        if (endAccess->getParent() != block)
-          return false;
-        loadInsts.insert(endAccess);
-      }
+    for (EndAccessInst *endAccess : beginAccess->getEndAccesses()) {
+      if (endAccess->getParent() != block)
+        return false;
+      loadInsts.insert(endAccess);
     }
     return true;
   }
@@ -347,6 +347,57 @@ SILInstruction *TempRValueOptPass::getLastUseWhileSourceIsNotModified(
   return nullptr;
 }
 
+/// Tries to move an end_access down to extend the access scope over all uses
+/// of the temporary. For example:
+///
+///   %a = begin_access %src
+///   copy_addr %a to [initialization] %temp : $*T
+///   end_access %a
+///   use %temp
+///
+/// We must not replace %temp with %a after the end_access. Instead we try to
+/// move the end_access after "use %temp".
+bool TempRValueOptPass::extendAccessScopes(
+    CopyAddrInst *copyInst, SILInstruction *lastUseInst) {
+
+  SILValue copySrc = copyInst->getSrc();
+  EndAccessInst *endAccessToMove = nullptr;
+  auto begin = std::next(copyInst->getIterator());
+  auto end = std::next(lastUseInst->getIterator());
+
+  for (SILInstruction &inst : make_range(begin, end)) {
+    if (auto *endAccess = dyn_cast<EndAccessInst>(&inst)) {
+      // To keep things simple, we can just move a single end_access. Also, we
+      // cannot move an end_access over a (non-aliasing) end_access.
+      if (endAccessToMove)
+        return false;
+      // Is this the end of an access scope of the copy-source?
+      if (!aa->isNoAlias(copySrc, endAccess->getSource())) {
+        assert(endAccess->getBeginAccess()->getAccessKind() ==
+                 SILAccessKind::Read &&
+               "a may-write end_access should not be in the copysrc lifetime");
+        endAccessToMove = endAccess;
+      }
+    } else if (endAccessToMove) {
+      // We cannot move an end_access over a begin_access. This would destroy
+      // the proper nesting of accesses.
+      if (isa<BeginAccessInst>(&inst) || isa<BeginUnpairedAccessInst>(inst))
+        return false;
+      // Don't extend a read-access scope over a (potential) write.
+      // Note that inst can be a function call containing other access scopes.
+      // But doing the mayWriteToMemory check, we know that the function can
+      // only contain read accesses (to the same memory location). So it's fine
+      // to move endAccessToMove even over such a function call.
+      if (aa->mayWriteToMemory(&inst, endAccessToMove->getSource()))
+        return false;
+    }
+  }
+  if (endAccessToMove)
+    endAccessToMove->moveAfter(lastUseInst);
+
+  return true;
+}
+
 /// Return true if the \p tempObj, which is initialized by \p copyInst, is
 /// destroyed in an orthodox way.
 ///
@@ -419,13 +470,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
 
   bool isOSSA = copyInst->getFunction()->hasOwnership();
   
-  // The copy's source address must not be a scoped instruction, like
-  // begin_borrow. When the temporary object is eliminated, it's uses are
-  // replaced with the copy's source. Therefore, the source address must be
-  // valid at least until the next instruction that may write to or destroy the
-  // source. End-of-scope markers, such as end_borrow, do not write to or
-  // destroy memory, so scoped addresses are not valid replacements.
-  SILValue copySrc = stripAccessMarkers(copyInst->getSrc());
+  SILValue copySrc = copyInst->getSrc();
   assert(tempObj != copySrc && "can't initialize temporary with itself");
 
   // If the source of the copyInst is taken, we must insert a compensating
@@ -487,6 +532,9 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   if (!isOSSA && !checkTempObjectDestroy(tempObj, copyInst))
     return false;
 
+  if (!extendAccessScopes(copyInst, lastLoadInst))
+    return false;
+
   LLVM_DEBUG(llvm::dbgs() << "  Success: replace temp" << *tempObj);
 
   if (needToInsertDestroy) {
@@ -529,7 +577,7 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
       auto *li = cast<LoadInst>(user);
       if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
         li->setOwnershipQualifier(LoadOwnershipQualifier::Copy);
-      use->set(copyInst->getSrc());
+      use->set(copySrc);
       break;
     }
 
@@ -702,7 +750,7 @@ void TempRValueOptPass::run() {
   bool changed = false;
 
   // Find all copy_addr instructions.
-  llvm::SmallVector<CopyAddrInst *, 8> deadCopies;
+  llvm::SmallSetVector<CopyAddrInst *, 8> deadCopies;
   for (auto &block : *getFunction()) {
     // Increment the instruction iterator only after calling
     // tryOptimizeCopyIntoTemp because the instruction after CopyInst might be
@@ -716,9 +764,9 @@ void TempRValueOptPass::run() {
         // calling tryOptimizeCopyIntoTemp or was created by an earlier
         // iteration, where another copy_addr copied the temporary back to the
         // source location.
-        if (stripAccessMarkers(copyInst->getSrc()) == copyInst->getDest()) {
+        if (copyInst->getSrc() == copyInst->getDest()) {
           changed = true;
-          deadCopies.push_back(copyInst);
+          deadCopies.insert(copyInst);
         }
         ++ii;
         continue;
@@ -735,21 +783,14 @@ void TempRValueOptPass::run() {
     }
   }
 
-  // Delete the copies and any unused address operands.
-  // The same copy may have been added multiple times.
-  sortUnique(deadCopies);
-  InstModCallbacks callbacks{
-#ifndef NDEBUG
-      // With asserts, we include this assert. Otherwise, we use the default
-      // impl for perf.
-      [](SILInstruction *instToKill) {
-        // SimplifyInstruction is not in the business of removing
-        // copy_addr. If it were, then we would need to update deadCopies.
-        assert(!isa<CopyAddrInst>(instToKill));
-        instToKill->eraseFromParent();
-      }
-#endif
-  };
+  InstModCallbacks callbacks(
+    [](SILInstruction *instToKill) {
+      // SimplifyInstruction is not in the business of removing
+      // copy_addr. If it were, then we would need to update deadCopies.
+      assert(!isa<CopyAddrInst>(instToKill));
+      instToKill->eraseFromParent();
+    }
+  );
 
   DeadEndBlocks deBlocks(getFunction());
   for (auto *deadCopy : deadCopies) {

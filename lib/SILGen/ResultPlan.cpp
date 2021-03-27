@@ -487,13 +487,14 @@ public:
                                calleeTypeInfo.substResultType, throws);
 
     // Wrap the Builtin.RawUnsafeContinuation in an
-    // Unsafe[Throwing]Continuation<T>.
-    auto continuationDecl = throws
-      ? SGF.getASTContext().getUnsafeThrowingContinuationDecl()
-      : SGF.getASTContext().getUnsafeContinuationDecl();
-    
+    // UnsafeContinuation<T, E>.
+    auto continuationDecl = SGF.getASTContext().getUnsafeContinuationDecl();
+
+    auto errorTy = throws
+      ? SGF.getASTContext().getExceptionType()
+      : SGF.getASTContext().getNeverType();
     auto continuationTy = BoundGenericType::get(continuationDecl, Type(),
-                                                calleeTypeInfo.substResultType)
+                                                { calleeTypeInfo.substResultType, errorTy })
       ->getCanonicalType();
     auto wrappedContinuation =
         SGF.B.createStruct(loc,
@@ -523,17 +524,24 @@ public:
       handlerIsOptional = false;
       impFnTy = cast<SILFunctionType>(impTy.getASTType());
     }
+    auto env = SGF.F.getGenericEnvironment();
+    auto sig = env ? env->getGenericSignature()->getCanonicalSignature()
+                   : CanGenericSignature();
     SILFunction *impl = SGF.SGM
-      .getOrCreateForeignAsyncCompletionHandlerImplFunction(impFnTy,
-                                                continuationTy,
-                                                *calleeTypeInfo.foreign.async);
+      .getOrCreateForeignAsyncCompletionHandlerImplFunction(
+                  cast<SILFunctionType>(impFnTy->mapTypeOutOfContext()
+                                               ->getCanonicalType(sig)),
+                  continuationTy->mapTypeOutOfContext()->getCanonicalType(sig),
+                  sig,
+                  *calleeTypeInfo.foreign.async);
     auto impRef = SGF.B.createFunctionRef(loc, impl);
     
     // Initialize the block object for the completion handler.
     SILValue block = SGF.B.createInitBlockStorageHeader(loc, blockStorage,
-                          impRef, SILType::getPrimitiveObjectType(impFnTy), {});
+                          impRef, SILType::getPrimitiveObjectType(impFnTy),
+                          SGF.getForwardingSubstitutionMap());
     
-    // Wrap it in optional if the callee expects if.
+    // Wrap it in optional if the callee expects it.
     if (handlerIsOptional) {
       block = SGF.B.createOptionalSome(loc, block, impTy);
     }
@@ -626,8 +634,11 @@ public:
     auto &errorTL = SGF.getTypeLowering(errorType);
 
     // Allocate a temporary.
+    // It's flagged with "hasDynamicLifetime" because it's not possible to
+    // statically verify the lifetime of the value.
     SILValue errorTemp =
-        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType());
+        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType(),
+                                    /*hasDynamicLifetime*/ true);
 
     // Nil-initialize it.
     SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);

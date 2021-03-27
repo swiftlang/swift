@@ -6,13 +6,25 @@ sil_stage raw // CHECK: sil_stage raw
 import Builtin
 import Swift
 
-actor class Actor { }
+actor Actor { }
 
 // CHECK-LABEL: sil @test_hop_to_executor
 sil @test_hop_to_executor : $@convention(thin) (@guaranteed Actor) -> () {
 bb0(%0 : $Actor):
   // CHECK: hop_to_executor %0 : $Actor
   hop_to_executor %0 : $Actor
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil @some_async_function : $@convention(thin) @async () -> ()
+
+// CHECK-LABEL: sil @test_noasync_call
+sil @test_noasync_call : $@convention(thin) () -> () {
+bb0:
+  // CHECK: apply [noasync]
+  %fn = function_ref @some_async_function : $@convention(thin) @async () -> ()
+  %result = apply [noasync] %fn() : $@convention(thin) @async () -> ()
   %2 = tuple ()
   return %2 : $()
 }

@@ -371,8 +371,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   SourceLoc asyncLoc;
   SourceLoc throwsLoc;
   if (isAtFunctionTypeArrow()) {
-    status |= parseEffectsSpecifiers(SourceLoc(), asyncLoc, throwsLoc,
-                                     /*rethrows=*/nullptr);
+    status |= parseEffectsSpecifiers(SourceLoc(),
+                                     asyncLoc, /*reasync=*/nullptr,
+                                     throwsLoc, /*rethrows=*/nullptr);
   }
 
   // Handle type-function if we have an arrow.
@@ -380,7 +381,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     SourceLoc arrowLoc = consumeToken();
 
     // Handle async/throws in the wrong place.
-    parseEffectsSpecifiers(arrowLoc, asyncLoc, throwsLoc, /*rethrows=*/nullptr);
+    parseEffectsSpecifiers(arrowLoc,
+                           asyncLoc, /*reasync=*/nullptr,
+                           throwsLoc, /*rethrows=*/nullptr);
 
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
@@ -403,9 +406,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       if (InputNode.is<ParsedTupleTypeSyntax>()) {
         auto TupleTypeNode = std::move(InputNode).castTo<ParsedTupleTypeSyntax>();
         // Decompose TupleTypeSyntax and repack into FunctionType.
-        auto LeftParen = TupleTypeNode.getDeferredLeftParen();
-        auto Arguments = TupleTypeNode.getDeferredElements();
-        auto RightParen = TupleTypeNode.getDeferredRightParen();
+        auto LeftParen = TupleTypeNode.getDeferredLeftParen(SyntaxContext);
+        auto Arguments = TupleTypeNode.getDeferredElements(SyntaxContext);
+        auto RightParen = TupleTypeNode.getDeferredRightParen(SyntaxContext);
         Builder
           .useLeftParen(std::move(LeftParen))
           .useArguments(std::move(Arguments))
@@ -996,7 +999,7 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
     // 'inout' here can be a obsoleted use of the marker in an argument list,
     // consume it in backtracking context so we can determine it's really a
     // deprecated use of it.
-    llvm::Optional<BacktrackingScope> Backtracking;
+    llvm::Optional<CancellableBacktrackingScope> Backtracking;
     SourceLoc ObsoletedInOutLoc;
     if (Tok.is(tok::kw_inout)) {
       Backtracking.emplace(*this);
@@ -1017,11 +1020,13 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
         && (peekToken().is(tok::colon)
             || peekToken().canBeArgumentLabel())) {
       // Consume a name.
-      element.NameLoc = consumeArgumentLabel(element.Name);
+      element.NameLoc = consumeArgumentLabel(element.Name,
+                                             /*diagnoseDollarPrefix=*/true);
 
       // If there is a second name, consume it as well.
       if (Tok.canBeArgumentLabel())
-        element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
+        element.SecondNameLoc = consumeArgumentLabel(element.SecondName,
+                                                     /*diagnoseDollarPrefix=*/true);
 
       // Consume the ':'.
       if (consumeIf(tok::colon, element.ColonLoc)) {
@@ -1405,9 +1410,10 @@ bool Parser::canParseType() {
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
-      if (!canParseTypeIdentifier())
-        return false;
-      break;
+  case tok::code_complete:
+    if (!canParseTypeIdentifier())
+      return false;
+    break;
   case tok::kw_protocol: // Deprecated composition syntax
   case tok::identifier:
     if (!canParseTypeIdentifierOrTypeComposition())
@@ -1495,7 +1501,7 @@ bool Parser::canParseTypeIdentifierOrTypeComposition() {
 
 bool Parser::canParseSimpleTypeIdentifier() {
   // Parse an identifier.
-  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any, tok::code_complete))
     return false;
   consumeToken();
 

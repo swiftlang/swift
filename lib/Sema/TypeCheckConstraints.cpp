@@ -35,14 +35,14 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 #include <iterator>
 #include <map>
 #include <memory>
-#include <utility>
 #include <tuple>
+#include <utility>
 
 using namespace swift;
 using namespace constraints;
@@ -538,12 +538,14 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       }
     }
   }
-  
+
   if (hadError)
     PBD->setInvalid();
 
   PBD->setInitializerChecked(patternNumber);
-  
+
+  checkPatternBindingDeclAsyncUsage(PBD);
+
   return hadError;
 }
 
@@ -598,10 +600,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     auto module = dc->getParentModule();
     auto conformanceRef = module->lookupConformance(Ty, sequenceProto);
     
-    if (conformanceRef.classifyAsThrows() && 
+    if (conformanceRef.hasEffect(EffectKind::Throws) &&
         stmt->getTryLoc().isInvalid()) {
       auto &diags = dc->getASTContext().Diags;
-      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled)
+      diags.diagnose(stmt->getAwaitLoc(), diag::throwing_call_unhandled, "call")
         .fixItInsert(stmt->getAwaitLoc(), "try");
 
       return failed();
@@ -1157,7 +1159,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
         out << " as ";
         Type(fixed).print(out, PO);
       } else {
-        const_cast<ConstraintSystem *>(this)->inferBindingsFor(tv).dump(out, 1);
+        const_cast<ConstraintSystem *>(this)->getBindingsFor(tv).dump(out, 1);
       }
     } else {
       out << " equivalent to ";

@@ -238,20 +238,32 @@ namespace swift {
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
+    /// Provide additional warnings about code that is unsafe in the
+    /// eventual Swift concurrency model, and will eventually become errors
+    /// in a future Swift language version, but are too noisy for existing
+    /// language modes.
+    bool WarnConcurrency = false;
+
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
     /// Enable experimental concurrency model.
     bool EnableExperimentalConcurrency = false;
 
-    /// Enable experimental ConcurrentValue checking.
-    bool EnableExperimentalConcurrentValueChecking = false;
+    /// Enable experimental asyncHandler support.
+    bool EnableExperimentalAsyncHandler = false;
+
+    /// Enable experimental flow-sensitive concurrent captures.
+    bool EnableExperimentalFlowSensitiveConcurrentCaptures = false;
+
+    /// Enable inference of Sendable conformances for public types.
+    bool EnableInferPublicSendable = false;
+
+    /// Enable experimental derivation of `Codable` for enums.
+    bool EnableExperimentalEnumCodableDerivation = false;
 
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport = false;
-
-    /// Enable experimental support for `@_specialize(exported: true,...)` .
-    bool EnableExperimentalPrespecialization = false;
 
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
@@ -280,13 +292,6 @@ namespace swift {
     /// but will not be used for checking type equality.
     /// [TODO: Clang-type-plumbing] Turn on for feature rollout.
     bool UseClangFunctionTypes = false;
-
-    /// Whether to use the import as member inference system
-    ///
-    /// When importing a global, try to infer whether we can import it as a
-    /// member of some type instead. This includes inits, computed properties,
-    /// and methods.
-    bool InferImportAsMember = false;
 
     /// If set to true, compile with the SIL Opaque Values enabled.
     /// This is for bootstrapping. It can't be in SILOptions because the
@@ -635,13 +640,6 @@ namespace swift {
     /// instead of dropped altogether when possible.
     bool ImportForwardDeclarations = false;
 
-    /// Whether to use the import as member inference system
-    ///
-    /// When importing a global, try to infer whether we can import it as a
-    /// member of some type instead. This includes inits, computed properties,
-    /// and methods.
-    bool InferImportAsMember = false;
-
     /// If true ignore the swift bridged attribute.
     bool DisableSwiftBridgeAttr = false;
 
@@ -674,7 +672,6 @@ namespace swift {
                           static_cast<uint8_t>(Mode),
                           DetailedPreprocessingRecord,
                           ImportForwardDeclarations,
-                          InferImportAsMember,
                           DisableSwiftBridgeAttr,
                           DisableOverlayModules);
     }

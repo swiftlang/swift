@@ -76,7 +76,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
@@ -1280,20 +1280,15 @@ BlockState::ValueState BlockState::getValueStateAtEndOfBlock(RLEContext &Ctx,
 SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
                                                      LSLocation &L) {
   llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> Values;
-  BasicBlockSet HandledBBs(Fn);
-  llvm::SmallVector<SILBasicBlock *, 8> WorkList;
+  BasicBlockWorklist<16> WorkList(Fn);
 
   // Push in all the predecessors to get started.
   for (auto Pred : BB->getPredecessorBlocks()) {
-    WorkList.push_back(Pred);
+    WorkList.pushIfNotVisited(Pred);
   }
 
-  while (!WorkList.empty()) {
-    auto *CurBB = WorkList.pop_back_val();
+  while (SILBasicBlock *CurBB = WorkList.pop()) {
     BlockState &Forwarder = getBlockState(CurBB);
-
-    // Mark this basic block as processed.
-    HandledBBs.insert(CurBB);
 
     // There are 3 cases that can happen here.
     //
@@ -1316,9 +1311,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     // locations, collect in this block's predecessors.
     if (Forwarder.isCoverValues(*this, L)) {
       for (auto Pred : CurBB->getPredecessorBlocks()) {
-        if (HandledBBs.contains(Pred))
-          continue;
-        WorkList.push_back(Pred);
+        WorkList.pushIfNotVisited(Pred);
       }
       continue;
     }
@@ -1335,12 +1328,20 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     Values.push_back({CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt)});
   }
 
+  auto ownershipRange =
+      makeTransformRange(llvm::make_range(Values.begin(), Values.end()),
+                         [](std::pair<SILBasicBlock *, SILValue> v) {
+                           return v.second.getOwnershipKind();
+                         });
+
+  auto mergedOwnershipKind = ValueOwnershipKind::merge(ownershipRange);
+
   // Finally, collect all the values for the SILArgument, materialize it using
   // the SSAUpdater.
   Updater.initialize(
       L.getType(&BB->getModule(), TypeExpansionContext(*BB->getParent()))
           .getObjectType(),
-      Values[0].second.getOwnershipKind());
+      mergedOwnershipKind);
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   Updater.setInsertedPhis(&insertedPhis);
@@ -1450,21 +1451,16 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
   // Process each basic block with the gen and kill set. Every time the
   // ForwardSetOut of a basic block changes, the optimization is rerun on its
   // successors.
-  llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  BasicBlockSet HandledBBs(Fn);
+  BasicBlockWorklist<16> WorkList(Fn);
 
   // Push into the worklist in post order so that we can pop from the back and
   // get reverse post order.
   for (SILBasicBlock *BB : PO->getPostOrder()) {
-    WorkList.push_back(BB);
-    HandledBBs.insert(BB);
+    WorkList.push(BB);
   }
-  while (!WorkList.empty()) {
-    SILBasicBlock *BB = WorkList.pop_back_val();
+  while (SILBasicBlock *BB = WorkList.popAndForget()) {
     LLVM_DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
                             << " with Gen/Kill.\n");
-    HandledBBs.erase(BB);
-
     // Intersection.
     BlockState &Forwarder = getBlockState(BB);
     // Compute the ForwardSetIn at the beginning of the basic block.
@@ -1472,11 +1468,7 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
 
     if (Forwarder.processBasicBlockWithGenKillSet()) {
       for (SILBasicBlock *succ : BB->getSuccessors()) {
-        // We do not push basic block into the worklist if its already
-        // in the worklist.
-        if (HandledBBs.contains(succ))
-          continue;
-        WorkList.push_back(succ);
+        WorkList.pushIfNotVisited(succ);
       }
     }
     LLVM_DEBUG(Forwarder.dump(*this));

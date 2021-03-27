@@ -6,12 +6,6 @@
 
 import Dispatch
 
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 enum HomeworkError: Error, Equatable {
   case dogAteIt(String)
 }
@@ -27,14 +21,14 @@ func testSimple(
 
   var completed = false
 
-  let taskHandle = Task.runDetached { () async throws -> String in
+  let taskHandle: Task.Handle<String, Error> = Task.runDetached {
     let greeting = await formGreeting(name: name)
 
     // If the intent is to test suspending, wait a bit so the second task
     // can complete.
     if doSuspend {
       print("- Future sleeping")
-      sleep(1)
+      await Task.sleep(1_000_000_000)
     }
 
     if (shouldThrow) {
@@ -50,7 +44,7 @@ func testSimple(
   // can complete.
   if !doSuspend {
     print("+ Reader sleeping")
-    sleep(1)
+    await Task.sleep(1_000_000_000)
   }
 
   do {

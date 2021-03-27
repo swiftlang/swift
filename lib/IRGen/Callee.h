@@ -125,28 +125,81 @@ namespace irgen {
   /// A function pointer value.
   class FunctionPointer {
   public:
-    struct KindTy {
-      enum class Value {
-        Function,
-        AsyncFunctionPointer,
-      };
-      static const Value Function = Value::Function;
-      static const Value AsyncFunctionPointer = Value::AsyncFunctionPointer;
-      Value value;
-      KindTy(Value value) : value(value) {}
-      KindTy(CanSILFunctionType fnType)
-          : value(fnType->isAsync() ? Value::AsyncFunctionPointer
-                                    : Value::Function) {}
-      friend bool operator==(const KindTy &lhs, const KindTy &rhs) {
+    enum class BasicKind {
+      Function,
+      AsyncFunctionPointer
+    };
+
+    enum class SpecialKind {
+      TaskFutureWait,
+      TaskFutureWaitThrowing,
+      TaskGroupWaitNext,
+    };
+
+    class Kind {
+      static constexpr unsigned SpecialOffset = 2;
+      unsigned value;
+    public:
+      static constexpr BasicKind Function =
+        BasicKind::Function;
+      static constexpr BasicKind AsyncFunctionPointer =
+        BasicKind::AsyncFunctionPointer;
+
+      Kind(BasicKind kind) : value(unsigned(kind)) {}
+      Kind(SpecialKind kind) : value(unsigned(kind) + SpecialOffset) {}
+      Kind(CanSILFunctionType fnType)
+        : Kind(fnType->isAsync() ? BasicKind::AsyncFunctionPointer
+                                 : BasicKind::Function) {}
+
+      BasicKind getBasicKind() const {
+        return value < SpecialOffset ? BasicKind(value) : BasicKind::Function;
+      }
+      bool isAsyncFunctionPointer() const {
+        return value == unsigned(BasicKind::AsyncFunctionPointer);
+      }
+
+      bool isSpecial() const {
+        return value >= SpecialOffset;
+      }
+      SpecialKind getSpecialKind() const {
+        assert(isSpecial());
+        return SpecialKind(value - SpecialOffset);
+      }
+
+      /// Should we suppress the generic signature from the given function?
+      ///
+      /// This is a micro-optimization we apply to certain special functions
+      /// that we know don't need generics.
+      bool suppressGenerics() const {
+        if (!isSpecial()) return false;
+
+        switch (getSpecialKind()) {
+        case SpecialKind::TaskFutureWait:
+        case SpecialKind::TaskFutureWaitThrowing:
+          // FIXME: I have disabled this optimization, if we bring it back we
+          // need to debug why it currently does not work (call emission
+          // computes an undef return pointer) and change the runtime entries to
+          // remove the extra type parameter.
+          //
+          // We suppress generics from these as a code-size optimization
+          // because the runtime can recover the success type from the
+          // future.
+          return false;
+        case SpecialKind::TaskGroupWaitNext:
+          return false;
+        }
+      }
+
+      friend bool operator==(Kind lhs, Kind rhs) {
         return lhs.value == rhs.value;
       }
-      friend bool operator!=(const KindTy &lhs, const KindTy &rhs) {
+      friend bool operator!=(Kind lhs, Kind rhs) {
         return !(lhs == rhs);
       }
     };
 
   private:
-    KindTy Kind;
+    Kind kind;
 
     /// The actual pointer, either to the function or to its descriptor.
     llvm::Value *Value;
@@ -155,34 +208,29 @@ namespace irgen {
 
     Signature Sig;
 
-    bool isFunctionPointerWithoutContext = false;
-
   public:
     /// Construct a FunctionPointer for an arbitrary pointer value.
     /// We may add more arguments to this; try to use the other
     /// constructors/factories if possible.
-    explicit FunctionPointer(KindTy kind, llvm::Value *value,
+    explicit FunctionPointer(Kind kind, llvm::Value *value,
                              PointerAuthInfo authInfo,
-                             const Signature &signature,
-                             bool isWithoutCtxt = false)
-        : Kind(kind), Value(value), AuthInfo(authInfo), Sig(signature),
-          isFunctionPointerWithoutContext(isWithoutCtxt) {
+                             const Signature &signature)
+        : kind(kind), Value(value), AuthInfo(authInfo), Sig(signature) {
       // The function pointer should have function type.
       assert(value->getType()->getPointerElementType()->isFunctionTy());
       // TODO: maybe assert similarity to signature.getType()?
     }
 
     // Temporary only!
-    explicit FunctionPointer(KindTy kind, llvm::Value *value,
-                             const Signature &signature,
-                             bool isWithoutCtxt = false)
-        : FunctionPointer(kind, value, PointerAuthInfo(), signature, isWithoutCtxt) {}
+    explicit FunctionPointer(Kind kind, llvm::Value *value,
+                             const Signature &signature)
+      : FunctionPointer(kind, value, PointerAuthInfo(), signature) {}
 
     static FunctionPointer forDirect(IRGenModule &IGM,
                                      llvm::Constant *value,
                                      CanSILFunctionType fnType);
 
-    static FunctionPointer forDirect(KindTy kind, llvm::Constant *value,
+    static FunctionPointer forDirect(Kind kind, llvm::Constant *value,
                                      const Signature &signature) {
       return FunctionPointer(kind, value, PointerAuthInfo(), signature);
     }
@@ -197,7 +245,8 @@ namespace irgen {
       return (isa<llvm::Constant>(Value) && AuthInfo.isConstant());
     }
 
-    KindTy getKind() const { return Kind; }
+    Kind getKind() const { return kind; }
+    BasicKind getBasicKind() const { return kind.getBasicKind(); }
 
     /// Given that this value is known to have been constructed from a direct
     /// function,  Return the name of that function.
@@ -250,7 +299,11 @@ namespace irgen {
     FunctionPointer getAsFunction(IRGenFunction &IGF) const;
 
     bool useStaticContextSize() const {
-      return isFunctionPointerWithoutContext;
+      return !kind.isAsyncFunctionPointer();
+    }
+
+    bool suppressGenerics() const {
+      return kind.suppressGenerics();
     }
   };
 
@@ -313,6 +366,10 @@ namespace irgen {
 
     const Signature &getSignature() const {
       return Fn.getSignature();
+    }
+
+    bool suppressGenerics() const {
+      return Fn.suppressGenerics();
     }
 
     /// If this callee has a value for the Swift context slot, return

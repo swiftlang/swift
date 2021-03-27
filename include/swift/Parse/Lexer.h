@@ -553,7 +553,13 @@ private:
   void lexOperatorIdentifier();
   void lexHexNumber();
   void lexNumber();
-  StringRef lexTrivia(bool IsForTrailingTrivia);
+
+  /// Skip over trivia and return characters that were skipped over in a \c
+  /// StringRef. \p AllTriviaStart determines the start of the trivia. In nearly
+  /// all cases, this should be \c CurPtr. If other trivia has already been
+  /// skipped over (like a BOM), this can be used to point to the start of the
+  /// BOM. The returned \c StringRef will always start at \p AllTriviaStart.
+  StringRef lexTrivia(bool IsForTrailingTrivia, const char *AllTriviaStart);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,

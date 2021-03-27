@@ -19,7 +19,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -1340,11 +1340,21 @@ hoistLoadsAndStores(AccessPath accessPath, SILLoop *loop) {
     }
   }
   assert(storeAddr && "hoistLoadsAndStores requires a store in the loop");
-  SILValue initialAddr = cloneUseDefChain(
-      storeAddr, preheader->getTerminator(), [&](SILValue srcAddr) {
-        // Clone projections until the address dominates preheader.
-        return !DomTree->dominates(srcAddr->getParentBlock(), preheader);
-      });
+  auto checkBase = [&](SILValue srcAddr) {
+    // Clone projections until the address dominates preheader.
+    if (DomTree->dominates(srcAddr->getParentBlock(), preheader))
+      return srcAddr;
+
+    // return an invalid SILValue to continue cloning.
+    return SILValue();
+  };
+  SILValue initialAddr =
+      cloneUseDefChain(storeAddr, preheader->getTerminator(), checkBase);
+  // cloneUseDefChain may currently fail if a begin_borrow or mark_dependence is
+  // in the chain.
+  if (!initialAddr)
+    return;
+
   LoadInst *initialLoad =
       B.createLoad(preheader->getTerminator()->getLoc(), initialAddr,
                    LoadOwnershipQualifier::Unqualified);

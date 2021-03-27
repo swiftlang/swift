@@ -69,7 +69,7 @@
 ///         utf8[4]     //-> Fatal error!
 ///     }
 @frozen
-public struct StaticString: ConcurrentValue {
+public struct StaticString: Sendable {
 
   /// Either a pointer to the start of UTF-8 data, represented as an integer,
   /// or an integer representation of a single Unicode scalar.

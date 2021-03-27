@@ -213,7 +213,8 @@ protected:
     ApplyInst *N =
         getBuilder().createApply(getOpLocation(Inst->getLoc()),
                                  Helper.getCallee(), Helper.getSubstitutions(),
-                                 Helper.getArguments(), Inst->isNonThrowing(),
+                                 Helper.getArguments(),
+                                 Inst->getApplyOptions(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
     // Specialization can return noreturn applies that were not identified as
@@ -233,6 +234,7 @@ protected:
         Helper.getSubstitutions(), Helper.getArguments(),
         getOpBasicBlock(Inst->getNormalBB()),
         getOpBasicBlock(Inst->getErrorBB()),
+        Inst->getApplyOptions(),
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
     recordClonedInstruction(Inst, N);

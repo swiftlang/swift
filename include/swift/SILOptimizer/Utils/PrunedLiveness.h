@@ -219,6 +219,10 @@ public:
   /// live range vs. a nested borrow scope within the extended live range.
   void updateForUse(SILInstruction *user, bool lifetimeEnding);
 
+  /// Updates the liveness for a whole borrow scope, beginning at \p op.
+  /// Returns false if this cannot be done.
+  bool updateForBorrowingOperand(Operand *op);
+
   PrunedLiveBlocks::IsLive getBlockLiveness(SILBasicBlock *bb) const {
     return liveBlocks.getBlockLiveness(bb);
   }

@@ -62,7 +62,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/LoopInfo.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILCloner.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/CommandLine.h"
@@ -797,7 +797,8 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
         ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
 
       // Verify that no illegal critical edges were created.
-      getFunction()->verifyCriticalEdges();
+      if (getFunction()->getModule().getOptions().VerifyAll)
+        getFunction()->verifyCriticalEdges();
 
       // We preserve the dominator tree. Let's invalidate everything
       // else.

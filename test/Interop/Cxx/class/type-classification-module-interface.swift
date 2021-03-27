@@ -5,6 +5,13 @@
 // CHECK-NOT: StructWithInheritedPrivateDefaultedCopyConstructor
 // CHECK-NOT: StructWithSubobjectPrivateDefaultedCopyConstructor
 // CHECK-NOT: StructNonCopyableTriviallyMovable
+// CHECK-NOT: StructNonCopyableNonMovable
+// CHECK-NOT: StructWithMoveConstructor
+// CHECK-NOT: StructWithInheritedMoveConstructor
+// CHECK-NOT: StructWithSubobjectMoveConstructor
+// CHECK-NOT: StructWithMoveAssignment
+// CHECK-NOT: StructWithInheritedMoveAssignment
+// CHECK-NOT: StructWithSubobjectMoveAssignment
 // CHECK-NOT: StructWithPrivateDefaultedDestructor
 // CHECK-NOT: StructWithInheritedPrivateDefaultedDestructor
 // CHECK-NOT: StructWithSubobjectPrivateDefaultedDestructor

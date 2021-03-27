@@ -79,6 +79,23 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
   return finalize();
 }
 
+std::string
+IRGenMangler::mangleAsyncNonconstantPartialApplyThunk(StringRef FuncName,
+                                                      unsigned index) {
+  if (FuncName.empty()) {
+    beginMangling();
+  } else {
+    if (FuncName.startswith(MANGLING_PREFIX_STR)) {
+      Buffer << FuncName;
+    } else {
+      beginMangling();
+      appendIdentifier(FuncName);
+    }
+  }
+  appendOperator("Tw", Index(index));
+  return finalize();
+}
+
 SymbolicMangling
 IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
                                   llvm::function_ref<void ()> body) {
@@ -144,8 +161,10 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
 
 SymbolicMangling
 IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
-                                      Type Ty) {
+                                      CanGenericSignature Sig,
+                                      CanType Ty) {
   return withSymbolicReferences(IGM, [&]{
+    bindGenericParameters(Sig);
     appendType(Ty);
   });
 }
@@ -179,20 +198,6 @@ std::string IRGenMangler::mangleProtocolConformanceInstantiationCache(
   }
   appendOperator("MK");
   return finalize();
-}
-
-SymbolicMangling
-IRGenMangler::mangleProtocolConformanceForReflection(IRGenModule &IGM,
-                                  Type ty, ProtocolConformanceRef conformance) {
-  return withSymbolicReferences(IGM, [&]{
-    if (conformance.isConcrete()) {
-      appendProtocolConformance(conformance.getConcrete());
-    } else {
-      // Use a special mangling for abstract conformances.
-      appendType(ty);
-      appendProtocolName(conformance.getAbstract());
-    }
-  });
 }
 
 std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {

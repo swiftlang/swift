@@ -27,8 +27,28 @@
 
 namespace swift {
 
+/// Returns true if this value requires OSSA cleanups.
+inline bool requiresOSSACleanup(SILValue v) {
+  return v->getFunction()->hasOwnership()
+    && v.getOwnershipKind() != OwnershipKind::None
+    && v.getOwnershipKind() != OwnershipKind::Unowned;
+}
+
 // Defined in BasicBlockUtils.h
 struct JointPostDominanceSetComputer;
+
+/// Given a new phi that may use a guaranteed value, create nested borrow scopes
+/// for its incoming operands and end_borrows that cover the phi's extended
+/// borrow scope, which transitively includes any phis that use this phi.
+///
+/// Returns true if any changes were made.
+///
+/// Note: \p newPhi itself might not have Guaranteed ownership. A phi that
+/// converts Guaranteed to None ownership still needs nested borrows.
+///
+/// Note: This may be called on partially invalid OSSA form, where multiple
+/// newly created phis do not yet have a borrow scope.
+bool createBorrowScopeForPhiOperands(SILPhiArgument *newPhi);
 
 /// A struct that contains context shared in between different operation +
 /// "ownership fixup" utilities. Please do not put actual methods on this, it is

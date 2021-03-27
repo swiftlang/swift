@@ -5,6 +5,11 @@ sil_stage canonical
 import Builtin
 import Swift
 
+public struct S {
+  var o: AnyObject
+}
+sil @dummy : $@convention(thin) () -> ()
+
 // CHECK-LABEL: sil [ossa] @dead1 :
 // CHECK: bb0
 // CHECK-NEXT: return %0
@@ -110,15 +115,15 @@ bb4:
   %44 = struct_extract %43 : $Bool, #Bool._value
 // CHECK-NOT: cond_br
 // CHECK: br bb5
-  cond_br %44, bb5, bb6(%28 : $Int32)
+  cond_br %44, bb5, bb6
 
 bb5:
   %46 = integer_literal $Builtin.Int32, 0
   %47 = struct $Int32 (%46 : $Builtin.Int32)
   br bb7(%47 : $Int32)
 
-bb6(%28a : $Int32):
- br bb7(%28a : $Int32)
+bb6:
+ br bb7(%28 : $Int32)
 
 bb7(%49 : $Int32):
   %50 = integer_literal $Builtin.Int32, 10
@@ -126,15 +131,15 @@ bb7(%49 : $Int32):
   %53 = builtin "cmp_eq_Int32"(%50 : $Builtin.Int32, %52 : $Builtin.Int32) : $Builtin.Int1
   %54 = struct $Bool (%53 : $Builtin.Int1)
   %55 = struct_extract %54 : $Bool, #Bool._value
-  cond_br %55, bb8, bb9(%29 : $Int32)
+  cond_br %55, bb8, bb9
 
 bb8:
   %57 = integer_literal $Builtin.Int32, 0
   %58 = struct $Int32 (%57 : $Builtin.Int32)
   br bb10(%58 : $Int32)
 
-bb9(%29a : $Int32):
-  br bb10(%29a : $Int32)
+bb9:
+  br bb10(%29 : $Int32)
 
 // CHECK: bb5([[BBARG:%.*]]):
 bb10(%60 : $Int32):
@@ -289,3 +294,69 @@ bb0(%0 : @owned $(String, (Int, Int, String))):
   return %1 : $String
 }
 
+// Test fix_lifetime of a struct and tuple. It cannot be removed
+// without proving reference uniqueness first.
+// rdar://36038096 ([SR-6608] DeadCodeElimination removes fix_lifetime instructions.)
+//
+// CHECK-LABEL: @testFixLifetimeTuple : $@convention(thin) (@owned S, @owned AnyObject) -> () {
+// CHECK: bb0(%0 : $S, %1 : $AnyObject):
+// CHECK:   [[TUPLE:%.*]] = tuple (%0 : $S, %1 : $AnyObject)
+// CHECK:   apply
+// CHECK:   fix_lifetime [[TUPLE]] : $(S, AnyObject)
+// CHECK:   strong_release %1 : $AnyObject
+// CHECK:   strong_release %{{.*}} : $AnyObject
+// CHECK-LABEL: } // end sil function 'testFixLifetimeTuple'
+sil @testFixLifetimeTuple : $@convention(thin) (@owned S, @owned AnyObject) -> () {
+bb0(%0 : $S, %1 : $AnyObject):
+  %4 = struct_extract %0 : $S, #S.o
+  %7 = tuple (%0 : $S, %1 : $AnyObject)
+  %8 = function_ref @dummy : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  fix_lifetime %7 : $(S, AnyObject)
+  strong_release %1 : $AnyObject
+  strong_release %4 : $AnyObject
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// Test fix_lifetime of a load_borrow. It cannot be removed without
+// proving reference uniqueness first.
+// rdar://74759728 (The compiler/optimizer seems to be shortening the lifetime too early)
+//
+// Test case derived from $defer #1 <A><A1>() in _ArrayBuffer.withUnsafeBufferPointer<A>(_:)
+//
+// Original source that exposed the issue with -Ounchecked -sanitize=address:
+//
+// public func makeRawData(name: String) -> UnsafeMutableRawPointer {
+//   var array: [UInt8] = []
+//   array.append(contentsOf: name.utf8)
+//   array.append(0)
+//
+//   let rawData = array.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) -> UnsafeMutableRawPointer in
+//     let rawData = malloc(Int(buffer.count))!
+//     rawData.copyMemory(from: buffer.baseAddress!, byteCount: buffer.count)
+//     return rawData
+//   }
+//   return rawData
+// }
+//
+// CHECK-LABEL: sil [ossa] @testDCEFixLifetime : $@convention(thin) (@guaranteed S) -> () {
+// %0 "self"                                      // users: %3, %1
+// CHECK: bb0(%0 : @guaranteed $S):
+// CHECK:   [[LD:%.*]] = load_borrow
+// CHECK:   fix_lifetime [[LD]] : $S
+// CHECK:   end_borrow [[LD]] : $S
+// CHECK-LABEL: } // end sil function 'testDCEFixLifetime'
+sil [ossa] @testDCEFixLifetime : $@convention(thin) (@guaranteed S) -> () {
+// %0 "self"
+bb0(%0 : @guaranteed $S):
+  debug_value %0 : $S, let, name "self", argno 1
+  %2 = alloc_stack $S
+  %3 = store_borrow %0 to %2 : $*S
+  %4 = load_borrow %2 : $*S
+  fix_lifetime %4 : $S
+  end_borrow %4 : $S
+  dealloc_stack %2 : $*S
+  %8 = tuple ()
+  return %8 : $()
+}

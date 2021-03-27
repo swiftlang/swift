@@ -26,7 +26,7 @@ struct DummyTangentVector: Differentiable & AdditiveArithmetic {
 
 struct Struct: Protocol {
   typealias TangentVector = DummyTangentVector
-  mutating func move(along _: TangentVector) {}
+  mutating func move(by _: TangentVector) {}
 
   @differentiable(reverse, wrt: (self, x, y))
   @differentiable(reverse, wrt: x)

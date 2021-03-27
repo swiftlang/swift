@@ -38,7 +38,7 @@ using namespace swift::syntax;
 %         child_elt_name = child.name + 'Member'
 %       end
 Parsed${node.name}Builder &
-Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} ${child.name}) {
+Parsed${node.name}Builder::use${child.name}(Parsed${child.type_name} &&${child.name}) {
 %       if child_elt:
   assert(${child_elt_name}s.empty() && "use either 'use' function or 'add', not both");
 %       end
@@ -67,8 +67,8 @@ Parsed${node.name}Builder::record() {
 Parsed${node.name}
 Parsed${node.name}Builder::makeDeferred() {
   finishLayout(/*deferred=*/true);
-  auto raw = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${node.syntax_kind},
-    Layout, SPCtx);
+  auto raw = SPCtx.getRecorder().makeDeferred(SyntaxKind::${node.syntax_kind},
+                                              Layout, SPCtx);
   return Parsed${node.name}(std::move(raw));
 }
 
@@ -91,7 +91,7 @@ void Parsed${node.name}Builder::finishLayout(bool deferred) {
 %     if child_elt:
   if (!${child_elt_name}s.empty()) {
     if (deferred) {
-      Layout[${idx}] = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${child_node.syntax_kind},
+      Layout[${idx}] = Rec.makeDeferred(SyntaxKind::${child_node.syntax_kind},
                           ${child_elt_name}s, SPCtx);
     } else {
       Layout[${idx}] = Rec.recordRawSyntax(SyntaxKind::${child_node.syntax_kind}, ${child_elt_name}s);
@@ -104,13 +104,13 @@ void Parsed${node.name}Builder::finishLayout(bool deferred) {
 %         token = child.main_token()
 %         tok_kind = token.kind if token else "unknown"
     if (deferred) {
-      Layout[${idx}] = ParsedRawSyntaxNode::makeDeferredMissing(tok::${tok_kind}, SourceLoc());
+      Layout[${idx}] = Rec.makeDeferredMissing(tok::${tok_kind}, SourceLoc());
     } else {
       Layout[${idx}] = Rec.recordMissingToken(tok::${tok_kind}, SourceLoc());
     }
 %       elif child_elt:
     if (deferred) {
-      Layout[${idx}] = ParsedRawSyntaxNode::makeDeferred(SyntaxKind::${child_node.syntax_kind}, {}, SPCtx);
+      Layout[${idx}] = Rec.makeDeferred(SyntaxKind::${child_node.syntax_kind}, {}, SPCtx);
     } else {
       Layout[${idx}] = Rec.recordRawSyntax(SyntaxKind::${child_node.syntax_kind}, {});
     }

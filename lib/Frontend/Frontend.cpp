@@ -40,6 +40,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
@@ -154,6 +155,20 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
+  
+  if (!outs.SymbolGraphOutputDir.empty()) {
+    serializationOpts.SymbolGraphOutputDir = outs.SymbolGraphOutputDir;
+  } else if (opts.EmitSymbolGraph) {
+    if (!opts.SymbolGraphOutputDir.empty()) {
+      serializationOpts.SymbolGraphOutputDir = opts.SymbolGraphOutputDir;
+    } else {
+      serializationOpts.SymbolGraphOutputDir = serializationOpts.OutputPath;
+    }
+    SmallString<256> OutputDir(serializationOpts.SymbolGraphOutputDir);
+    llvm::sys::fs::make_absolute(OutputDir);
+    serializationOpts.SymbolGraphOutputDir = OutputDir.str().str();
+  }
+  
   if (!getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
 
@@ -164,8 +179,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.getValueOr(
           !isModuleExternallyConsumed(module));
 
-  serializationOpts.ExperimentalCrossModuleIncrementalInfo =
-      opts.EnableExperimentalCrossModuleIncrementalBuild;
+  serializationOpts.DisableCrossModuleIncrementalInfo =
+      opts.DisableCrossModuleIncrementalBuild;
 
   return serializationOpts;
 }
@@ -511,8 +526,9 @@ bool CompilerInstance::setUpModuleLoaders() {
   auto &FEOpts = Invocation.getFrontendOptions();
   ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
   Context->addModuleInterfaceChecker(
-    std::make_unique<ModuleInterfaceCheckerImpl>(*Context, ModuleCachePath,
-      FEOpts.PrebuiltModuleCachePath, LoaderOpts));
+      std::make_unique<ModuleInterfaceCheckerImpl>(
+          *Context, ModuleCachePath, FEOpts.PrebuiltModuleCachePath, LoaderOpts,
+          RequireOSSAModules_t(Invocation.getSILOptions())));
   // If implicit modules are disabled, we need to install an explicit module
   // loader.
   bool ExplicitModuleBuild = Invocation.getFrontendOptions().DisableImplicitModules;
@@ -551,15 +567,14 @@ bool CompilerInstance::setUpModuleLoaders() {
                                                        ->getClangModuleLoader()->getClangInstance());
     auto &FEOpts = Invocation.getFrontendOptions();
     ModuleInterfaceLoaderOptions LoaderOpts(FEOpts);
-    InterfaceSubContextDelegateImpl ASTDelegate(Context->SourceMgr, Context->Diags,
-                                                Context->SearchPathOpts, Context->LangOpts,
-                                                Context->ClangImporterOpts,
-                                                LoaderOpts,
-                                                /*buildModuleCacheDirIfAbsent*/false,
-                                                ModuleCachePath,
-                                                FEOpts.PrebuiltModuleCachePath,
-                                                FEOpts.SerializeModuleInterfaceDependencyHashes,
-                                                FEOpts.shouldTrackSystemDependencies());
+    InterfaceSubContextDelegateImpl ASTDelegate(
+        Context->SourceMgr, Context->Diags, Context->SearchPathOpts,
+        Context->LangOpts, Context->ClangImporterOpts, LoaderOpts,
+        /*buildModuleCacheDirIfAbsent*/ false, ModuleCachePath,
+        FEOpts.PrebuiltModuleCachePath,
+        FEOpts.SerializeModuleInterfaceDependencyHashes,
+        FEOpts.shouldTrackSystemDependencies(),
+        RequireOSSAModules_t(Invocation.getSILOptions()));
     auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
     std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
       std::make_unique<PlaceholderSwiftModuleScanner>(*Context,
@@ -641,7 +656,7 @@ CompilerInstance::getRecordedBufferID(const InputFile &input,
 
   // Recover by dummy buffer if requested.
   if (!buffers.hasValue() && shouldRecover &&
-      input.getType() == file_types::TY_Swift && !input.isPrimary()) {
+      input.getType() == file_types::TY_Swift) {
     buffers = ModuleBuffers(llvm::MemoryBuffer::getMemBuffer(
         "// missing file\n", input.getFileName()));
   }
@@ -912,7 +927,10 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setPrivateImportsEnabled();
     if (Invocation.getFrontendOptions().EnableImplicitDynamic)
       MainModule->setImplicitDynamicEnabled();
-
+    if (!Invocation.getFrontendOptions().ModuleABIName.empty()) {
+      MainModule->setABIName(getASTContext().getIdentifier(
+          Invocation.getFrontendOptions().ModuleABIName));
+    }
     if (Invocation.getFrontendOptions().EnableLibraryEvolution)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
 
@@ -945,8 +963,30 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
 bool CompilerInstance::performParseAndResolveImportsOnly() {
   FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
 
-  // Resolve imports for all the source files.
   auto *mainModule = getMainModule();
+
+  // Load access notes.
+  if (!Invocation.getFrontendOptions().AccessNotesPath.empty()) {
+    auto accessNotesPath = Invocation.getFrontendOptions().AccessNotesPath;
+
+    auto bufferOrError =
+        swift::vfs::getFileOrSTDIN(getFileSystem(), accessNotesPath);
+    if (bufferOrError) {
+      int sourceID =
+          SourceMgr.addNewSourceBuffer(std::move(bufferOrError.get()));
+      auto buffer =
+          SourceMgr.getLLVMSourceMgr().getMemoryBuffer(sourceID);
+
+      if (auto accessNotesFile = AccessNotesFile::load(*Context, buffer))
+        mainModule->getAccessNotes() = *accessNotesFile;
+    }
+    else {
+      Diagnostics.diagnose(SourceLoc(), diag::access_notes_file_io_error,
+                           accessNotesPath, bufferOrError.getError().message());
+    }
+  }
+
+  // Resolve imports for all the source files.
   for (auto *file : mainModule->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(file))
       performImportResolution(*SF);

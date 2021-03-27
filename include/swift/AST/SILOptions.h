@@ -44,6 +44,16 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
+  /// Force-run SIL copy propagation to shorten object lifetime in whatever
+  /// optimization pipeline is currently used.
+  /// When this is 'false' the pipeline has default behavior.
+  bool EnableCopyPropagation = false;
+
+  /// Disable SIL copy propagation to preserve object lifetime in whatever
+  /// optimization pipeline is currently used.
+  /// When this is 'false' the pipeline has default behavior.
+  bool DisableCopyPropagation = false;
+
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
@@ -88,6 +98,11 @@ public:
   /// Whether to stop the optimization pipeline right before we lower ownership
   /// and go from OSSA to non-ownership SIL.
   bool StopOptimizationBeforeLoweringOwnership = false;
+
+  /// Do we always serialize SIL in OSSA form?
+  ///
+  /// If this is disabled we do not serialize in OSSA form when optimizing.
+  bool EnableOSSAModules = false;
 
   // The kind of function bodies to skip emitting.
   FunctionBodySkipping SkipFunctionBodies = FunctionBodySkipping::None;
@@ -152,6 +167,10 @@ public:
 
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
+
+  /// When building the stdlib with opts should we lower ownership after
+  /// serialization? Otherwise we do before.
+  bool SerializeStdlibWithOwnershipWithOpts = true;
 
   /// Calls to the replaced method inside of the replacement method will call
   /// the previous implementation.

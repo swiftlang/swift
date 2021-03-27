@@ -52,21 +52,6 @@ func pass(s: StructWithSubobjectDefaultedCopyConstructor) {
   // CHECK: bb0(%0 : $StructWithSubobjectDefaultedCopyConstructor):
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithMoveConstructor)
-func pass(s: StructWithMoveConstructor) {
-  // CHECK: bb0(%0 : $*StructWithMoveConstructor):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithInheritedMoveConstructor)
-func pass(s: StructWithInheritedMoveConstructor) {
-  // CHECK: bb0(%0 : $*StructWithInheritedMoveConstructor):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithSubobjectMoveConstructor)
-func pass(s: StructWithSubobjectMoveConstructor) {
-  // CHECK: bb0(%0 : $*StructWithSubobjectMoveConstructor):
-}
-
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithCopyAssignment)
 func pass(s: StructWithCopyAssignment) {
   // CHECK: bb0(%0 : $*StructWithCopyAssignment):
@@ -80,21 +65,6 @@ func pass(s: StructWithInheritedCopyAssignment) {
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithSubobjectCopyAssignment)
 func pass(s: StructWithSubobjectCopyAssignment) {
   // CHECK: bb0(%0 : $*StructWithSubobjectCopyAssignment):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithMoveAssignment)
-func pass(s: StructWithMoveAssignment) {
-  // CHECK: bb0(%0 : $*StructWithMoveAssignment):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithInheritedMoveAssignment)
-func pass(s: StructWithInheritedMoveAssignment) {
-  // CHECK: bb0(%0 : $*StructWithInheritedMoveAssignment):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithSubobjectMoveAssignment)
-func pass(s: StructWithSubobjectMoveAssignment) {
-  // CHECK: bb0(%0 : $*StructWithSubobjectMoveAssignment):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructWithDestructor)
@@ -132,9 +102,4 @@ func pass(s: StructWithSubobjectDefaultedDestructor) {
 // CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructTriviallyCopyableMovable)
 func pass(s: StructTriviallyCopyableMovable) {
   // CHECK: bb0(%0 : $StructTriviallyCopyableMovable):
-}
-
-// CHECK-LABEL: sil hidden [ossa] @$s4main4pass{{.*[ (]}}StructNonCopyableNonMovable)
-func pass(s: StructNonCopyableNonMovable) {
-  // CHECK: bb0(%0 : $StructNonCopyableNonMovable):
 }

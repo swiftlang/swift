@@ -44,12 +44,20 @@ public:
         Diags(diags) {}
 
   bool convert(std::vector<std::string> &mainOutputs,
+               std::vector<std::string> &mainOutputsForIndexUnits,
                std::vector<SupplementaryOutputPaths> &supplementaryOutputs);
 
   /// Try to read an output file list file.
   /// \returns `None` if it could not open the filelist.
   static Optional<std::vector<std::string>>
   readOutputFileList(StringRef filelistPath, DiagnosticEngine &diags);
+};
+
+struct OutputOptInfo {
+  StringRef PrettyName;
+  options::ID SingleID;
+  options::ID FilelistID;
+  StringRef SingleOptSpelling;
 };
 
 class OutputFilesComputer {
@@ -62,6 +70,7 @@ class OutputFilesComputer {
   const llvm::opt::Arg *const ModuleNameArg;
   const StringRef Suffix;
   const bool HasTextualOutput;
+  const OutputOptInfo OutputInfo;
 
   OutputFilesComputer(DiagnosticEngine &diags,
                       const FrontendInputsAndOutputs &inputsAndOutputs,
@@ -69,19 +78,23 @@ class OutputFilesComputer {
                       StringRef outputDirectoryArgument, StringRef firstInput,
                       FrontendOptions::ActionType requestedAction,
                       const llvm::opt::Arg *moduleNameArg, StringRef suffix,
-                      bool hasTextualOutput);
+                      bool hasTextualOutput,
+                      OutputOptInfo optInfo);
 
 public:
   static Optional<OutputFilesComputer>
   create(const llvm::opt::ArgList &args, DiagnosticEngine &diags,
-         const FrontendInputsAndOutputs &inputsAndOutputs);
+         const FrontendInputsAndOutputs &inputsAndOutputs,
+         OutputOptInfo optInfo);
 
   /// \return the output filenames on the command line or in the output
   /// filelist. If there
   /// were neither -o's nor an output filelist, returns an empty vector.
   static Optional<std::vector<std::string>>
   getOutputFilenamesFromCommandLineOrFilelist(const llvm::opt::ArgList &args,
-                                              DiagnosticEngine &diags);
+                                              DiagnosticEngine &diags,
+                                              options::ID singleOpt,
+                                              options::ID filelistOpt);
 
   Optional<std::vector<std::string>> computeOutputFiles() const;
 

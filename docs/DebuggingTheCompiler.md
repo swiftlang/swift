@@ -233,10 +233,10 @@ A short (non-exhaustive) list of SIL printing options:
   `-sil-print-function` and/or `-sil-print-functions`.
 
 * `-Xllvm -sil-print-before=$PASS_NAME`: Like `-sil-print-around`, but prints
-  the SIL only _before_ the specfied pass runs.
+  the SIL only _before_ the specified pass runs.
 
 * `-Xllvm -sil-print-after=$PASS_NAME`: Like `-sil-print-around`, but prints
-  the SIL only _after_ the specfied pass did run.
+  the SIL only _after_ the specified pass did run.
 
 NOTE: This may emit a lot of text to stderr, so be sure to pipe the
 output to a file.
@@ -536,6 +536,157 @@ the pipeline. Here is a quick summary of the various options:
 * ``-Xllvm -filter-print-funcs=$FUNC_NAME_1,$FUNC_NAME_2,...,$FUNC_NAME_N``:
   When printing IR for functions for print-[before|after]-all options, Only
   print the IR for functions whose name is in this comma separated list.
+
+## Debugging assembly and object code
+
+Understanding layout of compiler-generated metadata
+can sometimes involve looking at assembly and object code.
+
+### Working with a single file
+
+Here's how to generate assembly or object code:
+
+```
+# Emit assembly in Intel syntax (AT&T syntax is the default)
+swiftc tmp.swift -emit-assembly -Xllvm -x86-asm-syntax=intel -o tmp.S
+
+# Emit object code
+swiftc tmp.swift -emit-object -o tmp.o
+```
+
+Understanding mangled names can be hard though: `swift demangle` to the rescue!
+
+```
+swiftc tmp.swift -emit-assembly -Xllvm -x86-asm-syntax=intel -o - \
+  | swift demangle > tmp-demangled.S
+
+swiftc tmp.swift -emit-object -o tmp.o
+
+# Look at where different symbols are located, sorting by address (-n)
+# and displaying section names (-m)
+nm -n -m tmp.o | swift demangle > tmp.txt
+
+# Inspect disassembly of an existing dylib (AT&T syntax is the default)
+objdump -d -macho --x86-asm-syntax=intel /path/to/libcake.dylib \
+  | swift demangle > libcake.S
+```
+
+### Working with multiple files
+
+Some bugs only manifest in WMO, and may involve complicated Xcode projects.
+Moreover, Xcode may be passing arguments via `-filelist`
+and expecting outputs via `-output-filelist`, and those file lists
+may be in temporary directories.
+
+If you want to inspect assembly or object code for individual files when
+compiling under WMO, you can mimic this by doing the following:
+
+```
+# Assuming all .swift files from the MyProject/Sources directory
+# need to be included
+find MyProject/Sources -name '*.swift' -type f > input-files.txt
+
+# In some cases, projects may use multiple files with the same
+# name but in different directories (for different schemes),
+# which can be a problem. Having a file list makes working around
+# this convenient as you can manually manually edit out the files
+# that are not of interest at this stage.
+
+mkdir Output
+
+# 1. -output-filelist doesn't recreate a subdirectory structure,
+#    so first strip out directories
+# 2. map .swift files to assembly files
+sed -e 's|.*/|Output/|;s|\.swift|.S|' input-files.txt > output-files.txt
+
+# Save command-line arguments from Xcode's 'CompileSwiftSources' phase in
+# the build log to a file for convenience, say args.txt.
+#
+# -sdk /path/to/sdk <... other args ...>
+
+xcrun swift-frontend @args.txt \
+  -filelist input-files.txt \
+  -output-filelist output-files.txt \
+  -O -whole-module-optimization \
+  -emit-assembly
+```
+
+If you are manually calling `swift-frontend` without an Xcode invocation to
+use as a template, you will need to at least add
+`-sdk "$(xcrun --show-sdk-path macosx)"` (if compiling for macOS),
+and `-I /path/to/includedir` to include necessary swift modules and interfaces.
+
+### Working with multi-architecture binaries
+
+On macOS, one might be interested in debugging multi-architecture binaries
+such as [universal binaries][]. By default `nm` will show symbols from all
+architectures, so a universal binary might look funny due to two copies of
+everything. Use `nm -arch` to look at a specific architecture:
+
+```
+nm -n -m -arch x86_64 path/to/libcake.dylib | swift demangle
+```
+
+[universal binaries]: https://en.wikipedia.org/wiki/Universal_binary
+
+### Other helpful tools
+
+TODO: This section should mention information about non-macOS platforms:
+maybe we can have a table with rows for use cases and columns for
+platforms (macOS, Linux, Windows), and the cells would be tool names.
+We could also mention platforms next to the tool names.
+
+In the previous sub-sections, we've seen how using different tools can
+make working with assembly and object code much nicer. Here is a short
+listing of commonly used tools on macOS, along with some example use cases:
+
+- Miscellaneous:
+ - `strings`: Find printable strings in a binary file.
+  - Potential use cases: If you're building a binary in multiple configurations,
+    and forgot which binary corresponds to which configuration, you can look
+    through the output of `strings` to identify differences.
+- `c++filt`: The C++ equivalent of `swift-demangle`.
+  - Potential use cases: Looking at the generated code for the
+    Swift runtime, investigating C++ interop issues.
+
+- Linking:
+  - `libtool`: A tool to create static and dynamic libraries. Generally, it's
+    easier to instead ask `swiftc` to link files, but potentially handy as
+    a higher-level alternative to `ld`, `ar` and `lipo`.
+
+- Debug info:
+  - `dwarfdump`: Extract debug info in human-readable form.
+    - Potential use cases: If you want to quickly check if two binaries
+      are identical, you can compare their UUIDs. For on-disk binaries,
+      you can obtain the UUID using `dwarfdump --uuid` For binaries
+      loaded by a running application, you can obtain the UUID using
+      `image list` in LLDB.
+- `objdump`: Dump object files.
+   Some examples of using `objdump` are documented in the previous subsection.
+   If you have a Swift compiler build, you can use `llvm-objdump` from
+   `$LLVM_BUILD_DIR/bin` instead of using the system `objdump`.
+
+   Compared to other tools on this list, `objdump` packs a LOT of
+   functionality; it can show information about sections, relocations
+   and more. It also supports many flags to format and filter the output.
+
+- Linker information (symbol table, sections, binding):
+  - `nm`: Display symbol tables.
+    Some examples of using `nm` are documented in the previous subsection.
+  - `size`: Get high-level information about sections in a binary,
+    such as the sizes of sections and where they are located.
+  - `dyldinfo`: Display information used by dyld, such as which dylibs
+    an image depends on.
+  - `install_name_tool`: Change the name for a dynamic shared library,
+    and query or modify the runpath search paths (aka 'rpaths') it uses.
+
+- Multi-architecture binaries:
+  - `lipo`: A tool that can be used to create, inspect and dissect
+     [universal binaries][universal binaries].
+     - Potential use cases: If you have a universal binary on an
+       Apple Silicon Mac, but want to quickly test if the issue would reproduce
+       on `x86_64`, you can extract the `x86_64` slice by using `lipo`.
+       The `x86_64` binary will automatically run under Rosetta 2.
 
 ## Bisecting Compiler Errors
 

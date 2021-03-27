@@ -25,45 +25,52 @@ using namespace swift;
 using namespace swift::syntax;
 
 % for node in SYNTAX_NODES:
-%   if node.requires_validation():
-void ${node.name}::validate() const {
+%   if not node.is_syntax_collection():
+void ${node.name}Ref::validate() const {
+%     if node.requires_validation():
 #ifndef NDEBUG
-  auto raw = Data.getRaw();
+  auto raw = getDataRef()->getRaw();
   if (isMissing()) return;
   assert(raw->getLayout().size() == ${len(node.children)});
-%     for child in node.children:
-%       if child.token_choices:
-%         choices = ", ".join("tok::" + choice.kind
-%                             for choice in child.token_choices)
+%       for child in node.children:
+%         if child.token_choices:
+%           choices = ", ".join("tok::" + choice.kind
+%                               for choice in child.token_choices)
   syntax_assert_child_token(raw, ${child.name}, ${choices});
-%       end
-%       if child.main_token() and child.text_choices:
-%         token_kind = child.main_token().kind
-%         choices = ", ".join("\"%s\"" % choice
-%                             for choice in child.text_choices)
+%         end
+%         if child.main_token() and child.text_choices:
+%           token_kind = child.main_token().kind
+%           choices = ", ".join("\"%s\"" % choice
+%                               for choice in child.text_choices)
   syntax_assert_child_token_text(raw, ${child.name},
                                  tok::${token_kind}, ${choices});
-%       end
-%       if child.node_choices:
-  if (auto &__Child = raw->getChild(Cursor::${child.name}))
+%         end
+%         if child.node_choices:
+  if (auto __Child = raw->getChild(Cursor::${child.name}))
     assert(${check_child_condition_raw(child)}(__Child));
+%         end
 %       end
-%     end
 #endif
+%     end
 }
+
+void ${node.name}::validate() const {
+  ${node.name}Ref(*this).validate();
+}
+
 %   end
 
 %   for child in node.children:
 %     if child.is_optional:
 llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() const {
-  auto ChildData = Data.getChild(Cursor::${child.name});
+  auto ChildData = Data->getChild(Cursor::${child.name});
   if (!ChildData)
     return llvm::None;
-  return ${child.type_name}(*ChildData);
+  return ${child.type_name}(ChildData);
 }
 %     else:
 ${child.type_name} ${node.name}::get${child.name}() const {
-  return ${child.type_name}(*Data.getChild(Cursor::${child.name}));
+  return ${child.type_name}(Data->getChild(Cursor::${child.name}));
 }
 %     end
 
@@ -75,29 +82,33 @@ ${child.type_name} ${node.name}::get${child.name}() const {
 %         raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
 %       end
 ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
-  RC<RawSyntax> raw = getRaw()->getChild(Cursor::${child.name});
+  const RawSyntax *raw = getRaw()->getChild(Cursor::${child.name});
   if (raw)
     raw = raw->append(${child_elt}.getRaw());
   else
     raw = RawSyntax::makeAndCalcLength(SyntaxKind::${child_node.syntax_kind},
-      {${child_elt}.getRaw()}, SourcePresence::Present);
-  return ${node.name}(Data.replacingChild(raw, Cursor::${child.name}));
+      {${child_elt}.getRaw()}, SourcePresence::Present, raw->getArena());
+  return ${node.name}(Data->replacingChild(raw, Cursor::${child.name}));
 }
 %     end
 
 ${node.name} ${node.name}::with${child.name}(
   llvm::Optional<${child.type_name}> New${child.type_name}) {
-  RC<RawSyntax> raw;
+  const RawSyntax *raw;
   if (New${child.type_name}.hasValue()) {
     raw = New${child.type_name}->getRaw();
   } else {
 % if child.is_optional:
     raw = nullptr;
 % else:
-    raw = ${make_missing_child(child)};
+    {
+      // make_missing_child access the 'Arena' variable. Create it.
+      RC<SyntaxArena> Arena = getRaw()->getArena();
+      raw = ${make_missing_child(child)};
+    }
 % end
   }
-  return ${node.name}(Data.replacingChild(raw, Cursor::${child.name}));
+  return ${node.name}(Data->replacingChild(raw, Cursor::${child.name}));
 }
 
 %   end

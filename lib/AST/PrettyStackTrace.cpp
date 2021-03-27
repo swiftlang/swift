@@ -232,6 +232,7 @@ void PrettyStackTraceTypeRepr::print(llvm::raw_ostream &out) const {
 
 void PrettyStackTraceConformance::print(llvm::raw_ostream &out) const {
   out << "While " << Action << ' ';
+  auto &Context = Conformance->getDeclContext()->getASTContext();
   printConformanceDescription(out, Conformance, Context);
 }
 
@@ -285,8 +286,7 @@ void PrettyStackTraceDifferentiabilityWitness::print(
 void swift::printDifferentiabilityWitnessDescription(
     llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
     bool addNewline) {
-  out << key.first << " ";
-  key.second.print(out);
+  key.print(out);
   if (addNewline)
     out << '\n';
 }

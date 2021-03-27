@@ -96,14 +96,16 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   }
 
   Optional<DriverKind> Kind =
-  llvm::StringSwitch<Optional<DriverKind>>(DriverName)
-  .Case("swift", DriverKind::Interactive)
-  .Case("swiftc", DriverKind::Batch)
-  .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-  .Case("swift-indent", DriverKind::SwiftIndent)
-  .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
-  .Default(None);
-  
+      llvm::StringSwitch<Optional<DriverKind>>(DriverName)
+          .Case("swift", DriverKind::Interactive)
+          .Case("swiftc", DriverKind::Batch)
+          .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
+          .Case("swift-indent", DriverKind::SwiftIndent)
+          .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
+          .Case("swift-api-extract", DriverKind::APIExtract)
+          .Case("swift-api-digester", DriverKind::APIDigester)
+          .Default(None);
+
   if (Kind.hasValue())
     driverKind = Kind.getValue();
   else if (!OptName.empty())
@@ -1007,8 +1009,9 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
-    const bool EnableCrossModuleDependencies = ArgList->hasArg(
-        options::OPT_enable_experimental_cross_module_incremental_build);
+    const bool EnableCrossModuleDependencies
+        = ArgList->hasArg(options::OPT_enable_incremental_imports,
+                          options::OPT_disable_incremental_imports, true);
 
     // clang-format off
     C = std::make_unique<Compilation>(
@@ -1284,6 +1287,7 @@ void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
   llvm::DenseMap<StringRef, StringRef> SourceFileNames;
+  bool HasVFS = Args.hasArg(options::OPT_vfsoverlay);
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
@@ -1305,7 +1309,7 @@ void Driver::buildInputs(const ToolChain &TC,
         }
       }
 
-      if (checkInputExistence(*this, Args, Diags, Value))
+      if (HasVFS || checkInputExistence(*this, Args, Diags, Value))
         Inputs.push_back(std::make_pair(Ty, A));
 
       if (Ty == file_types::TY_Swift) {
@@ -2039,6 +2043,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_RawSIB:
       case file_types::TY_RawSIL:
       case file_types::TY_Nothing:
+      case file_types::TY_IndexUnitOutputPath:
+      case file_types::TY_SymbolGraphOutputPath:
       case file_types::TY_INVALID:
         llvm_unreachable("these types should never be inferred");
       }
@@ -2504,6 +2510,28 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
   return Buffer.str();
 }
 
+static StringRef getIndexUnitOutputFilename(Compilation &C,
+                                            const JobAction *JA,
+                                            const TypeToPathMap *OutputMap,
+                                            bool AtTopLevel) {
+  if (JA->getType() == file_types::TY_Nothing)
+    return {};
+
+  if (OutputMap) {
+    auto iter = OutputMap->find(file_types::TY_IndexUnitOutputPath);
+    if (iter != OutputMap->end())
+      return iter->second;
+  }
+
+  if (AtTopLevel) {
+    const llvm::opt::DerivedArgList &Args = C.getArgs();
+    if (Arg *FinalOutput = Args.getLastArg(options::OPT_index_unit_output_path))
+      return FinalOutput->getValue();
+  }
+
+  return {};
+}
+
 static StringRef getOutputFilename(Compilation &C,
                                    const JobAction *JA,
                                    const TypeToPathMap *OutputMap,
@@ -2916,6 +2944,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                          options::OPT_emit_objc_header_path))
     chooseObjectiveCHeaderOutputPath(C, OutputMap, workingDirectory,
                                      Output.get());
+  
+  if (C.getArgs().hasArg(options::OPT_emit_symbol_graph))
+    chooseSymbolGraphOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   // 4. Construct a Job which produces the right CommandOutput.
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, C, std::move(InputJobs),
@@ -3018,7 +3049,7 @@ void Driver::computeMainOutput(
     SmallVectorImpl<const Job *> &InputJobs, const TypeToPathMap *OutputMap,
     StringRef workingDirectory, StringRef BaseInput, StringRef PrimaryInput,
     llvm::SmallString<128> &Buf, CommandOutput *Output) const {
-  StringRef OutputFile;
+  StringRef OutputFile, IndexUnitOutputFile;
   if (C.getOutputInfo().isMultiThreading() && isa<CompileJobAction>(JA) &&
       file_types::isAfterLLVM(JA->getType())) {
     // Multi-threaded compilation: A single frontend command produces multiple
@@ -3039,8 +3070,10 @@ void Driver::computeMainOutput(
 
       OutputFile = getOutputFilename(C, JA, OMForInput, workingDirectory,
                                      AtTopLevel, Base, Primary, Buf);
+      IndexUnitOutputFile = getIndexUnitOutputFilename(C, JA, OMForInput,
+                                                       AtTopLevel);
       Output->addPrimaryOutput(CommandInputPair(Base, Primary),
-                               OutputFile);
+                               OutputFile, IndexUnitOutputFile);
     };
     // Add an output file for each input action.
     for (const Action *A : InputActions) {
@@ -3060,8 +3093,10 @@ void Driver::computeMainOutput(
     // The common case: there is a single output file.
     OutputFile = getOutputFilename(C, JA, OutputMap, workingDirectory,
                                    AtTopLevel, BaseInput, PrimaryInput, Buf);
+    IndexUnitOutputFile = getIndexUnitOutputFilename(C, JA, OutputMap,
+                                                     AtTopLevel);
     Output->addPrimaryOutput(CommandInputPair(BaseInput, PrimaryInput),
-                             OutputFile);
+                             OutputFile, IndexUnitOutputFile);
   }
 }
 
@@ -3382,6 +3417,31 @@ void Driver::chooseOptimizationRecordPath(Compilation &C,
     Diags.diagnose({}, diag::warn_opt_remark_disabled);
 }
 
+void Driver::chooseSymbolGraphOutputPath(Compilation &C,
+                                         const TypeToPathMap *OutputMap,
+                                         StringRef workingDirectory,
+                                         CommandOutput *Output) const {
+  StringRef optionOutput = C.getArgs().getLastArgValue(options::OPT_emit_symbol_graph_dir);
+  if (hasExistingAdditionalOutput(*Output, file_types::TY_SymbolGraphOutputPath, optionOutput)) {
+    return;
+  }
+  
+  StringRef SymbolGraphDir;
+  if (OutputMap) {
+    auto iter = OutputMap->find(file_types::TY_SymbolGraphOutputPath);
+    if (iter != OutputMap->end())
+      SymbolGraphDir = iter->second;
+  }
+  
+  if (SymbolGraphDir.empty() && !optionOutput.empty()) {
+    SymbolGraphDir = optionOutput;
+  }
+  
+  if (!SymbolGraphDir.empty()) {
+    Output->setAdditionalOutputForType(file_types::TY_SymbolGraphOutputPath, SymbolGraphDir);
+  }
+}
+
 void Driver::chooseObjectiveCHeaderOutputPath(Compilation &C,
                                               const TypeToPathMap *OutputMap,
                                               StringRef workingDirectory,
@@ -3466,6 +3526,8 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::AutolinkExtract:
   case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
+  case DriverKind::APIExtract:
+  case DriverKind::APIDigester:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

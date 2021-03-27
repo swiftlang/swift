@@ -91,7 +91,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -562,7 +562,7 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   FunctionRefInst *arrayAllocateRef =
       builder.createFunctionRef(loc, arrayAllocateFun);
   ApplyInst *applyInst = builder.createApply(
-      loc, arrayAllocateRef, subMap, ArrayRef<SILValue>(numElementsSIL), false);
+      loc, arrayAllocateRef, subMap, ArrayRef<SILValue>(numElementsSIL));
 
   // Extract the elements of the tuple returned by the call to the allocator.
   DestructureTupleInst *destructureInst =
@@ -698,7 +698,7 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
     FunctionRefInst *stringInitRef =
         builder.createFunctionRef(loc, stringInfo.getStringInitIntrinsic());
     ApplyInst *applyInst = builder.createApply(
-        loc, stringInitRef, SubstitutionMap(), ArrayRef<SILValue>(args), false);
+        loc, stringInitRef, SubstitutionMap(), ArrayRef<SILValue>(args));
     return applyInst;
   }
   case SymbolicValue::Integer: { // Builtin integer types.

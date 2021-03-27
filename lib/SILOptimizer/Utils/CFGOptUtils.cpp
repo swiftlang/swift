@@ -18,7 +18,7 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -425,7 +425,7 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     }
     builder.createTryApply( tai->getLoc(), tai->getCallee(),
                 tai->getSubstitutionMap(), args, normalBB, errorBB,
-                tai->getSpecializationInfo());
+                tai->getApplyOptions(), tai->getSpecializationInfo());
     tai->eraseFromParent();
     return;
   }

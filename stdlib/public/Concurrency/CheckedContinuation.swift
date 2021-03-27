@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import Swift
 
 @_silgen_name("swift_continuation_logFailedCheck")
@@ -36,14 +48,7 @@ internal final class CheckedContinuationCanary {
     return functionPtr.assumingMemoryBound(to: String.self)
   }
 
-  internal static func create<T>(continuation: UnsafeContinuation<T>,
-                                 function: String) -> Self {
-    return _create(
-        continuation: unsafeBitCast(continuation, to: UnsafeRawPointer.self),
-        function: function)
-  }
-
-  internal static func create<T>(continuation: UnsafeThrowingContinuation<T>,
+  internal static func create<T, E>(continuation: UnsafeContinuation<T, E>,
                                  function: String) -> Self {
     return _create(
         continuation: unsafeBitCast(continuation, to: UnsafeRawPointer.self),
@@ -56,23 +61,14 @@ internal final class CheckedContinuationCanary {
 
   // Take the continuation away from the container, or return nil if it's
   // already been taken.
-  private func _takeContinuation() -> UnsafeRawPointer? {
+  internal func takeContinuation<T, E>() -> UnsafeContinuation<T, E>? {
     // Atomically exchange the current continuation value with a null pointer.
     let rawContinuationPtr = unsafeBitCast(_continuationPtr,
       to: Builtin.RawPointer.self)
     let rawOld = Builtin.atomicrmw_xchg_seqcst_Word(rawContinuationPtr,
       0._builtinWordValue)
 
-    return unsafeBitCast(rawOld, to: UnsafeRawPointer?.self)
-  }
-
-  internal func takeContinuation<T>() -> UnsafeContinuation<T>? {
-    return unsafeBitCast(_takeContinuation(),
-      to: UnsafeContinuation<T>?.self)
-  }
-  internal func takeThrowingContinuation<T>() -> UnsafeThrowingContinuation<T>? {
-    return unsafeBitCast(_takeContinuation(),
-      to: UnsafeThrowingContinuation<T>?.self)
+    return unsafeBitCast(rawOld, to: UnsafeContinuation<T, E>?.self)
   }
 
   deinit {
@@ -97,6 +93,7 @@ internal final class CheckedContinuationCanary {
 /// is abandoned without resuming the task, then the task will be stuck in
 /// the suspended state forever, and conversely, if the same continuation is
 /// resumed multiple times, it will put the task in an undefined state.
+///
 /// `UnsafeContinuation` avoids enforcing these invariants at runtime because
 /// it aims to be a low-overhead mechanism for interfacing Swift tasks with
 /// event loops, delegate methods, callbacks, and other non-`async` scheduling
@@ -104,20 +101,22 @@ internal final class CheckedContinuationCanary {
 /// invariants are being upheld in testing is important.
 ///
 /// `CheckedContinuation` is designed to be a drop-in API replacement for
-/// `UnsafeContinuation` that can be used for testing purposes, at the cost
-/// of an extra allocation and indirection for the wrapper object.
-/// Changing a call of `withUnsafeContinuation` into a call of
-/// `withCheckedContinuation` should be enough to obtain the extra checking
-/// without further source modification in most circumstances.
-public struct CheckedContinuation<T> {
-  let canary: CheckedContinuationCanary
+/// `UnsafeContinuation` that can be used for testing purposes, at the cost of
+/// an extra allocation and indirection for the wrapper object. Changing a call
+/// of `withUnsafeContinuation` or `withUnsafeThrowingContinuation` into a call
+/// of `withCheckedContinuation` or `withCheckedThrowingContinuation` should be
+/// enough to obtain the extra checking without further source modification in
+/// most circumstances.
+public struct CheckedContinuation<T, E: Error> {
+  private let canary: CheckedContinuationCanary
   
   /// Initialize a `CheckedContinuation` wrapper around an
   /// `UnsafeContinuation`.
   ///
-  /// In most cases, you should use `withCheckedContinuation` instead.
-  /// You only need to initialize your own `CheckedContinuation<T>` if you
-  /// already have an `UnsafeContinuation` you want to impose checking on.
+  /// In most cases, you should use `withCheckedContinuation` or
+  /// `withCheckedThrowingContinuation` instead. You only need to initialize
+  /// your own `CheckedContinuation<T, E>` if you already have an
+  /// `UnsafeContinuation` you want to impose checking on.
   ///
   /// - Parameters:
   ///   - continuation: a fresh `UnsafeContinuation` that has not yet
@@ -126,7 +125,7 @@ public struct CheckedContinuation<T> {
   ///   - function: a string identifying the declaration that is the notional
   ///     source for the continuation, used to identify the continuation in
   ///     runtime diagnostics related to misuse of this continuation.
-  public init(continuation: UnsafeContinuation<T>, function: String = #function) {
+  public init(continuation: UnsafeContinuation<T, E>, function: String = #function) {
     canary = CheckedContinuationCanary.create(
       continuation: continuation,
       function: function)
@@ -134,6 +133,8 @@ public struct CheckedContinuation<T> {
   
   /// Resume the task awaiting the continuation by having it return normally
   /// from its suspension point.
+  ///
+  /// - Parameter value: The value to return from the continuation.
   ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
@@ -143,99 +144,7 @@ public struct CheckedContinuation<T> {
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
   public func resume(returning x: __owned T) {
-    if let c: UnsafeContinuation<T> = canary.takeContinuation() {
-      c.resume(returning: x)
-    } else {
-      fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
-    }
-  }
-}
-
-extension CheckedContinuation where T == Void {
-  /// Resume the task awaiting the continuation by having it return normally
-  /// from its suspension point.
-  ///
-  /// A continuation must be resumed exactly once. If the continuation has
-  /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will trap.
-  ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
-  /// able to reschedule it.
-  @inlinable
-  public func resume() {
-    self.resume(returning: ())
-  }
-}
-
-public func withCheckedContinuation<T>(
-    function: String = #function,
-    _ body: (CheckedContinuation<T>) -> Void
-) async -> T {
-  return await withUnsafeContinuation {
-    body(CheckedContinuation(continuation: $0, function: function))
-  }
-}
-
-/// A wrapper class for `UnsafeThrowingContinuation` that logs misuses of the
-/// continuation, logging a message if the continuation is resumed
-/// multiple times, or if an object is destroyed without its continuation
-/// ever being resumed.
-///
-/// Raw `UnsafeThrowingContinuation`, like other unsafe constructs, requires the
-/// user to apply it correctly in order to maintain invariants. The key
-/// invariant is that the continuation must be resumed exactly once,
-/// and bad things happen if this invariant is not upheld--if a continuation
-/// is abandoned without resuming the task, then the task will be stuck in
-/// the suspended state forever, and conversely, if the same continuation is
-/// resumed multiple times, it will put the task in an undefined state.
-/// `UnsafeThrowingContinuation` avoids enforcing these invariants at runtime because
-/// it aims to be a low-overhead mechanism for interfacing Swift tasks with
-/// event loops, delegate methods, callbacks, and other non-`async` scheduling
-/// mechanisms. However, during development, being able to verify that the
-/// invariants are being upheld in testing is important.
-///
-/// `CheckedThrowingContinuation` is designed to be a drop-in API replacement for
-/// `UnsafeThrowingContinuation` that can be used for testing purposes, at the cost
-/// of an extra allocation and indirection for the wrapper object.
-/// Changing a call of `withUnsafeThrowingContinuation` into a call of
-/// `withCheckedThrowingContinuation` should be enough to obtain the extra checking
-/// without further source modification in most circumstances.
-public struct CheckedThrowingContinuation<T> {
-  let canary: CheckedContinuationCanary
-  
-  /// Initialize a `CheckedThrowingContinuation` wrapper around an
-  /// `UnsafeThrowingContinuation`.
-  ///
-  /// In most cases, you should use `withCheckedThrowingContinuation` instead.
-  /// You only need to initialize your own `CheckedThrowingContinuation<T>` if you
-  /// already have an `UnsafeThrowingContinuation` you want to impose checking on.
-  ///
-  /// - Parameters:
-  ///   - continuation: a fresh `UnsafeThrowingContinuation` that has not yet
-  ///     been resumed. The `UnsafeThrowingContinuation` must not be used outside of
-  ///     this object once it's been given to the new object.
-  ///   - function: a string identifying the declaration that is the notional
-  ///     source for the continuation, used to identify the continuation in
-  ///     runtime diagnostics related to misuse of this continuation.
-  public init(continuation: UnsafeThrowingContinuation<T>, function: String = #function) {
-    canary = CheckedContinuationCanary.create(
-      continuation: continuation,
-      function: function)
-  }
-  
-  /// Resume the task awaiting the continuation by having it return normally
-  /// from its suspension point.
-  ///
-  /// A continuation must be resumed exactly once. If the continuation has
-  /// already been resumed through this object, then the attempt to resume
-  /// the continuation again will trap.
-  ///
-  /// After `resume` enqueues the task, control is immediately returned to
-  /// the caller. The task will continue executing when its executor is
-  /// able to reschedule it.
-  public func resume(returning x: __owned T) {
-    if let c: UnsafeThrowingContinuation<T> = canary.takeThrowingContinuation() {
+    if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(returning: x)
     } else {
       fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(x)!\n")
@@ -245,6 +154,8 @@ public struct CheckedThrowingContinuation<T> {
   /// Resume the task awaiting the continuation by having it throw an error
   /// from its suspension point.
   ///
+  /// - Parameter error: The error to throw from the continuation.
+  ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
   /// the continuation again will trap.
@@ -252,11 +163,37 @@ public struct CheckedThrowingContinuation<T> {
   /// After `resume` enqueues the task, control is immediately returned to
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
-  public func resume(throwing x: __owned Error) {
-    if let c: UnsafeThrowingContinuation<T> = canary.takeThrowingContinuation() {
+  public func resume(throwing x: __owned E) {
+    if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(throwing: x)
     } else {
       fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(x)!\n")
+    }
+  }
+}
+
+extension CheckedContinuation {
+  /// Resume the task awaiting the continuation by having it either
+  /// return normally or throw an error based on the state of the given
+  /// `Result` value.
+  ///
+  /// - Parameter result: A value to either return or throw from the
+  ///   continuation.
+  ///
+  /// A continuation must be resumed exactly once. If the continuation has
+  /// already been resumed through this object, then the attempt to resume
+  /// the continuation again will trap.
+  ///
+  /// After `resume` enqueues the task, control is immediately returned to
+  /// the caller. The task will continue executing when its executor is
+  /// able to reschedule it.
+  @_alwaysEmitIntoClient
+  public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
+    switch result {
+      case .success(let val):
+        self.resume(returning: val)
+      case .failure(let err):
+        self.resume(throwing: err)
     }
   }
 
@@ -264,6 +201,9 @@ public struct CheckedThrowingContinuation<T> {
   /// return normally or throw an error based on the state of the given
   /// `Result` value.
   ///
+  /// - Parameter result: A value to either return or throw from the
+  ///   continuation.
+  ///
   /// A continuation must be resumed exactly once. If the continuation has
   /// already been resumed through this object, then the attempt to resume
   /// the continuation again will trap.
@@ -271,17 +211,16 @@ public struct CheckedThrowingContinuation<T> {
   /// After `resume` enqueues the task, control is immediately returned to
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
-  public func resume<E: Error>(with x: __owned Result<T, E>) {
-    switch x {
-    case .success(let s):
-      return resume(returning: s)
-    case .failure(let e):
-      return resume(throwing: e)
+  @_alwaysEmitIntoClient
+  public func resume(with result: Result<T, E>) {
+    switch result {
+      case .success(let val):
+        self.resume(returning: val)
+      case .failure(let err):
+        self.resume(throwing: err)
     }
   }
-}
 
-extension CheckedThrowingContinuation where T == Void {
   /// Resume the task awaiting the continuation by having it return normally
   /// from its suspension point.
   ///
@@ -292,18 +231,27 @@ extension CheckedThrowingContinuation where T == Void {
   /// After `resume` enqueues the task, control is immediately returned to
   /// the caller. The task will continue executing when its executor is
   /// able to reschedule it.
-  @inlinable
-  public func resume() {
+  @_alwaysEmitIntoClient
+  public func resume() where T == Void {
     self.resume(returning: ())
+  }
+}
+
+public func withCheckedContinuation<T>(
+    function: String = #function,
+    _ body: (CheckedContinuation<T, Never>) -> Void
+) async -> T {
+  return await withUnsafeContinuation {
+    body(CheckedContinuation(continuation: $0, function: function))
   }
 }
 
 public func withCheckedThrowingContinuation<T>(
     function: String = #function,
-    _ body: (CheckedThrowingContinuation<T>) -> Void
+    _ body: (CheckedContinuation<T, Error>) -> Void
 ) async throws -> T {
   return try await withUnsafeThrowingContinuation {
-    body(CheckedThrowingContinuation(continuation: $0, function: function))
+    body(CheckedContinuation(continuation: $0, function: function))
   }
 }
 

@@ -244,7 +244,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
                     ManagedValue::forUnmanaged(witnessRef), subs,
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
-                    calleeTypeInfo, ApplyOptions::None, context, None);
+                    calleeTypeInfo, ApplyOptions(), context, None);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -276,7 +276,7 @@ static ManagedValue emitBridgeBoolToWindowsBool(SILGenFunction &SGF,
                                                 SILLocation L, ManagedValue b) {
   // func _convertToWindowsBool(Bool) -> WindowsBool
   SILValue F = SGF.emitGlobalFunctionRef(L, SGF.SGM.getBoolToWindowsBoolFn());
-  SILValue R = SGF.B.createApply(L, F, {}, b.forward(SGF), false);
+  SILValue R = SGF.B.createApply(L, F, {}, b.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(R);
 }
 
@@ -470,7 +470,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   ManagedValue result = SGF.emitMonomorphicApply(loc, fn, args,
                                                  formalNativeResultType,
                                                  formalNativeResultType,
-                                                 ApplyOptions::None,
+                                                 ApplyOptions(),
                                                  None, None, C)
     .getAsSingleValue(SGF, loc);
 
@@ -909,7 +909,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
   ManagedValue result = SGF.emitMonomorphicApply(loc, block, args,
                            formalBlockTy.getResult(),
                            formalResultType,
-                           ApplyOptions::None,
+                           ApplyOptions(),
                            /*override CC*/ SILFunctionTypeRepresentation::Block,
                            /*foreign error*/ None,
                            SGFContext(init.get()))
@@ -1684,6 +1684,19 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
   };
   
+  auto pushErrorFlag = [&](bool hasError,
+                           SmallVectorImpl<SILValue> &completionHandlerArgs) {
+    bool errorFlagIsZeroOnError = foreignAsync->completionHandlerFlagIsErrorOnZero();
+    auto errorFlagIndex = foreignAsync->completionHandlerFlagParamIndex();
+    auto errorFlagTy = completionTy->getParameters()[*errorFlagIndex]
+      .getSILStorageInterfaceType();
+    
+    auto errorFlag = emitWrapIntegerLiteral(loc, errorFlagTy,
+                                            hasError ^ errorFlagIsZeroOnError);
+    
+    completionHandlerArgs.push_back(errorFlag);
+  };
+  
   // Helper function to pass a native async function's result as arguments to
   // the ObjC completion handler block.
   auto passResultToCompletionHandler = [&](SILValue result) -> SILValue {
@@ -1711,6 +1724,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     Scope completionArgDestructureScope(*this, loc);
 
     auto errorParamIndex = foreignAsync->completionHandlerErrorParamIndex();
+    auto errorFlagIndex = foreignAsync->completionHandlerFlagParamIndex();
     auto pushErrorPlaceholder = [&]{
       auto errorArgTy = completionTy->getParameters()[*errorParamIndex]
         .getSILStorageInterfaceType();
@@ -1721,18 +1735,22 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     };
     
     unsigned numResults
-      = completionTy->getParameters().size() - errorParamIndex.hasValue();
+      = completionTy->getParameters().size() - errorParamIndex.hasValue()
+                                             - errorFlagIndex.hasValue();
     
     if (numResults == 1) {
-      if (errorParamIndex && *errorParamIndex == 0) {
-        pushErrorPlaceholder();
-      }
-      pushArg(asyncResult,
-              nativeFormalResultType,
-              completionTy->getParameters()[completionHandlerArgs.size()]);
-
-      if (errorParamIndex && *errorParamIndex == 1) {
-        pushErrorPlaceholder();
+      for (unsigned i = 0; i < completionTy->getNumParameters(); ++i) {
+        if (errorParamIndex && *errorParamIndex == i) {
+          pushErrorPlaceholder();
+          continue;
+        }
+        if (errorFlagIndex && *errorFlagIndex == i) {
+          pushErrorFlag(/*has error*/ false, completionHandlerArgs);
+          continue;
+        }
+        pushArg(asyncResult,
+                nativeFormalResultType,
+                completionTy->getParameters()[i]);
       }
     } else {
       // A tuple return maps to multiple completion handler parameters.
@@ -1743,7 +1761,12 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
           pushErrorPlaceholder();
           continue;
         }
-        auto elementI = paramI - (errorParamIndex && paramI > *errorParamIndex);
+        if (errorFlagIndex && paramI == *errorFlagIndex) {
+          pushErrorFlag(/*has error*/ false, completionHandlerArgs);
+          continue;
+        }
+        auto elementI = paramI - (errorParamIndex && paramI > *errorParamIndex)
+                               - (errorFlagIndex && paramI > *errorFlagIndex);
         auto param = completionTy->getParameters()[paramI];
         auto formalTy = formalTuple.getElementType(elementI);
         auto argPiece = B.createTupleExtract(loc, asyncResult, elementI);
@@ -1845,6 +1868,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
         SmallVector<SILValue, 2> completionHandlerArgs;
         auto completionTy = completionBlock->getType().castTo<SILFunctionType>();
         auto errorParamIndex = *foreignAsync->completionHandlerErrorParamIndex();
+        auto errorFlagIndex = foreignAsync->completionHandlerFlagParamIndex();
         auto completionErrorTy = completionTy->getParameters()[errorParamIndex]
           .getInterfaceType();
         auto bridgedError = emitNativeToBridgedError(loc,
@@ -1857,6 +1881,11 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
         for (unsigned i : indices(completionTy->getParameters())) {
           if (i == errorParamIndex) {
             completionHandlerArgs.push_back(bridgedError.borrow(*this, loc).getValue());
+            continue;
+          }
+          
+          if (errorFlagIndex && i == *errorFlagIndex) {
+            pushErrorFlag(/*has error*/ true, completionHandlerArgs);
             continue;
           }
           
@@ -2170,7 +2199,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
                   ManagedValue::forUnmanaged(fn), subs, args,
-                  calleeTypeInfo, ApplyOptions::None, context, None)
+                  calleeTypeInfo, ApplyOptions(), context, None)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

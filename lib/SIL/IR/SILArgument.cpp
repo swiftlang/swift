@@ -161,6 +161,12 @@ bool SILPhiArgument::getIncomingPhiValues(
   return true;
 }
 
+Operand *SILPhiArgument::getIncomingPhiOperand(SILBasicBlock *predBlock) const {
+  if (!isPhiArgument())
+    return nullptr;
+  return getIncomingPhiOperandForPred(getParent(), predBlock, getIndex());
+}
+
 bool SILPhiArgument::getIncomingPhiOperands(
     SmallVectorImpl<Operand *> &returnedPhiOperands) const {
   if (!isPhiArgument())
@@ -308,6 +314,14 @@ TermInst *SILPhiArgument::getSingleTerminator() const {
   if (!predBlock)
     return nullptr;
   return const_cast<SILBasicBlock *>(predBlock)->getTerminator();
+}
+
+TermInst *SILPhiArgument::getTerminatorForResultArg() const {
+  if (auto *termInst = getSingleTerminator()) {
+    if (!isa<BranchInst>(termInst) && !isa<CondBranchInst>(termInst))
+      return termInst;
+  }
+  return nullptr;
 }
 
 SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) {

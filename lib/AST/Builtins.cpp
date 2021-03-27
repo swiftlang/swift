@@ -577,6 +577,23 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
         if (BIT->isFixedWidth() && BIT->getFixedWidth() == BFT->getBitWidth())
           break;
+      
+    // Support VecNxInt1 -> IntN bitcast for SIMD comparison results.
+    if (auto *Vec = CheckInput->getAs<BuiltinVectorType>())
+      if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
+        if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
+          if (Element->getFixedWidth() == 1 &&
+              BIT->isFixedWidth() &&
+              BIT->getFixedWidth() == Vec->getNumElements())
+            break;
+    // And IntN -> VecNxInt1 for SIMDMask random generators.
+    if (auto *Vec = CheckOutput->getAs<BuiltinVectorType>())
+      if (auto *BIT = CheckInput->getAs<BuiltinIntegerType>())
+        if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
+          if (Element->getFixedWidth() == 1 &&
+              BIT->isFixedWidth() &&
+              BIT->getFixedWidth() == Vec->getNumElements())
+            break;
 
     // FIXME: Implement bitcast typechecking.
     llvm_unreachable("Bitcast not supported yet!");
@@ -1198,9 +1215,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
           params.push_back(FunctionType::Param(paramGen.build(builder)));
-        auto innerFunction =
-            FunctionType::get(params, fnResultGen.build(builder));
-        return innerFunction->withExtInfo(extInfo);
+        return FunctionType::get(params, fnResultGen.build(builder), extInfo);
       }};
   // Eagerly build the type of the first arg, then use that to compute the type
   // of the result.
@@ -1265,8 +1280,10 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
-      auto innerFunction = FunctionType::get(params,
-                                             linearFnResultGen.build(builder));
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      FunctionType::ExtInfo info;
+      auto innerFunction =
+          FunctionType::get(params, linearFnResultGen.build(builder), info);
       return innerFunction->withExtInfo(extInfo);
     }
   };
@@ -1333,6 +1350,13 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(id, { }, ctx.TheNativeObjectType);
 }
 
+static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  builder.setResult(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
+  builder.setAsync();
+  return builder.build(id);
+}
+
 static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
@@ -1347,23 +1371,25 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
-static ValueDecl *getCreateAsyncTask(ASTContext &ctx, Identifier id) {
-  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
-  return getBuiltinFunction(
-      id,
-      { ctx.getIntDecl()->getDeclaredInterfaceType(),
-        OptionalType::get(ctx.TheNativeObjectType),
-        FunctionType::get({ }, ctx.TheEmptyTupleType, extInfo) },
-      getAsyncTaskAndContextType(ctx));
-}
-
 static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
   builder.addParameter(
       makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
-      makeConcrete(OptionalType::get(ctx.TheNativeObjectType)));
+     makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+  builder.setResult(makeConcrete(getAsyncTaskAndContextType(ctx)));
+  return builder.build(id);
+}
+
+static ValueDecl *getCreateAsyncTaskGroupFuture(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder);
+  builder.addParameter(
+      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType())); // flags
+  builder.addParameter(
+      makeConcrete(OptionalType::get(ctx.TheRawPointerType))); // group
   auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
   builder.addParameter(
      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
@@ -1848,7 +1874,6 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
-  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
   case IITDescriptor::VecOfBitcastsToInt:
   case IITDescriptor::Subdivide2Argument:
@@ -1875,6 +1900,15 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
     return makeVector(eltType, D.Vector_Width.getKnownMinValue());
+  }
+  
+  // The element type of a vector type.
+  case IITDescriptor::VecElementArgument: {
+    Type argType = getTypeArgument(D.getArgumentNumber());
+    if (!argType) return Type();
+    auto vecType = argType->getAs<BuiltinVectorType>();
+    if (!vecType) return Type();
+    return vecType->getElementType();
   }
 
   // A pointer to an immediate type.
@@ -2539,14 +2573,17 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::GetCurrentAsyncTask:
     return getGetCurrentAsyncTask(Context, Id);
 
+  case BuiltinValueKind::GetCurrentExecutor:
+    return getGetCurrentExecutor(Context, Id);
+
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
 
-  case BuiltinValueKind::CreateAsyncTask:
-    return getCreateAsyncTask(Context, Id);
-
   case BuiltinValueKind::CreateAsyncTaskFuture:
     return getCreateAsyncTaskFuture(Context, Id);
+
+  case BuiltinValueKind::CreateAsyncTaskGroupFuture:
+    return getCreateAsyncTaskGroupFuture(Context, Id);
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);

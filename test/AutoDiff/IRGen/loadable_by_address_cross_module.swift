@@ -18,11 +18,11 @@
 // RUN: %target-swift-frontend -emit-sil -I%t %s | %FileCheck %s -check-prefix=CHECK-CLIENT-PRE-LBA
 // RUN: %target-swift-frontend -c -I%t %s -Xllvm -sil-print-after=loadable-address 2>&1 | %FileCheck %s -check-prefix=CHECK-CLIENT-POST-LBA
 
-// CHECK-CLIENT-PRE-LBA: differentiability_witness_function [jvp] [parameters 0 1] [results 0] <T> @${{.*}}LBAModifiedFunction{{.*}} : $@convention(method) <τ_0_0> (Float, LargeLoadableType<τ_0_0>) -> Float
-// CHECK-CLIENT-PRE-LBA: differentiability_witness_function [vjp] [parameters 0 1] [results 0] <T> @${{.*}}LBAModifiedFunction{{.*}} : $@convention(method) <τ_0_0> (Float, LargeLoadableType<τ_0_0>) -> Float
+// CHECK-CLIENT-PRE-LBA: differentiability_witness_function [jvp] [reverse] [parameters 0 1] [results 0] <T> @${{.*}}LBAModifiedFunction{{.*}} : $@convention(method) <τ_0_0> (Float, LargeLoadableType<τ_0_0>) -> Float
+// CHECK-CLIENT-PRE-LBA: differentiability_witness_function [vjp] [reverse] [parameters 0 1] [results 0] <T> @${{.*}}LBAModifiedFunction{{.*}} : $@convention(method) <τ_0_0> (Float, LargeLoadableType<τ_0_0>) -> Float
 
-// CHECK-CLIENT-POST-LBA: differentiability_witness_function [jvp] [parameters 0 1] [results 0] <T> @$s8external17LargeLoadableTypeV0A19LBAModifiedFunctionyS2fF : $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> Float as $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float, τ_0_0) -> Float for <LargeLoadableType<τ_0_0>>)
-// CHECK-CLIENT-POST-LBA: differentiability_witness_function [vjp] [parameters 0 1] [results 0] <T> @$s8external17LargeLoadableTypeV0A19LBAModifiedFunctionyS2fF : $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> Float as $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> (Float, τ_0_0) for <LargeLoadableType<τ_0_0>>)
+// CHECK-CLIENT-POST-LBA: differentiability_witness_function [jvp] [reverse] [parameters 0 1] [results 0] <T> @$s8external17LargeLoadableTypeV0A19LBAModifiedFunctionyS2fF : $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> Float as $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float, τ_0_0) -> Float for <LargeLoadableType<τ_0_0>>)
+// CHECK-CLIENT-POST-LBA: differentiability_witness_function [vjp] [reverse] [parameters 0 1] [results 0] <T> @$s8external17LargeLoadableTypeV0A19LBAModifiedFunctionyS2fF : $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> Float as $@convention(method) <τ_0_0> (Float, @in_constant LargeLoadableType<τ_0_0>) -> (Float, @owned @callee_guaranteed @substituted <τ_0_0> (Float) -> (Float, τ_0_0) for <LargeLoadableType<τ_0_0>>)
 
 // Finally, execute the test.
 

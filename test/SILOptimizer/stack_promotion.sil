@@ -820,3 +820,37 @@ bb14:                                             // Preds: bb12 bb1
   %32 = struct $Int32 (%31 : $Builtin.Int32)      // user: %33
   return %32 : $Int32                             // id: %33
 } // end sil function 'promote_with_unreachable_block_nest_bug'
+
+// Take XX as an argument, but don't actually return or escape it. I'm
+// not sure how this happens in practice, but stack promotion requires
+// that the argument does not escape.
+sil @tryInitXX : $@convention(method) (@owned XX) -> (@owned XX, @error Error) {
+bb0(%0 : $XX):
+  %1 = alloc_ref $XX
+  strong_release %0 : $XX
+  return %1 : $XX
+}
+
+// FIXME: Stack promotion currently fails whenever the last use is a
+// terminator. This is a ridiculous limitation.
+//
+// CHECK-LABEL: sil @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {
+// CHECK:        alloc_ref $XX
+// CHECK:        try_apply
+// CHECK:      bb1(%{{.*}} : $XX):
+// CHECK-NEXT:   return
+// CHECK:      bb2(%{{.*}}: $Error):
+// CHECK-NEXT:   throw
+// CHECK-LABEL: } // end sil function 'testUsedByTryApply'
+sil @testUsedByTryApply : $@convention(thin) () -> (@owned XX, @error Error) {
+bb0:
+  %0 = alloc_ref $XX
+  %1 = function_ref @tryInitXX : $@convention(method) (@owned XX) -> (@owned XX, @error Error)
+  try_apply %1(%0) : $@convention(method) (@owned XX) -> (@owned XX, @error Error), normal bb1, error bb2
+
+bb1(%4 : $XX):
+  return %4 : $XX
+
+bb2(%5 : $Error):
+  throw %5 : $Error
+}

@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
 #include "ClangDiagnosticConsumer.h"
-#include "IAMInference.h"
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -391,9 +390,7 @@ void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
   BridgeHeaderTopLevelDecls.push_back(D);
 }
 
-bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
-    clang::Decl *D) {
-  // Ignore forward references;
+bool importer::isForwardDeclOfType(const clang::Decl *D) {
   if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(D)) {
     if (!ID->isThisDeclarationADefinition())
       return true;
@@ -405,6 +402,11 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
       return true;
   }
   return false;
+}
+
+bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
+    clang::Decl *D) {
+  return importer::isForwardDeclOfType(D);
 }
 
 ClangImporter::ClangImporter(ASTContext &ctx,
@@ -1052,8 +1054,7 @@ ClangImporter::create(ASTContext &ctx,
           importer->Impl.BridgingHeaderLookupTable,
           importer->Impl.LookupTables, importer->Impl.SwiftContext,
           importer->Impl.getBufferImporterForDiagnostics(),
-          importer->Impl.platformAvailability,
-          importer->Impl.InferImportAsMember));
+          importer->Impl.platformAvailability));
 
   // Create a compiler instance.
   {
@@ -1169,7 +1170,7 @@ ClangImporter::create(ASTContext &ctx,
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
-      importer->Impl.getClangSema(), importer->Impl.InferImportAsMember));
+      importer->Impl.getClangSema()));
 
   // FIXME: These decls are not being parsed correctly since (a) some of the
   // callbacks are still being added, and (b) the logic to parse them has
@@ -1363,7 +1364,7 @@ bool ClangImporter::Implementation::importHeader(
   // to correct. The fix would be explicitly importing on the command line.
   if (implicitImport && !allParsedDecls.empty() &&
     BridgingHeaderExplicitlyRequested) {
-    SwiftContext.Diags.diagnose(
+    diagnose(
       diagLoc, diag::implicit_bridging_header_imported_from_module,
       llvm::sys::path::filename(headerName), adapter->getName());
   }
@@ -1398,8 +1399,7 @@ bool ClangImporter::Implementation::importHeader(
 
   // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
-    SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_error,
-                                headerName);
+    diagnose(diagLoc, diag::bridging_header_error, headerName);
     return true;
   }
 
@@ -1447,8 +1447,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
   if (!headerFile) {
-    Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
-                                     header);
+    Impl.diagnose(diagLoc, diag::bridging_header_missing, header);
     return true;
   }
 
@@ -1516,8 +1515,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 
   success |= !rewriteInstance.getDiagnostics().hasErrorOccurred();
   if (!success) {
-    Impl.SwiftContext.Diags.diagnose({},
-                                     diag::could_not_rewrite_bridging_header);
+    Impl.diagnose({}, diag::could_not_rewrite_bridging_header);
     return "";
   }
 
@@ -1604,9 +1602,8 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   emitInstance->ExecuteAction(*action);
 
   if (emitInstance->getDiagnostics().hasErrorOccurred()) {
-    Impl.SwiftContext.Diags.diagnose({},
-                                     diag::bridging_header_pch_error,
-                                     outputPCHPath, headerPath);
+    Impl.diagnose({}, diag::bridging_header_pch_error,
+                  outputPCHPath, headerPath);
     return true;
   }
   return false;
@@ -1665,9 +1662,7 @@ bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
   emitInstance->ExecuteAction(*action);
 
   if (emitInstance->getDiagnostics().hasErrorOccurred()) {
-    Impl.SwiftContext.Diags.diagnose({},
-                                     diag::emit_pcm_error,
-                                     outputPath, moduleMapPath);
+    Impl.diagnose({}, diag::emit_pcm_error, outputPath, moduleMapPath);
     return true;
   }
   return false;
@@ -1690,7 +1685,7 @@ bool ClangImporter::dumpPrecompiledModule(StringRef modulePath,
   dumpInstance->ExecuteAction(*action);
 
   if (dumpInstance->getDiagnostics().hasErrorOccurred()) {
-    Impl.SwiftContext.Diags.diagnose({}, diag::dump_pcm_error, modulePath);
+    Impl.diagnose({}, diag::dump_pcm_error, modulePath);
     return true;
   }
   return false;
@@ -2086,7 +2081,6 @@ ClangImporter::Implementation::Implementation(
     DWARFImporterDelegate *dwarfImporterDelegate)
     : SwiftContext(ctx),
       ImportForwardDeclarations(ctx.ClangImporterOpts.ImportForwardDeclarations),
-      InferImportAsMember(ctx.ClangImporterOpts.InferImportAsMember),
       DisableSwiftBridgeAttr(ctx.ClangImporterOpts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(!ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
@@ -3781,7 +3775,6 @@ void ClangImporter::Implementation::lookupValue(
           clangDecl->getMostRecentDecl();
 
       CurrentVersion.forEachOtherImportNameVersion(
-          SwiftContext.LangOpts.EnableExperimentalConcurrency,
           [&](ImportNameVersion nameVersion) {
         if (anyMatching)
           return;

@@ -114,6 +114,22 @@ public:
   using typename super::StoredSignedPointer;
   using typename super::StoredSize;
 
+  struct AsyncTaskAllocationChunk {
+    enum class ChunkKind {
+      Unknown,
+      NonPointer,
+      RawPointer,
+      StrongReference,
+      UnownedReference,
+      WeakReference,
+      UnmanagedReference
+    };
+
+    StoredPointer Start;
+    unsigned Length;
+    ChunkKind Kind;
+  };
+
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader), *this)
   {}
@@ -153,6 +169,8 @@ public:
       auto CmdBuf = this->getReader().readBytes(
           RemoteAddress(CmdStartAddress.getAddressData() + Offset),
           SegmentCmdHdrSize);
+      if (!CmdBuf)
+        return false;
       auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
       if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) == 0) {
         Command = CmdHdr;
@@ -173,6 +191,8 @@ public:
     auto LoadCmdAddress = reinterpret_cast<const char *>(loadCmdOffset);
     auto LoadCmdBuf = this->getReader().readBytes(
         RemoteAddress(LoadCmdAddress), sizeof(typename T::SegmentCmd));
+    if (!LoadCmdBuf)
+      return false;
     auto LoadCmd = reinterpret_cast<typename T::SegmentCmd *>(LoadCmdBuf.get());
 
     // The sections start immediately after the load command.
@@ -181,6 +201,8 @@ public:
                        sizeof(typename T::SegmentCmd);
     auto Sections = this->getReader().readBytes(
         RemoteAddress(SectAddress), NumSect * sizeof(typename T::Section));
+    if (!Sections)
+      return false;
 
     auto Slide = ImageStart.getAddressData() - Command->vmaddr;
     std::string Prefix = "__swift5";
@@ -211,6 +233,8 @@ public:
 
     auto SectBuf = this->getReader().readBytes(RemoteAddress(RangeStart),
                                                RangeEnd - RangeStart);
+    if (!SectBuf)
+      return false;
 
     auto findMachOSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
@@ -267,6 +291,8 @@ public:
       auto CmdBuf = this->getReader().readBytes(
           RemoteAddress(CmdStartAddress.getAddressData() + Offset),
           SegmentCmdHdrSize);
+      if (!CmdBuf)
+        return false;
       auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
       if (strncmp(CmdHdr->segname, "__DATA", sizeof(CmdHdr->segname)) == 0) {
         auto DataSegmentEnd =
@@ -289,6 +315,8 @@ public:
   bool readPECOFFSections(RemoteAddress ImageStart) {
     auto DOSHdrBuf = this->getReader().readBytes(
         ImageStart, sizeof(llvm::object::dos_header));
+    if (!DOSHdrBuf)
+      return false;
     auto DOSHdr =
         reinterpret_cast<const llvm::object::dos_header *>(DOSHdrBuf.get());
     auto COFFFileHdrAddr = ImageStart.getAddressData() +
@@ -297,6 +325,8 @@ public:
 
     auto COFFFileHdrBuf = this->getReader().readBytes(
         RemoteAddress(COFFFileHdrAddr), sizeof(llvm::object::coff_file_header));
+    if (!COFFFileHdrBuf)
+      return false;
     auto COFFFileHdr = reinterpret_cast<const llvm::object::coff_file_header *>(
         COFFFileHdrBuf.get());
 
@@ -306,9 +336,11 @@ public:
     auto SectionTableBuf = this->getReader().readBytes(
         RemoteAddress(SectionTableAddr),
         sizeof(llvm::object::coff_section) * COFFFileHdr->NumberOfSections);
+    if (!SectionTableBuf)
+      return false;
 
-    auto findCOFFSectionByName = [&](llvm::StringRef Name)
-        -> std::pair<RemoteRef<void>, uint64_t> {
+    auto findCOFFSectionByName =
+        [&](llvm::StringRef Name) -> std::pair<RemoteRef<void>, uint64_t> {
       for (size_t i = 0; i < COFFFileHdr->NumberOfSections; ++i) {
         const llvm::object::coff_section *COFFSec =
             reinterpret_cast<const llvm::object::coff_section *>(
@@ -323,6 +355,8 @@ public:
         auto Addr = ImageStart.getAddressData() + COFFSec->VirtualAddress;
         auto Buf = this->getReader().readBytes(RemoteAddress(Addr),
                                                COFFSec->VirtualSize);
+        if (!Buf)
+          return {nullptr, 0};
         auto BufStart = Buf.get();
         savedBuffers.push_back(std::move(Buf));
 
@@ -508,6 +542,8 @@ public:
             } else {
               SecBuf = this->getReader().readBytes(SecStart, SecSize);
             }
+            if (!SecBuf)
+              return {nullptr, 0};
             auto SecContents =
                 RemoteRef<void>(SecStart.getAddressData(), SecBuf.get());
             savedBuffers.push_back(std::move(SecBuf));
@@ -576,6 +612,8 @@ public:
   bool readELF(RemoteAddress ImageStart, llvm::Optional<llvm::sys::MemoryBlock> FileBuffer) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
+    if (!Buf)
+      return false;
 
     // Read the header.
     auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
@@ -887,10 +925,10 @@ public:
       return;
     auto NodeBytes = getReader().readBytes(RemoteAddress(NodePtr),
                                            sizeof(ConformanceNode<Runtime>));
+    if (!NodeBytes)
+      return;
     auto NodeData =
       reinterpret_cast<const ConformanceNode<Runtime> *>(NodeBytes.get());
-    if (!NodeData)
-      return;
     Call(NodeData->Type, NodeData->Proto);
     iterateConformanceTree(NodeData->Left, Call);
     iterateConformanceTree(NodeData->Right, Call);
@@ -901,21 +939,21 @@ public:
       std::function<void(StoredPointer Type, StoredPointer Proto)> Call) {
     auto MapBytes = getReader().readBytes(RemoteAddress(ConformancesPtr),
                                           sizeof(ConcurrentHashMap<Runtime>));
+    if (!MapBytes)
+      return;
     auto MapData =
         reinterpret_cast<const ConcurrentHashMap<Runtime> *>(MapBytes.get());
-    if (!MapData)
-      return;
 
     auto Count = MapData->ElementCount;
     auto Size = Count * sizeof(ConformanceCacheEntry<Runtime>);
 
     auto ElementsBytes =
         getReader().readBytes(RemoteAddress(MapData->Elements), Size);
+    if (!ElementsBytes)
+      return;
     auto ElementsData =
         reinterpret_cast<const ConformanceCacheEntry<Runtime> *>(
             ElementsBytes.get());
-    if (!ElementsData)
-      return;
 
     for (StoredSize i = 0; i < Count; i++) {
       auto &Element = ElementsData[i];
@@ -983,10 +1021,10 @@ public:
         auto AllocationBytes =
           getReader().readBytes(RemoteAddress(Allocation.Ptr),
                                               Allocation.Size);
+        if (!AllocationBytes)
+          return 0;
         auto Entry = reinterpret_cast<const GenericMetadataCacheEntry *>(
           AllocationBytes.get());
-        if (!Entry)
-          return 0;
         return Entry->Value;
     }
     return 0;
@@ -1023,10 +1061,10 @@ public:
     case GenericWitnessTableCacheTag: {
       auto NodeBytes = getReader().readBytes(
           RemoteAddress(Allocation.Ptr), sizeof(MetadataCacheNode<Runtime>));
+      if (!NodeBytes)
+        return llvm::None;
       auto Node =
           reinterpret_cast<const MetadataCacheNode<Runtime> *>(NodeBytes.get());
-      if (!Node)
-        return llvm::None;
       return *Node;
     }
     default:
@@ -1079,23 +1117,23 @@ public:
 
     auto PoolBytes = getReader()
       .readBytes(AllocationPoolAddr->getResolvedAddress(), sizeof(PoolRange));
-    auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
-    if (!Pool)
+    if (!PoolBytes)
       return std::string("failure reading allocation pool contents");
+    auto Pool = reinterpret_cast<const PoolRange *>(PoolBytes.get());
 
     auto TrailerPtr = Pool->Begin + Pool->Remaining;
     while (TrailerPtr) {
       auto TrailerBytes = getReader()
         .readBytes(RemoteAddress(TrailerPtr), sizeof(PoolTrailer));
-      auto Trailer = reinterpret_cast<const PoolTrailer *>(TrailerBytes.get());
-      if (!Trailer)
+      if (!TrailerBytes)
         break;
+      auto Trailer = reinterpret_cast<const PoolTrailer *>(TrailerBytes.get());
       auto PoolStart = TrailerPtr - Trailer->PoolSize;
       auto PoolBytes = getReader()
         .readBytes(RemoteAddress(PoolStart), Trailer->PoolSize);
-      auto PoolPtr = (const char *)PoolBytes.get();
-      if (!PoolPtr)
+      if (!PoolBytes)
         break;
+      auto PoolPtr = (const char *)PoolBytes.get();
 
       uintptr_t Offset = 0;
       while (Offset < Trailer->PoolSize) {
@@ -1137,10 +1175,7 @@ public:
       auto HeaderBytes = getReader().readBytes(
           RemoteAddress(BacktraceListNext),
           sizeof(MetadataAllocationBacktraceHeader<Runtime>));
-      auto HeaderPtr =
-          reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
-              HeaderBytes.get());
-      if (HeaderPtr == nullptr) {
+      if (!HeaderBytes) {
         // FIXME: std::stringstream would be better, but LLVM's standard library
         // introduces a vtable and we don't want that.
         char result[128];
@@ -1149,6 +1184,9 @@ public:
             BacktraceListNext.getAddressData());
         return std::string(result);
       }
+      auto HeaderPtr =
+          reinterpret_cast<const MetadataAllocationBacktraceHeader<Runtime> *>(
+              HeaderBytes.get());
       auto BacktraceAddrPtr =
           BacktraceListNext +
           sizeof(MetadataAllocationBacktraceHeader<Runtime>);
@@ -1162,6 +1200,48 @@ public:
 
       BacktraceListNext = RemoteAddress(HeaderPtr->Next);
     }
+    return llvm::None;
+  }
+
+  llvm::Optional<std::string> iterateAsyncTaskAllocations(
+      StoredPointer AsyncTaskPtr,
+      std::function<void(StoredPointer, unsigned, AsyncTaskAllocationChunk[])>
+          Call) {
+    using AsyncTask = AsyncTask<Runtime>;
+    using StackAllocator = StackAllocator<Runtime>;
+
+    auto AsyncTaskBytes =
+        getReader().readBytes(RemoteAddress(AsyncTaskPtr), sizeof(AsyncTask));
+    auto *AsyncTaskObj =
+        reinterpret_cast<const AsyncTask *>(AsyncTaskBytes.get());
+    if (!AsyncTaskObj)
+      return std::string("failure reading async task");
+
+    auto *Allocator = reinterpret_cast<const StackAllocator *>(
+        &AsyncTaskObj->AllocatorPrivate);
+    StoredPointer SlabPtr = Allocator->FirstSlab;
+    while (SlabPtr) {
+      auto SlabBytes = getReader().readBytes(
+          RemoteAddress(SlabPtr), sizeof(typename StackAllocator::Slab));
+      auto Slab = reinterpret_cast<const typename StackAllocator::Slab *>(
+          SlabBytes.get());
+      if (!Slab)
+        return std::string("failure reading slab");
+
+      // For now, we won't try to walk the allocations in the slab, we'll just
+      // provide the whole thing as one big chunk.
+      size_t HeaderSize =
+          llvm::alignTo(sizeof(*Slab), llvm::Align(alignof(std::max_align_t)));
+      AsyncTaskAllocationChunk Chunk;
+
+      Chunk.Start = SlabPtr + HeaderSize;
+      Chunk.Length = Slab->CurrentOffset;
+      Chunk.Kind = AsyncTaskAllocationChunk::ChunkKind::Unknown;
+      Call(SlabPtr, 1, &Chunk);
+
+      SlabPtr = Slab->Next;
+    }
+
     return llvm::None;
   }
 

@@ -1,9 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-concurrency %import-libdispatch -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
-// XFAIL: windows
-// XFAIL: linux
-// XFAIL: openbsd
+// REQUIRES: libdispatch
 
 import Dispatch
 
@@ -13,11 +12,11 @@ func test_skipCallingNext_butInvokeCancelAll() async {
   let result = try! await Task.withGroup(resultType: Int.self) { (group) async -> Int in
     for n in numbers {
       print("group.add { \(n) }")
-      await group.add { () async -> Int in
-        sleep(1)
+      await group.add { [group] () async -> Int in
+        await Task.sleep(1_000_000_000)
         print("  inside group.add { \(n) }")
-        let cancelled = await Task.isCancelled()
-        print("  inside group.add { \(n) } (canceled: \(cancelled))")
+        print("  inside group.add { \(n) } (group cancelled: \(group.isCancelled))")
+        print("  inside group.add { \(n) } (group child task cancelled: \(Task.isCancelled))")
         return n
       }
     }
@@ -25,19 +24,18 @@ func test_skipCallingNext_butInvokeCancelAll() async {
     group.cancelAll()
 
     // return immediately; the group should wait on the tasks anyway
-    print("return immediately 0 (canceled: \(await Task.isCancelled()))")
+    print("return immediately 0 (group cancelled: \(group.isCancelled))")
+    print("return immediately 0 (task cancelled: \(Task.isCancelled))")
     return 0
   }
 
   // CHECK: group.add { 1 }
-  // CHECK: group.add { 1 }
-  // CHECK: return immediately 0 (canceled: true)
-
-  // CHECK: inside group.add { 1 }
-  // CON: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
-
-  // CHECK: inside group.add { 1 }
-  // CON: inside group.add { 1 } (canceled: true) // TODO: Actually the child tasks should become cancelled as well, but that's not implemented yet
+  //
+  // CHECK: return immediately 0 (group cancelled: true)
+  // CHECK: return immediately 0 (task cancelled: false)
+  //
+  // CHECK: inside group.add { 1 } (group cancelled: true)
+  // CHECK: inside group.add { 1 } (group child task cancelled: true)
 
   // CHECK: result: 0
   print("result: \(result)")

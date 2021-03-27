@@ -58,7 +58,7 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "swift/Runtime/Debug.h"
@@ -391,6 +391,10 @@ static void swift_objc_classCopyFixupHandler(Class oldClass, Class newClass) {
   // Bail out if this isn't a Swift.
   if (!oldClassMetadata->isTypeMetadata())
    return;
+
+  // Copy the value witness table pointer for pointer authentication.
+  auto newClassMetadata = reinterpret_cast<ClassMetadata *>(newClass);
+  newClassMetadata->setValueWitnesses(oldClassMetadata->getValueWitnesses());
 
  // Otherwise, re-sign v-table entries using the extra discriminators stored
  // in the v-table descriptor.
@@ -1024,13 +1028,13 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
   // Unwrap ObjC class wrappers.
-  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+  if (auto wrapper = dyn_cast_or_null<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
   }
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(theClass->isTypeMetadata());
+  assert(!theClass || theClass->isTypeMetadata());
   return theClass;
 }
 
@@ -3025,13 +3029,6 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     setUpObjCRuntimeGetImageNameFromClass();
   }, nullptr);
 
-#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
-  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
-  static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void *_Nullable))
-    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
-#endif
-
   // Temporary workaround until objc_loadClassref is in the SDK.
   static auto objc_loadClassref =
     (Class (*)(void *))
@@ -3074,7 +3071,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // be safe to ignore the stub in this case.
     if (stub != nullptr &&
         objc_loadClassref != nullptr &&
-        _objc_realizeClassFromSwift != nullptr) {
+        &_objc_realizeClassFromSwift != nullptr) {
       _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
     } else {
       swift_instantiateObjCClass(self);
@@ -3125,14 +3122,7 @@ _swift_updateClassMetadataImpl(ClassMetadata *self,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets,
                                bool allowDependency) {
-#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
-  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
-  static auto _objc_realizeClassFromSwift =
-    (Class (*)(Class _Nullable, void *_Nullable))
-    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
-#endif
-
-  bool requiresUpdate = (_objc_realizeClassFromSwift != nullptr);
+  bool requiresUpdate = (&_objc_realizeClassFromSwift != nullptr);
 
   // If we're on a newer runtime, we're going to be initializing the
   // field offset vector. Realize the superclass metadata first, even
@@ -6068,7 +6058,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
 #if defined(_WIN32) && defined(_M_ARM64)
 namespace std {

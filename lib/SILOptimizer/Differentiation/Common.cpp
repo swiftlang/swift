@@ -248,6 +248,25 @@ void collectMinimalIndicesForFunctionCall(
 #endif
 }
 
+Optional<std::pair<SILDebugLocation, SILDebugVariable>>
+findDebugLocationAndVariable(SILValue originalValue) {
+  if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
+    return asi->getVarInfo().map([&](SILDebugVariable var) {
+      return std::make_pair(asi->getDebugLocation(), var);
+    });
+  for (auto *use : originalValue->getUses()) {
+    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
+      return dvi->getVarInfo().map([&](SILDebugVariable var) {
+        return std::make_pair(dvi->getDebugLocation(), var);
+      });
+    if (auto *dvai = dyn_cast<DebugValueAddrInst>(use->getUser()))
+      return dvai->getVarInfo().map([&](SILDebugVariable var) {
+        return std::make_pair(dvai->getDebugLocation(), var);
+      });
+  }
+  return None;
+}
+
 //===----------------------------------------------------------------------===//
 // Diagnostic utilities
 //===----------------------------------------------------------------------===//
@@ -369,38 +388,6 @@ void extractAllElements(SILValue value, SILBuilder &builder,
     results.push_back(builder.createTupleExtract(value.getLoc(), value, i));
 }
 
-void emitZeroIntoBuffer(SILBuilder &builder, CanType type,
-                        SILValue bufferAccess, SILLocation loc) {
-  auto &astCtx = builder.getASTContext();
-  auto *swiftMod = builder.getModule().getSwiftModule();
-  auto &typeConverter = builder.getModule().Types;
-  // Look up conformance to `AdditiveArithmetic`.
-  auto *additiveArithmeticProto =
-      astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto confRef = swiftMod->lookupConformance(type, additiveArithmeticProto);
-  assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
-  // Look up `AdditiveArithmetic.zero.getter`.
-  auto zeroDeclLookup = additiveArithmeticProto->lookupDirect(astCtx.Id_zero);
-  auto *zeroDecl = cast<VarDecl>(zeroDeclLookup.front());
-  assert(zeroDecl->isProtocolRequirement());
-  auto *accessorDecl = zeroDecl->getOpaqueAccessor(AccessorKind::Get);
-  SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-  auto silFnType = typeConverter.getConstantType(
-      TypeExpansionContext::minimal(), accessorDeclRef);
-  // %wm = witness_method ...
-  auto *getter = builder.createWitnessMethod(loc, type, confRef,
-                                             accessorDeclRef, silFnType);
-  // %metatype = metatype $T
-  auto metatypeType = CanMetatypeType::get(type, MetatypeRepresentation::Thick);
-  auto metatype = builder.createMetatype(
-      loc, SILType::getPrimitiveObjectType(metatypeType));
-  auto subMap = SubstitutionMap::getProtocolSubstitutions(
-      additiveArithmeticProto, type, confRef);
-  builder.createApply(loc, getter, subMap, {bufferAccess, metatype},
-                      /*isNonThrowing*/ false);
-  builder.emitDestroyValueOperation(loc, getter);
-}
-
 SILValue emitMemoryLayoutSize(
     SILBuilder &builder, SILLocation loc, CanType type) {
   auto &ctx = builder.getASTContext();
@@ -494,8 +481,8 @@ findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
 }
 
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
-    SILModule &module, SILFunction *original, IndexSubset *parameterIndices,
-    IndexSubset *resultIndices) {
+    SILModule &module, SILFunction *original, DifferentiabilityKind kind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices) {
   // AST differentiability witnesses always have a single result.
   if (resultIndices->getCapacity() != 1 || !resultIndices->contains(0))
     return nullptr;
@@ -520,8 +507,8 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
     original = module.lookUpFunction(SILDeclRef(originalAFD).asForeign());
   }
 
-  auto *existingWitness =
-      module.lookUpDifferentiabilityWitness({originalName, *minimalConfig});
+  auto *existingWitness = module.lookUpDifferentiabilityWitness(
+      {originalName, kind, *minimalConfig});
   if (existingWitness)
     return existingWitness;
 
@@ -530,7 +517,7 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "definitions with explicit differentiable attributes");
 
   return SILDifferentiabilityWitness::createDeclaration(
-      module, SILLinkage::PublicExternal, original,
+      module, SILLinkage::PublicExternal, original, kind,
       minimalConfig->parameterIndices, minimalConfig->resultIndices,
       minimalConfig->derivativeGenericSignature);
 }

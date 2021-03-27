@@ -103,8 +103,6 @@ ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
       "closure captures %0 before it is declared", (Identifier))
-ERROR(capture_before_declaration_defer,none,
-      "'defer' block captures %0 before it is declared", (Identifier))
 NOTE(captured_value_declared_here,none,
      "captured value declared here", ())
 
@@ -279,6 +277,9 @@ WARNING(switch_on_a_constant,none,
 NOTE(unreachable_code_note,none, "will never be executed", ())
 WARNING(warn_infinite_recursive_call,none,
         "function call causes an infinite recursion", ())
+WARNING(warn_dead_weak_store,none,
+        "weak reference will always be nil because the referenced object is "
+        "deallocated here", ())
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,

@@ -1757,6 +1757,8 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
   auto Elem = RespBuilder.getDictionary();
   Elem.set(KeyKind, Info.Kind);
   Elem.set(KeyName, Info.Name);
+  if (Info.DeclarationLang.isValid())
+    Elem.set(KeyDeclarationLang, Info.DeclarationLang);
   if (!Info.USR.empty())
     Elem.set(KeyUSR, Info.USR);
   if (!Info.TypeName.empty())
@@ -1815,6 +1817,13 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
       RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
     }
   }
+  if (!Info.ReceiverUSRs.empty()) {
+    auto Receivers = Elem.setArray(KeyReceivers);
+    for (auto USR : Info.ReceiverUSRs) {
+      auto Receiver = Receivers.appendDictionary();
+      Receiver.set(KeyUSR, USR);
+    }
+  }
   if (Info.IsSystem)
     Elem.setBool(KeyIsSystem, true);
   if (!Info.TypeInterface.empty())
@@ -1825,6 +1834,17 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
     Elem.set(KeyContainerTypeUsr, Info.ContainerTypeUSR);
   if (!Info.SymbolGraph.empty())
     Elem.set(KeySymbolGraph, Info.SymbolGraph);
+  if (!Info.ParentContexts.empty()) {
+    auto Parents = Elem.setArray(KeyParentContexts);
+    for (const auto &ParentTy: Info.ParentContexts) {
+      auto Parent = Parents.appendDictionary();
+      Parent.set(KeyName, ParentTy.Title);
+      Parent.set(KeyKind, ParentTy.KindName);
+      Parent.set(KeyUSR, ParentTy.USR);
+    }
+  }
+  if (Info.IsDynamic)
+    Elem.setBool(KeyIsDynamic, true);
 
   return Rec(RespBuilder.createResponse());
 }
@@ -2486,6 +2506,8 @@ public:
   void recordAffectedLineRange(unsigned Line, unsigned Length) override;
 
   void recordFormattedText(StringRef Text) override;
+
+  bool diagnosticsEnabled() override { return Opts.EnableDiagnostics; }
 
   void setDiagnosticStage(UIdent DiagStage) override;
   void handleDiagnostic(const DiagnosticEntryInfo &Info,

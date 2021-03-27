@@ -248,6 +248,9 @@ ERROR(computed_property_no_accessors, none,
       "%select{computed property|subscript}0 must have accessors specified", (bool))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
+ERROR(unexpected_getset_implementation_in_protocol,none,
+      "protocol property %0 cannot have a default implementation specified "
+      "here; use extension instead", (StringRef))
 ERROR(computed_property_missing_type,none,
       "computed property must have an explicit type", ())
 ERROR(getset_nontrivial_pattern,none,
@@ -275,6 +278,12 @@ ERROR(expected_lbrace_accessor,PointsToFirstBadToken,
 ERROR(expected_accessor_kw,none,
       "expected 'get', 'set', 'willSet', or 'didSet' keyword to "
       "start an accessor definition",())
+ERROR(invalid_accessor_specifier,none,
+      "'%0' accessor cannot have specifier '%1'",
+      (StringRef, StringRef))
+ERROR(invalid_accessor_with_effectful_get,none,
+      "'%0' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'",
+      (StringRef))
 ERROR(missing_getter,none,
       "%select{variable|subscript}0 with %1 must also have a getter",
       (unsigned, StringRef))
@@ -676,6 +685,9 @@ ERROR(sil_witness_protocol_conformance_not_found,none,
 // SIL differentiability witnesses
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
       "expected '%0' in differentiability witness", (StringRef))
+ERROR(sil_diff_witness_unknown_kind,PointsToFirstBadToken,
+      "unknonwn differentiability kind '%0'; expected 'forward', 'reverse', "
+      "'normal', or 'linear'", (StringRef))
 ERROR(sil_diff_witness_serialized_declaration,none,
       "differentiability witness declaration should not be serialized", ())
 ERROR(sil_diff_witness_undefined,PointsToFirstBadToken,
@@ -731,6 +743,9 @@ ERROR(generic_non_function,PointsToFirstBadToken,
 ERROR(rethrowing_function_type,none,
       "only function declarations may be marked 'rethrows'; "
       "did you mean 'throws'?", ())
+ERROR(reasync_function_type,none,
+      "only function declarations may be marked 'reasync'; "
+      "did you mean 'async'?", ())
 ERROR(async_or_throws_in_wrong_position,none,
       "'%0' may only occur before '->'", (StringRef))
 ERROR(throw_in_function_type,none,
@@ -745,7 +760,8 @@ ERROR(function_type_argument_label,none,
 ERROR(expected_dynamic_func_attr,none,
       "expected a dynamically_replaceable function", ())
 ERROR(async_after_throws,none,
-      "'async' must precede %select{'throws'|'rethrows'}0", (bool))
+      "%select{'async'|'reasync'}0 must precede %select{'throws'|'rethrows'}1",
+      (bool, bool))
 ERROR(async_init,none, "initializer cannot be marked 'async'", ())
 ERROR(duplicate_effects_specifier,none,
       "'%0' has already been specified", (StringRef))
@@ -1366,6 +1382,9 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_expected_integer_literal,none,
+"expected integer literal in '%0' attribute", (StringRef))
+
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
 
@@ -1581,9 +1600,6 @@ ERROR(attr_specialize_missing_comma,none,
 ERROR(attr_specialize_unknown_parameter_name,none,
       "unknown parameter %0 in '_specialize attribute'", (StringRef))
 
-ERROR(attr_specialize_unsupported_exported_true ,none,
-      "'exported: true' has no effect in '_specialize' attribute", (StringRef))
-
 ERROR(attr_specialize_expected_bool_value,none,
       "expected a boolean true or false value in '_specialize' attribute", ())
 
@@ -1667,6 +1683,11 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "expected witness_generic signature '%0' does not have same generic "
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
+
+// completionHandlerAsync
+ERROR(attr_completion_handler_async_invalid_name, none,
+      "argument of '%0' attribute must be an identifier or full function name",
+      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

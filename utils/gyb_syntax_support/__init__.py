@@ -38,14 +38,14 @@ def make_missing_child(child):
         tok_kind = token.kind if token else "unknown"
         tok_text = token.text if token else ""
         return \
-            'RawSyntax::missing(tok::%s, OwnedString::makeUnowned("%s"))' % \
+            'RawSyntax::missing(tok::%s, "%s", Arena)' % \
             (tok_kind, tok_text)
     else:
         missing_kind = "Unknown" if child.syntax_kind == "Syntax" \
                        else child.syntax_kind
         if child.node_choices:
             return make_missing_child(child.node_choices[0])
-        return 'RawSyntax::missing(SyntaxKind::%s)' % missing_kind
+        return 'RawSyntax::missing(SyntaxKind::%s, Arena)' % missing_kind
 
 
 def check_child_condition_raw(child):
@@ -53,7 +53,7 @@ def check_child_condition_raw(child):
     Generates a C++ closure to check whether a given raw syntax node can
     satisfy the requirements of child.
     """
-    result = '[](const RC<RawSyntax> &Raw) {\n'
+    result = '[](const RawSyntax *Raw) {\n'
     result += ' // check %s\n' % child.name
     if child.token_choices:
         result += 'if (!Raw->isToken()) return false;\n'

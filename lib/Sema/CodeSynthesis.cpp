@@ -265,8 +265,8 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
         if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
           varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
 
-          auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
-          isAutoClosure = wrapperInfo.wrappedValuePlaceholder->isAutoClosure();
+          auto initInfo = var->getPropertyWrapperInitializerInfo();
+          isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
         } else {
           varInterfaceType = backingPropertyType;
         }
@@ -554,6 +554,12 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
   // Inherit the @discardableResult attribute.
   if (superclassCtor->getAttrs().hasAttribute<DiscardableResultAttr>()) {
     auto *clonedAttr = new (ctx) DiscardableResultAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
+  }
+
+  // Inherit the rethrows attribute.
+  if (superclassCtor->getAttrs().hasAttribute<RethrowsAttr>()) {
+    auto *clonedAttr = new (ctx) RethrowsAttr(/*implicit=*/true);
     ctor->getAttrs().add(clonedAttr);
   }
 

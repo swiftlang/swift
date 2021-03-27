@@ -27,28 +27,46 @@ if(SWIFT_CONCURRENCY_USES_DISPATCH)
     # FIXME: we can't rely on libdispatch having been built for the
     # target at this point in the process.  Currently, we're relying
     # on soft-linking.
-    #list(APPEND swift_concurrency_link_libraries
-    #  dispatch)
+    list(APPEND swift_concurrency_link_libraries
+      dispatch)
   endif()
 endif()
 
 
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
   Actor.swift
   CheckedContinuation.swift
   GlobalExecutor.cpp
+  Executor.swift
+  AsyncCompactMapSequence.swift
+  AsyncDropFirstSequence.swift
+  AsyncDropWhileSequence.swift
+  AsyncFilterSequence.swift
+  AsyncFlatMapSequence.swift
   AsyncIteratorProtocol.swift
+  AsyncMapSequence.swift
+  AsyncPrefixSequence.swift
+  AsyncPrefixWhileSequence.swift
   AsyncSequence.swift
+  AsyncThrowingCompactMapSequence.swift
+  AsyncThrowingDropWhileSequence.swift
+  AsyncThrowingFilterSequence.swift
+  AsyncThrowingFlatMapSequence.swift
+  AsyncThrowingMapSequence.swift
+  AsyncThrowingPrefixWhileSequence.swift
   PartialAsyncTask.swift
   Task.cpp
   Task.swift
   TaskCancellation.swift
-  _TimeTypes.swift
   TaskAlloc.cpp
   TaskStatus.cpp
   TaskGroup.cpp
   TaskGroup.swift
+  TaskLocal.cpp
+  TaskLocal.swift
+  ThreadSanitizer.cpp
   Mutex.cpp
   ${swift_concurrency_objc_sources}
 

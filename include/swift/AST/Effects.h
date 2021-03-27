@@ -10,7 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines some data types for rethrows and reasync effects.
+// This file defines some data types used for 'rethrows' and `reasync` checking.
+//
+// We refer to 'throws' and 'async' as "effects". A function might have either or
+// both effects.
+//
+// A function is _effect polymorphic_ if its effect depends on the call site.
+// This can either be unconditional (the usual 'throws' or 'async' case), or it
+// can depend on either its arguments or conformances (these are 'rethrows' and
+// 'reasync' functions).
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,52 +35,64 @@ class raw_ostream;
 
 namespace swift {
 
-class ValueDecl;
-
-class ProtocolRethrowsRequirementList {
-public:
-  typedef std::pair<Type, ValueDecl *> Entry;
-
-private:
-  ArrayRef<Entry> entries;
-
-public:
-  ProtocolRethrowsRequirementList(ArrayRef<Entry> entries) : entries(entries) {}
-  ProtocolRethrowsRequirementList() : entries() {}
-
-  typedef const Entry *const_iterator;
-  typedef const_iterator iterator;
-
-  const_iterator begin() const { return entries.begin(); }
-  const_iterator end() const { return entries.end(); }
-
-  size_t size() const { return entries.size(); }
-
-  void print(raw_ostream &OS) const;
-
-  SWIFT_DEBUG_DUMP;
+enum class EffectKind : uint8_t {
+  Throws,
+  Async
 };
 
-void simple_display(llvm::raw_ostream &out, const ProtocolRethrowsRequirementList reqs);
+void simple_display(llvm::raw_ostream &out, const EffectKind kind);
 
-enum class FunctionRethrowingKind : uint8_t {
-  /// The function is not throwing
+class ValueDecl;
+
+class PolymorphicEffectRequirementList {
+  using Requirements = ArrayRef<AbstractFunctionDecl *>;
+  using Conformances = ArrayRef<std::pair<Type, ProtocolDecl *>>;
+private:
+  Requirements requirements;
+  Conformances conformances;
+
+public:
+  PolymorphicEffectRequirementList(Requirements requirements,
+                                   Conformances conformances)
+    : requirements(requirements), conformances(conformances) {}
+  PolymorphicEffectRequirementList() {}
+
+  Requirements getRequirements() const {
+    return requirements;
+  }
+
+  Conformances getConformances() const {
+    return conformances;
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const PolymorphicEffectRequirementList reqs);
+
+enum class PolymorphicEffectKind : uint8_t {
+  /// The function does not have this effect at all.
   None,
 
-  /// The function rethrows by closure
-  ByClosure, 
+  /// The function has this effect if at least one closure argument has it.
+  ///
+  /// This is the ordinary 'rethrows' /'reasync' case.
+  ByClosure,
 
-  /// The function rethrows by conformance
-  ByConformance, 
+  /// The function has this effect if at least one of its conformances has it.
+  ///
+  /// This is the conformance-based 'rethrows' /'reasync' case.
+  ByConformance,
 
-  /// The function throws
-  Throws, 
+  /// The function has this effect unconditionally.
+  ///
+  /// This is a plain old 'throws' / 'async' function.
+  Always,
 
-  /// The function throwing determinate is invalid
+  /// The function declaration was invalid.
   Invalid
 };
 
-void simple_display(llvm::raw_ostream &out, FunctionRethrowingKind value);
+void simple_display(llvm::raw_ostream &out, PolymorphicEffectKind value);
 
 } // end namespace swift
 

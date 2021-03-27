@@ -28,6 +28,9 @@ for module_file in os.listdir(sdk_overlay_dir):
     # TODO(TF-1229): Fix the "_Differentiation" module.
     if module_name == "_Differentiation":
         continue
+    # TODO: fix the DifferentiationUnittest module.
+    if module_name == "DifferentiationUnittest":
+        continue
     print("# " + module_name)
 
     module_path = os.path.join(sdk_overlay_dir, module_file)

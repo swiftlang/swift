@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_TYPECHECKCONCURRENCY_H
 
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Type.h"
 #include <cassert>
 
@@ -28,7 +29,9 @@ class ActorIsolation;
 class AnyFunctionType;
 class ASTContext;
 class ClassDecl;
+class ClosureExpr;
 class ConcreteDeclRef;
+class CustomAttr;
 class Decl;
 class DeclContext;
 class EnumElementDecl;
@@ -66,36 +69,6 @@ enum class ConcurrentReferenceKind {
   ConcurrentFunction,
 };
 
-/// Describes why or where a particular entity has a non-concurrent-value type.
-struct NonConcurrentType {
-  enum Kind {
-    /// A function parameter is a non-concurrent-value type.
-    Parameter,
-    /// The result of a function is a non-concurrent-value type.
-    Result,
-    /// The type of a property is a non-concurrent-value type.
-    Property,
-  } kind;
-
-  /// The declaration reference.
-  ConcreteDeclRef declRef;
-
-  /// The non-concurrent-value type being diagnosed.
-  Type type;
-
-  /// Determine whether a reference to the given declaration involves a
-  /// non-concurrent-value type. If it does, return the reason. Otherwise,
-  /// return \c None.
-  ///
-  /// \param dc The declaration context from which the reference occurs.
-  /// \param declRef The reference to the declaration.
-  static Optional<NonConcurrentType> get(
-      const DeclContext *dc, ConcreteDeclRef declRef);
-
-  /// Diagnose the non-concurrent-value type at the given source location.
-  void diagnose(SourceLoc loc);
-};
-
 /// The isolation restriction in effect for a given declaration that is
 /// referenced from source.
 class ActorIsolationRestriction {
@@ -104,99 +77,93 @@ public:
     /// There is no restriction on references to the given declaration.
     Unrestricted,
 
-    /// Access to the declaration is unsafe in a concurrent context.
+    /// Access to the declaration is unsafe in any concurrent context.
     Unsafe,
 
-    /// The declaration is a local entity whose capture could introduce
-    /// data races. The context in which the local was defined is provided.
-    LocalCapture,
-
     /// References to this entity are allowed from anywhere, but doing so
-    /// may cross an actor boundary if it is not on \c self.
+    /// may cross an actor boundary if it is not from within the same actor's
+    /// isolation domain.
     CrossActorSelf,
 
-    /// References to this member of an actor are only permitted on 'self'.
+    /// References to this member of an actor are only permitted from within
+    /// the actor's isolation domain.
     ActorSelf,
 
-    /// References to a declaration that is part of a global actor are only
-    /// permitted from other declarations with that same global actor.
+    /// References to a declaration that is part of a global actor are
+    /// permitted from other declarations with that same global actor or
+    /// are permitted from elsewhere as a cross-actor reference.
     GlobalActor,
 
-    /// Referneces to this entity are allowed from anywhere, but doing so may
-    /// cross an actor bounder if it is not from the same global actor.
-    CrossGlobalActor,
+    /// References to a declaration that is part of a global actor are
+    /// permitted from other declarations with that same global actor or
+    /// are permitted from elsewhere as a cross-actor reference, but
+    /// contexts with unspecified isolation won't diagnose anything.
+    GlobalActorUnsafe,
   };
 
 private:
-  /// The kind of restriction.
-  Kind kind;
-
   union {
     /// The local context that an entity is tied to.
     DeclContext *localContext;
 
-    /// The actor class that the entity is declared in.
-    ClassDecl *actorClass;
+    /// The actor that the entity is declared in.
+    NominalTypeDecl *actorType;
 
     /// The global actor type.
     TypeBase *globalActor;
   } data;
 
-  explicit ActorIsolationRestriction(Kind kind) : kind(kind) { }
+  explicit ActorIsolationRestriction(Kind kind, bool isCrossActor)
+      : kind(kind), isCrossActor(isCrossActor) { }
 
 public:
+  /// The kind of restriction.
+  const Kind kind;
+
+  /// Whether referencing this from another actor constitutes a cross-acter
+  /// reference.
+  const bool isCrossActor;
+
   Kind getKind() const { return kind; }
 
-  /// Retrieve the declaration context in which a local was defined.
-  DeclContext *getLocalContext() const {
-    assert(kind == LocalCapture);
-    return data.localContext;
-  }
-
-  /// Retrieve the actor class that the declaration is within.
-  ClassDecl *getActorClass() const {
+  /// Retrieve the actor type that the declaration is within.
+  NominalTypeDecl *getActorType() const {
     assert(kind == ActorSelf || kind == CrossActorSelf);
-    return data.actorClass;
+    return data.actorType;
   }
 
-  /// Retrieve the actor class that the declaration is within.
+  /// Retrieve the actor that the declaration is within.
   Type getGlobalActor() const {
-    assert(kind == GlobalActor || kind == CrossGlobalActor);
+    assert(kind == GlobalActor || kind == GlobalActorUnsafe);
     return Type(data.globalActor);
   }
 
   /// There are no restrictions on the use of the entity.
   static ActorIsolationRestriction forUnrestricted() {
-    return ActorIsolationRestriction(Unrestricted);
+    return ActorIsolationRestriction(Unrestricted, /*isCrossActor=*/false);
   }
 
   /// Accesses to the given declaration are unsafe.
   static ActorIsolationRestriction forUnsafe() {
-    return ActorIsolationRestriction(Unsafe);
+    return ActorIsolationRestriction(Unsafe, /*isCrossActor=*/false);
   }
 
   /// Accesses to the given declaration can only be made via the 'self' of
   /// the current actor or is a cross-actor access.
   static ActorIsolationRestriction forActorSelf(
-      ClassDecl *actorClass, bool isCrossActor) {
-    ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf);
-    result.data.actorClass = actorClass;
-    return result;
-  }
-
-  /// Access is restricted to code running within the given local context.
-  static ActorIsolationRestriction forLocalCapture(DeclContext *dc) {
-    ActorIsolationRestriction result(LocalCapture);
-    result.data.localContext = dc;
+      NominalTypeDecl *actor, bool isCrossActor) {
+    ActorIsolationRestriction result(isCrossActor? CrossActorSelf : ActorSelf,
+                                     isCrossActor);
+    result.data.actorType = actor;
     return result;
   }
 
   /// Accesses to the given declaration can only be made via this particular
   /// global actor or is a cross-actor access.
   static ActorIsolationRestriction forGlobalActor(
-      Type globalActor, bool isCrossActor) {
+      Type globalActor, bool isCrossActor, bool isUnsafe) {
     ActorIsolationRestriction result(
-        isCrossActor ? CrossGlobalActor : GlobalActor);
+        isUnsafe ? GlobalActorUnsafe : GlobalActor, isCrossActor);
     result.data.globalActor = globalActor.getPointer();
     return result;
   }
@@ -211,6 +178,10 @@ public:
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
 
+/// Determine whether the given context uses concurrency features, such
+/// as async functions or actors.
+bool contextUsesConcurrencyFeatures(const DeclContext *dc);
+
 /// Diagnose the presence of any non-concurrent types when referencing a
 /// given declaration from a particular declaration context.
 ///
@@ -224,7 +195,7 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// specific types at the use site.
 ///
 /// \param dc The declaration context from which the reference occurs. This is
-/// used to perform lookup of conformances to the \c ConcurrentValue protocol.
+/// used to perform lookup of conformances to the \c Sendable protocol.
 ///
 /// \param loc The location at which the reference occurs, which will be
 /// used when emitting diagnostics.
@@ -235,17 +206,38 @@ void checkOverrideActorIsolation(ValueDecl *value);
 /// \returns true if an problem was detected, false otherwise.
 bool diagnoseNonConcurrentTypesInReference(
     ConcreteDeclRef declRef, const DeclContext *dc, SourceLoc loc,
-    ConcurrentReferenceKind refKind);
+    ConcurrentReferenceKind refKind,
+    DiagnosticBehavior behavior = DiagnosticBehavior::Unspecified);
 
-/// Diagnose the presence of any non-concurrent types within the given
-/// function type.
-bool diagnoseNonConcurrentTypesInFunctionType(
-    const AnyFunctionType *fnType, const DeclContext *dc, SourceLoc loc,
-    bool isClosure);
+/// How the concurrent value check should be performed.
+enum class SendableCheck {
+  /// Sendable conformance was explicitly stated and should be
+  /// fully checked.
+  Explicit,
 
-/// Check the correctness of the given ConcurrentValue conformance.
-void checkConcurrentValueConformance(ProtocolConformance *conformance);
+  /// Sendable conformance was implied by one of the standard library
+  /// protocols that added Sendable after-the-fact.
+  ImpliedByStandardProtocol,
 
+  /// Implicit conformance to Sendable for structs and enums.
+  Implicit,
+};
+
+/// Given a set of custom attributes, pick out the global actor attributes
+/// and perform any necessary resolution and diagnostics, returning the
+/// global actor attribute and type it refers to (or \c None).
+Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
+checkGlobalActorAttributes(
+    SourceLoc loc, DeclContext *dc, ArrayRef<CustomAttr *> attrs);
+
+/// Get the explicit global actor specified for a closure.
+Type getExplicitGlobalActor(ClosureExpr *closure);
+
+/// Check the correctness of the given Sendable conformance.
+///
+/// \returns true if an error occurred.
+bool checkSendableConformance(
+    ProtocolConformance *conformance, SendableCheck check);
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */

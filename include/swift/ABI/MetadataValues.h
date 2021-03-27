@@ -46,6 +46,9 @@ enum {
   /// The number of words (in addition to the heap-object header)
   /// in a default actor.
   NumWords_DefaultActor = 10,
+
+  /// The number of words in a task group.
+  NumWords_TaskGroup = 32,
 };
 
 struct InProcess;
@@ -120,6 +123,9 @@ const size_t MaximumAlignment = 16;
 
 /// The alignment of a DefaultActor.
 const size_t Alignment_DefaultActor = MaximumAlignment;
+
+/// The alignment of a TaskGroup.
+const size_t Alignment_TaskGroup = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -311,6 +317,7 @@ private:
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
     IsDynamicMask = 0x20,
+    IsAsyncMask = 0x40,
     ExtraDiscriminatorShift = 16,
     ExtraDiscriminatorMask = 0xFFFF0000,
   };
@@ -339,6 +346,15 @@ public:
     return copy;
   }
 
+  MethodDescriptorFlags withIsAsync(bool isAsync) const {
+    auto copy = *this;
+    if (isAsync)
+      copy.Value |= IsAsyncMask;
+    else
+      copy.Value &= ~IsAsyncMask;
+    return copy;
+  }
+
   MethodDescriptorFlags withExtraDiscriminator(uint16_t value) const {
     auto copy = *this;
     copy.Value = (copy.Value & ~ExtraDiscriminatorMask)
@@ -355,6 +371,8 @@ public:
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  bool isAsync() const { return Value & IsAsyncMask; }
 
   uint16_t getExtraDiscriminator() const {
     return (Value >> ExtraDiscriminatorShift);
@@ -521,6 +539,7 @@ private:
   enum : int_type {
     KindMask = 0x0F,                // 16 kinds should be enough for anybody
     IsInstanceMask = 0x10,
+    IsAsyncMask = 0x20,
     ExtraDiscriminatorShift = 16,
     ExtraDiscriminatorMask = 0xFFFF0000,
   };
@@ -540,6 +559,15 @@ public:
     return copy;
   }
 
+  ProtocolRequirementFlags withIsAsync(bool isAsync) const {
+    auto copy = *this;
+    if (isAsync)
+      copy.Value |= IsAsyncMask;
+    else
+      copy.Value &= ~IsAsyncMask;
+    return copy;
+  }
+
   ProtocolRequirementFlags withExtraDiscriminator(uint16_t value) const {
     auto copy = *this;
     copy.Value = (copy.Value & ~ExtraDiscriminatorMask)
@@ -553,6 +581,8 @@ public:
   ///
   /// Note that 'init' is not considered an instance member.
   bool isInstance() const { return Value & IsInstanceMask; }
+
+  bool isAsync() const { return Value & IsAsyncMask; }
 
   bool isSignedWithAddress() const {
     return getKind() != Kind::BaseProtocol;
@@ -781,7 +811,7 @@ class TargetFunctionTypeFlags {
     DifferentiabilityMask  = 0x98000000U,
     DifferentiabilityShift = 27U,
     AsyncMask              = 0x20000000U,
-    ConcurrentMask         = 0x40000000U,
+    SendableMask           = 0x40000000U,
   };
   int_type Data;
   
@@ -831,10 +861,10 @@ public:
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
-  withConcurrent(bool isConcurrent) const {
+  withConcurrent(bool isSendable) const {
     return TargetFunctionTypeFlags<int_type>(
-        (Data & ~ConcurrentMask) |
-        (isConcurrent ? ConcurrentMask : 0));
+        (Data & ~SendableMask) |
+        (isSendable ? SendableMask : 0));
   }
 
   unsigned getNumParameters() const { return Data & NumParametersMask; }
@@ -851,8 +881,8 @@ public:
     return bool (Data & EscapingMask);
   }
 
-  bool isConcurrent() const {
-    return bool (Data & ConcurrentMask);
+  bool isSendable() const {
+    return bool (Data & SendableMask);
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
@@ -1167,9 +1197,6 @@ namespace SpecialPointerAuthDiscriminators {
   /// Resilient class stub initializer callback
   const uint16_t ResilientClassStubInitCallback = 0xC671;
 
-  /// Actor enqueue(partialTask:).
-  const uint16_t ActorEnqueuePartialTask = 0x8f3d;
-
   /// Jobs, tasks, and continuations.
   const uint16_t JobInvokeFunction = 0xcc64; // = 52324
   const uint16_t TaskResumeFunction = 0x2c42; // = 11330
@@ -1180,6 +1207,8 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x1933; // = 6451
   const uint16_t EscalationNotificationFunction = 0x5be4; // = 23524
+  const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
+  const uint16_t AsyncFutureFunction = 0x720f; // = 29199
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
@@ -1936,9 +1965,9 @@ public:
 
     // Kind-specific flags.
 
-    Task_IsChildTask  = 24,
-    Task_IsFuture     = 25,
-    Task_IsTaskGroup  = 26,
+    Task_IsChildTask      = 24,
+    Task_IsFuture         = 25,
+    Task_IsGroupChildTask = 26,
   };
 
   explicit JobFlags(size_t bits) : FlagSet(bits) {}
@@ -1965,11 +1994,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsFuture,
                                 task_isFuture,
                                 task_setIsFuture)
-
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsTaskGroup,
-                                task_isTaskGroup,
-                                task_setIsTaskGroup)
-
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsGroupChildTask,
+                                task_isGroupChildTask,
+                                task_setIsGroupChildTask)
 };
 
 /// Kinds of task status record.
@@ -1981,14 +2008,18 @@ enum class TaskStatusRecordKind : uint8_t {
   /// active child tasks.
   ChildTask = 1,
 
+  /// A TaskGroupTaskStatusRecord, which represents a task group
+  /// and child tasks spawned within it.
+  TaskGroup = 2,
+
   /// A CancellationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task is cancelled.
-  CancellationNotification = 2,
+  CancellationNotification = 3,
 
   /// An EscalationNotificationStatusRecord, which represents the
   /// need to call a custom function when the task's priority is
   /// escalated.
-  EscalationNotification = 3,
+  EscalationNotification = 4,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,

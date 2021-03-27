@@ -46,30 +46,7 @@ class ResultPlan;
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 class ArgumentScope;
 class Scope;
-
-enum class ApplyOptions : unsigned {
-  /// No special treatment is required.
-  None = 0,
-
-  /// Suppress the error-handling edge out of the call.  This should
-  /// be used carefully; it's used to implement features like 'rethrows'.
-  DoesNotThrow = 0x1,
-};
-inline ApplyOptions operator|(ApplyOptions lhs, ApplyOptions rhs) {
-  return ApplyOptions(unsigned(lhs) | unsigned(rhs));
-}
-inline ApplyOptions &operator|=(ApplyOptions &lhs, ApplyOptions rhs) {
-  return (lhs = (lhs | rhs));
-}
-inline bool operator&(ApplyOptions lhs, ApplyOptions rhs) {
-  return ((unsigned(lhs) & unsigned(rhs)) != 0);
-}
-inline ApplyOptions operator-(ApplyOptions lhs, ApplyOptions rhs) {
-  return ApplyOptions(unsigned(lhs) & ~unsigned(rhs));
-}
-inline ApplyOptions &operator-=(ApplyOptions &lhs, ApplyOptions rhs) {
-  return (lhs = (lhs - rhs));
-}
+class ExecutorBreadcrumb;
 
 struct LValueOptions {
   bool IsNonAccessing = false;
@@ -600,11 +577,12 @@ public:
     auto *Parent =
         DebugScopeStack.size() ? DebugScopeStack.back().getPointer() : F.getDebugScope();
     auto *DS = Parent;
-    // Don't nest a scope for Loc under Parent unless it's actually different.
-    if (RegularLocation(DS->getLoc()) != RegularLocation(Loc)) {
-      DS = new (SGM.M)
+    // Don't create a pointless scope for the function body's BraceStmt.
+    if (!DebugScopeStack.empty())
+      // Don't nest a scope for Loc under Parent unless it's actually different.
+      if (RegularLocation(DS->getLoc()) != RegularLocation(Loc))
+        DS = new (SGM.M)
           SILDebugScope(RegularLocation(Loc), &getFunction(), DS);
-    }
     DebugScopeStack.emplace_back(DS, isGuardScope);
     B.setCurrentDebugScope(DS);
   }
@@ -783,11 +761,7 @@ public:
                        CanAnyFunctionType inputSubstType,
                        CanAnyFunctionType outputSubstType,
                        bool baseLessVisibleThanDerived);
-  
-  /// If the current function is actor isolated, insert a hop_to_executor
-  /// instruction.
-  void emitHopToCurrentExecutor(SILLocation loc);
-  
+    
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
@@ -856,21 +830,27 @@ public:
   // Concurrency
   //===--------------------------------------------------------------------===//
 
-  /// Generates code into the given SGF that obtains the callee function's 
-  /// executor, if the function is actor-isolated.
-  /// @returns a SILValue representing the executor, if an executor exists.
-  static Optional<SILValue> EmitLoadActorExecutorForCallee(
-                                                  SILGenFunction *SGF, 
-                                                  ValueDecl *calleeVD,
-                                                  ArrayRef<ManagedValue> args);
+  /// Generates code to obtain the executor for the given actor isolation,
+  /// as-needed, and emits a \c hop_to_executor to that executor.
+  ///
+  /// \returns an \c ExecutorBreadcrumb that saves the information necessary to hop
+  /// back to what was previously the current executor after the actor-isolated
+  /// region ends. Invoke \c emit on the breadcrumb to
+  /// restore the previously-active executor.
+  ExecutorBreadcrumb emitHopToTargetActor(SILLocation loc,
+                            Optional<ActorIsolation> actorIso,
+                            Optional<ManagedValue> actorSelf);
 
+  /// Gets a reference to the current executor for the task.
+  SILValue emitGetCurrentExecutor(SILLocation loc);
+  
   /// Generates code to obtain the executor given the actor's decl.
-  /// @returns a SILValue representing the executor.
+  /// \returns a SILValue representing the executor.
   SILValue emitLoadActorExecutor(VarDecl *actorDecl);
 
   /// Generates the code to obtain the executor for the shared instance 
   /// of the \p globalActor based on the type.
-  /// @returns a SILValue representing the executor.
+  /// \returns a SILValue representing the executor.
   SILValue emitLoadGlobalActorExecutor(Type globalActor);
 
   //===--------------------------------------------------------------------===//
@@ -956,7 +936,8 @@ public:
   
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.
-  SILValue emitTemporaryAllocation(SILLocation loc, SILType ty);
+  SILValue emitTemporaryAllocation(SILLocation loc, SILType ty,
+                                   bool hasDynamicLifetime = false);
   
   /// Prepares a buffer to receive the result of an expression, either using the
   /// 'emit into' initialization buffer if available, or allocating a temporary
@@ -1478,7 +1459,8 @@ public:
                                            SILType storageType);
 
   SILValue emitUnwrapIntegerResult(SILLocation loc, SILValue value);
-  
+  SILValue emitWrapIntegerLiteral(SILLocation loc, SILType ty,
+                                  unsigned value);
   /// Load an r-value out of the given address. This does not handle
   /// reabstraction or bridging. If that is needed, use the other emit load
   /// entry point.
@@ -1602,6 +1584,7 @@ public:
       VarDecl *var,
       SubstitutionMap subs,
       RValue &&originalValue,
+      SILDeclRef::Kind initKind = SILDeclRef::Kind::PropertyWrapperBackingInitializer,
       SGFContext C = SGFContext());
 
   /// A convenience method for emitApply that just handles monomorphic
@@ -1652,6 +1635,7 @@ public:
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       CanSILFunctionType fnTy,
+                                      ExecutorBreadcrumb prevExecutor,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);
 

@@ -61,4 +61,16 @@ template <class T, class... Ts> class HasSpecializations<int, T, Ts...> {
   enum Maybe : int { No, Yes };
 };
 
+template <class>
+struct HasEmptySpecializationAndStaticDateMember {
+  inline static const bool value = false;
+};
+
+template <>
+struct HasEmptySpecializationAndStaticDateMember<char> {
+  inline static const bool value = true;
+};
+
+using HasEmptySpecializationAndStaticDateMemberInt = HasEmptySpecializationAndStaticDateMember<int>;
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_EXPLICIT_CLASS_SPECIALIZATION_H

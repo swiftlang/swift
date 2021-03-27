@@ -89,7 +89,10 @@ public:
 
   friend class Scope;
 
-//--- Function prologue and epilogue -------------------------------------------
+  Address createErrorResultSlot(SILType errorType, bool isAsync);
+
+  //--- Function prologue and epilogue
+  //-------------------------------------------
 public:
   Explosion collectParameters();
   void emitScalarReturn(SILType returnResultType, SILType funcResultType,
@@ -106,6 +109,7 @@ public:
   /// For async functions, this is different from the caller result slot because
   /// that is a gep into the %swift.context.
   Address getCalleeErrorResultSlot(SILType errorType);
+  Address getAsyncCalleeErrorResultSlot(SILType errorType);
 
   /// Return the error result slot provided by the caller.
   Address getCallerErrorResultSlot();
@@ -129,10 +133,11 @@ public:
   }
 
   llvm::Value *getAsyncTask();
-  llvm::Value *getAsyncExecutor();
   llvm::Value *getAsyncContext();
 
-  llvm::CallInst *emitSuspendAsyncCall(ArrayRef<llvm::Value *> args);
+  llvm::CallInst *emitSuspendAsyncCall(unsigned swiftAsyncContextIndex,
+                                       llvm::StructType *resultTy,
+                                       ArrayRef<llvm::Value *> args);
 
   llvm::Function *getOrCreateResumePrjFn();
   llvm::Function *createAsyncDispatchFn(const FunctionPointer &fnPtr,
@@ -165,13 +170,12 @@ private:
   Address ReturnSlot;
   llvm::BasicBlock *ReturnBB;
   llvm::Value *CalleeErrorResultSlot = nullptr;
+  llvm::Value *AsyncCalleeErrorResultSlot = nullptr;
   llvm::Value *CallerErrorResultSlot = nullptr;
   llvm::Value *CoroutineHandle = nullptr;
   llvm::Value *AsyncCoroutineCurrentResume = nullptr;
   llvm::Value *AsyncCoroutineCurrentContinuationContext = nullptr;
 
-  Address asyncTaskLocation;
-  Address asyncExecutorLocation;
   Address asyncContextLocation;
 
   /// The unique block that calls @llvm.coro.end.
@@ -192,8 +196,8 @@ public:
     return getEffectiveOptimizationMode() == OptimizationMode::ForSize;
   }
 
-  void setupAsync();
-  bool isAsync() const { return asyncTaskLocation.isValid(); }
+  void setupAsync(unsigned asyncContextIndex);
+  bool isAsync() const { return asyncContextLocation.isValid(); }
 
   Address createAlloca(llvm::Type *ty, Alignment align,
                        const llvm::Twine &name = "");

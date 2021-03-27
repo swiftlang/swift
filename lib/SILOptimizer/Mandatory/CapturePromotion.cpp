@@ -47,6 +47,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/FrozenMultiMap.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -313,11 +314,11 @@ private:
   SILValue getProjectBoxMappedVal(SILValue operandValue);
 
   void visitDebugValueAddrInst(DebugValueAddrInst *inst);
-  void visitStrongReleaseInst(StrongReleaseInst *inst);
   void visitDestroyValueInst(DestroyValueInst *inst);
   void visitStructElementAddrInst(StructElementAddrInst *inst);
   void visitLoadInst(LoadInst *inst);
   void visitLoadBorrowInst(LoadBorrowInst *inst);
+  void visitEndBorrowInst(EndBorrowInst *inst);
   void visitProjectBoxInst(ProjectBoxInst *inst);
   void visitBeginAccessInst(BeginAccessInst *inst);
   void visitEndAccessInst(EndAccessInst *inst);
@@ -467,9 +468,6 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
       orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
-  if (!orig->hasOwnership()) {
-    fn->setOwnershipEliminated();
-  }
   return fn;
 }
 
@@ -510,8 +508,7 @@ void ClosureCloner::populateCloned() {
     // If SIL ownership is enabled, we need to perform a borrow here if we have
     // a non-trivial value. We know that our value is not written to and it does
     // not escape. The use of a borrow enforces this.
-    if (cloned->hasOwnership() &&
-        mappedValue.getOwnershipKind() != OwnershipKind::None) {
+    if (mappedValue.getOwnershipKind() != OwnershipKind::None) {
       SILLocation loc(const_cast<ValueDecl *>((*ai)->getDecl()));
       mappedValue = getBuilder().emitBeginBorrowOperation(loc, mappedValue);
     }
@@ -565,7 +562,6 @@ SILFunction *ClosureCloner::constructClonedFunction(
 SILValue ClosureCloner::getProjectBoxMappedVal(SILValue operandValue) {
   if (auto *bai = dyn_cast<BeginAccessInst>(operandValue))
     operandValue = bai->getSource();
-
   if (auto *pbi = dyn_cast<ProjectBoxInst>(operandValue)) {
     auto iter = projectBoxArgumentMap.find(pbi);
     if (iter != projectBoxArgumentMap.end())
@@ -586,50 +582,25 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *inst) {
   SILCloner<ClosureCloner>::visitDebugValueAddrInst(inst);
 }
 
-/// Handle a strong_release instruction during cloning of a closure; if
-/// it is a strong release of a promoted box argument, then it is replaced with
-/// a ReleaseValue of the new object type argument, otherwise it is handled
-/// normally.
-void ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *inst) {
-  assert(
-      !inst->getFunction()->hasOwnership() &&
-      "Should not see strong release in a function with qualified ownership");
-  SILValue operandValue = inst->getOperand();
-  if (auto *arg = dyn_cast<SILArgument>(operandValue)) {
-    auto iter = boxArgumentMap.find(arg);
-    if (iter != boxArgumentMap.end()) {
-      // Releases of the box arguments get replaced with ReleaseValue of the new
-      // object type argument.
-      auto &typeLowering =
-          getBuilder().getTypeLowering(iter->second->getType());
-      SILBuilderWithPostProcess<ClosureCloner, 1> b(this, inst);
-      typeLowering.emitDestroyValue(b, inst->getLoc(), iter->second);
-      return;
-    }
-  }
-
-  SILCloner<ClosureCloner>::visitStrongReleaseInst(inst);
-}
-
-/// Handle a destroy_value instruction during cloning of a closure; if
-/// it is a strong release of a promoted box argument, then it is replaced with
-/// a destroy_value of the new object type argument, otherwise it is handled
+/// Handle a destroy_value instruction during cloning of a closure; if it is a
+/// destroy_value of a promoted box argument, then it is replaced with a
+/// destroy_value of the new object type argument, otherwise it is handled
 /// normally.
 void ClosureCloner::visitDestroyValueInst(DestroyValueInst *inst) {
   SILValue operand = inst->getOperand();
   if (auto *arg = dyn_cast<SILArgument>(operand)) {
     auto iter = boxArgumentMap.find(arg);
     if (iter != boxArgumentMap.end()) {
-      // Releases of the box arguments get replaced with an end_borrow,
+      // destroy_value of the box arguments get replaced with an end_borrow,
       // destroy_value of the new object type argument.
       SILFunction &f = getBuilder().getFunction();
       auto &typeLowering = f.getTypeLowering(iter->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> b(this, inst);
       SILValue value = iter->second;
 
-      // If ownership is enabled, then we must emit a begin_borrow for any
-      // non-trivial value.
-      if (f.hasOwnership() && value.getOwnershipKind() != OwnershipKind::None) {
+      // We must have emitted a begin_borrow for any non-trivial value. Insert
+      // an end_borrow if so.
+      if (value.getOwnershipKind() != OwnershipKind::None) {
         auto *bbi = cast<BeginBorrowInst>(value);
         value = bbi->getOperand();
         b.emitEndBorrowOperation(inst->getLoc(), bbi);
@@ -641,6 +612,29 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *inst) {
   }
 
   SILCloner<ClosureCloner>::visitDestroyValueInst(inst);
+}
+
+/// Handle an end_borrow instruction during cloning of a closure; if it is a
+/// end_borrow from a load_borrow of a promoted box argument, then it is
+/// deleted, otherwise it is handled normally.
+void ClosureCloner::visitEndBorrowInst(EndBorrowInst *inst) {
+  SILValue operand = inst->getOperand();
+
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(operand)) {
+    SILValue op = lbi->getOperand();
+    // When we check if we can do this, we only need to look through a single
+    // struct_element_addr since when checking if this is safe, we only look
+    // through a single struct_element_addr.
+    if (auto *sea = dyn_cast<StructElementAddrInst>(op))
+      op = sea->getOperand();
+
+    // If after optionally looking through a gep, we have our project_box, just
+    // eliminate the end_borrow.
+    if (getProjectBoxMappedVal(op))
+      return;
+  }
+
+  SILCloner<ClosureCloner>::visitEndBorrowInst(inst);
 }
 
 /// Handle a struct_element_addr instruction during cloning of a closure.
@@ -798,6 +792,8 @@ static SILArgument *getBoxFromIndex(SILFunction *f, unsigned index) {
 }
 
 static bool isNonMutatingLoad(SILInstruction *inst) {
+  if (isa<LoadBorrowInst>(inst))
+    return true;
   auto *li = dyn_cast<LoadInst>(inst);
   if (!li)
     return false;
@@ -1329,7 +1325,7 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
         // If our partial apply is concurrent and we can not promote this, emit
         // a warning that shows the variable, where the variable is captured,
         // and the mutation that we found.
-        if (pai->getFunctionType()->isConcurrent()) {
+        if (pai->getFunctionType()->isSendable()) {
           diagnoseInvalidCaptureByConcurrentClosure(abi, pai, state, user);
         }
 
@@ -1573,14 +1569,17 @@ class CapturePromotionPass : public SILModuleTransform {
   void run() override {
     SmallVector<SILFunction *, 128> worklist;
     for (auto &f : *getModule()) {
-      if (f.wasDeserializedCanonical())
+      if (f.wasDeserializedCanonical() || !f.hasOwnership())
         continue;
 
       processFunction(&f, worklist);
     }
 
     while (!worklist.empty()) {
-      processFunction(worklist.pop_back_val(), worklist);
+      auto *f = worklist.pop_back_val();
+      if (!f->hasOwnership())
+        continue;
+      processFunction(f, worklist);
     }
   }
 
@@ -1592,6 +1591,9 @@ class CapturePromotionPass : public SILModuleTransform {
 
 void CapturePromotionPass::processFunction(
     SILFunction *func, SmallVectorImpl<SILFunction *> &worklist) {
+  assert(func->hasOwnership() &&
+         "Only can perform capture promotion on functions with ownership. All "
+         "functions in raw SIL should have OSSA now out of SILGen");
   LLVM_DEBUG(llvm::dbgs() << "******** Performing Capture Promotion on: "
                           << func->getName() << "********\n");
   // This is a map from each partial apply to a set of indices of promotable

@@ -15,7 +15,7 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
@@ -41,6 +41,7 @@ namespace {
 
 // Without any complex analysis, does this instruction seem like
 // something that we need to keep?
+//
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
@@ -243,9 +244,17 @@ void DCE::markLive() {
         }
         break;
       }
+      // The side-effects of fix_lifetime effect all references to the same
+      // object. It must be preserved to keep alive any potentially aliasing
+      // references. fix_lifetime can only be removed by proving that its
+      // operand is both a unique and a dead reference, but this makes more
+      // sense in DeadObjectElimination.
       case SILInstructionKind::FixLifetimeInst: {
+        // If the operand is a trivial scalar value, then it has no aliases or
+        // side-effects. Consider handling this as an instruction
+        // canonicalization instead.
         SILValue Op = I.getOperand(0);
-        if (!Op->getType().isAddress()) {
+        if (!Op->getType().isAddress() && Op->getType().isTrivial(*F)) {
           addReverseDependency(Op, &I);
         } else {
           markInstructionLive(&I);

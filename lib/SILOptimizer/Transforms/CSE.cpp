@@ -285,7 +285,8 @@ public:
   }
 
   hash_code visitValueMetatypeInst(ValueMetatypeInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getType(),
+                              lookThroughOwnershipInsts(X->getOperand()));
   }
 
   hash_code visitExistentialMetatypeInst(ExistentialMetatypeInst *X) {
@@ -353,12 +354,14 @@ public:
     // We hash the enum by hashing its kind, element, and operand if it has one.
     if (!X->hasOperand())
       return llvm::hash_combine(X->getKind(), X->getElement());
-    return llvm::hash_combine(X->getKind(), X->getElement(), X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getElement(),
+                              lookThroughOwnershipInsts(X->getOperand()));
   }
 
   hash_code visitUncheckedEnumDataInst(UncheckedEnumDataInst *X) {
     // We hash the enum by hashing its kind, element, and operand.
-    return llvm::hash_combine(X->getKind(), X->getElement(), X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getElement(),
+                              lookThroughOwnershipInsts(X->getOperand()));
   }
 
   hash_code visitIndexAddrInst(IndexAddrInst *X) {
@@ -389,11 +392,10 @@ public:
   }
 
   hash_code visitSelectEnumInstBase(SelectEnumInstBase *X) {
-    auto hash = llvm::hash_combine(X->getKind(),
-                                   X->getEnumOperand(),
-                                   X->getType(),
-                                   X->hasDefault());
-    
+    auto hash = llvm::hash_combine(
+        X->getKind(), lookThroughOwnershipInsts(X->getEnumOperand()),
+        X->getType(), X->hasDefault());
+
     for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
       hash = llvm::hash_combine(hash, X->getCase(i).first,
                                 X->getCase(i).second);
@@ -415,9 +417,8 @@ public:
 
   hash_code visitSelectValueInst(SelectValueInst *X) {
     auto hash = llvm::hash_combine(X->getKind(),
-                                   X->getOperand(),
-                                   X->getType(),
-                                   X->hasDefault());
+                                   lookThroughOwnershipInsts(X->getOperand()),
+                                   X->getType(), X->hasDefault());
 
     for (unsigned i = 0, e = X->getNumCases(); i < e; ++i) {
       hash = llvm::hash_combine(hash, X->getCase(i).first,
@@ -452,6 +453,14 @@ public:
   }
 
   hash_code visitMarkDependenceInst(MarkDependenceInst *X) {
+    if (X->getFunction()->hasOwnership()) {
+      auto TransformedOpValues =
+          X->getOperandValues(lookThroughOwnershipInsts, false);
+      return llvm::hash_combine(
+          X->getKind(), X->getType(),
+          llvm::hash_combine_range(TransformedOpValues.begin(),
+                                   TransformedOpValues.end()));
+    }
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getType(),
@@ -1276,7 +1285,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
 
   ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI,
                                        ToAI->getSubstitutionMap(), Args,
-                                       ToAI->isNonThrowing());
+                                       ToAI->getApplyOptions());
   FromAI->replaceAllUsesWith(NAI);
   FromAI->eraseFromParent();
   ++NumOpenExtRemoved;

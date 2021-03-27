@@ -13,6 +13,7 @@
 #include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
+#include "ExecutorBreadcrumb.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
@@ -729,11 +730,10 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
   // Emit the condition bindings, branching to the bodyBB if they fail.
   auto NumFalseTaken = SGF.loadProfilerCount(S->getBody());
   auto NumNonTaken = SGF.loadProfilerCount(S);
-  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
-
   // Begin a new 'guard' scope, which is popped when the next innermost debug
   // scope ends.
   SGF.enterDebugScope(S, /*isGuardScope=*/true);
+  SGF.emitStmtCondition(S->getCond(), bodyBB, S, NumNonTaken, NumFalseTaken);
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
@@ -1456,6 +1456,7 @@ void StmtEmitter::visitFailStmt(FailStmt *S) {
 SILBasicBlock *
 SILGenFunction::getTryApplyErrorDest(SILLocation loc,
                                      CanSILFunctionType fnTy,
+                                     ExecutorBreadcrumb prevExecutor,
                                      SILResultInfo exnResult,
                                      bool suppressErrorPath) {
   assert(exnResult.getConvention() == ResultConvention::Owned);
@@ -1469,8 +1470,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
   SILGenSavedInsertionPoint savedIP(*this, destBB, FunctionSection::Postmatter);
 
-  if (fnTy->isAsync())
-    emitHopToCurrentExecutor(loc);
+  prevExecutor.emit(*this, loc);
 
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.

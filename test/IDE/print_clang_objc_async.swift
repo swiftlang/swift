@@ -26,11 +26,13 @@ import _Concurrency
 // CHECK-DAG:     func doSomethingFun(_ operation: String) async
 // CHECK-DAG:     func dance(_ step: String) async -> String
 // CHECK-DAG:     func __leap(_ height: Int) async -> String
+// CHECK-DAG:     func runOnMainThread(completionHandler completion: (@MainActor (String) -> Void)? = nil)
+// CHECK-DAG:     func runOnMainThread() async -> String
 // CHECK: {{^[}]$}}
 
 // CHECK-LABEL: protocol RefrigeratorDelegate
-// CHECK-NEXT: @asyncHandler func someoneDidOpenRefrigerator(_ fridge: Any)
-// CHECK-NEXT: @asyncHandler func refrigerator(_ fridge: Any, didGetFilledWithItems items: [Any])
+// CHECK-NEXT: func someoneDidOpenRefrigerator(_ fridge: Any)
+// CHECK-NEXT: func refrigerator(_ fridge: Any, didGetFilledWithItems items: [Any])
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, didGetFilledWithIntegers items: UnsafeMutablePointer<Int>, count: Int)
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, willAddItem item: Any)
 // CHECK-NEXT: {{^}}  func refrigerator(_ fridge: Any, didRemoveItem item: Any) -> Bool
@@ -38,9 +40,12 @@ import _Concurrency
 
 // CHECK-LABEL: protocol ProtocolWithSwiftAttributes {
 // CHECK-NEXT: @actorIndependent func independentMethod()
-// CHECK-NEXT: @asyncHandler func asyncHandlerMethod()
-// CHECK-NEXT: @MainActor func mainActorMethod()
+// CHECK-NEXT: func asyncHandlerMethod()
+// CHECK-NEXT: {{^}}  @MainActor func mainActorMethod()
+// CHECK-NEXT: {{^}}  @MainActor func uiActorMethod()
 // CHECK-NEXT: {{^}}  optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
 
-// CHECK: @actorIndependent var MAGIC_NUMBER: Int32 { get }
+// CHECK: {{^}}var MAGIC_NUMBER: Int32 { get }
+
+// CHECK: func doSomethingConcurrently(_ block: @Sendable () -> Void)

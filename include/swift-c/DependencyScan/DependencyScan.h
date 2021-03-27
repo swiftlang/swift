@@ -27,7 +27,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 0
-#define SWIFTSCAN_VERSION_MINOR 1
+#define SWIFTSCAN_VERSION_MINOR 2
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -275,6 +275,9 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation);
 //=== Cleanup Functions ---------------------------------------------------===//
 
 SWIFTSCAN_PUBLIC void
+swiftscan_string_set_dispose(swiftscan_string_set_t *set);
+
+SWIFTSCAN_PUBLIC void
 swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result);
 
 SWIFTSCAN_PUBLIC void
@@ -291,6 +294,13 @@ swiftscan_batch_scan_result_dispose(swiftscan_batch_scan_result_t *result);
 
 SWIFTSCAN_PUBLIC void
 swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation);
+
+//=== Feature-Query Functions -----------------------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_compiler_supported_arguments_query();
+
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_compiler_supported_features_query();
 
 //=== Scanner Functions ---------------------------------------------------===//
 

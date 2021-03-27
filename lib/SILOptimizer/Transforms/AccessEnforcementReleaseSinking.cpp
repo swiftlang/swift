@@ -141,6 +141,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::COWBufferForReading:
     case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::GetCurrentAsyncTask:
+    case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::AutoDiffCreateLinearMapContext:
       return false;
 
@@ -167,8 +168,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnsafeGuaranteed:
     case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
-    case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::CreateAsyncTaskFuture:
+    case BuiltinValueKind::CreateAsyncTaskGroupFuture:
     case BuiltinValueKind::ConvertTaskToJob:
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:

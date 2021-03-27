@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -o /dev/null | %target-sil-func-extractor -module-name="Swift" -func='$ss1XV4testyyF' | %FileCheck %s
-// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -O -parse-as-library -parse-stdlib -emit-sib -o - | %target-sil-func-extractor -module-name="Swift" -func='$ss1XV4testyyF' | %FileCheck %s -check-prefix=SIB-CHECK
+// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -module-link-name swiftCore -O -parse-as-library -parse-stdlib -emit-module -emit-module-path - -enable-ossa-modules -o /dev/null | %target-sil-func-extractor -module-name="Swift" -enable-ossa-modules -func='$ss1XV4testyyF' | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -module-name Swift -g -O -parse-as-library -parse-stdlib -emit-sib -enable-ossa-modules -o - | %target-sil-func-extractor -module-name="Swift" -enable-ossa-modules -func='$ss1XV4testyyF' | %FileCheck %s -check-prefix=SIB-CHECK
 
 // CHECK: import Builtin
 // CHECK: import Swift
@@ -12,7 +12,7 @@
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil [serialized] [canonical] @$ss1XV4testyyF : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil [serialized] [canonical] [ossa] @$ss1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -36,7 +36,7 @@
 // SIB-CHECK-NEXT:  init
 // SIB-CHECK-NEXT: }
 
-// SIB-CHECK-LABEL: sil [serialized] [canonical] @$ss1XV4testyyF : $@convention(method) (X) -> ()
+// SIB-CHECK-LABEL: sil [serialized] [canonical] [ossa] @$ss1XV4testyyF : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
 // SIB-CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()

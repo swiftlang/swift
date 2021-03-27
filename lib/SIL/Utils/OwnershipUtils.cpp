@@ -147,13 +147,10 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 //                 Guaranteed Use-Point (Lifetime) Discovery
 //===----------------------------------------------------------------------===//
 
-// Find all use points of \p guaranteedValue within its borrow scope where \p
-// guaranteedValue is not itself a BorrowedValue (it does not introduce a borrow
-// scope). This means there is no need to consider reborrows, and all uses are
-// naturally dominated by \p guaranteedValue. On the other hand, if a
-// PointerEscape is found, then no assumption can be made about \p
-// guaranteedValue's lifetime. Therefore the use points are incomplete and this
-// returns false.
+// Find all use points of \p guaranteedValue within its borrow scope. All uses
+// are naturally dominated by \p guaranteedValue. If a PointerEscape is found,
+// then no assumption can be made about \p guaranteedValue's lifetime. Therefore
+// the use points are incomplete and this returns false.
 //
 // Accumulate results in \p usePoints, ignoring existing elements.
 //
@@ -161,7 +158,7 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
 // points. Transitively find all nested scope-ending instructions by looking
 // through nested reborrows. Nested reborrows are not use points and \p
 // visitReborrow is not called for them.
-static bool
+bool swift::
 findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
                                   SmallVectorImpl<Operand *> &usePoints) {
   // Push the value's immediate uses.
@@ -195,7 +192,6 @@ findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
     case OperandOwnership::TrivialUse:
     case OperandOwnership::ForwardingConsume:
     case OperandOwnership::DestroyingConsume:
-    case OperandOwnership::Reborrow:
       llvm_unreachable("this operand cannot handle an inner guaranteed use");
 
     case OperandOwnership::ForwardingUnowned:
@@ -205,7 +201,12 @@ findInnerTransitiveGuaranteedUses(SILValue guaranteedValue,
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
     case OperandOwnership::BitwiseEscape:
-    // An end_borrow may be pushed as a use when processing a nested borrow.
+    // Reborrow only happens when this is called on a value that creates a
+    // borrow scope.
+    case OperandOwnership::Reborrow:
+    // EndBorrow either happens when this is called on a value that creates a
+    // borrow scope, or when it is pushed as a use when processing a nested
+    // borrow.
     case OperandOwnership::EndBorrow:
       break;
 
@@ -648,16 +649,15 @@ bool BorrowedValue::visitInteriorPointerOperandHelper(
     if (isa<DebugValueInst>(user) || isa<SuperMethodInst>(user) ||
         isa<ClassMethodInst>(user) || isa<CopyValueInst>(user) ||
         isa<EndBorrowInst>(user) || isa<ApplyInst>(user) ||
-        isa<StoreBorrowInst>(user) || isa<StoreInst>(user) ||
-        isa<PartialApplyInst>(user) || isa<UnmanagedRetainValueInst>(user) ||
+        isa<StoreInst>(user) || isa<PartialApplyInst>(user) ||
+        isa<UnmanagedRetainValueInst>(user) ||
         isa<UnmanagedReleaseValueInst>(user) ||
         isa<UnmanagedAutoreleaseValueInst>(user)) {
       continue;
     }
 
     // These are interior pointers that have not had support yet added for them.
-    if (isa<OpenExistentialBoxInst>(user) ||
-        isa<ProjectExistentialBoxInst>(user)) {
+    if (isa<ProjectExistentialBoxInst>(user)) {
       continue;
     }
 
@@ -708,13 +708,12 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
     // and do not need to check transitive uses of.
     if (isa<LoadInst>(user) || isa<CopyAddrInst>(user) ||
         isIncidentalUse(user) || isa<StoreInst>(user) ||
-        isa<StoreBorrowInst>(user) || isa<PartialApplyInst>(user) ||
-        isa<DestroyAddrInst>(user) || isa<AssignInst>(user) ||
-        isa<AddressToPointerInst>(user) || isa<YieldInst>(user) ||
-        isa<LoadUnownedInst>(user) || isa<StoreUnownedInst>(user) ||
-        isa<EndApplyInst>(user) || isa<LoadWeakInst>(user) ||
-        isa<StoreWeakInst>(user) || isa<AssignByWrapperInst>(user) ||
-        isa<BeginUnpairedAccessInst>(user) ||
+        isa<PartialApplyInst>(user) || isa<DestroyAddrInst>(user) ||
+        isa<AssignInst>(user) || isa<AddressToPointerInst>(user) ||
+        isa<YieldInst>(user) || isa<LoadUnownedInst>(user) ||
+        isa<StoreUnownedInst>(user) || isa<EndApplyInst>(user) ||
+        isa<LoadWeakInst>(user) || isa<StoreWeakInst>(user) ||
+        isa<AssignByWrapperInst>(user) || isa<BeginUnpairedAccessInst>(user) ||
         isa<EndUnpairedAccessInst>(user) || isa<WitnessMethodInst>(user) ||
         isa<SwitchEnumAddrInst>(user) || isa<CheckedCastAddrBranchInst>(user) ||
         isa<SelectEnumAddrInst>(user) || isa<InjectEnumAddrInst>(user)) {
@@ -727,7 +726,7 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
         isa<OpenExistentialAddrInst>(user) ||
         isa<InitExistentialAddrInst>(user) || isa<InitEnumDataAddrInst>(user) ||
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
-        isa<IndexAddrInst>(user) ||
+        isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
         isa<UnconditionalCheckedCastAddrInst>(user) ||
         isa<UncheckedAddrCastInst>(user)) {
       for (SILValue r : user->getResults()) {
@@ -770,7 +769,7 @@ bool InteriorPointerOperand::findTransitiveUsesForAddress(
       }
 
       // If we are the value use, look through it.
-      llvm::copy(mdi->getValue()->getUses(), std::back_inserter(worklist));
+      llvm::copy(mdi->getUses(), std::back_inserter(worklist));
       continue;
     }
 

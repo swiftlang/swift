@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
@@ -98,9 +99,18 @@
 // CHECK:   return
 public let globalVariable = [ 100, 101, 102 ]
 
-// CHECK-LABEL: sil {{.*}}arrayLookup{{.*}} : $@convention(thin) (Int) -> Int {
-// CHECK:   global_value @{{.*}}arrayLookup{{.*}}
-// CHECK:   return
+// CHECK-LABEL: sil [noinline] @$s4test11arrayLookupyS2iF
+// CHECK:   global_value @$s4test11arrayLookupyS2iFTv_
+// CHECK-NOT: retain
+// CHECK-NOT: release
+// CHECK:   } // end sil function '$s4test11arrayLookupyS2iF'
+
+// CHECK-LLVM-LABEL: define {{.*}} @"$s4test11arrayLookupyS2iF"
+// CHECK-LLVM-NOT:  call
+// CHECK-LLVM:      [[E:%[0-9]+]] = getelementptr {{.*}} @"$s4test11arrayLookupyS2iFTv_"
+// CHECK-LLVM-NEXT: [[L:%[0-9]+]] = load {{.*}} [[E]]
+// CHECK-LLVM-NEXT: ret {{.*}} [[L]]
+// CHECK-LLVM:   }
 @inline(never)
 public func arrayLookup(_ i: Int) -> Int {
   let lookupTable = [10, 11, 12]

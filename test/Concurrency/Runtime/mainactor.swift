@@ -1,32 +1,23 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -enable-experimental-concurrency %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: libdispatch
 
-// REQUIRES: OS=macosx || OS=ios
-// FIXME: should not require Darwin to run this test once we have async main!
-
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-  import Dispatch
-#endif
+import Dispatch
 
 /// @returns true iff the expected answer is actually the case, i.e., correct.
 /// If the current queue does not match expectations, this function may return
 /// false or just crash the program with non-zero exit code, depending on SDK.
 func checkIfMainQueue(expectedAnswer expected: Bool) -> Bool {
-  // FIXME: until we start using dispatch on Linux, we only check
-  // which queue we're on with Darwin platforms.
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   if #available(macOS 10.12, iOS 10, tvOS 10, watchOS 3, *) {
     dispatchPrecondition(condition: expected ? .onQueue(DispatchQueue.main) 
                                              : .notOnQueue(DispatchQueue.main))
-    
   }
-#endif
   return true
 }
 
-actor class A {
+actor A {
   func onCorrectQueue(_ count : Int) -> Int {
     if checkIfMainQueue(expectedAnswer: false) {
       print("on actor instance's queue")
@@ -65,7 +56,7 @@ actor class A {
   return checkAnotherFn(count) + 1
 }
 
-@concurrent func someFunc() async -> Int {
+@Sendable func someFunc() async -> Int {
   // NOTE: the "return" counter is just to make sure we're properly returning values.
   // the expected number should be equal to the number of "plus-one" expressions.
   // since there are no loops or duplicate function calls
@@ -74,6 +65,8 @@ actor class A {
 
 
 // CHECK: starting
+// CHECK-NOT: ERROR
+// CHECK: Hello from the main function
 // CHECK-NOT: ERROR
 // CHECK: hello from main actor!
 // CHECK-NOT: ERROR
@@ -86,6 +79,11 @@ actor class A {
 @main struct RunIt {
   static func main() async {
     print("starting")
+    if checkIfMainQueue(expectedAnswer: true) {
+      print("Hello from the main function")
+    } else {
+      print("ERROR: not on the main queue")
+    }
     let result = await someFunc()
     print("finished with return counter = \(result)")
   }

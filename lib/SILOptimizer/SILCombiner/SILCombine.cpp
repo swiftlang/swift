@@ -24,7 +24,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -49,6 +49,12 @@ static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
     llvm::cl::desc("Enable sinking of owened forwarding insts"),
     llvm::cl::init(true), llvm::cl::Hidden);
 
+// Allow disabling general optimization for targetted unit tests.
+static llvm::cl::opt<bool> EnableSILCombineCanonicalize(
+    "sil-combine-canonicalize",
+    llvm::cl::desc("Canonicalization during sil-combine"), llvm::cl::init(true),
+    llvm::cl::Hidden);
+
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
 //===----------------------------------------------------------------------===//
@@ -61,17 +67,10 @@ static llvm::cl::opt<bool> EnableSinkingOwnedForwardingInstToUses(
 /// worklist (this significantly speeds up SILCombine on code where many
 /// instructions are dead or constant).
 void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
-  llvm::SmallVector<SILBasicBlock *, 256> Worklist;
+  BasicBlockWorklist<256> Worklist(BB);
   llvm::SmallVector<SILInstruction *, 128> InstrsForSILCombineWorklist;
-  BasicBlockSet Visited(BB->getParent());
 
-  Worklist.push_back(BB);
-  do {
-    BB = Worklist.pop_back_val();
-
-    // We have now visited this block!  If we've already been here, ignore it.
-    if (!Visited.insert(BB)) continue;
-
+  while (SILBasicBlock *BB = Worklist.pop()) {
     for (SILBasicBlock::iterator BBI = BB->begin(), E = BB->end(); BBI != E; ) {
       SILInstruction *Inst = &*BBI;
       ++BBI;
@@ -98,9 +97,10 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
     }
 
     // Recursively visit successors.
-    for (auto SI = BB->succ_begin(), SE = BB->succ_end(); SI != SE; ++SI)
-      Worklist.push_back(*SI);
-  } while (!Worklist.empty());
+    for (SILBasicBlock *Succ : BB->getSuccessors()) {
+      Worklist.pushIfNotVisited(Succ);
+    }
+  }
 
   // Once we've found all of the instructions to add to the worklist, add them
   // in reverse order. This way SILCombine will visit from the top of the
@@ -147,6 +147,9 @@ public:
   }
 
   bool tryCanonicalize(SILInstruction *inst) {
+    if (!EnableSILCombineCanonicalize)
+      return false;
+
     changed = false;
     canonicalize(inst);
     return changed;

@@ -89,7 +89,6 @@ void addImageDynamicReplacementBlockCallback(const void *start, uintptr_t size,
                                              uintptr_t size2);
 
 int lookupSymbol(const void *address, SymbolInfo *info);
-void *lookupSection(const char *segment, const char *section, size_t *outSize);
 
 } // end namespace swift
 

@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Sema/CSBindings.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -43,11 +44,13 @@ class Constraint;
 class ConstraintGraph;
 class ConstraintGraphScope;
 class ConstraintSystem;
+class TypeVariableBinding;
 
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
 public:
-  explicit ConstraintGraphNode(TypeVariableType *typeVar) : TypeVar(typeVar) { }
+  explicit ConstraintGraphNode(ConstraintGraph &CG, TypeVariableType *typeVar)
+      : CG(CG), TypeVar(typeVar) {}
 
   ConstraintGraphNode(const ConstraintGraphNode&) = delete;
   ConstraintGraphNode &operator=(const ConstraintGraphNode&) = delete;
@@ -63,15 +66,27 @@ public:
 
   /// Retrieve the set of type variables that are adjacent due to fixed
   /// bindings.
-  ArrayRef<TypeVariableType *> getFixedBindings() const {
-    return FixedBindings;
+  ArrayRef<TypeVariableType *> getReferencedVars() const {
+    return References.getArrayRef();
+  }
+
+  ArrayRef<TypeVariableType *> getReferencedBy() const {
+    return ReferencedBy.getArrayRef();
   }
 
   /// Retrieve all of the type variables in the same equivalence class
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
+  inference::PotentialBindings &getCurrentBindings();
+
 private:
+  /// Determines whether the type variable associated with this node
+  /// is a representative of an equivalence class.
+  ///
+  /// Note: The smallest equivalence class is of just one variable - itself.
+  bool forRepresentativeVar() const;
+
   /// Retrieve all of the type variables in the same equivalence class
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClassUnsafe() const;
@@ -88,15 +103,79 @@ private:
   /// Add the given type variables to this node's equivalence class.
   void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
 
+  /// Remove N last members from equivalence class of the current type variable.
+  void truncateEquivalenceClass(unsigned prevSize);
+
   /// Add a type variable related to this type variable through fixed
-  /// bindings.
-  void addFixedBinding(TypeVariableType *typeVar);
-  
-  /// Remove a type variable from the fixed-binding relationship.
-  void removeFixedBinding(TypeVariableType *typeVar);
+  /// binding.
+  void addReferencedVar(TypeVariableType *typeVar);
+
+  /// Add a type variable referencing this type variable - this type
+  /// variable occurs in fixed type of the given type variable.
+  void addReferencedBy(TypeVariableType *typeVar);
+
+  /// Remove a type variable referenced by this node through a fixed binding.
+  void removeReference(TypeVariableType *typeVar);
+
+  /// Remove a type variable which used to reference this type variable.
+  void removeReferencedBy(TypeVariableType *typeVar);
+
+  /// Binding Inference {
+
+  /// Infer bindings from the given constraint and notify referenced variables
+  /// about its arrival (if requested). This happens every time a new constraint
+  /// gets added to a constraint graph node.
+  void introduceToInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Forget about the given constraint. This happens every time a constraint
+  /// gets removed for a constraint graph.
+  void retractFromInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Re-evaluate the given constraint. This happens when there are changes
+  /// in associated type variables e.g. bound/unbound to/from a fixed type,
+  /// equivalence class changes.
+  void reintroduceToInference(Constraint *constraint, bool notifyReferencedVars);
+
+  /// Similar to \c introduceToInference(Constraint *, ...) this method is going
+  /// to notify inference that this type variable has been bound to a concrete
+  /// type.
+  ///
+  /// The reason why this can't simplify be a part of \c bindTypeVariable
+  /// is related to the fact that it's sometimes expensive to re-compute
+  /// bindings (i.e. if `DependentMemberType` is involved, because it requires
+  /// a conformance lookup), so inference has to be delayed until its clear that
+  /// type variable has been bound to a valid type and solver can make progress.
+  void introduceToInference(Type fixedType);
+
+  /// Opposite of \c introduceToInference(Type)
+  void
+  retractFromInference(Type fixedType,
+                       SmallPtrSetImpl<TypeVariableType *> &referencedVars);
+
+  /// Drop all previously collected bindings and re-infer based on the
+  /// current set constraints associated with this equivalence class.
+  void resetBindingSet();
+
+  /// Notify all of the type variables that have this one (or any member of
+  /// its equivalence class) referenced in their fixed type.
+  ///
+  /// This is a traversal up the reference change which triggers constraint
+  /// re-introduction to affected type variables.
+  ///
+  /// This is useful in situations when type variable gets bound and unbound,
+  /// or equivalence class changes.
+  void notifyReferencingVars() const;
+
+  /// }
+
+  /// The constraint graph this node belongs to.
+  ConstraintGraph &CG;
 
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
+
+  /// The set of bindings associated with this type variable.
+  llvm::Optional<inference::PotentialBindings> Bindings;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
@@ -106,9 +185,13 @@ private:
   /// to the index within the vector of constraints.
   llvm::SmallDenseMap<Constraint *, unsigned, 2> ConstraintIndex;
 
+  /// The set of type variables that reference type variable associated
+  /// with this constraint graph node.
+  llvm::SmallSetVector<TypeVariableType *, 2> ReferencedBy;
+
   /// The set of type variables that occur within the fixed binding of
   /// this type variable.
-  SmallVector<TypeVariableType *, 2> FixedBindings;
+  llvm::SmallSetVector<TypeVariableType *, 2> References;
 
   /// All of the type variables in the same equivalence class as this
   /// representative type variable.
@@ -127,6 +210,8 @@ private:
   void verify(ConstraintGraph &cg);
 
   friend class ConstraintGraph;
+  friend class ConstraintSystem;
+  friend class TypeVariableBinding;
 };
 
 /// A graph that describes the relationships among the various type variables

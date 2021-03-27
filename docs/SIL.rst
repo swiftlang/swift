@@ -1590,11 +1590,14 @@ Differentiability Witnesses
   sil-differentiability-witness ::=
       'sil_differentiability_witness'
       sil-linkage?
+      '[' differentiability-kind ']'
       '[' 'parameters' sil-differentiability-witness-function-index-list ']'
       '[' 'results' sil-differentiability-witness-function-index-list ']'
       generic-parameter-clause?
       sil-function-name ':' sil-type
       sil-differentiability-witness-body?
+
+  differentiability-kind ::= 'forward' | 'reverse' | 'normal' | 'linear'
 
   sil-differentiability-witness-body ::=
       '{' sil-differentiability-witness-entry?
@@ -1625,7 +1628,7 @@ based on the key.
 
 ::
 
-  sil_differentiability_witness hidden [parameters 0] [results 0] <T where T : Differentiable> @id : $@convention(thin) (T) -> T {
+  sil_differentiability_witness hidden [normal] [parameters 0] [results 0] <T where T : Differentiable> @id : $@convention(thin) (T) -> T {
     jvp: @id_jvp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
     vjp: @id_vjp : $@convention(thin) (T) -> (T, @owned @callee_guaranteed (T.TangentVector) -> T.TangentVector)
   }
@@ -2033,7 +2036,15 @@ and as a result:
 
 * Textual SIL does not represent the ownership of forwarding instructions
   explicitly. Instead, the instruction's ownership is inferred normally from the
-  parsed operand. Since the SILVerifier runs on Textual SIL after parsing, you
+  parsed operand.
+  In some cases the forwarding ownership kind is different from the ownership kind
+  of its operand. In such cases, textual SIL represents the forwarding ownership kind
+  explicity.
+  Eg: ::
+
+    %cast = unchecked_ref_cast %val : $Klass to $Optional<Klass>, forwarding: @unowned
+
+  Since the SILVerifier runs on Textual SIL after parsing, you
   can feel confident that ownership constraints were inferred correctly.
 
 Forwarding has slightly different ownership semantics depending on the value
@@ -2316,6 +2327,54 @@ The current list of interior pointer SIL instructions are:
 
 (*) We still need to finish adding support for project_box, but all other
 interior pointers are guarded already.
+
+Memory Lifetime
+~~~~~~~~~~~~~~~
+
+Similar to Ownership SSA, there are also lifetime rules for values in memory.
+With "memory" we refer to memory which is addressed by SIL instruction with
+address-type operands, like ``load``, ``store``, ``switch_enum_addr``, etc.
+
+Each memory location which holds a non-trivial value is either uninitialized
+or initialized. A memory location gets initialized by storing values into it
+(except assignment, which expects a location to be already initialized).
+A memory location gets de-initialized by "taking" from it or destroying it, e.g.
+with ``destroy_addr``. It is illegal to re-initialize a memory location or to
+use a location after it was de-initialized.
+
+If a memory location holds a trivial value (e.g. an ``Int``), it is not
+required to de-initialize the location.
+
+The SIL verifier checks this rule for memory locations which can be uniquely
+identified, for example and ``alloc_stack`` or an indirect parameter. The
+verifier cannot check memory locations which are potentially aliased, e.g.
+a ``ref_element_addr`` (a stored class property).
+
+Lifetime of Enums in Memory
+```````````````````````````
+
+The situation is a bit more complicated with enums, because an enum can have
+both, cases with non-trivial payloads and cases with no payload or trivial
+payloads.
+
+Even if an enum itself is not trivial (because it has at least on case with a
+non-trivial payload), it is not required to de-initialize such an enum memory
+location on paths where it's statically provable that the enum contains a
+trivial or non-payload case.
+
+That's the case if the destroy point is jointly dominated by:
+
+* a ``store [trivial]`` to the enum memory location.
+
+or
+
+* an ``inject_enum_addr`` to the enum memory location with a non-trivial or
+  non-payload case.
+
+or
+
+* a successor of a ``switch_enum`` or ``switch_enum_addr`` for a non-trivial
+  or non-payload case.
 
 Dead End Blocks
 ~~~~~~~~~~~~~~~
@@ -3407,7 +3466,7 @@ debug_value
 
 ::
 
-  sil-instruction ::= debug_value sil-operand (',' debug-var-attr)*
+  sil-instruction ::= debug_value '[poison]'? sil-operand (',' debug-var-attr)*
 
   debug_value %1 : $Int
 
@@ -3428,6 +3487,15 @@ There are a number of attributes that provide details about the source
 variable that is being described, including the name of the
 variable. For function and closure arguments ``argno`` is the number
 of the function argument starting with 1.
+
+If the '[poison]' flag is set, then all references within this debug
+value will be overwritten with a sentinel at this point in the
+program. This is used in debug builds when shortening non-trivial
+value lifetimes to ensure the debugger cannot inspect invalid
+memory. `debug_value` instructions with the poison flag are not
+generated until OSSA islowered. They are not expected to be serialized
+within the module, and the pipeline is not expected to do any
+significant code motion after lowering.
 
 debug_value_addr
 ````````````````
@@ -3489,42 +3557,91 @@ load_borrow
    %1 = load_borrow %0 : $*T
    // $T must be a loadable type
 
-Loads the value ``%1`` from the memory location ``%0``. The ``load_borrow``
+Loads the value ``%1`` from the memory location ``%0``. The `load_borrow`_
 instruction creates a borrowed scope in which a read-only borrow value ``%1``
 can be used to read the value stored in ``%0``. The end of scope is delimited
-by an ``end_borrow`` instruction. All ``load_borrow`` instructions must be
-paired with exactly one ``end_borrow`` instruction along any path through the
-program. Until ``end_borrow``, it is illegal to invalidate or store to ``%0``.
+by an `end_borrow`_ instruction. All `load_borrow`_ instructions must be
+paired with exactly one `end_borrow`_ instruction along any path through the
+program. Until `end_borrow`_, it is illegal to invalidate or store to ``%0``.
+
+store_borrow
+````````````
+
+::
+
+  sil-instruction ::= 'store_borrow' sil-value 'to' sil-operand
+
+  store_borrow %0 to %1 : $*T
+  // $T must be a loadable type
+  // %1 must be an alloc_stack $T
+
+Stores the value ``%0`` to a stack location ``%1``, which must be an
+``alloc_stack $T``.
+The stored value is alive until the ``dealloc_stack`` or until another
+``store_borrow`` overwrites the value. During the its lifetime, the stored
+value must not be modified or destroyed.
+The source value ``%0`` is borrowed (i.e. not copied) and it's borrow scope
+must outlive the lifetime of the stored value.
+
+Note: This is the current implementation and the design is not final.
 
 begin_borrow
 ````````````
 
-TODO
+::
+
+   sil-instruction ::= 'begin_borrow' sil-operand
+
+   %1 = begin_borrow %0 : $T
+
+Given a value ``%0`` with `Owned`_ or `Guaranteed`_ ownership, produces a new
+same typed value with `Guaranteed`_ ownership: ``%1``. ``%1`` is guaranteed to
+have a lifetime ending use (e.x.: `end_borrow`_) along all paths that do not end
+in `Dead End Blocks`_. This `begin_borrow`_ and the lifetime ending uses of
+``%1`` are considered to be liveness requiring uses of ``%0`` and as such in the
+region in between this borrow and its lifetime ending use, ``%0`` must be
+live. This makes sense semantically since ``%1`` is modeling a new value with a
+dependent lifetime on ``%0``.
+
+This instruction is only valid in functions in Ownership SSA form.
 
 end_borrow
 ``````````
 
 ::
 
-   sil-instruction ::= 'end_borrow' sil-value 'from' sil-value : sil-type, sil-type
+   sil-instruction ::= 'end_borrow' sil-operand
 
-   end_borrow %1 from %0 : $T, $T
-   end_borrow %1 from %0 : $T, $*T
-   end_borrow %1 from %0 : $*T, $T
-   end_borrow %1 from %0 : $*T, $*T
-   // We allow for end_borrow to be specified in between values and addresses
-   // all of the same type T.
+   // somewhere earlier
+   // %1 = begin_borrow %0
+   end_borrow %1 : $T
 
-Ends the scope for which the SILValue ``%1`` is borrowed from the SILValue
-``%0``. Must be paired with at most 1 borrowing instruction (like
-``load_borrow``) along any path through the program. In the region in between
-the borrow instruction and the ``end_borrow``, the original SILValue can not be
-modified. This means that:
+Ends the scope for which the `Guaranteed`_ ownership possessing SILValue ``%1``
+is borrowed from the SILValue ``%0``. Must be paired with at most 1 borrowing
+instruction (like `load_borrow`_, `begin_borrow`_) along any path through the
+program. In the region in between the borrow instruction and the `end_borrow`_,
+the original SILValue can not be modified. This means that:
 
 1. If ``%0`` is an address, ``%0`` can not be written to.
 2. If ``%0`` is a non-trivial value, ``%0`` can not be destroyed.
 
 We require that ``%1`` and ``%0`` have the same type ignoring SILValueCategory.
+
+This instruction is only valid in functions in Ownership SSA form.
+
+end_lifetime
+````````````
+
+::
+
+   sil-instruction ::= 'end_lifetime' sil-operand
+
+This instruction signifies the end of it's operand's lifetime to the ownership
+verifier. It is inserted by the compiler in instances where it could be illegal
+to insert a destroy operation. Ex: if the sil-operand had an undef value.
+
+This instruction is valid only in OSSA and is lowered to a no-op when lowering
+to non-OSSA.
 
 assign
 ``````
@@ -3541,12 +3658,12 @@ The type of %1 is ``*T`` and the type of ``%0`` is ``T``, which must be a
 loadable type. This will overwrite the memory at ``%1`` and destroy the value
 currently held there.
 
-The purpose of the ``assign`` instruction is to simplify the
+The purpose of the `assign`_ instruction is to simplify the
 definitive initialization analysis on loadable variables by removing
 what would otherwise appear to be a load and use of the current value.
 It is produced by SILGen, which cannot know which assignments are
 meant to be initializations.  If it is deemed to be an initialization,
-it can be replaced with a ``store``; otherwise, it must be replaced
+it can be replaced with a `store`_; otherwise, it must be replaced
 with a sequence that also correctly destroys the current value.
 
 This instruction is only valid in Raw SIL and is rewritten as appropriate
@@ -3556,7 +3673,9 @@ assign_by_wrapper
 ``````````````````
 ::
 
-  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' mode? sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+
+  mode ::= '[initialization]' | '[assign]' | '[assign_wrapped_value]'
 
   assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
@@ -3564,16 +3683,25 @@ assign_by_wrapper
   // $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
   // $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
 
-Similar to the ``assign`` instruction, but the assignment is done via a
+Similar to the `assign`_ instruction, but the assignment is done via a
 delegate.
 
-In case of an initialization, the function ``%2`` is called with ``%0`` as
-argument. The result is stored to ``%1``. In case ``%2`` is an address type,
-it is simply passed as a first out-argument to ``%2``.
+Initially the instruction is created with no mode. Once the mode is decided
+(by the definitive initialization pass), the instruction is lowered as follows:
 
-In case of a re-assignment, the function ``%3`` is called with ``%0`` as
-argument. As ``%3`` is a setter (e.g. for the property in the containing
-nominal type), the destination address ``%1`` is not used in this case.
+If the mode is ``initialization``, the function ``%2`` is called with ``%0`` as
+argument. The result is stored to ``%1``. In case of an address type, ``%1`` is
+simply passed as a first out-argument to ``%2``.
+
+The ``assign`` mode works similar to ``initialization``, except that the
+destination is "assigned" rather than "initialized". This means that the
+existing value in the destination is destroyed before the new value is
+stored.
+
+If the mode is ``assign_wrapped_value``, the function ``%3`` is called with
+``%0`` as argument. As ``%3`` is a setter (e.g. for the property in the
+containing nominal type), the destination address ``%1`` is not used in this
+case.
 
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
@@ -4194,7 +4322,9 @@ object. Returns 1 if the strong reference count is 1, and 0 if the
 strong reference count is greater than 1.
 
 A discussion of the semantics can be found here:
-:ref:`arcopts.is_unique`.
+`is_unique instruction <arcopts_is_unique_>`_
+
+.. _arcopts_is_unique: https://github.com/apple/swift/blob/main/docs/ARCOptimization.md#is_unique-instruction
 
 begin_cow_mutation
 ``````````````````
@@ -5090,7 +5220,7 @@ destroy_value
 
 ::
 
-  sil-instruction ::= 'destroy_value' sil-operand
+  sil-instruction ::= 'destroy_value' '[poison]'? sil-operand
 
   destroy_value %0 : $A
 
@@ -7066,6 +7196,7 @@ differentiability_witness_function
   sil-instruction ::=
       'differentiability_witness_function'
       '[' sil-differentiability-witness-function-kind ']'
+      '[' differentiability-kind ']'
       '[' 'parameters' sil-differentiability-witness-function-index-list ']'
       '[' 'results' sil-differentiability-witness-function-index-list ']'
       generic-parameter-clause?
@@ -7074,7 +7205,7 @@ differentiability_witness_function
   sil-differentiability-witness-function-kind ::= 'jvp' | 'vjp' | 'transpose'
   sil-differentiability-witness-function-index-list ::= [0-9]+ (' ' [0-9]+)*
 
-  differentiability_witness_function [jvp] [parameters 0] [results 0] \
+  differentiability_witness_function [vjp] [reverse] [parameters 0] [results 0] \
     <T where T: Differentiable> @foo : $(T) -> T
 
 Looks up a differentiability witness function (JVP, VJP, or transpose) for
@@ -7086,6 +7217,7 @@ look up: ``[jvp]``, ``[vjp]``, or ``[transpose]``.
 The remaining components identify the SIL differentiability witness:
 
 - Original function name.
+- Differentiability kind.
 - Parameter indices.
 - Result indices.
 - Witness generic parameter clause (optional). When parsing SIL, the parsed

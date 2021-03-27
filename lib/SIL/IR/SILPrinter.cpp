@@ -344,6 +344,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     OS << "!backinginit";
     break;
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+    OS << "!projectedvalueinit";
+    break;
   }
 
   if (isForeign)
@@ -1223,6 +1226,8 @@ public:
   void visitApplyInst(ApplyInst *AI) {
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
+    if (AI->isNonAsync())
+      *this << "[noasync] ";
     visitApplyInstBase(AI);
   }
 
@@ -1233,6 +1238,8 @@ public:
   }
 
   void visitTryApplyInst(TryApplyInst *AI) {
+    if (AI->isNonAsync())
+      *this << "[noasync] ";
     visitApplyInstBase(AI);
     *this << ", normal " << Ctx.getID(AI->getNormalBB());
     *this << ", error " << Ctx.getID(AI->getErrorBB());
@@ -1420,6 +1427,13 @@ public:
     }
   }
 
+  void printForwardingOwnershipKind(OwnershipForwardingMixin *inst,
+                                    SILValue op) {
+    if (inst->getForwardingOwnershipKind() != op.getOwnershipKind()) {
+      *this << ", forwarding: @" << inst->getForwardingOwnershipKind();
+    }
+  }
+
   void visitStoreInst(StoreInst *SI) {
     *this << Ctx.getID(SI->getSrc()) << " to ";
     printStoreOwnershipQualifier(SI->getOwnershipQualifier());
@@ -1443,7 +1457,19 @@ public:
 
   void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
     *this << getIDAndType(AI->getSrc()) << " to ";
-    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    switch (AI->getMode()) {
+    case AssignByWrapperInst::Unknown:
+      break;
+    case AssignByWrapperInst::Initialization:
+      *this << "[initialization] ";
+      break;
+    case AssignByWrapperInst::Assign:
+      *this << "[assign] ";
+      break;
+    case AssignByWrapperInst::AssignWrappedValue:
+      *this << "[assign_wrapped_value] ";
+      break;
+    }
     *this << getIDAndType(AI->getDest())
           << ", init " << getIDAndType(AI->getInitializer())
           << ", set " << getIDAndType(AI->getSetter());
@@ -1465,8 +1491,8 @@ public:
       *this << "[delegatingselfallocated] ";
       break;
     }
-
     *this << getIDAndType(MU->getOperand());
+    printForwardingOwnershipKind(MU, MU->getOperand());
   }
 
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
@@ -1476,6 +1502,8 @@ public:
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
+    if (DVI->poisonRefs())
+      *this << "[poison] ";
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo());
   }
@@ -1516,6 +1544,7 @@ public:
   
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
+    printForwardingOwnershipKind(CI, CI->getOperand());
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
@@ -1564,6 +1593,9 @@ public:
 
   void printUncheckedConversionInst(ConversionInst *CI, SILValue operand) {
     *this << getIDAndType(operand) << " to " << CI->getType();
+    if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(CI)) {
+      printForwardingOwnershipKind(ofci, ofci->getOperand(0));
+    }
   }
 
   void visitUncheckedOwnershipConversionInst(
@@ -1578,6 +1610,7 @@ public:
     if (CI->withoutActuallyEscaping())
       *this << "[without_actually_escaping] ";
     *this << CI->getType();
+    printForwardingOwnershipKind(CI, CI->getOperand());
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
@@ -1661,10 +1694,12 @@ public:
   void visitRefToBridgeObjectInst(RefToBridgeObjectInst *I) {
     *this << getIDAndType(I->getConverted()) << ", "
           << getIDAndType(I->getBitsOperand());
+    printForwardingOwnershipKind(I, I->getConverted());
   }
   
   void visitBridgeObjectToRefInst(BridgeObjectToRefInst *I) {
     printUncheckedConversionInst(I, I->getOperand());
+    printForwardingOwnershipKind(I, I->getOperand());
   }
   void visitBridgeObjectToWordInst(BridgeObjectToWordInst *I) {
     printUncheckedConversionInst(I, I->getOperand());
@@ -1686,6 +1721,8 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitDestroyValueInst(DestroyValueInst *I) {
+    if (I->poisonRefs())
+      *this << "[poison] ";
     *this << getIDAndType(I->getOperand());
   }
 
@@ -1748,6 +1785,7 @@ public:
           << SILDeclRef(UI->getElement(), SILDeclRef::Kind::EnumElement);
     if (UI->hasOperand()) {
       *this << ", " << getIDAndType(UI->getOperand());
+      printForwardingOwnershipKind(UI, UI->getOperand());
     }
   }
 
@@ -1759,6 +1797,7 @@ public:
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *UDAI) {
     *this << getIDAndType(UDAI->getOperand()) << ", "
           << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
+    printForwardingOwnershipKind(UDAI, UDAI->getOperand());
   }
   
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UDAI) {
@@ -1773,6 +1812,7 @@ public:
   
   void visitTupleExtractInst(TupleExtractInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", " << EI->getFieldIndex();
+    printForwardingOwnershipKind(EI, EI->getOperand());
   }
 
   void visitTupleElementAddrInst(TupleElementAddrInst *EI) {
@@ -1782,6 +1822,7 @@ public:
     *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
+    printForwardingOwnershipKind(EI, EI->getOperand());
   }
   void visitStructElementAddrInst(StructElementAddrInst *EI) {
     *this << getIDAndType(EI->getOperand()) << ", #";
@@ -1802,10 +1843,12 @@ public:
 
   void visitDestructureStructInst(DestructureStructInst *DSI) {
     *this << getIDAndType(DSI->getOperand());
+    printForwardingOwnershipKind(DSI, DSI->getOperand());
   }
 
   void visitDestructureTupleInst(DestructureTupleInst *DTI) {
     *this << getIDAndType(DTI->getOperand());
+    printForwardingOwnershipKind(DTI, DTI->getOperand());
   }
 
   void printMethodInst(MethodInst *I, SILValue Operand) {
@@ -1859,6 +1902,7 @@ public:
   }
   void visitOpenExistentialRefInst(OpenExistentialRefInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
   }
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
@@ -1868,9 +1912,11 @@ public:
   }
   void visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
   }
   void visitOpenExistentialValueInst(OpenExistentialValueInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
   }
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     *this << getIDAndType(AEI->getOperand()) << ", $"
@@ -1886,6 +1932,7 @@ public:
     *this << getIDAndType(AEI->getOperand()) << " : $"
           << AEI->getFormalConcreteType() << ", " << AEI->getType();
     printConformances(AEI->getConformances());
+    printForwardingOwnershipKind(AEI, AEI->getOperand());
   }
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *EMI) {
     *this << getIDAndType(EMI->getOperand()) << ", " << EMI->getType();
@@ -1939,6 +1986,7 @@ public:
   void visitMarkDependenceInst(MarkDependenceInst *MDI) {
     *this << getIDAndType(MDI->getValue()) << " on "
           << getIDAndType(MDI->getBase());
+    printForwardingOwnershipKind(MDI, MDI->getValue());
   }
   void visitCopyBlockInst(CopyBlockInst *RI) {
     *this << getIDAndType(RI->getOperand());
@@ -2133,6 +2181,7 @@ public:
 
   void visitSwitchEnumInst(SwitchEnumInst *SOI) {
     printSwitchEnumInst(SOI);
+    printForwardingOwnershipKind(SOI, SOI->getOperand());
   }
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
     printSwitchEnumInst(SOI);
@@ -2156,6 +2205,7 @@ public:
 
   void visitSelectEnumInst(SelectEnumInst *SEI) {
     printSelectEnumInst(SEI);
+    printForwardingOwnershipKind(SEI, SEI->getOperand());
   }
   void visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
     printSelectEnumInst(SEI);
@@ -2174,6 +2224,7 @@ public:
       *this << ", default " << Ctx.getID(SVI->getDefaultResult());
 
     *this << " : " << SVI->getType();
+    printForwardingOwnershipKind(SVI, SVI->getOperand());
   }
   
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -2411,6 +2462,7 @@ public:
       *this << " as ";
       *this << dfei->getType();
     }
+    printForwardingOwnershipKind(dfei, dfei->getOperand());
   }
 
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
@@ -2425,6 +2477,7 @@ public:
     }
     *this << "] ";
     *this << getIDAndType(lfei->getOperand());
+    printForwardingOwnershipKind(lfei, lfei->getOperand());
   }
 
   void visitDifferentiabilityWitnessFunctionInst(
@@ -2441,6 +2494,23 @@ public:
     case DifferentiabilityWitnessFunctionKind::Transpose:
       *this << "transpose";
       break;
+    }
+    *this << "] [";
+    switch (dwfi->getWitness()->getKind()) {
+    case DifferentiabilityKind::Forward:
+      *this << "forward";
+      break;
+    case DifferentiabilityKind::Reverse:
+      *this << "reverse";
+      break;
+    case DifferentiabilityKind::Normal:
+      *this << "normal";
+      break;
+    case DifferentiabilityKind::Linear:
+      *this << "linear";
+      break;
+    case DifferentiabilityKind::NonDifferentiable:
+      llvm_unreachable("Impossible case");
     }
     *this << "] [parameters";
     for (auto i : witness->getParameterIndices()->getIndices())
@@ -3342,8 +3412,26 @@ void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
   // ([serialized])?
   if (isSerialized())
     OS << "[serialized] ";
+  // Kind
+  OS << '[';
+  switch (getKind()) {
+  case DifferentiabilityKind::Forward:
+    OS << "forward";
+    break;
+  case DifferentiabilityKind::Reverse:
+    OS << "reverse";
+    break;
+  case DifferentiabilityKind::Normal:
+    OS << "normal";
+    break;
+  case DifferentiabilityKind::Linear:
+    OS << "linear";
+    break;
+  case DifferentiabilityKind::NonDifferentiable:
+    llvm_unreachable("Impossible case");
+  }
   // [parameters ...]
-  OS << "[parameters ";
+  OS << "] [parameters ";
   interleave(
       getParameterIndices()->getIndices(), [&](unsigned index) { OS << index; },
       [&] { OS << ' '; });

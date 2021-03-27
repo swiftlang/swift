@@ -706,13 +706,15 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
                        std::move(moduleDocInputBuffer),
                        std::move(moduleSourceInfoInputBuffer),
                        isFramework, loadedModuleFileCore);
+  SerializedASTFile *fileUnit = nullptr;
+
   if (loadInfo.status == serialization::Status::Valid) {
     loadedModuleFile =
         std::make_unique<ModuleFile>(std::move(loadedModuleFileCore));
     M.setResilienceStrategy(loadedModuleFile->getResilienceStrategy());
 
     // We've loaded the file. Now try to bring it into the AST.
-    auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
+    fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile);
     if (loadedModuleFile->isTestable())
       M.setTestingEnabled();
     if (loadedModuleFile->arePrivateImportsEnabled())
@@ -721,10 +723,12 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setImplicitDynamicEnabled();
     if (loadedModuleFile->hasIncrementalInfo())
       M.setHasIncrementalInfo();
+    if (!loadedModuleFile->getModuleABIName().empty())
+      M.setABIName(Ctx.getIdentifier(loadedModuleFile->getModuleABIName()));
 
     auto diagLocOrInvalid = diagLoc.getValueOr(SourceLoc());
-    loadInfo.status =
-        loadedModuleFile->associateWithFileContext(fileUnit, diagLocOrInvalid);
+    loadInfo.status = loadedModuleFile->associateWithFileContext(
+        fileUnit, diagLocOrInvalid, Ctx.LangOpts.AllowModuleWithCompilerErrors);
 
     // FIXME: This seems wrong. Overlay for system Clang module doesn't
     // necessarily mean it's "system" module. User can make their own overlay
@@ -734,31 +738,36 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       if (shadowed->isSystemModule())
         M.setIsSystemModule(true);
 
-    if (loadInfo.status == serialization::Status::Valid) {
+    if (loadInfo.status == serialization::Status::Valid ||
+        (Ctx.LangOpts.AllowModuleWithCompilerErrors &&
+         (loadInfo.status == serialization::Status::TargetTooNew ||
+          loadInfo.status == serialization::Status::TargetIncompatible))) {
       Ctx.bumpGeneration();
       LoadedModuleFiles.emplace_back(std::move(loadedModuleFile),
                                      Ctx.getCurrentGeneration());
       findOverlayFiles(diagLoc.getValueOr(SourceLoc()), &M, fileUnit);
-      return fileUnit;
+    } else {
+      fileUnit = nullptr;
     }
   }
 
-  // From here on is the failure path.
+  if (loadInfo.status != serialization::Status::Valid) {
+    if (diagLoc)
+      serialization::diagnoseSerializedASTLoadFailure(
+          Ctx, *diagLoc, loadInfo, moduleBufferID, moduleDocBufferID,
+          loadedModuleFile.get(), M.getName());
 
-  if (diagLoc)
-    serialization::diagnoseSerializedASTLoadFailure(
-        Ctx, *diagLoc, loadInfo, moduleBufferID,
-        moduleDocBufferID, loadedModuleFile.get(), M.getName());
+    // Even though the module failed to load, it's possible its contents
+    // include a source buffer that need to survive because it's already been
+    // used for diagnostics.
+    // Note this is only necessary in case a bridging header failed to load
+    // during the `associateWithFileContext()` call.
+    if (loadedModuleFile &&
+        loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
+      OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
+  }
 
-  // Even though the module failed to load, it's possible its contents include
-  // a source buffer that need to survive because it's already been used for
-  // diagnostics.
-  // Note this is only necessary in case a bridging header failed to load
-  // during the `associateWithFileContext()` call.
-  if (loadedModuleFile && loadedModuleFile->mayHaveDiagnosticsPointingAtBuffer())
-    OrphanedModuleFiles.push_back(std::move(loadedModuleFile));
-
-  return nullptr;
+  return fileUnit;
 }
 
 void swift::serialization::diagnoseSerializedASTLoadFailure(
@@ -908,7 +917,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
     auto diagKind = diag::serialization_target_incompatible;
-    if (Ctx.LangOpts.DebuggerSupport)
+    if (Ctx.LangOpts.DebuggerSupport ||
+        Ctx.LangOpts.AllowModuleWithCompilerErrors)
       diagKind = diag::serialization_target_incompatible_repl;
     Ctx.Diags.diagnose(diagLoc, diagKind, ModuleName, loadInfo.targetTriple,
                        moduleBufferID);
@@ -926,7 +936,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.
     auto diagKind = diag::serialization_target_too_new;
-    if (Ctx.LangOpts.DebuggerSupport)
+    if (Ctx.LangOpts.DebuggerSupport ||
+        Ctx.LangOpts.AllowModuleWithCompilerErrors)
       diagKind = diag::serialization_target_too_new_repl;
     Ctx.Diags.diagnose(diagLoc, diagKind, compilationOSInfo.first,
                        compilationOSInfo.second, ModuleName,

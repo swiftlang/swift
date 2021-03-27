@@ -48,7 +48,12 @@ Func Collection.subranges(where:) has been removed
 Func MutableCollection.moveSubranges(_:to:) has been removed
 Func MutableCollection.removeSubranges(_:) has been removed
 Func RangeReplaceableCollection.removeSubranges(_:) has been removed
+Struct AnyHashable has added a conformance to an existing protocol _HasCustomAnyHashableRepresentation
 Struct DiscontiguousSlice has been removed
 Struct RangeSet has been removed
 Subscript Collection.subscript(_:) has been removed
 Subscript MutableCollection.subscript(_:) has been removed
+Protocol CodingKey has added inherited protocol Sendable
+Protocol CodingKey has generic signature change from <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible> to <Self : Swift.CustomDebugStringConvertible, Self : Swift.CustomStringConvertible, Self : Swift.Sendable>
+Protocol Error has added inherited protocol Sendable
+Protocol Error has generic signature change from to <Self : Swift.Sendable>

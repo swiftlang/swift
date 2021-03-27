@@ -25,6 +25,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeResolutionStage.h"
@@ -43,7 +44,7 @@ class DefaultArgumentExpr;
 class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
-struct PropertyWrapperBackingPropertyInfo;
+class PropertyWrapperInitializerInfo;
 struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
@@ -312,9 +313,9 @@ public:
   void cacheResult(bool value) const;
 };
 
-class ProtocolRethrowsRequirementsRequest :
-    public SimpleRequest<ProtocolRethrowsRequirementsRequest,
-                         ProtocolRethrowsRequirementList(ProtocolDecl *),
+class PolymorphicEffectRequirementsRequest :
+    public SimpleRequest<PolymorphicEffectRequirementsRequest,
+                         PolymorphicEffectRequirementList(EffectKind, ProtocolDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -323,17 +324,17 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ProtocolRethrowsRequirementList 
-  evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+  PolymorphicEffectRequirementList
+  evaluate(Evaluator &evaluator, EffectKind kind, ProtocolDecl *decl) const;
 
 public:
   // Caching.
   bool isCached() const { return true; }
 };
 
-class ProtocolConformanceRefClassifyAsThrowsRequest : 
-    public SimpleRequest<ProtocolConformanceRefClassifyAsThrowsRequest,
-                         bool(ProtocolConformanceRef),
+class ConformanceHasEffectRequest :
+    public SimpleRequest<ConformanceHasEffectRequest,
+                         bool(EffectKind, ProtocolConformance *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -343,7 +344,8 @@ private:
 
   // Evaluation.
   bool 
-  evaluate(Evaluator &evaluator, ProtocolConformanceRef conformanceRef) const;
+  evaluate(Evaluator &evaluator, EffectKind kind,
+           ProtocolConformance *conformance) const;
 
 public:
   // Caching.
@@ -710,11 +712,10 @@ public:
   bool isCached() const;
 };
 
-/// Request information about the backing property for properties that have
-/// attached property wrappers.
-class PropertyWrapperBackingPropertyInfoRequest :
-    public SimpleRequest<PropertyWrapperBackingPropertyInfoRequest,
-                         PropertyWrapperBackingPropertyInfo(VarDecl *),
+/// Request the synthesized auxiliary declarations for a wrapped property.
+class PropertyWrapperAuxiliaryVariablesRequest :
+    public SimpleRequest<PropertyWrapperAuxiliaryVariablesRequest,
+                         PropertyWrapperAuxiliaryVariables(VarDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -723,7 +724,28 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  PropertyWrapperBackingPropertyInfo
+  PropertyWrapperAuxiliaryVariables
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
+/// Request information about initialization of the backing property
+/// for properties that have attached property wrappers.
+class PropertyWrapperInitializerInfoRequest :
+    public SimpleRequest<PropertyWrapperInitializerInfoRequest,
+                         PropertyWrapperInitializerInfo(VarDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  PropertyWrapperInitializerInfo
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
@@ -773,9 +795,9 @@ void simple_display(llvm::raw_ostream &out, FragileFunctionKind value);
 
 void simple_display(llvm::raw_ostream &out, ResilienceExpansion value);
 
-class FunctionRethrowingKindRequest :
-    public SimpleRequest<FunctionRethrowingKindRequest,
-                         FunctionRethrowingKind(AbstractFunctionDecl*),
+class PolymorphicEffectKindRequest :
+    public SimpleRequest<PolymorphicEffectKindRequest,
+                         PolymorphicEffectKind(EffectKind, AbstractFunctionDecl*),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -784,7 +806,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  FunctionRethrowingKind evaluate(Evaluator &evaluator, AbstractFunctionDecl *decl) const;
+  PolymorphicEffectKind evaluate(Evaluator &evaluator,
+                                 EffectKind kind,
+                                 AbstractFunctionDecl *decl) const;
 
 public:
   // Caching.
@@ -893,10 +917,10 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether the given class is an actor.
+/// Determine whether the given nominal type is an actor.
 class IsActorRequest :
     public SimpleRequest<IsActorRequest,
-                         bool(ClassDecl *),
+                         bool(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -904,7 +928,7 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
 
 public:
   // Caching
@@ -961,7 +985,8 @@ using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
 class GlobalActorAttributeRequest :
     public SimpleRequest<
         GlobalActorAttributeRequest,
-        Optional<CustomAttrNominalPair>(Decl *),
+        Optional<CustomAttrNominalPair>(
+            llvm::PointerUnion<Decl *, ClosureExpr *>),
         RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -971,7 +996,8 @@ private:
 
   // Evaluation.
   Optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-  evaluate(Evaluator &evaluator, Decl *decl) const;
+  evaluate(
+      Evaluator &evaluator, llvm::PointerUnion<Decl *, ClosureExpr *>) const;
 
 public:
   // Caching
@@ -2311,6 +2337,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Looks up and applies the access note for a given declaration.
+class ApplyAccessNoteRequest
+    : public SimpleRequest<ApplyAccessNoteRequest,
+                           evaluator::SideEffect(ValueDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+
 class TypeCheckSourceFileRequest
     : public SimpleRequest<
           TypeCheckSourceFileRequest, evaluator::SideEffect(SourceFile *),
@@ -2849,6 +2894,65 @@ private:
   FuncDecl *evaluate(Evaluator &evaluator, Decl *) const;
 
 public:
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the implicit conformance for the given nominal type to
+/// the Sendable protocol.
+class GetImplicitSendableRequest :
+    public SimpleRequest<GetImplicitSendableRequest,
+                         NormalProtocolConformance *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  NormalProtocolConformance *evaluate(
+      Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+class ConditionalRequirementsRequest
+    : public SimpleRequest<ConditionalRequirementsRequest,
+                           llvm::ArrayRef<Requirement>(
+                               NormalProtocolConformance *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::ArrayRef<Requirement> evaluate(Evaluator &evaluator,
+                                       NormalProtocolConformance *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class TypeCheckCompletionHandlerAsyncAttrRequest
+    : public SimpleRequest<TypeCheckCompletionHandlerAsyncAttrRequest,
+                           bool(AbstractFunctionDecl *,
+                                CompletionHandlerAsyncAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator,
+                AbstractFunctionDecl *attachedFucntionDecl,
+                CompletionHandlerAsyncAttr *attr) const;
+
+public:
+  // Caching
   bool isCached() const { return true; }
 };
 

@@ -56,7 +56,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 594; // @differentiable(reverse) attr
+const uint16_t SWIFTMODULE_VERSION_MINOR = 607; // async / throws property decls
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -790,7 +790,8 @@ namespace options_block {
     RESILIENCE_STRATEGY,
     ARE_PRIVATE_IMPORTS_ENABLED,
     IS_IMPLICIT_DYNAMIC_ENABLED,
-    IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED
+    IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED,
+    MODULE_ABI_NAME,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -827,6 +828,11 @@ namespace options_block {
 
   using IsAllowModuleWithCompilerErrorsEnabledLayout = BCRecordLayout<
     IS_ALLOW_MODULE_WITH_COMPILER_ERRORS_ENABLED
+  >;
+
+  using ModuleABINameLayout = BCRecordLayout<
+    MODULE_ABI_NAME,
+    BCBlob
   >;
 }
 
@@ -926,6 +932,11 @@ namespace decls_block {
     BCArray<BCVBR<6>>
   >;
 
+  /// A flag to mark a decl as being invalid
+  using ErrorFlagLayout = BCRecordLayout<
+    ERROR_FLAG
+  >;
+
   /// A placeholder for invalid types
   using ErrorTypeLayout = BCRecordLayout<
     ERROR_TYPE,
@@ -988,8 +999,8 @@ namespace decls_block {
     BCFixed<1>,   // concurrent?
     BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
-    DifferentiabilityKindField // differentiability kind
-
+    DifferentiabilityKindField, // differentiability kind
+    TypeIDField   // global actor
     // trailed by parameters
   >;
 
@@ -1066,6 +1077,7 @@ namespace decls_block {
     BCFixed<1>,          // async?
     BCFixed<1>,          // throws?
     DifferentiabilityKindField, // differentiability kind
+    TypeIDField,         // global actor
     GenericSignatureIDField // generic signture
 
     // trailed by parameters
@@ -1208,6 +1220,7 @@ namespace decls_block {
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit?
     BCFixed<1>,             // explicitly objc?
+    BCFixed<1>,             // Explicitly actor?
     BCFixed<1>,             // inherits convenience initializers from its superclass?
     BCFixed<1>,             // has missing designated initializers?
     GenericSignatureIDField, // generic environment
@@ -1365,6 +1378,7 @@ namespace decls_block {
     BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has forced static dispatch?
+    BCFixed<1>,   // async?
     BCFixed<1>,   // throws?
     GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
@@ -1773,7 +1787,9 @@ namespace decls_block {
     FOREIGN_ASYNC_CONVENTION,
     TypeIDField, // completion handler type
     BCVBR<4>,    // completion handler parameter index
-    BCVBR<4>     // completion handler error parameter index (+1)
+    BCVBR<4>,    // completion handler error parameter index (+1)
+    BCVBR<4>,    // completion handler error flag parameter index (+1)
+    BCFixed<1>   // completion handler error flag polarity
   >;
 
   using AbstractClosureExprLayout = BCRecordLayout<
@@ -1910,6 +1926,12 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
 
+  using CompletionHandlerAsyncDeclAttrLayout = BCRecordLayout<
+    CompletionHandlerAsync_DECL_ATTR,
+    BCVBR<5>,                   // Completion handler index
+    DeclIDField                 // Mapped async function decl
+  >;
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
@@ -1934,9 +1956,9 @@ namespace decls_block {
   using CustomDeclAttrLayout = BCRecordLayout<
     Custom_DECL_ATTR,
     BCFixed<1>,  // implicit flag
-    TypeIDField // type referenced by this custom attribute
+    TypeIDField, // type referenced by this custom attribute
+    BCFixed<1>   // is the argument (unsafe)
   >;
-
 }
 
 /// Returns the encoding kind for the given decl.

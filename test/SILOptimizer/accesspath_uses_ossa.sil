@@ -305,7 +305,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %8 to [assign] %11 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%13 : $Builtin.RawPointer)
+// CHECK-NEXT:  %17 = load [copy] %16 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 // CHECK: ###For MemOp:   %7 = load [copy] %6 : $*AnyObject
@@ -322,7 +322,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %8 to [assign] %11 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%13 : $Builtin.RawPointer)
+// CHECK-NEXT:  %17 = load [copy] %16 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 // CHECK: ###For MemOp:   store %7 to [assign] %6 : $*AnyObject
@@ -339,7 +339,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %8 to [assign] %11 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%13 : $Builtin.RawPointer)
+// CHECK-NEXT:  %17 = load [copy] %16 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 // CHECK: ###For MemOp:   store %8 to [assign] %11 : $*AnyObject
@@ -356,10 +356,10 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %8 to [assign] %11 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%13 : $Builtin.RawPointer)
+// CHECK-NEXT:  %17 = load [copy] %16 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
-// CHECK: ###For MemOp:   %18 = load [copy] %17 : $*AnyObject
+// CHECK: ###For MemOp:   %17 = load [copy] %16 : $*AnyObject
 // CHECK: Storage: Unidentified   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
 // CHECK: Path: (@Unknown)
 // CHECK: Exact Uses {
@@ -373,7 +373,7 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %8 to [assign] %11 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%13 : $Builtin.RawPointer)
+// CHECK-NEXT:  %17 = load [copy] %16 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 sil shared [ossa] @testIndexLoop : $@convention(thin) (UnsafeMutablePointer<AnyObject>) -> @owned AnyObject {
@@ -392,13 +392,13 @@ bb1(%5 : $Builtin.RawPointer):
   %11 = index_addr %6 : $*AnyObject, %10 : $Builtin.Word
   store %8 to [assign] %11 : $*AnyObject
   %13 = address_to_pointer %11 : $*AnyObject to $Builtin.RawPointer
-  cond_br undef, bb2, bb3(%13 : $Builtin.RawPointer)
+  cond_br undef, bb2, bb3
 
 bb2:
   br bb1(%13 : $Builtin.RawPointer)
 
-bb3(%16 : $Builtin.RawPointer):
-  %17 = pointer_to_address %16 : $Builtin.RawPointer to [strict] $*AnyObject
+bb3:
+  %17 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*AnyObject
   %18 = load [copy] %17 : $*AnyObject
   destroy_value %3 : $AnyObject
   return %18 : $AnyObject
@@ -897,6 +897,8 @@ bb5:
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  destroy_addr %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
@@ -909,6 +911,8 @@ bb5:
 // CHECK-NEXT:  inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  destroy_addr %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
@@ -923,6 +927,8 @@ bb5:
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  %{{.*}} = load [copy] %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
+// CHECK-NEXT:  destroy_addr %1 : $*Optional<AnyObject>
+// CHECK-NEXT:  Path: ()
 // CHECK-NEXT:  dealloc_stack %1 : $*Optional<AnyObject>
 // CHECK-NEXT:  Path: ()
 // CHECK-NEXT: }
@@ -933,6 +939,7 @@ bb0(%0 : @owned $AnyObject):
   store %0 to [init] %2 : $*AnyObject
   inject_enum_addr %1 : $*Optional<AnyObject>, #Optional.some!enumelt
   %5 = load [copy] %1 : $*Optional<AnyObject>
+  destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   return %5 : $Optional<AnyObject>
 }

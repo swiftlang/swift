@@ -606,6 +606,17 @@ void Remangler::mangleDynamicallyReplaceableFunctionVar(Node *node) {
   Buffer << "TX";
 }
 
+void Remangler::mangleAsyncNonconstantPartialApplyThunk(Node *node) {
+  unreachable("unsupported");
+}
+
+void Remangler::mangleAsyncAwaitResumePartialFunction(Node *node) {
+  unreachable("unsupported");
+}
+void Remangler::mangleAsyncSuspendResumePartialFunction(Node *node) {
+  unreachable("unsupported");
+}
+
 void Remangler::mangleDirectness(Node *node) {
   auto getChar = [](Directness d) -> char {
     switch (d) {
@@ -748,8 +759,24 @@ void Remangler::mangleAutoDiffFunction(Node *node, EntityContext &ctx) {
   Buffer << "<autodiff-function>";
 }
 
+void Remangler::mangleAutoDiffDerivativeVTableThunk(Node *node) {
+  Buffer << "<autodiff-derivative-vtable-thunk>";
+}
+
+void Remangler::mangleAutoDiffSelfReorderingReabstractionThunk(Node *node) {
+  Buffer << "<autodiff-self-reordering-reabstraction-thunk>";
+}
+
+void Remangler::mangleAutoDiffSubsetParametersThunk(Node *node) {
+  Buffer << "<autodiff-subset-parameters-thunk>";
+}
+
 void Remangler::mangleAutoDiffFunctionKind(Node *node) {
   Buffer << "<autodiff-function-kind>";
+}
+
+void Remangler::mangleDifferentiabilityWitness(Node *node) {
+  Buffer << "<differentiability-witness>";
 }
 
 void Remangler::mangleIndexSubset(Node *node) {
@@ -825,6 +852,11 @@ void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {
 void Remangler::manglePropertyWrapperBackingInitializer(Node *node,
                                                         EntityContext &ctx) {
   mangleSimpleEntity(node, 'I', "P", ctx);
+}
+
+void Remangler::manglePropertyWrapperInitFromProjectedValue(Node *node,
+                                                            EntityContext &ctx) {
+  mangleSimpleEntity(node, 'I', "W", ctx);
 }
 
 void Remangler::mangleDefaultArgumentInitializer(Node *node,
@@ -1271,7 +1303,7 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
     Buffer << "A";
   } else if (text == "@yield_many") {
     Buffer << "G";
-  } else if (text == "@concurrent") {
+  } else if (text == "@Sendable") {
     Buffer << "h";
   } else if (text == "@async") {
     Buffer << "H";

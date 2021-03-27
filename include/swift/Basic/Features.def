@@ -38,5 +38,10 @@ LANGUAGE_FEATURE(StaticAssert, 0, "#assert", langOpts.EnableExperimentalStaticAs
 LANGUAGE_FEATURE(AsyncAwait, 296, "async/await", true)
 LANGUAGE_FEATURE(MarkerProtocol, 0, "@_marker protocol", true)
 LANGUAGE_FEATURE(Actors, 0, "actors", langOpts.EnableExperimentalConcurrency)
+LANGUAGE_FEATURE(ConcurrentFunctions, 0, "@concurrent functions", true)
+LANGUAGE_FEATURE(RethrowsProtocol, 0, "@rethrows protocol", true)
+LANGUAGE_FEATURE(GlobalActors, 0, "Global actors", langOpts.EnableExperimentalConcurrency)
+LANGUAGE_FEATURE(BuiltinJob, 0, "Builtin.Job type", true)
+LANGUAGE_FEATURE(Sendable, 0, "Sendable and @Sendable", true)
 
 #undef LANGUAGE_FEATURE

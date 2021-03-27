@@ -25,7 +25,7 @@ ArrayAutoDiffTests.test("ArrayIdentity") {
     return x
   }
 
-  let backprop = pullback(at: [5, 6, 7, 8], in: arrayIdentity)
+  let backprop = pullback(at: [5, 6, 7, 8], of: arrayIdentity)
   expectEqual(
     FloatArrayTan([1, 2, 3, 4]),
     backprop(FloatArrayTan([1, 2, 3, 4])))
@@ -38,7 +38,7 @@ ArrayAutoDiffTests.test("ArraySubscript") {
 
   expectEqual(
     FloatArrayTan([1, 1, 1, 0, 0, 0]),
-    gradient(at: [2, 3, 4, 5, 6, 7], in: sumFirstThree))
+    gradient(at: [2, 3, 4, 5, 6, 7], of: sumFirstThree))
 }
 
 ArrayAutoDiffTests.test("ArrayLiteral") {
@@ -46,7 +46,7 @@ ArrayAutoDiffTests.test("ArrayLiteral") {
     func twoElementLiteral(_ x: Float, _ y: Float) -> [Float] {
       return [x, y]
     }
-    let pb = pullback(at: 1, 1, in: twoElementLiteral)
+    let pb = pullback(at: 1, 1, of: twoElementLiteral)
     expectEqual((1, 2), pb(FloatArrayTan([Float(1), Float(2)])))
   }
 
@@ -57,7 +57,7 @@ ArrayAutoDiffTests.test("ArrayLiteral") {
       result = result * y
       return [result, result]
     }
-    let pb = pullback(at: 3, 4, in: twoElementLiteralAddress)
+    let pb = pullback(at: 3, 4, of: twoElementLiteralAddress)
     expectEqual((8, 6), pb(FloatArrayTan([1, 1])))
   }
 
@@ -66,7 +66,7 @@ ArrayAutoDiffTests.test("ArrayLiteral") {
     func twoElementLiteralFunctionResult(_ x: Float, _ y: Float) -> [Float] {
       return [x * y, x * y]
     }
-    let pb = pullback(at: 3, 4, in: twoElementLiteralFunctionResult)
+    let pb = pullback(at: 3, 4, of: twoElementLiteralFunctionResult)
     expectEqual((8, 6), pb(FloatArrayTan([1, 1])))
   }
 
@@ -76,7 +76,7 @@ ArrayAutoDiffTests.test("ArrayLiteral") {
       let array = [x * y, x * y]
       return [array[0], array[1]]
     }
-    let pb = pullback(at: 3, 4, in: twoElementLiterals)
+    let pb = pullback(at: 3, 4, of: twoElementLiterals)
     expectEqual((8, 6), pb(FloatArrayTan([1, 1])))
   }
 }
@@ -86,7 +86,7 @@ ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
     func twoElementLiteralIndirect<T: Differentiable>(_ x: T, _ y: T) -> [T] {
       return [x, y]
     }
-    let pb = pullback(at: Float(1), 1, in: { twoElementLiteralIndirect($0, $1) })
+    let pb = pullback(at: Float(1), 1, of: { twoElementLiteralIndirect($0, $1) })
     expectEqual((1, 2), pb(FloatArrayTan([1, 2])))
   }
 
@@ -97,7 +97,7 @@ ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
       result = result + [y]
       return result
     }
-    let pb = pullback(at: Float(1), 1, in: { twoElementLiteralIndirectVar($0, $1) })
+    let pb = pullback(at: Float(1), 1, of: { twoElementLiteralIndirectVar($0, $1) })
     expectEqual((1, 2), pb(FloatArrayTan([1, 2])))
   }
 }
@@ -125,9 +125,9 @@ ArrayAutoDiffTests.test("ArrayLiteralStruct") {
       let array = structElementLiteral(s)
       return array[0] * array[1]
     }
-    expectEqual(TV(x: 1, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
-    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete1))
-    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete2))
+    expectEqual(TV(x: 1, y: 0), gradient(at: s, of: { s in structGeneric(s) }))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, of: structConcrete1))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, of: structConcrete2))
   }
 
   do {
@@ -146,9 +146,9 @@ ArrayAutoDiffTests.test("ArrayLiteralStruct") {
       let array = structElementAddressLiteral(s)
       return array[0] * array[1]
     }
-    expectEqual(TV(x: 1, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
-    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete1))
-    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete2))
+    expectEqual(TV(x: 1, y: 0), gradient(at: s, of: { s in structGeneric(s) }))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, of: structConcrete1))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, of: structConcrete2))
   }
 
   do {
@@ -168,9 +168,9 @@ ArrayAutoDiffTests.test("ArrayLiteralStruct") {
       let array = structElementAddressLiteral2(s)
       return array[0] * array[1]
     }
-    expectEqual(TV(x: 1, y: 0), gradient(at: s, in: { s in structGeneric(s) }))
-    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete1))
-    expectEqual(TV(x: 4, y: 3), gradient(at: s, in: structConcrete2))
+    expectEqual(TV(x: 1, y: 0), gradient(at: s, of: { s in structGeneric(s) }))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, of: structConcrete1))
+    expectEqual(TV(x: 4, y: 3), gradient(at: s, of: structConcrete2))
   }
 
   // TF-978: Test array literal initialized with `apply` indirect results.
@@ -179,7 +179,7 @@ ArrayAutoDiffTests.test("ArrayLiteralStruct") {
     func applyIndirectResult<T>(_ x: T, _ y: T) -> [Struct<T>] {
       return [Struct(x: x, y: y), Struct(x: x, y: y)]
     }
-    let pb = pullback(at: Float(3), 4, in: { applyIndirectResult($0, $1) })
+    let pb = pullback(at: Float(3), 4, of: { applyIndirectResult($0, $1) })
     let v = TV(x: 1, y: 1)
     expectEqual((2, 2), pb(.init([v, v])))
   }
@@ -191,7 +191,7 @@ ArrayAutoDiffTests.test("ArrayLiteralTuple") {
       var tuple = (x, y)
       return [tuple.0, tuple.1]
     }
-    let pb = pullback(at: Float(3), 4, in: { tupleElementGeneric($0, $1) })
+    let pb = pullback(at: Float(3), 4, of: { tupleElementGeneric($0, $1) })
     // FIXME(TF-977): Fix incorrect derivative for array literal with
     // `tuple_element_addr` elements.
     // expectEqual((1, 1), pb(FloatArrayTan([1, 1])))
@@ -207,7 +207,7 @@ ArrayAutoDiffTests.test("ArrayLiteralNested") {
       let result = [[[[x, y]]]]
       return result[0][0][0]
     }
-    let pb = pullback(at: 3, 4, in: { nested0($0, $1) })
+    let pb = pullback(at: 3, 4, of: { nested0($0, $1) })
     expectEqual((1, 1), pb(FloatArrayTan([1, 1, 1, 1])))
   }
 
@@ -218,7 +218,7 @@ ArrayAutoDiffTests.test("ArrayLiteralNested") {
       var result = [[x, y], [x, y]]
       return result[0] + result[1]
     }
-    let pb = pullback(at: 3, 4, in: { nested1($0, $1) })
+    let pb = pullback(at: 3, 4, of: { nested1($0, $1) })
     expectEqual((2, 2), pb(FloatArrayTan([1, 1, 1, 1])))
   }
 
@@ -234,7 +234,7 @@ ArrayAutoDiffTests.test("ArrayLiteralNested") {
       var nested = [result, [], result]
       return nested[0][1] + result[3]
     }
-    let (value, pb) = valueWithPullback(at: 3, 4, in: { nested2($0, $1) })
+    let (value, pb) = valueWithPullback(at: 3, 4, of: { nested2($0, $1) })
     expectEqual([3, 4], value)
     expectEqual((1, 1), pb(FloatArrayTan([1, 1])))
   }
@@ -251,7 +251,7 @@ ArrayAutoDiffTests.test("ArrayLiteralControlFlow") {
       var result3 = bool ? (bool ? result2 : result) : result2
       return result3
     }
-    let pb = pullback(at: 3, 4, in: { controlFlow($0, $1) })
+    let pb = pullback(at: 3, 4, of: { controlFlow($0, $1) })
     expectEqual((8, 6), pb(FloatArrayTan([1, 1])))
   }
 
@@ -266,7 +266,7 @@ ArrayAutoDiffTests.test("ArrayLiteralControlFlow") {
       var result3 = bool ? (bool ? result2 : result) : result2
       return result3
     }
-    let pb = pullback(at: 3, 4, in: { controlFlowAddress($0, $1) })
+    let pb = pullback(at: 3, 4, of: { controlFlowAddress($0, $1) })
     expectEqual((8, 6), pb(FloatArrayTan([1, 1])))
   }
 
@@ -278,7 +278,7 @@ ArrayAutoDiffTests.test("ArrayLiteralControlFlow") {
       var result3 = bool ? (bool ? result2 : result) : result2
       return result3
     }
-    let pb = pullback(at: Float(3), 4, in: { controlFlowGeneric($0, $1) })
+    let pb = pullback(at: Float(3), 4, of: { controlFlowGeneric($0, $1) })
     expectEqual((1, 1), pb(FloatArrayTan([1, 1])))
   }
 
@@ -292,7 +292,7 @@ ArrayAutoDiffTests.test("ArrayLiteralControlFlow") {
       var result3 = bool ? (bool ? result2 + [[y]] : result2 + [[y]]) : result2 + [[y]]
       return result3[0] + [result3[1][0]]
     }
-    let pb = pullback(at: 3, 4, in: { controlFlowNestedLiteral($0, $1) })
+    let pb = pullback(at: 3, 4, of: { controlFlowNestedLiteral($0, $1) })
     expectEqual((1, 1), pb(FloatArrayTan([1, 1])))
   }
 }
@@ -312,7 +312,7 @@ ArrayAutoDiffTests.test("ExpressibleByArrayLiteralIndirect") {
     return [x, y]
   }
 
-  let (gradX, gradY) = pullback(at: Float(1), Float(1), in: {
+  let (gradX, gradY) = pullback(at: Float(1), Float(1), of: {
     x, y in testArrayUninitializedIntrinsic(x, y)
   })(Indirect<Float>.TangentVector(x: 1))
   expectEqual(1, gradX)
@@ -327,13 +327,13 @@ ArrayAutoDiffTests.test("Array.+") {
 
   expectEqual(
     (.init([1, 1]), .init([1, 0])),
-    gradient(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating))
+    gradient(at: [0, 0], [0, 0], of: sumFirstThreeConcatenating))
   expectEqual(
     (.init([1, 1, 1, 0]), .init([0, 0])),
-    gradient(at: [0, 0, 0, 0], [0, 0], in: sumFirstThreeConcatenating))
+    gradient(at: [0, 0, 0, 0], [0, 0], of: sumFirstThreeConcatenating))
   expectEqual(
     (.init([]), .init([1, 1, 1, 0])),
-    gradient(at: [], [0, 0, 0, 0], in: sumFirstThreeConcatenating))
+    gradient(at: [], [0, 0, 0, 0], of: sumFirstThreeConcatenating))
 
   func identity(_ array: [Float]) -> [Float] {
     var results: [Float] = []
@@ -343,7 +343,11 @@ ArrayAutoDiffTests.test("Array.+") {
     return results
   }
   let v = FloatArrayTan([4, -5, 6])
-  expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
+  expectEqual(v, pullback(at: [1, 2, 3], of: identity)(v))
+  
+  let v1: [Float] = [1, 1]
+  let v2: [Float] = [1, 1, 1]
+  expectEqual((.zero, .zero), pullback(at: v1, v2, of: +)(.zero))
 }
 
 ArrayAutoDiffTests.test("Array.+=") {
@@ -355,13 +359,13 @@ ArrayAutoDiffTests.test("Array.+=") {
 
   expectEqual(
     (.init([1, 1]), .init([1, 0])),
-    gradient(at: [0, 0], [0, 0], in: sumFirstThreeConcatenating))
+    gradient(at: [0, 0], [0, 0], of: sumFirstThreeConcatenating))
   expectEqual(
     (.init([1, 1, 1, 0]), .init([0, 0])),
-    gradient(at: [0, 0, 0, 0], [0, 0], in: sumFirstThreeConcatenating))
+    gradient(at: [0, 0, 0, 0], [0, 0], of: sumFirstThreeConcatenating))
   expectEqual(
     (.init([]), .init([1, 1, 1, 0])),
-    gradient(at: [], [0, 0, 0, 0], in: sumFirstThreeConcatenating))
+    gradient(at: [], [0, 0, 0, 0], of: sumFirstThreeConcatenating))
 
   func identity(_ array: [Float]) -> [Float] {
     var results: [Float] = []
@@ -371,7 +375,7 @@ ArrayAutoDiffTests.test("Array.+=") {
     return results
   }
   let v = FloatArrayTan([4, -5, 6])
-  expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
+  expectEqual(v, pullback(at: [1, 2, 3], of: identity)(v))
 }
 
 ArrayAutoDiffTests.test("Array.append") {
@@ -383,7 +387,7 @@ ArrayAutoDiffTests.test("Array.append") {
   do {
     let v = FloatArrayTan([1, 2, 3, 4])
     expectEqual((.init([1, 2, 3]), 4),
-                pullback(at: [0, 0, 0], 0, in: appending)(v))
+                pullback(at: [0, 0, 0], 0, of: appending)(v))
   }
 
   func identity(_ array: [Float]) -> [Float] {
@@ -395,7 +399,7 @@ ArrayAutoDiffTests.test("Array.append") {
   }
   do {
     let v = FloatArrayTan([4, -5, 6])
-    expectEqual(v, pullback(at: [1, 2, 3], in: identity)(v))
+    expectEqual(v, pullback(at: [1, 2, 3], of: identity)(v))
   }
 }
 
@@ -407,7 +411,7 @@ ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
   expectEqual(Float(10), gradient(at: .zero) { x in
     repeating(x).differentiableReduce(0, {$0 + $1})
   })
-  expectEqual(Float(20), pullback(at: .zero, in: { x in
+  expectEqual(Float(20), pullback(at: .zero, of: { x in
     repeating(x).differentiableReduce(0, {$0 + $1})
   })(2))
 }
@@ -418,7 +422,7 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
     return Array<Float>.DifferentiableView(x)
   }
 
-  let backprop = pullback(at: [5, 6, 7, 8], in: constructView)
+  let backprop = pullback(at: [5, 6, 7, 8], of: constructView)
   expectEqual(
     FloatArrayTan([1, 2, 3, 4]),
     backprop(FloatArrayTan([1, 2, 3, 4])))
@@ -432,10 +436,20 @@ ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
 
   let backprop = pullback(
     at: Array<Float>.DifferentiableView([5, 6, 7, 8]),
-    in: accessBase)
+    of: accessBase)
   expectEqual(
     FloatArrayTan([1, 2, 3, 4]),
     backprop(FloatArrayTan([1, 2, 3, 4])))
+}
+
+ArrayAutoDiffTests.test("Array.DifferentiableView.move") {
+  var v: [Float] = [1, 2, 3]
+  v.move(by: .zero)
+  expectEqual(v, [1, 2, 3])
+
+  var z: [Float] = []
+  z.move(by: .zero)
+  expectEqual(z, [])
 }
 
 runAllTests()

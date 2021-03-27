@@ -48,6 +48,9 @@
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=REGULAR_MULTICLOSURE_APPLIED | %FileCheck %s --check-prefix=POINT_MEMBER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER
 // RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER2 | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=BEST_SOLUTION_FILTER_GEN | %FileCheck %s --check-prefix=BEST_SOLUTION_FILTER_GEN
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MISSINGARG_INLINE | %FileCheck %s --check-prefix=MISSINGARG_INLINE
+// RUN: %swift-ide-test -code-completion  -source-filename %s -code-completion-token=MISSINGARG_TRAILING | %FileCheck %s --check-prefix=MISSINGARG_TRAILING
 
 
 struct A {
@@ -313,9 +316,55 @@ func testMissingArgs() {
 
   test3(after: Test.#^OVERLOADEDFUNC_MISSINGARG_BEFORE^#);
   test4(both: Test.#^OVERLOADEDFUNC_MISSINGARG_BEFOREANDAFTER^#)
+
+  enum Bop { case bop }
+  enum Bix { case bix }
+  enum Blu { case blu }
+  enum Baz { case baz }
+  enum Boy { case boy }
+
+  func trailing(x: Int, _ y: () -> Foo, z: () -> ())  {}
+  func trailing(x: Int, _ y: () -> Bar, z: (() -> ())?)  {}
+  func trailing(x: Int, _ y: () -> Bop, z: Any)  {}
+  func trailing<T>(x: Int, _ y: () -> Bix, z: T) {}
+  func trailing<T>(x: Int, _ y: () -> Boy, z: T?) {}
+  func trailing<T>(x: Int, _ y: () -> Blu, z: [T]?) {}
+  func trailing(x: Int, _ y: () -> Blu, z: inout Any)  {}
+  func trailing(x: Int, _ y: () -> Baz, z: Int)  {}
+
+  trailing(x: 2, { .#^MISSINGARG_INLINE^# })
+  trailing(x: 2) { .#^MISSINGARG_TRAILING^# }
+
+  // MISSINGARG_INLINE: Begin completions, 14 items
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#Foo#]; name=foo
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(self: Foo)
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#Bar#]; name=bar
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bar)
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bop[#Bop#]; name=bop
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bop)
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bix[#Bix#]; name=bix
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bix)
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: boy[#Boy#]; name=boy
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(self: Boy)
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: blu[#Blu#]; name=blu
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Blu#})[#(into: inout Hasher) -> Void#]; name=hash(self: Blu)
+  // MISSINGARG_INLINE-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: baz[#Baz#]; name=baz
+  // MISSINGARG_INLINE-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Baz#})[#(into: inout Hasher) -> Void#]; name=hash(self: Baz)
+  // MISSINGARG_INLINE: End completions
+
+  // MISSINGARG_TRAILING: Begin completions, 10 items
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: foo[#Foo#]; name=foo
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Foo#})[#(into: inout Hasher) -> Void#]; name=hash(self: Foo)
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bar[#Bar#]; name=bar
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bar#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bar)
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bop[#Bop#]; name=bop
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bop#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bop)
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: bix[#Bix#]; name=bix
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Bix#})[#(into: inout Hasher) -> Void#]; name=hash(self: Bix)
+  // MISSINGARG_TRAILING-DAG: Decl[EnumElement]/ExprSpecific/TypeRelation[Identical]: boy[#Boy#]; name=boy
+  // MISSINGARG_TRAILING-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#(self): Boy#})[#(into: inout Hasher) -> Void#]; name=hash(self: Boy)
+  // MISSINGARG_TRAILING: End completions
 }
-
-
 
 protocol C {
   associatedtype Element
@@ -447,10 +496,10 @@ enum Enum123 {
 struct Struct123: Equatable {
     var structMem = Enum123.enumElem
 }
-func testNoBestSolutionFilter() {
+func testBestSolutionFilter() {
   let a = Struct123();
   let b = [Struct123]().first(where: { $0 == a && 1 + 90 * 5 / 8 == 45 * -10 })?.structMem != .#^BEST_SOLUTION_FILTER^#
-  let c = min(10.3, 10 / 10.4) < 6 + 5 / (10 - 3) ? true : Optional(a)?.structMem != .#^BEST_SOLUTION_FILTER2^#
+  let c = min(10.3, 10 / 10.4) < 6 / 7 ? true : Optional(a)?.structMem != .#^BEST_SOLUTION_FILTER2^#
 }
 
 // BEST_SOLUTION_FILTER: Begin completions
@@ -460,3 +509,16 @@ func testNoBestSolutionFilter() {
 // BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: none[#Optional<Enum123>#]{{; name=.+$}}
 // BEST_SOLUTION_FILTER-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Identical]: some({#Enum123#})[#Optional<Enum123>#]{{; name=.+$}}
 // BEST_SOLUTION_FILTER: End completions
+
+func testBestSolutionGeneric() {
+  struct Test1 {}
+  func genAndInt(_ x: Int) -> Int { return 1 }
+  func genAndInt<T>(_ x: T) -> Test1 { return Test1() }
+
+  genAndInt(2).#^BEST_SOLUTION_FILTER_GEN^#
+}
+
+// BEST_SOLUTION_FILTER_GEN: Begin completions
+// BEST_SOLUTION_FILTER_GEN-DAG: Keyword[self]/CurrNominal:     self[#Int#]; name=self
+// BEST_SOLUTION_FILTER_GEN-DAG: Keyword[self]/CurrNominal:     self[#Test1#]; name=self
+// BEST_SOLUTION_FILTER_GEN: End completions

@@ -29,11 +29,10 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
-#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -682,6 +681,31 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   LoadBorrowImmutabilityAnalysis loadBorrowImmutabilityAnalysis;
   bool SingleFunction = true;
 
+  /// A cache of the isOperandInValueUse check. When we process an operand, we
+  /// fix this for each of its uses.
+  llvm::DenseSet<std::pair<SILValue, const Operand *>> isOperandInValueUsesCache;
+
+  /// Check that this operand appears in the use-chain of the value it uses.
+  bool isOperandInValueUses(const Operand *operand) {
+    SILValue value = operand->get();
+
+    // First check the cache.
+    if (isOperandInValueUsesCache.contains({value, operand}))
+      return true;
+
+    // Otherwise, compute the value and initialize the cache for each of the
+    // operand's value uses.
+    bool foundUse = false;
+    for (auto *use : value->getUses()) {
+      if (use == operand) {
+        foundUse = true;
+      }
+      isOperandInValueUsesCache.insert({value, use});
+    }
+
+    return foundUse;
+  }
+
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
 public:
@@ -955,14 +979,17 @@ public:
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
     // - Non-phi arguments have a single predecessor.
-    if (arg->isPhiArgument()) {
-      for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
-        auto *TI = predBB->getTerminator();
-        // FIXME: when critical edges are removed, only allow BranchInst.
-        require(isa <BranchInst>(TI) || isa<CondBranchInst>(TI),
+    assert(arg->isPhiArgument() && "precondition");
+    for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
+      auto *TI = predBB->getTerminator();
+      if (F.hasOwnership()) {
+        require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
+      } else {
+        // FIXME: when critical edges are removed and cond_br arguments are
+        // disallowed, only allow BranchInst.
+        require(isa<BranchInst>(TI) || isa<CondBranchInst>(TI),
                 "All phi argument inputs must be from branches.");
       }
-    } else {
     }
     if (arg->isPhiArgument() && prohibitAddressPhis()) {
       // As a property of well-formed SIL, we disallow address-type
@@ -1112,7 +1139,7 @@ public:
 
       require(operand.getUser() == I,
               "instruction's operand's owner isn't the instruction");
-      require(isInValueUses(&operand), "operand value isn't used by operand");
+      require(isOperandInValueUses(&operand), "operand value isn't used by operand");
 
       if (operand.isTypeDependent()) {
         require(isa<SILInstruction>(I),
@@ -1309,14 +1336,6 @@ public:
                 "definition of this opened archetype");
       }
     });
-  }
-
-  /// Check that this operand appears in the use-chain of the value it uses.
-  static bool isInValueUses(const Operand *operand) {
-    for (auto use : operand->get()->getUses())
-      if (use == operand)
-        return true;
-    return false;
   }
 
   /// \return True if all of the users of the AllocStack instruction \p ASI are
@@ -1535,10 +1554,16 @@ public:
               "apply instruction cannot call function with error result");
     }
 
+    if (AI->isNonAsync()) {
+      require(calleeConv.funcTy->isAsync(),
+              "noasync flag used for sync callee");
+    } else {
+      require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+              "cannot call an async function from a non async function");
+    }
+
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
-    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
-            "cannot call an async function from a non async function");
   }
 
   void checkTryApplyInst(TryApplyInst *AI) {
@@ -1549,8 +1574,13 @@ public:
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
 
-    require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
-            "cannot call an async function from a non async function");
+    if (AI->isNonAsync()) {
+      require(calleeConv.funcTy->isAsync(),
+              "noasync flag used for sync callee");
+    } else {
+      require(!calleeConv.funcTy->isAsync() || AI->getFunction()->isAsync(),
+              "cannot call an async function from a non async function");
+    }
 
     auto normalBB = AI->getNormalBB();
     require(normalBB->args_size() == 1,
@@ -1671,8 +1701,8 @@ public:
     SILFunctionConventions substConv(substTy, F.getModule());
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
-    bool isConcurrentAndStageIsCanonical =
-        PAI->getFunctionType()->isConcurrent() &&
+    bool isSendableAndStageIsCanonical =
+        PAI->getFunctionType()->isSendable() &&
         F.getModule().getStage() >= SILStage::Canonical;
     for (auto p : llvm::enumerate(PAI->getArguments())) {
       requireSameType(
@@ -1683,7 +1713,7 @@ public:
           "inputs");
 
       // TODO: Expand this to also be true for address only types.
-      if (isConcurrentAndStageIsCanonical)
+      if (isSendableAndStageIsCanonical)
         require(
             !p.value()->getType().getASTType()->is<SILBoxType>() ||
                 p.value()->getType().getSILBoxFieldType(&F).isAddressOnly(F),
@@ -2004,6 +2034,14 @@ public:
         "Inst with qualified ownership in a function that is not qualified");
   }
 
+  void checkEndLifetimeInst(EndLifetimeInst *I) {
+    require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
+            "Source value should be non-trivial");
+    require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
+            "end_lifetime is only valid in functions with qualified "
+            "ownership");
+  }
+
   void checkUncheckedValueCastInst(UncheckedValueCastInst *) {
     require(
         F.hasOwnership(),
@@ -2171,6 +2209,23 @@ public:
       break;
     }
     }
+  }
+
+  void checkStoreBorrowInst(StoreBorrowInst *SI) {
+    require(SI->getSrc()->getType().isObject(),
+            "Can't store from an address source");
+    require(!fnConv.useLoweredAddresses()
+                || SI->getSrc()->getType().isLoadable(*SI->getFunction()),
+            "Can't store a non loadable type");
+    require(SI->getDest()->getType().isAddress(),
+            "Must store to an address dest");
+    requireSameType(SI->getDest()->getType().getObjectType(),
+                    SI->getSrc()->getType(),
+                    "Store operand type and dest type mismatch");
+
+    // Note: This is the current implementation and the design is not final.
+    require(isa<AllocStackInst>(SI->getDest()),
+            "store_borrow destination can only be an alloc_stack");
   }
 
   void checkAssignInst(AssignInst *AI) {
@@ -2873,6 +2928,10 @@ public:
 
     require(EI->getFieldIndex() < operandTy->getNumElements(),
             "invalid field index for tuple_extract instruction");
+
+    require(EI->getForwardingOwnershipKind() == OwnershipKind::None ||
+                EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
+            "invalid forwarding ownership kind on tuple_extract instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(EI->getType().getASTType(),
                       operandTy.getElementType(EI->getFieldIndex()),
@@ -2898,6 +2957,10 @@ public:
 
     require(EI->getField()->getDeclContext() == sd,
             "struct_extract field is not a member of the struct");
+
+    require(EI->getForwardingOwnershipKind() == OwnershipKind::None ||
+                EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
+            "invalid forwarding ownership kind on tuple_extract instruction");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
@@ -5405,12 +5468,7 @@ public:
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
-      LastSeenScope = SI.getDebugScope();
-      AlreadySeenScopes.insert(LastSeenScope);
-      break;
-    }
-    for (SILInstruction &SI : *BB) {
-      if (SI.isMetaInstruction())
+      if (SI.getLoc().getKind() == SILLocation::CleanupKind)
         continue;
 
       // If we haven't seen this debug scope yet, update the
@@ -5558,7 +5616,7 @@ public:
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
         !F->getModule().getASTContext().hadError()) {
-      verifyMemoryLifetime(F);
+      F->verifyMemoryLifetime();
     }
   }
 

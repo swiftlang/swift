@@ -84,6 +84,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::PatternMatch:
   case ConstraintLocator::ArgumentAttribute:
   case ConstraintLocator::UnresolvedMemberChainResult:
+  case ConstraintLocator::PlaceholderType:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
@@ -170,10 +171,14 @@ bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
   return !path.empty() && path.back().isKeyPathDynamicMember();
 }
 
-bool ConstraintLocator::isForKeyPathComponent() const {
+bool ConstraintLocator::isInKeyPathComponent() const {
   return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
     return elt.isKeyPathComponent();
   });
+}
+
+bool ConstraintLocator::isForKeyPathComponentResult() const {
+  return isLastElement<LocatorPathElt::KeyPathComponentResult>();
 }
 
 bool ConstraintLocator::isForGenericParameter() const {
@@ -484,7 +489,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
         break;
 
       case AttrLoc::Attribute::Concurrent:
-        out << "@concurrent";
+        out << "@Sendable";
+        break;
+
+      case AttrLoc::Attribute::GlobalActor:
+        out << "@<global actor>";
         break;
       }
 
@@ -493,6 +502,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
 
     case UnresolvedMemberChainResult:
       out << "unresolved chain result";
+      break;
+
+    case PlaceholderType:
+      out << "placeholder type";
       break;
     }
   }

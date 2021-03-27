@@ -548,6 +548,17 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
+  bool isAsyncCCSupported =
+    clangASTContext.getTargetInfo().checkCallingConvention(clang::CC_SwiftAsync)
+    == clang::TargetInfo::CCCR_OK;
+  if (isAsyncCCSupported) {
+    SwiftAsyncCC = llvm::CallingConv::SwiftTail;
+    AsyncTailCallKind = llvm::CallInst::TCK_MustTail;
+  } else {
+    SwiftAsyncCC = SwiftCC;
+    AsyncTailCallKind = llvm::CallInst::TCK_Tail;
+  }
+
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
@@ -609,10 +620,13 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   AsyncFunctionPointerPtrTy = AsyncFunctionPointerTy->getPointerTo(DefaultAS);
   SwiftContextPtrTy = SwiftContextTy->getPointerTo(DefaultAS);
   SwiftTaskPtrTy = SwiftTaskTy->getPointerTo(DefaultAS);
+  SwiftTaskGroupPtrTy = Int8PtrTy; // we pass it opaquely (TaskGroup*)
   SwiftExecutorPtrTy = SwiftExecutorTy->getPointerTo(DefaultAS);
   SwiftJobTy = createStructType(*this, "swift.job", {
+    RefCountedStructTy,   // object header
+    Int8PtrTy, Int8PtrTy, // SchedulerPrivate
     SizeTy,               // flags
-    Int8PtrTy             // execution function pointer
+    FunctionPtrTy,        // RunJob/ResumeTask
   });
   SwiftJobPtrTy = SwiftJobTy->getPointerTo();
 
@@ -620,8 +634,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   //   SWIFT_CC(swift)
   //   void (AsyncTask *, ExecutorRef, AsyncContext *);
   TaskContinuationFunctionTy = llvm::FunctionType::get(
-      VoidTy, {SwiftTaskPtrTy, SwiftExecutorPtrTy, SwiftContextPtrTy},
-      /*isVarArg*/ false);
+      VoidTy, {SwiftContextPtrTy}, /*isVarArg*/ false);
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
 
   AsyncTaskAndContextTy = createStructType(

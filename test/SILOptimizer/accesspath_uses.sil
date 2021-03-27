@@ -34,7 +34,7 @@ struct MyStruct {
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %7 to %10 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%12 : $Builtin.RawPointer)
+// CHECK-NEXT:  %16 = load %15 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 // CHECK: ###For MemOp:   %7 = load %6 : $*AnyObject
@@ -51,7 +51,7 @@ struct MyStruct {
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %7 to %10 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%12 : $Builtin.RawPointer)
+// CHECK-NEXT:  %16 = load %15 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 // CHECK: ###For MemOp:   store %7 to %6 : $*AnyObject
@@ -68,7 +68,7 @@ struct MyStruct {
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %7 to %10 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%12 : $Builtin.RawPointer)
+// CHECK-NEXT:  %16 = load %15 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 // CHECK: ###For MemOp:   store %7 to %10 : $*AnyObject
@@ -85,10 +85,10 @@ struct MyStruct {
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %7 to %10 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%12 : $Builtin.RawPointer)
+// CHECK-NEXT:  %16 = load %15 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
-// CHECK: ###For MemOp:   %17 = load %16 : $*AnyObject
+// CHECK: ###For MemOp:   %16 = load %15 : $*AnyObject
 // CHECK: Storage: Unidentified   %1 = struct_extract %0 : $UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
 // CHECK: Path: (@Unknown)
 // CHECK: Exact Uses {
@@ -102,7 +102,7 @@ struct MyStruct {
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT:  store %7 to %10 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
-// CHECK-NEXT:  cond_br undef, bb2, bb3(%12 : $Builtin.RawPointer)
+// CHECK-NEXT:  %16 = load %15 : $*AnyObject
 // CHECK-NEXT:  Path: (@Unknown)
 // CHECK-NEXT: }
 sil shared @testIndexLoop : $@convention(thin) (UnsafeMutablePointer<AnyObject>) -> AnyObject {
@@ -120,13 +120,13 @@ bb1(%5 : $Builtin.RawPointer):
   %10 = index_addr %6 : $*AnyObject, %9 : $Builtin.Word
   store %7 to %10 : $*AnyObject
   %12 = address_to_pointer %10 : $*AnyObject to $Builtin.RawPointer
-  cond_br undef, bb2, bb3(%12 : $Builtin.RawPointer)
+  cond_br undef, bb2, bb3
 
 bb2:
   br bb1(%12 : $Builtin.RawPointer)
 
-bb3(%15 : $Builtin.RawPointer):
-  %16 = pointer_to_address %15 : $Builtin.RawPointer to [strict] $*AnyObject
+bb3:
+  %16 = pointer_to_address %12 : $Builtin.RawPointer to [strict] $*AnyObject
   %17 = load %16 : $*AnyObject
   return %17 : $AnyObject
 }

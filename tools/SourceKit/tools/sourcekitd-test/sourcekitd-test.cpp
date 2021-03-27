@@ -897,6 +897,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::Open:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestEditorOpen);
     sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::Close:
@@ -912,6 +913,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                        Opts.ReplaceText.getValue().c_str());
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::PrintAnnotations:
@@ -1543,6 +1545,29 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
   OS << '\n';
 }
 
+template <typename T>
+static std::vector<T> readArray(
+    sourcekitd_variant_t Info, sourcekitd_uid_t Key,
+    std::function<T(sourcekitd_variant_t)> elementFromEntry) {
+  std::vector<T> Elements;
+  sourcekitd_variant_t Obj =
+    sourcekitd_variant_dictionary_get_value(Info, Key);
+  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(Obj);
+       i != e; ++i) {
+    sourcekitd_variant_t Entry = sourcekitd_variant_array_get_value(Obj, i);
+    Elements.push_back(elementFromEntry(Entry));
+  }
+  return Elements;
+}
+
+static std::vector<const char *> readStringArray(
+    sourcekitd_variant_t Info, sourcekitd_uid_t Key,
+    sourcekitd_uid_t ElementKey) {
+  return readArray<const char *>(Info, Key, [&](sourcekitd_variant_t Entry) {
+    return sourcekitd_variant_dictionary_get_string(Entry, ElementKey);
+  });
+}
+
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                             const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS) {
@@ -1578,6 +1603,12 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                               KeyModuleName);
   const char *GroupName = sourcekitd_variant_dictionary_get_string(Info,
                                                                    KeyGroupName);
+  
+  sourcekitd_uid_t LangUID =
+      sourcekitd_variant_dictionary_get_uid(Info, KeyDeclarationLang);
+  const char *DeclLang = nullptr;
+  if (LangUID)
+    DeclLang = sourcekitd_uid_get_string_ptr(LangUID);
 
   const char *LocalizationKey =
     sourcekitd_variant_dictionary_get_string(Info, KeyLocalizationKey);
@@ -1586,6 +1617,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   const char *TypeInterface =
       sourcekitd_variant_dictionary_get_string(Info, KeyTypeInterface);
   bool IsSystem = sourcekitd_variant_dictionary_get_bool(Info, KeyIsSystem);
+  bool IsDynamic = sourcekitd_variant_dictionary_get_bool(Info, KeyIsDynamic);
+
   const char *AnnotDecl = sourcekitd_variant_dictionary_get_string(Info,
                                                               KeyAnnotatedDecl);
   const char *FullAnnotDecl =
@@ -1604,56 +1637,47 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   }
   const char *FilePath = sourcekitd_variant_dictionary_get_string(Info, KeyFilePath);
 
-  std::vector<const char *> OverrideUSRs;
-  sourcekitd_variant_t OverridesObj =
-      sourcekitd_variant_dictionary_get_value(Info, KeyOverrides);
-  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(OverridesObj);
-         i != e; ++i) {
-    sourcekitd_variant_t Entry =
-      sourcekitd_variant_array_get_value(OverridesObj, i);
-    OverrideUSRs.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyUSR));
-  }
+  std::vector<const char *> OverrideUSRs = readStringArray(Info, KeyOverrides,
+                                                           KeyUSR);
 
-  std::vector<const char *> GroupNames;
-  sourcekitd_variant_t GroupObj =
-    sourcekitd_variant_dictionary_get_value(Info, KeyModuleGroups);
-  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(GroupObj);
-       i != e; ++i) {
-    sourcekitd_variant_t Entry =
-    sourcekitd_variant_array_get_value(GroupObj, i);
-    GroupNames.push_back(sourcekitd_variant_dictionary_get_string(Entry, KeyGroupName));
-  }
+  struct ParentInfo {
+    const char *Title;
+    const char *Kind;
+    const char *USR;
+  };
+  std::vector<ParentInfo> Parents = readArray<ParentInfo>(
+      Info,KeyParentContexts, [&](sourcekitd_variant_t Entry) {
+    return ParentInfo {
+      sourcekitd_variant_dictionary_get_string(Entry, KeyName),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyKind),
+      sourcekitd_variant_dictionary_get_string(Entry, KeyUSR)
+    };
+  });
 
-  std::vector<const char *> RelatedDecls;
-  sourcekitd_variant_t RelatedDeclsObj =
-  sourcekitd_variant_dictionary_get_value(Info, KeyRelatedDecls);
-  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(RelatedDeclsObj);
-       i != e; ++i) {
-    sourcekitd_variant_t Entry =
-    sourcekitd_variant_array_get_value(RelatedDeclsObj, i);
-    RelatedDecls.push_back(sourcekitd_variant_dictionary_get_string(Entry,
-                                                             KeyAnnotatedDecl));
-  }
+  std::vector<const char *> GroupNames = readStringArray(Info, KeyModuleGroups,
+                                                         KeyGroupName);
+
+  std::vector<const char *> RelatedDecls = readStringArray(
+      Info, KeyRelatedDecls, KeyAnnotatedDecl);
 
   struct ActionInfo {
     const char* KindUID;
     const char* KindName;
     const char* UnavailReason;
   };
-  std::vector<ActionInfo> AvailableActions;
-  sourcekitd_variant_t ActionsObj =
-  sourcekitd_variant_dictionary_get_value(Info, KeyRefactorActions);
-  for (unsigned i = 0, e = sourcekitd_variant_array_get_count(ActionsObj);
-       i != e; ++i) {
-    sourcekitd_variant_t Entry =
-    sourcekitd_variant_array_get_value(ActionsObj, i);
-    AvailableActions.push_back({
-      sourcekitd_uid_get_string_ptr(sourcekitd_variant_dictionary_get_uid(Entry,
-                                                                KeyActionUID)),
+  std::vector<ActionInfo> AvailableActions = readArray<ActionInfo>(
+      Info, KeyRefactorActions, [&](sourcekitd_variant_t Entry) {
+    return ActionInfo {
+      sourcekitd_uid_get_string_ptr(
+          sourcekitd_variant_dictionary_get_uid(Entry, KeyActionUID)),
       sourcekitd_variant_dictionary_get_string(Entry, KeyActionName),
-      sourcekitd_variant_dictionary_get_string(Entry, KeyActionUnavailableReason)
-    });
-  }
+      sourcekitd_variant_dictionary_get_string(Entry,
+                                               KeyActionUnavailableReason)
+    };
+  });
+
+  std::vector<const char *> Receivers = readStringArray(
+      Info, KeyReceivers, KeyUSR);
 
   uint64_t ParentOffset =
     sourcekitd_variant_dictionary_get_int64(Info, KeyParentLoc);
@@ -1672,6 +1696,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   OS << Name << '\n';
   if (USR)
     OS << USR << '\n';
+  if (DeclLang)
+    OS << DeclLang << "\n";
   if (Typename)
     OS << Typename << '\n';
   if (TypeUsr)
@@ -1696,6 +1722,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     OS << "<LocalizationKey>" << LocalizationKey;
     OS << "</LocalizationKey>" << '\n';
   }
+  if (IsDynamic)
+    OS << "DYNAMIC\n";
   if (SymbolGraph) {
     OS << "SYMBOL GRAPH BEGIN\n";
     if (auto Val = json::parse(StringRef(SymbolGraph))) {
@@ -1704,6 +1732,12 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
       OS << SymbolGraph;
     }
     OS << "\nSYMBOL GRAPH END\n";
+  }
+  if (!Parents.empty()) {
+    OS << "PARENT CONTEXTS BEGIN\n";
+    for (auto parent: Parents)
+      OS << parent.Title << " " << parent.Kind << " " << parent.USR << '\n';
+    OS << "PARENT CONTEXTS END\n";
   }
   OS << "OVERRIDES BEGIN\n";
   for (auto OverUSR : OverrideUSRs)
@@ -1730,6 +1764,10 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
     }
   }
   OS << "ACTIONS END\n";
+  OS << "RECEIVERS BEGIN\n";
+  for (auto Receiver : Receivers)
+    OS << Receiver << '\n';
+  OS << "RECEIVERS END\n";
   if (ParentOffset) {
     OS << "PARENT OFFSET: " << ParentOffset << "\n";
   }

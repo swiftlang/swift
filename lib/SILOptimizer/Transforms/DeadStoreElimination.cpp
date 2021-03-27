@@ -60,7 +60,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/MemoryLifetime.h"
+#include "swift/SIL/MemoryLocations.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -69,7 +69,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
 #include "swift/SIL/BasicBlockData.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -1165,24 +1165,16 @@ void DSEContext::runIterativeDSE() {
   // Process each basic block with the gen and kill set. Every time the
   // BBWriteSetIn of a basic block changes, the optimization is rerun on its
   // predecessors.
-  llvm::SmallVector<SILBasicBlock *, 16> WorkList;
-  BasicBlockSet HandledBBs(F);
+  BasicBlockWorklist<16> WorkList(F);
   // Push into reverse post order so that we can pop from the back and get
   // post order.
   for (SILBasicBlock *B : PO->getReversePostOrder()) {
-    WorkList.push_back(B);
-    HandledBBs.insert(B);
+    WorkList.push(B);
   }
-  while (!WorkList.empty()) {
-    SILBasicBlock *BB = WorkList.pop_back_val();
-    HandledBBs.erase(BB);
+  while (SILBasicBlock *BB = WorkList.popAndForget()) {
     if (processBasicBlockWithGenKillSet(BB)) {
       for (SILBasicBlock *pred : BB->getPredecessorBlocks()) {
-        // We do not push basic block into the worklist if its already 
-        // in the worklist.
-        if (HandledBBs.contains(pred))
-          continue;
-        WorkList.push_back(pred);
+        WorkList.pushIfNotVisited(pred);
       }
     }
   }

@@ -540,14 +540,15 @@ CONSTANT_OWNERSHIP_BUILTIN(None, IntInstrprofIncrement)
 CONSTANT_OWNERSHIP_BUILTIN(None, GlobalStringTablePointer)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(None, CancelAsyncTask)
-CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTask)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskFuture)
+CONSTANT_OWNERSHIP_BUILTIN(Owned, CreateAsyncTaskGroupFuture)
 CONSTANT_OWNERSHIP_BUILTIN(None, ConvertTaskToJob)
 CONSTANT_OWNERSHIP_BUILTIN(None, InitializeDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyDefaultActor)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
@@ -586,7 +587,7 @@ ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
-ValueOwnershipKind SILValue::getOwnershipKind() const {
+ValueOwnershipKind ValueBase::getOwnershipKind() const {
   // If we do not have an undef, we should always be able to get to our function
   // here. If we do not have ownership enabled, just return none for everything
   // to short circuit ownership optimizations. Since SILUndef in either case
@@ -594,7 +595,7 @@ ValueOwnershipKind SILValue::getOwnershipKind() const {
   //
   // We assume that any time we are in SILBuilder and call this without having a
   // value in a block yet, ossa is enabled.
-  if (auto *block = Value->getParentBlock()) {
+  if (auto *block = getParentBlock()) {
     auto *f = block->getParent();
     // If our block isn't in a function, then it must be in a global
     // variable. We don't verify ownership there so just return
@@ -609,7 +610,7 @@ ValueOwnershipKind SILValue::getOwnershipKind() const {
   }
 
   ValueOwnershipKindClassifier Classifier;
-  auto result = Classifier.visit(const_cast<ValueBase *>(Value));
+  auto result = Classifier.visit(const_cast<ValueBase *>(this));
   assert(result && "Returned ownership kind invalid on values");
   return result;
 }

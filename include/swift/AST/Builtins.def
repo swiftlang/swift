@@ -736,6 +736,13 @@ BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
+// getCurrentExecutor: () async -> Builtin.Word
+//
+// Retrieve the ExecutorRef on which the current asynchronous
+// function is executing.
+// Does not retain an actor executor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "n", Special)
+
 // getCurrentAsyncTask: () -> Builtin.NativeObject
 //
 // Retrieve the pointer to the task in which the current asynchronous
@@ -747,14 +754,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 /// Cancel the given asynchronous task.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
-/// createAsyncTask(): (
-///     Int, Builtin.NativeObject?, @escaping () async throws -> Void
-/// ) -> Builtin.NativeObject
-///
-/// Create a new asynchronous task, given flags, an (optional) parent task, and
-/// a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask, "createAsyncTask", "", Special)
-
 /// createAsyncTaskFuture(): (
 ///     Int, Builtin.NativeObject?, @escaping () async throws -> T
 /// ) -> Builtin.NativeObject
@@ -763,6 +762,18 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask, "createAsyncTask", "", Speci
 /// task and a function to execute.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskFuture,
     "createAsyncTaskFuture", "", Special)
+
+/// createAsyncTaskGroupFuture(): (
+///     Int, // flags
+///     Builtin.NativeObject?, // parent
+///     Builtin.RawPointer?, // group
+///     @escaping () async throws -> T
+/// ) -> Builtin.NativeObject
+///
+/// Create a new asynchronous task future, given flags, a parent task,
+/// task group and a function to execute.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskGroupFuture,
+    "createAsyncTaskGroupFuture", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed

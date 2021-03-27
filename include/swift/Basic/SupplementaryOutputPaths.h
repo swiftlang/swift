@@ -152,6 +152,9 @@ struct SupplementaryOutputPaths {
 
   /// The path to which we should emit module summary file.
   std::string ModuleSummaryOutputPath;
+  
+  /// The directory to which we should emit symbol graphs for the current module.
+  std::string SymbolGraphOutputDir;
 
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
@@ -185,7 +188,9 @@ struct SupplementaryOutputPaths {
     if (!LdAddCFilePath.empty())
       fn(LdAddCFilePath); 
     if (!ModuleSummaryOutputPath.empty())
-      fn(ModuleSummaryOutputPath); 
+      fn(ModuleSummaryOutputPath);
+    if (!SymbolGraphOutputDir.empty())
+      fn(SymbolGraphOutputDir);
   }
 
   bool empty() const {
@@ -194,7 +199,8 @@ struct SupplementaryOutputPaths {
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
            TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
-           ModuleSourceInfoOutputPath.empty() && LdAddCFilePath.empty();
+           ModuleSourceInfoOutputPath.empty() && LdAddCFilePath.empty() &&
+           SymbolGraphOutputDir.empty();
   }
 };
 } // namespace swift

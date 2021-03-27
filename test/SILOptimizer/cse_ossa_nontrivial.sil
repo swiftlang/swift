@@ -7,8 +7,9 @@ import Swift
 ///////////////
 // CSE Tests //
 ///////////////
-class Klass {
-}
+class SuperKlass {}
+
+class Klass : SuperKlass {}
 
 struct NonTrivialStruct {
   var val:Klass
@@ -34,6 +35,7 @@ struct StructWithEnum2 {
 
 sil @use_nontrivialstruct1 : $@convention(thin) (@guaranteed NonTrivialStruct) -> ()
 sil @use_nontrivialstruct2 : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
 
 // CHECK-LABEL: sil [ossa] @structliteral1 :
 // CHECK: struct $NonTrivialStruct
@@ -765,5 +767,66 @@ bb0(%0 : @guaranteed $WrapperKlass):
   end_borrow %borrow : $WrapperKlass
   %res  = tuple ()
   return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cse_upcast_loop :
+// CHECK: upcast
+// CHECK-NOT: upcast
+// CHECK-LABEL: } // end sil function 'cse_upcast_loop'
+sil [ossa] @cse_upcast_loop : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %func  = function_ref @use_superklass1 : $@convention(thin) (@owned SuperKlass) -> ()
+  %copy0 = copy_value %0 : $Klass
+  %1 = upcast %copy0 : $Klass to $SuperKlass
+  apply %func(%1) : $@convention(thin) (@owned SuperKlass) -> ()
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %copy1 = copy_value %0 : $Klass
+  %2 = upcast %copy1 : $Klass to $SuperKlass
+  apply %func(%2) : $@convention(thin) (@owned SuperKlass) -> ()
+  br bb1
+
+bb3:
+  destroy_value %0 : $Klass
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @cse_select_enum2 :
+// CHECK: select_enum
+// CHECK-NOT: select_enum
+// CHECK: tuple
+// CHECK-LABEL: } // end sil function 'cse_select_enum2'
+sil [ossa] @cse_select_enum2 : $@convention(thin) (@guaranteed FakeOptional) -> (Builtin.Int1, Builtin.Int1) {
+bb0(%0 : @guaranteed $FakeOptional):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  %1 = select_enum %0 : $FakeOptional, case #FakeOptional.none!enumelt: %t, case #FakeOptional.some!enumelt: %f : $Builtin.Int1
+  %copy = copy_value %0 : $FakeOptional
+  %2 = select_enum %copy : $FakeOptional, case #FakeOptional.none!enumelt: %t, case #FakeOptional.some!enumelt: %f : $Builtin.Int1
+  destroy_value %copy : $FakeOptional
+  %3 = tuple (%1: $Builtin.Int1, %2: $Builtin.Int1)
+  return %3: $(Builtin.Int1, Builtin.Int1)
+}
+
+// CHECK-LABEL: sil [ossa] @enum_cse2 :
+// CHECK: enum $FakeOptional, #FakeOptional.some!enumelt
+// CHECK-NOT: enum $FakeOptional, #FakeOptional.some!enumelt
+// CHECK-LABEL: } // end sil function 'enum_cse2'
+sil [ossa] @enum_cse2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %func = function_ref @unknown_fake_optional_user : $@convention(thin) (FakeOptional) -> ()
+  %copy = copy_value %0 : $Klass
+  %4 = enum $FakeOptional, #FakeOptional.some!enumelt, %0 : $Klass
+  %5 = enum $FakeOptional, #FakeOptional.some!enumelt, %copy : $Klass
+  apply %func(%4) : $@convention(thin) (FakeOptional) -> ()
+  apply %func(%5) : $@convention(thin) (FakeOptional) -> ()
+  destroy_value %5 : $FakeOptional
+  %6 = tuple()
+  return %6 : $()
 }
 

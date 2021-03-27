@@ -28,6 +28,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
@@ -1673,8 +1674,10 @@ static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
     if (auto var = dyn_cast<VarDecl>(member)) {
       if (var->hasAttachedPropertyWrapper()) {
         auto sourceFile = var->getDeclContext()->getParentSourceFile();
-        if (sourceFile && sourceFile->Kind != SourceFileKind::Interface)
-          (void)var->getPropertyWrapperBackingProperty();
+        if (sourceFile && sourceFile->Kind != SourceFileKind::Interface) {
+          (void)var->getPropertyWrapperAuxiliaryVariables();
+          (void)var->getPropertyWrapperInitializerInfo();
+        }
       }
     }
   }
@@ -2231,6 +2234,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Protocol:
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
+  case TypeReprKind::Placeholder:
     return { };
       
   case TypeReprKind::OpaqueReturn:
@@ -2624,6 +2628,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
   }
 
   ctx.Diags.diagnose(attr->getLocation(), diag::unknown_attribute, typeName);
+  attr->setInvalid();
 
   return nullptr;
 }
@@ -2699,8 +2704,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(req.getSecondType()->castTo<ProtocolType>()->getDecl(),
-                          loc);
+      result.emplace_back(req.getProtocolDecl(), loc);
     }
     return result;
   }

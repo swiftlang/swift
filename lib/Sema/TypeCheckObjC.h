@@ -17,6 +17,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_OBJC_H
 #define SWIFT_SEMA_TYPE_CHECK_OBJC_H
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "llvm/ADT/Optional.h"
@@ -25,6 +26,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class ASTContext;
+class ObjCAttr;
 class SubscriptDecl;
 class ValueDecl;
 class VarDecl;
@@ -68,6 +70,9 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
+    /// Has an explicit '@objc' attribute added by an access note, rather than
+    /// written in source code.
+    ExplicitlyObjCByAccessNote,
 
     // These kinds do not appear in diagnostics.
 
@@ -112,9 +117,13 @@ public:
   }
 };
 
-/// Determine whether we should diagnose conflicts due to inferring @objc
-/// with this particular reason.
-bool shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx);
+/// Determine how to diagnose conflicts due to inferring @objc with this
+/// particular reason.
+DiagnosticBehavior
+behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx);
+
+/// Returns the ObjCReason for this ObjCAttr to be attached to the declaration.
+ObjCReason objCReasonForObjCAttr(const ObjCAttr *attr);
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
 /// complain about the correct attribute during @objc inference.

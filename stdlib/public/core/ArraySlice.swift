@@ -1079,6 +1079,7 @@ extension ArraySlice: RangeReplaceableCollection {
   //===--- algorithms -----------------------------------------------------===//
 
   @inlinable
+  @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1517,5 +1518,5 @@ extension ArraySlice {
   }
 }
 
-extension ArraySlice: ConcurrentValue, UnsafeConcurrentValue
-  where Element: ConcurrentValue { }
+extension ArraySlice: Sendable, UnsafeSendable
+  where Element: Sendable { }

@@ -494,7 +494,7 @@ void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
 }
 
 Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
-  auto *call = Builder.CreateCall(IGM.getTaskAllocFn(), {getAsyncTask(), size});
+  auto *call = Builder.CreateCall(IGM.getTaskAllocFn(), {size});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
   auto address = Address(call, alignment);
@@ -503,7 +503,7 @@ Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
 
 void IRGenFunction::emitTaskDealloc(Address address) {
   auto *call = Builder.CreateCall(IGM.getTaskDeallocFn(),
-                                  {getAsyncTask(), address.getAddress()});
+                                  {address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
 }
@@ -528,8 +528,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
                                              StackAddress resultAddr,
                                              Explosion &out) {
   // Create the continuation.
-  // void current_sil_function(AsyncTask *currTask, Executor *currExecutor,
-  //                           AsyncContext *currCtxt) {
+  // void current_sil_function(AsyncContext *currCtxt) {
   //
   // A continuation is the current AsyncTask 'currTask' with:
   //   currTask->ResumeTask = @llvm.coro.async.resume();
@@ -555,7 +554,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
 
   // Create and setup the continuation context.
   // continuation_context.resumeCtxt = currCtxt;
-  // continuation_context.errResult = nulllptr;
+  // continuation_context.errResult = nullptr;
   // continuation_context.result = ... // local alloca T
   auto pointerAlignment = IGM.getPointerAlignment();
   auto continuationContext =
@@ -594,14 +593,11 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
                             contResultAddr->getType()->getPointerElementType()),
                         Address(contResultAddr, pointerAlignment));
   }
-  // continuation_context.resumeExecutor = // current executor
-  auto contExecutorRefAddr =
-      Builder.CreateStructGEP(continuationContext.getAddress(), 4);
-  Builder.CreateStore(
-      Builder.CreateBitOrPointerCast(
-          getAsyncExecutor(),
-          contExecutorRefAddr->getType()->getPointerElementType()),
-      Address(contExecutorRefAddr, pointerAlignment));
+  auto executorAddr =
+    Builder.CreateStructGEP(continuationContext.getAddress(), 4);
+  auto executor = Builder.CreateCall(IGM.getTaskGetCurrentExecutorFn(), {});
+  executorAddr = Builder.CreateBitCast(executorAddr, executor->getType()->getPointerTo());
+  Builder.CreateStore(executor, executorAddr, pointerAlignment);
 
   // Fill the current task (i.e the continuation) with the continuation
   // information.
@@ -687,6 +683,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
   {
     // Setup the suspend point.
     SmallVector<llvm::Value *, 8> arguments;
+    unsigned swiftAsyncContextIndex = 0;
+    arguments.push_back(IGM.getInt32(swiftAsyncContextIndex)); // context index
     arguments.push_back(AsyncCoroutineCurrentResume);
     auto resumeProjFn = getOrCreateResumePrjFn();
     arguments.push_back(
@@ -695,17 +693,14 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto resumeFnPtr =
         getFunctionPointerForResumeIntrinsic(AsyncCoroutineCurrentResume);
     arguments.push_back(Builder.CreateBitOrPointerCast(
-        createAsyncDispatchFn(resumeFnPtr,
-                              {IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.Int8PtrTy}),
+        createAsyncDispatchFn(resumeFnPtr, {IGM.Int8PtrTy}),
         IGM.Int8PtrTy));
     arguments.push_back(AsyncCoroutineCurrentResume);
-    arguments.push_back(
-        Builder.CreateBitOrPointerCast(getAsyncTask(), IGM.Int8PtrTy));
-    arguments.push_back(
-        Builder.CreateBitOrPointerCast(getAsyncExecutor(), IGM.Int8PtrTy));
     arguments.push_back(Builder.CreateBitOrPointerCast(
         AsyncCoroutineCurrentContinuationContext, IGM.Int8PtrTy));
-    emitSuspendAsyncCall(arguments);
+    auto resultTy =
+        llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy}, false /*packed*/);
+    emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
 
     auto results = Builder.CreateAtomicCmpXchg(
         contAwaitSyncAddr, null, one,

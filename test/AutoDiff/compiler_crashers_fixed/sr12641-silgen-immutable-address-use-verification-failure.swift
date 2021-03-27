@@ -19,7 +19,7 @@ public func f(_ c: Class) -> Resilient {
   return Resilient(x: 0)
 }
 
-_ = pullback(at: Class(Resilient(x: 10)), in: f)
+_ = pullback(at: Class(Resilient(x: 10)), of: f)
 
 // swift/lib/SIL/Verifier/SILVerifier.cpp:456: bool (anonymous namespace)::ImmutableAddressUseVerifier::isConsumingOrMutatingArgumentConvention(swift::SILArgumentConvention): Assertion `conv.isIndirectConvention() && "Expect an indirect convention"' failed.
 // Stack dump:
@@ -50,7 +50,7 @@ func loadableOriginal<T: AdditiveArithmetic>(_ loadable: LoadableOriginal<T>) ->
 // 2.      While evaluating request ExecuteSILPipelineRequest(Run pipelines { Guaranteed Passes } on SIL for main.main)
 // 3.      While running pass #153 SILModuleTransform "Differentiation".
 // 4.      While processing // differentiability witness for loadableOriginal<A>(_:)
-// sil_differentiability_witness hidden [parameters 0] [results 0] <T where T : AdditiveArithmetic, T : Differentiable> @$s4main16loadableOriginalyxAA08LoadableC0CyxGs18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlF : $@convention(thin) <T where T : Additive
+// sil_differentiability_witness hidden [reverse] [parameters 0] [results 0] <T where T : AdditiveArithmetic, T : Differentiable> @$s4main16loadableOriginalyxAA08LoadableC0CyxGs18AdditiveArithmeticRz16_Differentiation14DifferentiableRzlF : $@convention(thin) <T where T : Additive
 // Arithmetic, T : Differentiable> (@guaranteed LoadableOriginal<T>) -> @out T {
 // }
 //

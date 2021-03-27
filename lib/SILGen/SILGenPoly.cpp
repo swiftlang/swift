@@ -3652,22 +3652,20 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
   Mangle::ASTMangler mangler;
-  std::string name = mangler.mangleReabstractionThunkHelper(
-      thunkType, fromInterfaceType, toInterfaceType, Type(),
-      getModule().getSwiftModule());
-  // TODO(TF-685): Use principled thunk mangling.
-  switch (linearMapKind) {
-  case AutoDiffLinearMapKind::Differential:
-    name += "_differential";
-    break;
-  case AutoDiffLinearMapKind::Pullback:
-    name += "_pullback";
-    break;
+  std::string name;
+  // If `self` is being reordered, it is an AD-specific self-reordering
+  // reabstraction thunk.
+  if (reorderSelf) {
+    name = mangler.mangleAutoDiffSelfReorderingReabstractionThunk(
+        toInterfaceType, fromInterfaceType,
+        thunkType->getInvocationGenericSignature(), linearMapKind);
   }
-  name = "AD__" + name;
-  if (reorderSelf)
-    name += "_self_reordering";
-  name += "_thunk";
+  // Otherwise, it is just a normal reabstraction thunk.
+  else {
+    name = mangler.mangleReabstractionThunkHelper(
+        thunkType, fromInterfaceType, toInterfaceType, Type(),
+        getModule().getSwiftModule());
+  }
 
   // Create the thunk.
   auto loc = F.getLocation();
@@ -3838,7 +3836,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
 
   auto *linearMapArg = thunk->getArgumentsWithoutIndirectResults().back();
   auto *apply = thunkSGF.B.createApply(loc, linearMapArg, SubstitutionMap(),
-                                       arguments, /*isNonThrowing*/ false);
+                                       arguments);
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
@@ -4478,17 +4476,6 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   // Now that the thunk body has been completely emitted, verify the
   // body early.
   F.verify();
-}
-
-//===----------------------------------------------------------------------===//
-// Concurrency
-//===----------------------------------------------------------------------===//
-
-/// If the current function is associated with an actor, then this
-/// function emits a hop_to_executor to that actor's executor at loc.
-void SILGenFunction::emitHopToCurrentExecutor(SILLocation loc) {
-  if (actor)
-    B.createHopToExecutor(loc, actor);
 }
 
 //===----------------------------------------------------------------------===//

@@ -1804,19 +1804,19 @@ public:
         Out << "\n";
         abort();
       } else if (E->throws() && !FT->isThrowing()) {
-        FunctionRethrowingKind rethrowingKind = FunctionRethrowingKind::Invalid;
+        PolymorphicEffectKind rethrowingKind = PolymorphicEffectKind::Invalid;
         if (auto DRE = dyn_cast<DeclRefExpr>(E->getFn())) {
           if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(DRE->getDecl())) {
-            rethrowingKind = fnDecl->getRethrowingKind();
+            rethrowingKind = fnDecl->getPolymorphicEffectKind(EffectKind::Throws);
           }
         } else if (auto OCDRE = dyn_cast<OtherConstructorDeclRefExpr>(E->getFn())) {
           if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(OCDRE->getDecl())) {
-            rethrowingKind = fnDecl->getRethrowingKind();
+            rethrowingKind = fnDecl->getPolymorphicEffectKind(EffectKind::Throws);
           }
         }
 
-        if (rethrowingKind != FunctionRethrowingKind::ByConformance &&
-            rethrowingKind != FunctionRethrowingKind::Throws) {
+        if (rethrowingKind != PolymorphicEffectKind::ByConformance &&
+            rethrowingKind != PolymorphicEffectKind::Always) {
           Out << "apply expression is marked as throwing, but function operand"
                  "does not have a throwing function type\n";
           E->dump(Out);
@@ -2752,8 +2752,7 @@ public:
             abort();
           }
 
-          auto reqProto =
-            req.getSecondType()->castTo<ProtocolType>()->getDecl();
+          auto reqProto = req.getProtocolDecl();
           if (reqProto != conformances[idx].getRequirement()) {
             Out << "error: wrong protocol in signature conformances: have "
               << conformances[idx].getRequirement()->getName().str()

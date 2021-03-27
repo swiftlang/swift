@@ -87,11 +87,16 @@ namespace {
   class SignatureExpansion;
 }
 
+class AsyncInfo {
+public:
+  uint32_t AsyncContextIdx = 0;
+  uint32_t AsyncResumeFunctionSwiftSelfIdx = 0;
+};
+
 /// A signature represents something which can actually be called.
 class Signature {
-  using ExtraData = SimpleExternalUnion<void,
-                                        ForeignFunctionInfo,
-                                        CoroutineInfo>;
+  using ExtraData =
+      SimpleExternalUnion<void, ForeignFunctionInfo, CoroutineInfo, AsyncInfo>;
 
   llvm::FunctionType *Type;
   llvm::AttributeList Attributes;
@@ -120,11 +125,19 @@ public:
   /// IRGenModule::getSignature(CanSILFunctionType), which is what
   /// clients should generally be using.
   static Signature getUncached(IRGenModule &IGM,
-                               CanSILFunctionType formalType);
+                               CanSILFunctionType formalType,
+                               bool suppressGenerics);
 
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,
                                             CanSILFunctionType coroType);
+
+  static Signature forAsyncReturn(IRGenModule &IGM,
+                                  CanSILFunctionType asyncType);
+  static Signature forAsyncAwait(IRGenModule &IGM,
+                                 CanSILFunctionType asyncType);
+  static Signature forAsyncEntry(IRGenModule &IGM,
+                                 CanSILFunctionType asyncType);
 
   llvm::FunctionType *getType() const {
     assert(isValid());
@@ -154,6 +167,20 @@ public:
     if (auto info = ExtraDataStorage.dyn_cast<CoroutineInfo>(ExtraDataKind))
       return *info;
     return CoroutineInfo();
+  }
+
+  AsyncInfo getAsyncInfo() const {
+    assert(isValid());
+    if (auto info = ExtraDataStorage.dyn_cast<AsyncInfo>(ExtraDataKind))
+      return *info;
+    return AsyncInfo();
+  }
+
+  uint32_t getAsyncContextIndex() const {
+    return getAsyncInfo().AsyncContextIdx;
+  }
+  uint32_t getAsyncResumeFunctionSwiftSelfIndex() const {
+    return getAsyncInfo().AsyncResumeFunctionSwiftSelfIdx;
   }
 
   // The mutators below should generally only be used when building up

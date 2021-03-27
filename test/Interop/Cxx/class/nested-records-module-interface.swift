@@ -57,11 +57,39 @@
 // CHECK: }
 
 // CHECK: struct HasForwardDeclaredNestedType {
-// CHECK:   struct NormalSubType {
-// CHECK:     init()
-// CHECK:   }
 // CHECK:   struct ForwardDeclaredType {
 // CHECK:     init()
 // CHECK:   }
+// CHECK:   struct NormalSubType {
+// CHECK:     init()
+// CHECK:   }
 // CHECK:   init()
+// CHECK: }
+
+// CHECK: struct HasForwardDeclaredTemplateChild {
+// CHECK:   struct ForwardDeclaredClassTemplate<T> {
+// CHECK:   }
+// CHECK:   struct DeclaresForwardDeclaredClassTemplateFriend {
+// CHECK:     init()
+// CHECK:   }
+// CHECK:   init()
+// CHECK: }
+
+// CHECK: extension NestedDeclIsAFirstForwardDeclaration {
+// CHECK:   struct ForwardDeclaresFriend {
+// CHECK:     init()
+// CHECK:   }
+// CHECK:   struct ForwardDeclaredFriend {
+// CHECK:     init()
+// CHECK:   }
+// CHECK:   static func takesFriend(_ b: NestedDeclIsAFirstForwardDeclaration.ForwardDeclaredFriend)
+// CHECK:   struct HasNestedForwardDeclaration {
+// CHECK:     struct IsNestedForwardDeclaration {
+// CHECK:       var a: Int32
+// CHECK:       init()
+// CHECK:       init(a: Int32)
+// CHECK:     }
+// CHECK:     init()
+// CHECK:   }
+// CHECK:   static func takesHasNestedForwardDeclaration(_: NestedDeclIsAFirstForwardDeclaration.HasNestedForwardDeclaration)
 // CHECK: }

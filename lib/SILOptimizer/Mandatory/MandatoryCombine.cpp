@@ -31,7 +31,7 @@
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
@@ -206,19 +206,10 @@ static llvm::cl::opt<bool> EnableCanonicalizationAndTrivialDCE(
                    "dead code and canonicalizing SIL"));
 
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
-  SmallVector<SILBasicBlock *, 32> blockWorklist;
-  BasicBlockSet blockAlreadyAddedToWorklist(&function);
+  BasicBlockWorklist<32> blockWorklist(function.getEntryBlock());
   SmallVector<SILInstruction *, 128> initialInstructionWorklist;
 
-  {
-    auto *firstBlock = &*function.begin();
-    blockWorklist.push_back(firstBlock);
-    blockAlreadyAddedToWorklist.insert(firstBlock);
-  }
-
-  while (!blockWorklist.empty()) {
-    auto *block = blockWorklist.pop_back_val();
-
+  while (SILBasicBlock *block = blockWorklist.pop()) {
     for (auto iterator = block->begin(), end = block->end(); iterator != end;) {
       auto *instruction = &*iterator;
       ++iterator;
@@ -236,11 +227,9 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
       initialInstructionWorklist.push_back(instruction);
     }
 
-    llvm::copy_if(block->getSuccessorBlocks(),
-                  std::back_inserter(blockWorklist),
-                  [&](SILBasicBlock *block) -> bool {
-                    return blockAlreadyAddedToWorklist.insert(block);
-                  });
+    for (SILBasicBlock *succ : block->getSuccessors()) {
+      blockWorklist.pushIfNotVisited(succ);
+    }
   }
 
   worklist.addInitialGroup(initialInstructionWorklist);
@@ -362,7 +351,7 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
       /*Loc=*/instruction->getDebugLocation().getLocation(), /*Fn=*/callee,
       /*Subs=*/partialApply->getSubstitutionMap(),
       /*Args*/ argsVec,
-      /*isNonThrowing=*/instruction->isNonThrowing(),
+      /*isNonThrowing=*/instruction->getApplyOptions(),
       /*SpecializationInfo=*/partialApply->getSpecializationInfo());
 
   worklist.replaceInstructionWithInstruction(instruction, replacement

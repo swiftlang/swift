@@ -217,6 +217,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
+  inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -230,6 +231,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
+  inputArgs.AddLastArg(arguments, options::OPT_module_abi_name);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
@@ -278,6 +280,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
       options::OPT_disable_fuzzy_forward_scan_trailing_closure_matching);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
+  inputArgs.AddLastArg(arguments, options::OPT_access_notes_path);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -496,15 +499,30 @@ ToolChain::constructInvocation(const CompileJobAction &job,
 
   // Add the output file argument if necessary.
   if (context.Output.getPrimaryOutputType() != file_types::TY_Nothing) {
+    auto IndexUnitOutputs = context.Output.getIndexUnitOutputFilenames();
+
     if (context.shouldUseMainOutputFileListInFrontendInvocation()) {
       Arguments.push_back("-output-filelist");
       Arguments.push_back(context.getTemporaryFilePath("outputs", ""));
       II.FilelistInfos.push_back({Arguments.back(),
                                   context.Output.getPrimaryOutputType(),
                                   FilelistInfo::WhichFiles::Output});
+      if (!IndexUnitOutputs.empty()) {
+        Arguments.push_back("-index-unit-output-path-filelist");
+        Arguments.push_back(context.getTemporaryFilePath("index-unit-outputs",
+                                                         ""));
+        II.FilelistInfos.push_back({
+          Arguments.back(), file_types::TY_IndexUnitOutputPath,
+          FilelistInfo::WhichFiles::IndexUnitOutputPaths});
+      }
     } else {
       for (auto FileName : context.Output.getPrimaryOutputFilenames()) {
         Arguments.push_back("-o");
+        Arguments.push_back(context.Args.MakeArgString(FileName));
+      }
+
+      for (auto FileName : IndexUnitOutputs) {
+        Arguments.push_back("-index-unit-output-path");
         Arguments.push_back(context.Args.MakeArgString(FileName));
       }
     }
@@ -632,6 +650,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SwiftCrossImportDir:
   case file_types::TY_SwiftOverlayFile:
+  case file_types::TY_IndexUnitOutputPath:
+  case file_types::TY_SymbolGraphOutputPath:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -773,6 +793,8 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
   addOutputsOfType(arguments, Output, Args,
                    file_types::TY_SwiftModuleSummaryFile,
                    "-emit-module-summary-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SymbolGraphOutputPath,
+                   "-emit-symbol-graph-dir");
 }
 
 ToolChain::InvocationInfo
@@ -889,6 +911,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftSourceInfoFile:
     case file_types::TY_SwiftCrossImportDir:
     case file_types::TY_SwiftOverlayFile:
+    case file_types::TY_IndexUnitOutputPath:
+    case file_types::TY_SymbolGraphOutputPath:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -1039,11 +1063,12 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args, file_types::TY_TBD,
                    "-emit-tbd-path");
 
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph);
+  context.Args.AddLastArg(Arguments, options::OPT_emit_symbol_graph_dir);
+
   context.Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
-  context.Args.AddLastArg(
-      Arguments,
-      options::OPT_enable_experimental_cross_module_incremental_build);
+  context.Args.AddLastArg(Arguments, options::OPT_disable_incremental_imports);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));

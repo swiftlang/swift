@@ -2950,10 +2950,14 @@ public:
       // A thin function looks like a plain pointer.
       // FIXME: Except for extra inhabitants?
       return C.TheRawPointerType;
-    case SILFunctionType::Representation::Thick:
+    case SILFunctionType::Representation::Thick: {
       // All function types look like () -> ().
       // FIXME: It'd be nice not to have to call through the runtime here.
-      return CanFunctionType::get({}, C.TheEmptyTupleType);
+      //
+      // FIXME: Verify ExtInfo state is correct, not working by accident.
+      CanFunctionType::ExtInfo info;
+      return CanFunctionType::get({}, C.TheEmptyTupleType, info);
+    }
     case SILFunctionType::Representation::Block:
       // All block types look like AnyObject.
       return C.getAnyObjectType();
@@ -3149,10 +3153,13 @@ namespace {
         // A thin function looks like a plain pointer.
         // FIXME: Except for extra inhabitants?
         return emitFromValueWitnessTable(C.TheRawPointerType);
-      case SILFunctionType::Representation::Thick:
+      case SILFunctionType::Representation::Thick: {
         // All function types look like () -> ().
+        // FIXME: Verify ExtInfo state is correct, not working by accident.
+        CanFunctionType::ExtInfo info;
         return emitFromValueWitnessTable(
-                 CanFunctionType::get({}, C.TheEmptyTupleType));
+            CanFunctionType::get({}, C.TheEmptyTupleType, info));
+      }
       case SILFunctionType::Representation::Block:
         // All block types look like AnyObject.
         return emitFromValueWitnessTable(C.getAnyObjectType());

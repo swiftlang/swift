@@ -158,12 +158,30 @@ func cast_test(_ ptr: inout Builtin.RawPointer, i8: inout Builtin.Int8,
   d = Builtin.bitcast_Int64_FPIEEE64(i64)   // CHECK: bitcast
 }
 
-func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16) {
+func vector_bitcast_test(_ src: Builtin.Vec16xInt8) -> Builtin.Int16 {
+  // CHECK: vector_bitcast_test
+  // This is the idiom for pmovmskb on x86 targets:
+  let zero: Builtin.Vec16xInt8 = Builtin.zeroInitializer()
+  let mask = Builtin.cmp_slt_Vec16xInt8(src, zero)
+  return Builtin.bitcast_Vec16xInt1_Int16(mask) // CHECK: bitcast
+}
+
+func vector_bitcast_test_ii(_ src: Builtin.Int16) -> Builtin.Vec16xInt8 {
+  // CHECK: vector_bitcast_test_ii
+  let v16x1 = Builtin.bitcast_Int16_Vec16xInt1(src) // CHECK: bitcast
+  return Builtin.sext_Vec16xInt1_Vec16xInt8(v16x1)   // CHECK: sext
+}
+
+func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
+                    _ v8i16: Builtin.Vec8xInt16) {
+  // CHECK: intrinsic_test
   i32 = Builtin.int_bswap_Int32(i32) // CHECK: llvm.bswap.i32(
 
   i16 = Builtin.int_bswap_Int16(i16) // CHECK: llvm.bswap.i16(
   
   var x = Builtin.int_sadd_with_overflow_Int16(i16, i16) // CHECK: call { i16, i1 } @llvm.sadd.with.overflow.i16(
+  
+  i16 = Builtin.int_vector_reduce_smin_Vec8xInt16(v8i16) // CHECK: llvm.vector.reduce.smin.v8i16(
   
   Builtin.int_trap() // CHECK: llvm.trap()
 }
@@ -841,10 +859,8 @@ func globalStringTablePointerUse(_ str: String) -> Builtin.RawPointer {
 
 // CHECK-LABEL: define {{.*}}convertTaskToJob
 // CHECK:      call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
-// CHECK-NEXT: [[T0:%.*]] = bitcast %swift.refcounted* %0 to i8*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8, i8* [[T0]], i64 16
-// CHECK-NEXT: [[T2:%.*]] = bitcast i8* [[T1]] to %swift.job*
-// CHECK-NEXT: ret %swift.job* [[T2]]
+// CHECK-NEXT: [[T0:%.*]] = bitcast %swift.refcounted* %0 to %swift.job*
+// CHECK-NEXT: ret %swift.job* [[T0]]
 func convertTaskToJob(_ task: Builtin.NativeObject) -> Builtin.Job {
   return Builtin.convertTaskToJob(task)
 }

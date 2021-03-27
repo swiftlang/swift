@@ -65,4 +65,10 @@ module NestedRecords {
 
 module LinkedRecords {
   header "linked-records.h"
+  requires cplusplus
+}
+
+module InvalidNestedStruct {
+  header "invalid-nested-struct.h"
+  requires cplusplus
 }

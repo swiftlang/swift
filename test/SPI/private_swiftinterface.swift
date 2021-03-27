@@ -2,8 +2,8 @@
 /// one doesn't leak SPI decls and info.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface
-// RUN: %target-swift-frontend -enable-experimental-prespecialization -emit-module %S/Inputs/ioi_helper.swift -module-name IOIHelper -emit-module-path %t/IOIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/IOIHelper.swiftinterface -emit-private-module-interface-path %t/IOIHelper.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %S/Inputs/ioi_helper.swift -module-name IOIHelper -emit-module-path %t/IOIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/IOIHelper.swiftinterface -emit-private-module-interface-path %t/IOIHelper.private.swiftinterface
 
 /// Make sure that the public swiftinterface of spi_helper doesn't leak SPI.
 // RUN: %FileCheck -check-prefix=CHECK-HELPER %s < %t/SPIHelper.swiftinterface
@@ -206,5 +206,5 @@ extension PublicType: SPIProto where T: PrivateConstraint {}
 @_spi(S) public protocol SPIProtocol {}
 internal protocol InternalProtocol: SPIProtocol {}
 public struct PublicStruct2: InternalProtocol {}
-// CHECK-PRIVATE: @_spi(S) extension {{.*}}.PublicStruct2 : {{.*}}.SPIProtocol
+// CHECK-PRIVATE: @_spi(S) extension {{.*}}PublicStruct2 : {{.*}}.SPIProtocol
 // CHECK-PUBLIC-NOT: SPIProtocol

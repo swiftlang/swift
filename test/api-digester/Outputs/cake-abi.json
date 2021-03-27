@@ -147,6 +147,12 @@
         },
         {
           "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
+        },
+        {
+          "kind": "Conformance",
           "name": "P2",
           "printedName": "P2",
           "usr": "s:4cake2P2P"
@@ -883,6 +889,14 @@
       "moduleName": "cake",
       "declAttributes": [
         "Frozen"
+      ],
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
+        }
       ]
     },
     {
@@ -1733,9 +1747,9 @@
         },
         {
           "kind": "Conformance",
-          "name": "ConcurrentValue",
-          "printedName": "ConcurrentValue",
-          "usr": "s:s15ConcurrentValueP"
+          "name": "Sendable",
+          "printedName": "Sendable",
+          "usr": "s:s8SendableP"
         },
         {
           "kind": "Conformance",

@@ -304,7 +304,7 @@ The documents in this section might be worth breaking up into several documents,
 and linking one document from the other. Breaking up into components will
 provide greater clarity to contributors wanting to add new documentation.
 
-- [ARCOptimization.rst](/docs/ARCOptimization.rst):
+- [ARCOptimization.md](/docs/ARCOptimization.md):
   Covers how ARC optimization works, with several examples.
   TODO: Not clear if this is intended to be an explanation or a reference guide.
 - [CompilerPerformance.md](/docs/CompilerPerformance.md):

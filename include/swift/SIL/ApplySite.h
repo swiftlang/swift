@@ -348,6 +348,37 @@ public:
     return getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
   }
 
+  /// Return the SILArgumentConvention for the given applied argument operand at
+  /// the apply instruction.
+  ///
+  /// For full applies, this is equivalent to `getArgumentConvention`. But for
+  /// a partial_apply, the argument ownership convention at the partial_apply
+  /// instruction itself is different from the argument convention of the callee.
+  /// For details see the partial_apply documentation in SIL.rst.
+  SILArgumentConvention getArgumentOperandConvention(const Operand &oper) const {
+    SILArgumentConvention conv = getArgumentConvention(oper);
+    auto *pai = dyn_cast<PartialApplyInst>(Inst);
+    if (!pai)
+      return conv;
+    switch (conv) {
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+      return conv;
+    case SILArgumentConvention::Direct_Owned:
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Direct_Guaranteed:
+      return pai->isOnStack() ? SILArgumentConvention::Direct_Guaranteed
+                              : SILArgumentConvention::Direct_Owned;
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
+                              : SILArgumentConvention::Indirect_In;
+    case SILArgumentConvention::Indirect_Out:
+      llvm_unreachable("partial_apply cannot have an @out operand");
+    }
+  }
+
   /// Return true if 'self' is an applied argument.
   bool hasSelfArgument() const {
     switch (ApplySiteKind(Inst->getKind())) {
@@ -412,19 +443,28 @@ public:
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
 
-  /// Return whether the given apply is of a formally-throwing function
-  /// which is statically known not to throw.
-  bool isNonThrowing() const {
+  ApplyOptions getApplyOptions() const {
     switch (ApplySiteKind(getInstruction()->getKind())) {
     case ApplySiteKind::ApplyInst:
-      return cast<ApplyInst>(Inst)->isNonThrowing();
+      return cast<ApplyInst>(Inst)->getApplyOptions();
     case ApplySiteKind::BeginApplyInst:
-      return cast<BeginApplyInst>(Inst)->isNonThrowing();
+      return cast<BeginApplyInst>(Inst)->getApplyOptions();
     case ApplySiteKind::TryApplyInst:
-      return false;
+      return cast<TryApplyInst>(Inst)->getApplyOptions();
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
     }
+  }
+  /// Return whether the given apply is of a formally-throwing function
+  /// which is statically known not to throw.
+  bool isNonThrowing() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotThrow);
+  }
+
+  /// Return whether the given apply is of a formally-async function
+  /// which is statically known not to await.
+  bool isNonAsync() const {
+    return getApplyOptions().contains(ApplyFlags::DoesNotAwait);
   }
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }

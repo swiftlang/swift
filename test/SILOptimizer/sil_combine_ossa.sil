@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -generic-specializer | %FileCheck %s  --check-prefix=CHECK_FORWARDING_OWNERSHIP_KIND
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -545,6 +546,20 @@ bb0(%0 : @owned $HeapBufferStorage<T_0_0, T_0_1>):
   %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3
   %3 = unconditional_checked_cast %2 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
+}
+
+class Derived : C {}
+
+// CHECK-LABEL: sil [ossa] @dead_unconditional_checked_cast :
+// CHECK-NOT: unconditional_checked_cast
+// CHECK:     destroy_value %0
+// CHECK: } // end sil function 'dead_unconditional_checked_cast'
+sil [ossa] @dead_unconditional_checked_cast : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = unconditional_checked_cast %0 : $C to Derived
+  destroy_value %1 : $Derived
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil [ossa] @cond_fail_applied_to_zero_removal :
@@ -2016,16 +2031,18 @@ sil [ossa] @generic_call_with_indirect_result : $@convention(thin) <T> (@in T) -
 sil [ossa] @generic_call_without_indirect_result : $@convention(thin) <T> (@in T) -> Bool
 sil [ossa] @generic_call_with_direct_result : $@convention(thin) <T> (T) -> T
 
-// CHECK-LABEL: sil [ossa] @generic_partialapply : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @generic_partialapply : $@convention(thin)
 // CHECK-NOT: partial_apply
 // CHECK: } // end sil function 'generic_partialapply'
-sil [ossa] @generic_partialapply : $@convention(thin) () -> () {
-bb0:
+sil [ossa] @generic_partialapply : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%a : $Builtin.Int32):
   %0 = function_ref @generic_call_with_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %1 = function_ref @generic_call_without_indirect_result : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
   %2 = partial_apply %0<Builtin.Int32>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
   %3 = alloc_stack $Builtin.Int32
   %4 = alloc_stack $Builtin.Int32
+  store %a to [trivial] %3 : $*Builtin.Int32
+  store %a to [trivial] %4 : $*Builtin.Int32
   %5 = apply %2(%3, %4) : $@callee_owned (@in Builtin.Int32) -> @out Builtin.Int32
   %6 = partial_apply %1<Builtin.Int32>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> Bool
   %7 = apply %6(%3) : $@callee_owned (@in Builtin.Int32) -> Bool
@@ -4194,6 +4211,19 @@ bb0(%0 : $*Builtin.Int64, %1 : @owned $B):
   return %4 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil [ossa] @mark_dependence_string_literal
+// CHECK:       %1 = string_literal utf8 "a"
+// CHECK:       %2 = struct $UnsafePointer<Int8> (%1 : $Builtin.RawPointer)
+// CHECK:       return %2
+// CHECK: } // end sil function 'mark_dependence_string_literal'
+sil [ossa] @mark_dependence_string_literal : $@convention(thin) (@guaranteed Builtin.NativeObject) -> UnsafePointer<Int8> {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = string_literal utf8 "a"
+  %2 = struct $UnsafePointer<Int8> (%1 : $Builtin.RawPointer)
+  %3 = mark_dependence %2 : $UnsafePointer<Int8> on %0 : $Builtin.NativeObject
+  return %3 : $UnsafePointer<Int8>
+}
+
 // Test to see if we can constant fold a classify_bridge_object on a Swift class
 // to false.
 // CHECK-LABEL: sil [ossa] @test_classify_fold :
@@ -4390,12 +4420,12 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> @out ()):
 // CHECK-LABEL: sil [ossa] @convert_function_substitution_pa :
 // CHECK-NOT: convert_function
 // CHECK: } // end sil function 'convert_function_substitution_pa'
-sil [ossa] @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int) -> @owned @callee_guaranteed () -> @out () {
-bb0(%0 : @guaranteed $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int):
+sil [ossa] @convert_function_substitution_pa : $@convention(thin) (@guaranteed @callee_guaranteed (@in Int, @in Int) -> @out (), @in Int, @in Int) -> @owned @callee_guaranteed () -> @out () {
+bb0(%0 : @guaranteed $@callee_guaranteed (@in Int, @in Int) -> @out (), %1 : $*Int, %1b : $*Int):
   %2 = convert_function %0 : $@callee_guaranteed (@in Int, @in Int) -> @out () to $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
   %2a = copy_value %2 : $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
   %3 = partial_apply [callee_guaranteed] %2a(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A, @in B) -> @out C for <Int, Int, ()>
-  %4 = partial_apply [callee_guaranteed] %3(%1) : $@callee_guaranteed @substituted <A, B, C> (@in A) -> @out C for <Int, Int, ()>
+  %4 = partial_apply [callee_guaranteed] %3(%1b) : $@callee_guaranteed @substituted <A, B, C> (@in A) -> @out C for <Int, Int, ()>
   %5 = convert_function %4 : $@callee_guaranteed @substituted <A, B, C> () -> @out C for <Int, Int, ()> to $@callee_guaranteed () -> @out ()
   return %5 : $@callee_guaranteed () -> @out ()
 
@@ -4899,5 +4929,94 @@ bb2:
 
 bb3(%4 : @owned $KlassNativeObjEither):
   return %4 : $KlassNativeObjEither
+}
+
+
+sil @convert_raw_pointer_to_nativeobject : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject
+
+// To eliminate the convert_function below we need to convert the try_apply to
+// an apply. We do not delete edges like this in SILCombine with ownership and
+// are trying to reduce it without ownership. So make sure we don't optimize
+// this. This should be done in a different pass that handles CFG issues.
+//
+// CHECK-LABEL: sil [ossa] @do_not_eliminate_error_adding_convert_function_used_by_try_apply : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject {
+// CHECK: convert_function
+// CHECK: try_apply
+// CHECK: } // end sil function 'do_not_eliminate_error_adding_convert_function_used_by_try_apply'
+sil [ossa] @do_not_eliminate_error_adding_convert_function_used_by_try_apply : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject {
+bb0(%0 : $Builtin.RawPointer):
+  %f = function_ref @convert_raw_pointer_to_nativeobject : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject
+  %t = thin_to_thick_function %f : $@convention(thin) (Builtin.RawPointer) -> @owned Builtin.NativeObject to $@noescape @callee_guaranteed (Builtin.RawPointer) -> @owned Builtin.NativeObject
+  %c = convert_function %t : $@noescape @callee_guaranteed (Builtin.RawPointer) -> @owned Builtin.NativeObject to $@noescape @callee_guaranteed (Builtin.RawPointer) -> (@owned Builtin.NativeObject, @error Error)
+  try_apply %c(%0) : $@noescape @callee_guaranteed (Builtin.RawPointer) -> (@owned Builtin.NativeObject, @error Error), normal bb1, error bb2
+
+bb1(%result : @owned $Builtin.NativeObject):
+  return %result : $Builtin.NativeObject
+
+bb2(%error : @owned $Error):
+  unreachable
+}
+
+sil [ossa] @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
+
+// CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: sil shared [ossa] @$s8refcast24main5KlassC_Tg5 : 
+// CHECK_FORWARDING_OWNERSHIP_KIND: unchecked_ref_cast %1 : $Klass to $Optional<Klass>, forwarding: @unowned
+// CHECK_FORWARDING_OWNERSHIP_KIND-LABEL: } // end sil function '$s8refcast24main5KlassC_Tg5'
+sil [ossa] @refcast2 : $@convention(thin) <T> (@in T, @owned Klass) -> () {
+bb0(%0 : $*T, %1 : @owned $Klass):
+  destroy_addr %0 : $*T
+  %2 = unchecked_bitwise_cast %1 : $Klass to $Optional<Klass>
+  %3 = copy_value %2 : $Optional<Klass>
+  destroy_value %1 : $Klass
+  %func = function_ref @takeKlass : $@convention(thin) (@owned Optional<Klass>) -> ()
+  apply %func(%3) : $@convention(thin) (@owned Optional<Klass>) -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @caller : $@convention(thin) (@in Klass, @owned Klass) -> () {
+bb0(%0 :  $*Klass, %1 : @owned $Klass):
+  %f = function_ref @refcast2 : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Klass) -> ()
+  %res = apply %f<Klass>(%0, %1) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+class KlassWithTailAllocatedElems {
+  var x : Builtin.NativeObject
+  init()
+}
+
+// Test conversion from address_to_pointer->pointer_to_address to
+// unchecked_addr_cast when the base is an interior pointer (ref_tail_addr).
+//
+// RAW attempts to clone the ref_tail_addr and its access path to the
+// load, which includes
+//
+// CHECK-LABEL: sil [ossa] @unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast : $@convention(thin) () -> Builtin.Word {
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: [[TAIL_ADDR:%.*]] = ref_tail_addr
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: [[CAST_RESULT:%.*]] = unchecked_addr_cast [[TAIL_ADDR]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: load [trivial] [[CAST_RESULT]]
+// CHECK-NOT: pointer_to_address
+// CHECK-NOT: address_to_pointer
+// CHECK: } // end sil function 'unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast'
+sil [ossa] @unchecked_addr_cast_formation_handling_interior_pointer_rebase_of_cast : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %7 = integer_literal $Builtin.Word, 1
+  %8 = alloc_ref [tail_elems $(Builtin.NativeObject) * %7 : $Builtin.Word] $KlassWithTailAllocatedElems
+  %borrow = begin_borrow %8 : $KlassWithTailAllocatedElems
+  %addr = ref_tail_addr %borrow : $KlassWithTailAllocatedElems, $Builtin.NativeObject
+  %1 = address_to_pointer %addr : $*Builtin.NativeObject to $Builtin.RawPointer
+  end_borrow %borrow : $KlassWithTailAllocatedElems
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.Word
+  %3 = load [trivial] %2 : $*Builtin.Word
+  destroy_value %8 : $KlassWithTailAllocatedElems
+  return %3 : $Builtin.Word
 }
 

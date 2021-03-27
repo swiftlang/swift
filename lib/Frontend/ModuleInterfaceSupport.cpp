@@ -18,6 +18,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
@@ -36,24 +37,9 @@
 
 using namespace swift;
 
-version::Version swift::InterfaceFormatVersion({1, 0});
+// MARK: Module interface header comments
 
-/// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
-/// access path. These are not yet supported by module interfaces, since the
-/// information about the declaration kind is not preserved through the binary
-/// serialization that happens as an intermediate step in non-whole-module
-/// builds.
-///
-/// These come from declarations like `import class FooKit.MainFooController`.
-static void diagnoseScopedImports(DiagnosticEngine &diags,
-                                  ArrayRef<ImportedModule> imports){
-  for (const ImportedModule &importPair : imports) {
-    if (importPair.accessPath.empty())
-      continue;
-    diags.diagnose(importPair.accessPath.front().Loc,
-                   diag::module_interface_scoped_import_unsupported);
-  }
-}
+version::Version swift::InterfaceFormatVersion({1, 0});
 
 /// Prints to \p out a comment containing a format version number, tool version
 /// string as well as any relevant command-line flags in \p Opts used to
@@ -91,6 +77,106 @@ llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
 llvm::Regex swift::getSwiftInterfaceCompilerVersionRegex() {
   return llvm::Regex("^// " SWIFT_COMPILER_VERSION_KEY
                      ": (.+)$", llvm::Regex::Newline);
+}
+
+// MARK: Module name shadowing warnings (SR-898)
+//
+// When swiftc emits a module interface, it qualifies most types with their
+// module name. This usually makes the interface less ambiguous, but if a type
+// exists with the same name as a module, then references to that module will
+// incorrectly look inside the type instead. This breakage is not obvious until
+// someone tries to load the module interface, and may sometimes only occur in
+// clients' module interfaces.
+//
+// Truly fixing this will require a new module-qualification syntax which
+// completely ignores shadowing. In lieu of that, we detect and warn about three
+// common examples which are relatively actionable:
+//
+// 1. An `import` statement written into the module interface will
+//    (transitively) import a type with the module interface's name.
+//
+// 2. The module interface declares a type with the same name as the module the
+//    interface is for.
+//
+// 3. The module interface declares a type with the same name as a module it has
+//     (transitively) imported without `@_implementationOnly`.
+//
+// We do not check for shadowing between imported module names and imported
+// declarations; this is both much rarer and much more difficult to solve.
+// We silence these warnings if you use the temporary workaround flag,
+// '-module-interface-preserve-types-as-written'.
+
+/// Emit a warning explaining that \p shadowingDecl will interfere with
+/// references to types in \p shadowedModule in the module interfaces of
+/// \p brokenModule and its clients.
+static void
+diagnoseDeclShadowsModule(ModuleInterfaceOptions const &Opts,
+                          TypeDecl *shadowingDecl, ModuleDecl *shadowedModule,
+                          ModuleDecl *brokenModule) {
+  if (Opts.PreserveTypesAsWritten || shadowingDecl == shadowedModule)
+    return;
+
+  shadowingDecl->diagnose(
+      diag::warning_module_shadowing_may_break_module_interface,
+      shadowingDecl->getDescriptiveKind(),
+      FullyQualified<Type>(shadowingDecl->getDeclaredInterfaceType()),
+      shadowedModule, brokenModule);
+}
+
+/// Check whether importing \p importedModule will bring in any declarations
+/// that will shadow \p importingModule, and diagnose them if so.
+static void
+diagnoseIfModuleImportsShadowingDecl(ModuleInterfaceOptions const &Opts,
+                                     ModuleDecl *importedModule,
+                                     ModuleDecl *importingModule) {
+  using namespace namelookup;
+
+  SmallVector<ValueDecl *, 4> decls;
+  lookupInModule(importedModule, importingModule->getName(), decls,
+                 NLKind::UnqualifiedLookup, ResolutionKind::TypesOnly,
+                 importedModule,
+                 NL_UnqualifiedDefault | NL_IncludeUsableFromInline);
+  for (auto decl : decls)
+    diagnoseDeclShadowsModule(Opts, cast<TypeDecl>(decl), importingModule,
+                              importingModule);
+}
+
+/// Check whether \p D will shadow any modules imported by \p M, and diagnose
+/// them if so.
+static void diagnoseIfDeclShadowsKnownModule(ModuleInterfaceOptions const &Opts,
+                                             Decl *D, ModuleDecl *M) {
+  ASTContext &ctx = M->getASTContext();
+
+  // We only care about types (and modules, which are a subclass of TypeDecl);
+  // when the grammar expects a type name, it ignores non-types during lookup.
+  TypeDecl *TD = dyn_cast<TypeDecl>(D);
+  if (!TD)
+    return;
+
+  ModuleDecl *shadowedModule = ctx.getLoadedModule(TD->getName());
+  if (!shadowedModule || M->isImportedImplementationOnly(shadowedModule))
+    return;
+
+  diagnoseDeclShadowsModule(Opts, TD, shadowedModule, M);
+}
+
+// MARK: Import statements
+
+/// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
+/// access path. These are not yet supported by module interfaces, since the
+/// information about the declaration kind is not preserved through the binary
+/// serialization that happens as an intermediate step in non-whole-module
+/// builds.
+///
+/// These come from declarations like `import class FooKit.MainFooController`.
+static void diagnoseScopedImports(DiagnosticEngine &diags,
+                                  ArrayRef<ImportedModule> imports){
+  for (const ImportedModule &importPair : imports) {
+    if (importPair.accessPath.empty())
+      continue;
+    diags.diagnose(importPair.accessPath.front().Loc,
+                   diag::module_interface_scoped_import_unsupported);
+  }
 }
 
 /// Prints the imported modules in \p M to \p out in the form of \c import
@@ -171,8 +257,12 @@ static void printImports(raw_ostream &out,
     }
 
     out << "\n";
+
+    diagnoseIfModuleImportsShadowingDecl(Opts, importedModule, M);
   }
 }
+
+// MARK: Dummy protocol conformances
 
 // FIXME: Copied from ASTPrinter.cpp...
 static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
@@ -431,7 +521,7 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor class'?
+    /// is this nominal specifically an 'actor'?
     bool actorClass = false;
     if (auto klass = dyn_cast<ClassDecl>(nominal))
       actorClass = klass->isActor();
@@ -460,22 +550,14 @@ public:
         if (!handledProtocols.insert(inherited).second)
           return TypeWalker::Action::SkipChildren;
 
-        // If 'nominal' is an 'actor class', we do not synthesize its 
-        // conformance to the Actor protocol through a dummy extension.
+        // If 'nominal' is an actor, we do not synthesize its conformance
+        // to the Actor protocol through a dummy extension.
         // There is a special restriction on the Actor protocol in that
-        // it is only valid to conform to Actor on an 'actor class' decl,
-        // not extensions of that 'actor class'.
+        // it is only valid to conform to Actor on an 'actor' decl,
+        // not extensions of that 'actor'.
         if (actorClass &&
             inherited->isSpecificProtocol(KnownProtocolKind::Actor))
-          return TypeWalker::Action::Continue; 
-
-#if false
-        // If the protocol is a marker protocol, print it separately.
-        if (inherited->isMarkerProtocol()) {
-          protocolsToPrint.push_back({inherited, protoAndAvailability.second});
           return TypeWalker::Action::SkipChildren;
-        }
-#endif
 
         if (inherited->isSPI() && !printOptions.PrintSPIs)
           return TypeWalker::Action::Continue;
@@ -508,7 +590,10 @@ public:
       DeclAttributes::print(printer, printOptions, attrs);
 
       printer << "extension ";
-      nominal->getDeclaredType().print(printer, printOptions);
+      PrintOptions typePrintOptions = printOptions;
+      typePrintOptions.FullyQualifiedTypes = false;
+      typePrintOptions.FullyQualifiedTypesIfAmbiguous = false;
+      nominal->getDeclaredType().print(printer, typePrintOptions);
       printer << " : ";
 
       proto->getDeclaredInterfaceType()->print(printer, printOptions);
@@ -561,6 +646,8 @@ const StringLiteral InheritedProtocolCollector::DummyProtocolName =
     "_ConstraintThatIsNotPartOfTheAPIOfThisLibrary";
 } // end anonymous namespace
 
+// MARK: Interface emission
+
 bool swift::emitSwiftInterface(raw_ostream &out,
                                ModuleInterfaceOptions const &Opts,
                                ModuleDecl *M) {
@@ -588,6 +675,8 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
     D->print(out, printOptions);
     out << "\n";
+
+    diagnoseIfDeclShadowsKnownModule(Opts, const_cast<Decl *>(D), M);
   }
 
   // Print dummy extensions for any protocols that were indirectly conformed to.

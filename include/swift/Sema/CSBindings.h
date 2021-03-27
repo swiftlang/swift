@@ -138,7 +138,7 @@ public:
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
-    return {HoleType::get(typeVar->getASTContext(), typeVar),
+    return {PlaceholderType::get(typeVar->getASTContext(), typeVar),
             AllowedBindingKind::Exact,
             /*source=*/locator};
   }
@@ -185,31 +185,46 @@ struct LiteralRequirement {
     CoveredBy = coveredBy;
   }
 
-  bool isCoveredBy(Type type, DeclContext *useDC) const;
+  /// Determines whether this literal requirement is "covered"
+  /// by the given binding - type of the binding could either be
+  /// equal (in canonical sense) to the protocol's default type,
+  /// or conform to a protocol.
+  ///
+  /// \param binding The binding to check for coverage.
+  ///
+  /// \param canBeNil The flag that determines whether given type
+  /// variable requires all of its bindings to be optional.
+  ///
+  /// \param useDC The declaration context in which this literal
+  /// requirement is used.
+  ///
+  /// \returns a pair of bool and a type:
+  ///    - bool, true if binding covers given literal protocol;
+  ///    - type, non-null if binding type has to be adjusted
+  ///      to cover given literal protocol;
+  std::pair<bool, Type> isCoveredBy(const PotentialBinding &binding,
+                                    bool canBeNil,
+                                    DeclContext *useDC) const;
 
   /// Determines whether literal protocol associated with this
   /// meta-information is viable for inclusion as a defaultable binding.
   bool viableAsBinding() const { return !isCovered() && hasDefaultType(); }
+
+private:
+  bool isCoveredBy(Type type, DeclContext *useDC) const;
 };
 
 struct PotentialBindings {
-  using BindingScore =
-      std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
-
   /// The constraint system this type variable and its bindings belong to.
   ConstraintSystem &CS;
 
   TypeVariableType *TypeVar;
 
   /// The set of potential bindings.
-  llvm::SmallSetVector<PotentialBinding, 4> Bindings;
+  llvm::SmallVector<PotentialBinding, 4> Bindings;
 
   /// The set of protocol requirements placed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
-
-  /// The set of transitive protocol requirements inferred through
-  /// subtype/conversion/equivalence relations with other type variables.
-  llvm::Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
@@ -217,10 +232,10 @@ struct PotentialBindings {
   /// Note that ordering is important when it comes to bindings, we'd
   /// like to add any "direct" default types first to attempt them
   /// before transitive ones.
-  llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+  llvm::SmallPtrSet<Constraint *, 2> Literals;
 
   /// The set of constraints which would be used to infer default types.
-  llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
+  llvm::SmallPtrSet<Constraint *, 2> Defaults;
 
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
@@ -231,7 +246,8 @@ struct PotentialBindings {
   /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
   /// reachable through subtype/conversion  relationship e.g.
   /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
-  llvm::SmallPtrSet<TypeVariableType *, 2> AdjacentVars;
+  llvm::SmallDenseSet<std::pair<TypeVariableType *, Constraint *>, 2>
+      AdjacentVars;
 
   ASTNode AssociatedCodeCompletionToken = ASTNode();
 
@@ -239,22 +255,112 @@ struct PotentialBindings {
   /// is a subtype of, supertype of or is equivalent to. This is used
   /// to determine ordering inside of a chain of subtypes to help infer
   /// transitive bindings  and protocol requirements.
-  llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SubtypeOf;
-  llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> SupertypeOf;
-  llvm::SmallMapVector<TypeVariableType *, Constraint *, 4> EquivalentTo;
+  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
+  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
+  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
   PotentialBindings(ConstraintSystem &cs, TypeVariableType *typeVar)
       : CS(cs), TypeVar(typeVar) {}
 
-  /// Determine whether the set of bindings is non-empty.
-  explicit operator bool() const {
-    return !Bindings.empty() || getNumViableLiteralBindings() > 0 ||
-           !Defaults.empty() || isDirectHole();
+  void addDefault(Constraint *constraint);
+
+  void addLiteral(Constraint *constraint);
+
+  /// Add a potential binding to the list of bindings,
+  /// coalescing supertype bounds when we are able to compute the meet.
+  void addPotentialBinding(PotentialBinding binding);
+
+  bool isGenericParameter() const;
+
+  bool isSubtypeOf(TypeVariableType *typeVar) const {
+    return llvm::any_of(
+        SubtypeOf,
+        [&typeVar](const std::pair<TypeVariableType *, Constraint *> &subtype) {
+          return subtype.first == typeVar &&
+                 subtype.second->getKind() == ConstraintKind::Subtype;
+        });
   }
 
-  /// Determines whether this type variable could be `nil`,
-  /// which means that all of its bindings should be optional.
+private:
+  /// Attempt to infer a new binding and other useful information
+  /// (i.e. whether bindings should be delayed) from the given
+  /// relational constraint.
+  Optional<PotentialBinding> inferFromRelational(Constraint *constraint);
+
+public:
+  void infer(Constraint *constraint);
+
+  /// Retract all bindings and other information related to a given
+  /// constraint from this binding set.
+  ///
+  /// This would happen when constraint is simplified or solver backtracks
+  /// (either from overload choice or (some) type variable binding).
+  void retract(Constraint *constraint);
+};
+
+class BindingSet {
+  using BindingScore =
+      std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
+
+  ConstraintSystem &CS;
+
+  TypeVariableType *TypeVar;
+
+  const PotentialBindings &Info;
+
+  llvm::SmallPtrSet<TypeVariableType *, 4> AdjacentVars;
+
+public:
+  llvm::SmallSetVector<PotentialBinding, 4> Bindings;
+  llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+  llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
+
+  /// The set of transitive protocol requirements inferred through
+  /// subtype/conversion/equivalence relations with other type variables.
+  llvm::Optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
+
+  BindingSet(const PotentialBindings &info)
+      : CS(info.CS), TypeVar(info.TypeVar), Info(info) {
+    for (const auto &binding : info.Bindings)
+      addBinding(binding);
+
+    for (auto *literal : info.Literals)
+      addLiteralRequirement(literal);
+
+    for (auto *constraint : info.Defaults)
+      addDefault(constraint);
+
+    for (auto &entry : info.AdjacentVars)
+      AdjacentVars.insert(entry.first);
+  }
+
+  ConstraintSystem &getConstraintSystem() const { return CS; }
+
+  TypeVariableType *getTypeVariable() const { return Info.TypeVar; }
+
   bool canBeNil() const;
+
+  /// If this type variable doesn't have any viable bindings, or
+  /// if there is only one binding and it's a placeholder type, consider
+  /// this type variable to be a hole in a constraint system
+  /// regardless of where the placeholder type originated.
+  bool isHole() const {
+    if (isDirectHole())
+      return true;
+
+    if (Bindings.size() != 1)
+      return false;
+
+    const auto &binding = Bindings.front();
+    return binding.BindingType->is<PlaceholderType>();
+  }
+
+  /// Determines whether the only possible binding for this type variable
+  /// would be a placeholder type. This is different from `isHole` method
+  /// because type variable could also acquire a placeholder type transitively
+  /// if one of the type variables in its subtype/equivalence chain has been
+  /// bound to a placeholder type.
+  bool isDirectHole() const;
 
   /// Determine whether attempting this type variable should be
   /// delayed until the rest of the constraint system is considered
@@ -278,28 +384,6 @@ struct PotentialBindings {
   /// `bind param` are present in the system.
   bool isPotentiallyIncomplete() const;
 
-  /// If this type variable doesn't have any viable bindings, or
-  /// if there is only one binding and it's a hole type, consider
-  /// this type variable to be a hole in a constraint system
-  /// regardless of where hole type originated.
-  bool isHole() const {
-    if (isDirectHole())
-      return true;
-
-    if (Bindings.size() != 1)
-      return false;
-
-    const auto &binding = Bindings.front();
-    return binding.BindingType->is<HoleType>();
-  }
-
-  /// Determines whether the only possible binding for this type variable
-  /// would be a hole type. This is different from `isHole` method because
-  /// type variable could also acquire a hole type transitively if one
-  /// of the type variables in its subtype/equivalence chain has been
-  /// bound to a hole type.
-  bool isDirectHole() const;
-
   /// Determine if the bindings only constrain the type variable from above
   /// with an existential type; such a binding is not very helpful because
   /// it's impossible to enumerate the existential type's subtypes.
@@ -311,6 +395,30 @@ struct PotentialBindings {
       return binding.BindingType->isExistentialType() &&
              binding.Kind == AllowedBindingKind::Subtypes;
     });
+  }
+
+  /// Check if this binding is viable for inclusion in the set.
+  bool isViable(PotentialBinding &binding);
+
+  explicit operator bool() const {
+    return hasViableBindings() || isDirectHole();
+  }
+
+  /// Determine whether this set has any "viable" (or non-hole) bindings.
+  ///
+  /// A viable binding could be - a direct or transitive binding
+  /// inferred from a constraint, literal binding, or defaltable
+  /// binding.
+  ///
+  /// A hole is not considered a viable binding since it doesn't
+  /// add any new type information to constraint system.
+  bool hasViableBindings() const {
+    return !Bindings.empty() || getNumViableLiteralBindings() > 0 ||
+           !Defaults.empty();
+  }
+
+  ArrayRef<Constraint *> getConformanceRequirements() const {
+    return Info.Protocols;
   }
 
   unsigned getNumViableLiteralBindings() const;
@@ -343,12 +451,45 @@ struct PotentialBindings {
     return numDefaultable - unviable;
   }
 
-  static BindingScore formBindingScore(const PotentialBindings &b);
+  ASTNode getAssociatedCodeCompletionToken() const {
+    return Info.AssociatedCodeCompletionToken;
+  }
+
+  LiteralBindingKind getLiteralKind() const;
+
+  /// Check if this binding is favored over a disjunction e.g.
+  /// if it has only concrete types or would resolve a closure.
+  bool favoredOverDisjunction(Constraint *disjunction) const;
+
+  /// Detect `subtype` relationship between two type variables and
+  /// attempt to infer supertype bindings transitively e.g.
+  ///
+  /// Given A <: T1 <: T2 transitively A <: T2
+  ///
+  /// Which gives us a new (superclass A) binding for T2 as well as T1.
+  ///
+  /// \param inferredBindings The set of all bindings inferred for type
+  /// variables in the workset.
+  void inferTransitiveBindings(
+      const llvm::SmallDenseMap<TypeVariableType *, BindingSet>
+          &inferredBindings);
+
+  /// Detect subtype, conversion or equivalence relationship
+  /// between two type variables and attempt to propagate protocol
+  /// requirements down the subtype or equivalence chain.
+  void inferTransitiveProtocolRequirements(
+      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+
+  /// Finalize binding computation for this type variable by
+  /// inferring bindings from context e.g. transitive bindings.
+  void finalize(
+      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+
+  static BindingScore formBindingScore(const BindingSet &b);
 
   /// Compare two sets of bindings, where \c x < y indicates that
   /// \c x is a better set of bindings that \c y.
-  friend bool operator<(const PotentialBindings &x,
-                        const PotentialBindings &y) {
+  friend bool operator<(const BindingSet &x, const BindingSet &y) {
     auto xScore = formBindingScore(x);
     auto yScore = formBindingScore(y);
 
@@ -373,10 +514,10 @@ struct PotentialBindings {
     // This is required because algorithm can't currently infer
     // bindings for subtype transitively through superclass ones.
     if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
-      if (x.isSubtypeOf(y.TypeVar))
+      if (x.Info.isSubtypeOf(y.getTypeVariable()))
         return false;
 
-      if (y.isSubtypeOf(x.TypeVar))
+      if (y.Info.isSubtypeOf(x.getTypeVariable()))
         return true;
     }
 
@@ -385,93 +526,23 @@ struct PotentialBindings {
     return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
   }
 
-  LiteralBindingKind getLiteralKind() const;
-
-  void addDefault(Constraint *constraint);
-
-  void addLiteral(Constraint *constraint);
-
-  /// Determines whether the given literal protocol is "covered"
-  /// by the given binding - type of the binding could either be
-  /// equal (in canonical sense) to the protocol's default type,
-  /// or conform to a protocol.
-  ///
-  /// \param literal The literal protocol requirement to check.
-  ///
-  /// \param binding The binding to check for coverage.
-  ///
-  /// \param canBeNil The flag that determines whether given type
-  /// variable requires all of its bindings to be optional.
-  ///
-  /// \returns a pair of bool and a type:
-  ///    - bool, true if binding covers given literal protocol;
-  ///    - type, non-null if binding type has to be adjusted
-  ///      to cover given literal protocol;
-  std::pair<bool, Type> isLiteralCoveredBy(const LiteralRequirement &literal,
-                                           const PotentialBinding &binding,
-                                           bool canBeNil) const;
-
-  /// Add a potential binding to the list of bindings,
-  /// coalescing supertype bounds when we are able to compute the meet.
-  void addPotentialBinding(PotentialBinding binding, bool allowJoinMeet = true);
-
-  /// Check if this binding is viable for inclusion in the set.
-  bool isViable(PotentialBinding &binding) const;
-
-  bool isGenericParameter() const;
-
-  bool isSubtypeOf(TypeVariableType *typeVar) const {
-    auto result = SubtypeOf.find(typeVar);
-    if (result == SubtypeOf.end())
-      return false;
-
-    auto *constraint = result->second;
-    return constraint->getKind() == ConstraintKind::Subtype;
-  }
-
-  /// Check if this binding is favored over a disjunction e.g.
-  /// if it has only concrete types or would resolve a closure.
-  bool favoredOverDisjunction(Constraint *disjunction) const;
-
-private:
-  /// Detect `subtype` relationship between two type variables and
-  /// attempt to infer supertype bindings transitively e.g.
-  ///
-  /// Given A <: T1 <: T2 transitively A <: T2
-  ///
-  /// Which gives us a new (superclass A) binding for T2 as well as T1.
-  ///
-  /// \param inferredBindings The set of all bindings inferred for type
-  /// variables in the workset.
-  void inferTransitiveBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-          &inferredBindings);
-
-  /// Detect subtype, conversion or equivalence relationship
-  /// between two type variables and attempt to propagate protocol
-  /// requirements down the subtype or equivalence chain.
-  void inferTransitiveProtocolRequirements(
-      llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-          &inferredBindings);
-
-  /// Attempt to infer a new binding and other useful information
-  /// (i.e. whether bindings should be delayed) from the given
-  /// relational constraint.
-  Optional<PotentialBinding> inferFromRelational(Constraint *constraint);
-
-public:
-  void infer(Constraint *constraint);
-
-  /// Finalize binding computation for this type variable by
-  /// inferring bindings from context e.g. transitive bindings.
-  void finalize(llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
-                    &inferredBindings);
-
-  void dump(llvm::raw_ostream &out,
-            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
-
+  void dump(llvm::raw_ostream &out, unsigned indent) const;
   void dump(TypeVariableType *typeVar, llvm::raw_ostream &out,
             unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
+
+private:
+  void addBinding(PotentialBinding binding);
+
+  void addLiteralRequirement(Constraint *literal);
+
+  void addDefault(Constraint *constraint) {
+    auto defaultTy = constraint->getSecondType();
+    Defaults.insert({defaultTy->getCanonicalType(), constraint});
+  }
+
+  /// Check whether the given binding set covers any of the
+  /// literal protocols associated with this type variable.
+  void determineLiteralCoverage();
 };
 
 } // end namespace inference

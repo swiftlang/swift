@@ -96,7 +96,7 @@ public:
                    bool wantRValue = true) const {
     auto &cs = getConstraintSystem();
 
-    if (rawType->hasTypeVariable() || rawType->hasHole()) {
+    if (rawType->hasTypeVariable() || rawType->hasPlaceholder()) {
       rawType = rawType.transform([&](Type type) {
         if (auto *typeVar = type->getAs<TypeVariableType>()) {
           auto resolvedType = S.simplifyType(typeVar);
@@ -106,8 +106,9 @@ public:
                      : resolvedType;
         }
 
-        return type->isHole() ? Type(cs.getASTContext().TheUnresolvedType)
-                              : type;
+        return type->isPlaceholder()
+                   ? Type(cs.getASTContext().TheUnresolvedType)
+                   : type;
       });
     }
 
@@ -703,7 +704,7 @@ public:
 };
 
 /// Diagnose errors related to converting function type which
-/// isn't explicitly '@escaping' or '@concurrent' to some other type.
+/// isn't explicitly '@escaping' or '@Sendable' to some other type.
 class AttributedFuncToTypeConversionFailure final : public ContextualFailure {
 public:
   enum AttributeKind {
@@ -723,10 +724,21 @@ public:
 
 private:
   /// Emit tailored diagnostics for no-escape/non-concurrent parameter
-  /// conversions e.g. passing such parameter as an @escaping or @concurrent
+  /// conversions e.g. passing such parameter as an @escaping or @Sendable
   /// argument, or trying to assign it to a variable which expects @escaping
-  /// or @concurrent function.
+  /// or @Sendable function.
   bool diagnoseParameterUse() const;
+};
+
+/// Diagnose failure where a global actor attribute is dropped when
+/// trying to convert one function type to another.
+class DroppedGlobalActorFunctionAttr final : public ContextualFailure {
+public:
+  DroppedGlobalActorFunctionAttr(const Solution &solution, Type fromType,
+                                 Type toType, ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to use of the unwrapped optional types,
@@ -1063,6 +1075,30 @@ public:
                                       Type wrapper, ConstraintLocator *locator)
       : PropertyWrapperReferenceFailure(solution, property, usingStorageWrapper,
                                         base, wrapper, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidPropertyWrapperType final : public FailureDiagnostic {
+  Type wrapperType;
+
+public:
+  InvalidPropertyWrapperType(const Solution &solution, Type wrapper,
+                             ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidProjectedValueArgument final : public FailureDiagnostic {
+  Type wrapperType;
+  ParamDecl *param;
+
+public:
+  InvalidProjectedValueArgument(const Solution &solution, Type wrapper,
+                                ParamDecl *param, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)),
+        param(param) {}
 
   bool diagnoseAsError() override;
 };
@@ -1553,7 +1589,7 @@ public:
                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), Member(member) {
     assert(member->hasName());
-    assert(locator->isForKeyPathComponent() ||
+    assert(locator->isInKeyPathComponent() ||
            locator->isForKeyPathDynamicMemberLookup());
   }
 
@@ -1874,6 +1910,12 @@ public:
   /// Tailored diagnostics for argument mismatches associated with trailing
   /// closures being passed to non-closure parameters.
   bool diagnoseTrailingClosureMismatch() const;
+
+  /// Tailored key path as function diagnostics for argument mismatches where
+  /// argument is a keypath expression that has a root type that matches a
+  /// function parameter, but keypath value don't match the function parameter
+  /// result value.
+  bool diagnoseKeyPathAsFunctionResultMismatch() const;
 
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
@@ -2250,6 +2292,8 @@ public:
   Type getFromType() const override { return RawReprType; }
   Type getToType() const override { return ExpectedType; }
 
+  bool diagnoseAsError() override;
+
 private:
   void fixIt(InFlightDiagnostic &diagnostic) const override;
 };
@@ -2467,6 +2511,28 @@ public:
                                        Type toType, CheckedCastKind kind,
                                        ConstraintLocator *locator)
       : CheckedCastBaseFailure(solution, fromType, toType, kind, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when static member reference has invalid result
+/// type which disqualifies it from being used on a protocol metatype base.
+///
+/// \code
+/// protocol Foo {
+///   static var bar: Int
+/// }
+///
+/// _ = Foo.bar
+/// \endcode
+///
+/// `bar` can't be referenced from `P.Protocol` base because its result type
+/// `Int` doesn't conform to `Foo`.
+class InvalidMemberRefOnProtocolMetatype final : public FailureDiagnostic {
+public:
+  InvalidMemberRefOnProtocolMetatype(const Solution &solution,
+                                     ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator) {}
 
   bool diagnoseAsError() override;
 };

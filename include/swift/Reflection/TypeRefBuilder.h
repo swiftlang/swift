@@ -287,6 +287,8 @@ public:
 
   Demangle::NodeFactory &getNodeFactory() { return Dem; }
 
+  void clearNodeFactory() { Dem.clear(); }
+
   BuiltType decodeMangledType(Node *node);
   
   ///
@@ -415,9 +417,14 @@ public:
       const TypeRef *result, FunctionTypeFlags flags) {
     return FunctionTypeRef::create(*this, params, result, flags);
   }
+  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
+  using BuiltRequirement = TypeRefRequirement;
 
   const FunctionTypeRef *createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,
+      BuiltRequirement *witnessMethodConformanceRequirement,
+      const llvm::SmallVectorImpl<BuiltType> &genericParameters,
+      const llvm::SmallVectorImpl<BuiltRequirement> &requirements,
       llvm::ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
       llvm::ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
       llvm::Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
@@ -445,7 +452,7 @@ public:
       break;
     }
 
-    funcFlags = funcFlags.withConcurrent(flags.isConcurrent());
+    funcFlags = funcFlags.withConcurrent(flags.isSendable());
     funcFlags = funcFlags.withAsync(flags.isAsync());
 
     auto result = createTupleType({}, "");
@@ -517,8 +524,6 @@ public:
   }
 
   using BuiltSILBoxField = typename SILBoxTypeWithLayoutTypeRef::Field;
-  using BuiltSubstitution = std::pair<const TypeRef *, const TypeRef *>;
-  using BuiltRequirement = TypeRefRequirement;
   using BuiltLayoutConstraint = TypeRefLayoutConstraint;
   BuiltLayoutConstraint getLayoutConstraint(LayoutConstraintKind kind) {
     // FIXME: Implement this.

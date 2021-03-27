@@ -200,15 +200,19 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // Create the new apply inst.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     return Builder.createTryApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
-                                  TAI->getNormalBB(), TAI->getErrorBB());
+                                  TAI->getNormalBB(), TAI->getErrorBB(),
+                                  TAI->getApplyOptions());
   }
 
   // Match the throwing bit of the underlying function_ref. We assume that if
   // we got this far it is legal to perform the transformation (since
   // otherwise, we would be creating malformed SIL).
-  bool setNonThrowing = FRI->getFunctionType()->hasErrorResult();
+  ApplyOptions Options = AI.getApplyOptions();
+  Options -= ApplyFlags::DoesNotThrow;
+  if (FRI->getFunctionType()->hasErrorResult())
+    Options |= ApplyFlags::DoesNotThrow;
   ApplyInst *NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(),
-                                       Args, setNonThrowing);
+                                       Args, Options);
   assert(FullApplySite(NAI).getSubstCalleeType()->getAllResultsSubstType(
              AI.getModule(), AI.getFunction()->getTypeExpansionContext()) ==
              AI.getSubstCalleeType()->getAllResultsSubstType(
@@ -1220,11 +1224,12 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   if (auto *TAI = dyn_cast<TryApplyInst>(Apply))
     NewApply = ApplyBuilder.createTryApply(
         Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
-        TAI->getNormalBB(), TAI->getErrorBB());
+        TAI->getNormalBB(), TAI->getErrorBB(),
+        TAI->getApplyOptions());
   else
     NewApply = ApplyBuilder.createApply(
         Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
-        cast<ApplyInst>(Apply)->isNonThrowing());
+        cast<ApplyInst>(Apply)->getApplyOptions());
 
   if (auto NewAI = dyn_cast<ApplyInst>(NewApply))
     replaceInstUsesWith(*cast<ApplyInst>(Apply.getInstruction()), NewAI);
@@ -1708,10 +1713,6 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   // from visitPartialApplyInst(), so bail here.
   if (isa<PartialApplyInst>(AI->getCallee()))
     return nullptr;
-
-  if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee())) {
-    return optimizeApplyOfConvertFunctionInst(AI, CFI);
-  }
 
   // Optimize readonly functions with no meaningful users.
   SILFunction *Fn = AI->getReferencedFunctionOrNull();

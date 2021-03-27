@@ -26,6 +26,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/Utils.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
@@ -1299,10 +1300,6 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
   return false;
 }
 
-static NominalTypeDecl *getNominalParent(ValueDecl *D) {
-  return D->getDeclContext()->getSelfNominalTypeDecl();
-}
-
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
                                                   IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(/*SerializedOK*/false), /*IsRef=*/false, Info))
@@ -1337,81 +1334,13 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   return false;
 }
 
-static bool isSuperRefExpr(Expr *E) {
-  if (!E)
-    return false;
-  if (isa<SuperRefExpr>(E))
-    return true;
-  if (auto LoadE = dyn_cast<LoadExpr>(E))
-    return isSuperRefExpr(LoadE->getSubExpr());
-  return false;
-}
-
-static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
-  // The call is 'dynamic' if the method is not of a struct/enum and the
-  // receiver is not 'super'. Note that if the receiver is 'super' that
-  // does not mean that the call is statically determined (an extension
-  // method may have injected itself in the super hierarchy).
-  // For our purposes 'dynamic' means that the method call cannot invoke
-  // a method in a subclass.
-  auto TyD = getNominalParent(D);
-  if (!TyD)
-    return false;
-  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD))
-    return false;
-  if (isSuperRefExpr(BaseE))
-    return false;
-  if (BaseE->getType()->is<MetatypeType>())
-    return false;
-
-  return true;
-}
-
-static Expr *getUnderlyingFunc(Expr *Fn) {
-  Fn = Fn->getSemanticsProvidingExpr();
-  if (auto *DRE = dyn_cast<DeclRefExpr>(Fn))
-    return DRE;
-  if (auto ApplyE = dyn_cast<SelfApplyExpr>(Fn))
-    return getUnderlyingFunc(ApplyE->getFn());
-  if (auto *ACE = dyn_cast<AutoClosureExpr>(Fn)) {
-    if (auto *Unwrapped = ACE->getUnwrappedCurryThunkExpr())
-      return getUnderlyingFunc(Unwrapped);
-  }
-  return Fn;
-}
-
-static bool isBeingCalled(Expr *Target, ArrayRef<Expr*> ExprStack) {
-  if (!Target)
-    return false;
-  Target = getUnderlyingFunc(Target);
-
-  for (Expr *E: reverse(ExprStack)) {
-    auto *AE = dyn_cast<ApplyExpr>(E);
-    if (!AE || AE->isImplicit())
-      continue;
-    if (isa<ConstructorRefCallExpr>(AE) && AE->getArg() == Target)
-      return true;
-    if (isa<SelfApplyExpr>(AE))
-      continue;
-    if (getUnderlyingFunc(AE->getFn()) == Target)
-      return true;
-  }
-  return false;
-}
-
 bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                                  IndexSymbol &Info) {
 
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
-  Expr *CurrentE = getCurrentExpr();
-  if (!CurrentE)
-    return false;
-
-  Expr *ParentE = getParentExpr();
-
-  if (!isa<AbstractStorageDecl>(D) && !isBeingCalled(CurrentE, ExprStack))
+  if (!isa<AbstractStorageDecl>(D) && !ide::isBeingCalled(ExprStack))
     return false;
 
   Info.roles |= (unsigned)SymbolRole::Call;
@@ -1420,31 +1349,20 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
       return true;
   }
 
-  Expr *BaseE = nullptr;
-  if (auto DotE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
-    BaseE = DotE->getBase();
-  else if (auto MembE = dyn_cast<MemberRefExpr>(CurrentE))
-    BaseE = MembE->getBase();
-  else if (auto SubsE = dyn_cast<SubscriptExpr>(CurrentE))
-    BaseE = SubsE->getBase();
-
-  if (!BaseE || BaseE == CurrentE)
+  Expr *BaseE = ide::getBase(ExprStack);
+  if (!BaseE)
     return false;
 
-  if (Type ReceiverTy = BaseE->getType()) {
-    if (auto LVT = ReceiverTy->getAs<LValueType>())
-      ReceiverTy = LVT->getObjectType();
-    else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
-      ReceiverTy = MetaT->getInstanceType();
+  if (ide::isDynamicCall(BaseE, D))
+    Info.roles |= (unsigned)SymbolRole::Dynamic;
 
-    if (auto TyD = ReceiverTy->getAnyNominal()) {
-      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy, TyD))
-        return true;
-      if (isDynamicCall(BaseE, D))
-        Info.roles |= (unsigned)SymbolRole::Dynamic;
-    }
+  SmallVector<NominalTypeDecl *, 1> Types;
+  ide::getReceiverType(BaseE, Types);
+  for (auto *ReceiverTy : Types) {
+    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationReceivedBy,
+                    ReceiverTy))
+      return true;
   }
-
   return false;
 }
 

@@ -42,9 +42,15 @@ namespace {
 class CopyPropagation : public SILFunctionTransform {
   /// True if debug_value instructions should be pruned.
   bool pruneDebug;
+  /// True of all values should be canonicalized.
+  bool canonicalizeAll;
+  /// If true, then new destroy_value instructions will be poison.
+  bool poisonRefs;
 
 public:
-  CopyPropagation(bool pruneDebug): pruneDebug(pruneDebug) {}
+  CopyPropagation(bool pruneDebug, bool canonicalizeAll, bool poisonRefs)
+    : pruneDebug(pruneDebug), canonicalizeAll(canonicalizeAll),
+      poisonRefs(poisonRefs) {}
 
   /// The entry point to this function transformation.
   void run() override;
@@ -83,13 +89,20 @@ void CopyPropagation::run() {
   llvm::SmallSetVector<SILValue, 16> copiedDefs;
   for (auto &bb : *f) {
     for (auto &i : bb) {
-      if (auto *copy = dyn_cast<CopyValueInst>(&i))
+      if (auto *copy = dyn_cast<CopyValueInst>(&i)) {
         copiedDefs.insert(
             CanonicalizeOSSALifetime::getCanonicalCopiedDef(copy));
+      } else if (canonicalizeAll) {
+        if (auto *destroy = dyn_cast<DestroyValueInst>(&i)) {
+          copiedDefs.insert(CanonicalizeOSSALifetime::getCanonicalCopiedDef(
+              destroy->getOperand()));
+        }
+      }
     }
   }
   // Perform copy propgation for each copied value.
-  CanonicalizeOSSALifetime canonicalizer(pruneDebug, accessBlockAnalysis,
+  CanonicalizeOSSALifetime canonicalizer(pruneDebug, poisonRefs,
+                                         accessBlockAnalysis,
                                          dominanceAnalysis,
                                          deBlocksAnalysis->get(f));
   // Cleanup dead copies. If getCanonicalCopiedDef returns a copy (because the
@@ -122,14 +135,19 @@ void CopyPropagation::run() {
     accessBlockAnalysis->lockInvalidation();
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     accessBlockAnalysis->unlockInvalidation();
-    f->verifyOwnership(deBlocksAnalysis->get(f));
+    if (f->getModule().getOptions().VerifySILOwnership) {
+      f->verifyOwnership(deBlocksAnalysis->get(f));
+    }
   }
 }
 
-SILTransform *swift::createCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ true);
+SILTransform *swift::createMandatoryCopyPropagation() {
+  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ true,
+                             /*poisonRefs*/ true);
 }
 
-SILTransform *swift::createMandatoryCopyPropagation() {
-  return new CopyPropagation(/*pruneDebug*/ false);
+SILTransform *swift::createCopyPropagation() {
+  return new CopyPropagation(/*pruneDebug*/ true, /*canonicalizeAll*/ false,
+                             /*poisonRefs*/ false);
 }
+

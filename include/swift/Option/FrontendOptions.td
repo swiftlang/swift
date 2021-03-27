@@ -188,6 +188,17 @@ def batch_scan_input_file
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only dentify all imports of the main Swift module sources">;
 
+def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
+  HelpText<"Run SIL copy propagation to shorten object lifetime.">;
+def disable_copy_propagation : Flag<["-"], "disable-copy-propagation">,
+  HelpText<"Don't run SIL copy propagation to preserve object lifetime.">;
+
+def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-sendable">,
+    HelpText<"Enable inference of Sendable conformances for public structs and enums">;
+
+def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
+    HelpText<"Disable inference of Sendable conformances for public structs and enums">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -214,17 +225,21 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
-  def enable_experimental_prespecialization :
-    Flag<["-"], "enable-experimental-prespecialization">,
-    HelpText<"Enable experimental pre-specialization support">;
-
 def enable_experimental_concurrency :
   Flag<["-"], "enable-experimental-concurrency">,
   HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_concurrent_value_checking :
-  Flag<["-"], "enable-experimental-concurrent-value-checking">,
-  HelpText<"Enable ConcurrentValue checking">;
+def enable_experimental_async_handler :
+  Flag<["-"], "enable-experimental-async-handler">,
+  HelpText<"Enable experimental @asyncHandler feature">;
+
+def enable_experimental_flow_sensitive_concurrent_captures :
+  Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
+  HelpText<"Enable flow-sensitive concurrent captures">;
+
+def enable_experimental_enum_codable_derivation :
+  Flag<["-"], "enable-experimental-enum-codable-derivation">,
+  HelpText<"Enable experimental derivation of Codable for enums">;
 
 def enable_resilience : Flag<["-"], "enable-resilience">,
      HelpText<"Deprecated, use -enable-library-evolution instead">;
@@ -406,9 +421,8 @@ def disable_conformance_availability_errors : Flag<["-"],
   "disable-conformance-availability-errors">,
   HelpText<"Diagnose conformance availability violations as warnings">;
 
-def enable_infer_import_as_member :
-  Flag<["-"], "enable-infer-import-as-member">,
-  HelpText<"Infer when a global could be imported as a member">;
+def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
+  HelpText<"Deprecated, will be removed in future versions.">;
 
 def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -630,6 +644,9 @@ def index_ignore_stdlib :
   Flag<["-"], "index-ignore-stdlib">,
   HelpText<"Avoid emitting index data for the standard library.">;
 
+def index_unit_output_path_filelist : Separate<["-"], "index-unit-output-path-filelist">,
+  HelpText<"Specify index unit output paths in a file rather than on the command line">;
+
 def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
@@ -792,5 +809,13 @@ def disable_ast_verifier : Flag<["-"], "disable-ast-verifier">,
            "when asserts are enabled and not run it when asserts are "
            "disabled. NOTE: Can not be used if enable-ast-verifier is used "
            "as well">;
+
+def enable_ossa_modules : Flag<["-"], "enable-ossa-modules">,
+  HelpText<"Always serialize SIL in ossa form. If this flag is not passed in, "
+           "when optimizing ownership will be lowered before serializing SIL">;
+
+def new_driver_path
+  : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
+  HelpText<"Path of the new driver to be used">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

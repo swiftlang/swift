@@ -18,7 +18,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockData.h"
-#include "swift/SIL/SILBitfield.h"
+#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -2012,16 +2012,13 @@ void LifetimeChecker::updateInstructionForInitState(unsigned UseID) {
 
     switch (Use.Kind) {
     case DIUseKind::Initialization:
-      AI->setAssignInfo(AssignOwnershipQualifier::Init,
-                        AssignByWrapperInst::Destination::BackingWrapper);
+      AI->setMode(AssignByWrapperInst::Initialization);
       break;
     case DIUseKind::Assign:
-      AI->setAssignInfo(AssignOwnershipQualifier::Reassign,
-                        AssignByWrapperInst::Destination::BackingWrapper);
+      AI->setMode(AssignByWrapperInst::Assign);
       break;
     case DIUseKind::AssignWrappedValue:
-      AI->setAssignInfo(AssignOwnershipQualifier::Reassign,
-                        AssignByWrapperInst::Destination::WrappedValue);
+      AI->setMode(AssignByWrapperInst::AssignWrappedValue);
       break;
     default:
       llvm_unreachable("Wrong use kind for assign_by_wrapper");

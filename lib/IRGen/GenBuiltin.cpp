@@ -219,6 +219,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  // getCurrentActor has no arguments.
+  if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
+    auto *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGetCurrentExecutorFn(),
+                                        {});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    out.add(call);
+    return;
+  }
+
   // Everything else cares about the (rvalue) argument.
 
   if (Builtin.ID == BuiltinValueKind::CancelAsyncTask) {
@@ -226,24 +236,24 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::CreateAsyncTask ||
-      Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) {
+  if (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture ||
+      Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture) {
+
     auto flags = args.claimNext();
-    auto parentTask = args.claimNext();
+    auto taskGroup =
+        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture)
+        ? args.claimNext()
+        : nullptr;
     auto futureResultType =
-        (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture)
+        ((Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture) ||
+         (Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture))
           ? args.claimNext()
           : nullptr;
     auto taskFunction = args.claimNext();
     auto taskContext = args.claimNext();
 
-    // FIXME: SIL treats the function/context parameter as "guaranteed", but
-    // the runtime entry point assumes it is owned. Introduce an extra retain
-    // of the context to balance things out.
-    IGF.emitNativeStrongRetain(taskContext, IGF.getDefaultAtomicity());
-
     auto newTaskAndContext = emitTaskCreate(
-        IGF, flags, parentTask, futureResultType, taskFunction, taskContext,
+        IGF, flags, taskGroup, futureResultType, taskFunction, taskContext,
         substitutions);
 
     // Cast back to NativeObject/RawPointer.
@@ -258,11 +268,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::ConvertTaskToJob) {
     auto task = args.claimNext();
-    // The job object starts immediately past the heap-object header.
-    auto bytes = IGF.Builder.CreateBitCast(task, IGF.IGM.Int8PtrTy);
-    auto offset = IGF.IGM.RefCountedStructSize;
-    bytes = IGF.Builder.CreateInBoundsGEP(bytes, IGF.IGM.getSize(offset));
-    auto job = IGF.Builder.CreateBitCast(bytes, IGF.IGM.SwiftJobPtrTy);
+    // The job object starts at the beginning of the task.
+    auto job = IGF.Builder.CreateBitCast(task, IGF.IGM.SwiftJobPtrTy);
     out.add(job);
     return;
   }

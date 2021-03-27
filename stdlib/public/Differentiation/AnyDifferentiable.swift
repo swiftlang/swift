@@ -23,7 +23,7 @@ import Swift
 
 internal protocol _AnyDifferentiableBox {
   // `Differentiable` requirements.
-  mutating func _move(along direction: AnyDerivative)
+  mutating func _move(by offset: AnyDerivative)
 
   /// The underlying base value, type-erased to `Any`.
   var _typeErasedBase: Any { get }
@@ -50,14 +50,11 @@ internal struct _ConcreteDifferentiableBox<T: Differentiable>: _AnyDifferentiabl
     return (self as? _ConcreteDifferentiableBox<U>)?._base
   }
 
-  mutating func _move(along direction: AnyDerivative) {
-    guard
-      let directionBase =
-        direction.base as? T.TangentVector
-    else {
-      _derivativeTypeMismatch(T.self, type(of: direction.base))
+  mutating func _move(by offset: AnyDerivative) {
+    guard let offsetBase = offset.base as? T.TangentVector else {
+      _derivativeTypeMismatch(T.self, type(of: offset.base))
     }
-    _base.move(along: directionBase)
+    _base.move(by: offsetBase)
   }
 }
 
@@ -100,9 +97,15 @@ public struct AnyDifferentiable: Differentiable {
 
   public typealias TangentVector = AnyDerivative
 
-  public mutating func move(along direction: TangentVector) {
-    _box._move(along: direction)
+  public mutating func move(by offset: TangentVector) {
+    _box._move(by: offset)
   }
+}
+
+extension AnyDifferentiable: CustomReflectable {
+    public var customMirror: Mirror {
+        Mirror(reflecting: base)
+    }
 }
 
 //===----------------------------------------------------------------------===//
@@ -121,7 +124,7 @@ internal protocol _AnyDerivativeBox {
   func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox
 
   // `Differentiable` requirements.
-  mutating func _move(along direction: _AnyDerivativeBox)
+  mutating func _move(by offset: _AnyDerivativeBox)
 
   /// The underlying base value, type-erased to `Any`.
   var _typeErasedBase: Any { get }
@@ -215,19 +218,16 @@ where T: Differentiable, T.TangentVector == T {
 
   // `Differentiable` requirements.
   @inlinable
-  mutating func _move(along direction: _AnyDerivativeBox) {
-    if direction._isOpaqueZero() {
+  mutating func _move(by offset: _AnyDerivativeBox) {
+    if offset._isOpaqueZero() {
       return
     }
     // The case where `self._isOpaqueZero()` returns true is handled in
-    // `AnyDerivative.move(along:)`.
-    guard
-      let directionBase =
-        direction._unboxed(to: T.TangentVector.self)
-    else {
-      _derivativeTypeMismatch(T.self, type(of: direction._typeErasedBase))
+    // `AnyDerivative.move(by:)`.
+    guard let offsetBase = offset._unboxed(to: T.TangentVector.self) else {
+      _derivativeTypeMismatch(T.self, type(of: offset._typeErasedBase))
     }
-    _base.move(along: directionBase)
+    _base.move(by: offsetBase)
   }
 }
 
@@ -362,13 +362,19 @@ public struct AnyDerivative: Differentiable & AdditiveArithmetic {
 
   // `Differentiable` requirements.
   @inlinable
-  public mutating func move(along direction: TangentVector) {
+  public mutating func move(by offset: TangentVector) {
     if _box._isOpaqueZero() {
-      _box = direction._box
+      _box = offset._box
       return
     }
-    _box._move(along: direction._box)
+    _box._move(by: offset._box)
   }
+}
+
+extension AnyDerivative: CustomReflectable {
+    public var customMirror: Mirror {
+        Mirror(reflecting: base)
+    }
 }
 
 //===----------------------------------------------------------------------===//

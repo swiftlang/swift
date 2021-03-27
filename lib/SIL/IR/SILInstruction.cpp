@@ -384,6 +384,16 @@ namespace {
       return true;
     }
     
+    bool visitDestroyValueInst(const DestroyValueInst *RHS) {
+      auto *left = cast<DestroyValueInst>(LHS);
+      return left->poisonRefs() == RHS->poisonRefs();
+    }
+
+    bool visitDebugValue(const DebugValueInst *RHS) {
+      auto *left = cast<DebugValueInst>(LHS);
+      return left->poisonRefs() == RHS->poisonRefs();
+    }
+
     bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {
       auto *left = cast<BeginCOWMutationInst>(LHS);
       return left->isNative() == RHS->isNative();

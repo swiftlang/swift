@@ -20,61 +20,112 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
+bool AnyFunctionType::hasEffect(EffectKind kind) const {
+  switch (kind) {
+  case EffectKind::Throws: return getExtInfo().isThrowing();
+  case EffectKind::Async: return getExtInfo().isAsync();
+  }
+  llvm_unreachable("Bad effect kind");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const EffectKind kind) {
+  switch (kind) {
+  case EffectKind::Throws: out << "throws"; return;
+  case EffectKind::Async: out << "async"; return;
+  }
+  llvm_unreachable("Bad effect kind");
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
-                           const ProtocolRethrowsRequirementList list) {
-  for (auto entry : list) {
-    simple_display(out, entry.first);
-    simple_display(out, entry.second);
+                           const PolymorphicEffectRequirementList list) {
+  for (auto req : list.getRequirements()) {
+    simple_display(out, req);
+    out << "\n";
+  }
+
+  for (auto conf : list.getConformances()) {
+    simple_display(out, conf.first);
+    out << " : ";
+    simple_display(out, conf.second);
+    llvm::errs() << "\n";
   }
 }
 
-ProtocolRethrowsRequirementList 
-ProtocolDecl::getRethrowingRequirements() const {
+PolymorphicEffectRequirementList 
+ProtocolDecl::getPolymorphicEffectRequirements(EffectKind kind) const {
   return evaluateOrDefault(getASTContext().evaluator,
-    ProtocolRethrowsRequirementsRequest{const_cast<ProtocolDecl *>(this)}, 
-    ProtocolRethrowsRequirementList());
+    PolymorphicEffectRequirementsRequest{kind, const_cast<ProtocolDecl *>(this)},
+    PolymorphicEffectRequirementList());
 }
 
-bool ProtocolDecl::isRethrowingProtocol() const {
-  return getAttrs().hasAttribute<swift::AtRethrowsAttr>();
+bool ProtocolDecl::hasPolymorphicEffect(EffectKind kind) const {
+  switch (kind) {
+  case EffectKind::Throws:
+    return getAttrs().hasAttribute<swift::AtRethrowsAttr>();
+  case EffectKind::Async:
+    return getAttrs().hasAttribute<swift::AtReasyncAttr>();
+  }
+  llvm_unreachable("Bad effect kind");
 }
 
-FunctionRethrowingKind AbstractFunctionDecl::getRethrowingKind() const {
+bool AbstractFunctionDecl::hasEffect(EffectKind kind) const {
+  switch (kind) {
+  case EffectKind::Throws:
+    return hasThrows();
+  case EffectKind::Async:
+    return hasAsync();
+  }
+  llvm_unreachable("Bad effect kind");
+}
+
+bool AbstractFunctionDecl::hasPolymorphicEffect(EffectKind kind) const {
+  switch (kind) {
+  case EffectKind::Throws:
+    return getAttrs().hasAttribute<swift::RethrowsAttr>();
+  case EffectKind::Async:
+    return getAttrs().hasAttribute<swift::ReasyncAttr>();
+  }
+  llvm_unreachable("Bad effect kind");
+}
+
+PolymorphicEffectKind
+AbstractFunctionDecl::getPolymorphicEffectKind(EffectKind kind) const {
   return evaluateOrDefault(getASTContext().evaluator,
-    FunctionRethrowingKindRequest{const_cast<AbstractFunctionDecl *>(this)}, 
-    FunctionRethrowingKind::Invalid);
+    PolymorphicEffectKindRequest{kind, const_cast<AbstractFunctionDecl *>(this)},
+    PolymorphicEffectKind::Invalid);
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           FunctionRethrowingKind kind) {
+                           PolymorphicEffectKind kind) {
   switch (kind) {
-  case FunctionRethrowingKind::None:
-    out << "non-throwing";
+  case PolymorphicEffectKind::None:
+    out << "none";
     break;
-  case FunctionRethrowingKind::ByClosure:
+  case PolymorphicEffectKind::ByClosure:
     out << "by closure";
     break;
-  case FunctionRethrowingKind::ByConformance:
+  case PolymorphicEffectKind::ByConformance:
     out << "by conformance";
     break;
-  case FunctionRethrowingKind::Throws:
-    out << "throws";
+  case PolymorphicEffectKind::Always:
+    out << "always";
     break;
-  case FunctionRethrowingKind::Invalid:
+  case PolymorphicEffectKind::Invalid:
     out << "invalid";
     break;
   }
 }
 
-bool ProtocolConformanceRef::classifyAsThrows() const {
+bool ProtocolConformanceRef::hasEffect(EffectKind kind) const {
   if (!isConcrete()) { return true; }
   return evaluateOrDefault(getRequirement()->getASTContext().evaluator,
-     ProtocolConformanceRefClassifyAsThrowsRequest{ *this }, 
+     ConformanceHasEffectRequest{kind, getConcrete()},
      true);
 }

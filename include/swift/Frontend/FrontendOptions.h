@@ -48,8 +48,12 @@ public:
   /// An Objective-C header to import and make implicitly visible.
   std::string ImplicitObjCHeaderPath;
 
-  /// The name of the module which the frontend is building.
+  /// The name of the module that the frontend is building.
   std::string ModuleName;
+
+  /// The ABI name of the module that the frontend is building, to be used in
+  /// mangling and metadata.
+  std::string ModuleABIName;
 
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
@@ -69,6 +73,9 @@ public:
 
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
+
+  /// The path to load access notes from.
+  std::string AccessNotesPath;
 
   /// The path to look in when loading a module interface file, to see if a
   /// binary module has already been built for use by the compiler.
@@ -295,7 +302,7 @@ public:
   ///
   /// This flag is currently only propagated from the driver to
   /// any merge-modules jobs.
-  bool EnableExperimentalCrossModuleIncrementalBuild = false;
+  bool DisableCrossModuleIncrementalBuild = false;
 
   /// Best effort to output a .swiftmodule regardless of any compilation
   /// errors. SIL generation and serialization is skipped entirely when there
@@ -373,6 +380,19 @@ public:
 
   /// Whether we're configured to track system intermodule dependencies.
   bool shouldTrackSystemDependencies() const;
+  
+  /// Whether to emit symbol graphs for the output module.
+  bool EmitSymbolGraph = false;
+
+  /// The directory to which we should emit a symbol graph JSON files.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// These are JSON file that describes the public interface of a module for
+  /// curating documentation, separated into files for each module this module
+  /// extends.
+  ///
+  /// \sa SymbolGraphASTWalker
+  std::string SymbolGraphOutputDir;
 
 private:
   static bool canActionEmitDependencies(ActionType);

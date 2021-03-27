@@ -44,6 +44,7 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -731,6 +732,7 @@ public:
   llvm::PointerType *AsyncFunctionPointerPtrTy;
   llvm::PointerType *SwiftContextPtrTy;
   llvm::PointerType *SwiftTaskPtrTy;
+  llvm::PointerType *SwiftTaskGroupPtrTy;
   llvm::PointerType *SwiftJobPtrTy;
   llvm::PointerType *SwiftExecutorPtrTy;
   llvm::FunctionType *TaskContinuationFunctionTy;
@@ -753,6 +755,10 @@ public:
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
+  llvm::CallingConv::ID SwiftAsyncCC;  /// swift calling convention for async
+
+  /// What kind of tail call should be used for async->async calls.
+  llvm::CallInst::TailCallKind AsyncTailCallKind;
 
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
 
@@ -1382,7 +1388,8 @@ public:
   void finalizeClangCodeGen();
   void finishEmitAfterTopLevel();
 
-  Signature getSignature(CanSILFunctionType fnType);
+  Signature getSignature(CanSILFunctionType fnType,
+                         bool suppressGenerics = false);
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
                                       llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);

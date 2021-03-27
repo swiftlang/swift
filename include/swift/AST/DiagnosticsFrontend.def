@@ -123,6 +123,8 @@ ERROR(error_mode_cannot_emit_interface,none,
       "this mode does not support emitting module interface files", ())
 ERROR(error_mode_cannot_emit_module_summary,none,
       "this mode does not support emitting module summary files", ())
+ERROR(error_mode_cannot_emit_symbol_graph,none,
+      "this mode does not support emitting symbol graph files", ())
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "the -experimental-skip-*-function-bodies* flags do not support "
       "emitting IR", ())
@@ -130,6 +132,7 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
+ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
       "%select{|; use -module-name flag to specify an alternate name}1",
@@ -162,15 +165,15 @@ ERROR(error_mode_requires_one_sil_multi_sib,none,
       ())
 
 ERROR(error_no_output_filename_specified,none,
-      "an output filename was not specified for a mode which requires an "
-      "output filename", ())
+      "an %0 filename was not specified for a mode which requires an "
+      "%0 filename", (StringRef))
 
 ERROR(error_implicit_output_file_is_directory,none,
       "the implicit output file '%0' is a directory; explicitly specify a "
-      "filename using -o", (StringRef))
+      "filename using %1", (StringRef, StringRef))
 
 ERROR(error_if_any_output_files_are_specified_they_all_must_be,none,
-      "if any output files are specified, they all must be", ())
+      "if any %0 files are specified, they all must be", (StringRef))
 
 ERROR(error_primary_file_not_found,none,
       "primary file '%0' was not found in file list '%1'",
@@ -208,6 +211,8 @@ ERROR(error_index_failed_status_check,none,
       "failed file status check: %0", (StringRef))
 ERROR(error_index_inputs_more_than_outputs,none,
       "index output filenames do not match input source files", ())
+WARNING(warn_index_unit_output_path_without_index_store,none,
+      "-index-unit-output-path is ignored without -index-store-path", ())
 
 ERROR(error_wrong_number_of_arguments,none,
       "wrong number of '%0' arguments (expected %1, got %2)",
@@ -350,6 +355,13 @@ ERROR(error_opening_explicit_module_file,none,
       "failed to open explicit Swift module: %0", (StringRef))
 ERROR(error_extracting_flags_from_module_interface,none,
       "error extracting flags from module interface", ())
+WARNING(warning_module_shadowing_may_break_module_interface,none,
+        "public %0 %1 shadows module %2, which may cause failures when "
+        "importing %3 or its clients in some configurations; please rename "
+        "either the %0 %1 or the module %2, or see "
+        "https://bugs.swift.org/browse/SR-14195 for workarounds",
+        (DescriptiveDeclKind, FullyQualified<Type>,
+        /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
 NOTE(sdk_version_pbm_version,none,
@@ -382,6 +394,11 @@ REMARK(interface_file_lock_failure,none,
 REMARK(interface_file_lock_timed_out,none,
       "timed out waiting to acquire lock file for module interface '%0'", (StringRef))
 
+ERROR(error_option_required,none, "option '%0' is required", (StringRef))
+ERROR(error_nonexistent_output_dir,none,
+      "'-output-dir' argument '%0' does not exist or is not a directory", (StringRef))
+
+
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
       "expected "
@@ -404,6 +421,17 @@ WARNING(module_incompatible_with_skip_function_bodies,none,
         "module '%0' cannot be built with any of the "
         "-experimental-skip-*-function-bodies* flags; they have "
         "been automatically disabled", (StringRef))
+
+WARNING(access_notes_file_io_error,none,
+        "ignored access notes file at '%0' because it cannot be read: %1",
+        (StringRef, StringRef))
+WARNING(error_in_access_notes_file,none,
+        "ignored access notes file because it cannot be parsed: %0",
+        (StringRef))
+REMARK(warning_in_access_notes_file,none,
+       "ignored invalid content in access notes file: %0",
+       (StringRef))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

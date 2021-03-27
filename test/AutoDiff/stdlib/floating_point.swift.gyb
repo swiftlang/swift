@@ -35,68 +35,68 @@ func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
 %end
 
 FloatingPointDerivativeTests.test("${Self}.+") {
-  expectEqual((1, 1), gradient(at: ${Self}(4), ${Self}(5), in: +))
-  expectEqual((10, 10), pullback(at: ${Self}(4), ${Self}(5), in: +)(${Self}(10)))
+  expectEqual((1, 1), gradient(at: ${Self}(4), ${Self}(5), of: +))
+  expectEqual((10, 10), pullback(at: ${Self}(4), ${Self}(5), of: +)(${Self}(10)))
 
-  expectEqual(2, derivative(at: ${Self}(4), ${Self}(5), in: +))
-  expectEqual(20, differential(at: ${Self}(4), ${Self}(5), in: +)(${Self}(10), ${Self}(10)))
+  expectEqual(2, derivative(at: ${Self}(4), ${Self}(5), of: +))
+  expectEqual(20, differential(at: ${Self}(4), ${Self}(5), of: +)(${Self}(10), ${Self}(10)))
 }
 
 FloatingPointDerivativeTests.test("${Self}.-") {
-  expectEqual((1, -1), gradient(at: ${Self}(4), ${Self}(5), in: -))
-  expectEqual((10, -10), pullback(at: ${Self}(4), ${Self}(5), in: -)(${Self}(10)))
+  expectEqual((1, -1), gradient(at: ${Self}(4), ${Self}(5), of: -))
+  expectEqual((10, -10), pullback(at: ${Self}(4), ${Self}(5), of: -)(${Self}(10)))
 
-  expectEqual(0, derivative(at: ${Self}(4), ${Self}(5), in: -))
-  expectEqual(-5, differential(at: ${Self}(4), ${Self}(5), in: -)(${Self}(5), ${Self}(10)))
+  expectEqual(0, derivative(at: ${Self}(4), ${Self}(5), of: -))
+  expectEqual(-5, differential(at: ${Self}(4), ${Self}(5), of: -)(${Self}(5), ${Self}(10)))
 }
 
 FloatingPointDerivativeTests.test("${Self}.*") {
-  expectEqual((5, 4), gradient(at: ${Self}(4), ${Self}(5), in: *))
-  expectEqual((50, 40), pullback(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10)))
+  expectEqual((5, 4), gradient(at: ${Self}(4), ${Self}(5), of: *))
+  expectEqual((50, 40), pullback(at: ${Self}(4), ${Self}(5), of: *)(${Self}(10)))
 
-  expectEqual(9, derivative(at: ${Self}(4), ${Self}(5), in: *))
-  expectEqual(90, differential(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10), ${Self}(10)))
+  expectEqual(9, derivative(at: ${Self}(4), ${Self}(5), of: *))
+  expectEqual(90, differential(at: ${Self}(4), ${Self}(5), of: *)(${Self}(10), ${Self}(10)))
 }
 
 FloatingPointDerivativeTests.test("${Self}./") {
   do {
-    let (dx, dy) = gradient(at: ${Self}(4), ${Self}(5), in: /)
+    let (dx, dy) = gradient(at: ${Self}(4), ${Self}(5), of: /)
     expectEqual(0.2, dx)
     expectEqual(-0.16, dy)
   }
   do {
-    let (dx, dy) = pullback(at: ${Self}(4), ${Self}(5), in: /)(${Self}(10))
+    let (dx, dy) = pullback(at: ${Self}(4), ${Self}(5), of: /)(${Self}(10))
     expectEqual(2, dx)
     expectEqualWithTolerance(-1.6, dy)
   }
 
-  expectEqualWithTolerance(0.04, derivative(at: ${Self}(4), ${Self}(5), in: /))
-  expectEqual(90, differential(at: ${Self}(4), ${Self}(5), in: *)(${Self}(10), ${Self}(10)))
+  expectEqualWithTolerance(0.04, derivative(at: ${Self}(4), ${Self}(5), of: /))
+  expectEqual(90, differential(at: ${Self}(4), ${Self}(5), of: *)(${Self}(10), ${Self}(10)))
 }
 
 FloatingPointDerivativeTests.test("${Self}.squareRoot") {
-  expectEqual(0.5, gradient(at: 1, in: { $0.squareRoot() }))
-  expectEqual(0.25, gradient(at: 4, in: { $0.squareRoot() }))
+  expectEqual(0.5, gradient(at: 1, of: { $0.squareRoot() }))
+  expectEqual(0.25, gradient(at: 4, of: { $0.squareRoot() }))
 }
 
 FloatingPointDerivativeTests.test("${Self}.addingProduct") {
-  expectEqual((1, 2, 3), gradient(at: ${Self}(10), 3, 2, in: { $0.addingProduct($1, $2) }))
+  expectEqual((1, 2, 3), gradient(at: ${Self}(10), 3, 2, of: { $0.addingProduct($1, $2) }))
 }
 
 FloatingPointDerivativeTests.test("${Self}.minimum") {
-  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), ${Self}(2), in : { ${Self}.minimum($0, $1) }))
-  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), ${Self}(1), in : { ${Self}.minimum($0, $1) }))
-  expectEqual((0.0, 1.0), gradient(at: ${Self}(2), ${Self}(1), in : { ${Self}.minimum($0, $1) }))
-  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), .nan, in : { ${Self}.minimum($0, $1) }))
-  expectEqual((0.0, 1.0), gradient(at: .nan, ${Self}(1), in : { ${Self}.minimum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), ${Self}(2), of: { ${Self}.minimum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), ${Self}(1), of: { ${Self}.minimum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(2), ${Self}(1), of: { ${Self}.minimum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), .nan, of: { ${Self}.minimum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: .nan, ${Self}(1), of: { ${Self}.minimum($0, $1) }))
 }
 
 FloatingPointDerivativeTests.test("${Self}.maximum") {
-  expectEqual((0.0, 1.0), gradient(at: ${Self}(1), ${Self}(2), in : { ${Self}.maximum($0, $1) }))
-  expectEqual((0.0, 1.0), gradient(at: ${Self}(1), ${Self}(1), in : { ${Self}.maximum($0, $1) }))
-  expectEqual((1.0, 0.0), gradient(at: ${Self}(2), ${Self}(1), in : { ${Self}.maximum($0, $1) }))
-  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), .nan, in : { ${Self}.maximum($0, $1) }))
-  expectEqual((0.0, 1.0), gradient(at: .nan, ${Self}(1), in : { ${Self}.maximum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(1), ${Self}(2), of: { ${Self}.maximum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: ${Self}(1), ${Self}(1), of: { ${Self}.maximum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(2), ${Self}(1), of: { ${Self}.maximum($0, $1) }))
+  expectEqual((1.0, 0.0), gradient(at: ${Self}(1), .nan, of: { ${Self}.maximum($0, $1) }))
+  expectEqual((0.0, 1.0), gradient(at: .nan, ${Self}(1), of: { ${Self}.maximum($0, $1) }))
 }
 
 %if Self == 'Float80':

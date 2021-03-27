@@ -492,7 +492,7 @@ namespace {
     }
     
     void addName() {
-      B.addRelativeAddress(IGM.getAddrOfGlobalString(M->getName().str(),
+      B.addRelativeAddress(IGM.getAddrOfGlobalString(M->getABIName().str(),
                                            /*willBeRelativelyAddressed*/ true));
     }
     
@@ -5138,8 +5138,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::FloatingPoint:
   case KnownProtocolKind::Actor:
-  case KnownProtocolKind::ConcurrentValue:
-  case KnownProtocolKind::UnsafeConcurrentValue:
+  case KnownProtocolKind::Sendable:
+  case KnownProtocolKind::UnsafeSendable:
     return SpecialProtocol::None;
   }
 
@@ -5219,10 +5219,10 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
   assert(sig);
   GenericRequirementsMetadata metadata;
   for (auto &requirement : requirements) {
-    ++metadata.NumRequirements;
-
     switch (auto kind = requirement.getKind()) {
     case RequirementKind::Layout:
+      ++metadata.NumRequirements;
+
       switch (auto layoutKind =
                 requirement.getLayoutConstraint()->getKind()) {
       case LayoutConstraintKind::Class: {
@@ -5243,13 +5243,14 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
       break;
 
     case RequirementKind::Conformance: {
-      auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
-        ->getDecl();
+      auto protocol = requirement.getProtocolDecl();
 
       // Marker protocols do not record generic requirements at all.
-      if (protocol->isMarkerProtocol())
+      if (protocol->isMarkerProtocol()) {
         break;
+      }
 
+      ++metadata.NumRequirements;
       bool needsWitnessTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
@@ -5273,6 +5274,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
     case RequirementKind::SameType:
     case RequirementKind::Superclass: {
+      ++metadata.NumRequirements;
       auto abiKind = kind == RequirementKind::SameType
         ? GenericRequirementKind::SameType
         : GenericRequirementKind::BaseClass;

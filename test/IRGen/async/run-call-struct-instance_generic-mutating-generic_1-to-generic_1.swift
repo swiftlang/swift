@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -emit-ir -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -module-name main -o %t/main %target-rpath(%t) 
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -emit-ir -parse-as-library -module-name main | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -parse-as-library -module-name main -o %t/main %target-rpath(%t) 
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -13,7 +13,7 @@ import _Concurrency
 
 struct G<T> {
   // CHECK-LL: @"$s4main1GV19theMutatingFunctionyqd__qd__YlFTu" = hidden global %swift.async_func_pointer
-  // CHECK-LL: define hidden swiftcc void @"$s4main1GV19theMutatingFunctionyqd__qd__YlF"(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+  // CHECK-LL: define hidden swift{{(tail)?}}cc void @"$s4main1GV19theMutatingFunctionyqd__qd__YlF"(
   mutating func theMutatingFunction<U>(_ u: U) async -> U {
     return u
   }

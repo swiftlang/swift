@@ -264,24 +264,16 @@ struct OwnershipLifetimeExtender {
 CopyValueInst *
 OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
                                              SILInstruction *consumingPoint) {
-  auto *newValInsertPt = value->getDefiningInsertionPoint();
-  assert(newValInsertPt);
-  CopyValueInst *copy;
-  if (!isa<SILArgument>(value)) {
-    SILBuilderWithScope::insertAfter(newValInsertPt, [&](SILBuilder &builder) {
-      copy = builder.createCopyValue(builder.getInsertionPointLoc(), value);
-    });
-  } else {
-    SILBuilderWithScope builder(newValInsertPt);
-    copy = builder.createCopyValue(newValInsertPt->getLoc(), value);
-  }
+  auto *copyPoint = value->getNextInstruction();
+  auto loc = copyPoint->getLoc();
+  auto *copy = SILBuilderWithScope(copyPoint).createCopyValue(loc, value);
 
   auto &callbacks = ctx.callbacks;
   callbacks.createdNewInst(copy);
 
   auto *result = copy;
   findJointPostDominatingSet(
-      newValInsertPt->getParent(), consumingPoint->getParent(),
+      copyPoint->getParent(), consumingPoint->getParent(),
       // inputBlocksFoundDuringWalk.
       [&](SILBasicBlock *loopBlock) {
         // This must be consumingPoint->getParent() since we only have one
@@ -291,10 +283,16 @@ OwnershipLifetimeExtender::createPlusOneCopy(SILValue value,
         assert(loopBlock == consumingPoint->getParent());
         auto front = loopBlock->begin();
         SILBuilderWithScope newBuilder(front);
+
+        // Create an extra copy when the consuming point is inside a
+        // loop and both copyPoint and the destroy points are outside the
+        // loop. This copy will be consumed in the same block. The original
+        // value will be destroyed on all paths exiting the loop.
+        //
+        // Since copyPoint dominates consumingPoint, it must be outside the
+        // loop. Otherwise backward traversal would have stopped at copyPoint.
         result = newBuilder.createCopyValue(front->getLoc(), copy);
         callbacks.createdNewInst(result);
-
-        llvm_unreachable("Should never visit this!");
       },
       // Input blocks in joint post dom set. We don't care about thse.
       [&](SILBasicBlock *postDomBlock) {
@@ -790,89 +788,6 @@ SILBasicBlock::iterator OwnershipRAUWUtility::perform() {
 //                     Interior Pointer Operand Rebasing
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-/// Clone all projections and casts on the access use-def chain until either the
-/// specified predicate is true or the access base is reached.
-///
-/// This will not clone ref_element_addr or ref_tail_addr because those aren't
-/// part of the access chain.
-class InteriorPointerAddressRebaseUseDefChainCloner
-    : public AccessUseDefChainVisitor<
-          InteriorPointerAddressRebaseUseDefChainCloner, SILValue> {
-  SILValue oldAddressValue;
-  SingleValueInstruction *oldIntPtr;
-  SingleValueInstruction *newIntPtr;
-  SILInstruction *insertPt;
-
-public:
-  InteriorPointerAddressRebaseUseDefChainCloner(
-      SILValue oldAddressValue, SingleValueInstruction *oldIntPtr,
-      SingleValueInstruction *newIntPtr, SILInstruction *insertPt)
-      : oldAddressValue(oldAddressValue), oldIntPtr(oldIntPtr),
-        newIntPtr(newIntPtr), insertPt(insertPt) {}
-
-  // Recursive main entry point
-  SILValue cloneUseDefChain(SILValue currentOldAddr) {
-    // If we have finally hit oldIntPtr, we are done.
-    if (currentOldAddr == oldIntPtr)
-      return currentOldAddr;
-    return this->visit(currentOldAddr);
-  }
-
-  // Recursively clone an address on the use-def chain.
-  SingleValueInstruction *cloneProjection(SingleValueInstruction *projectedAddr,
-                                          Operand *sourceOper) {
-    SILValue sourceOperVal = sourceOper->get();
-    SILValue projectedSource = cloneUseDefChain(sourceOperVal);
-    // If we hit the end of our chain, then make newIntPtr the operand so that
-    // we have successfully rebased.
-    if (sourceOperVal == projectedSource)
-      projectedSource = newIntPtr;
-    SILInstruction *clone = projectedAddr->clone(insertPt);
-    clone->setOperand(sourceOper->getOperandNumber(), projectedSource);
-    return cast<SingleValueInstruction>(clone);
-  }
-
-  SILValue visitBase(SILValue base, AccessedStorage::Kind kind) {
-    assert(false && "access base cannot be cloned");
-    return SILValue();
-  }
-
-  SILValue visitNonAccess(SILValue base) {
-    assert(false && "unknown address root cannot be cloned");
-    return SILValue();
-  }
-
-  SILValue visitPhi(SILPhiArgument *phi) {
-    assert(false && "unexpected phi on access path");
-    return SILValue();
-  }
-
-  SILValue visitStorageCast(SingleValueInstruction *cast, Operand *sourceOper) {
-    assert(false && "unexpected storage cast on access path");
-    return SILValue();
-  }
-
-  SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
-                                 Operand *sourceOper) {
-    return cloneProjection(projectedAddr, sourceOper);
-  }
-};
-
-} // namespace
-
-/// \p oldAddressValue is an address rooted in \p oldIntPtr. Clone the use-def
-/// chain from \p oldAddressValue to \p oldIntPtr, but starting from \p
-/// newAddressValue.
-static SILValue cloneInteriorProjectionUseDefChain(
-    SILValue oldAddressValue, SingleValueInstruction *oldIntPtr,
-    SingleValueInstruction *newIntPtr, SILInstruction *insertPt) {
-  InteriorPointerAddressRebaseUseDefChainCloner cloner(
-      oldAddressValue, oldIntPtr, newIntPtr, insertPt);
-  return cloner.cloneUseDefChain(oldAddressValue);
-}
-
 SILBasicBlock::iterator
 OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
                                         SILValue newValue) {
@@ -909,19 +824,18 @@ OwnershipRAUWHelper::replaceAddressUses(SingleValueInstruction *oldValue,
   // the access path from newValue to intPtr but upon newIntPtr. Then we make it
   // use newIntPtr.
   auto *intPtrUser = cast<SingleValueInstruction>(intPtr->getUser());
-  SILValue initialAddr = cloneInteriorProjectionUseDefChain(
-      newValue /*address we originally wanted to replace*/,
-      intPtrUser /*the interior pointer of that value*/,
-      newIntPtrUser /*the interior pointer we need to recreate the chain upon*/,
-      oldValue /*insert point*/);
 
-  // If we got back newValue, then we need to set initialAddr to be int ptr
-  // user.
-  if (initialAddr == newValue)
-    initialAddr = newIntPtrUser;
+  // This cloner invocation must match the canCloneUseDefChain check in the
+  // constructor.
+  auto checkBase = [&](SILValue srcAddr) {
+    return (srcAddr == intPtrUser) ? SILValue(newIntPtrUser) : SILValue();
+  };
+  SILValue clonedAddr =
+      cloneUseDefChain(newValue, /*insetPt*/ oldValue, checkBase);
+  assert(clonedAddr != newValue && "expect at least the base to be replaced");
 
   // Now that we have an addr that is setup appropriately, RAUW!
-  return replaceAllUsesAndErase(oldValue, initialAddr, ctx->callbacks);
+  return replaceAllUsesAndErase(oldValue, clonedAddr, ctx->callbacks);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1013,6 +927,17 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
   auto borrowedValue = intPtr.getSingleBaseValue();
   if (!borrowedValue) {
     // Invalidate!
+    ctx = nullptr;
+    return;
+  }
+
+  // This cloner check must match the later cloner invocation in
+  // replaceAddressUses()
+  auto *intPtrUser = cast<SingleValueInstruction>(intPtr->getUser());
+  auto checkBase = [&](SILValue srcAddr) {
+    return (srcAddr == intPtrUser) ? SILValue(intPtrUser) : SILValue();
+  };
+  if (!canCloneUseDefChain(newValue, checkBase)) {
     ctx = nullptr;
     return;
   }
@@ -1299,4 +1224,160 @@ SILBasicBlock::iterator OwnershipReplaceSingleUseHelper::perform() {
   SWIFT_DEFER { ctx->clear(); };
   SingleUseReplacementUtility utility{use, newValue, *ctx};
   return utility.perform();
+}
+
+//===----------------------------------------------------------------------===//
+//                      createBorrowScopeForPhiOperands
+//===----------------------------------------------------------------------===//
+
+/// Given a phi that has been newly created or converted from terminator
+/// results, check for inner guaranteed operands (which do not introduce a
+/// borrow scope). This is invalid OSSA because the phi is a reborrow, and all
+/// borrow-scope-ending instructions must directly use the BorrowedValue that
+/// introduces the scope.
+///
+/// Create nested borrow scopes for its operands.
+///
+/// Transitively follow its phi uses.
+///
+/// Create end_borrows at all points that cover the inner uses.
+///
+/// The client must check canCloneTerminator() first to make sure that the
+/// search for transitive uses does not encouter a PointerEscape.
+class GuaranteedPhiBorrowFixup {
+  // A phi in mustConvertPhis has already been determined to be part of this
+  // new nested borrow scope.
+  SmallSetVector<SILPhiArgument *, 8> mustConvertPhis;
+
+  // Phi operands that are already within the new nested borrow scope.
+  llvm::SmallDenseSet<PhiOperand, 8> nestedPhiOperands;
+
+public:
+  /// Return true if an extended nested borrow scope was created.
+  bool createExtendedNestedBorrowScope(SILPhiArgument *newPhi);
+
+protected:
+  bool phiOperandNeedsBorrow(Operand *operand) {
+    SILValue inVal = operand->get();
+    if (inVal.getOwnershipKind() != OwnershipKind::Guaranteed) {
+      assert(inVal.getOwnershipKind() == OwnershipKind::None);
+      return false;
+    }
+    // This operand needs a nested borrow if inVal is not a BorrowedValue.
+    return !bool(BorrowedValue(inVal));
+  }
+
+  void borrowPhiOperand(Operand *oper) {
+    // Begin the borrow just before the branch.
+    SILInstruction *borrowPoint = oper->getUser();
+    auto loc = RegularLocation::getAutoGeneratedLocation(borrowPoint->getLoc());
+    auto *borrow =
+        SILBuilderWithScope(borrowPoint).createBeginBorrow(loc, oper->get());
+    oper->set(borrow);
+  }
+
+  EndBorrowInst *createEndBorrow(SILValue guaranteedValue,
+                                 SILBasicBlock::iterator borrowPoint) {
+    auto loc = borrowPoint->getLoc();
+    return SILBuilderWithScope(borrowPoint)
+        .createEndBorrow(loc, guaranteedValue);
+  }
+
+  void insertEndBorrowsAndFindPhis(SILPhiArgument *phi);
+};
+
+void GuaranteedPhiBorrowFixup::insertEndBorrowsAndFindPhis(
+    SILPhiArgument *phi) {
+  // Scope ending instructions are only needed for nontrivial results.
+  if (phi->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    assert(phi->getOwnershipKind() == OwnershipKind::None);
+    return;
+  }
+  SmallVector<Operand *, 16> usePoints;
+  bool result = findInnerTransitiveGuaranteedUses(phi, usePoints);
+  assert(result && "should be checked by canCloneTerminator");
+  (void)result;
+
+  // Add usePoints to a set for phi membership checking.
+  //
+  // FIXME: consider integrating with ValueLifetimeBoundary instead.
+  SmallPtrSet<Operand *, 16> useSet(usePoints.begin(), usePoints.end());
+
+  auto phiUsers = llvm::map_range(usePoints, ValueBase::UseToUser());
+  ValueLifetimeAnalysis lifetimeAnalysis(phi, phiUsers);
+  ValueLifetimeBoundary boundary;
+  lifetimeAnalysis.computeLifetimeBoundary(boundary);
+
+  for (auto *boundaryEdge : boundary.boundaryEdges) {
+    createEndBorrow(phi, boundaryEdge->begin());
+  }
+
+  for (SILInstruction *lastUser : boundary.lastUsers) {
+    // If the last use is a branch, transitively process the phi.
+    if (isa<BranchInst>(lastUser)) {
+      for (Operand &oper : lastUser->getAllOperands()) {
+        if (!useSet.count(&oper))
+          continue;
+
+        PhiOperand phiOper(&oper);
+        nestedPhiOperands.insert(phiOper);
+        mustConvertPhis.insert(phiOper.getValue());
+        continue;
+      }
+    }
+    // If the last user is a terminator, add the successors as boundary edges.
+    if (isa<TermInst>(lastUser)) {
+      for (auto *succBB : lastUser->getParent()->getSuccessorBlocks()) {
+        // succBB cannot already be in boundaryEdges. It has a
+        // single predecessor with liveness ending at the terminator, which
+        // means it was not live into any successor blocks.
+        createEndBorrow(phi, succBB->begin());
+      }
+      continue;
+    }
+    // Otherwise, just plop down an end_borrow after the last use.
+    createEndBorrow(phi, std::next(lastUser->getIterator()));
+  }
+};
+
+// For each phi that transitively uses an inner guaranteed value, create nested
+// borrow scopes so that it is a well-formed reborrow.
+bool GuaranteedPhiBorrowFixup::
+createExtendedNestedBorrowScope(SILPhiArgument *newPhi) {
+  // Determine if this new phi needs a nested borrow scope. If so, seed the
+  // Visit phi operands, returning false as soon as one needs a borrow.
+  if (!newPhi->visitIncomingPhiOperands(
+        [&](Operand *op) { return !phiOperandNeedsBorrow(op); })) {
+    mustConvertPhis.insert(newPhi);
+  }
+  if (mustConvertPhis.empty())
+    return false;
+
+  // mustConvertPhis grows in this loop.
+  for (unsigned mustConvertIdx = 0; mustConvertIdx < mustConvertPhis.size();
+         ++mustConvertIdx) {
+    SILPhiArgument *phi = mustConvertPhis[mustConvertIdx];
+    insertEndBorrowsAndFindPhis(phi);
+  }
+  // To handle recursive phis, first discover all phis before attempting to
+  // borrow any phi operands.
+  for (SILPhiArgument *phi : mustConvertPhis) {
+    phi->visitIncomingPhiOperands([&](Operand *op) {
+      if (!nestedPhiOperands.count(op))
+        borrowPhiOperand(op);
+      return true;
+    });
+  }
+  return true;
+}
+
+// Note: \p newPhi itself might not have Guaranteed ownership. A phi that
+// converts Guaranteed to None ownership still needs nested borrows.
+//
+// Note: This may be called on partially invalid OSSA form, where multiple
+// newly created phis do not yet have a borrow scope. The implementation
+// assumes that this API will eventually be called for all such new phis until
+// OSSA is fully valid.
+bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
+  return GuaranteedPhiBorrowFixup().createExtendedNestedBorrowScope(newPhi);
 }

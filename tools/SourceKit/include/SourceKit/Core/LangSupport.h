@@ -276,6 +276,8 @@ public:
 
   virtual void recordFormattedText(StringRef Text) = 0;
 
+  virtual bool diagnosticsEnabled() = 0;
+
   virtual void setDiagnosticStage(UIdent DiagStage) = 0;
   virtual void handleDiagnostic(const DiagnosticEntryInfo &Info,
                                 UIdent DiagStage) = 0;
@@ -376,6 +378,12 @@ struct RefactoringInfo {
   StringRef UnavailableReason;
 };
 
+struct ParentInfo {
+  StringRef Title;
+  StringRef KindName;
+  StringRef USR;
+};
+
 struct CursorInfoData {
   // If nonempty, a proper Info could not be resolved (and the rest of the Info
   // will be empty). Clients can potentially use this to show a diagnostic
@@ -383,6 +391,7 @@ struct CursorInfoData {
   StringRef InternalDiagnostic;
 
   UIdent Kind;
+  UIdent DeclarationLang;
   StringRef Name;
   StringRef USR;
   StringRef TypeName;
@@ -419,7 +428,16 @@ struct CursorInfoData {
   ArrayRef<StringRef> ModuleGroupArray;
   /// All available actions on the code under cursor.
   ArrayRef<RefactoringInfo> AvailableActions;
+  /// Stores the Symbol Graph title, kind, and USR of the parent contexts of the
+  /// symbol under the cursor.
+  ArrayRef<ParentInfo> ParentContexts;
+  /// For calls this lists the USRs of the receiver types (multiple only in the
+  /// case that the base is a protocol composition).
+  ArrayRef<StringRef> ReceiverUSRs;
+
   bool IsSystem = false;
+  bool IsDynamic = false;
+
   llvm::Optional<unsigned> ParentNameOffset;
 };
 

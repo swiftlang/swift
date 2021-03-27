@@ -34,19 +34,23 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
 endif()
 
 set(DISPATCH_SDKS)
+
+# Build the host libdispatch if needed.
 if(SWIFT_BUILD_HOST_DISPATCH)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     if(NOT "${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_SDKS)
       list(APPEND DISPATCH_SDKS "${SWIFT_HOST_VARIANT_SDK}")
     endif()
   endif()
-
-  foreach(sdk ${SWIFT_SDKS})
-    if(NOT "${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
-      list(APPEND DISPATCH_SDKS "${sdk}")
-    endif()
-  endforeach()
 endif()
+
+# Build any target libdispatch if needed.
+foreach(sdk ${SWIFT_SDKS})
+  # Apple targets have libdispatch available, do not build it.
+  if(NOT "${sdk}" IN_LIST SWIFT_APPLE_PLATFORMS)
+    list(APPEND DISPATCH_SDKS "${sdk}")
+  endif()
+endforeach()
 
 foreach(sdk ${DISPATCH_SDKS})
   set(ARCHS ${SWIFT_SDK_${sdk}_ARCHITECTURES})
@@ -55,9 +59,19 @@ foreach(sdk ${DISPATCH_SDKS})
       list(APPEND ARCHS "${SWIFT_HOST_VARIANT_ARCH}")
     endif()
   endif()
+  
+  if(sdk STREQUAL ANDROID)
+    set(SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS)
+  else()
+    set(SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS -DCMAKE_C_COMPILER=${SWIFT_LIBDISPATCH_C_COMPILER};-DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER})
+  endif()
 
   foreach(arch ${ARCHS})
     set(LIBDISPATCH_VARIANT_NAME "libdispatch-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+
+    if(NOT sdk STREQUAL ANDROID)
+      set(SWIFT_LIBDISPATCH_SYSTEM_PROCESSOR  -DCMAKE_SYSTEM_PROCESSOR=${arch})
+    endif()
 
     ExternalProject_Add("${LIBDISPATCH_VARIANT_NAME}"
                         SOURCE_DIR
@@ -65,9 +79,8 @@ foreach(sdk ${DISPATCH_SDKS})
                         CMAKE_ARGS
                           -DCMAKE_AR=${CMAKE_AR}
                           -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                          -DCMAKE_C_COMPILER=${SWIFT_LIBDISPATCH_C_COMPILER}
+                          ${SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS}
                           -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                          -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                           -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                           -DCMAKE_INSTALL_LIBDIR=lib
@@ -76,7 +89,10 @@ foreach(sdk ${DISPATCH_SDKS})
                           -DCMAKE_RANLIB=${CMAKE_RANLIB}
                           -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
                           -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
-                          -DCMAKE_SYSTEM_PROCESSOR=${arch}
+                          ${SWIFT_LIBDISPATCH_SYSTEM_PROCESSOR}
+                          "-DCMAKE_ANDROID_NDK=${SWIFT_ANDROID_NDK_PATH}"
+                          -DCMAKE_ANDROID_ARCH_ABI=${SWIFT_SDK_ANDROID_ARCH_${arch}_ABI}
+                          -DCMAKE_ANDROID_API=${SWIFT_ANDROID_API_LEVEL}
                           -DBUILD_SHARED_LIBS=YES
                           -DENABLE_SWIFT=NO
                           -DENABLE_TESTING=NO
@@ -139,9 +155,8 @@ foreach(sdk ${DISPATCH_SDKS})
                           CMAKE_ARGS
                             -DCMAKE_AR=${CMAKE_AR}
                             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                            -DCMAKE_C_COMPILER=${SWIFT_LIBDISPATCH_C_COMPILER}
+                            ${SWIFT_LIBDISPATCH_COMPILER_CMAKE_ARGS}
                             -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                            -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                             -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                             -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                             -DCMAKE_INSTALL_LIBDIR=lib
@@ -149,8 +164,11 @@ foreach(sdk ${DISPATCH_SDKS})
                             -DCMAKE_LINKER=${CMAKE_LINKER}
                             -DCMAKE_RANLIB=${CMAKE_RANLIB}
                             -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-                            -DCMAKE_SYSTEM_NAME=${sdk}
-                            -DCMAKE_SYSTEM_PROCESSOR=${arch}
+                            -DCMAKE_SYSTEM_NAME=${SWIFT_SDK_${sdk}_NAME}
+                            ${SWIFT_LIBDISPATCH_SYSTEM_PROCESSOR}
+                            "-DCMAKE_ANDROID_NDK=${SWIFT_ANDROID_NDK_PATH}"
+                            -DCMAKE_ANDROID_ARCH_ABI=${SWIFT_SDK_ANDROID_ARCH_${arch}_ABI}
+                            -DCMAKE_ANDROID_API=${SWIFT_ANDROID_API_LEVEL}
                             -DBUILD_SHARED_LIBS=NO
                             -DENABLE_SWIFT=NO
                             -DENABLE_TESTING=NO

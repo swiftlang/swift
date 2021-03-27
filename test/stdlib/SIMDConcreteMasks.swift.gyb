@@ -1,0 +1,102 @@
+//===--- SIMDConcreteMasks.swift.gyb --------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/SIMDConcreteMasks.swift
+// RUN: %line-directive %t/SIMDConcreteMasks.swift -- %target-build-swift %t/SIMDConcreteMasks.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/SIMDConcreteMasks.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+%{
+from __future__ import division
+from SwiftIntTypes import all_integer_types
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
+}%
+
+func genericLogicalOps<T>(
+  _ a: SIMDMask<T>, _ b: SIMDMask<T>
+) -> (
+  not: SIMDMask<T>,
+  and: SIMDMask<T>,
+  or: SIMDMask<T>,
+  xor: SIMDMask<T>
+) where T: SIMD, T.Scalar: SignedInteger & FixedWidthInteger {(
+  not: .!a,
+  and: a .& b,
+  or: a .| b,
+  xor: a .^ b
+)}
+
+func genericComparisons<T>(
+  _ a: SIMDMask<T>, _ b: SIMDMask<T>
+) -> (
+  eq: SIMDMask<T>,
+  ne: SIMDMask<T>
+) where T: SIMD, T.Scalar: SignedInteger & FixedWidthInteger {(
+  eq: a .== b,
+  ne: a .!= b
+)}
+
+%for int in all_integer_types(word_bits):
+% Scalar = int.stdlib_name
+% for n in vectorscalarCounts:
+%  Vector = "SIMD" + str(n) + "<" + Scalar + ">"
+%  storageN = 4 if n == 3 else n
+%  s = "s" if int.is_signed else "u"
+%  Builtin = "Vec" + str(storageN) + "xInt" + str(int.bits)
+%  if int.is_signed:
+var ${Scalar}x${n}Mask_TestSuite = TestSuite("${Scalar}x${n}Mask")
+
+${Scalar}x${n}Mask_TestSuite.test("logical operators") {
+  let a = SIMDMask<${Vector}>.random()
+  let b = SIMDMask<${Vector}>.random()
+  let (not,and,or,xor) = genericLogicalOps(a, b)
+  expectEqual(not, .!a)
+  expectEqual(and, a .& b)
+  expectEqual(or, a .| b)
+  expectEqual(xor, a .^ b)
+}
+
+${Scalar}x${n}Mask_TestSuite.test("comparisons") {
+  let a = SIMDMask<${Vector}>.random()
+  let b = SIMDMask<${Vector}>.random()
+  let (eq,ne) = genericComparisons(a, b)
+  expectEqual(eq, a .== b)
+  expectEqual(ne, a .!= b)
+  expectTrue(all(a .== a))
+  expectTrue(all(a .!= .!a))
+  expectFalse(any(a .!= a))
+  expectFalse(any(a .== .!a))
+}
+  
+${Scalar}x${n}Mask_TestSuite.test("replacing") {
+  let a = SIMDMask<${Vector}>.random()
+  let b = SIMDMask<${Vector}>.random()
+  let t = SIMDMask<${Vector}>(repeating: true)
+  let f = SIMDMask<${Vector}>(repeating: false)
+  expectEqual(a.replacing(with: b, where: t), b)
+  expectEqual(a.replacing(with: b, where: f), a)
+  expectEqual(t.replacing(with: f, where: a), .!a)
+  expectEqual(f.replacing(with: t, where: a), a)
+  expectEqual(t.replacing(with: false, where: a), .!a)
+  expectEqual(f.replacing(with: true, where: a), a)
+}
+
+%  end
+% end
+%end
+
+runAllTests()

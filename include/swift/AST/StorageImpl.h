@@ -45,6 +45,8 @@ enum class AccessorKind {
 #define ACCESSOR(ID) ID,
 #define LAST_ACCESSOR(ID) Last = ID
 #include "swift/AST/AccessorKinds.def"
+#undef ACCESSOR
+#undef LAST_ACCESSOR
 };
 
 const unsigned NumAccessorKinds = unsigned(AccessorKind::Last) + 1;
@@ -52,6 +54,22 @@ const unsigned NumAccessorKinds = unsigned(AccessorKind::Last) + 1;
 static inline IntRange<AccessorKind> allAccessorKinds() {
   return IntRange<AccessorKind>(AccessorKind(0),
                                 AccessorKind(NumAccessorKinds));
+}
+
+/// \returns a user-readable string name for the accessor kind
+static inline StringRef accessorKindName(AccessorKind ak) {
+  switch(ak) {
+
+#define ACCESSOR(ID) ID
+#define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
+  case AccessorKind::ID:                                                       \
+    return #KEYWORD;
+
+#include "swift/AST/AccessorKinds.def"
+
+#undef ACCESSOR_KEYWORD
+#undef SINGLETON_ACCESSOR
+  }
 }
 
 /// Whether an access to storage is for reading, writing, or both.

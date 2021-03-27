@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -g -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -16,7 +16,7 @@
 // Currently this test just checks if nothing crashes.
 // TODO: also check if the current executor is the correct one.
 
-final actor class MyActor {
+final actor MyActor {
   var p: Int
 
   @inline(never)

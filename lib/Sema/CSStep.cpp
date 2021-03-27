@@ -598,10 +598,6 @@ bool TypeChecker::isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB) {
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
-  // Never skip disjunction choices in diagnostic mode.
-  if (CS.shouldAttemptFixes())
-    return false;
-
   auto skip = [&](std::string reason) -> bool {
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
@@ -613,11 +609,14 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     return true;
   };
 
-  if (choice.isDisabled())
+
+  // Skip disabled overloads in the diagnostic mode if they do not have a
+  // fix attached to them e.g. overloads where labels didn't match up.
+  if (choice.isDisabled() && !(CS.shouldAttemptFixes() && choice.hasFix()))
     return skip("disabled");
 
-  // Skip unavailable overloads.
-  if (choice.isUnavailable())
+  // Skip unavailable overloads (unless in dignostic mode).
+  if (choice.isUnavailable() && !CS.shouldAttemptFixes())
     return skip("unavailable");
 
   if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
@@ -663,8 +662,9 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *decl = constraint->getOverloadChoice().getDecl();
     if (decl->getBaseIdentifier().isArithmeticOperator()) {
       auto *useDC = constraint->getOverloadUseDC();
-      auto choiceType = CS.getEffectiveOverloadType(constraint->getOverloadChoice(),
-                                                    /*allowMembers=*/true, useDC);
+      auto choiceType = CS.getEffectiveOverloadType(
+          constraint->getLocator(), constraint->getOverloadChoice(),
+          /*allowMembers=*/true, useDC);
       auto choiceFnType = choiceType->getAs<FunctionType>();
       auto genericFnType = decl->getInterfaceType()->getAs<GenericFunctionType>();
       auto signature = genericFnType->getGenericSignature();
@@ -711,7 +711,7 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   auto delta = LastSolvedChoice->second - getCurrentScore();
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
-  bool hasAsyncMismatch = delta.Data[SK_AsyncSyncMismatch] > 0;
+  bool hasAsyncMismatch = delta.Data[SK_AsyncInSyncMismatch] > 0;
   auto isBeginningOfPartition = choice.isBeginningOfPartition();
 
   // Attempt to short-circuit evaluation of this disjunction only

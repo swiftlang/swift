@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -module-name main -emit-ir | %FileCheck %s --check-prefix=CHECK-LL
-// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency %s -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -parse-as-library -module-name main -emit-ir | %FileCheck %s --check-prefix=CHECK-LL
+// RUN: %target-build-swift -Xfrontend -enable-experimental-concurrency -g %s -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -13,7 +13,7 @@ import Swift
 import _Concurrency
 
 // CHECK-LL: @voidToInt64Tu =
-// CHECK-LL: define hidden swiftcc void @voidToInt64(%swift.task* {{%[0-9]+}}, %swift.executor* {{%[0-9]+}}, %swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}} {
+// CHECK-LL: define hidden swift{{(tail)?}}cc void @voidToInt64(%swift.context* swiftasync {{%[0-9]+}}) {{#[0-9]*}}
 @_silgen_name("voidToInt64")
 func voidToInt64() async -> Int64 { return 42 }
 

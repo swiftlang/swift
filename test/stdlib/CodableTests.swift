@@ -1,15 +1,17 @@
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2017 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: rdar49026133
 
 import Foundation
 import CoreGraphics
@@ -544,6 +546,10 @@ class TestCodable : TestCodableSuper {
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_JSON() {
         for (testLine, unit) in unitValues {
+            // FIXME: <rdar://problem/49026133>
+            // Terminating due to uncaught exception NSInvalidArgumentException:
+            // *** You must override baseUnit in your class NSDimension to define its base unit.
+            expectCrashLater()
             expectRoundTripEqualityThroughJSON(for: Measurement(value: 42, unit: unit), lineNumber: testLine)
         }
     }
@@ -551,7 +557,11 @@ class TestCodable : TestCodableSuper {
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     func test_Measurement_Plist() {
         for (testLine, unit) in unitValues {
-            expectRoundTripEqualityThroughJSON(for: Measurement(value: 42, unit: unit), lineNumber: testLine)
+            // FIXME: <rdar://problem/49026133>
+            // Terminating due to uncaught exception NSInvalidArgumentException:
+            // *** You must override baseUnit in your class NSDimension to define its base unit.
+            expectCrashLater()
+            expectRoundTripEqualityThroughPlist(for: Measurement(value: 42, unit: unit), lineNumber: testLine)
         }
     }
 
@@ -915,10 +925,10 @@ if #available(macOS 10.11, iOS 9.0, watchOS 2.0, tvOS 9.0, *) {
 }
 
 if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-    // tests["test_DateInterval_JSON"] = TestCodable.test_DateInterval_JSON
+    tests["test_DateInterval_JSON"] = TestCodable.test_DateInterval_JSON
     tests["test_DateInterval_Plist"] = TestCodable.test_DateInterval_Plist
-    // tests["test_Measurement_JSON"] = TestCodable.test_Measurement_JSON
-    // tests["test_Measurement_Plist"] = TestCodable.test_Measurement_Plist
+    tests["test_Measurement_JSON"] = TestCodable.test_Measurement_JSON
+    tests["test_Measurement_Plist"] = TestCodable.test_Measurement_Plist
 }
 
 if #available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {

@@ -37,7 +37,9 @@ struct InvalidRethrows : InvalidRethrowingProtocol {
   // expected-error@-1{{'rethrows' function must take a throwing function argument}}
 }
 
-func freeFloatingRethrowing<R: RethrowingProtocol>(_ r: R) rethrows { }
+func freeFloatingRethrowing<R: RethrowingProtocol>(_ r: R) rethrows {
+  try r.source()
+}
 
 func freeFloatingRethrowingFromExistential(_ r: RethrowingProtocol) rethrows {
   // expected-error@-1{{'rethrows' function must take a throwing function argument}}
@@ -64,7 +66,9 @@ protocol HasAssociatedRethrower {
   func makeRethrower() -> Rethrower
 }
 
-func freeFloatingRethrowing<R: HasAssociatedRethrower>(_ r: R) rethrows { }
+func freeFloatingRethrowing<R: HasAssociatedRethrower>(_ r: R) rethrows {
+  try r.makeRethrower().source()
+}
 
 @rethrows
 protocol InheritsRethrowing: RethrowingProtocol {}
@@ -75,7 +79,10 @@ func freeFloatingInheritedRethrowingFunctionFromExistential(_ r: InheritsRethrow
   // expected-error@-1{{'rethrows' function must take a throwing function argument}}
 }
 
-func closureAndRethrowing<R: RethrowingProtocol>(_ r: R, _ closure: () throws -> Void) rethrows { }
+func closureAndRethrowing<R: RethrowingProtocol>(_ r: R, _ closure: () throws -> Void) rethrows {
+  try r.source()
+  try closure()
+}
 
 closureAndRethrowing(NonThrows()) { }
 try closureAndRethrowing(NonThrows()) { } // expected-warning{{no calls to throwing functions occur within 'try' expression}}
@@ -85,8 +92,13 @@ try closureAndRethrowing(NonThrows()) { () throws -> Void in }
 // Make sure we handle the case where both the 'self' parameter and a closure
 // argument are rethrows sources.
 extension RethrowingProtocol {
-  func selfRethrowing() rethrows { }
-  func closureAndSelfRethrowing(_ closure: () throws -> Void) rethrows { }
+  func selfRethrowing() rethrows {
+    try source()
+  }
+  func closureAndSelfRethrowing(_ closure: () throws -> Void) rethrows {
+    try source()
+    try closure()
+  }
 }
 
 NonThrows().selfRethrowing()
@@ -129,7 +141,7 @@ func rethrowsWithRethrowsClosure<T : RethrowsClosure>(_ t: T) rethrows {
   try t.doIt() {}
 }
 
-try rethrowsWithRethrowsClosure(RethrowsClosureWitness())
+rethrowsWithRethrowsClosure(RethrowsClosureWitness())
 
 // Empty protocol
 @rethrows protocol Empty {}
@@ -139,22 +151,32 @@ func takesEmpty<T : Empty>(_: T) rethrows {}
 
 takesEmpty(EmptyWitness())
 
-// FIXME: Fix this soundness hole
+// Rethrows kinds need to line up when a 'rethrows' function witnesses a
+// 'rethrows' protocol requirement
 
-// Note: SimpleThrowsClosure is not @rethrows
+// Note: the SimpleThrowsClosure protocol is not @rethrows
 protocol SimpleThrowsClosure {
   func doIt(_: () throws -> ()) rethrows
+  // expected-note@-1 {{protocol requires function 'doIt' with type '(() throws -> ()) throws -> ()'; do you want to add a stub?}}
+
+  func doIt2<T : Empty>(_: T) rethrows
+  // expected-note@-1 {{protocol requires function 'doIt2' with type '<T> (T) throws -> ()'; do you want to add a stub?}}
 }
 
 struct ConformsToSimpleThrowsClosure<T : RethrowingProtocol> : SimpleThrowsClosure {
+// expected-error@-1 {{type 'ConformsToSimpleThrowsClosure<T>' does not conform to protocol 'SimpleThrowsClosure'}}
   let t: T
 
   // This cannot witness SimpleThrowsClosure.doIt(), because the
   // T : RethrowingProtocol conformance is a source here, but that
   // is not captured in the protocol's requirement signature.
   func doIt(_: () throws -> ()) rethrows {
+  // expected-note@-1 {{candidate is 'rethrows' via a conformance, but the protocol requirement is not from a '@rethrows' protocol}}
     try t.source()
   }
+
+  func doIt2<T : Empty>(_: T) rethrows {}
+  // expected-note@-1 {{candidate is 'rethrows' via a conformance, but the protocol requirement is not from a '@rethrows' protocol}}
 }
 
 func soundnessHole<T : SimpleThrowsClosure>(_ t: T) {
@@ -163,3 +185,58 @@ func soundnessHole<T : SimpleThrowsClosure>(_ t: T) {
 
 // This actually can throw...
 soundnessHole(ConformsToSimpleThrowsClosure(t: Throws()))
+
+// Test deeply-nested associated conformances
+@rethrows protocol First {
+  associatedtype A : Second
+}
+
+@rethrows protocol Second {
+  associatedtype B : Third
+}
+
+@rethrows protocol Third {
+  func f() throws
+}
+
+struct FirstWitness : First {
+  typealias A = SecondWitness
+}
+
+struct SecondWitness : Second {
+  typealias B = ThirdWitness
+}
+
+struct ThirdWitness : Third {
+  func f() {}
+}
+
+func takesFirst<T : First>(_: T) rethrows {}
+
+takesFirst(FirstWitness())
+
+// Crash with enum case
+@rethrows protocol WitnessedByEnumCase {
+  static func foo(_: Int) throws -> Self
+}
+
+enum MyEnum : WitnessedByEnumCase {
+  case foo(Int)
+  case bar
+}
+
+func takesWitnessedByEnumCase<T : WitnessedByEnumCase>(_: T) rethrows {
+  _ = try T.foo(123)
+}
+
+takesWitnessedByEnumCase(MyEnum.bar)
+
+// Invalid cases
+enum HorseError : Error {
+  case bolted
+}
+
+func hasRethrowsConformanceAndThrowsBody<T : Empty>(_: T) rethrows {
+  throw HorseError.bolted
+  // expected-error@-1 {{a function declared 'rethrows' may only throw if its parameter does}}
+}

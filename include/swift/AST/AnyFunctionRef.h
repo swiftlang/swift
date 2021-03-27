@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -103,6 +104,18 @@ public:
     return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
   }
 
+  ParameterList *getParameters() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getParameters();
+    return TheFunction.get<AbstractClosureExpr *>()->getParameters();
+  }
+
+  bool hasPropertyWrapperParameters() const {
+    return llvm::any_of(*getParameters(), [](const ParamDecl *param) {
+      return param->hasAttachedPropertyWrapper();
+    });
+  }
+
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();
@@ -166,12 +179,6 @@ public:
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
   }
 
-  bool isDeferBody() const {
-    if (auto *fd = dyn_cast_or_null<FuncDecl>(getAbstractFunctionDecl()))
-      return fd->isDeferBody();
-    return false;
-  }
-
   /// Return true if this closure is passed as an argument to a function and is
   /// known not to escape from that function.  In this case, captures can be
   /// more efficient.
@@ -181,13 +188,13 @@ public:
     return false;
   }
 
-  /// Whether this function is @concurrent.
-  bool isConcurrent() const {
+  /// Whether this function is @Sendable.
+  bool isSendable() const {
     if (!hasType())
       return false;
 
     if (auto *fnType = getType()->getAs<AnyFunctionType>())
-      return fnType->isConcurrent();
+      return fnType->isSendable();
 
     return false;
   }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-concurrency -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -enable-experimental-async-handler -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s
 
 // REQUIRES: VENDOR=apple 
 // REQUIRES: concurrency

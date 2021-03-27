@@ -101,10 +101,10 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{protocol 'CircleMiddle' refines itself}}
-// expected-note@-1 {{protocol 'CircleMiddle' declared here}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error {{protocol 'CircleStart' refines itself}}
-// expected-note@-1 2 {{protocol 'CircleStart' declared here}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{protocol 'CircleMiddle' refines itself}}
+// expected-note@-1 2 {{protocol 'CircleMiddle' declared here}}
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2 {{protocol 'CircleStart' refines itself}}
+// expected-note@-1 {{protocol 'CircleStart' declared here}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 3 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }

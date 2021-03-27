@@ -25,6 +25,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "llvm/IR/CallingConv.h"
 
+#include "Callee.h"
 #include "GenHeap.h"
 #include "IRGenModule.h"
 
@@ -70,19 +71,6 @@ namespace irgen {
   //   SwiftPartialFunction * __ptrauth(...) returnToCaller;
   //   SwiftActor * __ptrauth(...) callerActor;
   //   SwiftPartialFunction * __ptrauth(...) yieldToCaller?;
-  //   SwiftError *errorResult;
-  //   IndirectResultTypes *indirectResults...;
-  //   union {
-  //     struct {
-  //       SwiftPartialFunction * __ptrauth(...) resumeFromYield?;
-  //       SwiftPartialFunction * __ptrauth(...) abortFromYield?;
-  //       SwiftActor * __ptrauth(...) calleeActorDuringYield?;
-  //       YieldTypes yieldValues...;
-  //     };
-  //     ResultTypes directResults...;
-  //   };
-  //   SelfType self;
-  //   ArgTypes formalArguments...;
   // };
   struct AsyncContextLayout : StructLayout {
     struct ArgumentInfo {
@@ -95,202 +83,34 @@ namespace irgen {
     enum class FixedIndex : unsigned {
       Parent = 0,
       ResumeParent = 1,
-      ResumeParentExecutor = 2,
-      Flags = 3,
-      YieldToParent = 4,
+      Flags = 2,
     };
     enum class FixedCount : unsigned {
       Parent = 1,
       ResumeParent = 1,
-      ResumeParentExecutor = 1,
-      Error = 1,
     };
-    IRGenModule &IGM;
     CanSILFunctionType originalType;
     CanSILFunctionType substitutedType;
     SubstitutionMap substitutionMap;
-    SILType errorType;
-    bool canHaveValidError;
-    bool isCoroutine;
-    SmallVector<SILYieldInfo, 4> yieldInfos;
-    SmallVector<SILResultInfo, 4> directReturnInfos;
-    SmallVector<SILResultInfo, 4> indirectReturnInfos;
-    Optional<ArgumentInfo> localContextInfo;
-    NecessaryBindings bindings;
-    Optional<TrailingWitnessInfo> trailingWitnessInfo;
-    SmallVector<ArgumentInfo, 4> argumentInfos;
-
+  
     unsigned getParentIndex() { return (unsigned)FixedIndex::Parent; }
     unsigned getResumeParentIndex() {
       return (unsigned)FixedIndex::ResumeParent;
     }
-    unsigned getResumeParentExecutorIndex() {
-      return (unsigned)FixedIndex::ResumeParentExecutor;
-    }
     unsigned getFlagsIndex() { return (unsigned)FixedIndex::Flags; }
-    unsigned getYieldToParentIndex() {
-      assert(isCoroutine);
-      return (unsigned)FixedIndex::YieldToParent;
-    }
-    unsigned getErrorIndex() {
-      return (isCoroutine ? getYieldToParentIndex() : getFlagsIndex()) + 1;
-    }
-    unsigned getFirstIndirectReturnIndex() {
-      return getErrorIndex() + getErrorCount();
-    }
-    unsigned getIndexAfterIndirectReturns() {
-      return getFirstIndirectReturnIndex() + getIndirectReturnCount();
-    }
-    unsigned getFirstDirectReturnIndex() {
-      assert(!isCoroutine);
-      return getIndexAfterIndirectReturns();
-    }
-    unsigned getIndexAfterDirectReturns() {
-      assert(!isCoroutine);
-      return getFirstDirectReturnIndex() + getDirectReturnCount();
-    }
-    unsigned getResumeFromYieldIndex() {
-      assert(isCoroutine);
-      return getIndexAfterIndirectReturns();
-    }
-    unsigned getAbortFromYieldIndex() {
-      assert(isCoroutine);
-      return getResumeFromYieldIndex() + 1;
-      ;
-    }
-    unsigned getCalleeExecutorDuringYieldIndex() {
-      assert(isCoroutine);
-      return getAbortFromYieldIndex() + 1;
-    }
-    unsigned getFirstYieldIndex() {
-      assert(isCoroutine);
-      return getCalleeExecutorDuringYieldIndex() + 1;
-    }
-    unsigned getIndexAfterYields() {
-      assert(isCoroutine);
-      return getFirstYieldIndex() + getYieldCount();
-    }
-    unsigned getIndexAfterUnion() {
-      if (isCoroutine) {
-        return getIndexAfterYields();
-      } else {
-        return getIndexAfterDirectReturns();
-      }
-    }
-    unsigned getLocalContextIndex() {
-      assert(hasLocalContext());
-      return getIndexAfterUnion();
-    }
-    unsigned getIndexAfterLocalContext() {
-      return getIndexAfterUnion() + (hasLocalContext() ? 1 : 0);
-    }
-    unsigned getFirstArgumentIndex() { return getIndexAfterLocalContext(); }
-    unsigned getIndexAfterArguments() {
-      return getFirstArgumentIndex() + getArgumentCount();
-    }
-    unsigned getBindingsIndex() {
-      assert(hasBindings());
-      return getIndexAfterArguments();
-    }
-    unsigned getIndexAfterBindings() {
-      return getIndexAfterArguments() + (hasBindings() ? 1 : 0);
-    }
-    unsigned getSelfMetadataIndex() {
-      assert(hasTrailingWitnesses());
-      return getIndexAfterBindings();
-    }
-    unsigned getSelfWitnessTableIndex() {
-      assert(hasTrailingWitnesses());
-      return getIndexAfterBindings() + 1;
-    }
-    unsigned getIndexAfterTrailingWitnesses() {
-      return getIndexAfterBindings() + (hasTrailingWitnesses() ? 2 : 0);
-    }
 
   public:
     ElementLayout getParentLayout() { return getElement(getParentIndex()); }
     ElementLayout getResumeParentLayout() {
       return getElement(getResumeParentIndex());
     }
-    ElementLayout getResumeParentExecutorLayout() {
-      return getElement(getResumeParentExecutorIndex());
-    }
     ElementLayout getFlagsLayout() { return getElement(getFlagsIndex()); }
-    bool canHaveError() { return canHaveValidError; }
-    ElementLayout getErrorLayout() { return getElement(getErrorIndex()); }
-    unsigned getErrorCount() { return (unsigned)FixedCount::Error; }
-    SILType getErrorType() { return errorType; }
-
-    ElementLayout getIndirectReturnLayout(unsigned index) {
-      return getElement(getFirstIndirectReturnIndex() + index);
-    }
-    unsigned getIndirectReturnCount() { return indirectReturnInfos.size(); }
-
-    bool hasLocalContext() { return (bool)localContextInfo; }
-    ElementLayout getLocalContextLayout() {
-      assert(hasLocalContext());
-      return getElement(getLocalContextIndex());
-    }
-    SILType getLocalContextType() {
-      assert(hasLocalContext());
-      return localContextInfo->type;
-    }
-
-    bool hasBindings() const { return !bindings.empty(); }
-    ElementLayout getBindingsLayout() {
-      assert(hasBindings());
-      return getElement(getBindingsIndex());
-    }
-    const NecessaryBindings &getBindings() const { return bindings; }
-
-    ElementLayout getArgumentLayout(unsigned index) {
-      return getElement(getFirstArgumentIndex() + index);
-    }
-    SILType getArgumentType(unsigned index) {
-      return argumentInfos[index].type;
-    }
-    // Returns the type of a parameter of the substituted function using the
-    // indexing of the function parameters, *not* the indexing of
-    // AsyncContextLayout.
-    SILType getParameterType(unsigned index) {
-      SILFunctionConventions origConv(substitutedType, IGM.getSILModule());
-      return origConv.getSILArgumentType(index,
-                                         IGM.getMaximalTypeExpansionContext());
-    }
-    unsigned getArgumentCount() { return argumentInfos.size(); }
-    bool hasTrailingWitnesses() { return (bool)trailingWitnessInfo; }
-    ElementLayout getSelfMetadataLayout() {
-      assert(hasTrailingWitnesses());
-      return getElement(getSelfMetadataIndex());
-    }
-    ElementLayout getSelfWitnessTableLayout() {
-      return getElement(getSelfWitnessTableIndex());
-    }
-
-    unsigned getDirectReturnCount() {
-      assert(!isCoroutine);
-      return directReturnInfos.size();
-    }
-    ElementLayout getDirectReturnLayout(unsigned index) {
-      assert(!isCoroutine);
-      return getElement(getFirstDirectReturnIndex() + index);
-    }
-    unsigned getYieldCount() {
-      assert(isCoroutine);
-      return yieldInfos.size();
-    }
 
     AsyncContextLayout(
         IRGenModule &IGM, LayoutStrategy strategy, ArrayRef<SILType> fieldTypes,
         ArrayRef<const TypeInfo *> fieldTypeInfos,
         CanSILFunctionType originalType, CanSILFunctionType substitutedType,
-        SubstitutionMap substitutionMap, NecessaryBindings &&bindings,
-        Optional<TrailingWitnessInfo> trailingWitnessInfo, SILType errorType,
-        bool canHaveValidError, ArrayRef<ArgumentInfo> argumentInfos,
-        bool isCoroutine, ArrayRef<SILYieldInfo> yieldInfos,
-        ArrayRef<SILResultInfo> indirectReturnInfos,
-        ArrayRef<SILResultInfo> directReturnInfos,
-        Optional<ArgumentInfo> localContextInfo);
+        SubstitutionMap substitutionMap);
   };
 
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
@@ -299,7 +119,9 @@ namespace irgen {
   AsyncContextLayout getAsyncContextLayout(IRGenModule &IGM,
                                            CanSILFunctionType originalType,
                                            CanSILFunctionType substitutedType,
-                                           SubstitutionMap substitutionMap);
+                                           SubstitutionMap substitutionMap,
+                                           bool suppressGenerics,
+                                           FunctionPointer::Kind kind);
 
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.
@@ -316,10 +138,12 @@ namespace irgen {
       std::pair<bool, bool> values = {true, true},
       Size initialContextSize = Size(0));
   llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
-                                     SILFunctionTypeRepresentation convention);
+                                     SILFunctionTypeRepresentation convention,
+                                     bool isAsync);
 
   Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
-                                      CanSILFunctionType fnType);
+                                      CanSILFunctionType fnType,
+                                      bool forAsyncReturn = false);
 
   /// Does the given function have a self parameter that should be given
   /// the special treatment for self parameters?
@@ -406,7 +230,8 @@ namespace irgen {
   /// When \c futureResultType is non-null, calls the future variant to create
   /// a future.
   llvm::Value *emitTaskCreate(
-    IRGenFunction &IGF, llvm::Value *flags, llvm::Value *parentTask,
+    IRGenFunction &IGF, llvm::Value *flags,
+    llvm::Value *taskGroup,
     llvm::Value *futureResultType,
     llvm::Value *taskFunction, llvm::Value *localContextInfo,
     SubstitutionMap subs);
@@ -417,7 +242,8 @@ namespace irgen {
 
   void emitAsyncFunctionEntry(IRGenFunction &IGF,
                               const AsyncContextLayout &layout,
-                              LinkEntity asyncFunction);
+                              LinkEntity asyncFunction,
+                              unsigned asyncContextIndex);
 
   /// Yield the given values from the current continuation.
   ///
@@ -428,13 +254,17 @@ namespace irgen {
                          Explosion &yieldedValues);
 
   enum class AsyncFunctionArgumentIndex : unsigned {
-    Task = 0,
-    Executor = 1,
-    Context = 2,
+    Context = 0,
   };
 
+  void emitAsyncReturn(
+      IRGenFunction &IGF, AsyncContextLayout &layout, CanSILFunctionType fnType,
+      Optional<ArrayRef<llvm::Value *>> nativeResultArgs = llvm::None);
+
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
-                       CanSILFunctionType fnType);
+                       SILType funcResultTypeInContext,
+                       CanSILFunctionType fnType, Explosion &result,
+                       Explosion &error);
 
   Address emitAutoDiffCreateLinearMapContext(
       IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);

@@ -18,6 +18,7 @@
 #include "swift/DependencyScan/DependencyScanImpl.h"
 #include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/StringUtils.h"
+#include "swift/Option/Options.h"
 
 using namespace swift::dependencies;
 
@@ -29,14 +30,6 @@ DEFINE_SIMPLE_CONVERSION_FUNCTIONS(DependencyScanningTool, swiftscan_scanner_t);
 void swiftscan_string_dispose(swiftscan_string_ref_t string) {
   if (string.data)
     free(const_cast<void *>(string.data));
-}
-
-/// Free the given string set.
-void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
-  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
-    swiftscan_string_dispose(set->strings[SI]);
-  delete[] set->strings;
-  delete set;
 }
 
 void swiftscan_dependency_info_details_dispose(
@@ -422,6 +415,13 @@ swiftscan_scan_invocation_get_argv(swiftscan_scan_invocation_t invocation) {
 
 //=== Public Cleanup Functions --------------------------------------------===//
 
+void swiftscan_string_set_dispose(swiftscan_string_set_t *set) {
+  for (unsigned SI = 0, SE = set->count; SI < SE; ++SI)
+    swiftscan_string_dispose(set->strings[SI]);
+  delete[] set->strings;
+  delete set;
+}
+
 void swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result) {
   swiftscan_string_dispose(result->main_module_name);
   swiftscan_dependency_set_dispose(result->dependencies);
@@ -460,4 +460,34 @@ void swiftscan_scan_invocation_dispose(swiftscan_scan_invocation_t invocation) {
   swiftscan_string_dispose(invocation->working_directory);
   swiftscan_string_set_dispose(invocation->argv);
   delete invocation;
+}
+
+//=== Feature-Query Functions -----------------------------------------===//
+static void addFrontendFlagOption(llvm::opt::OptTable &table,
+                                  swift::options::ID id,
+                                  std::vector<std::string> &frontendOptions) {
+  if (table.getOption(id).hasFlag(swift::options::FrontendOption)) {
+    auto name = table.getOptionName(id);
+    if (strlen(name) > 0) {
+      frontendOptions.push_back(std::string(name));
+    }
+  }
+}
+
+swiftscan_string_set_t *
+swiftscan_compiler_supported_arguments_query() {
+  std::unique_ptr<llvm::opt::OptTable> table = swift::createSwiftOptTable();
+  std::vector<std::string> frontendFlags;
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
+               HELPTEXT, METAVAR, VALUES)                                      \
+  addFrontendFlagOption(*table, swift::options::OPT_##ID, frontendFlags);
+#include "swift/Option/Options.inc"
+#undef OPTION
+  return create_set(frontendFlags);
+}
+
+swiftscan_string_set_t *
+swiftscan_compiler_supported_features_query() {
+  // TODO: We are yet to figure out how "Features" will be organized.
+  return nullptr;
 }

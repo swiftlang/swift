@@ -249,7 +249,7 @@ func erroneousSR11350(x: Int) {
       if b {
         acceptInt(0) { }
       }
-    }).domap(0) // expected-error{{value of type '()?' has no member 'domap'}}
+    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
   }
 }
 
@@ -673,5 +673,43 @@ do {
     tuplify(true) { c in // expected-error{{invalid conversion from throwing function of type '(Bool) throws -> String' to non-throwing function type '(Bool) -> String'}}
     "testThrow"
     throw MyError.boom
+  }
+}
+
+struct TuplifiedStructWithInvalidClosure {
+  var condition: Bool
+
+  @TupleBuilder var unknownParameter: some Any {
+    if let cond = condition {
+      let _ = { (arg: UnknownType) in // expected-error {{cannot find type 'UnknownType' in scope}}
+      }
+      42
+    } else {
+      0
+    }
+  }
+
+  @TupleBuilder var unknownResult: some Any {
+    if let cond = condition {
+      let _ = { () -> UnknownType in // expected-error {{cannot find type 'UnknownType' in scope}}
+      }
+      42
+    } else {
+      0
+    }
+  }
+
+  @TupleBuilder var multipleLevelsDeep: some Any {
+    if let cond = condition {
+      switch MyError.boom {
+      case .boom:
+        let _ = { () -> UnknownType in // expected-error {{cannot find type 'UnknownType' in scope}}
+        }
+      }
+
+      42
+    } else {
+      0
+    }
   }
 }

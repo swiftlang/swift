@@ -28,6 +28,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/Index/Index.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
@@ -3894,12 +3895,6 @@ namespace asyncrefactorings {
 
 // TODO: Should probably split the refactorings into separate files
 
-/// Whether the given parameter name identifies a completion callback
-bool isCompletionHandlerName(StringRef Name) {
-  return Name.startswith("completion") || Name.contains("Completion") ||
-         Name.contains("Complete");
-}
-
 /// Whether the given type is the stdlib Result type
 bool isResultType(Type Ty) {
   if (!Ty)
@@ -4083,7 +4078,7 @@ struct AsyncHandlerDesc {
   HandlerType Type = HandlerType::INVALID;
   bool HasError = false;
 
-  static AsyncHandlerDesc find(const FuncDecl *FD, bool ignoreName = false) {
+  static AsyncHandlerDesc find(const FuncDecl *FD, bool ignoreName) {
     if (!FD || FD->hasAsync() || FD->hasThrows())
       return AsyncHandlerDesc();
 
@@ -4104,7 +4099,7 @@ struct AsyncHandlerDesc {
 
     // Callback must have a completion-like name (if we're not ignoring it)
     if (!ignoreName &&
-        !isCompletionHandlerName(HandlerDesc.Handler->getNameStr()))
+        !isCompletionHandlerParamName(HandlerDesc.Handler->getNameStr()))
       return AsyncHandlerDesc();
 
     // Callback must be a function type and return void. Doesn't need to have
@@ -4670,12 +4665,12 @@ private:
   }
 };
 
-/// Builds up async-converted code for any added AST nodes.
+/// Builds up async-converted code for an AST node.
 ///
-/// Function declarations will have `async` added. If a completion handler is
-/// present, it will be removed and the return type of the function will
-/// reflect the parameters of the handler, including an added `throws` if
-/// necessary.
+/// If it is a function, its declaration will have `async` added. If a
+/// completion handler is present, it will be removed and the return type of
+/// the function will reflect the parameters of the handler, including an
+/// added `throws` if necessary.
 ///
 /// Calls to the completion handler are replaced with either a `return` or
 /// `throws` depending on the arguments.
@@ -4699,32 +4694,67 @@ private:
 /// The fallback is generally avoided, however, since it's quite unlikely to be
 /// the code the user intended. In most cases the refactoring will continue,
 /// with any unhandled decls wrapped in placeholders instead.
-class AsyncConversionStringBuilder : private SourceEntityWalker {
+class AsyncConverter : private SourceEntityWalker {
   SourceManager &SM;
   DiagnosticEngine &DiagEngine;
+
+  // Node to convert
+  ASTNode StartNode;
+
+  // Completion handler of `StartNode` (if it's a function with an async
+  // alternative)
   const AsyncHandlerDesc &TopHandler;
   SmallString<0> Buffer;
   llvm::raw_svector_ostream OS;
 
+  // Decls where any force-unwrap of that decl should be unwrapped, eg. for a
+  // previously optional closure paramter has become a non-optional local
   llvm::DenseSet<const Decl *> Unwraps;
+  // Decls whose references should be replaced with, either because they no
+  // longer exist or are a different type. Any replaced code should ideally be
+  // handled by the refactoring properly, but that's not possible in all cases
   llvm::DenseSet<const Decl *> Placeholders;
+  // Mapping from decl -> name, used as both the name of possibly new local
+  // declarations of old parameters, as well as the replacement for any
+  // references to it
   llvm::DenseMap<const Decl *, std::string> Names;
 
+  // These are per-node (ie. are saved and restored on each convertNode call)
   SourceLoc LastAddedLoc;
   int NestedExprCount = 0;
 
 public:
-  AsyncConversionStringBuilder(SourceManager &SM, DiagnosticEngine &DiagEngine,
-                               const AsyncHandlerDesc &TopHandler)
-      : SM(SM), DiagEngine(DiagEngine), TopHandler(TopHandler), Buffer(),
-        OS(Buffer) {
+  AsyncConverter(SourceManager &SM, DiagnosticEngine &DiagEngine,
+                 ASTNode StartNode, const AsyncHandlerDesc &TopHandler)
+      : SM(SM), DiagEngine(DiagEngine), StartNode(StartNode),
+        TopHandler(TopHandler), Buffer(), OS(Buffer) {
     Placeholders.insert(TopHandler.Handler);
   }
 
-  void replace(ASTNode Node, SourceEditConsumer &EditConsumer) {
-    CharSourceRange Range =
-        Lexer::getCharSourceRangeFromSourceRange(SM, Node.getSourceRange());
-    EditConsumer.accept(SM, Range, Buffer.str());
+  bool convert() {
+    if (!Buffer.empty())
+      return !DiagEngine.hadAnyError();
+
+    if (auto *FD = dyn_cast_or_null<FuncDecl>(StartNode.dyn_cast<Decl *>())) {
+      addFuncDecl(FD);
+      if (FD->getBody()) {
+        convertNode(FD->getBody());
+      }
+    } else {
+      convertNode(StartNode);
+    }
+    return !DiagEngine.hadAnyError();
+  }
+
+  void replace(ASTNode Node, SourceEditConsumer &EditConsumer,
+               SourceLoc StartOverride = SourceLoc()) {
+    SourceRange Range = Node.getSourceRange();
+    if (StartOverride.isValid()) {
+      Range = SourceRange(StartOverride, Range.End);
+    }
+    CharSourceRange CharRange =
+        Lexer::getCharSourceRangeFromSourceRange(SM, Range);
+    EditConsumer.accept(SM, CharRange, Buffer.str());
     Buffer.clear();
   }
 
@@ -4734,13 +4764,7 @@ public:
     Buffer.clear();
   }
 
-  void convertFunction(const FuncDecl *FD) {
-    addFuncDecl(FD);
-    if (FD->getBody()) {
-      convertNode(FD->getBody());
-    }
-  }
-
+private:
   void convertNodes(ArrayRef<ASTNode> Nodes) {
     for (auto Node : Nodes) {
       OS << "\n";
@@ -4760,8 +4784,18 @@ public:
     addRange(LastAddedLoc, Node.getEndLoc(), /*ToEndOfToken=*/true);
   }
 
-private:
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override { return false; }
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    if (isa<PatternBindingDecl>(D)) {
+      NestedExprCount++;
+      return true;
+    }
+    return false;
+  }
+
+  bool walkToDeclPost(Decl *D) override {
+    NestedExprCount--;
+    return true;
+  }
 
 #define PLACEHOLDER_START "<#"
 #define PLACEHOLDER_END "#>"
@@ -4798,9 +4832,8 @@ private:
                          [&]() { addHandlerCall(CE); });
 
       if (auto *CE = dyn_cast<CallExpr>(E)) {
-        auto HandlerDesc =
-            AsyncHandlerDesc::find(getUnderlyingFunc(CE->getFn()),
-                                   /*ignoreName=*/true);
+        auto HandlerDesc = AsyncHandlerDesc::find(
+            getUnderlyingFunc(CE->getFn()), StartNode.dyn_cast<Expr *>() == CE);
         if (HandlerDesc.isValid())
           return addCustom(CE->getStartLoc(), CE->getEndLoc().getAdvancedLoc(1),
                            [&]() { addAsyncAlternativeCall(CE, HandlerDesc); });
@@ -4984,7 +5017,12 @@ private:
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;
     }
+
     auto Callback = dyn_cast<ClosureExpr>(ArgList.ref()[HandlerDesc.Index]);
+    auto Capture = dyn_cast<CaptureListExpr>(ArgList.ref()[HandlerDesc.Index]);
+    if (Capture) {
+      Callback = Capture->getClosureBody();
+    }
     if (!Callback) {
       DiagEngine.diagnose(CE->getStartLoc(), diag::missing_callback_arg);
       return;
@@ -5117,12 +5155,17 @@ private:
              /*ToEndOfToken=*/true);
 
     OS << tok::l_paren;
+    size_t realArgCount = 0;
     for (size_t I = 0, E = Args.size() - 1; I < E; ++I) {
-      if (I > 0)
+      if (isa<DefaultArgumentExpr>(Args[I]))
+        continue;
+
+      if (realArgCount > 0)
         OS << tok::comma << " ";
       // Can't just add the range as we need to perform replacements
       convertNode(Args[I], /*StartOverride=*/CE->getArgumentLabelLoc(I),
                   /*ConvertCalls=*/false);
+      realArgCount++;
     }
     OS << tok::r_paren;
   }
@@ -5247,13 +5290,11 @@ bool RefactoringActionConvertCallToAsyncAlternative::performChange() {
          "Should not run performChange when refactoring is not applicable");
 
   AsyncHandlerDesc TempDesc;
-  AsyncConversionStringBuilder Builder(SM, DiagEngine, TempDesc);
-  Builder.convertNode(CE);
-
-  if (DiagEngine.hadAnyError())
+  AsyncConverter Converter(SM, DiagEngine, CE, TempDesc);
+  if (!Converter.convert())
     return true;
 
-  Builder.replace(CE, EditConsumer);
+  Converter.replace(CE, EditConsumer);
   return false;
 }
 
@@ -5277,13 +5318,11 @@ bool RefactoringActionConvertToAsync::performChange() {
          "Should not run performChange when refactoring is not applicable");
 
   AsyncHandlerDesc TempDesc;
-  AsyncConversionStringBuilder Builder(SM, DiagEngine, TempDesc);
-  Builder.convertFunction(FD);
-
-  if (DiagEngine.hadAnyError())
+  AsyncConverter Converter(SM, DiagEngine, FD, TempDesc);
+  if (!Converter.convert())
     return true;
 
-  Builder.replace(FD, EditConsumer);
+  Converter.replace(FD, EditConsumer, FD->getSourceRangeIncludingAttrs().Start);
   return false;
 }
 
@@ -5316,16 +5355,14 @@ bool RefactoringActionAddAsyncAlternative::performChange() {
   assert(HandlerDesc.isValid() &&
          "Should not run performChange when refactoring is not applicable");
 
-  AsyncConversionStringBuilder Builder(SM, DiagEngine, HandlerDesc);
-  Builder.convertFunction(FD);
-
-  if (DiagEngine.hadAnyError())
+  AsyncConverter Converter(SM, DiagEngine, FD, HandlerDesc);
+  if (!Converter.convert())
     return true;
 
   EditConsumer.accept(SM, FD->getAttributeInsertionLoc(false),
                       "@available(*, deprecated, message: \"Prefer async "
                       "alternative instead\")\n");
-  Builder.insertAfter(FD, EditConsumer);
+  Converter.insertAfter(FD, EditConsumer);
 
   return false;
 }

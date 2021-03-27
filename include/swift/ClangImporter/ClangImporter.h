@@ -492,6 +492,9 @@ ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
 std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
+/// Whether the given parameter name identifies a completion handler.
+bool isCompletionHandlerParamName(StringRef paramName);
+
 } // end namespace swift
 
 #endif

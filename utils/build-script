@@ -886,8 +886,6 @@ class BuildScriptInvocation(object):
         product_classes = []
         if self.args.build_swiftpm:
             product_classes.append(products.SwiftPM)
-        if self.args.build_swift_driver or self.args.install_swift_driver:
-            product_classes.append(products.SwiftDriver)
         if self.args.build_swiftsyntax:
             product_classes.append(products.SwiftSyntax)
         if self.args.build_skstresstester:
@@ -908,6 +906,13 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SwiftInspect)
         if self.args.tsan_libdispatch_test:
             product_classes.append(products.TSanLibDispatch)
+
+        # Keep SwiftDriver at last.
+        # swift-driver's integration with the build scripts is not fully
+        # supported. Using swift-driver to build these products may hit
+        # failures.
+        if self.args.build_swift_driver or self.args.install_swift_driver:
+            product_classes.append(products.SwiftDriver)
         # Sanity check that all of our non-impl classes are actually
         # not build_script_impl products.
         for prod in product_classes:
@@ -1314,6 +1319,12 @@ def main_normal():
         toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
+    if args.sccache:
+        print("Ensuring the sccache server is running...")
+        # Use --show-stats to ensure the server is started, because using
+        # --start-server will fail if the server is already running.
+        # Capture the output because we don't want to see the stats.
+        shell.capture([toolchain.sccache, "--show-stats"])
 
     cmake = CMake(args=args, toolchain=toolchain)
     # Check the CMake version is sufficient on Linux and build from source

@@ -248,8 +248,15 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     return forDefinition ? linkage : addExternalToLinkage(linkage);
   };
 
-  // Function-local declarations have private linkage, unless serialized.
   ValueDecl *d = getDecl();
+
+  // Property wrapper generators of public functions have PublicNonABI linkage
+  if (isPropertyWrapperBackingInitializer() && isa<ParamDecl>(d)) {
+    if (isSerialized())
+      return maybeAddExternal(SILLinkage::PublicNonABI);
+  }
+
+  // Function-local declarations have private linkage, unless serialized.
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
     if (moduleContext->isLocalContext()) {
@@ -488,9 +495,16 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 
   auto *d = getDecl();
 
-  // Default argument generators are serialized if the containing
-  // declaration is public.
-  if (isDefaultArgGenerator()) {
+  // Default and property wrapper argument generators are serialized if the
+  // containing declaration is public.
+  if (isDefaultArgGenerator() || (isPropertyWrapperBackingInitializer() &&
+                                  isa<ParamDecl>(d))) {
+    if (isPropertyWrapperBackingInitializer()) {
+      if (auto *func = dyn_cast_or_null<ValueDecl>(d->getDeclContext()->getAsDecl())) {
+        d = func;
+      }
+    }
+
     // Ask the AST if we're inside an @inlinable context.
     if (d->getDeclContext()->getResilienceExpansion()
           == ResilienceExpansion::Minimal) {
@@ -692,8 +706,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
   ASTMangler mangler;
 
-  auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier();
-  if (derivativeFunctionIdentifier) {
+  if (auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier()) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
         derivativeFunctionIdentifier->getParameterIndices(),
@@ -703,7 +716,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         silParameterIndices, resultIndices,
         derivativeFunctionIdentifier->getDerivativeGenericSignature());
     return mangler.mangleAutoDiffDerivativeFunction(
-        cast<AbstractFunctionDecl>(asAutoDiffOriginalFunction().getDecl()),
+        asAutoDiffOriginalFunction().getAbstractFunctionDecl(),
         derivativeFunctionIdentifier->getKind(),
         silConfig);
   }
@@ -839,13 +852,17 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
                                                   SKind);
+
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+    return mangler.mangleInitFromProjectedValueEntity(cast<VarDecl>(getDecl()),
+                                                      SKind);
   }
 
   llvm_unreachable("bad entity kind!");
 }
 
 // Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
-// FIXME(TF-1213): Also consider derived declaration `@derivative` attributes.
+// FIXME(SR-14131): Also consider derived declaration `@derivative` attributes.
 static bool derivativeFunctionRequiresNewVTableEntry(SILDeclRef declRef) {
   assert(declRef.getDerivativeFunctionIdentifier() &&
          "Expected a derivative function SILDeclRef");

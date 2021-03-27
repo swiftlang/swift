@@ -2,23 +2,21 @@
 // REQUIRES: concurrency
 
 
-actor class MyActor {
+actor MyActor {
 
   private var p: Int
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC6calleeyySiYF : $@convention(method) @async (Int, @guaranteed MyActor) -> () {
   // CHECK-NOT:   hop_to_executor
   // CHECK:     } // end sil function '$s4test7MyActorC6calleeyySiYF'
-  @actorIndependent
-  func callee(_ x: Int) async {
+  nonisolated func callee(_ x: Int) async {
     print(x)
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC14throwingCalleeyySiYKF : $@convention(method) @async (Int, @guaranteed MyActor) -> @error Error {
   // CHECK-NOT:   hop_to_executor
   // CHECK:     } // end sil function '$s4test7MyActorC14throwingCalleeyySiYKF'
-  @actorIndependent
-  func throwingCallee(_ x: Int) async throws {
+  nonisolated func throwingCallee(_ x: Int) async throws {
     print(x)
   }
 
@@ -119,14 +117,14 @@ func testGenericGlobalActorWithGetter() async {
 }
 
 
-actor class RedActorImpl {
+actor RedActorImpl {
   // CHECK-LABEL: sil hidden [ossa] @$s4test12RedActorImplC5helloyySiF : $@convention(method) (Int, @guaranteed RedActorImpl) -> () {
   // CHECK-NOT: hop_to_executor
   // CHECK: } // end sil function '$s4test12RedActorImplC5helloyySiF'
   func hello(_ x : Int) {}
 }
 
-actor class BlueActorImpl {
+actor BlueActorImpl {
 // CHECK-LABEL: sil hidden [ossa] @$s4test13BlueActorImplC4poke6personyAA03RedcD0C_tYF : $@convention(method) @async (@guaranteed RedActorImpl, @guaranteed BlueActorImpl) -> () {
 // CHECK:       bb0([[RED:%[0-9]+]] : @guaranteed $RedActorImpl, [[BLUE:%[0-9]+]] : @guaranteed $BlueActorImpl):
 // CHECK:         hop_to_executor [[BLUE]] : $BlueActorImpl
@@ -213,8 +211,10 @@ struct BlueActor {
 // CHECK-LABEL: sil hidden [ossa] @$s4test20unspecifiedAsyncFuncyyYF : $@convention(thin) @async () -> () {
 // CHECK-NOT:     hop_to_executor
 // CHECK:         [[BORROW:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $RedActorImpl
+// CHECK-NEXT:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"()
 // CHECK-NEXT:    hop_to_executor [[BORROW]] : $RedActorImpl
 // CHECK-NEXT:    {{%[0-9]+}} = apply {{%[0-9]+}}({{%[0-9]+}}) : $@convention(thin) (Int) -> ()
+// CHECK-NEXT:    hop_to_executor [[PREV_EXEC]]
 // CHECK-NEXT:    end_borrow [[BORROW]] : $RedActorImpl
 // CHECK-NOT:     hop_to_executor
 // CHECK: } // end sil function '$s4test20unspecifiedAsyncFuncyyYF'
@@ -228,9 +228,10 @@ func unspecifiedAsyncFunc() async {
 // CHECK:         [[INTARG:%[0-9]+]] = apply {{%[0-9]+}}({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK-NOT:     hop_to_executor
 // CHECK:         [[METH:%[0-9]+]] = class_method [[RED]] : $RedActorImpl, #RedActorImpl.hello : (RedActorImpl) -> (Int) -> (), $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
+// CHECK-NEXT:    [[PREV_EXEC:%.*]] = builtin "getCurrentExecutor"()
 // CHECK-NEXT:    hop_to_executor [[RED]] : $RedActorImpl
 // CHECK-NEXT:    {{%[0-9]+}} = apply [[METH]]([[INTARG]], [[RED]]) : $@convention(method) (Int, @guaranteed RedActorImpl) -> ()
-// CHECK-NOT:     hop_to_executor
+// CHECK-NEXT:    hop_to_executor [[PREV_EXEC]]
 // CHECK: } // end sil function '$s4test27anotherUnspecifiedAsyncFuncyyAA12RedActorImplCYF'
 func anotherUnspecifiedAsyncFunc(_ red : RedActorImpl) async {
   await red.hello(12);

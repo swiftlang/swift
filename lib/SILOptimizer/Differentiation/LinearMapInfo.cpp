@@ -230,13 +230,19 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
     params.push_back(
         AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
   }
+
   AnyFunctionType *astFnTy;
-  if (auto genSig = silFnTy->getSubstGenericSignature())
+  if (auto genSig = silFnTy->getSubstGenericSignature()) {
+    // FIXME: Verify ExtInfo state is correct, not working by accident.
+    GenericFunctionType::ExtInfo info;
     astFnTy = GenericFunctionType::get(
-        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType());
-  else
+        genSig, params, silFnTy->getAllResultsInterfaceType().getASTType(),
+        info);
+  } else {
+    FunctionType::ExtInfo info;
     astFnTy = FunctionType::get(
-        params, silFnTy->getAllResultsInterfaceType().getASTType());
+        params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
+  }
 
   auto *origBB = ai->getParent();
   auto *linMapStruct = getLinearMapStruct(origBB);
