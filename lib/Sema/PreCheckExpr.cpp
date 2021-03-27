@@ -1391,22 +1391,6 @@ namespace {
 /// Perform prechecking of a ClosureExpr before we dive into it.  This returns
 /// true when we want the body to be considered part of this larger expression.
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
-  auto *PL = closure->getParameters();
-
-  // Validate the parameters.
-  bool hadParameterError = false;
-
-  // If we encounter an error validating the parameter list, don't bail.
-  // Instead, go on to validate any potential result type, and bail
-  // afterwards.  This allows for better diagnostics, and keeps the
-  // closure expression type well-formed.
-  for (auto param : *PL) {
-    hadParameterError |= param->isInvalid();
-  }
-
-  if (hadParameterError)
-    return false;
-
   // If we won't be checking the body of the closure, don't walk into it here.
   if (!shouldTypeCheckInEnclosingExpression(closure))
     return false;

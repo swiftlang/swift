@@ -488,6 +488,26 @@ matchWitnessDifferentiableAttr(DeclContext *dc, ValueDecl *req,
   return result;
 }
 
+/// A property or subscript witness must have the same or fewer
+/// effects specifiers than the protocol requirement.
+///
+/// \returns None iff the witness satisfies the requirement's effects limit.
+///          Otherwise, it returns the RequirementMatch that describes the
+///          problem.
+static Optional<RequirementMatch> checkEffects(AbstractStorageDecl *witness,
+                                               AbstractStorageDecl *req) {
+
+  if (!witness->isLessEffectfulThan(req, EffectKind::Async))
+    return RequirementMatch(getStandinForAccessor(witness, AccessorKind::Get),
+                            MatchKind::AsyncConflict);
+
+  if (!witness->isLessEffectfulThan(req, EffectKind::Throws))
+    return RequirementMatch(getStandinForAccessor(witness, AccessorKind::Get),
+                            MatchKind::ThrowsConflict);
+
+  return None; // OK
+}
+
 RequirementMatch
 swift::matchWitness(
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
@@ -618,6 +638,10 @@ swift::matchWitness(
         return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
                                 MatchKind::MutatingConflict);
     }
+
+    // Check that the witness has no more effects than the requirement.
+    if (auto problem = checkEffects(witnessASD, reqASD))
+      return problem.getValue();
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
@@ -2806,10 +2830,6 @@ bool ConformanceChecker::checkActorIsolation(
         .subst(requirementSubs);
     break;
   }
-
-  case ActorIsolation::IndependentUnsafe:
-    // The requirement is explicitly unsafe; allow it.
-    return false;
 
   case ActorIsolation::Independent:
   case ActorIsolation::Unspecified:

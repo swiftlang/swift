@@ -2535,7 +2535,6 @@ public:
       break;
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
-    case ActorIsolation::IndependentUnsafe:
       return;
     }
 

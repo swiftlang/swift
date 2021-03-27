@@ -1018,6 +1018,24 @@ static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
   }
 }
 
+static bool hasAsyncGetter(const AbstractStorageDecl *ASD) {
+  if (auto getter = ASD->getAccessor(AccessorKind::Get)) {
+    assert(!getter->getAttrs().hasAttribute<ReasyncAttr>());
+    return getter->hasAsync();
+  }
+
+  return false;
+}
+
+static bool hasThrowsGetter(const AbstractStorageDecl *ASD) {
+  if (auto getter = ASD->getAccessor(AccessorKind::Get)) {
+    assert(!getter->getAttrs().hasAttribute<RethrowsAttr>());
+    return getter->hasThrows();
+  }
+
+  return false;
+}
+
 static bool hasMutatingGetter(const AbstractStorageDecl *ASD) {
   return ASD->getAccessor(AccessorKind::Get) && ASD->isGetterMutating();
 }
@@ -1925,6 +1943,15 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     return;
   }
 
+  // prints with a space prefixed
+  auto printWithSpace = [&](StringRef word) {
+    Printer << " ";
+    Printer.printKeyword(word, Options);
+  };
+
+  const bool asyncGet = hasAsyncGetter(ASD);
+  const bool throwsGet = hasThrowsGetter(ASD);
+
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
@@ -1935,27 +1962,27 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     bool nonmutatingSetter = hasNonMutatingSetter(ASD);
 
     // We're about to print something like this:
-    //   { mutating? get (nonmutating? set)? }
+    //   { mutating? get async? throws? (nonmutating? set)? }
     // But don't print "{ get set }" if we don't have to.
     if (!inProtocol && !Options.PrintGetSetOnRWProperties &&
-        settable && !mutatingGetter && !nonmutatingSetter) {
+        settable && !mutatingGetter && !nonmutatingSetter
+        && !asyncGet && !throwsGet) {
       return;
     }
 
     Printer << " {";
-    if (mutatingGetter) {
-      Printer << " ";
-      Printer.printKeyword("mutating", Options);
-    }
-    Printer << " ";
-    Printer.printKeyword("get", Options);
+    if (mutatingGetter) printWithSpace("mutating");
+
+    printWithSpace("get");
+
+    if (asyncGet) printWithSpace("async");
+
+    if (throwsGet) printWithSpace("throws");
+
     if (settable) {
-      if (nonmutatingSetter) {
-        Printer << " ";
-        Printer.printKeyword("nonmutating", Options);
-      }
-      Printer << " ";
-      Printer.printKeyword("set", Options);
+      if (nonmutatingSetter) printWithSpace("nonmutating");
+
+      printWithSpace("set");
     }
     Printer << " }";
     return;
@@ -1983,7 +2010,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       !Options.PrintGetSetOnRWProperties &&
       !Options.FunctionDefinitions &&
       !ASD->isGetterMutating() &&
-      !ASD->getAccessor(AccessorKind::Set)->isExplicitNonMutating()) {
+      !ASD->getAccessor(AccessorKind::Set)->isExplicitNonMutating() &&
+      !asyncGet && !throwsGet) {
     return;
   }
 
@@ -1999,7 +2027,15 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (!PrintAccessorBody) {
       Printer << " ";
       printMutabilityModifiersIfNeeded(Accessor);
+
       Printer.printKeyword(getAccessorLabel(Accessor->getAccessorKind()), Options);
+
+      // handle any effects specifiers
+      if (Accessor->getAccessorKind() == AccessorKind::Get) {
+        if (asyncGet) printWithSpace("async");
+        if (throwsGet) printWithSpace("throws");
+      }
+
     } else {
       {
         IndentRAII IndentMore(*this);
@@ -2017,7 +2053,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   bool isOnlyGetter = impl.getReadImpl() == ReadImplKind::Get &&
                       ASD->getAccessor(AccessorKind::Get);
   bool isGetterMutating = ASD->supportsMutation() || ASD->isGetterMutating();
-  if (isOnlyGetter && !isGetterMutating && PrintAccessorBody &&
+  bool hasEffects = asyncGet || throwsGet;
+  if (isOnlyGetter && !isGetterMutating && !hasEffects && PrintAccessorBody &&
       Options.FunctionBody && Options.CollapseSingleGetterProperty) {
     Options.FunctionBody(ASD->getAccessor(AccessorKind::Get), Printer);
     indent();

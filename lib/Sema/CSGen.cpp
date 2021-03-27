@@ -1984,6 +1984,18 @@ namespace {
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = CS.getVarType(param);
+
+            // If closure parameter couldn't be resolved, let's record
+            // a fix to make sure that type resolution diagnosed the
+            // problem and replace it with a placeholder, so that solver
+            // can make forward progress (especially important for result
+            // builders).
+            if (declaredTy->hasError()) {
+              CS.recordFix(AllowRefToInvalidDecl::create(
+                  CS, CS.getConstraintLocator(param)));
+              declaredTy = PlaceholderType::get(CS.getASTContext(), param);
+            }
+
             externalType = CS.replaceInferableTypesWithTypeVars(declaredTy,
                                                                 paramLoc);
           } else {

@@ -68,6 +68,7 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Error about collection literals that default to Any collections in
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
+///   - KeyPath expressions cannot refer to effectful properties / subscripts
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -150,6 +151,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         CallArgs.insert(DSE->getIndex());
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        // raise an error if this KeyPath contains an effectful member.
+        checkForEffectfulKeyPath(KPE);
+
         for (auto Comp : KPE->getComponents()) {
           if (auto *Arg = Comp.getIndexExpr())
             CallArgs.insert(Arg);
@@ -320,6 +324,25 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
       
       return { true, E };
+    }
+
+    /// Visit each component of the keypath and emit a diganostic if they
+    /// refer to a member that has effects.
+    void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
+      for (const auto &component : keyPath->getComponents()) {
+        if (component.hasDeclRef()) {
+          auto decl = component.getDeclRef().getDecl();
+          if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
+            if (auto getter = asd->getEffectfulGetAccessor()) {
+              Ctx.Diags.diagnose(component.getLoc(),
+                                 diag::effectful_keypath_component,
+                                 asd->getDescriptiveKind());
+              Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
+                                 asd->getDescriptiveKind());
+            }
+          }
+        }
+      }
     }
 
     void checkCheckedCastExpr(CheckedCastExpr *cast) {
