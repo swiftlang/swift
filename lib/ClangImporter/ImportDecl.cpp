@@ -7961,6 +7961,34 @@ static bool suppressOverriddenMethods(ClangImporter::Implementation &importer,
   return false;
 }
 
+void addCompletionHandlerAttribute(Decl *asyncImport,
+                                   ArrayRef<Decl *> members,
+                                   ASTContext &SwiftContext) {
+  auto *ayncFunc = dyn_cast_or_null<AbstractFunctionDecl>(asyncImport);
+  if (!ayncFunc)
+    return;
+
+  auto errorConvention = ayncFunc->getForeignErrorConvention();
+  auto asyncConvention = ayncFunc->getForeignAsyncConvention();
+  if (!asyncConvention)
+    return;
+
+  unsigned completionIndex = asyncConvention->completionHandlerParamIndex();
+  if (errorConvention &&
+      completionIndex >= errorConvention->getErrorParameterIndex()) {
+    completionIndex--;
+  }
+
+  for (auto *member : members) {
+    if (member != asyncImport) {
+      member->getAttrs().add(
+          new (SwiftContext) CompletionHandlerAsyncAttr(
+              cast<AbstractFunctionDecl>(*asyncImport), completionIndex,
+              SourceLoc(), SourceLoc(), SourceRange()));
+    }
+  }
+}
+
 /// Given a set of methods with the same selector, each taken from a
 /// different protocol in the protocol hierarchy of a class into which
 /// we want to introduce mirror imports, import only the methods which
@@ -8003,6 +8031,8 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
     auto proto = entries[i].second;
     if (auto imported =
             Impl.importMirroredDecl(objcMethod, dc, getVersion(), proto)) {
+      size_t start = members.size();
+
       members.push_back(imported);
 
       for (auto alternate : Impl.getAlternateDecls(imported)) {
@@ -8014,8 +8044,13 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
         auto asyncVersion = getVersion().withConcurrency(true);
         if (auto asyncImport = Impl.importMirroredDecl(
                 objcMethod, dc, asyncVersion, proto)) {
-          if (asyncImport != imported)
+          if (asyncImport != imported) {
+            addCompletionHandlerAttribute(
+                asyncImport,
+                llvm::makeArrayRef(members).drop_front(start),
+                Impl.SwiftContext);
             members.push_back(asyncImport);
+          }
         }
       }
     }
@@ -9661,7 +9696,10 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
 
 void ClangImporter::Implementation::insertMembersAndAlternates(
     const clang::NamedDecl *nd, SmallVectorImpl<Decl *> &members) {
+
+  size_t start = members.size();
   llvm::SmallPtrSet<Decl *, 4> knownAlternateMembers;
+  Decl *asyncImport = nullptr;
   forEachDistinctName(
       nd, [&](ImportedName name, ImportNameVersion nameVersion) -> bool {
     auto member = importDecl(nd, nameVersion);
@@ -9682,8 +9720,18 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
       return true;
 
     members.push_back(member);
+    if (nameVersion.supportsConcurrency()) {
+      assert(!asyncImport &&
+             "Should only have a single version with concurrency enabled");
+      asyncImport = member;
+    }
+
     return true;
   });
+
+  addCompletionHandlerAttribute(asyncImport,
+                                llvm::makeArrayRef(members).drop_front(start),
+                                SwiftContext);
 }
 
 void ClangImporter::Implementation::importInheritedConstructors(
