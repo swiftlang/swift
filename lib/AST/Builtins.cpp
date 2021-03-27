@@ -1351,10 +1351,9 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
-  BuiltinFunctionBuilder builder(ctx);
-  builder.setResult(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
-  builder.setAsync();
-  return builder.build(id);
+  return getBuiltinFunction(ctx, id, _async(_thin),
+                            _parameters(),
+                            _executor);
 }
 
 static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
@@ -2691,6 +2690,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinJob:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_JOB);
+    break;
+  case BuiltinTypeKind::BuiltinExecutor:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_EXECUTOR);
     break;
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);

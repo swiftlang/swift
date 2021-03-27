@@ -736,7 +736,7 @@ BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
-// getCurrentExecutor: () async -> Builtin.Word
+// getCurrentExecutor: () async -> Builtin.Executor
 //
 // Retrieve the ExecutorRef on which the current asynchronous
 // function is executing.

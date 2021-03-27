@@ -41,6 +41,7 @@ enum SingletonTypeSynthesizer {
   _any,
   _bridgeObject,
   _error,
+  _executor,
   _job,
   _nativeObject,
   _never,
@@ -54,6 +55,7 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _any: return SC.Context.TheAnyType;
   case _bridgeObject: return SC.Context.TheBridgeObjectType;
   case _error: return SC.Context.getExceptionType();
+  case _executor: return SC.Context.TheExecutorType;
   case _job: return SC.Context.TheJobType;
   case _nativeObject: return SC.Context.TheNativeObjectType;
   case _never: return SC.Context.getNeverType();
