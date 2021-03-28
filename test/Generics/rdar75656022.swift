@@ -47,8 +47,8 @@ struct OriginalExampleWithWarning<A, B> where A : P2, B : P2, A.T == B.T {
   // CHECK-LABEL: Generic signature: <A, B, C, D, E where A == S1<C, E, S2<D>>, B : P2, C : P1, D == B.T, E == D.T, B.T == C.T>
   init<C, D, E>(_: C)
     where C : P1,
-          D : P1, // expected-warning {{redundant conformance constraint 'D': 'P1'}}
-          C.T : P1, // expected-warning {{redundant conformance constraint 'C.T': 'P1'}}
+          D : P1, // expected-warning {{redundant conformance constraint 'D' : 'P1'}}
+          C.T : P1, // expected-warning {{redundant conformance constraint 'C.T' : 'P1'}}
           A == S1<C, C.T.T, S2<C.T>>,
           C.T == D,
           E == D.T { }
@@ -69,7 +69,7 @@ struct WithoutBogusGenericParametersWithWarning<A, B> where A : P2, B : P2, A.T 
   // CHECK-LABEL: Generic signature: <A, B, C where A == S1<C, B.T.T, S2<B.T>>, B : P2, C : P1, B.T == C.T>
   init<C>(_: C)
     where C : P1,
-          C.T : P1, // expected-warning {{redundant conformance constraint 'C.T': 'P1'}}
+          C.T : P1, // expected-warning {{redundant conformance constraint 'C.T' : 'P1'}}
           A == S1<C, C.T.T, S2<C.T>> {}
 }
 

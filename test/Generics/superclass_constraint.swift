@@ -69,16 +69,16 @@ class S : P2 {
 // CHECK: superclassConformance1
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance1<T>(t: T)
-  where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
-        T : P3 {} // expected-warning{{redundant conformance constraint 'T': 'P3'}}
+  where T : C, // expected-note{{conformance constraint 'T' : 'P3' implied here}}
+        T : P3 {} // expected-warning{{redundant conformance constraint 'T' : 'P3'}}
 
 
 
 // CHECK: superclassConformance2
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
 func superclassConformance2<T>(t: T)
-  where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
-   T : P3 {} // expected-warning{{redundant conformance constraint 'T': 'P3'}}
+  where T : C, // expected-note{{conformance constraint 'T' : 'P3' implied here}}
+   T : P3 {} // expected-warning{{redundant conformance constraint 'T' : 'P3'}}
 
 protocol P4 { }
 
@@ -89,8 +89,8 @@ class C2 : C, P4 { }
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'C'}}
 // expected-note@-2{{superclass constraint 'T' : 'C2' written here}}
-// expected-warning@-3{{redundant conformance constraint 'T': 'P4'}}
-// expected-note@-4{{conformance constraint 'T': 'P4' implied here}}
+// expected-warning@-3{{redundant conformance constraint 'T' : 'P4'}}
+// expected-note@-4{{conformance constraint 'T' : 'P4' implied here}}
 
 protocol P5: A { }
 
@@ -175,8 +175,8 @@ protocol Rump : Tail {
 class Horse<T>: Rump { }
 
 func hasRedundantConformanceConstraint<X : Horse<T>, T>(_: X) where X : Rump {}
-// expected-warning@-1 {{redundant conformance constraint 'X': 'Rump'}}
-// expected-note@-2 {{conformance constraint 'X': 'Rump' implied here}}
+// expected-warning@-1 {{redundant conformance constraint 'X' : 'Rump'}}
+// expected-note@-2 {{conformance constraint 'X' : 'Rump' implied here}}
 
 // SR-5862
 protocol X {
