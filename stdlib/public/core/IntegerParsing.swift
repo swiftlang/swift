@@ -15,11 +15,12 @@
 // made in sync.
 @_alwaysEmitIntoClient
 internal func _parseASCIIDigits<
-  UTF8CodeUnits: Sequence, Result: FixedWidthInteger
+  UTF8CodeUnits: Collection, Result: FixedWidthInteger
 >(
   _ codeUnits: UTF8CodeUnits, radix: Int, isNegative: Bool
 ) -> Result? where UTF8CodeUnits.Element == UInt8 {
   _internalInvariant(radix >= 2 && radix <= 36)
+  guard _fastPath(!codeUnits.isEmpty) else { return nil }
   let multiplicand = Result(radix)
   var result = 0 as Result
   if radix <= 10 {
@@ -74,6 +75,7 @@ internal func _parseASCIIDigits<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
   _internalInvariant(radix >= 2 && radix <= 36)
+  guard _fastPath(!codeUnits.isEmpty) else { return nil }
   let multiplicand = Result(radix)
   var result = 0 as Result
   if radix <= 10 {
@@ -191,6 +193,7 @@ extension FixedWidthInteger {
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @inlinable
+  @inline(__always)
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     guard _fastPath(!text.isEmpty) else { return nil }
