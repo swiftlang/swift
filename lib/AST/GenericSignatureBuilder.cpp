@@ -8414,7 +8414,7 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
                        }));
 
   case RequirementKind::Layout:
-    return Requirement(RequirementKind::Conformance, subjectType,
+    return Requirement(RequirementKind::Layout, subjectType,
                        req.getLayoutConstraint());
   }
 
