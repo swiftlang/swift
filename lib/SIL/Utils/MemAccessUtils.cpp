@@ -1787,6 +1787,13 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       visitor(&builtin->getAllOperands()[2]);
       return;
 
+    // These consume values out of their second operand.
+    case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+    case BuiltinValueKind::ResumeThrowingContinuationReturning:
+    case BuiltinValueKind::ResumeThrowingContinuationThrowing:
+      visitor(&builtin->getAllOperands()[1]);
+      return;
+
     // WillThrow exists for the debugger, does nothing.
     case BuiltinValueKind::WillThrow:
       return;
