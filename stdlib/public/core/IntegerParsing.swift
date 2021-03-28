@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,15 +10,235 @@
 //
 //===----------------------------------------------------------------------===//
 
+// N.B.: This free function has been manually specialized below where
+// `UTF8CodeUnits == UnsafeBufferPoint<UInt8>`. Ensure that any changes are
+// made in sync.
+@_alwaysEmitIntoClient
+internal func _parseASCIIDigits<
+  UTF8CodeUnits: Sequence, Result: FixedWidthInteger
+>(
+  _ codeUnits: UTF8CodeUnits, radix: Int, isNegative: Bool
+) -> Result? where UTF8CodeUnits.Element == UInt8 {
+  _internalInvariant(radix >= 2 && radix <= 36)
+  let multiplicand = Result(radix)
+  var result = 0 as Result
+  if radix <= 10 {
+    let upperBound = 48 /* "0" */ &+ UInt8(radix)
+    for digit in codeUnits {
+      let digitValue: Result
+      if _fastPath(digit >= 48 && digit < upperBound) {
+        digitValue = Result(digit &- 48)
+      } else {
+        return nil
+      }
+      let (temporary, overflow1) =
+        result.multipliedReportingOverflow(by: multiplicand)
+      guard _fastPath(!overflow1) else { return nil }
+      let (nextResult, overflow2) = isNegative
+        ? temporary.subtractingReportingOverflow(digitValue)
+        : temporary.addingReportingOverflow(digitValue)
+      guard _fastPath(!overflow2) else { return nil }
+      result = nextResult
+    }
+  } else {
+    let uppercaseUpperBound = 65 /* "A" */ &+ UInt8(radix &- 10)
+    let lowercaseUpperBound = 97 /* "a" */ &+ UInt8(radix &- 10)
+    for digit in codeUnits {
+      let digitValue: Result
+      if _fastPath(digit >= 48 /* "0" */ && digit < 58) {
+        digitValue = Result(digit &- 48)
+      } else if _fastPath(digit >= 65 && digit < uppercaseUpperBound) {
+        digitValue = Result(digit &- 65 &+ 10)
+      } else if _fastPath(digit >= 97 && digit < lowercaseUpperBound) {
+        digitValue = Result(digit &- 97 &+ 10)
+      } else {
+        return nil
+      }
+      let (temporary, overflow1) =
+        result.multipliedReportingOverflow(by: multiplicand)
+      guard _fastPath(!overflow1) else { return nil }
+      let (nextResult, overflow2) = isNegative
+        ? temporary.subtractingReportingOverflow(digitValue)
+        : temporary.addingReportingOverflow(digitValue)
+      guard _fastPath(!overflow2) else { return nil }
+      result = nextResult
+    }
+  }
+  return result
+}
+
+// N.B.: This free function is a manually specialized version of the function
+// above. Ensure that any changes are made in sync.
+@_alwaysEmitIntoClient
+internal func _parseASCIIDigits<Result: FixedWidthInteger>(
+  _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
+) -> Result? {
+  _internalInvariant(radix >= 2 && radix <= 36)
+  let multiplicand = Result(radix)
+  var result = 0 as Result
+  if radix <= 10 {
+    let upperBound = 48 /* "0" */ &+ UInt8(radix)
+    for digit in codeUnits {
+      let digitValue: Result
+      if _fastPath(digit >= 48 && digit < upperBound) {
+        digitValue = Result(digit &- 48)
+      } else {
+        return nil
+      }
+      let (temporary, overflow1) =
+        result.multipliedReportingOverflow(by: multiplicand)
+      guard _fastPath(!overflow1) else { return nil }
+      let (nextResult, overflow2) = isNegative
+        ? temporary.subtractingReportingOverflow(digitValue)
+        : temporary.addingReportingOverflow(digitValue)
+      guard _fastPath(!overflow2) else { return nil }
+      result = nextResult
+    }
+  } else {
+    let uppercaseUpperBound = 65 /* "A" */ &+ UInt8(radix &- 10)
+    let lowercaseUpperBound = 97 /* "a" */ &+ UInt8(radix &- 10)
+    for digit in codeUnits {
+      let digitValue: Result
+      if _fastPath(digit >= 48 /* "0" */ && digit < 58) {
+        digitValue = Result(digit &- 48)
+      } else if _fastPath(digit >= 65 && digit < uppercaseUpperBound) {
+        digitValue = Result(digit &- 65 &+ 10)
+      } else if _fastPath(digit >= 97 && digit < lowercaseUpperBound) {
+        digitValue = Result(digit &- 97 &+ 10)
+      } else {
+        return nil
+      }
+      let (temporary, overflow1) =
+        result.multipliedReportingOverflow(by: multiplicand)
+      guard _fastPath(!overflow1) else { return nil }
+      let (nextResult, overflow2) = isNegative
+        ? temporary.subtractingReportingOverflow(digitValue)
+        : temporary.addingReportingOverflow(digitValue)
+      guard _fastPath(!overflow2) else { return nil }
+      result = nextResult
+    }
+  }
+  return result
+}
+
+@_alwaysEmitIntoClient
+internal func _parseASCII<UTF8CodeUnits: Collection, Result: FixedWidthInteger>(
+  _ codeUnits: UTF8CodeUnits, radix: Int
+) -> Result? where UTF8CodeUnits.Element == UInt8 {
+  _internalInvariant(!codeUnits.isEmpty)
+  let first = codeUnits.first!
+  if first == 45 /* "-" */ {
+    return _parseASCIIDigits(
+      codeUnits.dropFirst(), radix: radix, isNegative: true)
+  }
+  if first == 43 /* "+" */ {
+    return _parseASCIIDigits(
+      codeUnits.dropFirst(), radix: radix, isNegative: false)
+  }
+  return _parseASCIIDigits(codeUnits, radix: radix, isNegative: false)
+}
+
+@_alwaysEmitIntoClient
+internal func _parseASCII<Result: FixedWidthInteger>(
+  _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
+) -> Result? {
+  _internalInvariant(!codeUnits.isEmpty)
+  let first = codeUnits[0]
+  if first == 45 /* "-" */ {
+    return _parseASCIIDigits(
+      UnsafeBufferPointer(rebasing: codeUnits[1...]),
+      radix: radix, isNegative: true)
+  }
+  if first == 43 /* "+" */ {
+    return _parseASCIIDigits(
+      UnsafeBufferPointer(rebasing: codeUnits[1...]),
+      radix: radix, isNegative: false)
+  }
+  return _parseASCIIDigits(codeUnits, radix: radix, isNegative: false)
+}
+
+extension FixedWidthInteger {
+  /// Creates a new integer value from the given string and radix.
+  ///
+  /// The string passed as `text` may begin with a plus or minus sign character
+  /// (`+` or `-`), followed by one or more numeric digits (`0-9`) or letters
+  /// (`a-z` or `A-Z`). Parsing of the string is case insensitive.
+  ///
+  ///     let x = Int("123")
+  ///     // x == 123
+  ///
+  ///     let y = Int("-123", radix: 8)
+  ///     // y == -83
+  ///     let y = Int("+123", radix: 8)
+  ///     // y == +83
+  ///
+  ///     let z = Int("07b", radix: 16)
+  ///     // z == 123
+  ///
+  /// If `text` is in an invalid format or contains characters that are out of
+  /// bounds for the given `radix`, or if the value it denotes in the given
+  /// `radix` is not representable, the result is `nil`. For example, the
+  /// following conversions result in `nil`:
+  ///
+  ///     Int(" 100")                       // Includes whitespace
+  ///     Int("21-50")                      // Invalid format
+  ///     Int("ff6600")                     // Characters out of bounds
+  ///     Int("zzzzzzzzzzzzz", radix: 36)   // Out of range
+  ///
+  /// - Parameters:
+  ///   - text: The ASCII representation of a number in the radix passed as
+  ///     `radix`.
+  ///   - radix: The radix, or base, to use for converting `text` to an integer
+  ///     value. `radix` must be in the range `2...36`. The default is 10.
+  @inlinable
+  public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
+    _precondition(2...36 ~= radix, "Radix not in range 2...36")
+    guard _fastPath(!text.isEmpty) else { return nil }
+    let result: Self? =
+      text.utf8.withContiguousStorageIfAvailable {
+        _parseASCII($0, radix: radix)
+      } ?? _parseASCII(text.utf8, radix: radix)
+    guard let result_ = result else { return nil }
+    self = result_
+  }
+
+  /// Creates a new integer value from the given string.
+  ///
+  /// The string passed as `description` may begin with a plus or minus sign
+  /// character (`+` or `-`), followed by one or more numeric digits (`0-9`).
+  ///
+  ///     let x = Int("123")
+  ///     // x == 123
+  ///
+  /// If `description` is in an invalid format, or if the value it denotes in
+  /// base 10 is not representable, the result is `nil`. For example, the
+  /// following conversions result in `nil`:
+  ///
+  ///     Int(" 100")                       // Includes whitespace
+  ///     Int("21-50")                      // Invalid format
+  ///     Int("ff6600")                     // Characters out of bounds
+  ///     Int("10000000000000000000000000") // Out of range
+  ///
+  /// - Parameter description: The ASCII representation of a number.
+  @inlinable
+  @inline(__always)
+  public init?(_ description: String) {
+    self.init(description, radix: 10)
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Old entry points preserved for ABI compatibility.
+// -----------------------------------------------------------------------------
+
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
-@inlinable
+@usableFromInline
 internal func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
   _internalInvariant(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
 }
 
-@inlinable
-@inline(__always)
+@usableFromInline
 internal func _asciiDigit<CodeUnit: UnsignedInteger, Result: BinaryInteger>(
   codeUnit u_: CodeUnit, radix: Result
 ) -> Result? {
@@ -36,8 +256,7 @@ internal func _asciiDigit<CodeUnit: UnsignedInteger, Result: BinaryInteger>(
   return Result(truncatingIfNeeded: d)
 }
 
-@inlinable
-@inline(__always)
+@usableFromInline
 internal func _parseUnsignedASCII<
   Rest: IteratorProtocol, Result: FixedWidthInteger
 >(
@@ -68,12 +287,11 @@ where Rest.Element: UnsignedInteger {
 }
 
 //
-// TODO (TODO: JIRA): This needs to be completely rewritten. It's about 20KB of
-// always-inline code, most of which are MOV instructions.
+// Before it was superseded, this function was about 20KB of always-inline code,
+// most of which were MOV instructions.
 //
 
-@inlinable
-@inline(__always)
+@usableFromInline
 internal func _parseASCII<
   CodeUnits: IteratorProtocol, Result: FixedWidthInteger
 >(
@@ -112,89 +330,5 @@ extension FixedWidthInteger {
   ) -> Result?
   where CodeUnits.Element: UnsignedInteger {
     return _parseASCII(codeUnits: &codeUnits, radix: radix)
-  }
-
-  /// Creates a new integer value from the given string and radix.
-  ///
-  /// The string passed as `text` may begin with a plus or minus sign character
-  /// (`+` or `-`), followed by one or more numeric digits (`0-9`) or letters
-  /// (`a-z` or `A-Z`). Parsing of the string is case insensitive.
-  ///
-  ///     let x = Int("123")
-  ///     // x == 123
-  ///
-  ///     let y = Int("-123", radix: 8)
-  ///     // y == -83
-  ///     let y = Int("+123", radix: 8)
-  ///     // y == +83
-  ///
-  ///     let z = Int("07b", radix: 16)
-  ///     // z == 123
-  ///
-  /// If `text` is in an invalid format or contains characters that are out of
-  /// bounds for the given `radix`, or if the value it denotes in the given
-  /// `radix` is not representable, the result is `nil`. For example, the
-  /// following conversions result in `nil`:
-  ///
-  ///     Int(" 100")                       // Includes whitespace
-  ///     Int("21-50")                      // Invalid format
-  ///     Int("ff6600")                     // Characters out of bounds
-  ///     Int("zzzzzzzzzzzzz", radix: 36)   // Out of range
-  ///
-  /// - Parameters:
-  ///   - text: The ASCII representation of a number in the radix passed as
-  ///     `radix`.
-  ///   - radix: The radix, or base, to use for converting `text` to an integer
-  ///     value. `radix` must be in the range `2...36`. The default is 10.
-  @inlinable // @specializable
-  @_semantics("optimize.sil.specialize.generic.partial.never")
-  public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
-    _precondition(2...36 ~= radix, "Radix not in range 2...36")
-
-    if let str = text as? String, str._guts.isFastUTF8 {
-      guard let ret = str._guts.withFastUTF8 ({ utf8 -> Self? in
-        var iter = utf8.makeIterator()
-        return _parseASCII(codeUnits: &iter, radix: Self(radix))
-      }) else {
-        return nil
-      }
-      self = ret
-      return
-    }
-
-    // TODO(String performance): We can provide fast paths for common radices,
-    // native UTF-8 storage, etc.
-
-    var iter = text.utf8.makeIterator()
-    guard let ret = Self._parseASCIISlowPath(
-      codeUnits: &iter, radix: Self(radix)
-    ) else { return nil }
-
-    self = ret
-  }
-
-  /// Creates a new integer value from the given string.
-  ///
-  /// The string passed as `description` may begin with a plus or minus sign
-  /// character (`+` or `-`), followed by one or more numeric digits (`0-9`).
-  ///
-  ///     let x = Int("123")
-  ///     // x == 123
-  ///
-  /// If `description` is in an invalid format, or if the value it denotes in
-  /// base 10 is not representable, the result is `nil`. For example, the
-  /// following conversions result in `nil`:
-  ///
-  ///     Int(" 100")                       // Includes whitespace
-  ///     Int("21-50")                      // Invalid format
-  ///     Int("ff6600")                     // Characters out of bounds
-  ///     Int("10000000000000000000000000") // Out of range
-  ///
-  /// - Parameter description: The ASCII representation of a number.
-  @inlinable
-  @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inline(__always)
-  public init?(_ description: String) {
-    self.init(description, radix: 10)
   }
 }
