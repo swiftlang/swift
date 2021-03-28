@@ -729,56 +729,84 @@ size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
 }
 
-namespace {
-  
-/// Structure that gets filled in when a task is suspended by `withUnsafeContinuation`.
-struct AsyncContinuationContext {
-  // These fields are unnecessary for resuming a continuation.
-  void *Unused1;
-  void *Unused2;
-  // Storage slot for the error result, if any.
-  SwiftError *ErrorResult;
-  // Pointer to where to store a normal result.
-  OpaqueValue *NormalResult;
-  
-  // Executor on which to resume execution.
-  ExecutorRef ResumeExecutor;
-};
+AsyncTask *swift::swift_continuation_init(ContinuationAsyncContext *context,
+                                          AsyncContinuationFlags flags) {
+  context->Flags = AsyncContextKind::Continuation;
+  if (flags.canThrow()) context->Flags.setCanThrow(true);
+  context->ErrorResult = nullptr;
 
-static void resumeTaskAfterContinuation(AsyncTask *task,
-                                        AsyncContinuationContext *context) {
-  swift_task_enqueue(task, context->ResumeExecutor);
+  // Set the current executor as the target executor unless there's
+  // an executor override.
+  if (!flags.hasExecutorOverride())
+    context->ResumeToExecutor = swift_task_getCurrentExecutor();
+
+  // We can initialize this with a relaxed store because resumption
+  // must happen-after this call.
+  context->AwaitSynchronization.store(flags.isPreawaited()
+                                        ? ContinuationStatus::Awaited
+                                        : ContinuationStatus::Pending, 
+                                      std::memory_order_relaxed);
+
+  auto task = swift_task_getCurrent();
+  assert(task && "initializing a continuation with no current task");
+  task->ResumeContext = context;
+  task->ResumeTask = context->ResumeParent;
+
+  return task;
 }
 
+static void resumeTaskAfterContinuation(AsyncTask *task,
+                                        ContinuationAsyncContext *context) {
+  auto &sync = context->AwaitSynchronization;
+  auto status = sync.load(std::memory_order_acquire);
+  assert(status != ContinuationStatus::Resumed &&
+         "continuation was already resumed");
+
+  // Make sure TSan knows that the resume call happens-before the task
+  // restarting.
+  _swift_tsan_release(task);
+
+  // The status should be either Pending or Awaited.  If it's Awaited,
+  // which is probably the most likely option, then we should immediately
+  // enqueue; we don't need to update the state because there shouldn't
+  // be a racing attempt to resume the continuation.  If it's Pending,
+  // we need to set it to Resumed; if that fails (with a strong cmpxchg),
+  // it should be because the original thread concurrently set it to
+  // Awaited, and so we need to enqueue.
+  if (status == ContinuationStatus::Pending &&
+      sync.compare_exchange_strong(status, ContinuationStatus::Resumed,
+                                   /*success*/ std::memory_order_release,
+                                   /*failure*/ std::memory_order_relaxed)) {
+    return;
+  }
+  assert(status == ContinuationStatus::Awaited &&
+         "detected concurrent attempt to resume continuation");
+
+  // TODO: maybe in some mode we should set the status to Resumed here
+  // to make a stronger best-effort attempt to catch racing attempts to
+  // resume the continuation?
+
+  swift_task_enqueue(task, context->ResumeToExecutor);
 }
 
 SWIFT_CC(swift)
-static void swift_continuation_resumeImpl(/* +1 */ OpaqueValue *result,
-                                          void *continuation,
-                                          const Metadata *resumeType) {
-  auto task = reinterpret_cast<AsyncTask*>(continuation);
-  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
-  resumeType->vw_initializeWithTake(context->NormalResult, result);
-  
+static void swift_continuation_resumeImpl(AsyncTask *task) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
   resumeTaskAfterContinuation(task, context);
 }
 
 SWIFT_CC(swift)
-static void swift_continuation_throwingResumeImpl(/* +1 */ OpaqueValue *result,
-                                                  void *continuation,
-                                                  const Metadata *resumeType) {
-  return swift_continuation_resume(result, continuation, resumeType);
+static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
+  resumeTaskAfterContinuation(task, context);
 }
 
 
 SWIFT_CC(swift)
-void static swift_continuation_throwingResumeWithErrorImpl(/* +1 */ SwiftError *error,
-                                                           void *continuation,
-                                                           const Metadata *resumeType) {
-  auto task = reinterpret_cast<AsyncTask*>(continuation);
-  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
+static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
+                                                /* +1 */ SwiftError *error) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
   context->ErrorResult = error;
-  
   resumeTaskAfterContinuation(task, context);
 }
 

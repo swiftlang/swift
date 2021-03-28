@@ -1410,6 +1410,23 @@ static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
+                                                 Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_rawUnsafeContinuation,
+                                        _owned(_typeparam(0))),
+                            _void);
+}
+
+static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
+                                                Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawUnsafeContinuation,
+                                        _owned(_error)),
+                            _void);
+}
+
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
@@ -2619,6 +2636,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDefaultActor:
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
+
+  case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+  case BuiltinValueKind::ResumeThrowingContinuationReturning:
+    return getResumeContinuationReturning(Context, Id);
+
+  case BuiltinValueKind::ResumeThrowingContinuationThrowing:
+    return getResumeContinuationThrowing(Context, Id);
 
   case BuiltinValueKind::WithUnsafeContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/false);

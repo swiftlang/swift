@@ -113,21 +113,18 @@ OVERRIDE_TASK(task_future_wait_throwing, void,
 
 OVERRIDE_TASK(continuation_resume, void, SWIFT_EXPORT_FROM(swift_Concurrency),
               SWIFT_CC(swift), swift::,
-              (OpaqueValue *result, void *continuation,
-               const Metadata *resumeType),
-              (result, continuation, resumeType))
+              (AsyncTask *continuation),
+              (continuation))
 
 OVERRIDE_TASK(continuation_throwingResume, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
-              (OpaqueValue *result, void *continuation,
-               const Metadata *resumeType),
-              (result, continuation, resumeType))
+              (AsyncTask *continuation),
+              (continuation))
 
 OVERRIDE_TASK(continuation_throwingResumeWithError, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
-              (SwiftError *error, void *continuation,
-               const Metadata *resumeType),
-              (error, continuation, resumeType))
+              (AsyncTask *continuation, SwiftError *error),
+              (continuation, error))
 
 OVERRIDE_TASK(task_addCancellationHandler,
               CancellationNotificationStatusRecord *,

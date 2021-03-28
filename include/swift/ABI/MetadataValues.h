@@ -2052,6 +2052,9 @@ enum class AsyncContextKind {
   /// A context which can yield to its caller.
   Yielding         = 1,
 
+  /// A continuation context.
+  Continuation     = 2,
+
   // Other kinds are reserved for interesting special
   // intermediate contexts.
 
@@ -2094,6 +2097,55 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(ShouldNotDeallocate,
                                 shouldNotDeallocateInCallee,
                                 setShouldNotDeallocateInCallee)
+};
+
+/// Flags passed to swift_continuation_init.
+class AsyncContinuationFlags : public FlagSet<size_t> {
+public:
+  enum {
+    CanThrow            = 0,
+    HasExecutorOverride = 1,
+    IsPreawaited        = 2,
+  };
+
+  explicit AsyncContinuationFlags(size_t bits) : FlagSet(bits) {}
+  constexpr AsyncContinuationFlags() {}
+
+  /// Whether the continuation is permitted to throw.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(CanThrow, canThrow, setCanThrow)
+
+  /// Whether the continuation should be resumed on a different
+  /// executor than the current one.  swift_continuation_init
+  /// will not initialize ResumeToExecutor if this is set.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasExecutorOverride,
+                                hasExecutorOverride,
+                                setHasExecutorOverride)
+
+  /// Whether the continuation is "pre-awaited".  If so, it should
+  /// be set up in the already-awaited state, and so resumptions
+  /// will immediately schedule the continuation to begin
+  /// asynchronously.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsPreawaited,
+                                isPreawaited,
+                                setIsPreawaited)
+};
+
+/// Status values for a continuation.  Note that the "not yet"s in
+/// the description below aren't quite right because the system
+/// does not actually promise to update the status before scheduling
+/// the task.  This is because the continuation context is immediately
+/// invalidated once the task starts running again, so the window in
+/// which we can usefully protect against (say) double-resumption may
+/// be very small.
+enum class ContinuationStatus : size_t {
+  /// The continuation has not yet been awaited or resumed.
+  Pending = 0,
+
+  /// The continuation has already been awaited, but not yet resumed.
+  Awaited = 1,
+
+  /// The continuation has already been resumed, but not yet awaited.
+  Resumed = 2
 };
 
 } // end namespace swift

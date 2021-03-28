@@ -523,23 +523,35 @@ void swift_defaultActor_destroy(DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
-/// Resume a task from its continuation, given a normal result value.
+/// Prepare a continuation in the current task.
+///
+/// The caller should initialize the Parent, ResumeParent,
+/// and NormalResult fields.  This function will initialize the other
+/// fields with appropriate defaaults; the caller may then overwrite
+/// them if desired.
+///
+/// This function is provided as a code-size and runtime-usage
+/// optimization; calling it is not required if code is willing to
+/// do all its work inline.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_resume(/* +1 */ OpaqueValue *result,
-                               void *continuation,
-                               const Metadata *resumeType);
+AsyncTask *swift_continuation_init(ContinuationAsyncContext *context,
+                                   AsyncContinuationFlags flags);
 
-/// Resume a task from its throwing continuation, given a normal result value.
+/// Resume a task from a non-throwing continuation, given a normal
+/// result which has already been stored into the continuation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_throwingResume(/* +1 */ OpaqueValue *result,
-                                       void *continuation,
-                                       const Metadata *resumeType);
+void swift_continuation_resume(AsyncTask *continuation);
 
-/// Resume a task from its throwing continuation by throwing an error.
+/// Resume a task from a potentially-throwing continuation, given a
+/// normal result which has already been stored into the continuation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
-                                                void *continuation,
-                                                const Metadata *resumeType);
+void swift_continuation_throwingResume(AsyncTask *continuation);
+
+/// Resume a task from a potentially-throwing continuation by throwing
+/// an error.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
+                                                /* +1 */ SwiftError *error);
 
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)

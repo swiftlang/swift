@@ -536,6 +536,31 @@ public:
   }
 };
 
+/// An async context that can be resumed as a continuation.
+class ContinuationAsyncContext : public AsyncContext {
+public:
+  /// An atomic object used to ensure that a continuation is not
+  /// scheduled immediately during a resume if it hasn't yet been
+  /// awaited by the function which set it up.
+  std::atomic<ContinuationStatus> AwaitSynchronization;
+
+  /// The error result value of the continuation.
+  /// This should be null-initialized when setting up the continuation.
+  /// Throwing resumers must overwrite this with a non-null value.
+  SwiftError *ErrorResult;
+
+  /// A pointer to the normal result value of the continuation.
+  /// Normal resumers must initialize this before resuming.
+  OpaqueValue *NormalResult;
+
+  /// The executor that should be resumed to.
+  ExecutorRef ResumeToExecutor;
+
+  static bool classof(const AsyncContext *context) {
+    return context->Flags.getKind() == AsyncContextKind::Continuation;
+  }
+};
+
 /// An asynchronous context within a task that describes a general "Future".
 /// task.
 ///

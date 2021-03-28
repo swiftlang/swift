@@ -46,6 +46,7 @@ enum SingletonTypeSynthesizer {
   _nativeObject,
   _never,
   _rawPointer,
+  _rawUnsafeContinuation,
   _void,
   _word,
 };
@@ -60,6 +61,7 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _nativeObject: return SC.Context.TheNativeObjectType;
   case _never: return SC.Context.getNeverType();
   case _rawPointer: return SC.Context.TheRawPointerType;
+  case _rawUnsafeContinuation: return SC.Context.TheRawUnsafeContinuationType;
   case _void: return SC.Context.TheEmptyTupleType;
   case _word: return BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                              SC.Context);

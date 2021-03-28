@@ -6805,7 +6805,8 @@ void IRGenModule::emitSILStaticInitializers() {
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;
-  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out,
+                           i->throws());
   setLoweredExplosion(i, out);
 }
 
@@ -6813,7 +6814,8 @@ void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
   auto resultAddr = getLoweredStackAddress(i->getOperand());
   Explosion out;
-  emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out,
+                           i->throws());
   setLoweredExplosion(i, out);
 }
 

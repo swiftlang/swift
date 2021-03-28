@@ -723,6 +723,18 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
+/// Resume a non-throwing continuation normally with the given result.
+BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
+                       "resumeNonThrowingContinuationReturning", "", Special)
+
+/// Resume a throwing continuation normally with the given result.
+BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
+                       "resumeThrowingContinuationReturning", "", Special)
+
+/// Resume a throwing continuation abnormally with the given error.
+BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
+                       "resumeThrowingContinuationThrowing", "", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
