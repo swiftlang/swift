@@ -217,6 +217,87 @@ static bool hasNonInlinedDebugScope(SILInstruction *i) {
   return false;
 }
 
+namespace {
+
+/// A helper struct that attempts to infer the decl associated with a value from
+/// one of its uses. It does this by searching the def-use graph locally for
+/// debug_value and debug_value_addr instructions.
+struct ValueUseToDeclInferrer {
+  using Argument = ValueToDeclInferrer::Argument;
+  using ArgumentKeyKind = ValueToDeclInferrer::ArgumentKeyKind;
+
+  SmallPtrSet<swift::SILInstruction *, 8> visitedDebugValueInsts;
+  ValueToDeclInferrer &object;
+  ArgumentKeyKind keyKind;
+  SmallVectorImpl<Argument> &resultingInferredDecls;
+
+  bool findDecls(Operand *use, SILValue value);
+};
+
+} // anonymous namespace
+
+bool ValueUseToDeclInferrer::findDecls(Operand *use, SILValue value) {
+  // Skip type dependent operands.
+  if (use->isTypeDependent())
+    return false;
+
+  // Then see if we have a debug_value that is associated with a non-inlined
+  // debug scope. Such an instruction is an instruction that is from the
+  // current function.
+  auto *dvi = dyn_cast<DebugValueInst>(use->getUser());
+  if (!dvi)
+    return false;
+
+  if (!hasNonInlinedDebugScope(dvi))
+    return false;
+
+  // See if we have already inferred this debug_value as a potential source
+  // for this instruction. In such a case, just return.
+  if (!visitedDebugValueInsts.insert(dvi).second)
+    return false;
+
+  if (auto *decl = dvi->getDecl()) {
+    std::string msg;
+    {
+      llvm::raw_string_ostream stream(msg);
+      // If we are not a top level use, we must be a rc-identical transitive
+      // use. In such a case, we just print out the rc identical value
+      // without a projection path. This is because we now have a better
+      // name and the name is rc-identical to whatever was at the end of the
+      // projection path but is not at the end of that projection path.
+      object.printNote(stream, decl,
+                       use->get() == value /*print projection path*/);
+    }
+    resultingInferredDecls.emplace_back(
+        OptRemark::ArgumentKey{keyKind, "InferredValue"}, std::move(msg), decl);
+    return true;
+  }
+
+  // If we did not have a decl, see if we were asked for testing
+  // purposes to use SILDebugInfo to create a placeholder inferred
+  // value.
+  if (!DecllessDebugValueUseSILDebugInfo)
+    return false;
+
+  auto varInfo = dvi->getVarInfo();
+  if (!varInfo)
+    return false;
+
+  auto name = varInfo->Name;
+  if (name.empty())
+    return false;
+
+  std::string msg;
+  {
+    llvm::raw_string_ostream stream(msg);
+    object.printNote(stream, name,
+                     use->get() == value /*print projection path*/);
+  }
+  resultingInferredDecls.push_back(
+      Argument({keyKind, "InferredValue"}, std::move(msg), dvi->getLoc()));
+  return true;
+}
+
 bool ValueToDeclInferrer::infer(
     ArgumentKeyKind keyKind, SILValue value,
     SmallVectorImpl<Argument> &resultingInferredDecls,
@@ -225,7 +306,8 @@ bool ValueToDeclInferrer::infer(
   SWIFT_DEFER {
     accessPath.clear();
   };
-  SmallPtrSet<SILInstruction *, 8> visitedDebugValueInsts;
+  ValueUseToDeclInferrer valueUseInferrer{
+      {}, *this, keyKind, resultingInferredDecls};
   bool foundSingleRefElementAddr = false;
 
   // This is a linear IR traversal using a 'falling while loop'. That means
@@ -308,66 +390,7 @@ bool ValueToDeclInferrer::infer(
     // instance, if we FSOed.
     bool foundDeclFromUse = false;
     rcfi.visitRCUses(value, [&](Operand *use) {
-      // Skip type dependent uses.
-      if (use->isTypeDependent())
-        return;
-
-      // Then see if we have a debug_value that is associated with a non-inlined
-      // debug scope. Such an instruction is an instruction that is from the
-      // current function.
-      auto *dvi = dyn_cast<DebugValueInst>(use->getUser());
-      if (!dvi)
-        return;
-
-      if (!hasNonInlinedDebugScope(dvi))
-        return;
-
-      // See if we have already inferred this debug_value as a potential source
-      // for this instruction. In such a case, just return.
-      if (!visitedDebugValueInsts.insert(dvi).second)
-        return;
-
-      if (auto *decl = dvi->getDecl()) {
-        std::string msg;
-        {
-          llvm::raw_string_ostream stream(msg);
-          // If we are not a top level use, we must be a rc-identical transitive
-          // use. In such a case, we just print out the rc identical value
-          // without a projection path. This is because we now have a better
-          // name and the name is rc-identical to whatever was at the end of the
-          // projection path but is not at the end of that projection path.
-          printNote(stream, decl,
-                    use->get() == value /*print projection path*/);
-        }
-        resultingInferredDecls.emplace_back(
-            OptRemark::ArgumentKey{keyKind, "InferredValue"}, std::move(msg),
-            decl);
-        foundDeclFromUse = true;
-        return;
-      }
-
-      // If we did not have a decl, see if we were asked for testing
-      // purposes to use SILDebugInfo to create a placeholder inferred
-      // value.
-      if (!DecllessDebugValueUseSILDebugInfo)
-        return;
-
-      auto varInfo = dvi->getVarInfo();
-      if (!varInfo)
-        return;
-
-      auto name = varInfo->Name;
-      if (name.empty())
-        return;
-
-      std::string msg;
-      {
-        llvm::raw_string_ostream stream(msg);
-        printNote(stream, name, use->get() == value /*print projection path*/);
-      }
-      resultingInferredDecls.push_back(
-          Argument({keyKind, "InferredValue"}, std::move(msg), dvi->getLoc()));
-      foundDeclFromUse = true;
+      foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
     });
 
     // At this point, we could not infer any argument. See if we can look up the
