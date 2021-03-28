@@ -63,6 +63,7 @@ public:
       : FirstTypeAndKind(first, kind), SecondType(second) {
     assert(first);
     assert(second);
+    assert(kind != RequirementKind::Layout);
   }
 
   /// Create a layout constraint requirement.
@@ -71,6 +72,7 @@ public:
       : FirstTypeAndKind(first, kind), SecondLayout(second) {
     assert(first);
     assert(second);
+    assert(kind == RequirementKind::Layout);
   }
 
   /// Determine the kind of requirement.
