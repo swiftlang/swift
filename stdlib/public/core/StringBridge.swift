@@ -79,26 +79,26 @@ private func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
   return unsafeBitCast(str, to: _StringSelectorHolder.self)
 }
 
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 private func _copyNSString(_ str: _StringSelectorHolder) -> _CocoaString {
   return str.copy(with: nil)
 }
 
 @usableFromInline // @testable
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 internal func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
   return _copyNSString(_objc(source))
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 private func _NSStringLen(_ str: _StringSelectorHolder) -> Int {
   return str.length
 }
 
 @usableFromInline // @testable
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
@@ -108,7 +108,7 @@ internal func _stdlib_binary_CFStringGetLength(
   return _NSStringLen(_objc(source))
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _isNSString(_ str:AnyObject) -> Bool {
   if getConstantTaggedCocoaContents(str) != nil {
     return true
@@ -116,20 +116,20 @@ internal func _isNSString(_ str:AnyObject) -> Bool {
   return _swift_stdlib_isNSString(str) != 0
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
   return UnsafeMutablePointer(mutating: str._fastCharacterContents())
 }
 
 @usableFromInline // @testable
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
   return _NSStringCharactersPtr(_objc(source))
 }
 
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 private func _NSStringGetCharacters(
   from source: _StringSelectorHolder,
   range: Range<Int>,
@@ -143,7 +143,7 @@ private func _NSStringGetCharacters(
 
 /// Copies a slice of a _CocoaString into contiguous storage of sufficient
 /// capacity.
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 internal func _cocoaStringCopyCharacters(
   from source: _CocoaString,
   range: Range<Int>,
@@ -152,21 +152,21 @@ internal func _cocoaStringCopyCharacters(
   _NSStringGetCharacters(from: _objc(source), range: range, into: destination)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 private func _NSStringGetCharacter(
   _ target: _StringSelectorHolder, _ position: Int
 ) -> UTF16.CodeUnit {
   return target.character(at: position)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
   return _NSStringGetCharacter(_objc(target), position)
 }
 
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 private func _NSStringCopyUTF8(
   _ o: _StringSelectorHolder,
   into bufPtr: UnsafeMutableRawBufferPointer
@@ -190,7 +190,7 @@ private func _NSStringCopyUTF8(
   return nil
 }
 
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
   into bufPtr: UnsafeMutableRawBufferPointer
@@ -198,7 +198,7 @@ internal func _cocoaStringCopyUTF8(
   return _NSStringCopyUTF8(_objc(target), into: bufPtr)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 private func _NSStringUTF8Count(
   _ o: _StringSelectorHolder,
   range: Range<Int>
@@ -220,7 +220,7 @@ private func _NSStringUTF8Count(
   return nil
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _cocoaStringUTF8Count(
   _ target: _CocoaString,
   range: Range<Int>
@@ -229,7 +229,7 @@ internal func _cocoaStringUTF8Count(
   return _NSStringUTF8Count(_objc(target), range: range)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 private func _NSStringCompare(
   _ o: _StringSelectorHolder, _ other: _CocoaString
 ) -> Int {
@@ -238,21 +238,21 @@ private func _NSStringCompare(
   return o.compare(other, options: options, range: range, locale: nil)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _cocoaStringCompare(
   _ string: _CocoaString, _ other: _CocoaString
 ) -> Int {
   return _NSStringCompare(_objc(string), other)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _cocoaHashString(
   _ string: _CocoaString
 ) -> UInt {
   return _swift_stdlib_CFStringHashNSString(string)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _cocoaHashASCIIBytes(
   _ bytes: UnsafePointer<UInt8>, length: Int
 ) -> UInt {
@@ -262,14 +262,14 @@ internal func _cocoaHashASCIIBytes(
 // These "trampolines" are effectively objc_msgSend_super.
 // They bypass our implementations to use NSString's.
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func _cocoaCStringUsingEncodingTrampoline(
   _ string: _CocoaString, _ encoding: UInt
 ) -> UnsafePointer<UInt8>? {
   return _swift_stdlib_NSStringCStringUsingEncodingTrampoline(string, encoding)
 }
 
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 internal func _cocoaGetCStringTrampoline(
   _ string: _CocoaString,
   _ buffer: UnsafeMutablePointer<UInt8>,
@@ -356,7 +356,7 @@ private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointe
   return str._fastCStringContents(1)?._asUInt8
 }
 
-@_effects(readonly) // @opaque
+@_effects(readonly) @inline(__always) // @opaque
 private func _withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
   requireStableAddress: Bool,
@@ -381,7 +381,7 @@ private func _withCocoaASCIIPointer<R>(
   return nil
 }
 
-@_effects(readonly) // @opaque
+@_effects(readonly) @inline(__always) // @opaque
 internal func withCocoaASCIIPointer<R>(
   _ str: _CocoaString,
   work: (UnsafePointer<UInt8>) -> R?
@@ -389,7 +389,7 @@ internal func withCocoaASCIIPointer<R>(
   return _withCocoaASCIIPointer(str, requireStableAddress: false, work: work)
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 internal func stableCocoaASCIIPointer(_ str: _CocoaString)
   -> UnsafePointer<UInt8>? {
   return _withCocoaASCIIPointer(str, requireStableAddress: true, work: { $0 })
@@ -402,7 +402,7 @@ private enum CocoaStringPointer {
   case none
 }
 
-@_effects(readonly)
+@_effects(readonly) @inline(__always)
 private func _getCocoaStringPointer(
   _ cfImmutableValue: _CocoaString
 ) -> CocoaStringPointer {
@@ -558,7 +558,7 @@ extension String {
   }
 }
 
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 private func _createNSString(
   _ receiver: _StringSelectorHolder,
   _ ptr: UnsafePointer<UInt8>,
@@ -568,7 +568,7 @@ private func _createNSString(
   return receiver.createTaggedString(bytes: ptr, count: count)
 }
 
-@_effects(releasenone)
+@_effects(releasenone) @inline(__always)
 private func _createCFString(
   _ ptr: UnsafePointer<UInt8>,
   _ count: Int,

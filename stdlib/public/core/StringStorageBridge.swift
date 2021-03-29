@@ -74,7 +74,7 @@ extension _AbstractStringStorage {
       return 0
     }
     return (start == nativeOther.start ||
-      (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
+      (_swift_stdlib_memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
   }
 
   @inline(__always)
