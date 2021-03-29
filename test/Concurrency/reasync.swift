@@ -128,3 +128,22 @@ func invalidReasyncBody(_: () async -> ()) reasync {
 func validReasyncBody(_ fn: () async -> ()) reasync {
   await fn()
 }
+
+//// String interpolation
+
+func reasyncWithAutoclosure2(_: @autoclosure () async -> String) reasync {}
+
+func callReasyncWithAutoclosure3() {
+  let world = 123
+  reasyncWithAutoclosure2("Hello \(world)")
+}
+
+//// async let
+
+func callReasyncWithAutoclosure4(_: () async -> ()) reasync {
+  await reasyncFunction {
+    async let x = 123
+
+    _ = await x
+  }
+}
