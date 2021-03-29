@@ -519,17 +519,12 @@ public:
   TaskContinuationFunction * __ptrauth_swift_async_context_yield
     YieldToParent;
 
-  /// The executor that the parent context needs to be yielded to on.
-  ExecutorRef YieldToParentExecutor;
-
   YieldingAsyncContext(AsyncContextFlags flags,
                        TaskContinuationFunction *resumeParent,
                        TaskContinuationFunction *yieldToParent,
-                       ExecutorRef yieldToParentExecutor,
                        AsyncContext *parent)
     : AsyncContext(flags, resumeParent, parent),
-      YieldToParent(yieldToParent),
-      YieldToParentExecutor(yieldToParentExecutor) {}
+      YieldToParent(yieldToParent) {}
 
   static bool classof(const AsyncContext *context) {
     return context->Flags.getKind() == AsyncContextKind::Yielding;
