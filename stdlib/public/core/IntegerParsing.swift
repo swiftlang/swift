@@ -72,7 +72,6 @@ internal func _parseASCIIDigits<
 // N.B.: This free function is a manually specialized version of the function
 // above. Ensure that any changes are made in sync.
 @_alwaysEmitIntoClient
-@inline(never)
 internal func _parseASCIIDigits<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
@@ -144,7 +143,6 @@ internal func _parseASCII<UTF8CodeUnits: Collection, Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
-@inline(never)
 internal func _parseASCII<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
@@ -197,7 +195,8 @@ extension FixedWidthInteger {
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @inlinable
-  @inline(__always)
+  @_specialize(kind: partial, where S == String)
+  @_specialize(kind: partial, where S == Substring)
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     guard _fastPath(!text.isEmpty) else { return nil }
