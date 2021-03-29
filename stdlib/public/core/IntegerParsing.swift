@@ -14,6 +14,7 @@
 // `UTF8CodeUnits == UnsafeBufferPoint<UInt8>`. Ensure that any changes are
 // made in sync.
 @_alwaysEmitIntoClient
+@inline(never)
 internal func _parseASCIIDigits<
   UTF8CodeUnits: Collection, Result: FixedWidthInteger
 >(
@@ -124,6 +125,7 @@ internal func _parseASCIIDigits<Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(never)
 internal func _parseASCII<UTF8CodeUnits: Collection, Result: FixedWidthInteger>(
   _ codeUnits: UTF8CodeUnits, radix: Int
 ) -> Result? where UTF8CodeUnits.Element == UInt8 {
