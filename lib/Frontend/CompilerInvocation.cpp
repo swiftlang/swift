@@ -538,6 +538,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Args.hasFlag(OPT_enable_swift3_objc_inference,
                  OPT_disable_swift3_objc_inference, false);
 
+  if (const Arg *A = Args.getLastArg(OPT_library_level)) {
+    StringRef contents = A->getValue();
+    if (contents == "api") {
+      Opts.LibraryLevel = LibraryLevel::API;
+    } else if (contents == "spi") {
+      Opts.LibraryLevel = LibraryLevel::SPI;
+    } else {
+      Opts.LibraryLevel = LibraryLevel::Other;
+      if (contents != "other") {
+        // Error on unknown library levels.
+        auto inFlight = Diags.diagnose(SourceLoc(),
+                                       diag::error_unknown_library_level,
+                                       contents);
+
+        // Only warn for "ipi" as we may use it in the future.
+        if (contents == "ipi")
+          inFlight.limitBehavior(DiagnosticBehavior::Warning);
+      }
+    }
+  }
+
   if (Opts.EnableSwift3ObjCInference) {
     if (const Arg *A = Args.getLastArg(
                                    OPT_warn_swift3_objc_inference_minimal,
