@@ -630,8 +630,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   SwiftJobPtrTy = SwiftJobTy->getPointerTo(DefaultAS);
 
   // using TaskContinuationFunction =
-  //   SWIFT_CC(swift)
-  //   void (AsyncTask *, ExecutorRef, AsyncContext *);
+  //   SWIFT_CC(swift) void (SWIFT_ASYNC_CONTEXT AsyncContext *);
   TaskContinuationFunctionTy = llvm::FunctionType::get(
       VoidTy, {SwiftContextPtrTy}, /*isVarArg*/ false);
   TaskContinuationFunctionPtrTy = TaskContinuationFunctionTy->getPointerTo();
