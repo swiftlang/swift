@@ -85,6 +85,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheJobType;
   if (Name == "DefaultActorStorage")
     return Context.TheDefaultActorStorageType;
+  if (Name == "Executor")
+    return Context.TheExecutorType;
   if (Name == "NativeObject")
     return Context.TheNativeObjectType;
   if (Name == "BridgeObject")
