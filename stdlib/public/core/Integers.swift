@@ -1495,64 +1495,177 @@ extension BinaryInteger {
 //===--- CustomStringConvertible conformance ------------------------------===//
 //===----------------------------------------------------------------------===//
 
+@_alwaysEmitIntoClient
+internal func _overestimatedBufferCapacity<T: BinaryInteger>(
+  _ value: T, radix: Int
+) -> Int {
+  assert(radix >= 2 && radix <= 36)
+  let bitWidth = value.bitWidth
+  // We have to *overestimate* the buffer capacity required, and we'll do so by
+  // finding the nearest power-of-two base that's equal to or less than `radix`.
+  //
+  // This function could be optimized by looking to the *value* rather than the
+  // value's bit width, but consider that this may involve multiple
+  // generic heterogeneous comparisons.
+  let divisor = Int.bitWidth &- radix.leadingZeroBitCount &- 1
+  let result = (bitWidth &- 1) / divisor &+ 1
+  return T.isSigned ? result &+ 1 : result
+}
+
+@_alwaysEmitIntoClient
+internal func _convertSignedInteger<T: BinaryInteger>(
+  _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: T,
+  radix: Int, uppercase: Bool
+) -> /* initializedCount: */ Int {
+  var initializedCount = _convertUnsignedInteger(
+    buffer, value.magnitude, radix: radix, uppercase: uppercase)
+  if value < (0 as T) {
+    initializedCount += 1
+    buffer[buffer.count &- initializedCount] = 45 /* "-" */
+  }
+  return initializedCount
+}
+
+@_alwaysEmitIntoClient
+internal func _convertUnsignedInteger<T: BinaryInteger>(
+  _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: T,
+  radix: Int, uppercase: Bool
+) -> /* initializedCount: */ Int {
+  if value == (0 as T) {
+    buffer[buffer.count &- 1] = 48 /* "0" */
+    return 1
+  }
+  if value.bitWidth <= 64 {
+    return _convertNonzeroUInt64(
+      buffer, UInt64(truncatingIfNeeded: value),
+      radix: radix, uppercase: uppercase)
+  }
+  return _convertNonzeroUnsignedInteger(
+    buffer, value, radix: radix, uppercase: uppercase)
+}
+
+@_alwaysEmitIntoClient
+internal func _convertNonzeroUInt64(
+  _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: UInt64,
+  radix: Int, uppercase: Bool
+) -> /* initializedCount: */ Int {
+  switch radix {
+  case 10:
+    return _convertNonzeroUInt64ToDecimal(buffer, value)
+  case 16:
+    return _convertNonzeroUInt64ToHexadecimal(
+      buffer, value, uppercase: uppercase)
+  default:
+    return _convertNonzeroUnsignedInteger(
+      buffer, value, radix: radix, uppercase: uppercase)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@usableFromInline
+internal let _decimalDigitsLookupTable: [(UInt8, UInt8)] = [
+  (0x30, 0x30), (0x31, 0x30), (0x32, 0x30), (0x33, 0x30), (0x34, 0x30),
+  (0x35, 0x30), (0x36, 0x30), (0x37, 0x30), (0x38, 0x30), (0x39, 0x30),
+  (0x30, 0x31), (0x31, 0x31), (0x32, 0x31), (0x33, 0x31), (0x34, 0x31),
+  (0x35, 0x31), (0x36, 0x31), (0x37, 0x31), (0x38, 0x31), (0x39, 0x31),
+  (0x30, 0x32), (0x31, 0x32), (0x32, 0x32), (0x33, 0x32), (0x34, 0x32),
+  (0x35, 0x32), (0x36, 0x32), (0x37, 0x32), (0x38, 0x32), (0x39, 0x32),
+  (0x30, 0x33), (0x31, 0x33), (0x32, 0x33), (0x33, 0x33), (0x34, 0x33),
+  (0x35, 0x33), (0x36, 0x33), (0x37, 0x33), (0x38, 0x33), (0x39, 0x33),
+  (0x30, 0x34), (0x31, 0x34), (0x32, 0x34), (0x33, 0x34), (0x34, 0x34),
+  (0x35, 0x34), (0x36, 0x34), (0x37, 0x34), (0x38, 0x34), (0x39, 0x34),
+  (0x30, 0x35), (0x31, 0x35), (0x32, 0x35), (0x33, 0x35), (0x34, 0x35),
+  (0x35, 0x35), (0x36, 0x35), (0x37, 0x35), (0x38, 0x35), (0x39, 0x35),
+  (0x30, 0x36), (0x31, 0x36), (0x32, 0x36), (0x33, 0x36), (0x34, 0x36),
+  (0x35, 0x36), (0x36, 0x36), (0x37, 0x36), (0x38, 0x36), (0x39, 0x36),
+  (0x30, 0x37), (0x31, 0x37), (0x32, 0x37), (0x33, 0x37), (0x34, 0x37),
+  (0x35, 0x37), (0x36, 0x37), (0x37, 0x37), (0x38, 0x37), (0x39, 0x37),
+  (0x30, 0x38), (0x31, 0x38), (0x32, 0x38), (0x33, 0x38), (0x34, 0x38),
+  (0x35, 0x38), (0x36, 0x38), (0x37, 0x38), (0x38, 0x38), (0x39, 0x38),
+  (0x30, 0x39), (0x31, 0x39), (0x32, 0x39), (0x33, 0x39), (0x34, 0x39),
+  (0x35, 0x39), (0x36, 0x39), (0x37, 0x39), (0x38, 0x39), (0x39, 0x39),
+]
+
+@_alwaysEmitIntoClient
+internal func _convertNonzeroUInt64ToDecimal(
+  _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: UInt64
+) -> /* initializedCount: */ Int {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return _convertNonzeroUnsignedInteger(
+      buffer, value, radix: 10, uppercase: false)
+  }
+  var value = value
+  var i = buffer.count
+  while value >= 10 {
+    i -= 2
+    let digits: UInt64
+    (value, digits) = value.quotientAndRemainder(dividingBy: 100)
+    let digits_ = Int(truncatingIfNeeded: digits)
+    (buffer[i &+ 1], buffer[i]) = _decimalDigitsLookupTable[digits_]
+  }
+  if value > 0 {
+    i -= 1
+    buffer[i] = 48 /* "0" */ &+ UInt8(truncatingIfNeeded: value)
+  }
+  return buffer.count &- i
+}
+
+@_alwaysEmitIntoClient
+internal func _convertNonzeroUInt64ToHexadecimal(
+  _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: UInt64,
+  uppercase: Bool
+) -> /* initializedCount: */ Int {
+  //TODO: Implement fast path.
+  return _convertNonzeroUnsignedInteger(
+    buffer, value, radix: 16, uppercase: uppercase)
+}
+
+@_alwaysEmitIntoClient
+@_specialize(where T == UInt64)
+@inline(never)
+internal func _convertNonzeroUnsignedInteger<T: BinaryInteger>(
+  _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: T,
+  radix: Int, uppercase: Bool
+) -> /* initializedCount: */ Int {
+  _internalInvariant(radix >= 2 && radix <= 36)
+  let radix = T(radix)
+  var value = value
+  var i = buffer.count
+  while value > (0 as T) {
+    i -= 1
+    let digit: T
+    (value, digit) = value.quotientAndRemainder(dividingBy: radix)
+    if digit < 10 {
+      buffer[i] = 48 /* "0" */ &+ UInt8(truncatingIfNeeded: digit)
+    } else if uppercase {
+      buffer[i] = 65 /* "A" */ &+ (UInt8(truncatingIfNeeded: digit) &- 10)
+    } else {
+      buffer[i] = 97 /* "a" */ &+ (UInt8(truncatingIfNeeded: digit) &- 10)
+    }
+  }
+  return buffer.count &- i
+}
+
 extension BinaryInteger {
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
 
-    if bitWidth <= 64 {
-      let radix_ = Int64(radix)
-      return Self.isSigned
-        ? _int64ToString(
-          Int64(truncatingIfNeeded: self), radix: radix_, uppercase: uppercase)
-        : _uint64ToString(
-          UInt64(truncatingIfNeeded: self), radix: radix_, uppercase: uppercase)
-    }
-
-    if self == (0 as Self) { return "0" }
-
-    // Bit shifting can be faster than division when `radix` is a power of two
-    // (although not necessarily the case for builtin types).
-    let isRadixPowerOfTwo = radix.nonzeroBitCount == 1
-    let radix_ = Magnitude(radix)
-    func _quotientAndRemainder(_ value: Magnitude) -> (Magnitude, Magnitude) {
-      return isRadixPowerOfTwo
-        ? (value >> radix.trailingZeroBitCount, value & (radix_ - 1))
-        : value.quotientAndRemainder(dividingBy: radix_)
-    }
-
-    let hasLetters = radix > 10
-    func _ascii(_ digit: UInt8) -> UInt8 {
-      let base: UInt8
-      if !hasLetters || digit < 10 {
-        base = UInt8(("0" as Unicode.Scalar).value)
-      } else if uppercase {
-        base = UInt8(("A" as Unicode.Scalar).value) &- 10
-      } else {
-        base = UInt8(("a" as Unicode.Scalar).value) &- 10
+    let capacity = _overestimatedBufferCapacity(self, radix: radix)
+    return String(_uninitializedCapacity: capacity) {
+      let initializedCount = Self.isSigned
+        ? _convertSignedInteger($0, self, radix: radix, uppercase: uppercase)
+        : _convertUnsignedInteger($0, self, radix: radix, uppercase: uppercase)
+      // The last `initializedCount` bytes of the buffer have been initialized,
+      // but we need the first `initializedCount` bytes of the buffer to be
+      // initialized instead, so we move the initialized bytes if necessary.
+      let count = $0.count
+      if initializedCount < count {
+        let baseAddress = $0.baseAddress!
+        baseAddress.moveInitialize(
+          from: baseAddress + (count &- initializedCount),
+          count: initializedCount)
       }
-      return base &+ digit
-    }
-
-    let isNegative = Self.isSigned && self < (0 as Self)
-    var value = magnitude
-
-    // TODO(FIXME JIRA): All current stdlib types fit in small. Use a stack
-    // buffer instead of an array on the heap.
-
-    var result: [UInt8] = []
-    while value != 0 {
-      let (quotient, remainder) = _quotientAndRemainder(value)
-      result.append(_ascii(UInt8(truncatingIfNeeded: remainder)))
-      value = quotient
-    }
-
-    if isNegative {
-      result.append(UInt8(("-" as Unicode.Scalar).value))
-    }
-
-    result.reverse()
-    return result.withUnsafeBufferPointer {
-      return String._fromASCII($0)
+      return initializedCount
     }
   }
 
