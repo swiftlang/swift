@@ -13,31 +13,27 @@
 // These tests check the performance of KeyPath access
 import TestsUtils
 
+var fixedSizeArray10 = initializeFixedSizeArray10()
+
+let kp0 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 0))
+let kp1 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 1))
+let kp2 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 2))
+let kp3 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 3))
+let kp4 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 4))
+let kp5 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 5))
+let kp6 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 6))
+let kp7 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 7))
+let kp8 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 8))
+let kp9 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 9))
+
 public let KeyPath = [
-  BenchmarkInfo(name: "KeyPath", runFunction: run_KeyPath, tags: [.validation, .api]),
+    BenchmarkInfo(name: "StructKeyPathComputation", runFunction: runStructKeyPathComputation, tags: [.validation, .api]),
+    BenchmarkInfo(name: "StructDirectAccessComputation", runFunction: runStructDirectAccessComputation, tags: [.validation, .api]),
 ]
 
 @inline(never)
-public func run_KeyPath(N: Int) {
+public func runStructKeyPathComputation(N: Int) {
     let iters = 50000
-    let fixedSizeArray10 = initializeFixedSizeArray10()
-    
-    testFixedArrayKeyPath10(fixedSizeArray10, iters: iters)
-}
-
-func testFixedArrayKeyPath10(_ fixedSizeArray10_in: FixedSizeArray10<Double>, iters: Int) {
-    var fixedSizeArray10 = fixedSizeArray10_in
-    
-    let kp0 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 0))
-    let kp1 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 1))
-    let kp2 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 2))
-    let kp3 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 3))
-    let kp4 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 4))
-    let kp5 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 5))
-    let kp6 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 6))
-    let kp7 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 7))
-    let kp8 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 8))
-    let kp9 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 9))
     
     for n in 0..<iters {
         fixedSizeArray10[keyPath: kp5] += fixedSizeArray10[keyPath: kp1] + Double(n)
@@ -68,8 +64,48 @@ func testFixedArrayKeyPath10(_ fixedSizeArray10_in: FixedSizeArray10<Double>, it
         fixedSizeArray10[keyPath: kp1] += fixedSizeArray10[keyPath: kp9] - fixedSizeArray10[keyPath: kp3]
     }
     
-    
     blackHole(fixedSizeArray10)
+}
+
+@inline(never)
+public func runStructDirectAccessComputation(N: Int) {
+    let iters = 50000
+
+    for n in 0..<iters {
+        fixedSizeArray10.element5 += fixedSizeArray10.element1 + Double(n)
+        fixedSizeArray10.element5 += fixedSizeArray10.element7 - fixedSizeArray10.element5
+        fixedSizeArray10.element4 += fixedSizeArray10.element3 * fixedSizeArray10.element6
+        fixedSizeArray10.element1 += fixedSizeArray10.element3 / fixedSizeArray10.element4
+        fixedSizeArray10.element0 += fixedSizeArray10.element2 + fixedSizeArray10.element1
+        fixedSizeArray10.element8 += fixedSizeArray10.element6 - fixedSizeArray10.element5
+        fixedSizeArray10.element3 += fixedSizeArray10.element2 * fixedSizeArray10.element6
+        fixedSizeArray10.element2 += fixedSizeArray10.element5 / fixedSizeArray10.element5
+        fixedSizeArray10.element8 += fixedSizeArray10.element8 + fixedSizeArray10.element9
+        fixedSizeArray10.element9 += fixedSizeArray10.element4 - fixedSizeArray10.element4
+        fixedSizeArray10.element9 += fixedSizeArray10.element7 * fixedSizeArray10.element6
+        fixedSizeArray10.element5 += fixedSizeArray10.element7 / fixedSizeArray10.element3
+        fixedSizeArray10.element8 += fixedSizeArray10.element5 + fixedSizeArray10.element8
+        fixedSizeArray10.element9 += fixedSizeArray10.element8 - fixedSizeArray10.element2
+        fixedSizeArray10.element8 += fixedSizeArray10.element8 * fixedSizeArray10.element6
+        fixedSizeArray10.element5 += fixedSizeArray10.element1 / fixedSizeArray10.element6
+        fixedSizeArray10.element1 += fixedSizeArray10.element6 + fixedSizeArray10.element2
+        fixedSizeArray10.element2 += fixedSizeArray10.element9 - fixedSizeArray10.element0
+        fixedSizeArray10.element7 += fixedSizeArray10.element5 * fixedSizeArray10.element3
+        fixedSizeArray10.element8 += fixedSizeArray10.element8 / fixedSizeArray10.element9
+        fixedSizeArray10.element6 += fixedSizeArray10.element4 + fixedSizeArray10.element0
+        fixedSizeArray10.element8 += fixedSizeArray10.element2 - fixedSizeArray10.element4
+        fixedSizeArray10.element6 += fixedSizeArray10.element1 * fixedSizeArray10.element7
+        fixedSizeArray10.element3 += fixedSizeArray10.element8 / fixedSizeArray10.element1
+        fixedSizeArray10.element7 += fixedSizeArray10.element4 + fixedSizeArray10.element3
+        fixedSizeArray10.element1 += fixedSizeArray10.element9 - fixedSizeArray10.element3
+    }
+
+    blackHole(fixedSizeArray10)
+}
+
+func testFixedArrayKeyPath10(_ fixedSizeArray10in: FixedSizeArray10<Double>, iters: Int) {
+    var fixedSizeArray10 = fixedSizeArray10in
+    
 }
 
 public struct FixedSizeArray10<Element>: Sequence, IteratorProtocol {
@@ -151,8 +187,4 @@ public struct FixedSizeArray10<Element>: Sequence, IteratorProtocol {
 
 func initializeFixedSizeArray10() -> FixedSizeArray10<Double> {
     return FixedSizeArray10<Double>(element0: 0, element1: 1, element2: 2, element3: 3, element4: 4, element5: 5, element6: 6, element7: 7, element8: 8, element9: 9)
-}
-
-func identity(_ inputKeypath: WritableKeyPath<FixedSizeArray10<Element>, Element>) -> WritableKeyPath<FixedSizeArray10<Element>, Element> {
-    return inputKeypath
 }
