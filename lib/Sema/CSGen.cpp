@@ -3572,9 +3572,7 @@ static bool generateWrappedPropertyTypeConstraints(
     Type propertyType) {
   auto dc = wrappedVar->getInnermostDeclContext();
 
-  Type wrapperType = LValueType::get(initializerType);
   Type wrappedValueType;
-
   auto wrapperAttributes = wrappedVar->getAttachedPropertyWrappers();
   for (unsigned i : indices(wrapperAttributes)) {
     // FIXME: We should somehow pass an OpenUnboundGenericTypeFn to
@@ -3585,16 +3583,20 @@ static bool generateWrappedPropertyTypeConstraints(
     if (rawWrapperType->hasError() || !wrapperInfo)
       return true;
 
-    // The former wrappedValue type must be equal to the current wrapper type
-    if (wrappedValueType) {
-      auto *typeRepr = wrapperAttributes[i]->getTypeRepr();
-      auto *locator =
-          cs.getConstraintLocator(typeRepr, LocatorPathElt::ContextualType());
-      wrapperType = cs.replaceInferableTypesWithTypeVars(rawWrapperType,
-                                                         locator);
+    auto *typeExpr = wrapperAttributes[i]->getTypeExpr();
+    auto *locator = cs.getConstraintLocator(typeExpr);
+    auto wrapperType = cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
+    cs.setType(typeExpr, wrapperType);
+
+    if (!wrappedValueType) {
+      // Equate the outermost wrapper type to the initializer type.
+      if (initializerType)
+        cs.addConstraint(ConstraintKind::Equal, wrapperType, initializerType, locator);
+    } else {
+      // The former wrappedValue type must be equal to the current wrapper type
       cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType,
-                       locator);
-      cs.setContextualType(typeRepr, TypeLoc::withoutLoc(wrappedValueType),
+                       cs.getConstraintLocator(locator, LocatorPathElt::ContextualType()));
+      cs.setContextualType(typeExpr, TypeLoc::withoutLoc(wrappedValueType),
                            CTP_ComposedPropertyWrapper);
     }
 
@@ -3900,19 +3902,12 @@ bool ConstraintSystem::generateConstraints(
 
   case SolutionApplicationTarget::Kind::uninitializedWrappedVar: {
     auto *wrappedVar = target.getAsUninitializedWrappedVar();
-    auto *outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
-    auto *typeExpr = outermostWrapper->getTypeExpr();
-    auto backingType = replaceInferableTypesWithTypeVars(
-        outermostWrapper->getType(),getConstraintLocator(typeExpr));
-
-    setType(typeExpr, backingType);
-
     auto propertyType = getVarType(wrappedVar);
     if (propertyType->hasError())
       return true;
 
     return generateWrappedPropertyTypeConstraints(
-        *this, backingType, wrappedVar, propertyType);
+        *this, /*initializerType=*/Type(), wrappedVar, propertyType);
   }
   }
 }
