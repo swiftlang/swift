@@ -10,67 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// N.B.: This free function has been manually specialized below where
-// `UTF8CodeUnits == UnsafeBufferPoint<UInt8>`. Ensure that any changes are
-// made in sync.
-@_alwaysEmitIntoClient
-@inline(never)
-internal func _parseASCIIDigits<
-  UTF8CodeUnits: Collection, Result: FixedWidthInteger
->(
-  _ codeUnits: UTF8CodeUnits, radix: Int, isNegative: Bool
-) -> Result? where UTF8CodeUnits.Element == UInt8 {
-  _internalInvariant(radix >= 2 && radix <= 36)
-  guard _fastPath(!codeUnits.isEmpty) else { return nil }
-  let multiplicand = Result(radix)
-  var result = 0 as Result
-  if radix <= 10 {
-    let upperBound = 48 /* "0" */ &+ UInt8(radix)
-    for digit in codeUnits {
-      let digitValue: Result
-      if _fastPath(digit >= 48 && digit < upperBound) {
-        digitValue = Result(digit &- 48)
-      } else {
-        return nil
-      }
-      let (temporary, overflow1) =
-        result.multipliedReportingOverflow(by: multiplicand)
-      guard _fastPath(!overflow1) else { return nil }
-      let (nextResult, overflow2) = isNegative
-        ? temporary.subtractingReportingOverflow(digitValue)
-        : temporary.addingReportingOverflow(digitValue)
-      guard _fastPath(!overflow2) else { return nil }
-      result = nextResult
-    }
-  } else {
-    let uppercaseUpperBound = 65 /* "A" */ &+ UInt8(radix &- 10)
-    let lowercaseUpperBound = 97 /* "a" */ &+ UInt8(radix &- 10)
-    for digit in codeUnits {
-      let digitValue: Result
-      if _fastPath(digit >= 48 /* "0" */ && digit < 58) {
-        digitValue = Result(digit &- 48)
-      } else if _fastPath(digit >= 65 && digit < uppercaseUpperBound) {
-        digitValue = Result(digit &- 65 &+ 10)
-      } else if _fastPath(digit >= 97 && digit < lowercaseUpperBound) {
-        digitValue = Result(digit &- 97 &+ 10)
-      } else {
-        return nil
-      }
-      let (temporary, overflow1) =
-        result.multipliedReportingOverflow(by: multiplicand)
-      guard _fastPath(!overflow1) else { return nil }
-      let (nextResult, overflow2) = isNegative
-        ? temporary.subtractingReportingOverflow(digitValue)
-        : temporary.addingReportingOverflow(digitValue)
-      guard _fastPath(!overflow2) else { return nil }
-      result = nextResult
-    }
-  }
-  return result
-}
-
-// N.B.: This free function is a manually specialized version of the function
-// above. Ensure that any changes are made in sync.
 @_alwaysEmitIntoClient
 internal func _parseASCIIDigits<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
@@ -125,24 +64,6 @@ internal func _parseASCIIDigits<Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
-@inline(never)
-internal func _parseASCII<UTF8CodeUnits: Collection, Result: FixedWidthInteger>(
-  _ codeUnits: UTF8CodeUnits, radix: Int
-) -> Result? where UTF8CodeUnits.Element == UInt8 {
-  _internalInvariant(!codeUnits.isEmpty)
-  let first = codeUnits.first!
-  if first == 45 /* "-" */ {
-    return _parseASCIIDigits(
-      codeUnits.dropFirst(), radix: radix, isNegative: true)
-  }
-  if first == 43 /* "+" */ {
-    return _parseASCIIDigits(
-      codeUnits.dropFirst(), radix: radix, isNegative: false)
-  }
-  return _parseASCIIDigits(codeUnits, radix: radix, isNegative: false)
-}
-
-@_alwaysEmitIntoClient
 internal func _parseASCII<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
@@ -159,6 +80,14 @@ internal func _parseASCII<Result: FixedWidthInteger>(
       radix: radix, isNegative: false)
   }
   return _parseASCIIDigits(codeUnits, radix: radix, isNegative: false)
+}
+
+@_alwaysEmitIntoClient
+internal func _parseASCII<S: StringProtocol, Result: FixedWidthInteger>(
+    _ text: S, radix: Int
+) -> Result? {
+    var str = String(text)
+    return str.withUTF8 { _parseASCII($0, radix: radix) }
 }
 
 extension FixedWidthInteger {
@@ -203,7 +132,7 @@ extension FixedWidthInteger {
     let result: Self? =
       text.utf8.withContiguousStorageIfAvailable {
         _parseASCII($0, radix: radix)
-      } ?? _parseASCII(text.utf8, radix: radix)
+      } ?? _parseASCII(text, radix: radix)
     guard let result_ = result else { return nil }
     self = result_
   }
