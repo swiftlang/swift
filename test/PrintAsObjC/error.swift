@@ -1,7 +1,4 @@
 // RUN: %empty-directory(%t)
-// RdsagUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -typecheck -emit-objc-header-path %t/error.h
-// RUadsgN: %FileCheck %s < %t/error.h
-
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module-path %t/error.swiftmodule -emit-objc-header-path %t/error.h -experimental-allow-module-with-compiler-errors %s
 // RUN: %FileCheck %s < %t/error.h
 // RUN: %check-in-clang %t/error.h
@@ -48,8 +45,8 @@ import Foundation
   @objc @undefined func invalidAttribute() {}
   // CHECK: - (void)invalidAttribute;
 
-  @objc undefined func invalidModifier() {}
-  // TODO: Not output with invalid modifier
+  @objc someundefinedmodifier func invalidModifier() {}
+  // TODO: someundefinedmodifier treated as a function, so invalidModifier not seen as @objc
 
   @objc @available
   func invalidAvailability() {}
