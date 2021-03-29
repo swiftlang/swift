@@ -17,6 +17,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/Consumption.h"
+#include "swift/SIL/SILInstruction.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -1579,6 +1580,18 @@ swift::getSingleInitAllocStackUse(AllocStackInst *asi,
     switch (user->getKind()) {
     default:
       break;
+    case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+      auto *uccai = cast<UnconditionalCheckedCastAddrInst>(user);
+      // Only handle the case where we are doing a take of our alloc_stack as a
+      // source value. If we are the dest, then something else is happening!
+      // Break!
+      if (use->get() == uccai->getDest())
+        break;
+      // Ok, we are the Src and are performing a take. Treat it as a destroy!
+      if (destroyingUses)
+        destroyingUses->push_back(use);
+      continue;
+    }
     case SILInstructionKind::CheckedCastAddrBranchInst: {
       auto *ccabi = cast<CheckedCastAddrBranchInst>(user);
       // We only handle the case where we are doing a take of our alloc_stack as
