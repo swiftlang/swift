@@ -16,49 +16,37 @@ internal func _parseASCIIDigits<Result: FixedWidthInteger>(
 ) -> Result? {
   _internalInvariant(radix >= 2 && radix <= 36)
   guard _fastPath(!codeUnits.isEmpty) else { return nil }
+  let numericalUpperBound, uppercaseUpperBound, lowercaseUpperBound: UInt8
+  if radix <= 10 {
+    numericalUpperBound = 48 /* "0" */ &+ UInt8(radix)
+    uppercaseUpperBound = 65
+    lowercaseUpperBound = 97
+  } else {
+    numericalUpperBound = 58
+    uppercaseUpperBound = 65 /* "A" */ &+ UInt8(radix &- 10)
+    lowercaseUpperBound = 97 /* "a" */ &+ UInt8(radix &- 10)
+  }
   let multiplicand = Result(radix)
   var result = 0 as Result
-  if radix <= 10 {
-    let upperBound = 48 /* "0" */ &+ UInt8(radix)
-    for digit in codeUnits {
-      let digitValue: Result
-      if _fastPath(digit >= 48 && digit < upperBound) {
-        digitValue = Result(digit &- 48)
-      } else {
-        return nil
-      }
-      let (temporary, overflow1) =
-        result.multipliedReportingOverflow(by: multiplicand)
-      guard _fastPath(!overflow1) else { return nil }
-      let (nextResult, overflow2) = isNegative
-        ? temporary.subtractingReportingOverflow(digitValue)
-        : temporary.addingReportingOverflow(digitValue)
-      guard _fastPath(!overflow2) else { return nil }
-      result = nextResult
+  for digit in codeUnits {
+    let digitValue: Result
+    if _fastPath(digit >= 48 && digit < numericalUpperBound) {
+      digitValue = Result(digit &- 48)
+    } else if _fastPath(digit >= 65 && digit < uppercaseUpperBound) {
+      digitValue = Result(digit &- 65 &+ 10)
+    } else if _fastPath(digit >= 97 && digit < lowercaseUpperBound) {
+      digitValue = Result(digit &- 97 &+ 10)
+    } else {
+      return nil
     }
-  } else {
-    let uppercaseUpperBound = 65 /* "A" */ &+ UInt8(radix &- 10)
-    let lowercaseUpperBound = 97 /* "a" */ &+ UInt8(radix &- 10)
-    for digit in codeUnits {
-      let digitValue: Result
-      if _fastPath(digit >= 48 /* "0" */ && digit < 58) {
-        digitValue = Result(digit &- 48)
-      } else if _fastPath(digit >= 65 && digit < uppercaseUpperBound) {
-        digitValue = Result(digit &- 65 &+ 10)
-      } else if _fastPath(digit >= 97 && digit < lowercaseUpperBound) {
-        digitValue = Result(digit &- 97 &+ 10)
-      } else {
-        return nil
-      }
-      let (temporary, overflow1) =
-        result.multipliedReportingOverflow(by: multiplicand)
-      guard _fastPath(!overflow1) else { return nil }
-      let (nextResult, overflow2) = isNegative
-        ? temporary.subtractingReportingOverflow(digitValue)
-        : temporary.addingReportingOverflow(digitValue)
-      guard _fastPath(!overflow2) else { return nil }
-      result = nextResult
-    }
+    let (temporary, overflow1) =
+      result.multipliedReportingOverflow(by: multiplicand)
+    guard _fastPath(!overflow1) else { return nil }
+    let (nextResult, overflow2) = isNegative
+      ? temporary.subtractingReportingOverflow(digitValue)
+      : temporary.addingReportingOverflow(digitValue)
+    guard _fastPath(!overflow2) else { return nil }
+    result = nextResult
   }
   return result
 }
@@ -83,6 +71,7 @@ internal func _parseASCII<Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(never)
 internal func _parseASCII<S: StringProtocol, Result: FixedWidthInteger>(
   _ text: S, radix: Int
 ) -> Result? {
@@ -124,8 +113,7 @@ extension FixedWidthInteger {
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @inlinable
-  @_specialize(kind: partial, where S == String)
-  @_specialize(kind: partial, where S == Substring)
+  @inline(__always)
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     guard _fastPath(!text.isEmpty) else { return nil }
