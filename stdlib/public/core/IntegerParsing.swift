@@ -84,10 +84,10 @@ internal func _parseASCII<Result: FixedWidthInteger>(
 
 @_alwaysEmitIntoClient
 internal func _parseASCII<S: StringProtocol, Result: FixedWidthInteger>(
-    _ text: S, radix: Int
+  _ text: S, radix: Int
 ) -> Result? {
-    var str = String(text)
-    return str.withUTF8 { _parseASCII($0, radix: radix) }
+  var str = String(text)
+  return str.withUTF8 { _parseASCII($0, radix: radix) }
 }
 
 extension FixedWidthInteger {
