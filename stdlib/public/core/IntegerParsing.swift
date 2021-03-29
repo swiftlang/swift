@@ -72,6 +72,7 @@ internal func _parseASCIIDigits<
 // N.B.: This free function is a manually specialized version of the function
 // above. Ensure that any changes are made in sync.
 @_alwaysEmitIntoClient
+@inline(never)
 internal func _parseASCIIDigits<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
@@ -143,6 +144,7 @@ internal func _parseASCII<UTF8CodeUnits: Collection, Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(never)
 internal func _parseASCII<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
