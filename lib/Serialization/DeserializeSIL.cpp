@@ -1551,7 +1551,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
     ResultInst = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
-                                        Substitutions, Args, normalBB, errorBB);
+                                        Substitutions, Args, normalBB, errorBB,
+                                        ApplyOpts);
     break;
   }
   case SILInstructionKind::PartialApplyInst: {
