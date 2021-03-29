@@ -1419,6 +1419,7 @@ bool ModuleDecl::isBuiltinModule() const {
 }
 
 bool SourceFile::registerMainDecl(Decl *mainDecl, SourceLoc diagLoc) {
+  assert(mainDecl);
   if (mainDecl == MainDecl)
     return false;
 
@@ -2243,6 +2244,53 @@ SPIGroupsRequest::evaluate(Evaluator &evaluator, const Decl *decl) const {
 
   auto &ctx = decl->getASTContext();
   return ctx.AllocateCopy(spiGroups.getArrayRef());
+}
+
+LibraryLevel ModuleDecl::getLibraryLevel() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ModuleLibraryLevelRequest{this},
+                           LibraryLevel::Other);
+}
+
+LibraryLevel
+ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
+                                    const ModuleDecl *module) const {
+  auto &ctx = module->getASTContext();
+
+  /// Is \p modulePath from System/Library/PrivateFrameworks/?
+  auto fromPrivateFrameworks = [&](StringRef modulePath) -> bool {
+    if (!ctx.LangOpts.Target.isOSDarwin()) return false;
+
+    namespace path = llvm::sys::path;
+    SmallString<128> scratch;
+    scratch = ctx.SearchPathOpts.SDKPath;
+    path::append(scratch, "System", "Library", "PrivateFrameworks");
+    return hasPrefix(path::begin(modulePath), path::end(modulePath),
+                     path::begin(scratch), path::end(scratch));
+  };
+
+  if (module->isNonSwiftModule()) {
+    if (auto *underlying = module->findUnderlyingClangModule()) {
+      // Imported clangmodules are SPI if they are defined by a private
+      // modulemap or from the PrivateFrameworks folder in the SDK.
+      bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
+                         (underlying->isPartOfFramework() &&
+                          fromPrivateFrameworks(underlying->PresumedModuleMapFile));
+      return moduleIsSPI ? LibraryLevel::SPI : LibraryLevel::API;
+    }
+    return LibraryLevel::Other;
+
+  } else if (module->isMainModule()) {
+    // The current compilation target.
+    return ctx.LangOpts.LibraryLevel;
+
+  } else {
+    // Other Swift modules are SPI if they are from the PrivateFrameworks
+    // folder in the SDK.
+    auto modulePath = module->getModuleFilename();
+    return fromPrivateFrameworks(modulePath) ?
+      LibraryLevel::SPI : LibraryLevel::API;
+  }
 }
 
 bool SourceFile::shouldCrossImport() const {

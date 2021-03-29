@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/ABI/TaskStatus.h"
@@ -270,7 +271,8 @@ static void releaseStatusRecordLock(AsyncTask *task,
 /*************************** RECORD MANAGEMENT ****************************/
 /**************************************************************************/
 
-bool swift::swift_task_addStatusRecord(TaskStatusRecord *newRecord) {
+SWIFT_CC(swift)
+static bool swift_task_addStatusRecordImpl(TaskStatusRecord *newRecord) {
   auto task = swift_task_getCurrent();
 
   // Load the current state.  We can use a relaxed load because we're
@@ -298,7 +300,8 @@ bool swift::swift_task_addStatusRecord(TaskStatusRecord *newRecord) {
   }
 }
 
-bool swift::swift_task_tryAddStatusRecord(TaskStatusRecord *newRecord) {
+SWIFT_CC(swift)
+static bool swift_task_tryAddStatusRecordImpl(TaskStatusRecord *newRecord) {
   auto task = swift_task_getCurrent();
 
   // Load the current state.  We can use a relaxed load because we're
@@ -334,7 +337,8 @@ bool swift::swift_task_tryAddStatusRecord(TaskStatusRecord *newRecord) {
   }
 }
 
-bool swift::swift_task_removeStatusRecord(TaskStatusRecord *record) {
+SWIFT_CC(swift)
+static bool swift_task_removeStatusRecordImpl(TaskStatusRecord *record) {
   auto task = swift_task_getCurrent();
 
   // Load the current state.
@@ -401,17 +405,18 @@ bool swift::swift_task_removeStatusRecord(TaskStatusRecord *record) {
 /**************************************************************************/
 
 // ==== Child tasks ------------------------------------------------------------
-
-ChildTaskStatusRecord*
-swift::swift_task_attachChild(AsyncTask *child) {
+SWIFT_CC(swift)
+static ChildTaskStatusRecord*
+swift_task_attachChildImpl(AsyncTask *child) {
   void *allocation = malloc(sizeof(swift::ChildTaskStatusRecord));
   auto record = new (allocation) swift::ChildTaskStatusRecord(child);
   swift_task_addStatusRecord(record);
   return record;
 }
 
-void
-swift::swift_task_detachChild(ChildTaskStatusRecord *record) {
+SWIFT_CC(swift)
+static void
+swift_task_detachChildImpl(ChildTaskStatusRecord *record) {
   swift_task_removeStatusRecord(record);
 }
 
@@ -497,7 +502,8 @@ static void performGroupCancellationAction(TaskStatusRecord *record) {
   // FIXME: allow dynamic extension/correction?
 }
 
-void swift::swift_task_cancel(AsyncTask *task) {
+SWIFT_CC(swift)
+static void swift_task_cancelImpl(AsyncTask *task) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
@@ -528,7 +534,8 @@ void swift::swift_task_cancel(AsyncTask *task) {
   releaseStatusRecordLock(task, cancelledStatus, recordLockRecord);
 }
 
-void swift::swift_task_cancel_group_child_tasks(TaskGroup *group) {
+SWIFT_CC(swift)
+static void swift_task_cancel_group_child_tasksImpl(TaskGroup *group) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Acquire the status record lock.
@@ -601,8 +608,9 @@ static void performEscalationAction(TaskStatusRecord *record,
   // FIXME: allow dynamic extension/correction?
 }
 
+SWIFT_CC(swift)
 JobPriority
-swift::swift_task_escalate(AsyncTask *task, JobPriority newPriority) {
+static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
   Optional<StatusRecordLockRecord> recordLockRecord;
 
   // Fast path: check that the task's priority is not already at least
@@ -645,8 +653,8 @@ swift::swift_task_escalate(AsyncTask *task, JobPriority newPriority) {
 /**************************************************************************/
 /******************************** DEADLINE ********************************/
 /**************************************************************************/
-
-NearestTaskDeadline swift::swift_task_getNearestDeadline(AsyncTask *task) {
+SWIFT_CC(swift)
+static NearestTaskDeadline swift_task_getNearestDeadlineImpl(AsyncTask *task) {
   // We don't have to worry about the deadline records being
   // concurrently modified, so we can just walk the record chain,
   // ignoring the possibility of a concurrent cancelling task.
@@ -687,3 +695,6 @@ NearestTaskDeadline swift::swift_task_getNearestDeadline(AsyncTask *task) {
   }
   return result;
 }
+
+#define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

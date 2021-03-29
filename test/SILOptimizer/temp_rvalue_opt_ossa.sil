@@ -42,6 +42,8 @@ bb0(%0 : $*Klass, %1 : $*Klass):
 sil @throwing_function : $@convention(thin) (@in_guaranteed Klass) -> ((), @error Error)
 sil @use_gsbase_builtinnativeobject : $@convention(thin) (@guaranteed GS<Builtin.NativeObject>) -> ()
 
+sil_global @globalString : $String
+
 ///////////
 // Tests //
 ///////////
@@ -830,16 +832,105 @@ bb3(%obj3 : @owned $GS<Builtin.NativeObject>):
   return %obj3 : $GS<Builtin.NativeObject>
 }
 
-// Test copy elimination with access markers on both the source and dest.
-//
-// CHECK-LABEL: sil [ossa] @takeWithAccess : $@convention(thin) (@in Klass) -> () {
+// CHECK-LABEL: sil [ossa] @extendAccessScopeOverLoad
+// CHECK:   [[GLOBAL:%.*]] = global_addr @globalString
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL]]
+// CHECK:   [[LOAD:%.*]] = load [copy] [[ACCESS]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   return [[LOAD]]
+// CHECK-LABEL: } // end sil function 'extendAccessScopeOverLoad'
+sil [ossa] @extendAccessScopeOverLoad : $@convention(thin) () -> @owned String {
+bb0:
+  %1 = global_addr @globalString : $*String
+  %3 = begin_access [read] [dynamic] %1 : $*String
+  %4 = alloc_stack $String
+  copy_addr %3 to [initialization] %4 : $*String
+  end_access %3 : $*String
+  %6 = load [copy] %4 : $*String
+  destroy_addr %4 : $*String
+  dealloc_stack %4 : $*String
+  return %6 : $String
+}
+
+sil [ossa] @loadString : $@convention(thin) (@in_guaranteed String) -> @owned String {
+bb0(%0 : $*String):
+  %1 = load [copy] %0 : $*String
+  return %1 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @extendAccessScopeOverApply
+// CHECK:   [[GLOBAL:%.*]] = global_addr @globalString
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[GLOBAL]]
+// CHECK:   [[RESULT:%.*]] = apply {{%[0-9]+}}([[ACCESS]])
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'extendAccessScopeOverApply'
+sil [ossa] @extendAccessScopeOverApply : $@convention(thin) () -> @owned String {
+bb0:
+  %1 = global_addr @globalString : $*String
+  %3 = begin_access [read] [dynamic] %1 : $*String
+  %4 = alloc_stack $String
+  copy_addr %3 to [initialization] %4 : $*String
+  end_access %3 : $*String
+  %f = function_ref @loadString : $@convention(thin) (@in_guaranteed String) -> @owned String
+  %a = apply %f(%4) : $@convention(thin) (@in_guaranteed String) -> @owned String
+  destroy_addr %4 : $*String
+  dealloc_stack %4 : $*String
+  return %a : $String
+}
+
+// CHECK-LABEL: sil [ossa] @dontExtendModifyAccess
+// CHECK:      begin_access
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: end_access
+// CHECK-NEXT: load
+// CHECK-LABEL: } // end sil function 'dontExtendModifyAccess'
+sil [ossa] @dontExtendModifyAccess : $@convention(thin) () -> @owned String {
+bb0:
+  %1 = global_addr @globalString : $*String
+  %3 = begin_access [modify] [dynamic] %1 : $*String
+  %4 = alloc_stack $String
+  copy_addr %3 to [initialization] %4 : $*String
+  end_access %3 : $*String
+  %6 = load [copy] %4 : $*String
+  destroy_addr %4 : $*String
+  dealloc_stack %4 : $*String
+  return %6 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @dontExtendAccessScopeOverEndAccess
+// CHECK:      begin_access [read] [dynamic] %0 : $*Int
+// CHECK-NEXT: begin_access [read] [dynamic] %{{[0-9]+}} : $*String
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: copy_addr 
+// CHECK-NEXT: end_access %{{[0-9]+}} : $*String
+// CHECK-NEXT: end_access %{{[0-9]+}} : $*Int
+// CHECK-NEXT: load
+// CHECK-LABEL: } // end sil function 'dontExtendAccessScopeOverEndAccess'
+sil [ossa] @dontExtendAccessScopeOverEndAccess : $@convention(thin) (@in_guaranteed Int) -> @owned String {
+bb0(%0 : $*Int):
+  %1 = global_addr @globalString : $*String
+  %2 = begin_access [read] [dynamic] %0 : $*Int
+  %3 = begin_access [read] [dynamic] %1 : $*String
+  %4 = alloc_stack $String
+  copy_addr %3 to [initialization] %4 : $*String
+  end_access %3 : $*String
+  end_access %2 : $*Int
+  %6 = load [copy] %4 : $*String
+  destroy_addr %4 : $*String
+  dealloc_stack %4 : $*String
+  return %6 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @dontExtendAccessScopeOverBeginAccess : $@convention(thin) (@in Klass) -> () {
 // CHECK: bb0(%0 : $*Klass):
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Klass
+// CHECK:   [[STACK:%.*]] = alloc_stack $Klass
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] [[STACK]] : $*Klass
 // CHECK:   apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@in_guaranteed Klass) -> ()
-// CHECK:   end_access [[ACCESS]] : $*Klass
-// CHECK:   destroy_addr %0 : $*Klass
-// CHECK-LABEL: } // end sil function 'takeWithAccess'
-sil [ossa] @takeWithAccess : $@convention(thin) (@in Klass) -> () {
+// CHECK:   destroy_addr [[STACK]] : $*Klass
+// CHECK-LABEL: } // end sil function 'dontExtendAccessScopeOverBeginAccess'
+sil [ossa] @dontExtendAccessScopeOverBeginAccess : $@convention(thin) (@in Klass) -> () {
 bb0(%0 : $*Klass):
   %stack = alloc_stack $Klass
   %access = begin_access [read] [static] %0 : $*Klass

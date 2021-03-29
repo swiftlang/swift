@@ -1181,3 +1181,111 @@ std::pair<Type, ConcreteDeclRef> swift::ide::getReferencedDecl(Expr *expr) {
 
   return std::make_pair(exprTy, refDecl);
 }
+
+bool swift::ide::isBeingCalled(ArrayRef<Expr *> ExprStack) {
+  if (ExprStack.empty())
+    return false;
+
+  Expr *Target = ExprStack.back();
+  auto UnderlyingDecl = getReferencedDecl(Target).second;
+  for (Expr *E: reverse(ExprStack)) {
+    auto *AE = dyn_cast<ApplyExpr>(E);
+    if (!AE || AE->isImplicit())
+      continue;
+    if (isa<ConstructorRefCallExpr>(AE) && AE->getArg() == Target)
+      return true;
+    if (isa<SelfApplyExpr>(AE))
+      continue;
+    if (getReferencedDecl(AE->getFn()).second == UnderlyingDecl)
+      return true;
+  }
+  return false;
+}
+
+static Expr *getContainingExpr(ArrayRef<Expr *> ExprStack, size_t index) {
+  if (ExprStack.size() > index)
+    return ExprStack.end()[-std::ptrdiff_t(index + 1)];
+  return nullptr;
+}
+
+Expr *swift::ide::getBase(ArrayRef<Expr *> ExprStack) {
+  if (ExprStack.empty())
+    return nullptr;
+
+  Expr *CurrentE = ExprStack.back();
+  Expr *ParentE = getContainingExpr(ExprStack, 1);
+  Expr *Base = nullptr;
+  if (auto DSE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
+    Base = DSE->getBase();
+  else if (auto MRE = dyn_cast<MemberRefExpr>(CurrentE))
+    Base = MRE->getBase();
+  else if (auto SE = dyn_cast<SubscriptExpr>(CurrentE))
+    Base = SE->getBase();
+
+  if (Base) {
+    while (auto ICE = dyn_cast<ImplicitConversionExpr>(Base))
+      Base = ICE->getSubExpr();
+    // DotSyntaxCallExpr with getBase() == CurrentE (ie. the current call is
+    // the base of another expression)
+    if (Base == CurrentE)
+      return nullptr;
+  }
+  return Base;
+}
+
+bool swift::ide::isDynamicCall(Expr *Base, ValueDecl *D) {
+  auto TyD = D->getDeclContext()->getSelfNominalTypeDecl();
+  if (!TyD)
+    return false;
+
+  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD) || D->isFinal())
+    return false;
+
+  // super.method()
+  // TODO: Should be dynamic if `D` is marked as dynamic and @objc, but in
+  //       that case we really need to change the role the index outputs as
+  //       well - the overrides we'd want to include are from the type of
+  //       super up to `D`
+  if (Base->isSuperExpr())
+    return false;
+
+  // `SomeType.staticOrClassMethod()`
+  if (isa<TypeExpr>(Base))
+    return false;
+
+  // `type(of: foo).staticOrClassMethod()`, not "dynamic" if the instance type
+  // is a struct/enum or if it is a class and the function is a static method
+  // (rather than a class method).
+  if (auto IT = Base->getType()->getAs<MetatypeType>()) {
+    auto InstanceType = IT->getInstanceType();
+    if (InstanceType->getStructOrBoundGenericStruct() ||
+        InstanceType->getEnumOrBoundGenericEnum())
+      return false;
+    if (InstanceType->getClassOrBoundGenericClass() && D->isFinal())
+      return false;
+  }
+
+  return true;
+}
+
+void swift::ide::getReceiverType(Expr *Base,
+                                 SmallVectorImpl<NominalTypeDecl *> &Types) {
+  Type ReceiverTy = Base->getType();
+  if (!ReceiverTy)
+    return;
+
+  if (auto LVT = ReceiverTy->getAs<LValueType>())
+    ReceiverTy = LVT->getObjectType();
+  else if (auto MetaT = ReceiverTy->getAs<MetatypeType>())
+    ReceiverTy = MetaT->getInstanceType();
+  else if (auto SelfT = ReceiverTy->getAs<DynamicSelfType>())
+    ReceiverTy = SelfT->getSelfType();
+
+  // TODO: Handle generics and composed protocols
+  if (auto OpenedTy = ReceiverTy->getAs<OpenedArchetypeType>())
+    ReceiverTy = OpenedTy->getOpenedExistentialType();
+
+  if (auto TyD = ReceiverTy->getAnyNominal()) {
+    Types.push_back(TyD);
+  }
+}

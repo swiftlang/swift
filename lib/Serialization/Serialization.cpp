@@ -3724,6 +3724,7 @@ public:
                                uint8_t(getStableSelfAccessKind(
                                                   fn->getSelfAccessKind())),
                                fn->hasForcedStaticDispatch(),
+                               fn->hasAsync(),
                                fn->hasThrows(),
                                S.addGenericSignatureRef(
                                                   fn->getGenericSignature()),

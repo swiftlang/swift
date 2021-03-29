@@ -2753,6 +2753,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Get the library level of a module.
+class ModuleLibraryLevelRequest
+    : public SimpleRequest<ModuleLibraryLevelRequest,
+                           LibraryLevel(const ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  LibraryLevel evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 class ResolveTypeRequest
     : public SimpleRequest<ResolveTypeRequest,
                            Type(const TypeResolution *, TypeRepr *,
@@ -2933,6 +2951,26 @@ private:
                                        NormalProtocolConformance *decl) const;
 
 public:
+  bool isCached() const { return true; }
+};
+
+class TypeCheckCompletionHandlerAsyncAttrRequest
+    : public SimpleRequest<TypeCheckCompletionHandlerAsyncAttrRequest,
+                           bool(AbstractFunctionDecl *,
+                                CompletionHandlerAsyncAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator,
+                AbstractFunctionDecl *attachedFucntionDecl,
+                CompletionHandlerAsyncAttr *attr) const;
+
+public:
+  // Caching
   bool isCached() const { return true; }
 };
 

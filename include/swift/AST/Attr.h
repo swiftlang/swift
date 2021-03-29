@@ -110,12 +110,15 @@ protected:
   union {
     uint64_t OpaqueBits;
 
-    SWIFT_INLINE_BITFIELD_BASE(DeclAttribute, bitmax(NumDeclAttrKindBits,8)+1+1,
+    SWIFT_INLINE_BITFIELD_BASE(DeclAttribute, bitmax(NumDeclAttrKindBits,8)+1+1+1,
       Kind : bitmax(NumDeclAttrKindBits,8),
       // Whether this attribute was implicitly added.
       Implicit : 1,
 
-      Invalid : 1
+      Invalid : 1,
+
+      /// Whether the attribute was created by an access note.
+      AddedByAccessNote : 1
     );
 
     SWIFT_INLINE_BITFIELD(ObjCAttr, DeclAttribute, 1+1+1,
@@ -191,6 +194,7 @@ protected:
     Bits.DeclAttribute.Kind = static_cast<unsigned>(DK);
     Bits.DeclAttribute.Implicit = Implicit;
     Bits.DeclAttribute.Invalid = false;
+    Bits.DeclAttribute.AddedByAccessNote = false;
   }
 
 private:
@@ -328,6 +332,18 @@ public:
   void setInvalid() { Bits.DeclAttribute.Invalid = true; }
 
   bool isValid() const { return !isInvalid(); }
+
+
+  /// Determine whether this attribute was added by an access note. If it was,
+  /// the compiler will generally recover from failures involving this attribute
+  /// as though it is not present.
+  bool getAddedByAccessNote() const {
+    return Bits.DeclAttribute.AddedByAccessNote;
+  }
+
+  void setAddedByAccessNote(bool accessNote = true) {
+    Bits.DeclAttribute.AddedByAccessNote = accessNote;
+  }
 
   /// Returns the address of the next pointer field.
   /// Used for object deserialization.

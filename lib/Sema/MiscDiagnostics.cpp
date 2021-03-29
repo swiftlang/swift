@@ -24,6 +24,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -67,6 +68,7 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///   - Error about collection literals that default to Any collections in
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
+///   - KeyPath expressions cannot refer to effectful properties / subscripts
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                                          bool isExprStmt) {
@@ -149,6 +151,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         CallArgs.insert(DSE->getIndex());
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+        // raise an error if this KeyPath contains an effectful member.
+        checkForEffectfulKeyPath(KPE);
+
         for (auto Comp : KPE->getComponents()) {
           if (auto *Arg = Comp.getIndexExpr())
             CallArgs.insert(Arg);
@@ -319,6 +324,25 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
       
       return { true, E };
+    }
+
+    /// Visit each component of the keypath and emit a diganostic if they
+    /// refer to a member that has effects.
+    void checkForEffectfulKeyPath(KeyPathExpr *keyPath) {
+      for (const auto &component : keyPath->getComponents()) {
+        if (component.hasDeclRef()) {
+          auto decl = component.getDeclRef().getDecl();
+          if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
+            if (auto getter = asd->getEffectfulGetAccessor()) {
+              Ctx.Diags.diagnose(component.getLoc(),
+                                 diag::effectful_keypath_component,
+                                 asd->getDescriptiveKind());
+              Ctx.Diags.diagnose(asd->getLoc(), diag::kind_declared_here,
+                                 asd->getDescriptiveKind());
+            }
+          }
+        }
+      }
     }
 
     void checkCheckedCastExpr(CheckedCastExpr *cast) {
@@ -4615,6 +4639,68 @@ static void diagnoseComparisonWithNaN(const Expr *E, const DeclContext *DC) {
 
   ComparisonWithNaNFinder Walker(DC);
   const_cast<Expr *>(E)->walk(Walker);
+}
+
+namespace {
+
+class CompletionHandlerUsageChecker final : public ASTWalker {
+  ASTContext &ctx;
+
+public:
+  CompletionHandlerUsageChecker(ASTContext &ctx) : ctx(ctx) {}
+
+  bool walkToDeclPre(Decl *D) override { return !isa<PatternBindingDecl>(D); }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (expr->getType().isNull())
+      return {false, expr}; // Something failed to typecheck, bail out
+
+    if (ClosureExpr *closure = dyn_cast<ClosureExpr>(expr))
+      return {closure->isBodyAsync(), closure};
+
+    if (ApplyExpr *call = dyn_cast<ApplyExpr>(expr)) {
+      if (DeclRefExpr *fnDeclExpr = dyn_cast<DeclRefExpr>(call->getFn())) {
+        ValueDecl *fnDecl = fnDeclExpr->getDecl();
+        CompletionHandlerAsyncAttr *asyncAltAttr =
+            fnDecl->getAttrs().getAttribute<CompletionHandlerAsyncAttr>();
+        if (asyncAltAttr) {
+          // Ensure that the attribute typechecks,
+          // this also resolves the async function decl.
+          if (!evaluateOrDefault(
+                  ctx.evaluator,
+                  TypeCheckCompletionHandlerAsyncAttrRequest{
+                      cast<AbstractFunctionDecl>(fnDecl), asyncAltAttr},
+                  false)) {
+            return {false, call};
+          }
+          ctx.Diags.diagnose(call->getLoc(), diag::warn_use_async_alternative);
+          ctx.Diags.diagnose(asyncAltAttr->AsyncFunctionDecl->getLoc(),
+                             diag::decl_declared_here,
+                             asyncAltAttr->AsyncFunctionDecl->getName());
+        }
+      }
+    }
+    return {true, expr};
+  }
+};
+
+} // namespace
+
+void swift::checkFunctionAsyncUsage(AbstractFunctionDecl *decl) {
+  if (!decl->isAsyncContext())
+    return;
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  BraceStmt *body = decl->getBody();
+  if (body)
+    body->walk(checker);
+}
+
+void swift::checkPatternBindingDeclAsyncUsage(PatternBindingDecl *decl) {
+  CompletionHandlerUsageChecker checker(decl->getASTContext());
+  for (Expr *init : decl->initializers()) {
+    if (auto closure = dyn_cast_or_null<ClosureExpr>(init))
+      closure->walk(checker);
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -105,7 +105,7 @@ static Expr *checkConstantness(Expr *expr) {
   expressionsToCheck.push_back(expr);
   while (!expressionsToCheck.empty()) {
     Expr *expr = expressionsToCheck.pop_back_val();
-    // Lookthrough identity_expr, tuple and inject_into_optional expressions.
+    // Lookthrough identity_expr, tuple, binary_expr and inject_into_optional expressions.
     if (IdentityExpr *identityExpr = dyn_cast<IdentityExpr>(expr)) {
       expressionsToCheck.push_back(identityExpr->getSubExpr());
       continue;
@@ -113,6 +113,10 @@ static Expr *checkConstantness(Expr *expr) {
     if (TupleExpr *tupleExpr = dyn_cast<TupleExpr>(expr)) {
       for (Expr *element : tupleExpr->getElements())
         expressionsToCheck.push_back(element);
+      continue;
+    }
+    if (BinaryExpr *binaryExpr = dyn_cast<BinaryExpr>(expr)) {
+      expressionsToCheck.push_back(binaryExpr->getArg());
       continue;
     }
     if (InjectIntoOptionalExpr *optionalExpr =

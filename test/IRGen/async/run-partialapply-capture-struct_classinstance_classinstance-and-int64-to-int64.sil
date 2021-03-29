@@ -76,11 +76,11 @@ entry(%in : $Int64, %s : $S):
   return %in : $Int64
 }
 
-sil @partial_apply_guaranteed_class_pair_param : $@async @convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64 {
+sil @partial_apply_guaranteed_class_pair_param : $@async @convention(thin) (@owned S) -> @async @callee_guaranteed (Int64) -> Int64 {
 bb0(%x : $S):
   %f = function_ref @structClassInstanceClassInstanceAndInt64ToInt64 : $@async @convention(thin) (Int64, @guaranteed S) -> Int64
-  %p = partial_apply %f(%x) : $@async @convention(thin) (Int64, @guaranteed S) -> Int64
-  return %p : $@async @callee_owned (Int64) -> Int64
+  %p = partial_apply [callee_guaranteed] %f(%x) : $@async @convention(thin) (Int64, @guaranteed S) -> Int64
+  return %p : $@async @callee_guaranteed (Int64) -> Int64
 }
 
 
@@ -93,11 +93,11 @@ sil @test_case : $@convention(thin) @async () -> () {
   strong_retain %instance2 : $C
   %instance = struct $S (%instance1 : $C, %instance2 : $C)
 
-  %partial_apply_guaranteed_class_pair_param = function_ref @partial_apply_guaranteed_class_pair_param : $@async @convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
-  %partiallyApplied = apply %partial_apply_guaranteed_class_pair_param(%instance) : $@async @convention(thin) (@owned S) -> @async @callee_owned (Int64) -> Int64
+  %partial_apply_guaranteed_class_pair_param = function_ref @partial_apply_guaranteed_class_pair_param : $@async @convention(thin) (@owned S) -> @async @callee_guaranteed (Int64) -> Int64
+  %partiallyApplied = apply %partial_apply_guaranteed_class_pair_param(%instance) : $@async @convention(thin) (@owned S) -> @async @callee_guaranteed (Int64) -> Int64
   %int_literal = integer_literal $Builtin.Int64, 9999
   %int = struct $Int64 (%int_literal : $Builtin.Int64)
-  %result = apply %partiallyApplied(%int) : $@async @callee_owned (Int64) -> Int64
+  %result = apply %partiallyApplied(%int) : $@async @callee_guaranteed (Int64) -> Int64
   %printInt64 = function_ref @printInt64 : $@convention(thin) (Int64) -> ()
   %printInt64_result = apply %printInt64(%result) : $@convention(thin) (Int64) -> () // CHECK: 9999
 

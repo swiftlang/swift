@@ -775,6 +775,33 @@ OperandOwnershipBuiltinClassifier::visitCreateAsyncTaskGroupFuture(BuiltinInst *
   return OperandOwnership::InteriorPointer;
 }
 
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeNonThrowingContinuationReturning(BuiltinInst *bi, StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeThrowingContinuationReturning(BuiltinInst *bi, StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
+OperandOwnership OperandOwnershipBuiltinClassifier::
+visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
+  // The value operand is consumed.
+  if (&op == &bi->getOperandRef(1))
+    return OperandOwnership::DestroyingConsume;
+
+  return OperandOwnership::TrivialUse;
+}
+
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InteriorPointer, DestroyDefaultActor)

@@ -706,12 +706,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
       Out << "actor-independent";
       break;
 
-    case ActorIsolation::IndependentUnsafe:
-      Out << "actor-independent-unsafe";
-      break;
-
     case ActorIsolation::Unspecified:
-      Out << "non-actor-isolated";
+      Out << "unspecified";
       break;
     }
   }
@@ -1115,12 +1111,10 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 llvm::StringRef
 DiagnosticEngine::diagnosticStringFor(const DiagID id,
-                                      bool printDiagnosticName) {
-  // TODO: Print diagnostic names from `localization`.
-  if (printDiagnosticName) {
-    return debugDiagnosticStrings[(unsigned)id];
-  }
-  auto defaultMessage = diagnosticStrings[(unsigned)id];
+                                      bool printDiagnosticNames) {
+  auto defaultMessage = printDiagnosticNames
+                            ? debugDiagnosticStrings[(unsigned)id]
+                            : diagnosticStrings[(unsigned)id];
   if (localization) {
     auto localizedMessage =
         localization.get()->getMessageOr(id, defaultMessage);

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/TaskLocal.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
@@ -21,20 +22,23 @@ using namespace swift;
 // =============================================================================
 // ==== ABI --------------------------------------------------------------------
 
-void swift::swift_task_localValuePush(AsyncTask *task,
-                                      const Metadata *keyType,
-                                      /* +1 */ OpaqueValue *value,
-                                      const Metadata *valueType) {
+SWIFT_CC(swift)
+static void swift_task_localValuePushImpl(AsyncTask *task,
+                                          const Metadata *keyType,
+                                          /* +1 */ OpaqueValue *value,
+                                          const Metadata *valueType) {
   task->localValuePush(keyType, value, valueType);
 }
 
-OpaqueValue* swift::swift_task_localValueGet(AsyncTask *task,
-                                             const Metadata *keyType,
-                                             TaskLocal::TaskLocalInheritance inheritance) {
+SWIFT_CC(swift)
+static OpaqueValue* swift_task_localValueGetImpl(AsyncTask *task,
+                                                 const Metadata *keyType,
+                                                 TaskLocal::TaskLocalInheritance inheritance) {
   return task->localValueGet(keyType, inheritance);
 }
 
-void swift::swift_task_localValuePop(AsyncTask *task) {
+SWIFT_CC(swift)
+static void swift_task_localValuePopImpl(AsyncTask *task) {
   task->localValuePop();
 }
 
@@ -185,3 +189,5 @@ OpaqueValue* TaskLocal::Storage::getValue(AsyncTask *task,
   return nullptr;
 }
 
+#define OVERRIDE_TASK_LOCAL COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

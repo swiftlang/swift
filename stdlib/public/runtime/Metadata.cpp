@@ -58,7 +58,7 @@ extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
-#include "CompatibilityOverride.h"
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
 #include "swift/Runtime/Debug.h"
@@ -1028,13 +1028,13 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
   // Unwrap ObjC class wrappers.
-  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
+  if (auto wrapper = dyn_cast_or_null<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
   }
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(theClass->isTypeMetadata());
+  assert(!theClass || theClass->isTypeMetadata());
   return theClass;
 }
 
@@ -6058,7 +6058,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
-#include "CompatibilityOverride.def"
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
 #if defined(_WIN32) && defined(_M_ARM64)
 namespace std {

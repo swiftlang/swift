@@ -9,13 +9,13 @@
 
 // RUN: %target-swift-frontend -emit-module %S/Inputs/autolinking_module_inferred.swift -emit-module-path %t/autolinking_module_inferred.swiftmodule -module-link-name autolinking_module_inferred -I %t -swift-version 4
 
-// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D NORMAL_IMPORT | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -check-prefix CHECK-NORMAL-%target-os -implicit-check-not BAD %s
-// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D IMPLEMENTATION_ONLY_IMPORT | %FileCheck -check-prefix CHECK -check-prefix CHECK-IMPL_ONLY -check-prefix CHECK-IMPL_ONLY-%target-os -implicit-check-not BAD %s
+// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D NORMAL_IMPORT | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -implicit-check-not BAD %s
+// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D IMPLEMENTATION_ONLY_IMPORT | %FileCheck -check-prefix CHECK -check-prefix CHECK-IMPL_ONLY -implicit-check-not BAD %s
 
-// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D NORMAL_AND_IMPLEMENTATION_ONLY | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -check-prefix CHECK-NORMAL-%target-os -implicit-check-not BAD %s
-// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D IMPLEMENTATION_ONLY_AND_NORMAL | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -check-prefix CHECK-NORMAL-%target-os -implicit-check-not BAD %s
-// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D EXPORTED_AND_IMPLEMENTATION_ONLY | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -check-prefix CHECK-NORMAL-%target-os -implicit-check-not BAD %s
-// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D IMPLEMENTATION_ONLY_AND_EXPORTED | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -check-prefix CHECK-NORMAL-%target-os -implicit-check-not BAD %s
+// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D NORMAL_AND_IMPLEMENTATION_ONLY | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -implicit-check-not BAD %s
+// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D IMPLEMENTATION_ONLY_AND_NORMAL | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -implicit-check-not BAD %s
+// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D EXPORTED_AND_IMPLEMENTATION_ONLY | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -implicit-check-not BAD %s
+// RUN: %target-swift-frontend -emit-ir %s -I %t -swift-version 4 -enable-objc-interop -D IMPLEMENTATION_ONLY_AND_EXPORTED | %FileCheck -check-prefix CHECK -check-prefix CHECK-NORMAL -implicit-check-not BAD %s
 
 // Linux uses a different autolinking mechanism, based on
 // swift-autolink-extract. This file tests the Darwin mechanism.

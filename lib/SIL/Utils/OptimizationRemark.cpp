@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-opt-remarks"
+
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -30,6 +32,7 @@
 #include "swift/SIL/SILRemarkStreamer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -145,15 +148,29 @@ Emitter::Emitter(StringRef passName, SILFunction &fn)
            fn.getASTContext().LangOpts.OptimizationRemarkMissedPattern->match(
                passName))) {}
 
+static SourceLoc getLocForPresentation(SILLocation loc,
+                                       SourceLocPresentationKind kind) {
+  if (!loc)
+    return SourceLoc();
+  switch (kind) {
+  case SourceLocPresentationKind::StartRange:
+    return loc.getSourceLoc();
+  case SourceLocPresentationKind::EndRange:
+    return loc.getEndSourceLoc();
+  }
+}
+
 /// The user has passed us an instruction that for some reason has a source loc
 /// that can not be used. Search down the current block for an instruction with
 /// a valid source loc and use that instead.
-static SourceLoc inferOptRemarkSearchForwards(SILInstruction &i) {
+static SourceLoc
+inferOptRemarkSearchForwards(SILInstruction &i,
+                             SourceLocPresentationKind presentationKind) {
   for (auto &inst :
        llvm::make_range(std::next(i.getIterator()), i.getParent()->end())) {
-    auto newLoc = inst.getLoc().getSourceLoc();
+    auto newLoc = getLocForPresentation(inst.getLoc(), presentationKind);
     if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
-      newLoc = inlinedLoc.getSourceLoc();
+      newLoc = getLocForPresentation(inlinedLoc, presentationKind);
     if (newLoc.isValid())
       return newLoc;
   }
@@ -165,18 +182,16 @@ static SourceLoc inferOptRemarkSearchForwards(SILInstruction &i) {
 /// that can not be used. Search up the current block for an instruction with
 /// a valid SILLocation and use the end SourceLoc of the SourceRange for the
 /// instruction.
-static SourceLoc inferOptRemarkSearchBackwards(SILInstruction &i) {
+static SourceLoc
+inferOptRemarkSearchBackwards(SILInstruction &i,
+                              SourceLocPresentationKind presentationKind) {
   for (auto &inst : llvm::make_range(std::next(i.getReverseIterator()),
                                      i.getParent()->rend())) {
     auto loc = inst.getLoc();
     if (auto inlinedLoc = inst.getDebugScope()->getOutermostInlineLocation())
       loc = inlinedLoc;
-    if (!loc.getSourceLoc().isValid())
-      continue;
-
-    auto range = loc.getSourceRange();
-    if (range.isValid())
-      return range.End;
+    if (auto result = getLocForPresentation(loc, presentationKind))
+      return result;
   }
 
   return SourceLoc();
@@ -195,34 +210,56 @@ static llvm::cl::opt<bool> IgnoreAlwaysInferForTesting(
 // (retain, release) and other situations where we are ok with original source
 // locs if we are not inlined (alloc_ref, alloc_stack).
 SourceLoc swift::OptRemark::inferOptRemarkSourceLoc(
-    SILInstruction &i, SourceLocInferenceBehavior inferBehavior) {
+    SILInstruction &i, SourceLocInferenceBehavior inferBehavior,
+    SourceLocPresentationKind presentationKind) {
+  LLVM_DEBUG(llvm::dbgs() << "Begin infer source loc for: " << i);
   // If we are only supposed to infer in inline contexts, see if we have a valid
   // loc and if that loc is an inlined call site.
   auto loc = i.getLoc();
-  if (loc.getSourceLoc().isValid() &&
-      !(bool(inferBehavior & SourceLocInferenceBehavior::AlwaysInfer) &&
-        !IgnoreAlwaysInferForTesting) &&
-      !(i.getDebugScope() && i.getDebugScope()->InlinedCallSite))
-    return loc.getSourceLoc();
+  if (!(bool(inferBehavior & SourceLocInferenceBehavior::AlwaysInfer) &&
+        !IgnoreAlwaysInferForTesting)) {
+    LLVM_DEBUG(llvm::dbgs() << "Testing insts own source loc?!\n");
+    if (loc.getSourceLoc().isValid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found initial valid loc!\n");
+      if (!(i.getDebugScope() && i.getDebugScope()->InlinedCallSite)) {
+        LLVM_DEBUG(llvm::dbgs() << "Found debug scope!\n");
+        return getLocForPresentation(loc, presentationKind);
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "Did not find debug scope!\n");
+      }
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to find initial valid loc!\n");
+    }
+  }
 
   if (bool(inferBehavior & SourceLocInferenceBehavior::ForwardScan)) {
-    SourceLoc newLoc = inferOptRemarkSearchForwards(i);
-    if (newLoc.isValid())
+    LLVM_DEBUG(llvm::dbgs() << "Inferring Source Loc Forward!\n");
+    SourceLoc newLoc = inferOptRemarkSearchForwards(i, presentationKind);
+    if (newLoc.isValid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found loc!\n");
       return newLoc;
+    }
   }
 
   if (bool(inferBehavior & SourceLocInferenceBehavior::BackwardScan)) {
-    SourceLoc newLoc = inferOptRemarkSearchBackwards(i);
-    if (newLoc.isValid())
+    LLVM_DEBUG(llvm::dbgs() << "Inferring Source Loc Backwards!\n");
+    SourceLoc newLoc = inferOptRemarkSearchBackwards(i, presentationKind);
+    if (newLoc.isValid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found loc!\n");
       return newLoc;
+    }
   }
 
   if (bool(inferBehavior & SourceLocInferenceBehavior::ForwardScan2nd)) {
-    SourceLoc newLoc = inferOptRemarkSearchForwards(i);
-    if (newLoc.isValid())
+    LLVM_DEBUG(llvm::dbgs() << "Inferring Source Loc Forward Scan 2nd!\n");
+    SourceLoc newLoc = inferOptRemarkSearchForwards(i, presentationKind);
+    if (newLoc.isValid()) {
+      LLVM_DEBUG(llvm::dbgs() << "Found loc!\n");
       return newLoc;
+    }
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Failed to find good loc!\n");
   return SourceLoc();
 }
 

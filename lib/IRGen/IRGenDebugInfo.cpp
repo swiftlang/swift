@@ -1339,6 +1339,13 @@ private:
                                         MangledName);
     }
 
+    case TypeKind::BuiltinExecutor: {
+      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+      return DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                        /* DWARFAddressSpace */ None,
+                                        MangledName);
+    }
+
     case TypeKind::DynamicSelf: {
       // Self. We don't have a way to represent instancetype in DWARF,
       // so we emit the static type instead. This is similar to what we

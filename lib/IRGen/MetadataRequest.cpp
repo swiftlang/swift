@@ -1310,6 +1310,12 @@ namespace {
     }
 
     MetadataResponse
+    visitBuiltinExecutorType(CanBuiltinExecutorType type,
+                             DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);

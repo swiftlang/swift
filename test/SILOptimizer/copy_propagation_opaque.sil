@@ -1,11 +1,11 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-NDEBUG,CHECK-OPT
+// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
 // RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -debug-only=copy-propagation %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK-TRACE
 //
 // Mandatory copy propagation does not currently handle address-only
 // types. It needs a visible layout to inject poison refs.
-//   %target-sil-opt -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-NDEBUG,CHECK-ONONE
+//   %target-sil-opt -mandatory-copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
 //
-// The CHECK-DEBUG/CHECK-NDEBUG prefixes are for the controlling the
+// The CHECK-DEBUG prefix is for the controlling the
 // debug_values preservation. CHECK-DEBUG are not currently tested
 // because we don't have a flag to enable debug_value preservation,
 // and it isn't clear that it's useful.

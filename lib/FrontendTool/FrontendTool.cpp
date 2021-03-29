@@ -640,7 +640,10 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   //
   // FIXME: It seems more appropriate for the driver to notice the early-exit
   // and react by always enqueuing the jobs it dropped in the other waves.
-  if (Instance.getDiags().hadAnyError())
+  //
+  // We will output a module if allowing errors, so ignore that case.
+  if (Instance.getDiags().hadAnyError() &&
+      !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
     return;
 
   for (auto *SF : Instance.getPrimarySourceFiles()) {
@@ -989,10 +992,11 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (!ctx.hadError()) {
     emitLoadedModuleTraceForAllPrimariesIfNeeded(
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
-    
-    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
 
     dumpAPIIfNeeded(Instance);
+  }
+  if (!ctx.hadError() || opts.AllowModuleWithCompilerErrors) {
+    emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance);
   }
 
   // Verify reference dependencies of the current compilation job. Note this

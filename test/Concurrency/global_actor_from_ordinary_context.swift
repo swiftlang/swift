@@ -47,7 +47,6 @@ func referenceGlobalActor2() {
 }
 
 
-// expected-note@+2 {{add '@asyncHandler' to function 'referenceAsyncGlobalActor()' to create an implicit asynchronous context}} {{1-1=@asyncHandler }}
 // expected-note@+1 {{add 'async' to function 'referenceAsyncGlobalActor()' to make it asynchronous}} {{33-33= async}}
 func referenceAsyncGlobalActor() {
   let y = asyncGlobalActFn
@@ -62,12 +61,12 @@ func callGlobalActor() {
 
 func fromClosure() {
   { () -> Void in
-    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this context}}
+    // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated context}}
     let x = syncGlobActorFn
     x()
   }()
 
-  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  // expected-error@+1 {{global function 'syncGlobActorFn()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
   let _ = { syncGlobActorFn() }()
 }
 

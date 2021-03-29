@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+
 #include "swift/ABI/TaskGroup.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/Metadata.h"
@@ -442,7 +444,8 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
 // ==== initialize -------------------------------------------------------------
 
 // Initializes into the preallocated _group an actual TaskGroupImpl.
-void swift::swift_taskGroup_initialize(TaskGroup *group) {
+SWIFT_CC(swift)
+static void swift_taskGroup_initializeImpl(TaskGroup *group) {
 //  // nasty trick, but we want to keep the record inside the group as we'll need
 //  // to remove it from the task as the group is destroyed, as well as interact
 //  // with it every time we add child tasks; so it is useful to pre-create it here
@@ -466,8 +469,8 @@ void swift::swift_taskGroup_initialize(TaskGroup *group) {
 
 // =============================================================================
 // ==== create -----------------------------------------------------------------
-
-TaskGroup* swift::swift_taskGroup_create() {
+SWIFT_CC(swift)
+static TaskGroup *swift_taskGroup_createImpl() {
   // TODO: John suggested we should rather create from a builtin, which would allow us to optimize allocations even more?
   void *allocation = swift_task_alloc(sizeof(TaskGroup));
   auto group = reinterpret_cast<TaskGroup *>(allocation);
@@ -477,16 +480,17 @@ TaskGroup* swift::swift_taskGroup_create() {
 
 // =============================================================================
 // ==== add / attachChild ------------------------------------------------------
-
-void swift::swift_taskGroup_attachChild(TaskGroup *group, AsyncTask *child) {
+SWIFT_CC(swift)
+static void swift_taskGroup_attachChildImpl(TaskGroup *group,
+                                            AsyncTask *child) {
   auto groupRecord = asImpl(group)->getTaskRecord();
   return groupRecord->attachChild(child);
 }
 
 // =============================================================================
 // ==== destroy ----------------------------------------------------------------
-
-void swift::swift_taskGroup_destroy(TaskGroup *group) {
+SWIFT_CC(swift)
+static void swift_taskGroup_destroyImpl(TaskGroup *group) {
   asImpl(group)->destroy();
 }
 
@@ -651,7 +655,7 @@ task_group_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 // =============================================================================
 // ==== group.next() implementation (wait_next and groupPoll) ------------------
 SWIFT_CC(swiftasync)
-void swift::swift_taskGroup_wait_next_throwing(
+static void swift_taskGroup_wait_next_throwingImpl(
     OpaqueValue *resultPointer, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
     TaskGroup *_group, const Metadata *successType) {
   auto waitingTask = swift_task_getCurrent();
@@ -782,22 +786,22 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
 
 // =============================================================================
 // ==== isEmpty ----------------------------------------------------------------
-
-bool swift::swift_taskGroup_isEmpty(TaskGroup *group) {
+SWIFT_CC(swift)
+static bool swift_taskGroup_isEmptyImpl(TaskGroup *group) {
   return asImpl(group)->isEmpty();
 }
 
 // =============================================================================
 // ==== isCancelled ------------------------------------------------------------
-
-bool swift::swift_taskGroup_isCancelled(TaskGroup *group) {
+SWIFT_CC(swift)
+static bool swift_taskGroup_isCancelledImpl(TaskGroup *group) {
   return asImpl(group)->isCancelled();
 }
 
 // =============================================================================
 // ==== cancelAll --------------------------------------------------------------
-
-void swift::swift_taskGroup_cancelAll(TaskGroup *group) {
+SWIFT_CC(swift)
+static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
   asImpl(group)->cancelAll();
 }
 
@@ -816,8 +820,11 @@ bool TaskGroupImpl::cancelAll() {
 
 // =============================================================================
 // ==== addPending -------------------------------------------------------------
-
-bool swift::swift_taskGroup_addPending(TaskGroup *group) {
+SWIFT_CC(swift)
+static bool swift_taskGroup_addPendingImpl(TaskGroup *group) {
   auto assumedStatus = asImpl(group)->statusAddPendingTaskRelaxed();
   return !assumedStatus.isCancelled();
 }
+
+#define OVERRIDE_TASK_GROUP COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

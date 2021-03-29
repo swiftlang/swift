@@ -557,47 +557,6 @@ bool GenericSignatureImpl::isCanonicalTypeInContext(
   });
 }
 
-CanType GenericSignatureImpl::getCanonicalTypeInContext(
-    Type type, GenericSignatureBuilder &builder) const {
-  type = type->getCanonicalType();
-
-  // All the contextual canonicality rules apply to type parameters, so if the
-  // type doesn't involve any type parameters, it's already canonical.
-  if (!type->hasTypeParameter())
-    return CanType(type);
-
-  // Replace non-canonical type parameters.
-  type = type.transformRec([&](TypeBase *component) -> Optional<Type> {
-    if (!isa<GenericTypeParamType>(component) &&
-        !isa<DependentMemberType>(component))
-      return None;
-
-    // Find the equivalence class for this dependent type.
-    auto resolved = builder.maybeResolveEquivalenceClass(
-                      Type(component),
-                      ArchetypeResolutionKind::CompleteWellFormed,
-                      /*wantExactPotentialArchetype=*/false);
-    if (!resolved) return None;
-
-    if (auto concrete = resolved.getAsConcreteType())
-      return getCanonicalTypeInContext(concrete, builder);
-
-    auto equivClass = resolved.getEquivalenceClass(builder);
-    if (!equivClass) return None;
-
-    if (equivClass->concreteType) {
-      return getCanonicalTypeInContext(equivClass->concreteType, builder);
-    }
-
-    return equivClass->getAnchor(builder, getGenericParams());
-  });
-  
-  auto result = type->getCanonicalType();
-
-  assert(isCanonicalTypeInContext(result, builder));
-  return result;
-}
-
 CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
   type = type->getCanonicalType();
 
@@ -607,7 +566,7 @@ CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
     return CanType(type);
 
   auto &builder = *getGenericSignatureBuilder();
-  return getCanonicalTypeInContext(type, builder);
+  return builder.getCanonicalTypeInContext(type, { })->getCanonicalType();
 }
 
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>

@@ -1584,6 +1584,10 @@ WARNING(enum_frozen_nonpublic,none,
 ERROR(getset_init,none,
       "variable with getter/setter cannot have an initial value", ())
 
+ERROR(effectful_not_representable_objc,none,
+      "%0 with 'throws' or 'async' is not representable in Objective-C",
+      (DescriptiveDeclKind))
+
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes| in protocol extensions}0"
@@ -2391,11 +2395,10 @@ ERROR(requires_generic_param_same_type_does_not_conform,none,
 ERROR(requires_same_concrete_type,none,
       "generic signature requires types %0 and %1 to be the same", (Type, Type))
 WARNING(redundant_conformance_constraint,none,
-        "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
+        "redundant conformance constraint %0 : %1", (Type, ProtocolDecl *))
 NOTE(redundant_conformance_here,none,
-     "conformance constraint %1: %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, ProtocolDecl *))
+     "conformance constraint %0 : %1 implied here",
+     (Type, ProtocolDecl *))
 
 ERROR(unsupported_recursive_requirements, none,
       "requirement involves recursion that is not currently supported", ())
@@ -2421,15 +2424,17 @@ NOTE(superclass_redundancy_here,none,
      (unsigned, Type, Type))
 
 ERROR(conflicting_layout_constraints,none,
-      "%select{generic parameter |protocol |}0%1 has conflicting "
-      "constraints %2 and %3",
-      (unsigned, Type, LayoutConstraint, LayoutConstraint))
+      "type %0 has conflicting constraints %1 and %2",
+      (Type, LayoutConstraint, LayoutConstraint))
+NOTE(conflicting_layout_constraint, none,
+     "constraint conflicts with %0 : %1",
+     (Type, LayoutConstraint))
 WARNING(redundant_layout_constraint,none,
-        "redundant constraint %0 : %1", (Type, LayoutConstraint))
+        "redundant constraint %0 : %1",
+        (Type, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-     "constraint %1 : %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, LayoutConstraint))
+     "constraint %0 : %1 implied here",
+     (Type, LayoutConstraint))
 
 WARNING(redundant_same_type_constraint,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
@@ -2600,6 +2605,10 @@ ERROR(override_class_declaration_in_extension,none,
 ERROR(override_throws,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
+// TODO: this really could be merged with the above.
+ERROR(override_with_more_effects,none,
+      "cannot override non-'%1' %0 with '%1' %0",
+      (DescriptiveDeclKind, StringRef))
 ERROR(override_throws_objc,none,
       "overriding a throwing @objc %select{method|initializer}0 with "
       "a non-throwing %select{method|initializer}0 is not supported", (bool))
@@ -2834,6 +2843,9 @@ WARNING(warn_implementation_only_conflict,none,
         (Identifier))
 NOTE(implementation_only_conflict_here,none,
      "imported as implementation-only here", ())
+WARNING(warn_public_import_of_private_module,none,
+        "private module %0 is imported publicly from the public module %1",
+        (Identifier, Identifier))
 
 ERROR(implementation_only_decl_non_override,none,
       "'@_implementationOnly' can only be used on overrides", ())
@@ -3376,6 +3388,9 @@ ERROR(attr_completion_handler_async_ambiguous_function,none,
 
 ERROR(attr_completion_handler_async_no_suitable_function,none,
       "no corresponding async function named %0", (DeclNameRef))
+
+WARNING(warn_use_async_alternative,none,
+        "consider using asynchronous alternative function",())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
@@ -4147,21 +4162,21 @@ ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
 ERROR(try_unhandled,none,
       "errors thrown from here are not handled", ())
 ERROR(throwing_call_unhandled,none,
-      "call can throw, but the error is not handled", ())
+      "%0 can throw, but the error is not handled", (StringRef))
 ERROR(tryless_throwing_call_unhandled,none,
-      "call can throw, but it is not marked with 'try' and "
-      "the error is not handled", ())
+      "%0 can throw, but it is not marked with 'try' and "
+      "the error is not handled", (StringRef))
 ERROR(throw_in_nonthrowing_function,none,
       "error is not handled because the enclosing function "
       "is not declared 'throws'", ())
 
 ERROR(throwing_call_in_rethrows_function,none,
-      "call can throw, but the error is not handled; a function declared "
-      "'rethrows' may only throw if its parameter does", ())
+      "%0 can throw, but the error is not handled; a function declared "
+      "'rethrows' may only throw if its parameter does", (StringRef))
 ERROR(tryless_throwing_call_in_rethrows_function,none,
-      "call can throw, but it is not marked with 'try' and "
+      "%0 can throw, but it is not marked with 'try' and "
       "the error is not handled; a function declared "
-      "'rethrows' may only throw if its parameter does", ())
+      "'rethrows' may only throw if its parameter does", (StringRef))
 ERROR(throw_in_rethrows_function,none,
       "a function declared 'rethrows' may only throw if its parameter does", ())
 NOTE(because_rethrows_argument_throws,none,
@@ -4173,11 +4188,11 @@ NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
-      "call can throw, but it is executed in a non-throwing "
-      "autoclosure",())
+      "%0 can throw, but it is executed in a non-throwing "
+      "autoclosure",(StringRef))
 ERROR(tryless_throwing_call_in_nonthrowing_autoclosure,none,
-      "call can throw, but it is not marked with 'try' and "
-      "it is executed in a non-throwing autoclosure",())
+      "%0 can throw, but it is not marked with 'try' and "
+      "it is executed in a non-throwing autoclosure",(StringRef))
 ERROR(throw_in_nonthrowing_autoclosure,none,
       "error is not handled because it is thrown in a non-throwing "
       "autoclosure", ())
@@ -4186,17 +4201,17 @@ ERROR(try_unhandled_in_nonexhaustive_catch,none,
       "errors thrown from here are not handled because the "
       "enclosing catch is not exhaustive", ())
 ERROR(throwing_call_in_nonexhaustive_catch,none,
-      "call can throw, but the enclosing catch is not exhaustive", ())
+      "%0 can throw, but the enclosing catch is not exhaustive", (StringRef))
 ERROR(tryless_throwing_call_in_nonexhaustive_catch,none,
-      "call can throw, but it is not marked with 'try' and "
-      "the enclosing catch is not exhaustive", ())
+      "%0 can throw, but it is not marked with 'try' and "
+      "the enclosing catch is not exhaustive", (StringRef))
 ERROR(throw_in_nonexhaustive_catch,none,
       "error is not handled because the enclosing catch is not exhaustive", ())
 
-ERROR(throwing_call_in_illegal_context,none,
-      "call can throw, but errors cannot be thrown out of "
+ERROR(throwing_op_in_illegal_context,none,
+      "%1 can throw, but errors cannot be thrown out of "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
-      (unsigned))
+      (unsigned, StringRef))
 ERROR(throw_in_illegal_context,none,
       "errors cannot be thrown out of "
       "%select{<<ERROR>>|a default argument|a property wrapper initializer|a property initializer|a global variable initializer|an enum case raw value|a catch pattern|a catch guard expression|a defer body}0",
@@ -4210,6 +4225,10 @@ ERROR(throwing_call_without_try,none,
       "call can throw but is not marked with 'try'", ())
 ERROR(throwing_async_let_without_try,none,
       "reading 'async let' can throw but is not marked with 'try'", ())
+ERROR(throwing_prop_access_without_try,none,
+      "property access can throw but is not marked with 'try'", ())
+ERROR(throwing_subscript_access_without_try,none,
+      "subscript access can throw but is not marked with 'try'", ())
 NOTE(note_forgot_try,none,
       "did you mean to use 'try'?", ())
 NOTE(note_error_to_optional,none,
@@ -4311,6 +4330,8 @@ ERROR(asynchandler_noescape_closure_parameter,none,
 ERROR(asynchandler_mutating,none,
       "'@asyncHandler' function cannot be 'mutating'",
       ())
+ERROR(asynchandler_removed,none,
+      "'@asyncHandler' has been removed from the language", ())
 
 ERROR(objc_ambiguous_async_convention,none,
       "%0 overrides or implements protocol requirements for Objective-C "
@@ -4323,7 +4344,7 @@ ERROR(async_objc_dynamic_self,none,
       "asynchronous method returning 'Self' cannot be '@objc'", ())
 
 ERROR(actor_with_nonactor_superclass,none,
-      "actor class cannot inherit from non-actor class %0", (DeclName))
+      "actor cannot inherit from non-actor class %0", (DeclName))
 
 ERROR(actor_isolated_non_self_reference,none,
         "actor-isolated %0 %1 can only be %select{referenced|mutated|used 'inout'}3 "
@@ -4377,6 +4398,9 @@ ERROR(actor_isolated_from_escaping_closure,none,
 ERROR(actor_isolated_keypath_component,none,
       "cannot form key path to actor-isolated %0 %1",
       (DescriptiveDeclKind, DeclName))
+ERROR(effectful_keypath_component,none,
+      "cannot form key path to %0 with 'throws' or 'async'",
+      (DescriptiveDeclKind))
 ERROR(local_function_executed_concurrently,none,
       "concurrently-executed %0 %1 must be marked as '@Sendable'",
       (DescriptiveDeclKind, DeclName))
@@ -4500,7 +4524,7 @@ ERROR(multiple_global_actors,none,
 ERROR(global_actor_disallowed,none,
       "%0 cannot have a global actor", (DescriptiveDeclKind))
 ERROR(global_actor_on_actor_class,none,
-      "actor class %0 cannot have a global actor", (Identifier))
+      "actor %0 cannot have a global actor", (Identifier))
 ERROR(global_actor_on_local_variable,none,
       "local variable %0 cannot have a global actor", (DeclName))
 ERROR(global_actor_non_unsafe_init,none,
@@ -4827,7 +4851,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)|marked @objc by an access note}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "
@@ -5581,16 +5605,16 @@ ERROR(property_wrapper_param_not_supported,none,
       (DescriptiveDeclKind))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (Identifier))
-ERROR(property_wrapper_param_no_projection,none,
-      "cannot use property wrapper projection parameter; "
-      "wrapper %0 does not have a 'projectedValue'", (Type))
-ERROR(property_wrapper_param_no_wrapper,none,
-      "cannot use property wrapper projection argument; "
-      "parameter does not have an attached property wrapper",
-      ())
-ERROR(property_wrapper_param_projection_invalid,none,
-      "cannot use property wrapper projection argument; "
-      "pass wrapped value type %0 instead", (Type))
+ERROR(invalid_projection_argument,none,
+      "cannot use property wrapper projection %select{argument|parameter}0",
+      (bool))
+NOTE(property_wrapper_param_no_wrapper,none,
+     "parameter %0 does not have an attached property wrapper", (Identifier))
+NOTE(property_wrapper_param_attr_arg,none,
+     "property wrapper has arguments in the wrapper attribute", ())
+NOTE(property_wrapper_no_init_projected_value,none,
+     "property wrapper type %0 does not support initialization from a "
+     "projected value", (Type))
 ERROR(property_wrapper_param_mutating,none,
       "property wrapper applied to parameter must have a nonmutating "
       "'wrappedValue' getter", ())
@@ -5610,6 +5634,9 @@ ERROR(property_wrapper_let, none,
 ERROR(property_wrapper_computed, none,
       "property wrapper cannot be applied to a computed property",
       ())
+ERROR(property_wrapper_effectful,none,
+    "property wrappers currently cannot define an 'async' or 'throws' accessor",
+    ())
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "

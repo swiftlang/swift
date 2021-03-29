@@ -1,9 +1,12 @@
 // RUN: %empty-directory(%t)
 
 // The module should be generated regardless of errors and diagnostic should still be output
-// RUN: %target-swift-frontend -verify -emit-module -o %t/errors.swiftmodule -experimental-allow-module-with-compiler-errors -D ERROR_MODULE %s
+// RUN: %target-swift-frontend -verify -emit-module -o %t/errors.swiftmodule -emit-reference-dependencies-path %t/errors.swiftdeps -emit-dependencies-path %t/errors.d -experimental-allow-module-with-compiler-errors -D ERROR_MODULE -primary-file %s
 // RUN: llvm-bcanalyzer %t/errors.swiftmodule | %FileCheck -check-prefix=CHECK-BC %s
 // CHECK-BC-NOT: UnknownCode
+// RUN: ls %t/errors.swiftdeps
+// RUN: ls %t/errors.d
+
 #if ERROR_MODULE
 public struct ValidStructInvalidMember {
   public var member: String

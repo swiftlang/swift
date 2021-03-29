@@ -61,16 +61,17 @@ struct ValueToDeclInferrer {
   using Argument = OptRemark::Argument;
   using ArgumentKeyKind = OptRemark::ArgumentKeyKind;
 
-  RCIdentityFunctionInfo &rcfi;
   SmallVector<std::pair<SILType, Projection>, 32> accessPath;
   SmallVector<Operand *, 32> rcIdenticalSecondaryUseSearch;
+  RCIdentityFunctionInfo &rcfi;
 
   ValueToDeclInferrer(RCIdentityFunctionInfo &rcfi) : rcfi(rcfi) {}
 
   /// Given a value, attempt to infer a conservative list of decls that the
   /// passed in value could be referring to. This is done just using heuristics
   bool infer(ArgumentKeyKind keyKind, SILValue value,
-             SmallVectorImpl<Argument> &resultingInferredDecls);
+             SmallVectorImpl<Argument> &resultingInferredDecls,
+             bool allowSingleRefEltAddrPeek = false);
 
   /// Print out a note to \p stream that beings at decl and then if
   /// useProjectionPath is set to true iterates the accessPath we computed for
@@ -157,6 +158,7 @@ void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
       stream << "bitwise_cast<" << proj.getCastType(baseType) << ">";
       continue;
     case ProjectionKind::Struct:
+    case ProjectionKind::Class:
       stream << proj.getVarDecl(baseType)->getBaseName();
       continue;
     case ProjectionKind::Tuple:
@@ -165,8 +167,10 @@ void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
     case ProjectionKind::Enum:
       stream << proj.getEnumElementDecl(baseType)->getBaseName();
       continue;
-    // Object -> Address projections can never be looked through.
-    case ProjectionKind::Class:
+
+    // Object -> Address projections can never be looked through unless they are
+    // from a class where we have special logic for it only happening a single
+    // time.
     case ProjectionKind::Box:
     case ProjectionKind::Index:
     case ProjectionKind::TailElems:
@@ -215,12 +219,14 @@ static bool hasNonInlinedDebugScope(SILInstruction *i) {
 
 bool ValueToDeclInferrer::infer(
     ArgumentKeyKind keyKind, SILValue value,
-    SmallVectorImpl<Argument> &resultingInferredDecls) {
+    SmallVectorImpl<Argument> &resultingInferredDecls,
+    bool allowSingleRefEltAddrPeek) {
   // Clear the stored access path at end of scope.
   SWIFT_DEFER {
     accessPath.clear();
   };
   SmallPtrSet<SILInstruction *, 8> visitedDebugValueInsts;
+  bool foundSingleRefElementAddr = false;
 
   // This is a linear IR traversal using a 'falling while loop'. That means
   // every time through the loop we are trying to handle a case before we hit
@@ -310,7 +316,10 @@ bool ValueToDeclInferrer::infer(
       // debug scope. Such an instruction is an instruction that is from the
       // current function.
       auto *dvi = dyn_cast<DebugValueInst>(use->getUser());
-      if (!dvi || !hasNonInlinedDebugScope(dvi))
+      if (!dvi)
+        return;
+
+      if (!hasNonInlinedDebugScope(dvi))
         return;
 
       // See if we have already inferred this debug_value as a potential source
@@ -375,6 +384,20 @@ bool ValueToDeclInferrer::infer(
         accessPath.emplace_back(value->getType(), proj);
         continue;
       }
+
+      // Check if we had a ref_element_addr and our caller said that they were
+      // ok with skipping a single one.
+      //
+      // Examples of users: begin_access, end_access.
+      if (allowSingleRefEltAddrPeek &&
+          proj.getKind() == ProjectionKind::Class) {
+        if (!foundSingleRefElementAddr) {
+          value = cast<RefElementAddrInst>(value)->getOperand();
+          accessPath.emplace_back(value->getType(), proj);
+          foundSingleRefElementAddr = true;
+          continue;
+        }
+      }
     }
 
     // TODO: We could emit at this point a msg for temporary allocations.
@@ -412,9 +435,58 @@ struct OptRemarkGeneratorInstructionVisitor
   void visitAllocRefInst(AllocRefInst *ari);
   void visitAllocBoxInst(AllocBoxInst *abi);
   void visitSILInstruction(SILInstruction *) {}
+  void visitBeginAccessInst(BeginAccessInst *bai);
+  void visitEndAccessInst(EndAccessInst *eai);
 };
 
 } // anonymous namespace
+
+void OptRemarkGeneratorInstructionVisitor::visitBeginAccessInst(
+    BeginAccessInst *bai) {
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, bai->getOperand(), inferredArgs,
+        true /*allow single ref elt peek*/);
+    (void)foundArgs;
+
+    // Use the actual source loc of the
+    auto remark =
+        RemarkMissed("memory", *bai, SourceLocInferenceBehavior::ForwardScan)
+        << "begin exclusive access to value of type '"
+        << NV("ValueType", bai->getOperand()->getType()) << "'";
+    for (auto arg : inferredArgs) {
+      remark << arg;
+    }
+    return remark;
+  });
+}
+
+void OptRemarkGeneratorInstructionVisitor::visitEndAccessInst(
+    EndAccessInst *eai) {
+  ORE.emit([&]() {
+    using namespace OptRemark;
+    auto *bai = cast<BeginAccessInst>(eai->getOperand());
+    SmallVector<Argument, 8> inferredArgs;
+    bool foundArgs = valueToDeclInferrer.infer(
+        ArgumentKeyKind::Note, bai->getOperand(), inferredArgs,
+        true /*allow single ref elt peek*/);
+    (void)foundArgs;
+
+    // Use the actual source loc of the begin_access if it works. Otherwise,
+    // scan backwards.
+    auto remark =
+        RemarkMissed("memory", *eai, SourceLocInferenceBehavior::BackwardScan,
+                     SourceLocPresentationKind::EndRange)
+        << "end exclusive access to value of type '"
+        << NV("ValueType", eai->getOperand()->getType()) << "'";
+    for (auto arg : inferredArgs) {
+      remark << arg;
+    }
+    return remark;
+  });
+}
 
 void OptRemarkGeneratorInstructionVisitor::visitStrongRetainInst(
     StrongRetainInst *sri) {
@@ -450,7 +522,8 @@ void OptRemarkGeneratorInstructionVisitor::visitStrongReleaseInst(
 
     auto remark =
         RemarkMissed("memory", *sri,
-                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer)
+                     SourceLocInferenceBehavior::BackwardScanAlwaysInfer,
+                     SourceLocPresentationKind::EndRange)
         << "release of type '" << NV("ValueType", sri->getOperand()->getType())
         << "'";
     for (auto arg : inferredArgs) {

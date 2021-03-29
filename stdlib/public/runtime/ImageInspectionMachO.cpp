@@ -51,8 +51,6 @@ using mach_header_platform = mach_header_64;
 using mach_header_platform = mach_header;
 #endif
 
-extern "C" void *_NSGetMachExecuteHeader();
-
 template <const char *SEGMENT_NAME, const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
 void addImageCallback(const mach_header *mh) {
@@ -166,19 +164,6 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }
-
-#ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
-
-void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
-  unsigned long size;
-  auto *executableHeader = static_cast<mach_header_platform *>(_NSGetMachExecuteHeader());
-  uint8_t *data = getsectiondata(executableHeader, segment, section, &size);
-  if (outSize != nullptr && data != nullptr)
-    *outSize = size;
-  return static_cast<void *>(data);
-}
-
-#endif // #ifndef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
 #endif // defined(__APPLE__) && defined(__MACH__) &&
        // !defined(SWIFT_RUNTIME_MACHO_NO_DYLD)

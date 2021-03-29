@@ -26,6 +26,7 @@
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -154,14 +155,23 @@ public:
 };
 
 class LocalizationProducer {
+  /// This allocator will retain localized diagnostic strings containing the
+  /// diagnostic's message and identifier as `message [id]` for the duration of
+  /// compiler invocation. This will be used when the frontend flag
+  /// `-debug-diagnostic-names` is used.
+  llvm::BumpPtrAllocator localizationAllocator;
+  llvm::StringSaver localizationSaver;
+  bool printDiagnosticNames;
+
 public:
+  LocalizationProducer(bool printDiagnosticNames = false)
+      : localizationSaver(localizationAllocator),
+        printDiagnosticNames(printDiagnosticNames) {}
+
   /// If the  message isn't available/localized in current context
   /// return the fallback default message.
   virtual llvm::StringRef getMessageOr(swift::DiagID id,
-                                       llvm::StringRef defaultMessage) const {
-    auto message = getMessage(id);
-    return message.empty() ? defaultMessage : message;
-  }
+                                       llvm::StringRef defaultMessage);
 
   virtual ~LocalizationProducer() {}
 
@@ -177,7 +187,8 @@ class YAMLLocalizationProducer final : public LocalizationProducer {
 public:
   /// The diagnostics IDs that are no longer available in `.def`
   std::vector<std::string> unknownIDs;
-  explicit YAMLLocalizationProducer(llvm::StringRef filePath);
+  explicit YAMLLocalizationProducer(llvm::StringRef filePath,
+                                    bool printDiagnosticNames = false);
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation
@@ -198,7 +209,8 @@ class SerializedLocalizationProducer final : public LocalizationProducer {
 
 public:
   explicit SerializedLocalizationProducer(
-      std::unique_ptr<llvm::MemoryBuffer> buffer);
+      std::unique_ptr<llvm::MemoryBuffer> buffer,
+      bool printDiagnosticNames = false);
 
 protected:
   llvm::StringRef getMessage(swift::DiagID id) const override;

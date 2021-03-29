@@ -2,9 +2,6 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// rdar_72047158
-// XFAIL: CPU=arm64e
-
 import Foundation
 
 // CHECK: %T16actor_class_objc7MyClassC = type <{ %swift.refcounted, %swift.defaultactor, %TSi }>
@@ -17,7 +14,7 @@ import Foundation
 // CHECK-SAME: %objc_class* @"OBJC_METACLASS_$_SwiftNativeNSObject",
 
 // CHECK: @"$s16actor_class_objc7MyClassCMf" = internal global
-// CHECK-SAME: @"$s16actor_class_objc7MyClassCfD"
+// CHECK-SAME: @"$s16actor_class_objc7MyClassCfD{{(.ptrauth)?}}"
 // CHECK-SAME: @"OBJC_METACLASS_$__TtC16actor_class_objc7MyClass"
 // CHECK-SAME: @"OBJC_CLASS_$_SwiftNativeNSObject"
 //   Flags: uses Swift refcounting

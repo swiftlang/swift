@@ -254,7 +254,7 @@ public:
 /// subsequently used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
 public:
-  using FunctionType = void (void *);
+  using FunctionType = SWIFT_CC(swift) void (SWIFT_CONTEXT void *);
 
 private:
   FunctionType * __ptrauth_swift_cancellation_notification_function Function;

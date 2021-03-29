@@ -521,7 +521,7 @@ public:
     if (!printOptions.shouldPrint(nominal))
       return;
 
-    /// is this nominal specifically an 'actor class'?
+    /// is this nominal specifically an 'actor'?
     bool actorClass = false;
     if (auto klass = dyn_cast<ClassDecl>(nominal))
       actorClass = klass->isActor();

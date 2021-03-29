@@ -24,10 +24,6 @@
 
 using namespace swift;
 
-static llvm::cl::opt<bool> EnableDumpAll(
-    "enable-mem-behavior-dump-all", llvm::cl::init(false),
-    llvm::cl::desc("With -mem-behavior-dump, dump all memory access pairs."));
-
 //===----------------------------------------------------------------------===//
 //                               Value Gatherer
 //===----------------------------------------------------------------------===//
@@ -58,14 +54,25 @@ class MemBehaviorDumper : public SILModuleTransform {
   // To reduce the amount of output, we only dump the memory behavior of
   // selected types of instructions.
   static bool shouldTestInstruction(SILInstruction *I) {
-    // Only consider function calls.
-    if ((EnableDumpAll && I->mayReadOrWriteMemory()) ||
-        FullApplySite::isa(I) ||
-        isa<EndApplyInst>(I) ||
-        isa<AbortApplyInst>(I))
+    switch (I->getKind()) {
+    case SILInstructionKind::ApplyInst:
+    case SILInstructionKind::TryApplyInst:
+    case SILInstructionKind::EndApplyInst:
+    case SILInstructionKind::BeginApplyInst:
+    case SILInstructionKind::AbortApplyInst:
+    case SILInstructionKind::BeginAccessInst:
+    case SILInstructionKind::EndAccessInst:
+    case SILInstructionKind::EndCOWMutationInst:
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::DestroyValueInst:
+    case SILInstructionKind::EndBorrowInst:
+    case SILInstructionKind::LoadInst:
+    case SILInstructionKind::StoreInst:
+    case SILInstructionKind::CopyAddrInst:
       return true;
-
-    return false;
+    default:
+      return false;
+    }
   }
 
   void run() override {
@@ -87,6 +94,9 @@ class MemBehaviorDumper : public SILModuleTransform {
             // function.
             for (auto &V : Values) {
               if (V->getDefiningInstruction() == &I)
+                continue;
+                
+              if (!V->getType().isAddress() && !isa<AddressToPointerInst>(V))
                 continue;
 
               bool Read = AA->mayReadFromMemory(&I, V);

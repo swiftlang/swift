@@ -171,9 +171,11 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 /*accessorKeywordLoc*/ SourceLoc(),
                                 accessorInfo->Kind, accessorInfo->Storage,
                                 /*StaticLoc*/ SourceLoc(),
-                                StaticSpellingKind::None, throws,
-                                /*ThrowsLoc=*/SourceLoc(), genericParams,
-                                bodyParams, resultTy, dc, clangNode);
+                                StaticSpellingKind::None,
+                                throws, /*ThrowsLoc=*/SourceLoc(),
+                                async, /*AsyncLoc=*/SourceLoc(),
+                                genericParams, bodyParams,
+                                resultTy, dc, clangNode);
   } else {
     return FuncDecl::createImported(ctx, funcLoc, name, nameLoc, async, throws,
                                     bodyParams, resultTy, genericParams, dc,
@@ -606,6 +608,7 @@ static void makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
                      rawValueDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
@@ -682,6 +685,7 @@ static AccessorDecl *makeStructRawValueGetter(
                      computedVar,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
@@ -712,6 +716,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
@@ -745,6 +750,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr, params,
@@ -1690,6 +1696,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
                      subscript->getStaticSpelling(),
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
@@ -1741,6 +1748,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
                      subscript->getStaticSpelling(),
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
@@ -1926,6 +1934,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      errorDomainPropertyDecl,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,
@@ -3725,6 +3734,14 @@ namespace {
 
     Decl *VisitClassTemplateSpecializationDecl(
                  const clang::ClassTemplateSpecializationDecl *decl) {
+      // Before we go any further, check if we've already got tens of thousands
+      // of specializations. If so, it means we're likely instantiating a very
+      // deep/complex template, or we've run into an infinite loop. In either
+      // case, its not worth the compile time, so bail.
+      // TODO: this could be configurable at some point.
+      if (llvm::size(decl->getSpecializedTemplate()->specializations()) > 10000)
+        return nullptr;
+
       // `Sema::isCompleteType` will try to instantiate the class template as a
       // side-effect and we rely on this here. `decl->getDefinition()` can
       // return nullptr before the call to sema and return its definition
@@ -3752,8 +3769,9 @@ namespace {
       // any instantiation errors.
       for (auto member : decl->decls()) {
         if (auto varDecl = dyn_cast<clang::VarDecl>(member)) {
-          Impl.getClangSema()
-            .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
+          if (varDecl->getTemplateInstantiationPattern())
+            Impl.getClangSema()
+              .InstantiateVariableDefinition(varDecl->getLocation(), varDecl);
         }
       }
 
@@ -4272,6 +4290,7 @@ namespace {
       auto accessor = AccessorDecl::create(
           Impl.SwiftContext, SourceLoc(), SourceLoc(), AccessorKind::Get,
           swiftVar, SourceLoc(), StaticSpellingKind::KeywordStatic,
+          /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
           /*throws=*/false, SourceLoc(), /*genericParams*/ nullptr,
           ParameterList::createEmpty(Impl.SwiftContext), swiftVar->getType(),
           swiftVar->getDeclContext());
@@ -8009,6 +8028,19 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   return *sourceFile;
 }
 
+Optional<bool> swift::importer::isMainActorAttr(
+    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr) {
+  if (swiftAttr->getAttribute() == "@MainActor" ||
+      swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
+      swiftAttr->getAttribute() == "@UIActor") {
+    bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
+        !ctx.LangOpts.isSwiftVersionAtLeast(6);
+    return isUnsafe;
+  }
+
+  return None;
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -8179,17 +8211,12 @@ void ClangImporter::Implementation::importAttributes(
     if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
       // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
-      if (swiftAttr->getAttribute() == "@MainActor" ||
-          swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
-          swiftAttr->getAttribute() == "@UIActor") {
-        bool isUnsafe = swiftAttr->getAttribute() == "@MainActor(unsafe)" ||
-            !C.LangOpts.isSwiftVersionAtLeast(6);
+      if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
+        bool isUnsafe = *isMainActor;
         if (Type mainActorType = getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
           attr->setArgIsUnsafe(isUnsafe);
-          if (isUnsafe)
-            attr->setImplicit();
           MappedDecl->getAttrs().add(attr);
         }
 
@@ -9104,6 +9131,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                      var,
                      /*StaticLoc=*/SourceLoc(),
                      StaticSpellingKind::None,
+                     /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                      /*Throws=*/false,
                      /*ThrowsLoc=*/SourceLoc(),
                      /*GenericParams=*/nullptr,

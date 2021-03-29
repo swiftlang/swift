@@ -87,7 +87,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
-    CompatibilityOverride.cpp
+    CompatibilityOverrideRuntime.cpp
+    CompatibilityOverrideConcurrency.cpp
     Concurrent.cpp
     Metadata.cpp
     Mutex.cpp

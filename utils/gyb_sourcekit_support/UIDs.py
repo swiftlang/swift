@@ -38,6 +38,7 @@ UID_KEYS = [
     KEY('Line', 'key.line'),
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
+    KEY('Receivers', 'key.receivers'),
     KEY('IsDynamic', 'key.is_dynamic'),
     KEY('IsImplicit', 'key.is_implicit'),
     KEY('FilePath', 'key.filepath'),

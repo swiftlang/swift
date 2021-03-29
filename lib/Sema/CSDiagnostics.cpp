@@ -3306,32 +3306,39 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
     return true;
   }
 
-  if (isa<ParamDecl>(getProperty())) {
-    auto wrapperType = getToType();
-    auto wrappedValueType = computeWrappedValueType(getProperty(), wrapperType);
-    emitDiagnostic(diag::property_wrapper_param_projection_invalid, wrappedValueType);
-    return true;
-  }
-
   emitDiagnostic(diag::incorrect_property_wrapper_reference, getPropertyName(),
                  getFromType(), getToType(), true)
       .fixItRemoveChars(getLoc(), endLoc);
   return true;
 }
 
-bool MissingProjectedValueFailure::diagnoseAsError() {
-  emitDiagnostic(diag::property_wrapper_param_no_projection, wrapperType);
+bool InvalidPropertyWrapperType::diagnoseAsError() {
+  // The property wrapper constraint is currently only used for
+  // implicit property wrappers on closure parameters.
+  auto *wrappedVar = getAsDecl<VarDecl>(getAnchor());
+  assert(wrappedVar->hasImplicitPropertyWrapper());
+
+  emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
   return true;
 }
 
-bool MissingPropertyWrapperAttributeFailure::diagnoseAsError() {
-  if (auto *param = getAsDecl<ParamDecl>(getAnchor())) {
-    emitDiagnostic(diag::invalid_implicit_property_wrapper, wrapperType);
+bool InvalidProjectedValueArgument::diagnoseAsError() {
+  emitDiagnostic(diag::invalid_projection_argument, param->hasImplicitPropertyWrapper());
 
-    // FIXME: emit a note and fix-it to add '@propertyWrapper' if the
-    // type is a nominal and in the same module.
+  if (!param->hasAttachedPropertyWrapper()) {
+    param->diagnose(diag::property_wrapper_param_no_wrapper, param->getName());
+  } else if (!param->hasImplicitPropertyWrapper() &&
+             param->getAttachedPropertyWrappers().front()->getArg()) {
+    param->diagnose(diag::property_wrapper_param_attr_arg);
   } else {
-    emitDiagnostic(diag::property_wrapper_param_no_wrapper);
+    Type backingType;
+    if (param->hasImplicitPropertyWrapper()) {
+      backingType = getType(param->getPropertyWrapperBackingProperty());
+    } else {
+      backingType = param->getPropertyWrapperBackingPropertyType();
+    }
+
+    param->diagnose(diag::property_wrapper_no_init_projected_value, backingType);
   }
 
   return true;
@@ -7192,10 +7199,17 @@ bool MissingContextualTypeForNil::diagnoseAsError() {
 }
 
 bool ReferenceToInvalidDeclaration::diagnoseAsError() {
+  auto &DE = getASTContext().Diags;
+
+  // `resolveType` caches results, so there is no way
+  // to suppress and then re-request the diagnostic
+  // via calling `resolveType` on the same `TypeRepr`.
+  if (getAsDecl<ParamDecl>(getAnchor()))
+    return DE.hadAnyError();
+
   auto *decl = castToExpr<DeclRefExpr>(getAnchor())->getDecl();
   assert(decl);
 
-  auto &DE = getASTContext().Diags;
   // This problem should have been already diagnosed during
   // validation of the declaration.
   if (DE.hadAnyError())

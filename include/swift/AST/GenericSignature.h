@@ -362,8 +362,6 @@ public:
   /// Return the canonical version of the given type under this generic
   /// signature.
   CanType getCanonicalTypeInContext(Type type) const;
-  CanType getCanonicalTypeInContext(Type type,
-                                    GenericSignatureBuilder &builder) const;
 
   bool isCanonicalTypeInContext(Type type) const;
   bool isCanonicalTypeInContext(Type type,

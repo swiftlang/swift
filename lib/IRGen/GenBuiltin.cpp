@@ -287,7 +287,23 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::DestroyDefaultActor) {
+  if (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationReturning ||
+      Builtin.ID == BuiltinValueKind::ResumeNonThrowingContinuationReturning) {
+    auto continuation = args.claimNext();
+    auto valueTy = argTypes[1];
+    auto valuePtr = args.claimNext();
+    bool throwing =
+      (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationReturning);
+    IGF.emitResumeAsyncContinuationReturning(continuation, valuePtr, valueTy,
+                                             throwing);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::ResumeThrowingContinuationThrowing) {
+    auto continuation = args.claimNext();
+    auto error = args.claimNext();
+    IGF.emitResumeAsyncContinuationThrowing(continuation, error);
+    return;
   }
 
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.

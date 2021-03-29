@@ -212,6 +212,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinRawUnsafeContinuation:
   case TypeKind::BuiltinJob:
+  case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:
@@ -967,7 +968,7 @@ ParameterListInfo::ParameterListInfo(
     }
 
     if (param->hasAttachedPropertyWrapper()) {
-      propertyWrappers[i] = param;
+      propertyWrappers.set(i);
     }
   }
 }
@@ -983,9 +984,8 @@ bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
       acceptsUnlabeledTrailingClosures[paramIdx];
 }
 
-const ParamDecl *
-ParameterListInfo::getPropertyWrapperParam(unsigned paramIdx) const {
-  return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : nullptr;
+bool ParameterListInfo::hasExternalPropertyWrapper(unsigned paramIdx) const {
+  return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : false;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -4125,6 +4125,13 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
       continue;
     }
 
+    // There are no subtitutions to apply if the type is still unbound,
+    // continue looking into the parent.
+    if (auto unboundGeneric = baseTy->getAs<UnboundGenericType>()) {
+      baseTy = unboundGeneric->getParent();
+      continue;
+    }
+
     // Assert and break to avoid hanging if we get an unexpected baseTy.
     assert(0 && "Bad base type");
     break;
@@ -5091,6 +5098,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinRawUnsafeContinuation:
   case TypeKind::BuiltinJob:
+  case TypeKind::BuiltinExecutor:
   case TypeKind::BuiltinDefaultActorStorage:
   case TypeKind::BuiltinUnsafeValueBuffer:
   case TypeKind::BuiltinVector:

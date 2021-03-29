@@ -85,6 +85,8 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheJobType;
   if (Name == "DefaultActorStorage")
     return Context.TheDefaultActorStorageType;
+  if (Name == "Executor")
+    return Context.TheExecutorType;
   if (Name == "NativeObject")
     return Context.TheNativeObjectType;
   if (Name == "BridgeObject")
@@ -581,6 +583,14 @@ static ValueDecl *getCastOperation(ASTContext &Context, Identifier Id,
     // Support VecNxInt1 -> IntN bitcast for SIMD comparison results.
     if (auto *Vec = CheckInput->getAs<BuiltinVectorType>())
       if (auto *BIT = CheckOutput->getAs<BuiltinIntegerType>())
+        if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
+          if (Element->getFixedWidth() == 1 &&
+              BIT->isFixedWidth() &&
+              BIT->getFixedWidth() == Vec->getNumElements())
+            break;
+    // And IntN -> VecNxInt1 for SIMDMask random generators.
+    if (auto *Vec = CheckOutput->getAs<BuiltinVectorType>())
+      if (auto *BIT = CheckInput->getAs<BuiltinIntegerType>())
         if (auto *Element = Vec->getElementType()->getAs<BuiltinIntegerType>())
           if (Element->getFixedWidth() == 1 &&
               BIT->isFixedWidth() &&
@@ -1343,10 +1353,9 @@ static ValueDecl *getGetCurrentAsyncTask(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getGetCurrentExecutor(ASTContext &ctx, Identifier id) {
-  BuiltinFunctionBuilder builder(ctx);
-  builder.setResult(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
-  builder.setAsync();
-  return builder.build(id);
+  return getBuiltinFunction(ctx, id, _async(_thin),
+                            _parameters(),
+                            _executor);
 }
 
 static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
@@ -1400,6 +1409,23 @@ static ValueDecl *getDefaultActorInitDestroy(ASTContext &ctx,
                                              Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_nativeObject),
+                            _void);
+}
+
+static ValueDecl *getResumeContinuationReturning(ASTContext &ctx,
+                                                 Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted),
+                            _parameters(_rawUnsafeContinuation,
+                                        _owned(_typeparam(0))),
+                            _void);
+}
+
+static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
+                                                Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawUnsafeContinuation,
+                                        _owned(_error)),
                             _void);
 }
 
@@ -2613,6 +2639,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
 
+  case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
+  case BuiltinValueKind::ResumeThrowingContinuationReturning:
+    return getResumeContinuationReturning(Context, Id);
+
+  case BuiltinValueKind::ResumeThrowingContinuationThrowing:
+    return getResumeContinuationThrowing(Context, Id);
+
   case BuiltinValueKind::WithUnsafeContinuation:
     return getWithUnsafeContinuation(Context, Id, /*throws=*/false);
 
@@ -2683,6 +2716,9 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinJob:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_JOB);
+    break;
+  case BuiltinTypeKind::BuiltinExecutor:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_EXECUTOR);
     break;
   case BuiltinTypeKind::BuiltinDefaultActorStorage:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE);

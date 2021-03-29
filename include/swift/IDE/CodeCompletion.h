@@ -603,6 +603,7 @@ public:
     Redundant,
     Deprecated,
     InvalidContext,
+    CrossActorReference,
     NoReason,
   };
 

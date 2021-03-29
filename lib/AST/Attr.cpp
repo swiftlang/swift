@@ -1020,7 +1020,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       type.print(Printer, Options);
     else
       attr->getTypeRepr()->print(Printer, Options);
-    if (attr->isArgUnsafe())
+    if (attr->isArgUnsafe() && Options.IsForSwiftInterface)
       Printer << "(unsafe)";
     Printer.printNamePost(PrintNameContext::Attribute);
     break;
@@ -1332,6 +1332,7 @@ SourceLoc ObjCAttr::getRParenLoc() const {
 ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
   attr->setSwift3Inferred(isSwift3Inferred());
+  attr->setAddedByAccessNote(getAddedByAccessNote());
   return attr;
 }
 

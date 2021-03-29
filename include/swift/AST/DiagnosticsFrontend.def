@@ -36,6 +36,10 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
+ERROR(error_unknown_library_level, none,
+      "unknown library level '%0', "
+      "expected one of 'api', 'spi' or 'other'", (StringRef))
+
 ERROR(error_unsupported_opt_for_target, none,
       "unsupported option '%0' for target '%1'", (StringRef, StringRef))
 

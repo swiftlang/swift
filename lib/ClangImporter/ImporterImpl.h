@@ -334,7 +334,6 @@ public:
   ASTContext &SwiftContext;
 
   const bool ImportForwardDeclarations;
-  const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
@@ -830,6 +829,8 @@ public:
   /// being imported into, which may affect info from API notes.
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
+
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1541,18 +1542,16 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   ASTContext &swiftCtx;
   ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
-  const bool inferImportAsMember;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
                            ClangSourceBufferImporter &buffersForDiagnostics,
-                           const PlatformAvailability &avail, bool inferIAM)
+                           const PlatformAvailability &avail)
       : // An unfortunate workaround until D97702 lands.
         clang::ModuleFileExtension(static_cast<ModuleFileExtensionKind>(42)),
         pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
-        inferImportAsMember(inferIAM) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;
@@ -1566,6 +1565,14 @@ public:
                         clang::serialization::ModuleFile &mod,
                         const llvm::BitstreamCursor &stream) override;
 };
+
+/// Determines whether the given swift_attr attribute describes the main
+/// actor.
+///
+/// \returns None if this is not a main-actor attribute, and a Boolean
+/// indicating whether (unsafe) was provided in the attribute otherwise.
+Optional<bool> isMainActorAttr(
+    ASTContext &ctx, const clang::SwiftAttrAttr *swiftAttr);
 
 }
 }

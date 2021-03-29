@@ -132,7 +132,7 @@ public:
     return data.actorType;
   }
 
-  /// Retrieve the actor class that the declaration is within.
+  /// Retrieve the actor that the declaration is within.
   Type getGlobalActor() const {
     assert(kind == GlobalActor || kind == GlobalActorUnsafe);
     return Type(data.globalActor);
@@ -238,7 +238,6 @@ Type getExplicitGlobalActor(ClosureExpr *closure);
 /// \returns true if an error occurred.
 bool checkSendableConformance(
     ProtocolConformance *conformance, SendableCheck check);
-
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPECHECKCONCURRENCY_H */
