@@ -1047,6 +1047,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       return appendOperator("BI");
     case TypeKind::BuiltinJob:
       return appendOperator("Bj");
+    case TypeKind::BuiltinExecutor:
+      return appendOperator("Be");
     case TypeKind::BuiltinDefaultActorStorage:
       return appendOperator("BD");
     case TypeKind::BuiltinRawPointer:

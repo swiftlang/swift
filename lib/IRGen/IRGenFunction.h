@@ -147,7 +147,8 @@ public:
 
   void emitGetAsyncContinuation(SILType resumeTy,
                                 StackAddress optionalResultAddr,
-                                Explosion &out);
+                                Explosion &out,
+                                bool canThrow);
 
   void emitAwaitAsyncContinuation(SILType resumeTy,
                                   bool isIndirectResult,
@@ -155,6 +156,14 @@ public:
                                   llvm::BasicBlock *&normalBB,
                                   llvm::PHINode *&optionalErrorPhi,
                                   llvm::BasicBlock *&optionalErrorBB);
+
+  void emitResumeAsyncContinuationReturning(llvm::Value *continuation,
+                                            llvm::Value *srcPtr,
+                                            SILType valueTy,
+                                            bool throwing);
+
+  void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
+                                           llvm::Value *error);
 
   FunctionPointer
   getFunctionPointerForResumeIntrinsic(llvm::Value *resumeIntrinsic);

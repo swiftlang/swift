@@ -162,17 +162,17 @@ TEST_F(CompatibilityOverrideConcurrencyTest,
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_continuation_resume) {
-  swift_continuation_resume(nullptr, nullptr, nullptr);
+  swift_continuation_resume(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_continuation_throwingResume) {
-  swift_continuation_resume(nullptr, nullptr, nullptr);
+  swift_continuation_throwingResume(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_continuation_throwingResumeWithError) {
-  swift_continuation_resume(nullptr, nullptr, nullptr);
+  swift_continuation_throwingResumeWithError(nullptr, nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_initialize) {

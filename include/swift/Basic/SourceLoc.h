@@ -44,7 +44,13 @@ public:
   
   bool isValid() const { return Value.isValid(); }
   bool isInvalid() const { return !isValid(); }
-  
+
+  /// An explicit bool operator so one can check if a SourceLoc is valid in an
+  /// if statement:
+  ///
+  /// if (auto x = getSourceLoc()) { ... }
+  explicit operator bool() const { return isValid(); }
+
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
   bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
   
@@ -106,6 +112,12 @@ public:
   
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
+
+  /// An explicit bool operator so one can check if a SourceRange is valid in an
+  /// if statement:
+  ///
+  /// if (auto x = getSourceRange()) { ... }
+  explicit operator bool() const { return isValid(); }
 
   /// Extend this SourceRange to the smallest continuous SourceRange that
   /// includes both this range and the other one.

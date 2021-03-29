@@ -198,8 +198,8 @@ AsyncContextLayout::AsyncContextLayout(
 #endif
 }
 
-static Alignment getAsyncContextAlignment(IRGenModule &IGM) {
-  return IGM.getPointerAlignment();
+Alignment IRGenModule::getAsyncContextAlignment() const {
+  return Alignment(MaximumAlignment);
 }
 
 void IRGenFunction::setupAsync(unsigned asyncContextIndex) {
@@ -3815,7 +3815,7 @@ llvm::Value *irgen::emitTaskCreate(
 
 Address irgen::emitAllocAsyncContext(IRGenFunction &IGF,
                                      llvm::Value *sizeValue) {
-  auto alignment = getAsyncContextAlignment(IGF.IGM);
+  auto alignment = IGF.IGM.getAsyncContextAlignment();
   auto address = IGF.emitTaskAlloc(sizeValue, alignment);
   IGF.Builder.CreateLifetimeStart(address, Size(-1) /*dynamic size*/);
   return address;
