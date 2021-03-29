@@ -103,11 +103,6 @@ public func runStructDirectAccessComputation(N: Int) {
     blackHole(fixedSizeArray10)
 }
 
-func testFixedArrayKeyPath10(_ fixedSizeArray10in: FixedSizeArray10<Double>, iters: Int) {
-    var fixedSizeArray10 = fixedSizeArray10in
-    
-}
-
 public struct FixedSizeArray10<Element>: Sequence, IteratorProtocol {
     public init(
         element0: Element,
