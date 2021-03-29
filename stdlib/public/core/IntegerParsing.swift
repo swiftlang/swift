@@ -147,7 +147,7 @@ extension FixedWidthInteger {
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @inlinable // @specializable
-  @_semantics("optimize.sil.specialize.generic.partial.never")
+  @inline(__always)
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
 
@@ -192,7 +192,6 @@ extension FixedWidthInteger {
   ///
   /// - Parameter description: The ASCII representation of a number.
   @inlinable
-  @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?(_ description: String) {
     self.init(description, radix: 10)
