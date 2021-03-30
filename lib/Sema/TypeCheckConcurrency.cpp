@@ -774,7 +774,13 @@ static bool isEscapingClosure(const AbstractClosureExpr *closure) {
 static bool isSendableClosure(const AbstractClosureExpr *closure) {
   if (auto type = closure->getType()) {
     if (auto fnType = type->getAs<AnyFunctionType>())
-      return fnType->isSendable();
+      if (fnType->isSendable())
+        return true;
+  }
+
+  if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+    if (explicitClosure->isUnsafeSendable())
+      return true;
   }
 
   return false;
@@ -2201,6 +2207,12 @@ namespace {
 
         if (Type globalActorType = resolveGlobalActorType(explicitClosure))
           return ClosureActorIsolation::forGlobalActor(globalActorType);
+
+        if (explicitClosure->isUnsafeMainActor()) {
+          ASTContext &ctx = closure->getASTContext();
+          if (Type mainActor = ctx.getMainActorType())
+            return ClosureActorIsolation::forGlobalActor(mainActor);
+        }
       }
 
       // Escaping and concurrent closures are always actor-independent.

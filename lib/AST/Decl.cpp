@@ -7331,6 +7331,27 @@ void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
   DerivativeFunctionConfigs->insert(config);
 }
 
+bool AbstractFunctionDecl::hasKnownUnsafeSendableFunctionParams() const {
+  auto nominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  // DispatchQueue operations.
+  auto nominalName = nominal->getName().str();
+  if (nominalName == "DispatchQueue") {
+    auto name = getBaseName().userFacingName();
+    return llvm::StringSwitch<bool>(name)
+      .Case("sync", true)
+      .Case("async", true)
+      .Case("asyncAndWait", true)
+      .Case("asyncAfter", true)
+      .Case("concurrentPerform", true)
+      .Default(false);
+  }
+
+  return false;
+}
+
 void FuncDecl::setResultInterfaceType(Type type) {
   getASTContext().evaluator.cacheOutput(ResultTypeRequest{this},
                                         std::move(type));

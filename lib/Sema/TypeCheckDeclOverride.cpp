@@ -1544,6 +1544,7 @@ namespace  {
 
     UNINTERESTING_ATTR(AtReasync)
     UNINTERESTING_ATTR(Nonisolated)
+    UNINTERESTING_ATTR(UnsafeSendable)
 
 #undef UNINTERESTING_ATTR
 

@@ -3343,6 +3343,7 @@ struct ParameterListInfo {
   SmallBitVector defaultArguments;
   SmallBitVector acceptsUnlabeledTrailingClosures;
   SmallBitVector propertyWrappers;
+  SmallBitVector unsafeSendable;
 
 public:
   ParameterListInfo() { }
@@ -3360,6 +3361,11 @@ public:
   /// The ParamDecl at the given index if the parameter has an applied
   /// property wrapper.
   bool hasExternalPropertyWrapper(unsigned paramIdx) const;
+
+  /// Whether the given parameter is unsafe Sendable, meaning that
+  /// we will treat it as Sendable in a context that has adopted concurrency
+  /// features.
+  bool isUnsafeSendable(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {
