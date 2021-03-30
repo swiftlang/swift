@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -286,8 +286,15 @@ extension _SmallString {
         // Restore the memory type of self._storage
         _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
       }
-      return try initializer(
+      let initializedCount = try initializer(
         UnsafeMutableBufferPointer<UInt8>(start: ptr, count: capacity))
+      // Zero-initialize any unused capacity (which could be deinitialized).
+      let unusedCapacity = capacity &- initializedCount
+      if unusedCapacity > 0 {
+        (rawPtr + initializedCount).initializeMemory(
+          as: UInt8.self, repeating: 0, count: unusedCapacity)
+      }
+      return initializedCount
     }
     self._invariantCheck()
   }
