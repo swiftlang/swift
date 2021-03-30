@@ -2498,6 +2498,38 @@ static Optional<ActorIsolation> getIsolationFromWitnessedRequirements(
   return std::get<1>(isolatedRequirements.front());
 }
 
+/// Compute the isolation of a nominal type from the conformances that
+/// are directly specified on the type.
+static Optional<ActorIsolation> getIsolationFromConformances(
+    NominalTypeDecl *nominal) {
+  if (isa<ProtocolDecl>(nominal))
+    return None;
+  
+  Optional<ActorIsolation> foundIsolation;
+  for (auto proto : nominal->getLocalProtocols()) {
+    switch (auto protoIsolation = getActorIsolation(proto)) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Independent:
+      break;
+
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::GlobalActorUnsafe:
+      if (!foundIsolation) {
+        foundIsolation = protoIsolation;
+        continue;
+      }
+
+      if (*foundIsolation != protoIsolation)
+        return None;
+
+      break;
+    }
+  }
+
+  return foundIsolation;
+}
+
 // Check whether a declaration is an asynchronous handler.
 static bool isAsyncHandler(ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -2720,6 +2752,14 @@ ActorIsolation ActorIsolationRequest::evaluate(
             return inferred;
         }
       }
+    }
+
+    // If the declaration is a nominal type and any of the protocols to which
+    // it directly conforms is isolated to a global actor, use that.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(value)) {
+      if (auto conformanceIsolation = getIsolationFromConformances(nominal))
+        if (auto inferred = inferredIsolation(*conformanceIsolation))
+          return inferred;
     }
   }
 
