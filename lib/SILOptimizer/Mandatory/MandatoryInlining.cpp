@@ -632,7 +632,7 @@ static SILValue stripFunctionConversions(SILValue CalleeValue) {
     // If the conversion only changes the substitution level of the function,
     // we can also look through it.
     if (ConvertFn->onlyConvertsSubstitutions())
-      return stripCopiesAndBorrows(ConvertFn->getOperand());
+      return stripFunctionConversions(ConvertFn->getOperand());
 
     auto FromCalleeTy =
         ConvertFn->getOperand()->getType().castTo<SILFunctionType>();
