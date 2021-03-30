@@ -2674,16 +2674,8 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // If the declaration is in a nominal type (or extension thereof) that
     // has isolation, use that.
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (auto selfTypeIsolation = getActorIsolation(selfTypeDecl)) {
-        // Don't propagate implicit, unsafe global actor isolation from a type
-        // to non-imported instance members.
-        if (selfTypeIsolation != ActorIsolation::GlobalActorUnsafe ||
-            value->getClangNode() ||
-            (selfTypeDecl->getGlobalActorAttr() &&
-             !selfTypeDecl->getGlobalActorAttr()->first->isImplicit())) {
-          return inferredIsolation(selfTypeIsolation);
-        }
-      }
+      if (auto selfTypeIsolation = getActorIsolation(selfTypeDecl))
+        return inferredIsolation(selfTypeIsolation);
     }
   }
 
