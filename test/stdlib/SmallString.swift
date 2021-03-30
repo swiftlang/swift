@@ -105,4 +105,16 @@ SmallStringTests.test("Append, repeating") {
   }
 }
 
+if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  SmallStringTests.test("Equatable") {
+    let str = String(unsafeUninitializedCapacity: 2) {
+      let last = $0.count &- 1
+      $0[last] = 49 // "1"
+      $0.baseAddress!.moveInitialize(from: $0.baseAddress! + last, count: 1)
+      return 1
+    }
+    expectTrue(str == "1")
+  }
+}
+
 runAllTests()
