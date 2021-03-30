@@ -91,6 +91,12 @@ namespace {
 ///   @_silgen_name("swift_task_future_wait_throwing")
 ///   func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 ///
+///   @_silgen_name("swift_asyncLet_wait")
+///   func _asyncLetGet<T>(_ task: Builtin.RawPointer) async -> T
+///
+///   @_silgen_name("swift_asyncLet_waitThrowing")
+///   func _asyncLetGetThrowing<T>(_ task: Builtin.RawPointer) async throws -> T
+///
 class TaskFutureWaitAsyncContext : public AsyncContext {
 public:
   SwiftError *errorResult;

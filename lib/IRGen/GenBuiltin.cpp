@@ -220,10 +220,30 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  // getCurrentActor has no arguments.
+  // emitGetCurrentExecutor has no arguments.
   if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
     emitGetCurrentExecutor(IGF, out);
 
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::StartAsyncLet) {
+    auto taskFunction = args.claimNext();
+    auto taskContext = args.claimNext();
+
+    auto asyncLet = emitBuiltinStartAsyncLet(
+        IGF,
+        taskFunction,
+        taskContext,
+        substitutions
+        );
+
+    out.add(asyncLet);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLet) {
+    emitEndAsyncLet(IGF, args.claimNext());
     return;
   }
 

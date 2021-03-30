@@ -1481,6 +1481,38 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getStartAsyncLet(ASTContext &ctx, Identifier id) {
+//  return getBuiltinFunction(ctx, id, _thin,
+//                            _generics(_unrestricted),
+//                            _parameters(_rawPointer, <function>), TODO: seems we can't express function here?
+//                            _rawPointer)
+
+  ModuleDecl *M = ctx.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+  SynthesisContext SC(ctx, DC);
+
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder); // <T>
+
+  // AsyncLet*
+  builder.addParameter(makeConcrete(OptionalType::get(ctx.TheRawPointerType)));
+
+  // operation async function pointer: () async throws -> T
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  builder.addParameter(
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+
+  // -> Builtin.RawPointer
+  builder.setResult(makeConcrete(synthesizeType(SC, _rawPointer)));
+  return builder.build(id);
+}
+
+static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
+                            _void);
+}
+
 static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(),
@@ -2739,6 +2771,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDefaultActor:
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
+
+  case BuiltinValueKind::StartAsyncLet:
+    return getStartAsyncLet(Context, Id);
+
+  case BuiltinValueKind::EndAsyncLet:
+    return getEndAsyncLet(Context, Id);
 
   case BuiltinValueKind::CreateTaskGroup:
     return getCreateTaskGroup(Context, Id);

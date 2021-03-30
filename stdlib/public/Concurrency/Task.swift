@@ -860,8 +860,8 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 }
 
 // FIXME: both of these ought to take their arguments _owned so that
-// we can do a move out of the future in the common case where it's
-// unreferenced
+//        we can do a move out of the future in the common case where it's
+//        unreferenced
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_future_wait")
 public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
@@ -869,29 +869,6 @@ public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_future_wait_throwing")
 public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
-
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func _runChildTask<T>(
-  operation: @Sendable @escaping () async throws -> T
-) async -> Builtin.NativeObject {
-  let currentTask = Builtin.getCurrentAsyncTask()
-
-  // Set up the job flags for a new task.
-  var flags = Task.JobFlags()
-  flags.kind = .task
-  flags.priority = getJobFlags(currentTask).priority ?? .unspecified
-  flags.isFuture = true
-  flags.isChildTask = true
-
-  // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(
-      flags.bits, operation)
-
-  // Enqueue the resulting job.
-  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
-
-  return task
-}
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_cancel")

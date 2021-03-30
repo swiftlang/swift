@@ -171,6 +171,44 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
   IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
 }
 
+llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                             llvm::Value *taskFunction,
+                                             llvm::Value *localContextInfo,
+                                             SubstitutionMap subs) {
+  // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
+  auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
+  auto address = IGF.createAlloca(ty, Alignment(Alignment_AsyncLet));
+  auto alet = IGF.Builder.CreateBitCast(address.getAddress(),
+                                        IGF.IGM.Int8PtrTy);
+  IGF.Builder.CreateLifetimeStart(alet);
+
+  assert(subs.getReplacementTypes().size() == 1 &&
+         "startAsyncLet should have a type substitution");
+  auto futureResultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto futureResultTypeMetadata = IGF.emitAbstractTypeMetadataRef(futureResultType);
+
+  // This is @_silgen_name("swift_asyncLet_start")
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetStartFn(),
+                                      {alet,
+                                       futureResultTypeMetadata,
+                                       taskFunction,
+                                       localContextInfo
+                                      });
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  return alet;
+}
+
+void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getEndAsyncLetFn(),
+                                      {alet});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.Builder.CreateLifetimeEnd(alet);
+}
+
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF) {
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));

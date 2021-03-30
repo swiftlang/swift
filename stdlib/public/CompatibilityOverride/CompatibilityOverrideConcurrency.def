@@ -43,6 +43,7 @@
 #ifdef OVERRIDE
 #  define OVERRIDE_ACTOR OVERRIDE
 #  define OVERRIDE_TASK OVERRIDE
+#  define OVERRIDE_ASYNC_LET OVERRIDE
 #  define OVERRIDE_TASK_GROUP OVERRIDE
 #  define OVERRIDE_TASK_LOCAL OVERRIDE
 #  define OVERRIDE_TASK_STATUS OVERRIDE
@@ -52,6 +53,9 @@
 #  endif
 #  ifndef OVERRIDE_TASK
 #    define OVERRIDE_TASK(...)
+#  endif
+#  ifndef OVERRIDE_ASYNC_LET
+#    define OVERRIDE_ASYNC_LET(...)
 #  endif
 #  ifndef OVERRIDE_TASK_GROUP
 #    define OVERRIDE_TASK_GROUP(...)
@@ -144,6 +148,36 @@ OVERRIDE_TASK(task_removeCancellationHandler, void,
 OVERRIDE_TASK(task_asyncMainDrainQueue, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
               , )
+
+OVERRIDE_ASYNC_LET(asyncLet_start, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::,
+                   (AsyncLet *alet,
+                    const Metadata *futureResultType,
+                    void *closureEntryPoint,
+                    HeapObject */* +1 */ closureContext
+                   ),
+                   (alet, futureResultType,
+                    closureEntryPoint, closureContext))
+
+OVERRIDE_ASYNC_LET(asyncLet_wait, void, SWIFT_EXPORT_FROM(swift_Concurrency),
+                   SWIFT_CC(swiftasync), swift::,
+                   (OpaqueValue *result,
+                       SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+                       AsyncLet *alet, Metadata *T),
+                   (result, rawContext, alet, T))
+
+OVERRIDE_ASYNC_LET(asyncLet_wait_throwing, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swiftasync),
+                   swift::,
+                   (OpaqueValue *result,
+                       SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+                       AsyncLet *alet, Metadata *T),
+                   (result, rawContext, alet, T))
+
+OVERRIDE_ASYNC_LET(asyncLet_end, void,
+                   SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                   swift::, (AsyncLet *alet), (alet))
 
 OVERRIDE_TASK_GROUP(taskGroup_initialize, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -250,6 +284,7 @@ OVERRIDE_TASK_STATUS(task_getNearestDeadline, NearestTaskDeadline,
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR
 #undef OVERRIDE_TASK
+#undef OVERRIDE_ASYNC_LET
 #undef OVERRIDE_TASK_GROUP
 #undef OVERRIDE_TASK_LOCAL
 #undef OVERRIDE_TASK_STATUS

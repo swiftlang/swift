@@ -545,6 +545,8 @@ CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildSerialExecutorRef)
+CONSTANT_OWNERSHIP_BUILTIN(None, StartAsyncLet)
+CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLet)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
 

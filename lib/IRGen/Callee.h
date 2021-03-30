@@ -170,6 +170,8 @@ namespace irgen {
     enum class SpecialKind {
       TaskFutureWait,
       TaskFutureWaitThrowing,
+      AsyncLetWait,
+      AsyncLetWaitThrowing,
       TaskGroupWaitNext,
     };
 
@@ -213,6 +215,9 @@ namespace irgen {
         switch (getSpecialKind()) {
         case SpecialKind::TaskFutureWait:
         case SpecialKind::TaskFutureWaitThrowing:
+        case SpecialKind::AsyncLetWait:
+        case SpecialKind::AsyncLetWaitThrowing:
+        case SpecialKind::TaskGroupWaitNext:
           // FIXME: I have disabled this optimization, if we bring it back we
           // need to debug why it currently does not work (call emission
           // computes an undef return pointer) and change the runtime entries to
@@ -221,8 +226,6 @@ namespace irgen {
           // We suppress generics from these as a code-size optimization
           // because the runtime can recover the success type from the
           // future.
-          return false;
-        case SpecialKind::TaskGroupWaitNext:
           return false;
         }
       }
