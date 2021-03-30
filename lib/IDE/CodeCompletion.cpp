@@ -4609,7 +4609,8 @@ public:
     }
   }
 
-  void getGenericRequirementCompletions(DeclContext *DC) {
+  void getGenericRequirementCompletions(DeclContext *DC,
+                                        SourceLoc CodeCompletionLoc) {
     auto genericSig = DC->getGenericSignatureOfContext();
     if (!genericSig)
       return;
@@ -4636,6 +4637,18 @@ public:
                              CurrDeclContext, IncludeInstanceMembers,
                              /*includeDerivedRequirements*/false,
                              /*includeProtocolExtensionMembers*/true);
+    // We not only allow referencing nested types/typealiases directly, but also
+    // qualified by the current type. Thus also suggest current self type so the
+    // user can do a memberwise lookup on it.
+    if (auto SelfType = typeContext->getSelfNominalTypeDecl()) {
+      addNominalTypeRef(SelfType, DeclVisibilityKind::LocalVariable,
+                        DynamicLookupInfo());
+    }
+
+    // Self is also valid in all cases in which it can be used in function
+    // bodies. Suggest it if applicable.
+    getSelfTypeCompletionInDeclContext(CodeCompletionLoc,
+                                       /*isForResultType=*/false);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4757,6 +4770,9 @@ public:
     getAttributeDeclParamCompletions(DAK_Available, 0);
   }
 
+  /// \p Loc is the location of the code completin token.
+  /// \p isForDeclResult determines if were are spelling out the result type
+  /// of a declaration.
   void getSelfTypeCompletionInDeclContext(SourceLoc Loc, bool isForDeclResult) {
     const DeclContext *typeDC = CurrDeclContext->getInnermostTypeContext();
     if (!typeDC)
@@ -6924,9 +6940,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::GenericRequirement:
-    Lookup.getGenericRequirementCompletions(CurDeclContext);
+  case CompletionKind::GenericRequirement: {
+    auto Loc = Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getGenericRequirementCompletions(CurDeclContext, Loc);
     break;
+  }
   case CompletionKind::PrecedenceGroup:
     Lookup.getPrecedenceGroupCompletions(SyntxKind);
     break;
