@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_alwaysEmitIntoClient
+@inline(never)
 internal func _parseASCIIDigits<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
@@ -52,20 +53,90 @@ internal func _parseASCIIDigits<Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
+internal func _parseASCIIDigitsUInt64(
+  _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
+) -> UInt64? {
+  _internalInvariant(radix >= 2 && radix <= 36)
+  guard _fastPath(!codeUnits.isEmpty) else { return nil }
+  let numericalUpperBound, uppercaseUpperBound, lowercaseUpperBound: UInt8
+  if radix <= 10 {
+    numericalUpperBound = 48 /* "0" */ &+ UInt8(radix)
+    uppercaseUpperBound = 65
+    lowercaseUpperBound = 97
+  } else {
+    numericalUpperBound = 58
+    uppercaseUpperBound = 65 /* "A" */ &+ UInt8(radix &- 10)
+    lowercaseUpperBound = 97 /* "a" */ &+ UInt8(radix &- 10)
+  }
+  let multiplicand = UInt64(truncatingIfNeeded: radix)
+  var result = 0 as UInt64
+  for digit in codeUnits {
+    let digitValue: UInt64
+    if _fastPath(digit >= 48 && digit < numericalUpperBound) {
+      digitValue = UInt64(truncatingIfNeeded: digit &- 48)
+    } else if _fastPath(digit >= 65 && digit < uppercaseUpperBound) {
+      digitValue = UInt64(truncatingIfNeeded: digit &- 65 &+ 10)
+    } else if _fastPath(digit >= 97 && digit < lowercaseUpperBound) {
+      digitValue = UInt64(truncatingIfNeeded: digit &- 97 &+ 10)
+    } else {
+      return nil
+    }
+    let (temporary, overflow1) =
+      result.multipliedReportingOverflow(by: multiplicand)
+    guard _fastPath(!overflow1) else { return nil }
+    let (nextResult, overflow2) =
+      temporary.addingReportingOverflow(digitValue)
+    guard _fastPath(!overflow2) else { return nil }
+    result = nextResult
+  }
+  return result
+}
+
+@_alwaysEmitIntoClient
 internal func _parseASCII<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
   _internalInvariant(!codeUnits.isEmpty)
   let first = codeUnits[0]
   if first == 45 /* "-" */ {
+    if _fastPath(Result.bitWidth <= 64) {
+      return _parseASCIIDigitsUInt64(
+        UnsafeBufferPointer(rebasing: codeUnits[1...]),
+        radix: radix
+      ).flatMap {
+        $0 > UInt64(truncatingIfNeeded: Result.min.magnitude)
+          ? nil
+          : Result(truncatingIfNeeded: Int64(bitPattern: ~$0 &+ 1))
+      }
+    }
     return _parseASCIIDigits(
       UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: true)
   }
   if first == 43 /* "+" */ {
+    if _fastPath(Result.bitWidth <= 64) {
+      return _parseASCIIDigitsUInt64(
+        UnsafeBufferPointer(rebasing: codeUnits[1...]),
+        radix: radix
+      ).flatMap {
+        $0 > UInt64(truncatingIfNeeded: Result.max)
+          ? nil
+          : Result(truncatingIfNeeded: $0)
+      }
+    }
     return _parseASCIIDigits(
       UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: false)
+  }
+  if _fastPath(Result.bitWidth <= 64) {
+    return _parseASCIIDigitsUInt64(
+      codeUnits,
+      radix: radix
+    ).flatMap {
+      $0 > UInt64(truncatingIfNeeded: Result.max)
+        ? nil
+        : Result(truncatingIfNeeded: $0)
+    }
   }
   return _parseASCIIDigits(codeUnits, radix: radix, isNegative: false)
 }
@@ -117,8 +188,10 @@ extension FixedWidthInteger {
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     guard _fastPath(!text.isEmpty) else { return nil }
-    var str = String(text)
-    let result: Self? = str.withUTF8 { _parseASCII($0, radix: radix) }
+    let result: Self? =
+      text.utf8.withContiguousStorageIfAvailable {
+        _parseASCII($0, radix: radix)
+      } ?? _parseASCII(text, radix: radix)
     guard let result_ = result else { return nil }
     self = result_
   }
