@@ -47,3 +47,5 @@ import main // expected-warning{{'implementation-only-import-suggestion.swift' i
 
 // rdar://76004923
 // UNSUPPORTED: OS=iphoneos
+// UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=tvos
