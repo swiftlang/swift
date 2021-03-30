@@ -47,4 +47,16 @@ OperatorsTestSuite.test("AddressOnlyIntWrapper.call (out-of-line)") {
   expectEqual(57, resultTwoArgs)
 }
 
+OperatorsTestSuite.test("ReadWriteIntArray.subscript (out-of-line)") {
+  var arr = ReadWriteIntArray()
+
+  let resultBefore = arr[1]
+  expectEqual(2, resultBefore)
+
+  arr[1] = 234
+
+  let resultAfter = arr[1]
+  expectEqual(234, resultAfter)
+}
+
 runAllTests()
