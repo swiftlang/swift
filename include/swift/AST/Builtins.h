@@ -140,6 +140,8 @@ bool canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty);
 /// createAsyncTask* builtins.
 Type getAsyncTaskAndContextType(ASTContext &ctx);
 
+Type getAsyncLetAndTaskType(ASTContext &ctx); // TODO: decide if we use it or not
+
 }
 
 #endif

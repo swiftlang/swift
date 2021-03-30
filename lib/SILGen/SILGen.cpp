@@ -362,6 +362,34 @@ SILGenModule::getRunChildTask() {
 }
 
 FuncDecl *
+SILGenModule::getAsyncLetStart() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    AsyncLetStart,
+                                    "_asyncLetStart");
+}
+
+FuncDecl *
+SILGenModule::getAsyncLetGet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    AsyncLetGet,
+                                    "_asyncLetGet");
+}
+
+FuncDecl *
+SILGenModule::getAsyncLetGetThrowing() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    AsyncLetGetThrowing,
+                                    "_asyncLetGetThrowing");
+}
+
+FuncDecl *
+SILGenModule::getEndAsyncLet() {
+  return lookupConcurrencyIntrinsic(getASTContext(),
+                                    EndAsyncLet,
+                                    "_asyncLetEnd");
+}
+
+FuncDecl *
 SILGenModule::getTaskFutureGet() {
   return lookupConcurrencyIntrinsic(getASTContext(),
                                     TaskFutureGet,

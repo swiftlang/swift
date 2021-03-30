@@ -21,22 +21,22 @@ func testAsyncLetInt() async -> Int {
   // CHECK: [[REABSTRACT_THUNK:%.*]] = function_ref @$sSiIeghHd_Sis5Error_pIeghHrzo_TR : $@convention(thin) @Sendable @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
   // CHECK: [[REABSTRACT_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT_THUNK]]([[THICK_CLOSURE]]) : $@convention(thin) @Sendable @async (@guaranteed @Sendable @async @callee_guaranteed () -> Int) -> (@out Int, @error Error)
   // CHECK: [[CLOSURE_ARG:%.*]] = convert_function [[REABSTRACT_CLOSURE]] : $@Sendable @async @callee_guaranteed () -> (@out Int, @error Error) to $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
-  // CHECK: [[RUN_CHILD_TASK:%.*]] = function_ref @$ss13_runChildTask9operationBoxyYaYbKc_tYalF : $@convention(thin) @async <τ_0_0> (@guaranteed @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK: [[CHILD_TASK:%.*]] = apply [[RUN_CHILD_TASK]]<Int>([[CLOSURE_ARG]]) : $@convention(thin) @async <τ_0_0> (@guaranteed @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK: [[ASYNC_LET_START:%.*]] = function_ref @$ss14_asyncLetStart9operationBpxyYaYbKc_tYalF : $@convention(thin) @async <τ_0_0> (@guaranteed @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> Builtin.RawPointer
+  // CHECK: [[CHILD_TASK:%.*]] = apply [[ASYNC_LET_START]]<Int>([[CLOSURE_ARG]]) : $@convention(thin) @async <τ_0_0> (@guaranteed @Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <τ_0_0>) -> Builtin.RawPointer
   async let i = await getInt()
 
-  // CHECK: [[FUTURE_GET:%.*]] = function_ref @swift_task_future_wait : $@convention(thin) @async <τ_0_0> (@guaranteed Builtin.NativeObject) -> @out τ_0_0
+  // TODO: do we need @guaranteed Builtin.RawPointer???
+  // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
   // CHECK: [[INT_RESULT:%.*]] = alloc_stack $Int
-  // CHECK: apply [[FUTURE_GET]]<Int>([[INT_RESULT]], [[CHILD_TASK]]) : $@convention(thin) @async <τ_0_0> (@guaranteed Builtin.NativeObject) -> @out τ_0_0
+  // CHECK: apply [[ASYNC_LET_GET]]<Int>([[INT_RESULT]], [[CHILD_TASK]]) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
   // CHECK: [[INT_RESULT_VALUE:%.*]] = load [trivial] [[INT_RESULT]] : $*Int
   // CHECK: assign [[INT_RESULT_VALUE]] to [[I]] : $*Int
   return await i
 
-  // CHECK: [[BORROW_CHILD_TASK:%.*]] = begin_borrow [[CHILD_TASK]] : $Builtin.NativeObject
-  // CHECK-NEXT: builtin "cancelAsyncTask"([[BORROW_CHILD_TASK]] : $Builtin.NativeObject) : $()
-  // CHECK-NEXT: end_borrow [[BORROW_CHILD_TASK]] : $Builtin.NativeObject
-  
-  // CHECK: destroy_value [[CHILD_TASK]] : $Builtin.NativeObject 
+  // CHECK: builtin "endAsyncLet"(%8 : $Builtin.RawPointer) : $()
+
+  // CHECK: [[CLOSURE_ARG]] : $@Sendable @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <Int>
+  // TODO: destroy_value [[CHILD_TASK]] : $Builtin.RawPointer ???
 }
 
 func testAsyncLetWithThrows(cond: Bool) async throws -> String {
@@ -46,7 +46,7 @@ func testAsyncLetWithThrows(cond: Bool) async throws -> String {
   if cond {
     throw SomeError.boom
   }
-  
+
   return await s
 }
 
@@ -54,8 +54,8 @@ func testAsyncLetWithThrows(cond: Bool) async throws -> String {
 func testAsyncLetThrows() async throws -> String {
   async let s = try await getStringThrowingly()
 
-  // CHECK: [[RUN_CHILD_TASK:%.*]] = function_ref @swift_task_future_wait_throwing : $@convention(thin) @async <τ_0_0> (@guaranteed Builtin.NativeObject) -> (@out τ_0_0, @error Error)
-  // CHECK: try_apply [[RUN_CHILD_TASK]]<String>
+  // CHECK: [[ASYNC_LET_WAIT_THROWING:%.*]] = function_ref @swift_asyncLet_wait_throwing : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> (@out τ_0_0, @error Error)
+  // CHECK: try_apply [[ASYNC_LET_WAIT_THROWING]]<String>
   return try await s
 }
 
@@ -68,9 +68,9 @@ func testDecomposeAwait(cond: Bool) async -> Int {
   async let (i, s) = await getIntAndString()
 
   if cond {
-    // CHECK: [[FUTURE_GET:%.*]] = function_ref @swift_task_future_wait : $@convention(thin) @async <τ_0_0> (@guaranteed Builtin.NativeObject) -> @out τ_0_0
+    // CHECK: [[ASYNC_LET_GET:%.*]] = function_ref @swift_asyncLet_wait : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
     // CHECK: [[TUPLE_RESULT:%.*]] = alloc_stack $(Int, String)
-    // CHECK: apply [[FUTURE_GET]]<(Int, String)>([[TUPLE_RESULT]], {{%.*}}) : $@convention(thin) @async <τ_0_0> (@guaranteed Builtin.NativeObject) -> @out τ_0_0
+    // CHECK: apply [[ASYNC_LET_GET]]<(Int, String)>([[TUPLE_RESULT]], {{%.*}}) : $@convention(thin) @async <τ_0_0> (Builtin.RawPointer) -> @out τ_0_0
     // CHECK: [[TUPLE_RESULT_VAL:%.*]] = load [take] [[TUPLE_RESULT]] : $*(Int, String)
     // CHECK: ([[FIRST_VAL:%.*]], [[SECOND_VAL:%.*]]) = destructure_tuple [[TUPLE_RESULT_VAL]] : $(Int, String)
     // CHECK: assign [[FIRST_VAL]] to [[I]] : $*Int

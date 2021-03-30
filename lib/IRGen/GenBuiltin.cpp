@@ -220,10 +220,43 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  // getCurrentActor has no arguments.
+  // emitGetCurrentExecutor has no arguments.
   if (Builtin.ID == BuiltinValueKind::GetCurrentExecutor) {
     emitGetCurrentExecutor(IGF, out);
 
+    return;
+  }
+
+  // emitCreateAsyncLet takes the child task it is associated with.
+  if (Builtin.ID == BuiltinValueKind::CreateAsyncLet) {
+    // out.add(emitCreateAsyncLet(IGF, args.claimNext()));
+
+    fprintf(stderr, "[%s:%d] (%s) args count:%d\n", __FILE__, __LINE__, __FUNCTION__, args.size());
+    auto flags = args.claimNext();
+    fprintf(stderr, "[%s:%d] (%s) flags:%d\n", __FILE__, __LINE__, __FUNCTION__, flags);
+    auto futureResultType = args.claimNext();
+    fprintf(stderr, "[%s:%d] (%s) futureResultType:%d\n", __FILE__, __LINE__, __FUNCTION__, futureResultType);
+    auto taskFunction = args.claimNext();
+    fprintf(stderr, "[%s:%d] (%s) taskFunction:%d\n", __FILE__, __LINE__, __FUNCTION__, taskFunction);
+    auto taskContext = args.claimNext();
+    fprintf(stderr, "[%s:%d] (%s) taskContext:%d\n", __FILE__, __LINE__, __FUNCTION__, taskContext);
+
+    fprintf(stderr, "[%s:%d] (%s) emitCreateAsyncLet...\n", __FILE__, __LINE__, __FUNCTION__);
+    auto asyncLet = emitCreateAsyncLet(
+        IGF,
+        flags,
+        futureResultType,
+        taskFunction,
+        taskContext,
+        substitutions
+        );
+
+    out.add(asyncLet);
+    return;
+  }
+
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLet) {
+    emitEndAsyncLet(IGF, args.claimNext());
     return;
   }
 
