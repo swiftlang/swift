@@ -18,6 +18,15 @@
 #ifndef SWIFT_IRGEN_GENCONCURRENCY_H
 #define SWIFT_IRGEN_GENCONCURRENCY_H
 
+#include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/SIL/ApplySite.h"
+#include "llvm/IR/CallingConv.h"
+
+#include "Callee.h"
+#include "GenHeap.h"
+#include "IRGenModule.h"
+
 namespace llvm {
 class Value;
 }
@@ -35,6 +44,15 @@ void emitBuildSerialExecutorRef(IRGenFunction &IGF, llvm::Value *actor,
 
 /// Emit the getCurrentExecutor builtin.
 void emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out);
+
+/// Emit the createAsyncLet builtin.
+llvm::Value *emitBuiltinStartAsyncLet(IRGenFunction &IGF,
+                                      llvm::Value *taskFunction,
+                                      llvm::Value *localContextInfo,
+                                      SubstitutionMap subs);
+
+/// Emit the endAsyncLet builtin.
+void emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet);
 
 /// Emit the createTaskGroup builtin.
 llvm::Value *emitCreateTaskGroup(IRGenFunction &IGF);
