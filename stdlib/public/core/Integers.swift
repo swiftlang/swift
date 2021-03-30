@@ -1515,13 +1515,34 @@ internal func _overestimatedBufferCapacity<T: BinaryInteger>(
 
 @_alwaysEmitIntoClient
 @inline(__always)
-internal func _convertSignedInteger<T: BinaryInteger>(
+internal func _moveInitializedBytesFromEnd(
+  _ buffer: UnsafeMutableBufferPointer<UInt8>,
+  initializedCount: Int
+) {
+  let count = buffer.count
+  let unusedCapacity = count &- initializedCount
+  guard unusedCapacity > 0 else { return }
+  // The last `initializedCount` bytes of the buffer have been initialized, but
+  // we need the first `initializedCount` bytes of the buffer to be initialized
+  // instead, so we move the initialized bytes if necessary.
+  _internalInvariant(buffer.baseAddress != nil)
+  let ptr1 = buffer.baseAddress!
+  ptr1.moveInitialize(from: ptr1 + unusedCapacity, count: initializedCount)
+  // Work around a `_SmallString` bug.
+  let ptr2 = ptr1 + initializedCount
+  ptr2.initialize(repeating: 0, count: unusedCapacity)
+  ptr2.deinitialize(count: unusedCapacity)
+}
+
+@_alwaysEmitIntoClient
+@inline(__always)
+internal func _convertInteger<T: BinaryInteger>(
   _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: T,
   radix: Int, uppercase: Bool
 ) -> /* initializedCount: */ Int {
   var initializedCount = _convertUnsignedInteger(
     buffer, value.magnitude, radix: radix, uppercase: uppercase)
-  if value < (0 as T) {
+  if T.isSigned && value < (0 as T) {
     initializedCount += 1
     buffer[buffer.count &- initializedCount] = 45 /* "-" */
   }
@@ -1637,35 +1658,28 @@ internal func _convertNonzeroUnsignedInteger<T: BinaryInteger>(
 }
 
 extension BinaryInteger {
+  @_alwaysEmitIntoClient
+  @inline(__always)
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
-
     let capacity = _overestimatedBufferCapacity(self, radix: radix)
-    return String(_uninitializedCapacity: capacity) {
-      let initializedCount = Self.isSigned
-        ? _convertSignedInteger($0, self, radix: radix, uppercase: uppercase)
-        : _convertUnsignedInteger($0, self, radix: radix, uppercase: uppercase)
-      // The last `initializedCount` bytes of the buffer have been initialized,
-      // but we need the first `initializedCount` bytes of the buffer to be
-      // initialized instead, so we move the initialized bytes if necessary.
-      let count = $0.count
-      if initializedCount < count {
-        let baseAddress = $0.baseAddress!
-        let unusedCapacity = count &- initializedCount
-        baseAddress.moveInitialize(
-          from: baseAddress + unusedCapacity,
-          count: initializedCount)
-        // Work around a `_SmallString` bug.
-        let ptr = baseAddress + initializedCount
-        ptr.initialize(repeating: 0, count: unusedCapacity)
-        ptr.deinitialize(count: unusedCapacity)
+    if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+      return String(unsafeUninitializedCapacity: capacity) {
+        let i = _convertInteger($0, self, radix: radix, uppercase: uppercase)
+        _moveInitializedBytesFromEnd($0, initializedCount: i)
+        return i
       }
-      return initializedCount
     }
+    let buffer =
+      UnsafeMutableBufferPointer<UInt8>.allocate(capacity: capacity)
+    defer { buffer.deallocate() }
+    let i = _convertInteger(buffer, self, radix: radix, uppercase: uppercase)
+    return String._fromASCII(UnsafeBufferPointer(rebasing: buffer.suffix(i)))
   }
 
   /// A textual representation of this value.
   @_semantics("binaryInteger.description")
+  @inlinable
   public var description: String {
     return _description(radix: 10, uppercase: false)
   }
