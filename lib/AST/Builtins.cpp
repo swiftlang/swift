@@ -1424,6 +1424,16 @@ Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   return TupleType::get(resultTupleElements, ctx);
 }
 
+Type swift::getAsyncLetAndTaskType(ASTContext &ctx) {
+  TupleTypeElt resultTupleElements[2] = {
+    ctx.TheRawPointerType,  // AsyncLet *,
+    ctx.TheRawPointerType,  // AsyncLet *,
+//    ctx.TheNativeObjectType // task
+  };
+
+  return TupleType::get(resultTupleElements, ctx);
+}
+
 static ValueDecl *getCreateAsyncTaskFuture(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
   auto genericParam = makeGenericParam().build(builder);
@@ -1478,6 +1488,40 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_rawUnsafeContinuation,
                                         _owned(_error)),
+                            _void);
+}
+
+static ValueDecl *getCreateAsyncLet(ASTContext &ctx, Identifier id) {
+  ModuleDecl *M = ctx.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+  SynthesisContext SC(ctx, DC);
+
+  BuiltinFunctionBuilder builder(ctx);
+  auto genericParam = makeGenericParam().build(builder); // <T>
+
+  // flags
+  builder.addParameter(
+      makeConcrete(ctx.getIntDecl()->getDeclaredInterfaceType()));
+
+  // operation async function pointer: () async throws -> T
+  auto extInfo = ASTExtInfoBuilder().withAsync().withThrows().build();
+  builder.addParameter(
+      makeConcrete(FunctionType::get({ }, genericParam, extInfo)));
+
+  // -> AsyncLet*
+//  auto resultType = synthesizeType(SC, _rawPointer);
+//  builder.setResult(makeConcrete(resultType));
+  builder.setResult(makeConcrete(getAsyncLetAndTaskType(ctx))); // TODO: this can work I think
+  return builder.build(id);
+
+//  return getBuiltinFunction(ctx, id, _thin,
+//                            _parameters(_nativeObject),
+//                            _rawPointer);
+}
+
+static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer),
                             _void);
 }
 
@@ -2739,6 +2783,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InitializeDefaultActor:
   case BuiltinValueKind::DestroyDefaultActor:
     return getDefaultActorInitDestroy(Context, Id);
+
+  case BuiltinValueKind::CreateAsyncLet:
+    return getCreateAsyncLet(Context, Id);
+
+  case BuiltinValueKind::EndAsyncLet:
+    return getEndAsyncLet(Context, Id);
 
   case BuiltinValueKind::CreateTaskGroup:
     return getCreateTaskGroup(Context, Id);

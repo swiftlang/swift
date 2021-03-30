@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_TASK_GROUP_H
-#define SWIFT_ABI_TASK_GROUP_H
+#ifndef SWIFT_ABI_TASK_ASYNC_LET_H
+#define SWIFT_ABI_TASK_ASYNC_LET_H
 
 #include "swift/ABI/Task.h"
 #include "swift/ABI/HeapObject.h"
@@ -26,21 +26,28 @@
 
 namespace swift {
 
-/// The task group is responsible for maintaining dynamically created child tasks.
-class alignas(Alignment_TaskGroup) TaskGroup {
+/// Represents an in-flight `async let`, i.e. the Task that is computing the
+/// result of the async let, along with the awaited status and other metadata.
+class alignas(Alignment_AsyncLet) AsyncLet {
 public:
-  // These constructors do not initialize the group instance, and the
-  // destructor does not destroy the group instance; you must call
-  // swift_taskGroup_{initialize,destroy} yourself.
-  constexpr TaskGroup()
+  // These constructors do not initialize the AsyncLet instance, and the
+  // destructor does not destroy the AsyncLet instance; you must call
+  // swift_asyncLet_{initialize,destroy} yourself.
+  constexpr AsyncLet()
     : PrivateData{} {}
 
-  void *PrivateData[NumWords_TaskGroup];
+  // TODO: not sure how many words we should reserve
+  void *PrivateData[NumWords_AsyncLet];
 
-  /// Upon a future task's completion, offer it to the task group it belongs to.
-  void offer(AsyncTask *completed, AsyncContext *context);
+  /// Returns true if the `async let` was already awaited on at-least once.
+  bool wasAwaitedOn() const;
+
+  /// Returns the child task that is associated with this async let.
+  /// The tasks completion is used to fulfil the value represented by this async let.
+  AsyncTask *getTask() const;
+
 };
 
 } // end namespace swift
 
-#endif // SWIFT_ABI_TASK_GROUP_H
+#endif // SWIFT_ABI_TASK_ASYNC_LET_H

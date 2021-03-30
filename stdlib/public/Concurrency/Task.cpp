@@ -380,7 +380,9 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
 
   assert(amountToAllocate % MaximumAlignment == 0);
 
+  fprintf(stderr, "[%s:%d] (%s) amountToAllocate:%d\n", __FILE__, __LINE__, __FUNCTION__, amountToAllocate);
   void *allocation = malloc(amountToAllocate);
+  fprintf(stderr, "[%s:%d] (%s) allocation:%d\n", __FILE__, __LINE__, __FUNCTION__, allocation);
 
   AsyncContext *initialContext =
     reinterpret_cast<AsyncContext*>(
@@ -485,6 +487,8 @@ static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     // Initialize task locals with a link to the parent task.
     task->Local.initializeLinkParent(task, parent);
   }
+
+  fprintf(stderr, "[%s:%d] (%s) CREATED TASK:%d\n", __FILE__, __LINE__, __FUNCTION__, task);
 
   return {task, initialContext};
 }

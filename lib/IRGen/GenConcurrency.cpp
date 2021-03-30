@@ -171,6 +171,45 @@ void irgen::emitGetCurrentExecutor(IRGenFunction &IGF, Explosion &out) {
   IGF.emitAllExtractValues(call, IGF.IGM.SwiftExecutorTy, out);
 }
 
+llvm::Value *irgen::emitCreateAsyncLet(IRGenFunction &IGF,
+                                       llvm::Value *flags,
+                                       llvm::Value *futureResultType,
+                                       llvm::Value *taskFunction,
+                                       llvm::Value *localContextInfo,
+                                       SubstitutionMap subs) {
+  fprintf(stderr, "[%s:%d] (%s) irgen emitCreateAsyncLet...\n", __FILE__, __LINE__, __FUNCTION__);
+
+  // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
+  auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
+  auto address = IGF.createAlloca(ty, Alignment(Alignment_AsyncLet));
+  auto alet = IGF.Builder.CreateBitCast(address.getAddress(),
+                                         IGF.IGM.Int8PtrTy);
+  IGF.Builder.CreateLifetimeStart(alet);
+
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getAsyncLetInitializeFn(),
+                                      {alet,
+                                       flags,
+                                       futureResultType,
+                                       taskFunction,
+                                       localContextInfo
+                                      });
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  fprintf(stderr, "[%s:%d] (%s) irgen emitCreateAsyncLet done...\n", __FILE__, __LINE__, __FUNCTION__);
+
+  return alet;
+}
+
+void irgen::emitEndAsyncLet(IRGenFunction &IGF, llvm::Value *alet) {
+  auto *call = IGF.Builder.CreateCall(IGF.IGM.getEndAsyncLetFn(),
+                                      {alet});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.Builder.CreateLifetimeEnd(alet);
+}
+
 llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF) {
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskGroup);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskGroup));

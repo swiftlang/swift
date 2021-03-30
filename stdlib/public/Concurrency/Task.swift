@@ -718,8 +718,8 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 }
 
 // FIXME: both of these ought to take their arguments _owned so that
-// we can do a move out of the future in the common case where it's
-// unreferenced
+//        we can do a move out of the future in the common case where it's
+//        unreferenced
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_future_wait")
 public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
@@ -742,8 +742,7 @@ public func _runChildTask<T>(
   flags.isChildTask = true
 
   // Create the asynchronous task future.
-  let (task, _) = Builtin.createAsyncTaskFuture(
-      flags.bits, operation)
+  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
 
   // Enqueue the resulting job.
   _enqueueJobGlobal(Builtin.convertTaskToJob(task))
@@ -758,6 +757,7 @@ func _taskCancel(_ task: Builtin.NativeObject)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_isCancelled")
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
+/// Attach child task to the parent (current) task.
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @usableFromInline
