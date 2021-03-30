@@ -86,7 +86,7 @@ ${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
   if (raw)
     raw = raw->append(${child_elt}.getRaw());
   else
-    raw = RawSyntax::makeAndCalcLength(SyntaxKind::${child_node.syntax_kind},
+    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
       {${child_elt}.getRaw()}, SourcePresence::Present, raw->getArena());
   return ${node.name}(Data->replacingChild(raw, Cursor::${child.name}));
 }

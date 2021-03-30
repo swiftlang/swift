@@ -218,31 +218,41 @@ class RawSyntax final
   }
 
   /// Constructor for creating layout nodes.
-  /// If the node has been allocated inside the bump allocator of a
-  /// \c SyntaxArena, that arena must be passed as \p Arena to retain the node's
-  /// underlying storage.
+  /// \p Children is an iterator that provides the child \c RawSyntax nodes.
+  /// It is only traversed once.
+  /// \p NumChildren is the number of elements provided by the \p Children
+  /// iterator.
   /// If \p NodeId is \c None, the next free NodeId is used, if it is passed,
   /// the caller needs to assure that the node ID has not been used yet.
-  RawSyntax(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout,
-            size_t TextLength, SourcePresence Presence,
+  template <typename ChildrenIteratorType>
+  RawSyntax(SyntaxKind Kind, ChildrenIteratorType ChildrenIt,
+            uint32_t NumChildren, SourcePresence Presence,
             const RC<SyntaxArena> &Arena, llvm::Optional<SyntaxNodeId> NodeId)
-      : Arena(Arena.get()), TextLength(uint32_t(TextLength)),
+      : Arena(Arena.get()), TextLength(0 /*computed in body*/),
         Presence(Presence), IsToken(false),
-        Bits(LayoutData{uint32_t(Layout.size()),
-                        /*TotalSubNodeCount=*/0, /*set in body*/
-                        Kind}) {
+        Bits(LayoutData{NumChildren,
+                        /*TotalSubNodeCount=*/0 /*computed in body*/, Kind}) {
     assert(Arena && "RawSyntax nodes must always be allocated in an arena");
     assert(
         Kind != SyntaxKind::Token &&
         "'token' syntax node must be constructed with dedicated constructor");
 
-    for (auto Child : Layout) {
+    const RawSyntax **TrailingChildren =
+        getTrailingObjects<const RawSyntax *>();
+    for (uint32_t I = 0; I < NumChildren;
+         ++I, ++ChildrenIt, ++TrailingChildren) {
+      const RawSyntax *Child = *ChildrenIt;
       if (Child) {
+        // Compute TextLength and TotalSubNodeCount of this node in place.
+        TextLength += Child->getTextLength();
         Bits.Layout.TotalSubNodeCount += Child->getTotalSubNodeCount() + 1;
+
         // If the child is stored in a different arena, it needs to stay alive
         // as long as this node's arena is alive.
         Arena->addChildArena(Child->Arena);
       }
+
+      *TrailingChildren = Child;
     }
 
     if (NodeId.hasValue()) {
@@ -251,10 +261,6 @@ class RawSyntax final
     } else {
       this->NodeId = NextFreeNodeId++;
     }
-
-    // Initialize layout data.
-    std::uninitialized_copy(Layout.begin(), Layout.end(),
-                            getTrailingObjects<const RawSyntax *>());
   }
 
   /// Constructor for creating token nodes
@@ -311,28 +317,26 @@ public:
   /// @{
 
   /// Make a raw "layout" syntax node.
+  template <typename ChildrenIteratorType>
   static const RawSyntax *
-  make(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout, size_t TextLength,
+  make(SyntaxKind Kind, ChildrenIteratorType ChildrenIt, size_t NumChildren,
        SourcePresence Presence, const RC<SyntaxArena> &Arena,
        llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
     assert(Arena && "RawSyntax nodes must always be allocated in an arena");
-    auto size = totalSizeToAlloc<const RawSyntax *>(Layout.size());
+    auto size = totalSizeToAlloc<const RawSyntax *>(NumChildren);
     void *data = Arena->Allocate(size, alignof(RawSyntax));
     return new (data)
-        RawSyntax(Kind, Layout, TextLength, Presence, Arena, NodeId);
+        RawSyntax(Kind, ChildrenIt, NumChildren, Presence, Arena, NodeId);
   }
 
+  /// Convenience constructor to create a raw "layout" syntax node from an
+  /// \c llvm::ArrayRef containing the children.
   static const RawSyntax *
-  makeAndCalcLength(SyntaxKind Kind, ArrayRef<const RawSyntax *> Layout,
-                    SourcePresence Presence, const RC<SyntaxArena> &Arena,
-                    llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
-    size_t TextLength = 0;
-    for (auto Child : Layout) {
-      if (Child) {
-        TextLength += Child->getTextLength();
-      }
-    }
-    return make(Kind, Layout, TextLength, Presence, Arena, NodeId);
+  make(SyntaxKind Kind, llvm::ArrayRef<const RawSyntax *> Children,
+       SourcePresence Presence, const RC<SyntaxArena> &Arena,
+       llvm::Optional<SyntaxNodeId> NodeId = llvm::None) {
+    return make(Kind, Children.begin(), Children.size(), Presence, Arena,
+                NodeId);
   }
 
   /// Make a raw "token" syntax node.
@@ -367,7 +371,7 @@ public:
   /// Make a missing raw "layout" syntax node.
   static const RawSyntax *missing(SyntaxKind Kind,
                                   const RC<SyntaxArena> &Arena) {
-    return make(Kind, {}, /*TextLength=*/0, SourcePresence::Missing, Arena);
+    return make(Kind, {}, SourcePresence::Missing, Arena);
   }
 
   /// Make a missing raw "token" syntax node.

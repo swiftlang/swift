@@ -199,8 +199,8 @@ template <> struct MappingTraits<const swift::RawSyntax *> {
       StringRef nodeIdString;
       in.mapRequired("id", nodeIdString);
       unsigned nodeId = std::atoi(nodeIdString.data());
-      value = swift::RawSyntax::makeAndCalcLength(kind, layout, presence,
-                                                  input->Arena, nodeId);
+      value =
+          swift::RawSyntax::make(kind, layout, presence, input->Arena, nodeId);
     }
   }
 };
