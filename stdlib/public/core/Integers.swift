@@ -1496,6 +1496,7 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _overestimatedBufferCapacity<T: BinaryInteger>(
   _ value: T, radix: Int
 ) -> Int {
@@ -1513,6 +1514,7 @@ internal func _overestimatedBufferCapacity<T: BinaryInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _convertSignedInteger<T: BinaryInteger>(
   _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: T,
   radix: Int, uppercase: Bool
@@ -1527,6 +1529,7 @@ internal func _convertSignedInteger<T: BinaryInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _convertUnsignedInteger<T: BinaryInteger>(
   _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: T,
   radix: Int, uppercase: Bool
@@ -1545,6 +1548,7 @@ internal func _convertUnsignedInteger<T: BinaryInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _convertNonzeroUInt64(
   _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: UInt64,
   radix: Int, uppercase: Bool
@@ -1561,68 +1565,54 @@ internal func _convertNonzeroUInt64(
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-@usableFromInline
-internal let _decimalDigitsLookupTable: [(UInt8, UInt8)] = [
-  (0x30, 0x30), (0x31, 0x30), (0x32, 0x30), (0x33, 0x30), (0x34, 0x30),
-  (0x35, 0x30), (0x36, 0x30), (0x37, 0x30), (0x38, 0x30), (0x39, 0x30),
-  (0x30, 0x31), (0x31, 0x31), (0x32, 0x31), (0x33, 0x31), (0x34, 0x31),
-  (0x35, 0x31), (0x36, 0x31), (0x37, 0x31), (0x38, 0x31), (0x39, 0x31),
-  (0x30, 0x32), (0x31, 0x32), (0x32, 0x32), (0x33, 0x32), (0x34, 0x32),
-  (0x35, 0x32), (0x36, 0x32), (0x37, 0x32), (0x38, 0x32), (0x39, 0x32),
-  (0x30, 0x33), (0x31, 0x33), (0x32, 0x33), (0x33, 0x33), (0x34, 0x33),
-  (0x35, 0x33), (0x36, 0x33), (0x37, 0x33), (0x38, 0x33), (0x39, 0x33),
-  (0x30, 0x34), (0x31, 0x34), (0x32, 0x34), (0x33, 0x34), (0x34, 0x34),
-  (0x35, 0x34), (0x36, 0x34), (0x37, 0x34), (0x38, 0x34), (0x39, 0x34),
-  (0x30, 0x35), (0x31, 0x35), (0x32, 0x35), (0x33, 0x35), (0x34, 0x35),
-  (0x35, 0x35), (0x36, 0x35), (0x37, 0x35), (0x38, 0x35), (0x39, 0x35),
-  (0x30, 0x36), (0x31, 0x36), (0x32, 0x36), (0x33, 0x36), (0x34, 0x36),
-  (0x35, 0x36), (0x36, 0x36), (0x37, 0x36), (0x38, 0x36), (0x39, 0x36),
-  (0x30, 0x37), (0x31, 0x37), (0x32, 0x37), (0x33, 0x37), (0x34, 0x37),
-  (0x35, 0x37), (0x36, 0x37), (0x37, 0x37), (0x38, 0x37), (0x39, 0x37),
-  (0x30, 0x38), (0x31, 0x38), (0x32, 0x38), (0x33, 0x38), (0x34, 0x38),
-  (0x35, 0x38), (0x36, 0x38), (0x37, 0x38), (0x38, 0x38), (0x39, 0x38),
-  (0x30, 0x39), (0x31, 0x39), (0x32, 0x39), (0x33, 0x39), (0x34, 0x39),
-  (0x35, 0x39), (0x36, 0x39), (0x37, 0x39), (0x38, 0x39), (0x39, 0x39),
-]
-
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _convertNonzeroUInt64ToDecimal(
   _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: UInt64
 ) -> /* initializedCount: */ Int {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
-    return _convertNonzeroUnsignedInteger(
-      buffer, value, radix: 10, uppercase: false)
-  }
   var value = value
   var i = buffer.count
-  while value >= 10 {
-    i -= 2
-    let digits: UInt64
-    (value, digits) = value.quotientAndRemainder(dividingBy: 100)
-    let digits_ = Int(truncatingIfNeeded: digits)
-    (buffer[i &+ 1], buffer[i]) = _decimalDigitsLookupTable[digits_]
-  }
-  if value > 0 {
+  while value > 0 {
     i -= 1
-    buffer[i] = 48 /* "0" */ &+ UInt8(truncatingIfNeeded: value)
+    let digit: UInt64
+    (value, digit) = value.quotientAndRemainder(dividingBy: 10)
+    buffer[i] = 48 /* "0" */ &+ UInt8(truncatingIfNeeded: digit)
   }
   return buffer.count &- i
 }
 
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _convertNonzeroUInt64ToHexadecimal(
   _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: UInt64,
   uppercase: Bool
 ) -> /* initializedCount: */ Int {
-  //TODO: Implement fast path.
-  return _convertNonzeroUnsignedInteger(
-    buffer, value, radix: 16, uppercase: uppercase)
+  var value = value
+  var i = buffer.count
+  if uppercase {
+    while value > 0 {
+      i -= 1
+      let digit = value & 15
+      value &>>= 4
+      buffer[i] = digit < 10
+        ? 48 /* "0" */ &+ UInt8(truncatingIfNeeded: digit)
+        : 65 /* "A" */ &+ (UInt8(truncatingIfNeeded: digit) &- 10)
+    }
+  } else {
+    while value > 0 {
+      i -= 1
+      let digit = value & 15
+      value &>>= 4
+      buffer[i] = digit < 10
+        ? 48 /* "0" */ &+ UInt8(truncatingIfNeeded: digit)
+        : 97 /* "a" */ &+ (UInt8(truncatingIfNeeded: digit) &- 10)
+    }
+  }
+  return buffer.count &- i
 }
 
 @_alwaysEmitIntoClient
 @_specialize(where T == UInt64)
-@inline(never)
 internal func _convertNonzeroUnsignedInteger<T: BinaryInteger>(
   _ buffer: UnsafeMutableBufferPointer<UInt8>, _ value: T,
   radix: Int, uppercase: Bool
