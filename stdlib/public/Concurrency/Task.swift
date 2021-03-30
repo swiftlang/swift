@@ -477,7 +477,7 @@ extension Task {
     // Enqueue the resulting job.
     _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
 
-    let _ = await Handle<Int, Never>(task).get()
+    await Handle<Void, Never>(task).get()
   }
 }
 
