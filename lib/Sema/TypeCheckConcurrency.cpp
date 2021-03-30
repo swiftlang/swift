@@ -2316,12 +2316,23 @@ void swift::checkPropertyWrapperActorIsolation(
 /// inference rules). Returns \c None if there were no attributes on this
 /// declaration.
 static Optional<ActorIsolation> getIsolationFromAttributes(
-    const Decl *decl, bool shouldDiagnose = true) {
+    const Decl *decl, bool shouldDiagnose = true, bool onlyExplicit = false) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
   auto independentAttr = decl->getAttrs().getAttribute<ActorIndependentAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
+
+  // Remove implicit attributes if we only care about explicit ones.
+  if (onlyExplicit) {
+    if (independentAttr && independentAttr->isImplicit())
+      independentAttr = nullptr;
+    if (nonisolatedAttr && nonisolatedAttr->isImplicit())
+      nonisolatedAttr = nullptr;
+    if (globalActorAttr && globalActorAttr->first->isImplicit())
+      globalActorAttr = None;
+  }
+
   unsigned numIsolationAttrs =
     (nonisolatedAttr ? 1 : 0) + (independentAttr ? 1 : 0) +
     (globalActorAttr ? 1 : 0);
@@ -2504,7 +2515,7 @@ static Optional<ActorIsolation> getIsolationFromConformances(
     NominalTypeDecl *nominal) {
   if (isa<ProtocolDecl>(nominal))
     return None;
-  
+
   Optional<ActorIsolation> foundIsolation;
   for (auto proto : nominal->getLocalProtocols()) {
     switch (auto protoIsolation = getActorIsolation(proto)) {
@@ -2884,8 +2895,12 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
   while (!dc->isModuleScopeContext()) {
     if (auto closure = dyn_cast<AbstractClosureExpr>(dc)) {
-      // A closure with an explicit global actor uses concurrency features.
+      // A closure with an explicit global actor or @actorIndependent
+      // uses concurrency features.
       if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (explicitClosure->getAttrs().hasAttribute<ActorIndependentAttr>())
+          return true;
+
         if (getExplicitGlobalActor(const_cast<ClosureExpr *>(explicitClosure)))
           return true;
       }
@@ -2899,7 +2914,8 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
     } else if (auto decl = dc->getAsDecl()) {
       // If any isolation attributes are present, we're using concurrency
       // features.
-      if (getIsolationFromAttributes(decl, /*shouldDiagnose=*/false))
+      if (getIsolationFromAttributes(
+              decl, /*shouldDiagnose=*/false, /*onlyExplicit=*/true))
         return true;
 
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -2915,7 +2931,9 @@ bool swift::contextUsesConcurrencyFeatures(const DeclContext *dc) {
         // If we're in an accessor declaration, also check the storage
         // declaration.
         if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-          if (getIsolationFromAttributes(accessor->getStorage()))
+          if (getIsolationFromAttributes(
+                  accessor->getStorage(), /*shouldDiagnose=*/false,
+                  /*onlyExplicit=*/true))
             return true;
         }
       }
