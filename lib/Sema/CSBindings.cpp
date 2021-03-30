@@ -290,25 +290,51 @@ void BindingSet::inferTransitiveProtocolRequirements(
     // If current type variable is part of an equivalence
     // class, make it a "representative" and let it infer
     // supertypes and direct protocol requirements from
-    // other members.
-    for (const auto &entry : bindings.Info.EquivalentTo) {
-      auto eqBindings = inferredBindings.find(entry.first);
-      if (eqBindings != inferredBindings.end()) {
-        const auto &bindings = eqBindings->getSecond();
+    // other members and their equivalence classes.
+    SmallSetVector<TypeVariableType *, 4> equivalenceClass;
+    {
+      SmallVector<TypeVariableType *, 4> workList;
+      workList.push_back(currentVar);
 
-        llvm::SmallPtrSet<Constraint *, 2> placeholder;
-        // Add any direct protocols from members of the
-        // equivalence class, so they could be propagated
-        // to all of the members.
-        propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
-                             placeholder);
+      do {
+        auto *typeVar = workList.pop_back_val();
 
-        // Since type variables are equal, current type variable
-        // becomes a subtype to any supertype found in the current
-        // equivalence  class.
-        for (const auto &eqEntry : bindings.Info.SubtypeOf)
-          addToWorkList(currentVar, eqEntry.first);
-      }
+        if (!equivalenceClass.insert(typeVar))
+          continue;
+
+        auto bindingSet = inferredBindings.find(typeVar);
+        if (bindingSet == inferredBindings.end())
+          continue;
+
+        auto &equivalences = bindingSet->getSecond().Info.EquivalentTo;
+        for (const auto &eqVar : equivalences) {
+          workList.push_back(eqVar.first);
+        }
+      } while (!workList.empty());
+    }
+
+    for (const auto &memberVar : equivalenceClass) {
+      if (memberVar == currentVar)
+        continue;
+
+      auto eqBindings = inferredBindings.find(memberVar);
+      if (eqBindings == inferredBindings.end())
+        continue;
+
+      const auto &bindings = eqBindings->getSecond();
+
+      llvm::SmallPtrSet<Constraint *, 2> placeholder;
+      // Add any direct protocols from members of the
+      // equivalence class, so they could be propagated
+      // to all of the members.
+      propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
+                           placeholder);
+
+      // Since type variables are equal, current type variable
+      // becomes a subtype to any supertype found in the current
+      // equivalence  class.
+      for (const auto &eqEntry : bindings.Info.SubtypeOf)
+        addToWorkList(currentVar, eqEntry.first);
     }
 
     // More subtype/equivalences relations have been added.
