@@ -677,3 +677,18 @@ struct TestConflictInCoroutineClosureArg {
     // expected-note@-2 {{conflicting access is here}}
   }
 }
+
+// Check that AccessSummaryAnalysis does not crash with this:
+struct TestStruct {
+  var x = 7
+  mutating func b()  {
+    func c() {}
+    func d() {
+        x // expected-warning {{property is accessed but result is unused}}
+    }
+     withoutActuallyEscaping(c) { e in
+        withoutActuallyEscaping(d) { e in
+        }
+    }
+  }
+}

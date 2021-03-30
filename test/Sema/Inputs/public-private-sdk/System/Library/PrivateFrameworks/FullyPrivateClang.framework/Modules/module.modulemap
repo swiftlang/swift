@@ -1,0 +1,6 @@
+framework module FullyPrivateClang {
+  umbrella header "FullyPrivateClang.h"
+
+  export *
+  module * { export * }
+}

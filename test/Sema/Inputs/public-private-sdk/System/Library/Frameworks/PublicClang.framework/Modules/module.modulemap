@@ -1,0 +1,4 @@
+framework module PublicClang {
+  umbrella header "PublicClang.h"
+  export *
+}

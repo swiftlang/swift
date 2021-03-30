@@ -8,8 +8,8 @@ actor Act { }
 @_transparent public func serialize_all() {
 }
 
-// CHECK-LABEL: sil public_external [transparent] [serialized] @test_hop_to_executor
-sil [transparent] [serialized] @test_hop_to_executor : $@convention(thin) (@guaranteed Act) -> () {
+// CHECK-LABEL: sil public_external [transparent] [serialized] @test_hop_to_executor_actor
+sil [transparent] [serialized] @test_hop_to_executor_actor : $@convention(thin) (@guaranteed Act) -> () {
 bb0(%0 : $Act):
   // CHECK: hop_to_executor %0 : $Act
   hop_to_executor %0 : $Act
@@ -17,9 +17,19 @@ bb0(%0 : $Act):
   return %2 : $()
 }
 
+// CHECK-LABEL: sil public_external [transparent] [serialized] @test_hop_to_executor_builtin
+sil [transparent] [serialized] @test_hop_to_executor_builtin : $@convention(thin) (@guaranteed Builtin.Executor) -> () {
+bb0(%0 : $Builtin.Executor):
+  // CHECK: hop_to_executor %0 : $Builtin.Executor
+  hop_to_executor %0 : $Builtin.Executor
+  %2 = tuple ()
+  return %2 : $()
+}
+
 sil [transparent] [serialized] @$s15def_concurrency13serialize_allyyF : $@convention(thin) () -> () {
 bb0:
-  %91 = function_ref @test_hop_to_executor : $@convention(thin) (@guaranteed Act) -> ()
+  %0 = function_ref @test_hop_to_executor_actor : $@convention(thin) (@guaranteed Act) -> ()
+  %1 = function_ref @test_hop_to_executor_builtin : $@convention(thin) (@guaranteed Builtin.Executor) -> ()
 
   %r = tuple ()
   return %r : $()

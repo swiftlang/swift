@@ -6,7 +6,10 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+
+// See SR-14333
 // XFAIL: OS=windows-msvc
+// UNSUPPORTED: MSVC_VER=15.0
 
 struct E : Error {}
 

@@ -126,6 +126,8 @@ SWIFT_REQUEST(TypeChecker, HasDynamicCallableAttributeRequest,
               bool(CanType), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasImplementationOnlyImportsRequest,
               bool(SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ModuleLibraryLevelRequest,
+              LibraryLevel(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature (ModuleDecl *, const GenericSignatureImpl *,
                                  GenericParamSource,

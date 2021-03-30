@@ -124,7 +124,7 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_JOB = {
     "Builtin.Job"};
 /// The name of the Builtin type for ExecutorRef
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_EXECUTOR = {
-    "Builtin.ExecutorRef"};
+    "Builtin.Executor"};
 /// The name of the Builtin type for DefaultActorStorage
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE = {
     "Builtin.DefaultActorStorage"};

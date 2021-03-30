@@ -37,13 +37,12 @@ TokenSyntax SyntaxFactory::makeToken(tok Kind, StringRef Text,
 
 UnknownSyntax
 SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens) {
-  std::vector<const RawSyntax *> Layout;
-  Layout.reserve(Tokens.size());
-  for (auto &Token : Tokens) {
-    Layout.push_back(Token.getRaw());
-  }
-  auto Raw = RawSyntax::makeAndCalcLength(SyntaxKind::Unknown, Layout,
-                                          SourcePresence::Present, Arena);
+  auto RawTokens = llvm::map_iterator(Tokens.begin(),
+    [](const TokenSyntax &Token) -> const RawSyntax * {
+      return Token.getRaw();
+    });
+  auto Raw = RawSyntax::make(SyntaxKind::Unknown, RawTokens, Tokens.size(),
+                             SourcePresence::Present, Arena);
   return makeRoot<UnknownSyntax>(Raw);
 }
 
@@ -135,15 +134,13 @@ const RawSyntax *SyntaxFactory::createRaw(
 %   end
     if (I != Elements.size())
       return nullptr;
-    return RawSyntax::makeAndCalcLength(Kind, Layout, SourcePresence::Present,
-                                        Arena);
+    return RawSyntax::make(Kind, Layout, SourcePresence::Present, Arena);
 % elif node.is_syntax_collection():
     for (auto &E : Elements) {
       if (!canServeAsCollectionMemberRaw(SyntaxKind::${node.syntax_kind}, E))
         return nullptr;
     }
-    return RawSyntax::makeAndCalcLength(Kind, Elements, SourcePresence::Present,
-                                        Arena);
+    return RawSyntax::make(Kind, Elements, SourcePresence::Present, Arena);
 % else:
     return nullptr;
 % end
@@ -178,7 +175,7 @@ Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
 %     child_params = ', '.join(child_params)
 ${node.name}
 SyntaxFactory::make${node.syntax_kind}(${child_params}) {
-  auto Raw = RawSyntax::makeAndCalcLength(SyntaxKind::${node.syntax_kind}, {
+  auto Raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, {
 %     for child in node.children:
 %       if child.is_optional:
     ${child.name}.hasValue() ? ${child.name}->getRaw() : nullptr,
@@ -198,8 +195,8 @@ SyntaxFactory::make${node.syntax_kind}(
   for (auto &element : elements) {
     layout.push_back(element.getRaw());
   }
-  auto raw = RawSyntax::makeAndCalcLength(SyntaxKind::${node.syntax_kind},
-    layout, SourcePresence::Present, Arena);
+  auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, layout,
+    SourcePresence::Present, Arena);
   return makeRoot<${node.name}>(raw);
 }
 %   end
@@ -214,7 +211,7 @@ SyntaxFactory::makeBlank${node.syntax_kind}() {
     ${make_missing_child(child)},
 %       end
 %   end
-  }, /*TextLength=*/0, SourcePresence::Present, Arena);
+  }, SourcePresence::Present, Arena);
   return makeRoot<${node.name}>(raw);
 }
 % end
