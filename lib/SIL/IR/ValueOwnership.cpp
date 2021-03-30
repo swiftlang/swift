@@ -552,6 +552,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
+CONSTANT_OWNERSHIP_BUILTIN(None, BuildSerialExecutorRef)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

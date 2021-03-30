@@ -210,6 +210,8 @@ PASS(HighLevelLICM, "high-level-licm",
      "Loop Invariant Code Motion in High-Level SIL")
 PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
+PASS(LowerHopToActor, "lower-hop-to-actor",
+     "Lower hop_to_executor instructions with actor operands")
 PASS(OptimizeHopToExecutor, "optimize-hop-to-executor",
      "Optimize hop_to_executor instructions for actor isolated code")
 PASS(InstCount, "inst-count",

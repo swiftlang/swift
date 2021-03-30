@@ -1481,6 +1481,15 @@ static ValueDecl *getResumeContinuationThrowing(ASTContext &ctx,
                             _void);
 }
 
+static ValueDecl *getBuildSerialExecutorRef(ASTContext &ctx, Identifier id) {
+  // TODO: restrict the generic parameter to the SerialExecutor protocol
+  return getBuiltinFunction(ctx, id, _thin,
+                            _generics(_unrestricted,
+                                      _layout(_typeparam(0), _classLayout())),
+                            _parameters(_typeparam(0)),
+                            _executor);
+}
+
 static ValueDecl *getAutoDiffCreateLinearMapContext(ASTContext &ctx,
                                                     Identifier id) {
   return getBuiltinFunction(
@@ -2657,6 +2666,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::ConvertTaskToJob:
     return getConvertTaskToJob(Context, Id);
+
+  case BuiltinValueKind::BuildSerialExecutorRef:
+    return getBuildSerialExecutorRef(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

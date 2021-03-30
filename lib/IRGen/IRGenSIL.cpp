@@ -6134,6 +6134,7 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 }
 
 void IRGenSILFunction::visitHopToExecutorInst(HopToExecutorInst *i) {
+  assert(i->getTargetExecutor()->getType().is<BuiltinExecutorType>());
   llvm::Value *resumeFn = Builder.CreateIntrinsicCall(
           llvm::Intrinsic::coro_async_resume, {});
           
