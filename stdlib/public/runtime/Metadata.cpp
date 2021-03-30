@@ -1027,19 +1027,29 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
 
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
+  // We're not supposed to accept NULL, but older runtimes somehow did as a
+  // side effect of UB in dyn_cast, so we'll keep that going.
+  if (!theMetadata)
+    return nullptr;
+
   // Unwrap ObjC class wrappers.
-  if (auto wrapper = dyn_cast_or_null<ObjCClassWrapperMetadata>(theMetadata)) {
+  if (auto wrapper = dyn_cast<ObjCClassWrapperMetadata>(theMetadata)) {
     return wrapper->Class;
   }
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(!theClass || theClass->isTypeMetadata());
+  assert(theClass->isTypeMetadata());
   return theClass;
 }
 
 const ClassMetadata *
 swift::swift_getObjCClassFromMetadataConditional(const Metadata *theMetadata) {
+  // We're not supposed to accept NULL, but older runtimes somehow did as a
+  // side effect of UB in dyn_cast, so we'll keep that going.
+  if (!theMetadata)
+    return nullptr;
+
   // If it's an ordinary class, return it.
   if (auto theClass = dyn_cast<ClassMetadata>(theMetadata)) {
     return theClass;
