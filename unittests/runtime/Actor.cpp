@@ -119,7 +119,7 @@ class TaskContinuationFromLambda {
 
   SWIFT_CC(swiftasync)
   static void invoke(SWIFT_ASYNC_CONTEXT AsyncContext *context, SWIFT_CONTEXT HeapObject *) {
-    (*lambdaStorage)(static_cast<Context*>(context));
+    return (*lambdaStorage)(static_cast<Context*>(context));
   }
 
 public:
@@ -219,20 +219,20 @@ static AsyncTask *createTaskStoring(JobPriority priority,
 TEST(ActorTest, validateTestHarness) {
   run([] {
     auto task0 = createTask(JobPriority::Background,
-      [](AsyncContext *context) {
+      [](AsyncContext *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(5);
         EXPECT_PROGRESS(6);
         finishTest();
         return context->ResumeParent(context);
       });
     auto task1 = createTask(JobPriority::Default,
-      [](AsyncContext *context) {
+      [](AsyncContext *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(1);
         EXPECT_PROGRESS(2);
         return context->ResumeParent(context);
       });
     auto task2 = createTask(JobPriority::Default,
-      [](AsyncContext *context) {
+      [](AsyncContext *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(3);
         EXPECT_PROGRESS(4);
         return context->ResumeParent(context);
@@ -253,14 +253,14 @@ TEST(ActorTest, actorSwitch) {
     auto actor = createActor();
     auto task0 = createTaskStoring(JobPriority::Default,
                                    (AsyncTask*) nullptr, actor,
-      [](Context *context) {
+      [](Context *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(1);
         EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
         EXPECT_EQ(nullptr, context->get<0>());
         std::get<0>(context->values) = swift_task_getCurrent();
 
         auto continuation = prepareContinuation<Context>(
-          [](Context *context) {
+          [](Context *context) SWIFT_CC(swiftasync) {
             EXPECT_PROGRESS(2);
             auto executor = swift_task_getCurrentExecutor();
             EXPECT_FALSE(executor.isGeneric());
@@ -268,7 +268,7 @@ TEST(ActorTest, actorSwitch) {
                       executor);
             EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
             auto continuation = prepareContinuation<Context>(
-              [](Context *context) {
+              [](Context *context) SWIFT_CC(swiftasync) {
                 EXPECT_PROGRESS(3);
                 EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
                 EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
@@ -295,7 +295,7 @@ TEST(ActorTest, actorContention) {
 
     auto task0 = createTaskStoring(JobPriority::Default,
                                    (AsyncTask*) nullptr, actor,
-      [](Context *context) {
+      [](Context *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(1);
         EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
         EXPECT_EQ(nullptr, context->get<0>());
@@ -304,7 +304,7 @@ TEST(ActorTest, actorContention) {
         std::get<0>(context->values) = task;
 
         parkTask(task, context,
-          [](Context *context) {
+          [](Context *context) SWIFT_CC(swiftasync) {
             EXPECT_PROGRESS(3);
             auto executor = swift_task_getCurrentExecutor();
             EXPECT_FALSE(executor.isGeneric());
@@ -313,7 +313,7 @@ TEST(ActorTest, actorContention) {
             auto task = swift_task_getCurrent();
             EXPECT_EQ(task, context->get<0>());
             parkTask(task, context,
-              [](Context *context) {
+              [](Context *context) SWIFT_CC(swiftasync) {
                 EXPECT_PROGRESS(4);
                 EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
                 EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
@@ -328,7 +328,7 @@ TEST(ActorTest, actorContention) {
 
     auto task1 = createTaskStoring(JobPriority::Background,
                                    (AsyncTask*) nullptr, actor,
-      [](Context *context) {
+      [](Context *context) SWIFT_CC(swiftasync) {
         EXPECT_PROGRESS(2);
         auto executor = swift_task_getCurrentExecutor();
         EXPECT_FALSE(executor.isGeneric());
@@ -339,7 +339,7 @@ TEST(ActorTest, actorContention) {
         std::get<0>(context->values) = task;
 
         parkTask(task, context,
-          [](Context *context) {
+          [](Context *context) SWIFT_CC(swiftasync) {
             EXPECT_PROGRESS(5);
             EXPECT_TRUE(swift_task_getCurrentExecutor().isGeneric());
             EXPECT_EQ(swift_task_getCurrent(), context->get<0>());
