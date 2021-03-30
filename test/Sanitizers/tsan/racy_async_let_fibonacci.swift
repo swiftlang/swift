@@ -7,6 +7,9 @@
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 
+// rdar://75365575 (Failing to start atos external symbolizer)
+// UNSUPPORTED: OS=watchos
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)

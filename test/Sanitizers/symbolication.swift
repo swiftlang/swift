@@ -5,6 +5,9 @@
 // REQUIRES: asan_runtime
 // REQUIRES: VENDOR=apple
 
+// rdar://75365575 (Failing to start atos external symbolizer)
+// UNSUPPORTED: OS=watchos
+
 // We copy the binary but not the corresponding .dSYM for remote runs (e.g.,
 // on-device testing), and hence online symbolication fails.
 // UNSUPPORTED: remote_run
