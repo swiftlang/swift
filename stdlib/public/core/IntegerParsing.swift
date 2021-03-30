@@ -117,10 +117,8 @@ extension FixedWidthInteger {
   public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
     guard _fastPath(!text.isEmpty) else { return nil }
-    let result: Self? =
-      text.utf8.withContiguousStorageIfAvailable {
-        _parseASCII($0, radix: radix)
-      } ?? _parseASCII(text, radix: radix)
+    var str = String(text)
+    let result: Self? = str.withUTF8 { _parseASCII($0, radix: radix) }
     guard let result_ = result else { return nil }
     self = result_
   }
