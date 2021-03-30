@@ -120,6 +120,12 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NAMED_PARAMETER_WITH_LEADING_VARIADIC | %FileCheck %s -check-prefix=NAMED_PARAMETER_WITH_LEADING_VARIADIC
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_WITH_INTERNAL_NAME | %FileCheck %s -check-prefix=CLOSURE_PARAM_WITH_INTERNAL_NAME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_WITH_PARENS | %FileCheck %s -check-prefix=CLOSURE_PARAM_WITH_PARENS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONAL_CLOSURE_PARAM | %FileCheck %s -check-prefix=OPTIONAL_CLOSURE_PARAM
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ESCAPING_OPTIONAL_CLOSURE_PARAM | %FileCheck %s -check-prefix=ESCAPING_OPTIONAL_CLOSURE_PARAM
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES | %FileCheck %s -check-prefix=COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -946,4 +952,38 @@ func testAfterVariadic() {
 // NAMED_PARAMETER_WITH_LEADING_VARIADIC-DAG: Pattern/ExprSpecific:               {#z: Int#}[#Int#]
 // NAMED_PARAMETER_WITH_LEADING_VARIADIC: End completions
   }
+}
+
+func testClosurePlaceholderContainsInternalParameterNamesIfPresentInSiganture() {
+  func sort(callback: (_ left: Int, _ right: Int) -> Bool) {}
+  sort(#^CLOSURE_PARAM_WITH_INTERNAL_NAME^#)
+// CLOSURE_PARAM_WITH_INTERNAL_NAME: Begin completions, 1 item
+// CLOSURE_PARAM_WITH_INTERNAL_NAME-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: (Int, Int) -> Bool##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// CLOSURE_PARAM_WITH_INTERNAL_NAME: End completions
+
+  func sortWithParensAroundClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)) {}
+  sortWithParensAroundClosureType(#^CLOSURE_PARAM_WITH_PARENS^#)
+// CLOSURE_PARAM_WITH_PARENS: Begin completions, 1 item
+// CLOSURE_PARAM_WITH_PARENS-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: ((Int, Int) -> Bool)##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// CLOSURE_PARAM_WITH_PARENS: End completions
+
+  func sortWithOptionalClosureType(callback: ((_ left: Int, _ right: Int) -> Bool)?) {}
+  sortWithOptionalClosureType(#^OPTIONAL_CLOSURE_PARAM^#)
+// OPTIONAL_CLOSURE_PARAM: Begin completions, 1 item
+// OPTIONAL_CLOSURE_PARAM-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: ((Int, Int) -> Bool)?##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// OPTIONAL_CLOSURE_PARAM: End completions
+
+  func sortWithEscapingClosureType(callback: @escaping (_ left: Int, _ right: Int) -> Bool) {}
+  sortWithEscapingClosureType(#^ESCAPING_OPTIONAL_CLOSURE_PARAM^#)
+// ESCAPING_OPTIONAL_CLOSURE_PARAM: Begin completions, 1 item
+// ESCAPING_OPTIONAL_CLOSURE_PARAM-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: (Int, Int) -> Bool##(_ left: Int, _ right: Int) -> Bool#}[')'][#Void#];
+// ESCAPING_OPTIONAL_CLOSURE_PARAM: End completions
+}
+
+func testClosurePlaceholderPrintsTypesOnlyIfNoInternalParameterNamesExist() {
+  func sort(callback: (Int, Int) -> Bool) {}
+  sort(#^COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES^#)
+// COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES: Begin completions, 1 item
+// COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES-DAG: Decl[FreeFunction]/Local:           ['(']{#callback: (Int, Int) -> Bool##(Int, Int) -> Bool#}[')'][#Void#];
+// COMPLETE_CLOSURE_PARAM_WITHOUT_INTERNAL_NAMES: End completions
 }

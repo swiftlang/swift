@@ -2423,7 +2423,7 @@ namespace {
           // Remove parameter labels; they aren't used when matching cases,
           // but outright conflicts will be checked during coercion.
           for (auto &param : params) {
-            param = param.getWithoutLabel();
+            param = param.getWithoutLabels();
           }
 
           Type outputType = CS.createTypeVariable(

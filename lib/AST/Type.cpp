@@ -833,7 +833,7 @@ Type TypeBase::removeArgumentLabels(unsigned numArgumentLabels) {
   llvm::SmallVector<AnyFunctionType::Param, 8> unlabeledParams;
   unlabeledParams.reserve(fnType->getNumParams());
   for (const auto &param : fnType->getParams())
-    unlabeledParams.push_back(param.getWithoutLabel());
+    unlabeledParams.push_back(param.getWithoutLabels());
 
   auto result = fnType->getResult()
                       ->removeArgumentLabels(numArgumentLabels - 1);
@@ -1014,9 +1014,7 @@ rebuildSelfTypeWithObjectType(AnyFunctionType::Param selfParam,
   if (selfParam.getPlainType()->getAs<MetatypeType>())
     objectTy = MetatypeType::get(objectTy);
 
-  return AnyFunctionType::Param(objectTy,
-                                selfParam.getLabel(),
-                                selfParam.getParameterFlags());
+  return selfParam.withType(objectTy);
 }
 
 /// Returns a new function type exactly like this one but with the self
@@ -1191,9 +1189,11 @@ getCanonicalParams(AnyFunctionType *funcType,
                    SmallVectorImpl<AnyFunctionType::Param> &canParams) {
   auto origParams = funcType->getParams();
   for (auto param : origParams) {
+    // Canonicalize the type and drop the internal label to canonicalize the
+    // Param.
     canParams.emplace_back(param.getPlainType()->getCanonicalType(genericSig),
-                           param.getLabel(),
-                           param.getParameterFlags());
+                           param.getLabel(), param.getParameterFlags(),
+                           /*InternalLabel=*/Identifier());
   }
 }
 
@@ -4776,6 +4776,7 @@ case TypeKind::Id:
       auto type = param.getPlainType();
       auto label = param.getLabel();
       auto flags = param.getParameterFlags();
+      auto internalLabel = param.getInternalLabel();
 
       auto substType = type.transformRec(fn);
       if (!substType)
@@ -4794,7 +4795,7 @@ case TypeKind::Id:
         flags = flags.withInOut(true);
       }
 
-      substParams.emplace_back(substType, label, flags);
+      substParams.emplace_back(substType, label, flags, internalLabel);
     }
 
     // Transform result type.
