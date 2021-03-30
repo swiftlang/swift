@@ -2508,6 +2508,61 @@ static bool isAsyncHandler(ValueDecl *value) {
   return false;
 }
 
+namespace {
+
+/// Describes how actor isolation is propagated to a member, if at all.
+enum class MemberIsolationPropagation {
+  GlobalActor,
+  AnyIsolation
+};
+
+}
+/// Determine how the given member can receive its isolation from its type
+/// context.
+static Optional<MemberIsolationPropagation> getMemberIsolationPropagation(
+    const ValueDecl *value) {
+  if (!value->getDeclContext()->isTypeContext())
+    return None;
+
+  switch (value->getKind()) {
+  case DeclKind::Import:
+  case DeclKind::Extension:
+  case DeclKind::TopLevelCode:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::MissingMember:
+  case DeclKind::Class:
+  case DeclKind::Enum:
+  case DeclKind::Protocol:
+  case DeclKind::Struct:
+  case DeclKind::TypeAlias:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::AssociatedType:
+  case DeclKind::OpaqueType:
+  case DeclKind::Param:
+  case DeclKind::Module:
+    return None;
+
+  case DeclKind::PatternBinding:
+  case DeclKind::EnumCase:
+  case DeclKind::EnumElement:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+    return MemberIsolationPropagation::GlobalActor;
+
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::Subscript:
+  case DeclKind::Var:
+    return value->isInstanceMember() ? MemberIsolationPropagation::AnyIsolation
+                                     : MemberIsolationPropagation::GlobalActor;
+  }
+}
+
 ActorIsolation ActorIsolationRequest::evaluate(
     Evaluator &evaluator, ValueDecl *value) const {
   // If this declaration has one of the actor isolation attributes, report
@@ -2537,12 +2592,16 @@ ActorIsolation ActorIsolationRequest::evaluate(
   }
 
   // Function used when returning an inferred isolation.
-  auto inferredIsolation = [&](ActorIsolation inferred) {
+  auto inferredIsolation = [&](
+      ActorIsolation inferred, bool onlyGlobal = false) {
     // Add an implicit attribute to capture the actor isolation that was
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
     switch (inferred) {
     case ActorIsolation::Independent:
+      if (onlyGlobal)
+        return ActorIsolation::forUnspecified();
+
       value->getAttrs().add(new (ctx) ActorIndependentAttr(
                               ActorIndependentKind::Safe, /*IsImplicit=*/true));
       break;
@@ -2560,6 +2619,9 @@ ActorIsolation ActorIsolationRequest::evaluate(
 
     case ActorIsolation::ActorInstance:
     case ActorIsolation::Unspecified:
+      if (onlyGlobal)
+        return ActorIsolation::forUnspecified();
+
       // Nothing to do.
       break;
     }
@@ -2661,13 +2723,17 @@ ActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Instance members infer isolation from their context.
-  if (value->isInstanceMember()) {
+  // Infer isolation for a member.
+  if (auto memberPropagation = getMemberIsolationPropagation(value)) {
+    // If were only allowed to propagate global actors, do so.
+    bool onlyGlobal =
+        *memberPropagation == MemberIsolationPropagation::GlobalActor;
+
     // If the declaration is in an extension that has one of the isolation
     // attributes, use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
       if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
-        return inferredIsolation(*isolationFromAttr);
+        return inferredIsolation(*isolationFromAttr, onlyGlobal);
       }
     }
 
@@ -2675,7 +2741,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // has isolation, use that.
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
       if (auto selfTypeIsolation = getActorIsolation(selfTypeDecl))
-        return inferredIsolation(selfTypeIsolation);
+        return inferredIsolation(selfTypeIsolation, onlyGlobal);
     }
   }
 
