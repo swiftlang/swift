@@ -343,7 +343,8 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes, StringRef labels) {
 
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
-    Type output, FunctionTypeFlags flags) {
+    Type output, FunctionTypeFlags flags,
+    FunctionMetadataDifferentiabilityKind diffKind) {
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -383,11 +384,11 @@ Type ASTBuilder::createFunctionType(
     break;
   }
 
-  DifferentiabilityKind diffKind;
-  switch (flags.getDifferentiabilityKind()) {
+  DifferentiabilityKind resultDiffKind;
+  switch (diffKind.Value) {
   #define SIMPLE_CASE(CASE) \
       case FunctionMetadataDifferentiabilityKind::CASE: \
-        diffKind = DifferentiabilityKind::CASE; break;
+        resultDiffKind = DifferentiabilityKind::CASE; break;
   SIMPLE_CASE(NonDifferentiable)
   SIMPLE_CASE(Forward)
   SIMPLE_CASE(Reverse)
@@ -411,7 +412,8 @@ Type ASTBuilder::createFunctionType(
 
   auto einfo =
       FunctionType::ExtInfoBuilder(representation, noescape, flags.isThrowing(),
-                                   diffKind, clangFunctionType, globalActor)
+                                   resultDiffKind, clangFunctionType,
+                                   globalActor)
           .withAsync(flags.isAsync())
           .build();
 

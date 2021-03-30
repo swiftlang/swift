@@ -3255,7 +3255,7 @@ public:
   void addConstructorCallsForType(Type type, Identifier name,
                                   DeclVisibilityKind Reason,
                                   DynamicLookupInfo dynamicLookupInfo) {
-    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr && !IsUnresolvedMember)
+    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr)
       return;
 
     assert(CurrDeclContext);
@@ -3267,10 +3267,6 @@ public:
       auto *init = cast<ConstructorDecl>(entry.getValueDecl());
       if (init->shouldHideFromEditor())
         continue;
-      if (IsUnresolvedMember && init->isFailable() &&
-          !init->isImplicitlyUnwrappedOptional()) {
-        continue;
-      }
       addConstructorCall(cast<ConstructorDecl>(init), Reason,
                          dynamicLookupInfo, type, None,
                          /*IsOnType=*/true, name);
@@ -3341,8 +3337,6 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
-    if (IsUnresolvedMember)
-      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
@@ -3371,8 +3365,6 @@ public:
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo) {
-    if (IsUnresolvedMember)
-      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,

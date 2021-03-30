@@ -1068,12 +1068,17 @@ public:
 
   struct Key {
     const FunctionTypeFlags Flags;
-
+    const FunctionMetadataDifferentiabilityKind DifferentiabilityKind;
     const Metadata *const *Parameters;
     const uint32_t *ParameterFlags;
     const Metadata *Result;
 
     FunctionTypeFlags getFlags() const { return Flags; }
+
+    FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind;
+    }
+
     const Metadata *getParameter(unsigned index) const {
       assert(index < Flags.getNumParameters());
       return Parameters[index];
@@ -1091,7 +1096,10 @@ public:
     }
 
     friend llvm::hash_code hash_value(const Key &key) {
-      auto hash = llvm::hash_combine(key.Flags.getIntValue(), key.Result);
+      auto hash = llvm::hash_combine(
+          key.Flags.getIntValue(),
+          key.DifferentiabilityKind.getIntValue(),
+          key.Result);
       for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
         hash = llvm::hash_combine(hash, key.getParameter(i));
         hash = llvm::hash_combine(hash, key.getParameterFlags(i).getIntValue());
@@ -1109,6 +1117,9 @@ public:
   bool matchesKey(const Key &key) const {
     if (key.getFlags().getIntValue() != Data.Flags.getIntValue())
       return false;
+    if (key.getDifferentiabilityKind().Value !=
+        Data.getDifferentiabilityKind().Value)
+      return false;
     if (key.getResult() != Data.ResultType)
       return false;
     for (unsigned i = 0, e = key.getFlags().getNumParameters(); i != e; ++i) {
@@ -1122,8 +1133,9 @@ public:
   }
 
   friend llvm::hash_code hash_value(const FunctionCacheEntry &value) {
-    Key key = {value.Data.Flags, value.Data.getParameters(),
-               value.Data.getParameterFlags(), value.Data.ResultType};
+    Key key = {value.Data.Flags, value.Data.getDifferentiabilityKind(),
+               value.Data.getParameters(), value.Data.getParameterFlags(),
+               value.Data.ResultType};
     return hash_value(key);
   }
 
@@ -1140,6 +1152,9 @@ public:
     auto size = numParams * sizeof(FunctionTypeMetadata::Parameter);
     if (flags.hasParameterFlags())
       size += numParams * sizeof(uint32_t);
+    if (flags.isDifferentiable())
+      size = roundUpToAlignment(size, sizeof(void *)) +
+          sizeof(FunctionMetadataDifferentiabilityKind);
     return roundUpToAlignment(size, sizeof(void *));
   }
 };
@@ -1195,7 +1210,26 @@ swift::swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
                                      const Metadata *const *parameters,
                                      const uint32_t *parameterFlags,
                                      const Metadata *result) {
-  FunctionCacheEntry::Key key = { flags, parameters, parameterFlags, result };
+  assert(!flags.isDifferentiable()
+         && "Differentiable function type metadata should be obtained using "
+            "'swift_getFunctionTypeMetadataDifferentiable'");
+  FunctionCacheEntry::Key key = {
+    flags, FunctionMetadataDifferentiabilityKind::NonDifferentiable, parameters,
+    parameterFlags, result,
+  };
+  return &FunctionTypes.getOrInsert(key).first->Data;
+}
+
+const FunctionTypeMetadata *
+swift::swift_getFunctionTypeMetadataDifferentiable(
+    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
+    const Metadata *const *parameters, const uint32_t *parameterFlags,
+    const Metadata *result) {
+  assert(flags.isDifferentiable());
+  assert(diffKind.isDifferentiable());
+  FunctionCacheEntry::Key key = {
+    flags, diffKind, parameters, parameterFlags, result
+  };
   return &FunctionTypes.getOrInsert(key).first->Data;
 }
 
@@ -1235,6 +1269,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
   Data.setKind(MetadataKind::Function);
   Data.Flags = flags;
   Data.ResultType = key.getResult();
+  if (flags.isDifferentiable())
+    *Data.getDifferentiabilityKindAddress() = key.getDifferentiabilityKind();
 
   for (unsigned i = 0; i < numParameters; ++i) {
     Data.getParameters()[i] = key.getParameter(i);
