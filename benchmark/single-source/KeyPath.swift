@@ -28,7 +28,6 @@ let kp9 = identity(FixedSizeArray10<Double>.getKeypathToElement(index: 9))
 
 public let KeyPath = [
     BenchmarkInfo(name: "StructKeyPathComputation", runFunction: runStructKeyPathComputation, tags: [.validation, .api]),
-    BenchmarkInfo(name: "StructDirectAccessComputation", runFunction: runStructDirectAccessComputation, tags: [.validation, .api]),
 ]
 
 @inline(never)
@@ -64,42 +63,6 @@ public func runStructKeyPathComputation(N: Int) {
         fixedSizeArray10[keyPath: kp1] += fixedSizeArray10[keyPath: kp9] - fixedSizeArray10[keyPath: kp3]
     }
     
-    blackHole(fixedSizeArray10)
-}
-
-@inline(never)
-public func runStructDirectAccessComputation(N: Int) {
-    let iters = 50000
-
-    for n in 0..<iters {
-        fixedSizeArray10.element5 += fixedSizeArray10.element1 + Double(n)
-        fixedSizeArray10.element5 += fixedSizeArray10.element7 - fixedSizeArray10.element5
-        fixedSizeArray10.element4 += fixedSizeArray10.element3 * fixedSizeArray10.element6
-        fixedSizeArray10.element1 += fixedSizeArray10.element3 / fixedSizeArray10.element4
-        fixedSizeArray10.element0 += fixedSizeArray10.element2 + fixedSizeArray10.element1
-        fixedSizeArray10.element8 += fixedSizeArray10.element6 - fixedSizeArray10.element5
-        fixedSizeArray10.element3 += fixedSizeArray10.element2 * fixedSizeArray10.element6
-        fixedSizeArray10.element2 += fixedSizeArray10.element5 / fixedSizeArray10.element5
-        fixedSizeArray10.element8 += fixedSizeArray10.element8 + fixedSizeArray10.element9
-        fixedSizeArray10.element9 += fixedSizeArray10.element4 - fixedSizeArray10.element4
-        fixedSizeArray10.element9 += fixedSizeArray10.element7 * fixedSizeArray10.element6
-        fixedSizeArray10.element5 += fixedSizeArray10.element7 / fixedSizeArray10.element3
-        fixedSizeArray10.element8 += fixedSizeArray10.element5 + fixedSizeArray10.element8
-        fixedSizeArray10.element9 += fixedSizeArray10.element8 - fixedSizeArray10.element2
-        fixedSizeArray10.element8 += fixedSizeArray10.element8 * fixedSizeArray10.element6
-        fixedSizeArray10.element5 += fixedSizeArray10.element1 / fixedSizeArray10.element6
-        fixedSizeArray10.element1 += fixedSizeArray10.element6 + fixedSizeArray10.element2
-        fixedSizeArray10.element2 += fixedSizeArray10.element9 - fixedSizeArray10.element0
-        fixedSizeArray10.element7 += fixedSizeArray10.element5 * fixedSizeArray10.element3
-        fixedSizeArray10.element8 += fixedSizeArray10.element8 / fixedSizeArray10.element9
-        fixedSizeArray10.element6 += fixedSizeArray10.element4 + fixedSizeArray10.element0
-        fixedSizeArray10.element8 += fixedSizeArray10.element2 - fixedSizeArray10.element4
-        fixedSizeArray10.element6 += fixedSizeArray10.element1 * fixedSizeArray10.element7
-        fixedSizeArray10.element3 += fixedSizeArray10.element8 / fixedSizeArray10.element1
-        fixedSizeArray10.element7 += fixedSizeArray10.element4 + fixedSizeArray10.element3
-        fixedSizeArray10.element1 += fixedSizeArray10.element9 - fixedSizeArray10.element3
-    }
-
     blackHole(fixedSizeArray10)
 }
 
