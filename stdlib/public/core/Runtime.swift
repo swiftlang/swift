@@ -346,7 +346,7 @@ internal func _uint64ToStringImpl(
   _ uppercase: Bool
 ) -> UInt64
 
-@available(*, unavailable)
+@available(*, deprecated, message: "Use 'String(_:radix:uppercase:)' instead")
 public // @testable
 func _uint64ToString(
   _ value: UInt64,
