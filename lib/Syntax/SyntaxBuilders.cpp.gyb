@@ -45,9 +45,9 @@ ${node.name}Builder &
 ${node.name}Builder::add${child_elt}(${child_elt_type} ${child_elt}) {
   auto &raw = Layout[cursorIndex(${node.name}::Cursor::${child.name})];
   if (!raw)
-    raw = RawSyntax::makeAndCalcLength(SyntaxKind::${child_node.syntax_kind},
-                                       {${child_elt}.getRaw()},
-                                       SourcePresence::Present, Arena);
+    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
+                          {${child_elt}.getRaw()}, SourcePresence::Present,
+                          Arena);
   else
     raw = raw->append(${child_elt}.getRaw());
   return *this;
@@ -64,8 +64,8 @@ ${node.name}Builder::build() {
 %     end
 %   end
 % end
-  auto raw = RawSyntax::makeAndCalcLength(SyntaxKind::${node.syntax_kind},
-    Layout, SourcePresence::Present, Arena);
+  auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, Layout,
+                             SourcePresence::Present, Arena);
   return makeRoot<${node.name}>(raw);
 }
 
