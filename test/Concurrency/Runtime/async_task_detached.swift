@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// See SR-14333
+// UNSUPPORTED: MSVC_VER=15.0
+
 class X {
   init() {
     print("X: init")
