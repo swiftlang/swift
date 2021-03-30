@@ -1588,6 +1588,27 @@ static ValueDecl *getInsertElementOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, VecTy);
 }
 
+static ValueDecl *getShuffleVectorOperation(ASTContext &Context, Identifier Id,
+                                 Type FirstTy, Type SecondTy) {
+  // (Vector<N, T>, Vector<N, T>, Vector<M, Int32) -> Vector<M, T>
+  auto VecTy = FirstTy->getAs<BuiltinVectorType>();
+  if (!VecTy)
+    return nullptr;
+  auto ElementTy = VecTy->getElementType();
+
+  auto IndexTy = SecondTy->getAs<BuiltinVectorType>();
+  if (!IndexTy)
+    return nullptr;
+  auto IdxElTy = IndexTy->getElementType()->getAs<BuiltinIntegerType>();
+  if (!IdxElTy || !IdxElTy->isFixedWidth() || IdxElTy->getFixedWidth() != 32)
+    return nullptr;
+
+  Type ArgElts[] = { VecTy, VecTy, IndexTy };
+  Type ResultTy = BuiltinVectorType::get(Context, ElementTy,
+                                         IndexTy->getNumElements());
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
+}
+
 static ValueDecl *getStaticReportOperation(ASTContext &Context, Identifier Id) {
   auto BoolTy = BuiltinIntegerType::get(1, Context);
   auto MessageTy = Context.TheRawPointerType;
@@ -2533,6 +2554,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::InsertElement:
     if (Types.size() != 3) return nullptr;
     return getInsertElementOperation(Context, Id, Types[0], Types[1], Types[2]);
+      
+  case BuiltinValueKind::ShuffleVector:
+    if (Types.size() != 2) return nullptr;
+    return getShuffleVectorOperation(Context, Id, Types[0], Types[1]);
 
   case BuiltinValueKind::StaticReport:
     if (!Types.empty()) return nullptr;
