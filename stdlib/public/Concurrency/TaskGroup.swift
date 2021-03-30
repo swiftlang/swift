@@ -842,7 +842,7 @@ func _taskGroupCreate() -> Builtin.RawPointer
 func _taskGroupAttachChild(
   group: Builtin.RawPointer,
   child: Builtin.NativeObject
-) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
+)
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_destroy")

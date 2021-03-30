@@ -233,6 +233,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::EndAsyncLet) {
+    emitAsyncLetEnd(IGF, args.claimNext());
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::CreateAsyncTaskFuture ||
       Builtin.ID == BuiltinValueKind::CreateAsyncTaskGroupFuture) {
 

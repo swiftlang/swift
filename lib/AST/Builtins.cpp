@@ -1415,6 +1415,11 @@ static ValueDecl *getCancelAsyncTask(ASTContext &ctx, Identifier id) {
       id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
 }
 
+static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      id, { ctx.TheNativeObjectType }, ctx.TheEmptyTupleType);
+}
+
 Type swift::getAsyncTaskAndContextType(ASTContext &ctx) {
   TupleTypeElt resultTupleElements[2] = {
     ctx.TheNativeObjectType, // task,
@@ -2682,6 +2687,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CancelAsyncTask:
     return getCancelAsyncTask(Context, Id);
+
+  case BuiltinValueKind::EndAsyncLet:
+    return getEndAsyncLet(Context, Id);
 
   case BuiltinValueKind::CreateAsyncTaskFuture:
     return getCreateAsyncTaskFuture(Context, Id);

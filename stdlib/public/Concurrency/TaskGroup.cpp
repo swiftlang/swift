@@ -452,19 +452,6 @@ static TaskGroup *asAbstract(TaskGroupImpl *group) {
 // Initializes into the preallocated _group an actual TaskGroupImpl.
 SWIFT_CC(swift)
 static void swift_taskGroup_initializeImpl(TaskGroup *group) {
-//  // nasty trick, but we want to keep the record inside the group as we'll need
-//  // to remove it from the task as the group is destroyed, as well as interact
-//  // with it every time we add child tasks; so it is useful to pre-create it here
-//  // and store it in the group.
-//  //
-//  // The record won't be used by anyone until we're done constructing and setting
-//  // up the group anyway.
-//  void *recordAllocation = swift_task_alloc(task, sizeof(TaskGroupTaskStatusRecord));
-//  auto record = new (recordAllocation)
-//    TaskGroupTaskStatusRecord(reinterpret_cast<TaskGroupImpl*>(_group));
-
-  // TODO: this becomes less weird once we make the fragment BE the group
-
   TaskGroupImpl *impl = new (group) TaskGroupImpl();
   auto record = impl->getTaskRecord();
   assert(impl == record && "the group IS the task record");

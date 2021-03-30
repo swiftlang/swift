@@ -224,6 +224,8 @@ namespace irgen {
 
   void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
 
+  void emitAsyncLetEnd(IRGenFunction &IGF, llvm::Value *asyncLet);
+
   /// Emit a class to swift_task_create[_f] or swift_task_create_future[__f]
   /// with the given flags, parent task, and task function.
   ///

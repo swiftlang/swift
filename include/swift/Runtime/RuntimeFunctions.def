@@ -1527,6 +1527,14 @@ FUNCTION(TaskCancel,
          ARGS(SwiftTaskPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// void swift_asyncLet_end(AsyncLet *alet);
+FUNCTION(AsyncLetEnd,
+         swift_asyncLet_end, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftAsyncLetPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 // AsyncTaskAndContext swift_task_create_f(
 //     size_t flags,
 //     TaskContinuationFunction* function,
