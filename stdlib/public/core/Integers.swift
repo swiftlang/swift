@@ -1661,9 +1661,14 @@ extension BinaryInteger {
       let count = $0.count
       if initializedCount < count {
         let baseAddress = $0.baseAddress!
+        let unusedCapacity = count &- initializedCount
         baseAddress.moveInitialize(
-          from: baseAddress + (count &- initializedCount),
+          from: baseAddress + unusedCapacity,
           count: initializedCount)
+        // Work around a `_SmallString` bug.
+        let ptr = baseAddress + initializedCount
+        ptr.initialize(repeating: 0, count: unusedCapacity)
+        ptr.deinitialize(count: unusedCapacity)
       }
       return initializedCount
     }
