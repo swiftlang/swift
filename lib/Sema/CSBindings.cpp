@@ -461,7 +461,6 @@ void BindingSet::inferTransitiveBindings(
 
 void BindingSet::finalize(
     llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings) {
-  inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
 
   determineLiteralCoverage();
@@ -478,11 +477,14 @@ void BindingSet::finalize(
       // func foo<T: P>(_: T) {}
       // foo(.bar) <- `.bar` should be a static member of `P`.
       // \endcode
-      if (!hasViableBindings() && TransitiveProtocols.hasValue()) {
-        for (auto *constraint : *TransitiveProtocols) {
-          auto protocolTy = constraint->getSecondType();
-          addBinding(
-              {protocolTy, AllowedBindingKind::Exact, constraint});
+      if (!hasViableBindings()) {
+        inferTransitiveProtocolRequirements(inferredBindings);
+
+        if (TransitiveProtocols.hasValue()) {
+          for (auto *constraint : *TransitiveProtocols) {
+            auto protocolTy = constraint->getSecondType();
+            addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
+          }
         }
       }
     }

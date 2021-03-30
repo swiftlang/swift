@@ -330,16 +330,7 @@ TEST_F(SemaTest, TestTransitiveProtocolInferenceThroughEquivalenceChains) {
   cs.addConstraint(ConstraintKind::ConformsTo, typeVar2, protocolTy0, nilLocator);
   cs.addConstraint(ConstraintKind::ConformsTo, typeVar3, protocolTy1, nilLocator);
 
-  llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
-  for (auto *typeVar : cs.getTypeVariables()) {
-    cache.insert({typeVar, cs.getBindingsFor(typeVar, /*finalize=*/false)});
-  }
-
-  auto bindingSet = cache.find(typeVar0);
-  assert(bindingSet != cache.end());
-
-  auto &bindings = bindingSet->getSecond();
-  bindings.inferTransitiveProtocolRequirements(cache);
+  auto bindings = inferBindings(cs, typeVar0);
 
   ASSERT_TRUE(bool(bindings.TransitiveProtocols));
   verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
