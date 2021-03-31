@@ -134,7 +134,8 @@ public:
     REPL,      ///< REPL mode
 
     EmitAssembly, ///< Emit assembly
-    EmitIR,       ///< Emit LLVM IR
+    EmitIRGen,    ///< Emit LLVM IR before LLVM optimizations
+    EmitIR,       ///< Emit LLVM IR after LLVM optimizations
     EmitBC,       ///< Emit LLVM BC
     EmitObject,   ///< Emit object file
 

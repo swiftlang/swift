@@ -537,6 +537,10 @@ bool swift::performLLVM(const IRGenOptions &Opts,
       RawOS->clear_error();
       return true;
     }
+    if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+      Module->print(RawOS.getValue(), nullptr);
+      return false;
+    }
   } else {
     assert(Opts.OutputKind == IRGenOutputKind::Module && "no output specified");
   }
@@ -569,9 +573,11 @@ bool swift::compileAndWriteLLVM(llvm::Module *module,
 
   // Set up the final emission passes.
   switch (opts.OutputKind) {
+  case IRGenOutputKind::LLVMAssemblyBeforeOptimization:
+    llvm_unreachable("Should be handled earlier.");
   case IRGenOutputKind::Module:
     break;
-  case IRGenOutputKind::LLVMAssembly:
+  case IRGenOutputKind::LLVMAssemblyAfterOptimization:
     EmitPasses.add(createPrintModulePass(out));
     break;
   case IRGenOutputKind::LLVMBitcode: {
