@@ -40,14 +40,20 @@ extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job : public HeapObject {
-protected:
+public:
   // Indices into SchedulerPrivate, for use by the runtime.
   enum {
     /// The next waiting task link, an AsyncTask that is waiting on a future.
     NextWaitingTaskIndex = 0,
+
+    /// An opaque field used by Dispatch when enqueueing Jobs directly.
+    DispatchLinkageIndex = 0,
+
+    /// The dispatch queue being used when enqueueing a Job directly with
+    /// Dispatch.
+    DispatchQueueIndex = 1,
   };
 
-public:
   // Reserved for the use of the scheduler.
   void *SchedulerPrivate[2];
 

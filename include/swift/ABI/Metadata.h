@@ -1338,18 +1338,20 @@ using ClassMetadata = TargetClassMetadata<InProcess>;
 /// dispatch expects to see, with padding to place them at the expected offsets.
 template <typename Runtime>
 struct TargetDispatchClassMetadata : public TargetHeapMetadata<Runtime> {
-  using DummyVTableCall = void (*)(void);
+  using InvokeCall = void (*)(void *, void *, uint32_t);
 
-  TargetDispatchClassMetadata(MetadataKind Kind,
-                              DummyVTableCall DummyVTableEntry)
-      : TargetHeapMetadata<Runtime>(Kind), DummyVTableEntry(DummyVTableEntry) {}
+  TargetDispatchClassMetadata(MetadataKind Kind, unsigned long VTableType,
+                              InvokeCall Invoke)
+      : TargetHeapMetadata<Runtime>(Kind), VTableType(VTableType),
+        VTableInvoke(Invoke) {}
 
   TargetPointer<Runtime, void> Opaque;
 #if SWIFT_OBJC_INTEROP
   TargetPointer<Runtime, void> OpaqueObjC[3];
 #endif
 
-  TargetSignedPointer<Runtime, DummyVTableCall> DummyVTableEntry;
+  unsigned long VTableType;
+  TargetSignedPointer<Runtime, InvokeCall __ptrauth_swift_dispatch_invoke_function> VTableInvoke;
 };
 using DispatchClassMetadata = TargetDispatchClassMetadata<InProcess>;
 
