@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 enum GeneralError : Error {
   case UnknownBallKind
   case Todo

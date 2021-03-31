@@ -2,6 +2,9 @@
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 class Canary {
   deinit {
     print("canary died")
