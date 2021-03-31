@@ -1788,8 +1788,9 @@ ERROR(function_type_access,none,
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its %select{parameter|result}5 uses "
-      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3 type",
-      (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+      "%select{a private|a fileprivate|an internal|an '@_spi'|an '@_spi'}3"
+      "%select{| API wrapper}6 type",
+      (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
 ERROR(function_type_spi,none,
       "%select{function|method|initializer}0 "
       "cannot be declared '@_spi' "
@@ -1802,18 +1803,19 @@ WARNING(function_type_access_warn,none,
         "%select{should be declared %select{private|fileprivate|internal|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its %select{parameter|result}5 uses "
-        "%select{a private|a fileprivate|an internal|%error|%error}3 type",
-        (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
+        "%select{a private|a fileprivate|an internal|%error|%error}3 "
+        "%select{|API wrapper}6 type",
+        (bool, AccessLevel, bool, AccessLevel, unsigned, bool, bool))
 ERROR(function_type_usable_from_inline,none,
-      "the %select{parameter|result}1 of a "
+      "the %select{parameter|result}1%select{| API wrapper}2 of a "
       "'@usableFromInline' %select{function|method|initializer}0 "
       "must be '@usableFromInline' or public",
-      (unsigned, bool))
+      (unsigned, bool, bool))
 WARNING(function_type_usable_from_inline_warn,none,
-        "the %select{parameter|result}1 of a "
+        "the %select{parameter|result}1%select{| API wrapper}2 of a "
         "'@usableFromInline' %select{function|method|initializer}0 "
         "should be '@usableFromInline' or public",
-        (unsigned, bool))
+        (unsigned, bool, bool))
 
 ERROR(spi_attribute_on_non_public,none,
       "%select{private|fileprivate|internal|%error|%error}0 %1 "

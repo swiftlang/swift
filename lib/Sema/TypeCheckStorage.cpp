@@ -2746,7 +2746,8 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
   VarDecl *wrappedValueVar = nullptr;
 
   // Create the backing storage property.
-  if (auto *param = dyn_cast<ParamDecl>(var)) {
+  if (var->hasExternalPropertyWrapper()) {
+    auto *param = cast<ParamDecl>(var);
     backingVar = ParamDecl::cloneWithoutType(ctx, param);
     backingVar->setName(name);
   } else {
@@ -2855,6 +2856,24 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         var->diagnose(diag::opaque_type_var_no_underlying_type);
       }
     }
+  } else if (!var->hasExternalPropertyWrapper()) {
+    auto *param = cast<ParamDecl>(var);
+    auto *backingVar = var->getPropertyWrapperBackingProperty();
+    auto *pbd = createPBD(backingVar);
+
+    auto *paramRef = new (ctx) DeclRefExpr(var, DeclNameLoc(), /*implicit=*/true);
+    initializer = buildPropertyWrapperInitCall(
+        var, storageType, paramRef, PropertyWrapperInitKind::WrappedValue);
+    TypeChecker::typeCheckExpression(initializer, dc);
+
+    // Check initializer effects.
+    auto *initContext = new (ctx) PropertyWrapperInitializer(
+        dc, param, PropertyWrapperInitializer::Kind::ProjectedValue);
+
+    TypeChecker::checkInitializerEffects(initContext, initializer);
+
+    pbd->setInit(0, initializer);
+    pbd->setInitializerChecked(0);
   }
 
   // If there is a projection property (projectedValue) in the wrapper,
@@ -2863,8 +2882,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
   if (auto *projection = var->getPropertyWrapperProjectionVar()) {
     createPBD(projection);
 
-    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
-    if (wrapperInfo.hasProjectedValueInit && isa<ParamDecl>(var)) {
+    if (var->hasExternalPropertyWrapper()) {
       // Projected-value initialization is currently only supported for parameters.
       auto *param = dyn_cast<ParamDecl>(var);
       auto *placeholder = PropertyWrapperValuePlaceholderExpr::create(

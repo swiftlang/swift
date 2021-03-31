@@ -5013,6 +5013,10 @@ public:
   /// Whether this var has an implicit property wrapper attribute.
   bool hasImplicitPropertyWrapper() const;
 
+  /// Whether this var is a parameter with an attached property wrapper
+  /// that has an external effect on the function.
+  bool hasExternalPropertyWrapper() const;
+
   /// Whether all of the attached property wrappers have an init(wrappedValue:)
   /// initializer.
   bool allAttachedPropertyWrappersHaveWrappedValueInit() const;

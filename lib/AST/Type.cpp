@@ -1013,7 +1013,7 @@ ParameterListInfo::ParameterListInfo(
       acceptsUnlabeledTrailingClosures.set(i);
     }
 
-    if (param->hasAttachedPropertyWrapper()) {
+    if (param->hasExternalPropertyWrapper()) {
       propertyWrappers.set(i);
     }
 
