@@ -830,6 +830,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
+  Opts.DisableImplicitDoubleCGFloatConversion |=
+      Args.hasArg(OPT_disable_implicit_double_cgfloat_conversion);
+
   for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
     unsigned line;
     if (StringRef(A->getValue()).getAsInteger(/*radix*/ 10, line)) {
