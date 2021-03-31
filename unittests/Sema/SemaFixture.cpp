@@ -136,6 +136,7 @@ BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
       continue;
 
     auto &bindings = cachedBindings->getSecond();
+    bindings.inferTransitiveProtocolRequirements(cache);
     bindings.finalize(cache);
   }
 

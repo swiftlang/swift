@@ -1710,6 +1710,7 @@ ConstraintSystem::getTypeOfMemberReference(
         // Concrete type replacing `Self` could be generic, so we need
         // to make sure that it's opened before use.
         baseOpenedTy = openType(concreteSelf, replacements);
+        baseObjTy = baseOpenedTy;
       }
     }
   } else if (baseObjTy->isExistentialType()) {
