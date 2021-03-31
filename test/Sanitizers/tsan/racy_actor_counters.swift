@@ -7,6 +7,9 @@
 // REQUIRES: libdispatch
 // REQUIRES: tsan_runtime
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 // rdar://75365575 (Failing to start atos external symbolizer)
 // UNSUPPORTED: OS=watchos
 

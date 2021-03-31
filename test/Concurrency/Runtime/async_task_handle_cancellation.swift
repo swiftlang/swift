@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 // This test is flaky on VS2017 (unknown reasons)
 // UNSUPPORTED: MSVC_VER=15.0
 
