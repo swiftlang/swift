@@ -3,8 +3,8 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// See SR-14333
-// UNSUPPORTED: MSVC_VER=15.0
+// https://bugs.swift.org/browse/SR-14333
+// UNSUPPORTED: OS=windows-msvc
 
 class X {
   init() {
