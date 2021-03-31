@@ -264,21 +264,6 @@ void checkUnsupportedProtocolType(ASTContext &ctx,
 void checkUnsupportedProtocolType(ASTContext &ctx,
                                   GenericParamList *genericParams);
 
-/// Resolve a reference to the given type declaration within a particular
-/// context.
-///
-/// This routine aids unqualified name lookup for types by performing the
-/// resolution necessary to rectify the declaration found by name lookup with
-/// the declaration context from which name lookup started.
-///
-/// \param typeDecl The type declaration found by name lookup.
-/// \param isSpecialized Whether the type will have generic arguments applied.
-/// \param resolution The resolution to perform.
-///
-/// \returns the resolved type.
-Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
-                          TypeResolution resolution, bool isSpecialized);
-
 /// Apply generic arguments to the unbound generic type represented by the
 /// given declaration and parent type.
 ///

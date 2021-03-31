@@ -419,16 +419,15 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   return dc->getASTContext().getBridgedToObjC(dc, valueType);
 }
 
-Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
-                                       TypeResolution resolution,
-                                       bool isSpecialized) {
-  auto fromDC = resolution.getDeclContext();
+Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
+                                          DeclContext *foundDC,
+                                          bool isSpecialized) {
+  auto fromDC = getDeclContext();
   ASTContext &ctx = fromDC->getASTContext();
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
-    return resolution.mapTypeIntoContext(
-        genericParam->getDeclaredInterfaceType());
+    return mapTypeIntoContext(genericParam->getDeclaredInterfaceType());
   }
 
   if (!isSpecialized) {
@@ -440,13 +439,12 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
            parentDC = parentDC->getParent()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
         if (parentNominal == nominalType)
-          return resolution.mapTypeIntoContext(
-              parentDC->getDeclaredInterfaceType());
+          return mapTypeIntoContext(parentDC->getDeclaredInterfaceType());
         if (isa<ExtensionDecl>(parentDC)) {
           auto *extendedType = parentNominal;
           while (extendedType != nullptr) {
             if (extendedType == nominalType)
-              return resolution.mapTypeIntoContext(
+              return mapTypeIntoContext(
                   extendedType->getDeclaredInterfaceType());
             extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
           }
@@ -466,11 +464,11 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
             if (auto *ugAliasDecl =
                     dyn_cast<TypeAliasDecl>(unboundGeneric->getAnyGeneric())) {
               if (ugAliasDecl == aliasDecl) {
-                if (resolution.getStage() == TypeResolutionStage::Structural &&
+                if (getStage() == TypeResolutionStage::Structural &&
                     aliasDecl->getUnderlyingTypeRepr() != nullptr) {
                   return aliasDecl->getStructuralType();
                 }
-                return resolution.mapTypeIntoContext(
+                return mapTypeIntoContext(
                     aliasDecl->getDeclaredInterfaceType());
               }
 
@@ -481,12 +479,11 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
           if (auto *aliasType =
                   dyn_cast<TypeAliasType>(extendedType.getPointer())) {
             if (aliasType->getDecl() == aliasDecl) {
-              if (resolution.getStage() == TypeResolutionStage::Structural &&
+              if (getStage() == TypeResolutionStage::Structural &&
                   aliasDecl->getUnderlyingTypeRepr() != nullptr) {
                 return aliasDecl->getStructuralType();
               }
-              return resolution.mapTypeIntoContext(
-                  aliasDecl->getDeclaredInterfaceType());
+              return mapTypeIntoContext(aliasDecl->getDeclaredInterfaceType());
             }
             extendedType = aliasType->getParent();
             continue;
@@ -507,12 +504,11 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
         return aliasDecl->getUnboundGenericType();
 
       // Otherwise, return the appropriate type.
-      if (resolution.getStage() == TypeResolutionStage::Structural &&
+      if (getStage() == TypeResolutionStage::Structural &&
           aliasDecl->getUnderlyingTypeRepr() != nullptr) {
         return aliasDecl->getStructuralType();
       }
-      return resolution.mapTypeIntoContext(
-          aliasDecl->getDeclaredInterfaceType());
+      return mapTypeIntoContext(aliasDecl->getDeclaredInterfaceType());
     }
 
     // When a nominal type used outside its context, return the unbound
@@ -539,12 +535,11 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
     if (!foundDC->getDeclaredInterfaceType())
       return ErrorType::get(ctx);
 
-    selfType =
-        resolution.mapTypeIntoContext(foundDC->getDeclaredInterfaceType());
+    selfType = mapTypeIntoContext(foundDC->getDeclaredInterfaceType());
   } else {
     // Otherwise, we want the protocol 'Self' type for
     // substituting into alias types and associated types.
-    selfType = resolution.mapTypeIntoContext(foundDC->getSelfInterfaceType());
+    selfType = mapTypeIntoContext(foundDC->getSelfInterfaceType());
 
     if (selfType->is<GenericTypeParamType>()) {
       if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
@@ -559,9 +554,9 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
           // because we use the Sequence.SubSequence default instead of
           // the Collection.SubSequence default, even when the conforming
           // type wants to conform to Collection.
-          if (resolution.getStage() == TypeResolutionStage::Structural) {
-            return resolution.resolveSelfAssociatedType(selfType, foundDC,
-                                                        typeDecl->getName());
+          if (getStage() == TypeResolutionStage::Structural) {
+            return resolveSelfAssociatedType(selfType, foundDC,
+                                             typeDecl->getName());
           } else if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
             typeDecl = assocType->getAssociatedTypeAnchor();
           }
@@ -587,8 +582,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
   }
 
   // Finally, substitute the base type into the member type.
-  return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl, selfType,
-                                 resolution.usesArchetypes());
+  return TypeChecker::substMemberTypeWithBase(
+      fromDC->getParentModule(), typeDecl, selfType, usesArchetypes());
 }
 
 static TypeResolutionOptions
@@ -1071,8 +1066,8 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                             ComponentIdentTypeRepr *comp) {
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
-  Type type = TypeChecker::resolveTypeInContext(
-      typeDecl, foundDC, resolution, isa<GenericIdentTypeRepr>(comp));
+  Type type = resolution.resolveTypeInContext(typeDecl, foundDC,
+                                              isa<GenericIdentTypeRepr>(comp));
 
   if (type->hasError() && foundDC &&
       (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {

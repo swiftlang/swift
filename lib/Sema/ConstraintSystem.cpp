@@ -1291,12 +1291,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TypeChecker::resolveTypeInContext(
-        typeDecl, nullptr,
+    auto type =
         TypeResolution::forContextual(useDC, TypeResolverContext::InExpression,
                                       /*unboundTyOpener*/ nullptr,
-                                      /*placeholderHandler*/ nullptr),
-        /*isSpecialized=*/false);
+                                      /*placeholderHandler*/ nullptr)
+            .resolveTypeInContext(typeDecl, /*foundDC*/ nullptr,
+                                  /*isSpecialized=*/false);
 
     checkNestedTypeConstraints(*this, type, locator);
 

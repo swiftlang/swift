@@ -407,6 +407,21 @@ public:
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
   bool areSameType(Type type1, Type type2) const;
+
+  /// Resolve a reference to the given type declaration within a particular
+  /// context.
+  ///
+  /// This routine aids unqualified name lookup for types by performing the
+  /// resolution necessary to rectify the declaration found by name lookup with
+  /// the declaration context from which name lookup started.
+  ///
+  /// \param typeDecl The type declaration found by name lookup.
+  /// \param foundDC The declaration context this type reference was found in.
+  /// \param isSpecialized Whether the type will have generic arguments applied.
+  ///
+  /// \returns the resolved type.
+  Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
+                            bool isSpecialized);
 };
 
 } // end namespace swift
