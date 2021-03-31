@@ -85,6 +85,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicitly non-concurrent}}
   doSomethingConcurrently(fn)
   // expected-error@-1{{passing non-concurrent parameter 'fn' to function expecting a @Sendable closure}}
+  doSomethingConcurrentlyButUnsafe(fn) // okay, @Sendable not part of the type
 
   var x = 17
   doSomethingConcurrently {
@@ -92,6 +93,14 @@ func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicit
     x = x + 1 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
     // expected-error@-1{{reference to captured var 'x' in concurrently-executing code}}
   }
+}
+
+func testSendableInAsync() async {
+  var x = 17
+  doSomethingConcurrentlyButUnsafe {
+    x = 42 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+  }
+  print(x)
 }
 
 // Check import of attributes
