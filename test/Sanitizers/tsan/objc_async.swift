@@ -10,6 +10,8 @@
 // UNSUPPORTED: linux
 // UNSUPPORTED: windows
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
 
 @main struct Main {
   static func main() async {

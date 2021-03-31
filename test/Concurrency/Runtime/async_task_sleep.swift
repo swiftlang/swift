@@ -3,6 +3,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 import _Concurrency
 // FIXME: should not depend on Dispatch
 import Dispatch

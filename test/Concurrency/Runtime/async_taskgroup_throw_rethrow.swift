@@ -2,6 +2,10 @@
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 // XFAIL: OS=windows-msvc
 
 struct Boom: Error {}

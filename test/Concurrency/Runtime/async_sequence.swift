@@ -3,6 +3,9 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 
 // Utility functions for closure based operators to force them into throwing 
