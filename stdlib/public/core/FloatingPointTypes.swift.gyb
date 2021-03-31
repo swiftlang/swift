@@ -1019,6 +1019,9 @@ extension ${Self} {
   }
 }
 
+${Availability(bits)}
+extension ${Self}: Sendable { }
+
 //===----------------------------------------------------------------------===//
 // Explicit conversions between types.
 //===----------------------------------------------------------------------===//
@@ -1342,9 +1345,6 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   }
 }
 % end
-
-${Availability(bits)}
-extension ${Self} : Sendable { }
 
 //===----------------------------------------------------------------------===//
 // Deprecated operators
