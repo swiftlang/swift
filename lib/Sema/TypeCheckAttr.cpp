@@ -47,13 +47,16 @@ using namespace swift;
 namespace {
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
-  void diagnoseAndRemoveAttr(DiagnosticEngine &Diags, Decl *D,
-                             DeclAttribute *attr, ArgTypes &&...Args) {
+  InFlightDiagnostic
+  diagnoseAndRemoveAttr(DiagnosticEngine &Diags, Decl *D, DeclAttribute *attr,
+                        ArgTypes &&...Args) {
+    attr->setInvalid();
+
     assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
 #ifndef NDEBUG
-      if (!loc.isValid()) {
+      if (!loc.isValid() && !attr->getAddedByAccessNote()) {
         llvm::errs() << "Attribute '";
         attr->print(llvm::errs());
         llvm::errs() << "' has invalid location, failed to diagnose!\n";
@@ -64,12 +67,11 @@ namespace {
         loc = D->getLoc();
       }
       if (loc.isValid()) {
-        Diags.diagnose(loc, std::forward<ArgTypes>(Args)...)
-          .fixItRemove(attr->getRangeWithAt());
+        return std::move(Diags.diagnose(loc, std::forward<ArgTypes>(Args)...)
+                            .fixItRemove(attr->getRangeWithAt()));
       }
     }
-
-    attr->setInvalid();
+    return InFlightDiagnostic();
   }
 
 /// This visits each attribute on a decl.  The visitor should return true if
@@ -83,9 +85,10 @@ public:
 
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
-  void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
-    ::diagnoseAndRemoveAttr(Ctx.Diags, D, attr,
-                            std::forward<ArgTypes>(Args)...);
+  InFlightDiagnostic diagnoseAndRemoveAttr(DeclAttribute *attr,
+                                           ArgTypes &&...Args) {
+    return ::diagnoseAndRemoveAttr(Ctx.Diags, D, attr,
+                                   std::forward<ArgTypes>(Args)...);
   }
 
   template <typename... ArgTypes>
@@ -938,7 +941,8 @@ static bool checkObjCDeclContext(Decl *D) {
   return false;
 }
 
-static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
+static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl,
+                                              DiagnosticBehavior behavior) {
   auto *SF = decl->getDeclContext()->getParentSourceFile();
   assert(SF);
 
@@ -950,7 +954,8 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
 
   if (!ctx.LangOpts.EnableObjCInterop) {
     ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
-      .fixItRemove(attr->getRangeWithAt());
+      .fixItRemove(attr->getRangeWithAt())
+      .limitBehavior(behavior);
     return;
   }
 
@@ -970,10 +975,14 @@ static void diagnoseObjCAttrWithoutFoundation(ObjCAttr *attr, Decl *decl) {
   ctx.Diags.diagnose(attr->getLocation(),
                      diag::attr_used_without_required_module, attr,
                      ctx.Id_Foundation)
-    .highlight(attr->getRangeWithAt());
+    .highlight(attr->getRangeWithAt())
+    .limitBehavior(behavior);
 }
 
 void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
+  auto reason = objCReasonForObjCAttr(attr);
+  auto behavior = behaviorLimitForObjCReason(reason, Ctx);
+
   // Only certain decls can be ObjC.
   Optional<Diag<>> error;
   if (isa<ClassDecl>(D) ||
@@ -1009,7 +1018,7 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
   }
 
   if (error) {
-    diagnoseAndRemoveAttr(attr, *error);
+    diagnoseAndRemoveAttr(attr, *error).limitBehavior(behavior);
     return;
   }
 
@@ -1023,21 +1032,32 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
       // names. Complain and recover by chopping off everything
       // after the first name.
       if (objcName->getNumArgs() > 0) {
-        SourceLoc firstNameLoc = attr->getNameLocs().front();
-        SourceLoc afterFirstNameLoc =
-          Lexer::getLocForEndOfToken(Ctx.SourceMgr, firstNameLoc);
+        SourceLoc firstNameLoc, afterFirstNameLoc;
+        if (!attr->getNameLocs().empty()) {
+          firstNameLoc = attr->getNameLocs().front();
+          afterFirstNameLoc =
+            Lexer::getLocForEndOfToken(Ctx.SourceMgr, firstNameLoc);
+        }
+        else {
+          firstNameLoc = D->getLoc();
+        }
         diagnose(firstNameLoc, diag::objc_name_req_nullary,
                  D->getDescriptiveKind())
-          .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc());
+          .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc())
+          .limitBehavior(behavior);
         const_cast<ObjCAttr *>(attr)->setName(
           ObjCSelector(Ctx, 0, objcName->getSelectorPieces()[0]),
           /*implicit=*/false);
       }
     } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
-      diagnose(attr->getLParenLoc(),
+      SourceLoc diagLoc = attr->getLParenLoc();
+      if (diagLoc.isInvalid())
+        diagLoc = D->getLoc();
+      diagnose(diagLoc,
                isa<SubscriptDecl>(D)
                  ? diag::objc_name_subscript
-                 : diag::objc_name_deinit);
+                 : diag::objc_name_deinit)
+          .limitBehavior(behavior);
       const_cast<ObjCAttr *>(attr)->clearName();
     } else {
       auto func = cast<AbstractFunctionDecl>(D);
@@ -1065,14 +1085,18 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
 
       unsigned numArgumentNames = objcName->getNumArgs();
       if (numArgumentNames != numParameters) {
-        diagnose(attr->getNameLocs().front(),
+        SourceLoc firstNameLoc = func->getLoc();
+        if (!attr->getNameLocs().empty())
+          firstNameLoc = attr->getNameLocs().front();
+        diagnose(firstNameLoc,
                  diag::objc_name_func_mismatch,
                  isa<FuncDecl>(func),
                  numArgumentNames,
                  numArgumentNames != 1,
                  numParameters,
                  numParameters != 1,
-                 func->hasThrows());
+                 func->hasThrows())
+            .limitBehavior(behavior);
         D->getAttrs().add(
           ObjCAttr::createUnnamed(Ctx, attr->AtLoc,  attr->Range.Start));
         D->getAttrs().removeAttribute(attr);
@@ -1080,11 +1104,12 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     }
   } else if (isa<EnumElementDecl>(D)) {
     // Enum elements require names.
-    diagnoseAndRemoveAttr(attr, diag::objc_enum_case_req_name);
+    diagnoseAndRemoveAttr(attr, diag::objc_enum_case_req_name)
+        .limitBehavior(behavior);
   }
 
   // Diagnose an @objc attribute used without importing Foundation.
-  diagnoseObjCAttrWithoutFoundation(attr, D);
+  diagnoseObjCAttrWithoutFoundation(attr, D, behavior);
 }
 
 void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
@@ -1132,6 +1157,9 @@ void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
+  if (auto VD = dyn_cast<ValueDecl>(D))
+    TypeChecker::applyAccessNote(VD);
+
   AttributeChecker Checker(D);
   // We need to check all OriginallyDefinedInAttr relative to each other, so
   // collect them and check in batch later.
@@ -1176,13 +1204,20 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     default: break;
     }
 
+    DiagnosticBehavior behavior = attr->getAddedByAccessNote()
+                                ? DiagnosticBehavior::Remark
+                                : DiagnosticBehavior::Unspecified;
+
     if (!OnlyKind.empty())
       Checker.diagnoseAndRemoveAttr(attr, diag::attr_only_one_decl_kind,
-                                    attr, OnlyKind);
+                                    attr, OnlyKind)
+          .limitBehavior(behavior);
     else if (attr->isDeclModifier())
-      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr);
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_modifier, attr)
+          .limitBehavior(behavior);
     else
-      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
+      Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr)
+          .limitBehavior(behavior);
   }
   Checker.checkOriginalDefinedInAttrs(D, ODIAttrs);
 }
@@ -2013,6 +2048,9 @@ void AttributeChecker::visitMainTypeAttr(MainTypeAttr *attr) {
   auto *func = evaluateOrDefault(context.evaluator,
                                  SynthesizeMainFunctionRequest{D},
                                  nullptr);
+
+  if (!func)
+    return;
 
   // Register the func as the main decl in the module. If there are multiples
   // they will be diagnosed.
@@ -5353,6 +5391,11 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 }
 
 void AttributeChecker::visitAsyncHandlerAttr(AsyncHandlerAttr *attr) {
+  if (!Ctx.LangOpts.EnableExperimentalAsyncHandler) {
+    diagnoseAndRemoveAttr(attr, diag::asynchandler_removed);
+    return;
+  }
+
   auto func = dyn_cast<FuncDecl>(D);
   if (!func) {
     diagnoseAndRemoveAttr(attr, diag::asynchandler_non_func);
@@ -5626,6 +5669,10 @@ public:
     // Nothing else to check.
   }
 
+  void visitActorIndependentAttr(ActorIndependentAttr *attr) {
+    // Nothing else to check.
+  }
+
   void visitCustomAttr(CustomAttr *attr) {
     // Check whether this custom attribute is the global actor attribute.
     auto globalActorAttr = evaluateOrDefault(
@@ -5661,7 +5708,21 @@ void TypeChecker::checkClosureAttributes(ClosureExpr *closure) {
 
 void AttributeChecker::visitCompletionHandlerAsyncAttr(
     CompletionHandlerAsyncAttr *attr) {
+  if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D))
+    AFD->getAsyncAlternative();
+}
 
+AbstractFunctionDecl *AsyncAlternativeRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *attachedFunctionDecl) const {
+  auto attr = attachedFunctionDecl->getAttrs()
+    .getAttribute<CompletionHandlerAsyncAttr>();
+  if (!attr)
+    return nullptr;
+
+  if (attr->AsyncFunctionDecl)
+    return attr->AsyncFunctionDecl;
+
+  auto &Diags = attachedFunctionDecl->getASTContext().Diags;
   // Check phases:
   //  1. Attached function shouldn't be async and should have enough args
   //     to have a completion handler
@@ -5673,30 +5734,29 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
   //      - Do some sanity checking on types
 
   // Phase 1: Typecheck the function the attribute is attached to
-  auto attachedFunctionDecl = cast<AbstractFunctionDecl>(D);
   if (attachedFunctionDecl->hasAsync()) {
-    diagnose(attr->getLocation(),
-             diag::attr_completion_handler_async_handler_not_func, attr);
-    diagnose(attachedFunctionDecl->getAsyncLoc(),
-             diag::note_attr_function_declared_async);
-    return;
+    Diags.diagnose(attr->getLocation(),
+                   diag::attr_completion_handler_async_handler_not_func, attr);
+    Diags.diagnose(attachedFunctionDecl->getAsyncLoc(),
+                   diag::note_attr_function_declared_async);
+    return nullptr;
   }
 
   const ParameterList *attachedFunctionParams =
       attachedFunctionDecl->getParameters();
   assert(attachedFunctionParams && "Attached function has no parameter list");
   if (attachedFunctionParams->size() == 0) {
-    diagnose(attr->getLocation(),
-             diag::attr_completion_handler_async_handler_not_func, attr);
-    return;
+    Diags.diagnose(attr->getLocation(),
+                   diag::attr_completion_handler_async_handler_not_func, attr);
+    return nullptr;
   }
   size_t completionHandlerIndex = attr->CompletionHandlerIndexLoc.isValid()
                                       ? attr->CompletionHandlerIndex
                                       : attachedFunctionParams->size() - 1;
   if (attachedFunctionParams->size() < completionHandlerIndex) {
-    diagnose(attr->CompletionHandlerIndexLoc,
-             diag::attr_completion_handler_async_handler_out_of_range);
-    return;
+    Diags.diagnose(attr->CompletionHandlerIndexLoc,
+                   diag::attr_completion_handler_async_handler_out_of_range);
+    return nullptr;
   }
 
   // Phase 2: Typecheck the completion handler
@@ -5706,14 +5766,17 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     AnyFunctionType *handlerType =
         completionHandlerParamDecl->getType()->getAs<AnyFunctionType>();
     if (!handlerType) {
-      diagnose(attr->getLocation(),
-               diag::attr_completion_handler_async_handler_not_func, attr);
-      diagnose(completionHandlerParamDecl->getTypeRepr()->getLoc(),
-               diag::note_attr_completion_handler_async_type_is_not_function,
-               completionHandlerParamDecl->getType())
+      Diags.diagnose(attr->getLocation(),
+                     diag::attr_completion_handler_async_handler_not_func,
+                     attr);
+      Diags
+          .diagnose(
+              completionHandlerParamDecl->getTypeRepr()->getLoc(),
+              diag::note_attr_completion_handler_async_type_is_not_function,
+              completionHandlerParamDecl->getType())
           .highlight(
               completionHandlerParamDecl->getTypeRepr()->getSourceRange());
-      return;
+      return nullptr;
     }
 
     auto handlerTypeRepr =
@@ -5730,27 +5793,31 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     const bool hasError = missingVoid | hasAutoclosure | !hasEscaping;
 
     if (hasError) {
-      diagnose(attr->getLocation(),
-               diag::attr_completion_handler_async_handler_not_func, attr);
+      Diags.diagnose(attr->getLocation(),
+                     diag::attr_completion_handler_async_handler_not_func,
+                     attr);
 
       if (missingVoid)
-        diagnose(completionHandlerParamDecl->getLoc(),
-                 diag::note_attr_completion_function_must_return_void)
+        Diags
+            .diagnose(completionHandlerParamDecl->getLoc(),
+                      diag::note_attr_completion_function_must_return_void)
             .highlight(
                 completionHandlerParamDecl->getTypeRepr()->getSourceRange());
 
       if (!hasEscaping)
-        diagnose(completionHandlerParamDecl->getLoc(),
-                 diag::note_attr_completion_handler_async_handler_attr_req,
-                 true, "escaping")
+        Diags
+            .diagnose(completionHandlerParamDecl->getLoc(),
+                      diag::note_attr_completion_handler_async_handler_attr_req,
+                      true, "escaping")
             .highlight(
                 completionHandlerParamDecl->getTypeRepr()->getSourceRange());
 
       if (hasAutoclosure)
-        diagnose(handlerTypeAttrs->getLoc(TAK_autoclosure),
-                 diag::note_attr_completion_handler_async_handler_attr_req,
-                 false, "autoclosure");
-      return;
+        Diags.diagnose(
+            handlerTypeAttrs->getLoc(TAK_autoclosure),
+            diag::note_attr_completion_handler_async_handler_attr_req, false,
+            "autoclosure");
+      return nullptr;
     }
   }
 
@@ -5784,7 +5851,7 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     //  should return all of those types in a tuple
 
     SmallVector<ValueDecl *, 2> allCandidates;
-    lookupReplacedDecl(attr->getAsyncFunctionName(), attr, attachedFunctionDecl,
+    lookupReplacedDecl(attr->AsyncFunctionName, attr, attachedFunctionDecl,
                        allCandidates);
     SmallVector<AbstractFunctionDecl *, 2> candidates;
     candidates.reserve(allCandidates.size());
@@ -5799,21 +5866,22 @@ void AttributeChecker::visitCompletionHandlerAsyncAttr(
     }
 
     if (candidates.empty()) {
-      diagnose(attr->AsyncFunctionNameLoc,
-               diag::attr_completion_handler_async_no_suitable_function,
-               attr->getAsyncFunctionName());
-      return;
+      Diags.diagnose(attr->AsyncFunctionNameLoc,
+                     diag::attr_completion_handler_async_no_suitable_function,
+                     attr->AsyncFunctionName);
+      return nullptr;
     } else if (candidates.size() > 1) {
-      diagnose(attr->AsyncFunctionNameLoc,
-               diag::attr_completion_handler_async_ambiguous_function, attr,
-               attr->getAsyncFunctionName());
+      Diags.diagnose(attr->AsyncFunctionNameLoc,
+                     diag::attr_completion_handler_async_ambiguous_function,
+                     attr, attr->AsyncFunctionName);
 
       for (AbstractFunctionDecl *candidate : candidates) {
-        diagnose(candidate->getLoc(), diag::decl_declared_here,
-                 candidate->getName());
+        Diags.diagnose(candidate->getLoc(), diag::decl_declared_here,
+                       candidate->getName());
       }
-      return;
+      return nullptr;
     }
-    attr->AsyncFunctionDecl = candidates.front();
+
+    return candidates.front();
   }
 }

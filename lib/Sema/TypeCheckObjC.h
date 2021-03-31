@@ -26,6 +26,7 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class ASTContext;
+class ObjCAttr;
 class SubscriptDecl;
 class ValueDecl;
 class VarDecl;
@@ -69,6 +70,9 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
+    /// Has an explicit '@objc' attribute added by an access note, rather than
+    /// written in source code.
+    ExplicitlyObjCByAccessNote,
 
     // These kinds do not appear in diagnostics.
 
@@ -117,6 +121,9 @@ public:
 /// particular reason.
 DiagnosticBehavior
 behaviorLimitForObjCReason(ObjCReason reason, ASTContext &ctx);
+
+/// Returns the ObjCReason for this ObjCAttr to be attached to the declaration.
+ObjCReason objCReasonForObjCAttr(const ObjCAttr *attr);
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
 /// complain about the correct attribute during @objc inference.

@@ -1079,24 +1079,26 @@ public:
   bool diagnoseAsError() override;
 };
 
-class MissingProjectedValueFailure final : public FailureDiagnostic {
+class InvalidPropertyWrapperType final : public FailureDiagnostic {
   Type wrapperType;
 
 public:
-  MissingProjectedValueFailure(const Solution &solution, Type wrapper,
-                               ConstraintLocator *locator)
+  InvalidPropertyWrapperType(const Solution &solution, Type wrapper,
+                             ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
 
   bool diagnoseAsError() override;
 };
 
-class MissingPropertyWrapperAttributeFailure final : public FailureDiagnostic {
+class InvalidProjectedValueArgument final : public FailureDiagnostic {
   Type wrapperType;
+  ParamDecl *param;
 
 public:
-  MissingPropertyWrapperAttributeFailure(const Solution &solution, Type wrapper,
-                                         ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)) {}
+  InvalidProjectedValueArgument(const Solution &solution, Type wrapper,
+                                ParamDecl *param, ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), wrapperType(resolveType(wrapper)),
+        param(param) {}
 
   bool diagnoseAsError() override;
 };
@@ -1908,6 +1910,12 @@ public:
   /// Tailored diagnostics for argument mismatches associated with trailing
   /// closures being passed to non-closure parameters.
   bool diagnoseTrailingClosureMismatch() const;
+
+  /// Tailored key path as function diagnostics for argument mismatches where
+  /// argument is a keypath expression that has a root type that matches a
+  /// function parameter, but keypath value don't match the function parameter
+  /// result value.
+  bool diagnoseKeyPathAsFunctionResultMismatch() const;
 
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.

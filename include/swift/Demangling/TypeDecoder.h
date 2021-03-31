@@ -316,6 +316,11 @@ public:
 
   bool isPseudogeneric() const { return Pseudogeneric; }
 
+  bool isDifferentiable() const {
+    return getDifferentiabilityKind() !=
+        ImplFunctionDifferentiabilityKind::NonDifferentiable;
+  }
+
   ImplFunctionDifferentiabilityKind getDifferentiabilityKind() const {
     return ImplFunctionDifferentiabilityKind(DifferentiabilityKind);
   }
@@ -708,10 +713,6 @@ public:
     case NodeKind::NoEscapeFunctionType:
     case NodeKind::AutoClosureType:
     case NodeKind::EscapingAutoClosureType:
-    case NodeKind::DifferentiableFunctionType:
-    case NodeKind::EscapingDifferentiableFunctionType:
-    case NodeKind::LinearFunctionType:
-    case NodeKind::EscapingLinearFunctionType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -727,15 +728,6 @@ public:
           flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
       } else if (Node->getKind() == NodeKind::ThinFunctionType) {
         flags = flags.withConvention(FunctionMetadataConvention::Thin);
-      } else if (Node->getKind() == NodeKind::DifferentiableFunctionType ||
-               Node->getKind() ==
-                   NodeKind::EscapingDifferentiableFunctionType) {
-        flags = flags.withDifferentiabilityKind(
-            FunctionMetadataDifferentiabilityKind::Reverse);
-      } else if (Node->getKind() == NodeKind::LinearFunctionType ||
-                 Node->getKind() == NodeKind::EscapingLinearFunctionType) {
-        flags = flags.withDifferentiabilityKind(
-            FunctionMetadataDifferentiabilityKind::Linear);
       }
 
       unsigned firstChildIdx = 0;
@@ -766,8 +758,34 @@ public:
         ++firstChildIdx;
       }
 
+      FunctionMetadataDifferentiabilityKind diffKind;
+      if (Node->getChild(firstChildIdx)->getKind() ==
+            NodeKind::DifferentiableFunctionType) {
+        auto mangledDiffKind = (MangledDifferentiabilityKind)
+            Node->getChild(firstChildIdx)->getIndex();
+        switch (mangledDiffKind) {
+        case MangledDifferentiabilityKind::NonDifferentiable:
+          assert(false && "Unexpected case NonDifferentiable");
+          break;
+        case MangledDifferentiabilityKind::Forward:
+          diffKind = FunctionMetadataDifferentiabilityKind::Forward;
+          break;
+        case MangledDifferentiabilityKind::Reverse:
+          diffKind = FunctionMetadataDifferentiabilityKind::Reverse;
+          break;
+        case MangledDifferentiabilityKind::Normal:
+          diffKind = FunctionMetadataDifferentiabilityKind::Normal;
+          break;
+        case MangledDifferentiabilityKind::Linear:
+          diffKind = FunctionMetadataDifferentiabilityKind::Linear;
+          break;
+        }
+        ++firstChildIdx;
+      }
+
       flags = flags.withConcurrent(isSendable)
-          .withAsync(isAsync).withThrows(isThrow);
+          .withAsync(isAsync).withThrows(isThrow)
+          .withDifferentiable(diffKind.isDifferentiable());
 
       if (Node->getNumChildren() < firstChildIdx + 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -786,16 +804,13 @@ public:
               .withEscaping(
                           Node->getKind() == NodeKind::FunctionType ||
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock ||
-                          Node->getKind() ==
-                              NodeKind::EscapingDifferentiableFunctionType ||
-                          Node->getKind() ==
-                              NodeKind::EscapingLinearFunctionType);
+                          Node->getKind() == NodeKind::EscapingObjCBlock);
 
       auto result = decodeMangledType(Node->getChild(firstChildIdx+1));
       if (result.isError())
         return result;
-      return Builder.createFunctionType(parameters, result.getType(), flags);
+      return Builder.createFunctionType(
+          parameters, result.getType(), flags, diffKind);
     }
     case NodeKind::ImplFunctionType: {
       auto calleeConvention = ImplParameterConvention::Direct_Unowned;

@@ -731,6 +731,18 @@ BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
 BUILTIN_MISC_OPERATION(DestroyDistributedActor,
                        "destroyDistributedActor", "", Special)
 
+/// Resume a non-throwing continuation normally with the given result.
+BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
+                       "resumeNonThrowingContinuationReturning", "", Special)
+
+/// Resume a throwing continuation normally with the given result.
+BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
+                       "resumeThrowingContinuationReturning", "", Special)
+
+/// Resume a throwing continuation abnormally with the given error.
+BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
+                       "resumeThrowingContinuationThrowing", "", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
@@ -744,7 +756,7 @@ BUILTIN_MISC_OPERATION(DestroyDistributedActor,
   BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
 #endif
 
-// getCurrentExecutor: () async -> Builtin.Word
+// getCurrentExecutor: () async -> Builtin.Executor
 //
 // Retrieve the ExecutorRef on which the current asynchronous
 // function is executing.

@@ -928,7 +928,7 @@ public:
     // Mark variables in async functions that don't generate a shadow copy for
     // lifetime extension, so they get spilled into the async context.
     if (!IGM.IRGen.Opts.shouldOptimize() && CurSILFn->isAsync())
-      if (isa<llvm::AllocaInst>(Storage) || isa<llvm::Constant>(Storage)) {
+      if (isa<llvm::AllocaInst>(Storage)) {
         if (emitLifetimeExtendingUse(Storage))
           if (ValueVariables.insert(Storage).second)
             ValueDomPoints.push_back({Storage, getActiveDominancePoint()});
@@ -4718,8 +4718,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   IndirectionKind Indirection = DirectValue;
-  if (CurSILFn->isAsync() &&
-      !i->getDebugScope()->InlinedCallSite) {
+  if (CurSILFn->isAsync() && !i->getDebugScope()->InlinedCallSite &&
+      (Copy.empty() || !isa<llvm::Constant>(Copy[0]))) {
     Indirection = CoroDirectValue;
   }
 
@@ -6805,7 +6805,8 @@ void IRGenModule::emitSILStaticInitializers() {
 void IRGenSILFunction::visitGetAsyncContinuationInst(
     GetAsyncContinuationInst *i) {
   Explosion out;
-  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), StackAddress(), out,
+                           i->throws());
   setLoweredExplosion(i, out);
 }
 
@@ -6813,7 +6814,8 @@ void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
     GetAsyncContinuationAddrInst *i) {
   auto resultAddr = getLoweredStackAddress(i->getOperand());
   Explosion out;
-  emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out);
+  emitGetAsyncContinuation(i->getLoweredResumeType(), resultAddr, out,
+                           i->throws());
   setLoweredExplosion(i, out);
 }
 

@@ -187,6 +187,9 @@ enum class ConstraintKind : char {
   /// - If base is a protocol metatype, this constraint becomes a conformance
   ///   check instead of an equality.
   UnresolvedMemberChainBase,
+  /// The first type is a property wrapper with a wrapped-value type
+  /// equal to the second type.
+  PropertyWrapper,
 };
 
 /// Classification of the different kinds of constraints.
@@ -586,6 +589,7 @@ public:
     case ConstraintKind::ValueMember:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
+    case ConstraintKind::PropertyWrapper:
       return ConstraintClassification::Member;
 
     case ConstraintKind::DynamicTypeOf:

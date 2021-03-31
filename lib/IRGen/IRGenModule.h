@@ -738,8 +738,8 @@ public:
   llvm::FunctionType *TaskContinuationFunctionTy;
   llvm::PointerType *TaskContinuationFunctionPtrTy;
   llvm::StructType *AsyncTaskAndContextTy;
-  llvm::StructType *AsyncContinuationContextTy;
-  llvm::PointerType *AsyncContinuationContextPtrTy;
+  llvm::StructType *ContinuationAsyncContextTy;
+  llvm::PointerType *ContinuationAsyncContextPtrTy;
   llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
@@ -777,6 +777,7 @@ public:
   Alignment getTypeMetadataAlignment() const {
     return getPointerAlignment();
   }
+  Alignment getAsyncContextAlignment() const;
 
   /// Return the offset, relative to the address point, of the start of the
   /// type-specific members of an enum metadata.

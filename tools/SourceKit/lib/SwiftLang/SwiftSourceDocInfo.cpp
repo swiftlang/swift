@@ -639,70 +639,51 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
                                     SwiftInterfaceGenMap &IFaceGenContexts,
                                     const CompilerInvocation &Invok,
                        std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-  std::string Name = Mod.getName().str();
   std::string FullName = Mod.getFullName();
-  CursorInfoData Info;
-  Info.Kind = SwiftLangSupport::getUIDForModuleRef();
-  Info.Name = Name;
-  Info.ModuleName = FullName;
-  if (auto IFaceGenRef = IFaceGenContexts.find(Info.ModuleName, Invok))
-    Info.ModuleInterfaceName = IFaceGenRef->getDocumentName();
-  Info.IsSystem = Mod.isSystemModule();
-  std::vector<StringRef> Groups;
+  SmallVector<CursorSymbolInfo, 1> Symbols;
+  SmallVector<StringRef, 4> ModuleGroups;
+
+  CursorSymbolInfo &Symbol = Symbols.emplace_back();
+  Symbol.Kind = SwiftLangSupport::getUIDForModuleRef();
+  Symbol.Name = Mod.getName();
+  Symbol.ModuleName = FullName;
+  if (auto IFaceGenRef = IFaceGenContexts.find(Symbol.ModuleName, Invok))
+    Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
+  Symbol.IsSystem = Mod.isSystemModule();
   if (auto MD = Mod.getAsSwiftModule()) {
-    Info.ModuleGroupArray = ide::collectModuleGroups(const_cast<ModuleDecl*>(MD),
-                                                     Groups);
+    ide::collectModuleGroups(const_cast<ModuleDecl *>(MD), ModuleGroups);
+    Symbol.ModuleGroupArray = llvm::makeArrayRef(ModuleGroups);
   }
-  Receiver(RequestResult<CursorInfoData>::fromResult(Info));
+
+  CursorInfoData Data;
+  Data.Symbols = llvm::makeArrayRef(Symbols);
+  Receiver(RequestResult<CursorInfoData>::fromResult(Data));
   return false;
 }
 
 static void
-collectAvailableRenameInfo(const ValueDecl *VD,
-                           Optional<RenameRefInfo> RefInfo,
-                           std::vector<UIdent> &RefactoringIds,
-                           DelayedStringRetriever &RefactroingNameOS,
-                           DelayedStringRetriever &RefactoringReasonOS) {
-  std::vector<ide::RenameAvailabiliyInfo> Scratch;
-  for (auto Info : ide::collectRenameAvailabilityInfo(VD, RefInfo,
-                                                      Scratch)){
-    RefactoringIds.push_back(SwiftLangSupport::
-      getUIDForRefactoringKind(Info.Kind));
-    RefactroingNameOS.startPiece();
-    RefactroingNameOS << ide::getDescriptiveRefactoringKindName(Info.Kind);
-    RefactroingNameOS.endPiece();
-    RefactoringReasonOS.startPiece();
-    RefactoringReasonOS << ide::getDescriptiveRenameUnavailableReason(Info.
-      AvailableKind);
-    RefactoringReasonOS.endPiece();
+collectAvailableRenameInfo(const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
+                           SmallVectorImpl<RefactoringInfo> &Refactorings) {
+  SmallVector<RenameAvailabilityInfo, 2> Renames;
+  collectRenameAvailabilityInfo(VD, RefInfo, Renames);
+  for (auto Info : Renames) {
+    Refactorings.emplace_back(
+        SwiftLangSupport::getUIDForRefactoringKind(Info.Kind),
+        ide::getDescriptiveRefactoringKindName(Info.Kind),
+        ide::getDescriptiveRenameUnavailableReason(Info.AvailableKind));
   }
 }
 
-static void
-serializeRefactoringKinds(ArrayRef<RefactoringKind> AllKinds,
-                          std::vector<UIdent> &RefactoringIds,
-                          DelayedStringRetriever &RefactroingNameOS,
-                          DelayedStringRetriever &RefactoringReasonOS) {
-  for (auto Kind : AllKinds) {
-    RefactoringIds.push_back(SwiftLangSupport::getUIDForRefactoringKind(Kind));
-    RefactroingNameOS.startPiece();
-    RefactroingNameOS << ide::getDescriptiveRefactoringKindName(Kind);
-    RefactroingNameOS.endPiece();
-    RefactoringReasonOS.startPiece();
-    RefactoringReasonOS.endPiece();
+static void collectAvailableRefactoringsOtherThanRename(
+    ResolvedCursorInfo CursorInfo,
+    SmallVectorImpl<RefactoringInfo> &Refactorings) {
+  SmallVector<RefactoringKind, 8> Kinds;
+  collectAvailableRefactorings(CursorInfo, Kinds, /*ExcludeRename*/ true);
+  for (auto Kind : Kinds) {
+    Refactorings.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
+                              ide::getDescriptiveRefactoringKindName(Kind),
+                              StringRef());
   }
-}
-
-static void
-collectAvailableRefactoringsOtherThanRename(SourceFile *SF,
-                                            ResolvedCursorInfo CursorInfo,
-                                            std::vector<UIdent> &RefactoringIds,
-                                      DelayedStringRetriever &RefactroingNameOS,
-                                  DelayedStringRetriever &RefactoringReasonOS) {
-  std::vector<RefactoringKind> Scratch;
-  serializeRefactoringKinds(collectAvailableRefactorings(SF, CursorInfo, Scratch,
-    /*ExcludeRename*/true), RefactoringIds, RefactroingNameOS,
-    RefactoringReasonOS);
 }
 
 static Optional<unsigned>
@@ -733,339 +714,311 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
+struct DeclInfo {
+  const ValueDecl *VD;
+  Type ContainerType;
+  bool IsRef;
+  bool IsDynamic;
+  ArrayRef<NominalTypeDecl *> ReceiverTypes;
+
+  /// If VD is a synthesized property wrapper backing storage (_foo) or
+  /// projected value ($foo) of a property (foo), the property instead.
+  /// Otherwise, VD.
+  const ValueDecl *OriginalProperty = nullptr;
+  bool Unavailable = true;
+  Type BaseType;
+  bool InSynthesizedExtension = false;
+
+  DeclInfo(const ValueDecl *VD, Type ContainerType, bool IsRef, bool IsDynamic,
+           ArrayRef<NominalTypeDecl *> ReceiverTypes,
+           const CompilerInvocation &Invoc)
+      : VD(VD), ContainerType(ContainerType), IsRef(IsRef),
+        IsDynamic(IsDynamic), ReceiverTypes(ReceiverTypes) {
+    if (VD == nullptr)
+      return;
+
+    // The synthesized properties $foo and _foo aren't unavailable even if
+    // the original property foo is, so check them rather than the original
+    // property.
+    Unavailable = AvailableAttr::isUnavailable(VD);
+    // No point computing the rest since they won't be used anyway.
+    if (Unavailable)
+      return;
+
+    OriginalProperty = VD;
+    if (auto *VarD = dyn_cast<VarDecl>(VD)) {
+      if (auto *Wrapped = VarD->getOriginalWrappedProperty())
+        OriginalProperty = Wrapped;
+    }
+
+    BaseType = findBaseTypeForReplacingArchetype(VD, ContainerType);
+    InSynthesizedExtension = false;
+    if (BaseType) {
+      if (auto Target = BaseType->getAnyNominal()) {
+        SynthesizedExtensionAnalyzer Analyzer(
+            Target, PrintOptions::printModuleInterface(
+                        Invoc.getFrontendOptions().PrintFullConvention));
+        InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
+      }
+    }
+  }
+};
+
+static StringRef copyAndClearString(llvm::BumpPtrAllocator &Allocator,
+                                    SmallVectorImpl<char> &Str) {
+  auto Ref = copyString(Allocator, StringRef(Str.data(), Str.size()));
+  Str.clear();
+  return Ref;
+}
+
+template <typename T>
+static ArrayRef<T> copyAndClearArray(llvm::BumpPtrAllocator &Allocator,
+                                     SmallVectorImpl<T> &Array) {
+  auto Ref = copyArray(Allocator, llvm::makeArrayRef(Array));
+  Array.clear();
+  return Ref;
+}
+
+static llvm::Error
+fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
+               ModuleDecl *MainModule, SourceLoc CursorLoc, bool AddSymbolGraph,
+               SwiftLangSupport &Lang, const CompilerInvocation &Invoc,
+               ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
+               llvm::BumpPtrAllocator &Allocator) {
+  SmallString<256> Buffer;
+  SmallVector<StringRef, 4> Strings;
+  llvm::raw_svector_ostream OS(Buffer);
+
+  Symbol.DeclarationLang = SwiftLangSupport::getUIDForDeclLanguage(DInfo.VD);
+  Symbol.Kind = SwiftLangSupport::getUIDForDecl(DInfo.VD, DInfo.IsRef);
+
+  SwiftLangSupport::printDisplayName(DInfo.VD, OS);
+  Symbol.Name = copyAndClearString(Allocator, Buffer);
+
+  SwiftLangSupport::printUSR(DInfo.OriginalProperty, OS);
+  if (DInfo.InSynthesizedExtension) {
+    OS << LangSupport::SynthesizedUSRSeparator;
+    SwiftLangSupport::printUSR(DInfo.BaseType->getAnyNominal(), OS);
+  }
+  Symbol.USR = copyAndClearString(Allocator, Buffer);
+
+  {
+    PrintOptions Options;
+    Options.PrintTypeAliasUnderlyingType = true;
+    DInfo.VD->getInterfaceType().print(OS, Options);
+  }
+  Symbol.TypeName = copyAndClearString(Allocator, Buffer);
+
+  SwiftLangSupport::printDeclTypeUSR(DInfo.VD, OS);
+  Symbol.TypeUSR = copyAndClearString(Allocator, Buffer);
+
+  if (DInfo.ContainerType && !DInfo.ContainerType->hasArchetype()) {
+    SwiftLangSupport::printTypeUSR(DInfo.ContainerType, OS);
+  }
+  Symbol.ContainerTypeUSR = copyAndClearString(Allocator, Buffer);
+
+  ide::getDocumentationCommentAsXML(DInfo.OriginalProperty, OS);
+  Symbol.DocComment = copyAndClearString(Allocator, Buffer);
+
+  {
+    auto *Group = DInfo.InSynthesizedExtension ? DInfo.BaseType->getAnyNominal()
+                                               : DInfo.VD;
+    if (auto Name = Group->getGroupName())
+      Symbol.GroupName = Name.getValue();
+  }
+
+  ide::getLocalizationKey(DInfo.VD, OS);
+  Symbol.LocalizationKey = copyAndClearString(Allocator, Buffer);
+
+  printAnnotatedDeclaration(DInfo.VD, DInfo.BaseType, OS);
+  Symbol.AnnotatedDeclaration = copyAndClearString(Allocator, Buffer);
+
+  SwiftLangSupport::printFullyAnnotatedDeclaration(DInfo.VD, DInfo.BaseType,
+                                                   OS);
+  Symbol.FullyAnnotatedDeclaration = copyAndClearString(Allocator, Buffer);
+
+  if (AddSymbolGraph) {
+    SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
+    symbolgraphgen::SymbolGraphOptions Options{
+        "",
+        Invoc.getLangOptions().Target,
+        /*PrettyPrint=*/false,
+        AccessLevel::Private,
+        /*EmitSynthesizedMembers*/ false,
+    };
+
+    symbolgraphgen::printSymbolGraphForDecl(DInfo.VD, DInfo.BaseType,
+                                            DInfo.InSynthesizedExtension,
+                                            Options, OS, PathComponents);
+    Symbol.SymbolGraph = copyAndClearString(Allocator, Buffer);
+
+    SmallVector<ParentInfo, 4> Parents;
+    for (auto &Component : PathComponents) {
+      SwiftLangSupport::printUSR(Component.VD, OS);
+      Parents.emplace_back(copyString(Allocator, Component.Title),
+                           Component.Kind,
+                           copyAndClearString(Allocator, Buffer));
+    };
+    Symbol.ParentContexts = copyArray(Allocator, llvm::makeArrayRef(Parents));
+  }
+
+  {
+    ASTContext &Ctx = DInfo.VD->getASTContext();
+    ClangImporter *Importer =
+        static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+    auto ClangNode = DInfo.VD->getClangNode();
+    if (ClangNode) {
+      auto ClangMod = Importer->getClangOwningModule(ClangNode);
+      if (ClangMod) {
+        Symbol.ModuleName =
+            copyString(Allocator, ClangMod->getFullModuleName());
+      }
+    } else if (DInfo.VD->getModuleContext() != MainModule) {
+      ModuleDecl *MD = DInfo.VD->getModuleContext();
+      // If the decl is from a cross-import overlay module, report the
+      // overlay's declaring module as the owning module.
+      if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
+        MD = Declaring;
+      Symbol.ModuleName = MD->getNameStr();
+    }
+  }
+
+  if (auto IFaceGenRef =
+          Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
+    Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
+
+  getLocationInfo(DInfo.OriginalProperty, Symbol.DeclarationLoc,
+                  Symbol.Filename);
+  if (Symbol.DeclarationLoc.hasValue()) {
+    Symbol.DeclarationLoc = tryRemappingLocToLatestSnapshot(
+        Lang, *Symbol.DeclarationLoc, Symbol.Filename, PreviousSnaps);
+    if (!Symbol.DeclarationLoc.hasValue()) {
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "Failed to remap declaration to latest snapshot.");
+    }
+  }
+
+  ide::walkOverriddenDecls(
+      DInfo.VD,
+      [&](llvm::PointerUnion<const ValueDecl *, const clang::NamedDecl *> D) {
+        // Could have junk in from previous failing USR print
+        Buffer.clear();
+        if (auto VD = D.dyn_cast<const ValueDecl *>()) {
+          if (SwiftLangSupport::printUSR(VD, OS))
+            return;
+        } else {
+          if (clang::index::generateUSRForDecl(
+                  D.get<const clang::NamedDecl *>(), Buffer))
+            return;
+        }
+        Strings.push_back(copyAndClearString(Allocator, Buffer));
+      });
+  Symbol.OverrideUSRs = copyAndClearArray(Allocator, Strings);
+
+  walkRelatedDecls(DInfo.VD, [&](const ValueDecl *RelatedDecl,
+                                 bool UseOriginalBase, bool DuplicateName) {
+    OS << "<RelatedName usr=\"";
+    SwiftLangSupport::printUSR(RelatedDecl, OS);
+    OS << "\">";
+    if (isa<AbstractFunctionDecl>(RelatedDecl) && DuplicateName) {
+      // Related decls are generally overloads, so print parameter types to
+      // differentiate them.
+      PrintOptions PO;
+      PO.SkipAttributes = true;
+      PO.SkipIntroducerKeywords = true;
+      PO.ArgAndParamPrinting =
+          PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+      XMLEscapingPrinter Printer(OS);
+      if (UseOriginalBase && DInfo.BaseType) {
+        PO.setBaseType(DInfo.BaseType);
+        PO.PrintAsMember = true;
+      }
+      RelatedDecl->print(Printer, PO);
+    } else {
+      SmallString<128> RelatedBuffer;
+      llvm::raw_svector_ostream RelatedOS(RelatedBuffer);
+      SwiftLangSupport::printDisplayName(RelatedDecl, RelatedOS);
+      swift::markup::appendWithXMLEscaping(OS, RelatedBuffer);
+    }
+    OS << "</RelatedName>";
+
+    Strings.push_back(copyAndClearString(Allocator, Buffer));
+  });
+  Symbol.AnnotatedRelatedDeclarations = copyAndClearArray(Allocator, Strings);
+
+  for (auto *ReceiverTy : DInfo.ReceiverTypes) {
+    if (!SwiftLangSupport::printUSR(ReceiverTy, OS))
+      Strings.push_back(copyAndClearString(Allocator, Buffer));
+  }
+  Symbol.ReceiverUSRs = copyAndClearArray(Allocator, Strings);
+
+  Symbol.IsSystem = DInfo.VD->getModuleContext()->isSystemModule();
+  Symbol.IsDynamic = DInfo.IsDynamic;
+  Symbol.ParentNameOffset = getParamParentNameOffset(DInfo.VD, CursorLoc);
+
+  return llvm::Error::success();
+}
+
 /// Returns true on success, false on error (and sets `Diagnostic` accordingly).
-static bool passCursorInfoForDecl(SourceFile* SF,
-                                  const ValueDecl *VD,
-                                  ModuleDecl *MainModule,
-                                  const Type ContainerTy,
-                                  bool IsRef,
-                                  bool RetrieveRefactoring,
-                                  bool SymbolGraph,
-                                  ResolvedCursorInfo TheTok,
-                                  Optional<unsigned> OrigBufferID,
-                                  SourceLoc CursorLoc,
-                  ArrayRef<RefactoringInfo> KownRefactoringInfoFromRange,
-                                  SwiftLangSupport &Lang,
-                                  const CompilerInvocation &Invoc,
-                                  std::string &Diagnostic,
-                      ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps,
-                  std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-  if (AvailableAttr::isUnavailable(VD)) {
+static bool passCursorInfoForDecl(
+    const ResolvedCursorInfo &Info, ModuleDecl *MainModule,
+    bool AddRefactorings, bool AddSymbolGraph,
+    ArrayRef<RefactoringInfo> KnownRefactoringInfo, SwiftLangSupport &Lang,
+    const CompilerInvocation &Invoc, std::string &Diagnostic,
+    ArrayRef<ImmutableTextSnapshotRef> PreviousSnaps,
+    std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
+  DeclInfo OrigInfo(Info.ValueD, Info.ContainerType, Info.IsRef, Info.IsDynamic,
+                    Info.ReceiverTypes, Invoc);
+  DeclInfo CtorTypeInfo(Info.CtorTyRef, Type(), true, false,
+                        ArrayRef<NominalTypeDecl *>(), Invoc);
+  DeclInfo &MainInfo = CtorTypeInfo.VD ? CtorTypeInfo : OrigInfo;
+  if (MainInfo.Unavailable) {
     Diagnostic = "Unavailable in the current compilation context.";
     return false;
   }
 
-  SmallString<64> SS;
-  auto BaseType = findBaseTypeForReplacingArchetype(VD, ContainerTy);
-  bool InSynthesizedExtension = false;
-  if (BaseType) {
-    if (auto Target = BaseType->getAnyNominal()) {
-      SynthesizedExtensionAnalyzer Analyzer(
-          Target, PrintOptions::printModuleInterface(
-                      Invoc.getFrontendOptions().PrintFullConvention));
-      InSynthesizedExtension = Analyzer.isInSynthesizedExtension(VD);
+  llvm::BumpPtrAllocator Allocator;
+
+  SmallVector<CursorSymbolInfo, 2> Symbols;
+  CursorSymbolInfo &MainSymbol = Symbols.emplace_back();
+  // The primary result for constructor calls, eg. `MyType()` should be
+  // the type itself, rather than the constructor. The constructor will be
+  // added as a secondary result.
+  if (auto Err = fillSymbolInfo(MainSymbol, MainInfo, MainModule, Info.Loc,
+                                AddSymbolGraph, Lang, Invoc, PreviousSnaps,
+                                Allocator)) {
+    llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {
+      Diagnostic = E.message();
+    });
+    return false;
+  }
+  if (MainInfo.VD != OrigInfo.VD && !OrigInfo.Unavailable) {
+    CursorSymbolInfo &CtorSymbol = Symbols.emplace_back();
+    if (auto Err = fillSymbolInfo(CtorSymbol, OrigInfo, MainModule, Info.Loc,
+                                  AddSymbolGraph, Lang, Invoc, PreviousSnaps,
+                                  Allocator)) {
+      // Ignore but make sure to remove the partially-filled symbol
+      llvm::handleAllErrors(std::move(Err), [&](const llvm::StringError &E) {});
+      Symbols.pop_back();
     }
   }
 
-  unsigned NameBegin = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    SwiftLangSupport::printDisplayName(VD, OS);
-  }
-  unsigned NameEnd = SS.size();
-
-  // If VD is the syntehsized property wrapper backing storage (_foo) or
-  // projected value ($foo) of a property (foo), use that property's USR instead
-  // so that a rename refactoring renames all three (foo, $foo, and _foo).
-  const ValueDecl* OriginalProperty = VD;
-  if (auto *VarD = dyn_cast<VarDecl>(VD)) {
-    if (auto *Wrapped = VarD->getOriginalWrappedProperty())
-        OriginalProperty = Wrapped;
-  }
-
-  unsigned USRBegin = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    SwiftLangSupport::printUSR(OriginalProperty, OS);
-    if (InSynthesizedExtension) {
-        OS << LangSupport::SynthesizedUSRSeparator;
-        SwiftLangSupport::printUSR(BaseType->getAnyNominal(), OS);
-    }
-  }
-  unsigned USREnd = SS.size();
-
-  unsigned TypenameBegin = SS.size();
-  llvm::raw_svector_ostream OS(SS);
-  PrintOptions Options;
-  Options.PrintTypeAliasUnderlyingType = true;
-  VD->getInterfaceType().print(OS, Options);
-
-  unsigned TypenameEnd = SS.size();
-
-  unsigned MangledTypeStart = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    SwiftLangSupport::printDeclTypeUSR(VD, OS);
-  }
-  unsigned MangledTypeEnd = SS.size();
-
-  unsigned MangledContainerTypeStart = SS.size();
-  if (ContainerTy && !ContainerTy->hasArchetype()) {
-    llvm::raw_svector_ostream OS(SS);
-    SwiftLangSupport::printTypeUSR(ContainerTy, OS);
-  }
-  unsigned MangledContainerTypeEnd = SS.size();
-
-  // If VD is the syntehsized property wrapper backing storage (_foo) or
-  // projected value ($foo) of a property (foo), use that property's
-  // documentation instead.
-
-  unsigned DocCommentBegin = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    ide::getDocumentationCommentAsXML(OriginalProperty, OS);
-  }
-  unsigned DocCommentEnd = SS.size();
-
-  unsigned DeclBegin = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    printAnnotatedDeclaration(VD, BaseType, OS);
-  }
-  unsigned DeclEnd = SS.size();
-
-
-  SmallVector<symbolgraphgen::PathComponent, 4> PathComponents;
-  unsigned SymbolGraphBegin = SS.size();
-  if (SymbolGraph) {
-    symbolgraphgen::SymbolGraphOptions Options {
-      "",
-      Invoc.getLangOptions().Target,
-      /*PrettyPrint=*/false,
-      AccessLevel::Private,
-      /*EmitSynthesizedMembers*/false,
-    };
-    llvm::raw_svector_ostream OS(SS);
-    symbolgraphgen::printSymbolGraphForDecl(VD, BaseType,
-                                            InSynthesizedExtension, Options, OS,
-                                            PathComponents);
-  }
-  unsigned SymbolGraphEnd = SS.size();
-
-  DelayedStringRetriever ParentUSRsOS(SS);
-  for (auto &Component: PathComponents) {
-    ParentUSRsOS.startPiece();
-    if (SwiftLangSupport::printUSR(Component.VD, OS))
-      ParentUSRsOS.startPiece(); // ignore any output if invalid
-    ParentUSRsOS.endPiece();
-  };
-
-  unsigned FullDeclBegin = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    SwiftLangSupport::printFullyAnnotatedDeclaration(VD, BaseType, OS);
-  }
-  unsigned FullDeclEnd = SS.size();
-
-  unsigned GroupBegin = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    auto *GroupVD = InSynthesizedExtension ? BaseType->getAnyNominal() : VD;
-    if (auto OP = GroupVD->getGroupName())
-      OS << OP.getValue();
-  }
-  unsigned GroupEnd = SS.size();
-
-  unsigned LocalizationBegin = SS.size();
-  {
-    llvm::raw_svector_ostream OS(SS);
-    ide::getLocalizationKey(VD, OS);
-  }
-  unsigned LocalizationEnd = SS.size();
-
-  std::vector<UIdent> RefactoringIds;
-  DelayedStringRetriever RefactoringNameOS(SS);
-  DelayedStringRetriever RefactoringReasonOS(SS);
-
-  if (RetrieveRefactoring) {
+  SmallVector<RefactoringInfo, 8> Refactorings;
+  if (AddRefactorings) {
     Optional<RenameRefInfo> RefInfo;
-    if (TheTok.IsRef)
-      RefInfo = {TheTok.SF, TheTok.Loc, TheTok.IsKeywordArgument};
-    collectAvailableRenameInfo(VD, RefInfo,
-                               RefactoringIds, RefactoringNameOS,
-                               RefactoringReasonOS);
-    collectAvailableRefactoringsOtherThanRename(SF, TheTok, RefactoringIds,
-      RefactoringNameOS, RefactoringReasonOS);
+    if (Info.IsRef)
+      RefInfo = {Info.SF, Info.Loc, Info.IsKeywordArgument};
+    collectAvailableRenameInfo(MainInfo.VD, RefInfo, Refactorings);
+    collectAvailableRefactoringsOtherThanRename(Info, Refactorings);
   }
+  Refactorings.insert(Refactorings.end(), KnownRefactoringInfo.begin(),
+                      KnownRefactoringInfo.end());
 
-  DelayedStringRetriever OverUSRsStream(SS);
-
-  ide::walkOverriddenDecls(VD,
-    [&](llvm::PointerUnion<const ValueDecl*, const clang::NamedDecl*> D) {
-      OverUSRsStream.startPiece();
-      if (auto VD = D.dyn_cast<const ValueDecl*>()) {
-        if (SwiftLangSupport::printUSR(VD, OverUSRsStream))
-          return;
-      } else {
-        llvm::SmallString<128> Buf;
-        if (clang::index::generateUSRForDecl(
-            D.get<const clang::NamedDecl*>(), Buf))
-          return;
-        OverUSRsStream << Buf.str();
-      }
-      OverUSRsStream.endPiece();
-  });
-
-  DelayedStringRetriever RelDeclsStream(SS);
-  walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool UseOriginalBase, bool DuplicateName) {
-    RelDeclsStream.startPiece();
-    {
-      RelDeclsStream<<"<RelatedName usr=\"";
-      SwiftLangSupport::printUSR(RelatedDecl, RelDeclsStream);
-      RelDeclsStream<<"\">";
-      if (isa<AbstractFunctionDecl>(RelatedDecl) && DuplicateName) {
-        // Related decls are generally overloads, so print parameter types to
-        // differentiate them.
-        PrintOptions PO;
-        PO.SkipAttributes = true;
-        PO.SkipIntroducerKeywords = true;
-        PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
-        XMLEscapingPrinter Printer(RelDeclsStream);
-        if (UseOriginalBase && BaseType) {
-          PO.setBaseType(BaseType);
-          PO.PrintAsMember = true;
-        }
-        RelatedDecl->print(Printer, PO);
-      } else {
-        llvm::SmallString<128> Buf;
-        {
-          llvm::raw_svector_ostream OSBuf(Buf);
-          SwiftLangSupport::printDisplayName(RelatedDecl, OSBuf);
-        }
-        swift::markup::appendWithXMLEscaping(RelDeclsStream, Buf);
-      }
-      RelDeclsStream<<"</RelatedName>";
-    }
-    RelDeclsStream.endPiece();
-  });
-
-  ASTContext &Ctx = VD->getASTContext();
-
-  ClangImporter *Importer = static_cast<ClangImporter*>(
-      Ctx.getClangModuleLoader());
-  std::string ModuleName;
-  auto ClangNode = VD->getClangNode();
-  if (ClangNode) {
-    auto ClangMod = Importer->getClangOwningModule(ClangNode);
-    if (ClangMod)
-      ModuleName = ClangMod->getFullModuleName();
-  } else if (VD->getModuleContext() != MainModule) {
-    ModuleDecl *MD = VD->getModuleContext();
-    // If the decl is from a cross-import overlay module, report the overlay's
-    // declaring module as the owning module.
-    if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
-      MD = Declaring;
-    ModuleName = MD->getNameStr().str();
-  }
-  StringRef ModuleInterfaceName;
-  if (auto IFaceGenRef = Lang.getIFaceGenContexts().find(ModuleName, Invoc))
-    ModuleInterfaceName = IFaceGenRef->getDocumentName();
-
-  UIdent DeclLang = SwiftLangSupport::getUIDForDeclLanguage(VD);
-  UIdent Kind = SwiftLangSupport::getUIDForDecl(VD, IsRef);
-  StringRef Name = StringRef(SS.begin()+NameBegin, NameEnd-NameBegin);
-  StringRef USR = StringRef(SS.begin()+USRBegin, USREnd-USRBegin);
-  StringRef TypeName = StringRef(SS.begin()+TypenameBegin,
-                                 TypenameEnd-TypenameBegin);
-  StringRef TypeUsr = StringRef(SS.begin()+MangledTypeStart,
-                                MangledTypeEnd - MangledTypeStart);
-
-  StringRef ContainerTypeUsr = StringRef(SS.begin()+MangledContainerTypeStart,
-                            MangledContainerTypeEnd - MangledContainerTypeStart);
-  StringRef DocComment = StringRef(SS.begin()+DocCommentBegin,
-                                   DocCommentEnd-DocCommentBegin);
-  StringRef AnnotatedDecl = StringRef(SS.begin()+DeclBegin,
-                                      DeclEnd-DeclBegin);
-  StringRef FullyAnnotatedDecl =
-      StringRef(SS.begin() + FullDeclBegin, FullDeclEnd - FullDeclBegin);
-  StringRef GroupName = StringRef(SS.begin() + GroupBegin, GroupEnd - GroupBegin);
-  StringRef LocalizationKey = StringRef(SS.begin() + LocalizationBegin,
-                                        LocalizationEnd - LocalizationBegin);
-  StringRef SymbolGraphJSON = StringRef(SS.begin()+SymbolGraphBegin,
-                                        SymbolGraphEnd-SymbolGraphBegin);
-
-  SmallVector<ParentInfo, 4> Parents;
-  auto ParentIt = PathComponents.begin();
-  ParentUSRsOS.retrieve([&](StringRef ParentUSR) {
-    assert(ParentIt != PathComponents.end());
-    if (!ParentUSR.empty())
-      Parents.push_back({ParentIt->Title, ParentIt->Kind, ParentUSR});
-    ++ParentIt;
-  });
-
-  // If VD is the syntehsized property wrapper backing storage (_foo) or
-  // projected value ($foo) of a property (foo), base the location on that
-  // property instead.
-  llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
-  StringRef Filename;
-  getLocationInfo(OriginalProperty, DeclarationLoc, Filename);
-  if (DeclarationLoc.hasValue()) {
-    DeclarationLoc = tryRemappingLocToLatestSnapshot(Lang,
-                                                     *DeclarationLoc,
-                                                     Filename,
-                                                     PreviousASTSnaps);
-    if (!DeclarationLoc.hasValue()) {
-      Diagnostic = "Failed to remap declaration to latest snapshot.";
-      return false;
-    }
-  }
-
-  SmallVector<StringRef, 4> OverUSRs;
-  OverUSRsStream.retrieve([&](StringRef S) { OverUSRs.push_back(S); });
-
-  SmallVector<StringRef, 4> AnnotatedRelatedDecls;
-  RelDeclsStream.retrieve([&](StringRef S) { AnnotatedRelatedDecls.push_back(S); });
-
-  SmallVector<RefactoringInfo, 4> RefactoringInfoBuffer;
-  for (unsigned I = 0, N = RefactoringIds.size(); I < N; I ++) {
-    RefactoringInfoBuffer.push_back({RefactoringIds[I], RefactoringNameOS[I],
-                                     RefactoringReasonOS[I]});
-  }
-
-  // Add available refactoring inheritted from range.
-  RefactoringInfoBuffer.insert(RefactoringInfoBuffer.end(),
-    KownRefactoringInfoFromRange.begin(),
-    KownRefactoringInfoFromRange.end());
-
-  bool IsSystem = VD->getModuleContext()->isSystemModule();
-  std::string TypeInterface;
-
-  CursorInfoData Info;
-  Info.DeclarationLang = DeclLang;
-  Info.Kind = Kind;
-  Info.Name = Name;
-  Info.USR = USR;
-  Info.TypeName = TypeName;
-  Info.TypeUSR = TypeUsr;
-  Info.ContainerTypeUSR = ContainerTypeUsr;
-  Info.DocComment = DocComment;
-  Info.AnnotatedDeclaration = AnnotatedDecl;
-  Info.FullyAnnotatedDeclaration = FullyAnnotatedDecl;
-  Info.ModuleName = ModuleName;
-  Info.ModuleInterfaceName = ModuleInterfaceName;
-  Info.DeclarationLoc = DeclarationLoc;
-  Info.Filename = Filename;
-  Info.OverrideUSRs = OverUSRs;
-  Info.AnnotatedRelatedDeclarations = AnnotatedRelatedDecls;
-  Info.GroupName = GroupName;
-  Info.LocalizationKey = LocalizationKey;
-  Info.IsSystem = IsSystem;
-  Info.TypeInterface = StringRef();
-  Info.AvailableActions = llvm::makeArrayRef(RefactoringInfoBuffer);
-  Info.ParentNameOffset = getParamParentNameOffset(VD, CursorLoc);
-  Info.SymbolGraph = SymbolGraphJSON;
-  Info.ParentContexts = llvm::makeArrayRef(Parents);
-  Receiver(RequestResult<CursorInfoData>::fromResult(Info));
+  CursorInfoData Data;
+  Data.Symbols = llvm::makeArrayRef(Symbols);
+  Data.AvailableActions = llvm::makeArrayRef(Refactorings);
+  Receiver(RequestResult<CursorInfoData>::fromResult(Data));
   return true;
 }
 
@@ -1353,10 +1306,10 @@ static void resolveCursor(
           Length = 0;
       }
 
-      // Retrive relevant actions on the code under selection.
-      std::vector<RefactoringInfo> AvailableRefactorings;
+      // Retrieve relevant actions on the code under selection.
+      llvm::SmallVector<RefactoringInfo, 8> Actions;
       if (Actionables && Length) {
-        std::vector<RefactoringKind> Scratch;
+        SmallVector<RefactoringKind, 8> Kinds;
         RangeConfig Range;
         Range.BufferId = BufferID;
         auto Pair = SM.getPresumedLineAndColumnForLoc(Loc);
@@ -1364,25 +1317,19 @@ static void resolveCursor(
         Range.Column = Pair.second;
         Range.Length = Length;
         bool RangeStartMayNeedRename = false;
-        for (RefactoringKind Kind :
-             collectAvailableRefactorings(&AstUnit->getPrimarySourceFile(),
-                                Range, RangeStartMayNeedRename, Scratch, {})) {
-          AvailableRefactorings.push_back({
-            SwiftLangSupport::getUIDForRefactoringKind(Kind),
-            getDescriptiveRefactoringKindName(Kind),
-            /*UnavailableReason*/ StringRef()
-          });
+        collectAvailableRefactorings(&AstUnit->getPrimarySourceFile(), Range,
+                                     RangeStartMayNeedRename, Kinds, {});
+        for (RefactoringKind Kind : Kinds) {
+          Actions.emplace_back(SwiftLangSupport::getUIDForRefactoringKind(Kind),
+                               getDescriptiveRefactoringKindName(Kind),
+                               /*UnavailableReason*/ StringRef());
         }
         if (!RangeStartMayNeedRename) {
-          CursorInfoData Info;
-
-          // FIXME: This Kind does not mean anything.
-          Info.Kind = SwiftLangSupport::getUIDForModuleRef();
-          Info.AvailableActions = llvm::makeArrayRef(AvailableRefactorings);
-
           // If Length is given, then the cursor-info request should only about
           // collecting available refactorings for the range.
-          Receiver(RequestResult<CursorInfoData>::fromResult(Info));
+          CursorInfoData Data;
+          Data.AvailableActions = llvm::makeArrayRef(Actions);
+          Receiver(RequestResult<CursorInfoData>::fromResult(Data));
           return;
         }
         // If the range start may need rename, we fall back to a regular cursor
@@ -1410,27 +1357,10 @@ static void resolveCursor(
                                 CompInvok, Receiver);
         return;
       case CursorInfoKind::ValueRef: {
-        ValueDecl *VD = CursorInfo.ValueD;
-        Type ContainerType = CursorInfo.ContainerType;
-        if (CursorInfo.CtorTyRef) {
-          // Treat constructor calls, e.g. MyType(), as the type itself,
-          // rather than its constructor.
-          VD = CursorInfo.CtorTyRef;
-          ContainerType = Type();
-        }
         std::string Diagnostic;
-        bool Success = passCursorInfoForDecl(&AstUnit->getPrimarySourceFile(),
-                                             VD, MainModule,
-                                             ContainerType,
-                                             CursorInfo.IsRef,
-                                             Actionables,
-                                             SymbolGraph,
-                                             CursorInfo,
-                                             BufferID, Loc,
-                                             AvailableRefactorings,
-                                             Lang, CompInvok, Diagnostic,
-                                             getPreviousASTSnaps(),
-                                             Receiver);
+        bool Success = passCursorInfoForDecl(
+            CursorInfo, MainModule, Actionables, SymbolGraph, Actions, Lang,
+            CompInvok, Diagnostic, getPreviousASTSnaps(), Receiver);
         if (!Success) {
           if (!getPreviousASTSnaps().empty()) {
             // Attempt again using the up-to-date AST.
@@ -1449,24 +1379,11 @@ static void resolveCursor(
       case CursorInfoKind::ExprStart:
       case CursorInfoKind::StmtStart: {
         if (Actionables) {
-          SmallString<64> SS;
-          std::vector<UIdent> RefactoringIds;
-          DelayedStringRetriever NameRetriever(SS);
-          DelayedStringRetriever ReasonRetriever(SS);
-          collectAvailableRefactoringsOtherThanRename(
-            &AstUnit->getPrimarySourceFile(), CursorInfo, RefactoringIds,
-            NameRetriever, ReasonRetriever);
-          if (auto Size = RefactoringIds.size()) {
-            CursorInfoData Info;
-
-            // FIXME: This Kind does not mean anything.
-            Info.Kind = SwiftLangSupport::getUIDForModuleRef();
-            for (unsigned I = 0; I < Size; I ++) {
-              AvailableRefactorings.push_back({RefactoringIds[I],
-                NameRetriever[I], ReasonRetriever[I]});
-            }
-            Info.AvailableActions = llvm::makeArrayRef(AvailableRefactorings);
-            Receiver(RequestResult<CursorInfoData>::fromResult(Info));
+          collectAvailableRefactoringsOtherThanRename(CursorInfo, Actions);
+          if (!Actions.empty()) {
+            CursorInfoData Data;
+            Data.AvailableActions = llvm::makeArrayRef(Actions);
+            Receiver(RequestResult<CursorInfoData>::fromResult(Data));
             return;
           }
         }
@@ -1721,11 +1638,11 @@ void SwiftLangSupport::getCursorInfo(
         } else {
           std::string Diagnostic;  // Unused.
           ModuleDecl *MainModule = IFaceGenRef->getModuleDecl();
-          passCursorInfoForDecl(
-              /*SourceFile*/nullptr, Entity.Dcl, MainModule, Type(),
-              Entity.IsRef, Actionables, SymbolGraph, ResolvedCursorInfo(),
-              /*OrigBufferID=*/None, SourceLoc(), {}, *this, Invok, Diagnostic,
-              {}, Receiver);
+          ResolvedCursorInfo Info;
+          Info.ValueD = const_cast<ValueDecl *>(Entity.Dcl);
+          Info.IsRef = Entity.IsRef;
+          passCursorInfoForDecl(Info, MainModule, Actionables, SymbolGraph, {},
+                                *this, Invok, Diagnostic, {}, Receiver);
         }
       } else {
         CursorInfoData Info;
@@ -1865,9 +1782,6 @@ static void resolveCursorFromUSR(
       auto &CompIns = AstUnit->getCompilerInstance();
       ModuleDecl *MainModule = CompIns.getMainModule();
 
-      unsigned BufferID =
-          AstUnit->getPrimarySourceFile().getBufferID().getValue();
-
       if (USR.startswith("c:")) {
         LOG_WARN_FUNC("lookup for C/C++/ObjC USRs not implemented");
         CursorInfoData Info;
@@ -1893,18 +1807,22 @@ static void resolveCursorFromUSR(
         passCursorInfoForModule(M, Lang.getIFaceGenContexts(), CompInvok,
                                 Receiver);
       } else {
+        ResolvedCursorInfo Info;
+        Info.ValueD = D;
+        Info.IsRef = false;
+
         auto *DC = D->getDeclContext();
         Type selfTy;
         if (DC->isTypeContext()) {
-          selfTy = DC->getSelfInterfaceType();
-          selfTy = D->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+          Info.ContainerType = DC->getSelfInterfaceType();
+          Info.ContainerType = D->getInnermostDeclContext()->mapTypeIntoContext(
+              Info.ContainerType);
         }
+
         std::string Diagnostic;
         bool Success =
-            passCursorInfoForDecl(/*SourceFile*/nullptr, D, MainModule, selfTy,
-                                  /*IsRef=*/false, /*Actionables*/false,
-                                  /*SymbolGraph*/false, ResolvedCursorInfo(),
-                                  BufferID, SourceLoc(), {}, Lang, CompInvok,
+            passCursorInfoForDecl(Info, MainModule, /*AddRefactorings*/ false,
+                                  /*AddSymbolGraph*/ false, {}, Lang, CompInvok,
                                   Diagnostic, PreviousASTSnaps, Receiver);
         if (!Success) {
           if (!PreviousASTSnaps.empty()) {
@@ -2127,7 +2045,7 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         if (CursorInfo.IsKeywordArgument)
           return;
 
-        ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
+        ValueDecl *VD = CursorInfo.typeOrValue();
         if (!VD)
           return; // This was a module reference.
 

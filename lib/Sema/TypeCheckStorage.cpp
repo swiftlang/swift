@@ -118,6 +118,8 @@ static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
     }
   }
 
+  // If this is an actor, check conformance to the Actor protocol to
+  // ensure that the actor storage will get created (if needed).
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     // If this is an actor class, check conformance to the Actor protocol to
     // ensure that the actor storage will get created (if needed).
@@ -1911,6 +1913,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       ctx, loc, /*AccessorKeywordLoc*/ loc,
       AccessorKind::Get, storage,
       staticLoc, StaticSpellingKind::None,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
       getterParams,
@@ -1962,6 +1965,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
       AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
       Type(),
@@ -2075,6 +2079,7 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
       kind, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params, retTy, dc);
   accessor->setSynthesized();
@@ -2324,6 +2329,9 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
                      PropertyWrapperSynthesizedPropertyKind::Projection)) {
           break;
         }
+      }
+      if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+        break;
       }
 
       // Anything else should not have a synthesized setter.

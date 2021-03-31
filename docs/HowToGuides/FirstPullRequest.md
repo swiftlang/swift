@@ -124,7 +124,7 @@ If you had an active discussion with someone on how to implement your change,
 you can `@` mention them in the PR description and ask for code review.
 If you directly implemented the change without any guidance from anyone else,
 `@` mention someone from GitHub's suggested reviewers. If GitHub doesn't
-make any suggestions, ask the [Code Owner](/CODE_OWNERS.txt) based on the
+make any suggestions, ask the [Code Owner](https://github.com/apple/swift/blob/main/CODE_OWNERS.TXT) based on the
 component for your change. Please ask someone though! We don't want you to get
 stuck because you were not sure who to ask for code review.
 

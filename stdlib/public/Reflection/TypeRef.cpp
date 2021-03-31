@@ -992,7 +992,8 @@ public:
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags());
+                                   SubstitutedResult, F->getFlags(),
+                                   F->getDifferentiabilityKind());
   }
 
   const TypeRef *
@@ -1111,7 +1112,8 @@ public:
     auto SubstitutedResult = visit(F->getResult());
 
     return FunctionTypeRef::create(Builder, SubstitutedParams,
-                                   SubstitutedResult, F->getFlags());
+                                   SubstitutedResult, F->getFlags(),
+                                   F->getDifferentiabilityKind());
   }
 
   const TypeRef *

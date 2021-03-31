@@ -42,7 +42,7 @@ class X {
       return 0
     }
 
-    set async { // expected-error{{expected '{' to start setter definition}}
+    set async { // expected-error{{'set' accessor cannot have specifier 'async'}}
     }
   }
 }

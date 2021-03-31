@@ -1048,6 +1048,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       return appendOperator("BI");
     case TypeKind::BuiltinJob:
       return appendOperator("Bj");
+    case TypeKind::BuiltinExecutor:
+      return appendOperator("Be");
     case TypeKind::BuiltinDefaultActorStorage:
       return appendOperator("BD");
     case TypeKind::BuiltinRawPointer:
@@ -2405,18 +2407,6 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Reverse) {
-      if (fn->isNoEscape())
-        return appendOperator("XF");
-      else
-        return appendOperator("XG");
-    }
-    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
-      if (fn->isNoEscape())
-        return appendOperator("XH");
-      else
-        return appendOperator("XI");
-    }
     if (isAutoClosure) {
       if (fn->isNoEscape())
         return appendOperator("XK");
@@ -2464,6 +2454,22 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("J");
   if (fn->isThrowing())
     appendOperator("K");
+  switch (auto diffKind = fn->getDifferentiabilityKind()) {
+  case DifferentiabilityKind::NonDifferentiable:
+    break;
+  case DifferentiabilityKind::Forward:
+    appendOperator("jf");
+    break;
+  case DifferentiabilityKind::Reverse:
+    appendOperator("jr");
+    break;
+  case DifferentiabilityKind::Normal:
+    appendOperator("jd");
+    break;
+  case DifferentiabilityKind::Linear:
+    appendOperator("jl");
+    break;
+  }
 }
 
 void ASTMangler::appendFunctionInputType(

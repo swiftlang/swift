@@ -4595,6 +4595,11 @@ private:
       ArrayRef<TypeVariableType *> referencedOuterParameters,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify a property wrapper constraint.
+  SolutionKind simplifyPropertyWrapperConstraint(Type wrapperType, Type wrappedValueType,
+                                                 TypeMatchOptions flags,
+                                                 ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify a one-way constraint.
   SolutionKind simplifyOneWayConstraint(ConstraintKind kind,
                                         Type first, Type second,

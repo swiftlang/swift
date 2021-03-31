@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -warn-concurrency
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -enable-experimental-async-handler -warn-concurrency
 // REQUIRES: concurrency
 
 // XFAIL: *
@@ -650,14 +650,24 @@ class SomeClassWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
 
-  init() {
+  static var shared = SomeClassWithInits() // expected-note{{static property declared here}}
+
+  init() { // expected-note{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
     self.mutableState = 42
     self.otherMutableState = 17
 
     self.isolated()
   }
 
+  deinit {
+    print(SomeClassWithInits.shared) // okay, we're actor-isolated
+  }
+
   func isolated() { }
+
+  static func staticIsolated() { // expected-note{{calls to static method 'staticIsolated()' from outside of its actor context are implicitly asynchronous}}
+    _ = SomeClassWithInits.shared
+  }
 
   func hasDetached() {
     Task.runDetached {
@@ -669,6 +679,12 @@ class SomeClassWithInits {
       print(await self.mutableState) // expected-warning{{cannot use parameter 'self' with a non-sendable type 'SomeClassWithInits' from concurrently-executed code}}
     }
   }
+}
+
+func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make global function 'outsideSomeClassWithInits()' part of global actor 'MainActor'}}
+  _ = SomeClassWithInits() // expected-error{{initializer 'init()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+  _ = SomeClassWithInits.shared // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+  SomeClassWithInits.staticIsolated() // expected-error{{static method 'staticIsolated()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
 }
 
 // ----------------------------------------------------------------------

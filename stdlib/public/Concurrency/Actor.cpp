@@ -17,6 +17,7 @@
 
 #include "swift/Runtime/Concurrency.h"
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Mutex.h"
@@ -151,7 +152,8 @@ SWIFT_RUNTIME_DECLARE_THREAD_LOCAL(
 
 } // end anonymous namespace
 
-void swift::swift_job_run(Job *job, ExecutorRef executor) {
+SWIFT_CC(swift)
+static void swift_job_runImpl(Job *job, ExecutorRef executor) {
   ExecutorTrackingInfo trackingInfo;
   trackingInfo.enterAndShadow(executor);
 
@@ -184,7 +186,8 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
   _swift_tsan_release(job);
 }
 
-AsyncTask *swift::swift_task_getCurrent() {
+SWIFT_CC(swift)
+static AsyncTask *swift_task_getCurrentImpl() {
   return ActiveTask::get();
 }
 
@@ -194,7 +197,8 @@ AsyncTask *swift::_swift_task_clearCurrent() {
   return task;
 }
 
-ExecutorRef swift::swift_task_getCurrentExecutor() {
+SWIFT_CC(swift)
+static ExecutorRef swift_task_getCurrentExecutorImpl() {
   auto result = ExecutorTrackingInfo::getActiveExecutorOnThread();
 #if SWIFT_TASK_PRINTF_DEBUG
   fprintf(stderr, "%p getting current executor %p\n", pthread_self(), (void*)result.getRawValue());
@@ -906,6 +910,7 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
   auto firstNewJob = preprocessQueue(oldState.FirstJob, JobRef(), nullptr,
                                      overridesToWake);
 
+  _swift_tsan_release(this);
   while (true) {
     State newState = oldState;
     newState.FirstJob = JobRef::getPreprocessed(firstNewJob);
@@ -945,7 +950,6 @@ void DefaultActorImpl::giveUpThread(RunningJobInfo runner) {
       // Try again.
       continue;
     }
-    _swift_tsan_release(this);
     
 #if SWIFT_TASK_PRINTF_DEBUG
 #  define LOG_STATE_TRANSITION fprintf(stderr, "%p transition from %zx to %zx in %p.%s\n", \
@@ -1085,6 +1089,7 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
                                      nullptr, overridesToWake);
 
   Optional<JobPriority> remainingJobPriority;
+  _swift_tsan_release(this);
   while (true) {
     State newState = oldState;
 
@@ -1128,11 +1133,6 @@ Job *DefaultActorImpl::claimNextJobOrGiveUp(bool actorIsOwned,
     }
     LOG_STATE_TRANSITION;
     
-    if (jobToRun)
-      _swift_tsan_acquire(this);
-    else
-      _swift_tsan_release(this);
-
     // We successfully updated the state.
 
     // If we're giving up the thread with jobs remaining, we need
@@ -1503,9 +1503,9 @@ static void runOnAssumedThread(AsyncTask *task, ExecutorRef executor,
 }
 
 SWIFT_CC(swiftasync)
-void swift::swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
-                              TaskContinuationFunction *resumeFunction,
-                              ExecutorRef newExecutor) {
+static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
+                                  TaskContinuationFunction *resumeFunction,
+                                  ExecutorRef newExecutor) {
   auto currentExecutor = ExecutorTrackingInfo::getActiveExecutorInThread();
 #if SWIFT_TASK_PRINTF_DEBUG
   fprintf(stderr, "%p switch %p -> %p\n", pthread_self(), (void*)currentExecutor.getRawValue(), (void*)newExecutor.getRawValue());
@@ -1550,7 +1550,8 @@ void swift::swift_task_switch(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContext,
 /************************* GENERIC ACTOR INTERFACES **************************/
 /*****************************************************************************/
 
-void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
+SWIFT_CC(swift)
+static void swift_task_enqueueImpl(Job *job, ExecutorRef executor) {
 #if SWIFT_TASK_PRINTF_DEBUG
   fprintf(stderr, "%p enqueue %p\n", pthread_self(), (void*)executor.getRawValue());
 #endif
@@ -1575,6 +1576,9 @@ void swift::swift_task_enqueue(Job *job, ExecutorRef executor) {
   return asImpl(reinterpret_cast<DefaultActor*>(executor.getRawValue()))
     ->enqueue(job);
 }
+
+#define OVERRIDE_ACTOR COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
 
 /*****************************************************************************/
 /***************************** DISTRIBUTED ACTOR *****************************/

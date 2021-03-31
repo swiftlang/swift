@@ -1020,7 +1020,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       type.print(Printer, Options);
     else
       attr->getTypeRepr()->print(Printer, Options);
-    if (attr->isArgUnsafe())
+    if (attr->isArgUnsafe() && Options.IsForSwiftInterface)
       Printer << "(unsafe)";
     Printer.printNamePost(PrintNameContext::Attribute);
     break;
@@ -1080,6 +1080,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
 #include "swift/AST/Attr.def"
     llvm_unreachable("handled above");
+
+  case DAK_CompletionHandlerAsync: {
+    auto *attr = cast<CompletionHandlerAsyncAttr>(this);
+    Printer.printAttrName("@completionHandlerAsync");
+    Printer << "(\"";
+    if (attr->AsyncFunctionDecl) {
+      Printer << attr->AsyncFunctionDecl->getName();
+    } else {
+      Printer << attr->AsyncFunctionName;
+    }
+    Printer << "\", completionHandleIndex: " <<
+        attr->CompletionHandlerIndex << ')';
+    break;
+  }
 
   default:
     assert(DeclAttribute::isDeclModifier(getKind()) &&
@@ -1332,6 +1346,7 @@ SourceLoc ObjCAttr::getRParenLoc() const {
 ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   auto attr = new (context) ObjCAttr(getName(), isNameImplicit());
   attr->setSwift3Inferred(isSwift3Inferred());
+  attr->setAddedByAccessNote(getAddedByAccessNote());
   return attr;
 }
 
@@ -2001,12 +2016,4 @@ bool CustomAttr::isArgUnsafe() const {
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {
   if (attr)
     attr->print(out);
-}
-
-DeclNameRef CompletionHandlerAsyncAttr::getAsyncFunctionName() const {
-  if (AsyncFunctionDecl)
-    return DeclNameRef(AsyncFunctionDecl->getName());
-  if (AsyncFunctionName)
-    return AsyncFunctionName;
-  llvm_unreachable("completionHandlerAsync attr missing async function name");
 }

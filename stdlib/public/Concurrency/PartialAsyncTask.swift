@@ -30,10 +30,6 @@ public struct UnsafeContinuation<T, E: Error> {
     self.context = context
   }
 
-  @usableFromInline
-  @_silgen_name("swift_continuation_resume")
-  internal func _resume(returning value: __owned T)
-
   /// Resume the task awaiting the continuation by having it return normally
   /// from its suspension point.
   ///
@@ -48,12 +44,8 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) where E == Never {
-    self._resume(returning: value)
+    Builtin.resumeNonThrowingContinuationReturning(context, value)
   }
-
-  @usableFromInline
-  @_silgen_name("swift_continuation_throwingResume")
-  internal func _resume(returningToThrowingFunction: __owned T)
 
   /// Resume the task awaiting the continuation by having it return normally
   /// from its suspension point.
@@ -69,12 +61,8 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) {
-    self._resume(returningToThrowingFunction: value)
+    Builtin.resumeThrowingContinuationReturning(context, value)
   }
-
-  @usableFromInline
-  @_silgen_name("swift_continuation_throwingResumeWithError")
-  internal func _resume(throwing: __owned Error)
 
   /// Resume the task awaiting the continuation by having it throw an error
   /// from its suspension point.
@@ -90,7 +78,7 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(throwing error: __owned E) {
-    self._resume(throwing: error)
+    Builtin.resumeThrowingContinuationThrowing(context, error)
   }
 }
 

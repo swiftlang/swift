@@ -35,7 +35,8 @@ static void finishTest() {
 
 static std::vector<Job*> globalQueue;
 SWIFT_CC(swift)
-static void enqueueGlobal(Job *job) {
+static void enqueueGlobal(Job *job,
+                          swift_task_enqueueGlobal_original original) {
   assert(job);
 
   // Check that the job isn't already on the queue.
@@ -85,7 +86,7 @@ static void run(llvm::function_ref<void()> fn) {
 
 namespace {
 
-/// A simple actor class.
+/// A simple actor.
 class TestActor : public DefaultActor {
 public:
   TestActor();

@@ -1416,6 +1416,19 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawUnsafeContinuationType, BuiltinType);
 
+/// BuiltinExecutorType - The builtin executor-ref type.  In C, this
+/// is the ExecutorRef struct type.
+class BuiltinExecutorType : public BuiltinType {
+  friend class ASTContext;
+  BuiltinExecutorType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinExecutor, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinExecutor;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinExecutorType, BuiltinType);
+
 /// BuiltinJobType - The builtin job type.  In C, this is a
 /// non-null Job*.  This pointer is completely unmanaged (the unscheduled
 /// job is self-owning), but has more spare bits than Builtin.RawPointer.
@@ -3329,7 +3342,7 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 struct ParameterListInfo {
   SmallBitVector defaultArguments;
   SmallBitVector acceptsUnlabeledTrailingClosures;
-  SmallVector<const ParamDecl *, 4> propertyWrappers;
+  SmallBitVector propertyWrappers;
 
 public:
   ParameterListInfo() { }
@@ -3346,7 +3359,7 @@ public:
 
   /// The ParamDecl at the given index if the parameter has an applied
   /// property wrapper.
-  const ParamDecl *getPropertyWrapperParam(unsigned paramIdx) const;
+  bool hasExternalPropertyWrapper(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {

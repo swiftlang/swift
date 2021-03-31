@@ -116,3 +116,39 @@ public func usesWithUnsafeThrowingContinuation() async throws {
 public func usesWithUnsafeContinuationCaptures(fn: (Builtin.RawUnsafeContinuation) -> ()) async throws {
   let _: Int = await Builtin.withUnsafeContinuation { c in fn(c) }
 }
+
+// CHECK-LABEL: sil [ossa] @$s4test29resumeNonThrowingContinuationyyBc_SSntF
+public func resumeNonThrowingContinuation(_ cont: Builtin.RawUnsafeContinuation,
+                                          _ value: __owned String) {
+  // CHECK: bb0(%0 : $Builtin.RawUnsafeContinuation, %1 : @owned $String):
+  // CHECK:      [[BORROW:%.*]] = begin_borrow %1 : $String
+  // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $String
+  // CHECK-NEXT: builtin "resumeNonThrowingContinuationReturning"<String>(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $String)
+  // CHECK-NEXT: end_borrow [[BORROW]] : $String
+  // CHECK-NEXT: destroy_value %1 : $String
+  Builtin.resumeNonThrowingContinuationReturning(cont, value)
+}
+
+// CHECK-LABEL: sil [ossa] @$s4test26resumeThrowingContinuationyyBc_SSntF
+public func resumeThrowingContinuation(_ cont: Builtin.RawUnsafeContinuation,
+                                       _ value: __owned String) {
+  // CHECK: bb0(%0 : $Builtin.RawUnsafeContinuation, %1 : @owned $String):
+  // CHECK:      [[BORROW:%.*]] = begin_borrow %1 : $String
+  // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $String
+  // CHECK-NEXT: builtin "resumeThrowingContinuationReturning"<String>(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $String)
+  // CHECK-NEXT: end_borrow [[BORROW]] : $String
+  // CHECK-NEXT: destroy_value %1 : $String
+  Builtin.resumeThrowingContinuationReturning(cont, value)
+}
+
+// CHECK-LABEL: sil [ossa] @$s4test026resumeThrowingContinuationC0yyBc_s5Error_pntF
+public func resumeThrowingContinuationThrowing(_ cont: Builtin.RawUnsafeContinuation,
+                                               _ error: __owned Error) {
+  // CHECK: bb0(%0 : $Builtin.RawUnsafeContinuation, %1 : @owned $Error):
+  // CHECK:      [[BORROW:%.*]] = begin_borrow %1 : $Error
+  // CHECK-NEXT: [[COPY:%.*]] = copy_value [[BORROW]] : $Error
+  // CHECK-NEXT: builtin "resumeThrowingContinuationThrowing"(%0 : $Builtin.RawUnsafeContinuation, [[COPY]] : $Error)
+  // CHECK-NEXT: end_borrow [[BORROW]] : $Error
+  // CHECK-NEXT: destroy_value %1 : $Error
+  Builtin.resumeThrowingContinuationThrowing(cont, error)
+}

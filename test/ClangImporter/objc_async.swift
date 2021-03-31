@@ -1,9 +1,11 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules -enable-experimental-concurrency -enable-experimental-async-handler %s -verify
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 import Foundation
 import ObjCConcurrency
+
+@MainActor func onlyOnMainActor() { }
 
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
@@ -49,6 +51,8 @@ func testSlowServer(slowServer: SlowServer) async throws {
 
 
   _ = await slowServer.operations()
+
+  _ = await slowServer.runOnMainThread()
 }
 
 func testSlowServerSynchronous(slowServer: SlowServer) {
@@ -63,6 +67,11 @@ func testSlowServerSynchronous(slowServer: SlowServer) {
 
   let s = slowServer.operations
   _ = s + []
+
+  slowServer.runOnMainThread { s in
+    print(s)
+    onlyOnMainActor() // okay because runOnMainThread has a @MainActor closure
+  }
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {
@@ -73,11 +82,23 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
   _ = slowServer.allOperations
 }
 
+func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicitly non-concurrent}}
+  doSomethingConcurrently(fn)
+  // expected-error@-1{{passing non-concurrent parameter 'fn' to function expecting a @Sendable closure}}
+
+  var x = 17
+  doSomethingConcurrently {
+    print(x) // expected-error{{reference to captured var 'x' in concurrently-executing code}}
+    x = x + 1 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+    // expected-error@-1{{reference to captured var 'x' in concurrently-executing code}}
+  }
+}
+
 // Check import of attributes
 func globalAsync() async { }
 
 actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
-  func syncMethod() { } // expected-note {{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
+  func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   func independentMethod() {
     syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from a non-isolated context}}
@@ -88,7 +109,7 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   }
 
   func mainActorMethod() {
-    syncMethod()
+    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from synchronous context of global actor 'MainActor'}}
   }
 
   func uiActorMethod() { }

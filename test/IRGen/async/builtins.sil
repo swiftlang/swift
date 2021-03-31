@@ -57,3 +57,52 @@ bb0(%0 : $Int, %1: @guaranteed $@async @callee_owned @substituted <τ_0_0> () ->
   %21 = tuple ()
   return %21 : $()
 }
+
+// CHECK-LABEL: define hidden swiftcc void @resume_nonthrowing_continuation
+sil hidden [ossa] @resume_nonthrowing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
+  // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
+  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 5
+  // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
+  // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3
+  // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load %swift.opaque*, %swift.opaque** [[RESULT_ADDR_SLOT]], align
+  // CHECK-NEXT: [[RESULT_ADDR:%.*]] = bitcast %swift.opaque* [[RESULT_ADDR_OPAQUE]] to %swift.refcounted**
+  // CHECK-NEXT: [[VALUE:%.*]] = load %swift.refcounted*, %swift.refcounted** %0, align
+  // CHECK-NEXT: store %swift.refcounted* [[VALUE]], %swift.refcounted** [[RESULT_ADDR]], align
+  // CHECK-NEXT: call swiftcc void @swift_continuation_resume(%swift.task* [[CONT]])
+  // CHECK-NEXT: ret void
+  builtin "resumeNonThrowingContinuationReturning"<Builtin.NativeObject>(%1 : $Builtin.RawUnsafeContinuation, %0 : $*Builtin.NativeObject) : $()
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc void @resume_throwing_continuation
+sil hidden [ossa] @resume_throwing_continuation : $(@in Builtin.NativeObject, Builtin.RawUnsafeContinuation) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : $Builtin.RawUnsafeContinuation):
+  // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
+  // CHECK-NEXT: [[CONTEXT_SLOT:%.*]] = getelementptr inbounds %swift.task, %swift.task* [[CONT]], i32 0, i32 5
+  // CHECK-NEXT: [[CONTEXT_OPAQUE:%.*]] = load %swift.context*, %swift.context** [[CONTEXT_SLOT]], align
+  // CHECK-NEXT: [[CONTEXT:%.*]] = bitcast %swift.context* [[CONTEXT_OPAQUE]] to %swift.continuation_context*
+  // CHECK-NEXT: [[RESULT_ADDR_SLOT:%.*]] = getelementptr inbounds %swift.continuation_context, %swift.continuation_context* [[CONTEXT]], i32 0, i32 3
+  // CHECK-NEXT: [[RESULT_ADDR_OPAQUE:%.*]] = load %swift.opaque*, %swift.opaque** [[RESULT_ADDR_SLOT]], align
+  // CHECK-NEXT: [[RESULT_ADDR:%.*]] = bitcast %swift.opaque* [[RESULT_ADDR_OPAQUE]] to %swift.refcounted**
+  // CHECK-NEXT: [[VALUE:%.*]] = load %swift.refcounted*, %swift.refcounted** %0, align
+  // CHECK-NEXT: store %swift.refcounted* [[VALUE]], %swift.refcounted** [[RESULT_ADDR]], align
+  // CHECK-NEXT: call swiftcc void @swift_continuation_throwingResume(%swift.task* [[CONT]])
+  // CHECK-NEXT: ret void
+  builtin "resumeThrowingContinuationReturning"<Builtin.NativeObject>(%1 : $Builtin.RawUnsafeContinuation, %0 : $*Builtin.NativeObject) : $()
+  %21 = tuple ()
+  return %21 : $()
+}
+
+// CHECK-LABEL: define hidden swiftcc void @resume_throwing_continuation_throwing
+sil hidden [ossa] @resume_throwing_continuation_throwing : $(@owned Error, Builtin.RawUnsafeContinuation) -> () {
+bb0(%0 : @owned $Error, %1 : $Builtin.RawUnsafeContinuation):
+  // CHECK:      [[CONT:%.*]] = bitcast i8* %1 to %swift.task*
+  // CHECK-NEXT: call swiftcc void @swift_continuation_throwingResumeWithError(%swift.task* [[CONT]], %swift.error* %0)
+  // CHECK-NEXT: ret void
+  builtin "resumeThrowingContinuationThrowing"(%1 : $Builtin.RawUnsafeContinuation, %0 : $Error) : $()
+  %21 = tuple ()
+  return %21 : $()
+}

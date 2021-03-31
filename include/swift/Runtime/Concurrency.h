@@ -338,7 +338,8 @@ bool swift_task_isCancelled(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 CancellationNotificationStatusRecord*
 swift_task_addCancellationHandler(
-    CancellationNotificationStatusRecord::FunctionType handler);
+    CancellationNotificationStatusRecord::FunctionType handler,
+    void *handlerContext);
 
 /// Remove the passed cancellation record from the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -479,14 +480,25 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_MainActor_register(HeapObject *actor);
 
 /// A hook to take over global enqueuing.
-/// TODO: figure out a better abstraction plan than this.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void (*swift_task_enqueueGlobal_hook)(Job *job);
+typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobal_original)(Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueGlobal_hook)(
+    Job *job, swift_task_enqueueGlobal_original original);
 
 /// A hook to take over global enqueuing with delay.
-/// TODO: figure out a better abstraction plan than this.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void (*swift_task_enqueueGlobalWithDelay_hook)(unsigned long long delay, Job *job);
+typedef SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_original)(
+    unsigned long long delay, Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueGlobalWithDelay_hook)(
+    unsigned long long delay, Job *job,
+    swift_task_enqueueGlobalWithDelay_original original);
+
+/// A hook to take over main executor enqueueing.
+typedef SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_original)(
+    Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void (*swift_task_enqueueMainExecutor_hook)(
+    Job *job, swift_task_enqueueMainExecutor_original original);
 
 /// Initialize the runtime storage for a default actor.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -523,23 +535,35 @@ void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_distributed_actor_is_remote(DefaultActor *actor);
 
-/// Resume a task from its continuation, given a normal result value.
+/// Prepare a continuation in the current task.
+///
+/// The caller should initialize the Parent, ResumeParent,
+/// and NormalResult fields.  This function will initialize the other
+/// fields with appropriate defaaults; the caller may then overwrite
+/// them if desired.
+///
+/// This function is provided as a code-size and runtime-usage
+/// optimization; calling it is not required if code is willing to
+/// do all its work inline.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_resume(/* +1 */ OpaqueValue *result,
-                               void *continuation,
-                               const Metadata *resumeType);
+AsyncTask *swift_continuation_init(ContinuationAsyncContext *context,
+                                   AsyncContinuationFlags flags);
 
-/// Resume a task from its throwing continuation, given a normal result value.
+/// Resume a task from a non-throwing continuation, given a normal
+/// result which has already been stored into the continuation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_throwingResume(/* +1 */ OpaqueValue *result,
-                                       void *continuation,
-                                       const Metadata *resumeType);
+void swift_continuation_resume(AsyncTask *continuation);
 
-/// Resume a task from its throwing continuation by throwing an error.
+/// Resume a task from a potentially-throwing continuation, given a
+/// normal result which has already been stored into the continuation.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
-                                                void *continuation,
-                                                const Metadata *resumeType);
+void swift_continuation_throwingResume(AsyncTask *continuation);
+
+/// Resume a task from a potentially-throwing continuation by throwing
+/// an error.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
+                                                /* +1 */ SwiftError *error);
 
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)
@@ -549,7 +573,7 @@ void swift_continuation_logFailedCheck(const char *message);
 /// If the binary links CoreFoundation, uses CFRunLoopRun
 /// Otherwise it uses dispatchMain.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_asyncMainDrainQueue();
+void swift_task_asyncMainDrainQueue [[noreturn]]();
 
 /// Establish that the current thread is running as the given
 /// executor, then run a job.

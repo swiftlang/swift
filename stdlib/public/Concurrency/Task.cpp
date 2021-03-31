@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/ABI/Task.h"
 #include "swift/ABI/TaskLocal.h"
@@ -293,7 +294,7 @@ static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *
 }
 
 /// All `swift_task_create*` variants funnel into this common implementation.
-static AsyncTaskAndContext swift_task_create_group_future_impl(
+static AsyncTaskAndContext swift_task_create_group_future_commonImpl(
     JobFlags flags, TaskGroup *group,
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
@@ -444,6 +445,11 @@ static AsyncTaskAndContext swift_task_create_group_future_impl(
   return {task, initialContext};
 }
 
+static AsyncTaskAndContext swift_task_create_group_future_common(
+    JobFlags flags, TaskGroup *group, const Metadata *futureResultType,
+    FutureAsyncSignature::FunctionType *function,
+    HeapObject * /* +1 */ closureContext, size_t initialContextSize);
+
 AsyncTaskAndContext
 swift::swift_task_create_f(JobFlags flags,
                 ThinNullaryAsyncSignature::FunctionType *function,
@@ -468,10 +474,10 @@ AsyncTaskAndContext swift::swift_task_create_group_future_f(
     const Metadata *futureResultType,
     FutureAsyncSignature::FunctionType *function,
     size_t initialContextSize) {
-  return swift_task_create_group_future_impl(flags, group,
-                                             futureResultType,
-                                             function, nullptr,
-                                             initialContextSize);
+  return swift_task_create_group_future_common(flags, group,
+                                               futureResultType,
+                                               function, nullptr,
+                                               initialContextSize);
 }
 
 /// Extract the entry point address and initial context size from an async closure value.
@@ -503,7 +509,7 @@ AsyncTaskAndContext swift::swift_task_create_future(JobFlags flags,
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
 
-  return swift_task_create_group_future_impl(
+  return swift_task_create_group_future_common(
       flags, nullptr, futureResultType,
       taskEntry, closureContext,
       initialContextSize);
@@ -522,16 +528,16 @@ swift::swift_task_create_group_future(
       FutureAsyncSignature,
       SpecialPointerAuthDiscriminators::AsyncFutureFunction
     >(closureEntry, closureContext);
-  return swift_task_create_group_future_impl(
+  return swift_task_create_group_future_common(
       flags, group, futureResultType,
       taskEntry, closureContext,
       initialContextSize);
 }
 
 SWIFT_CC(swiftasync)
-void swift::swift_task_future_wait(OpaqueValue *result,
-                                   SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
-                                   AsyncTask *task, Metadata *T) {
+static void swift_task_future_waitImpl(OpaqueValue *result,
+                                       SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+                                       AsyncTask *task, Metadata *T) {
   // Suspend the waiting task.
   auto waitingTask = swift_task_getCurrent();
   waitingTask->ResumeTask = rawContext->ResumeParent;
@@ -564,9 +570,9 @@ void swift::swift_task_future_wait(OpaqueValue *result,
 }
 
 SWIFT_CC(swiftasync)
-void swift::swift_task_future_wait_throwing(OpaqueValue *result,
-    SWIFT_ASYNC_CONTEXT AsyncContext *rawContext, AsyncTask *task,
-    Metadata *T) {
+void swift_task_future_wait_throwingImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *rawContext,
+    AsyncTask *task, Metadata *T) {
   auto waitingTask = swift_task_getCurrent();
   // Suspend the waiting task.
   auto originalResumeParent =
@@ -723,56 +729,84 @@ size_t swift::swift_task_getJobFlags(AsyncTask *task) {
   return task->Flags.getOpaqueValue();
 }
 
-namespace {
-  
-/// Structure that gets filled in when a task is suspended by `withUnsafeContinuation`.
-struct AsyncContinuationContext {
-  // These fields are unnecessary for resuming a continuation.
-  void *Unused1;
-  void *Unused2;
-  // Storage slot for the error result, if any.
-  SwiftError *ErrorResult;
-  // Pointer to where to store a normal result.
-  OpaqueValue *NormalResult;
-  
-  // Executor on which to resume execution.
-  ExecutorRef ResumeExecutor;
-};
+AsyncTask *swift::swift_continuation_init(ContinuationAsyncContext *context,
+                                          AsyncContinuationFlags flags) {
+  context->Flags = AsyncContextKind::Continuation;
+  if (flags.canThrow()) context->Flags.setCanThrow(true);
+  context->ErrorResult = nullptr;
 
-static void resumeTaskAfterContinuation(AsyncTask *task,
-                                        AsyncContinuationContext *context) {
-  swift_task_enqueue(task, context->ResumeExecutor);
+  // Set the current executor as the target executor unless there's
+  // an executor override.
+  if (!flags.hasExecutorOverride())
+    context->ResumeToExecutor = swift_task_getCurrentExecutor();
+
+  // We can initialize this with a relaxed store because resumption
+  // must happen-after this call.
+  context->AwaitSynchronization.store(flags.isPreawaited()
+                                        ? ContinuationStatus::Awaited
+                                        : ContinuationStatus::Pending, 
+                                      std::memory_order_relaxed);
+
+  auto task = swift_task_getCurrent();
+  assert(task && "initializing a continuation with no current task");
+  task->ResumeContext = context;
+  task->ResumeTask = context->ResumeParent;
+
+  return task;
 }
 
+static void resumeTaskAfterContinuation(AsyncTask *task,
+                                        ContinuationAsyncContext *context) {
+  auto &sync = context->AwaitSynchronization;
+  auto status = sync.load(std::memory_order_acquire);
+  assert(status != ContinuationStatus::Resumed &&
+         "continuation was already resumed");
+
+  // Make sure TSan knows that the resume call happens-before the task
+  // restarting.
+  _swift_tsan_release(task);
+
+  // The status should be either Pending or Awaited.  If it's Awaited,
+  // which is probably the most likely option, then we should immediately
+  // enqueue; we don't need to update the state because there shouldn't
+  // be a racing attempt to resume the continuation.  If it's Pending,
+  // we need to set it to Resumed; if that fails (with a strong cmpxchg),
+  // it should be because the original thread concurrently set it to
+  // Awaited, and so we need to enqueue.
+  if (status == ContinuationStatus::Pending &&
+      sync.compare_exchange_strong(status, ContinuationStatus::Resumed,
+                                   /*success*/ std::memory_order_release,
+                                   /*failure*/ std::memory_order_relaxed)) {
+    return;
+  }
+  assert(status == ContinuationStatus::Awaited &&
+         "detected concurrent attempt to resume continuation");
+
+  // TODO: maybe in some mode we should set the status to Resumed here
+  // to make a stronger best-effort attempt to catch racing attempts to
+  // resume the continuation?
+
+  swift_task_enqueue(task, context->ResumeToExecutor);
 }
 
 SWIFT_CC(swift)
-void swift::swift_continuation_resume(/* +1 */ OpaqueValue *result,
-                                      void *continuation,
-                                      const Metadata *resumeType) {
-  auto task = reinterpret_cast<AsyncTask*>(continuation);
-  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
-  resumeType->vw_initializeWithTake(context->NormalResult, result);
-  
+static void swift_continuation_resumeImpl(AsyncTask *task) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
   resumeTaskAfterContinuation(task, context);
 }
 
 SWIFT_CC(swift)
-void swift::swift_continuation_throwingResume(/* +1 */ OpaqueValue *result,
-                                              void *continuation,
-                                              const Metadata *resumeType) {
-  return swift_continuation_resume(result, continuation, resumeType);
+static void swift_continuation_throwingResumeImpl(AsyncTask *task) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
+  resumeTaskAfterContinuation(task, context);
 }
 
 
 SWIFT_CC(swift)
-void swift::swift_continuation_throwingResumeWithError(/* +1 */ SwiftError *error,
-                                                       void *continuation,
-                                                       const Metadata *resumeType) {
-  auto task = reinterpret_cast<AsyncTask*>(continuation);
-  auto context = reinterpret_cast<AsyncContinuationContext*>(task->ResumeContext);
+static void swift_continuation_throwingResumeWithErrorImpl(AsyncTask *task,
+                                                /* +1 */ SwiftError *error) {
+  auto context = cast<ContinuationAsyncContext>(task->ResumeContext);
   context->ErrorResult = error;
-  
   resumeTaskAfterContinuation(task, context);
 }
 
@@ -780,20 +814,23 @@ bool swift::swift_task_isCancelled(AsyncTask *task) {
   return task->isCancelled();
 }
 
-CancellationNotificationStatusRecord*
-swift::swift_task_addCancellationHandler(
-    CancellationNotificationStatusRecord::FunctionType handler) {
+SWIFT_CC(swift)
+static CancellationNotificationStatusRecord*
+swift_task_addCancellationHandlerImpl(
+    CancellationNotificationStatusRecord::FunctionType handler,
+    void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
   auto *record =
       new (allocation) CancellationNotificationStatusRecord(
-          handler, /*arg=*/nullptr);
+          handler, context);
 
   swift_task_addStatusRecord(record);
   return record;
 }
 
-void swift::swift_task_removeCancellationHandler(
+SWIFT_CC(swift)
+static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
   swift_task_removeStatusRecord(record);
   swift_task_dealloc(record);
@@ -804,7 +841,8 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
   swift_reportError(0, message);
 }
 
-void swift::swift_task_asyncMainDrainQueue() {
+SWIFT_CC(swift)
+static void swift_task_asyncMainDrainQueueImpl() {
 #if SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
   bool Finished = false;
   donateThreadToGlobalExecutorUntil([](void *context) {
@@ -828,6 +866,7 @@ void swift::swift_task_asyncMainDrainQueue() {
     abort();
 
   pfndispatch_main();
+  exit(0);
 #else
   // CFRunLoop is not available on non-Darwin targets.  Foundation has an
   // implementation, but CoreFoundation is not meant to be exposed.  We can only
@@ -836,11 +875,16 @@ void swift::swift_task_asyncMainDrainQueue() {
 #if defined(__APPLE__)
   auto runLoop =
       reinterpret_cast<void (*)(void)>(dlsym(RTLD_DEFAULT, "CFRunLoopRun"));
-  if (runLoop)
-    return runLoop();
+  if (runLoop) {
+    runLoop();
+    exit(0);
+  }
 #endif
 
     dispatch_main();
 #endif
 #endif
 }
+
+#define OVERRIDE_TASK COMPATIBILITY_OVERRIDE
+#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH

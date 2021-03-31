@@ -1549,17 +1549,17 @@ const TypeInfo &TypeConverter::getTaskContinuationFunctionPtrTypeInfo() {
 }
 
 const TypeInfo &IRGenModule::getSwiftExecutorPtrTypeInfo() {
-  return Types.getSwiftExecutorPtrTypeInfo();
+  return Types.getExecutorTypeInfo();
 }
 
-const TypeInfo &TypeConverter::getSwiftExecutorPtrTypeInfo() {
-  if (SwiftExecutorPtrTI) return *SwiftExecutorPtrTI;
-  SwiftExecutorPtrTI = createUnmanagedStorageType(IGM.SwiftExecutorPtrTy,
-                                                  ReferenceCounting::Unknown,
-                                                  /*isOptional*/ false);
-  SwiftExecutorPtrTI->NextConverted = FirstType;
-  FirstType = SwiftExecutorPtrTI;
-  return *SwiftExecutorPtrTI;
+const LoadableTypeInfo &TypeConverter::getExecutorTypeInfo() {
+  if (ExecutorTI) return *ExecutorTI;
+  ExecutorTI = createPrimitive(IGM.SwiftExecutorPtrTy,
+                               IGM.getPointerSize(),
+                               IGM.getPointerAlignment());
+  ExecutorTI->NextConverted = FirstType;
+  FirstType = ExecutorTI;
+  return *ExecutorTI;
 }
 
 const LoadableTypeInfo &
@@ -2081,6 +2081,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return &getRawUnsafeContinuationTypeInfo();
   case TypeKind::BuiltinJob:
     return &getJobTypeInfo();
+  case TypeKind::BuiltinExecutor:
+    return &getExecutorTypeInfo();
   case TypeKind::BuiltinIntegerLiteral:
     return &getIntegerLiteralTypeInfo();
   case TypeKind::BuiltinFloat:
@@ -2095,7 +2097,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinDefaultActorStorage: {
     // Builtin.DefaultActorStorage represents the extra storage
-    // (beyond the heap header) of a default actor class.  It is
+    // (beyond the heap header) of a default actor.  It is
     // fixed-size and totally opaque.
     auto numWords = NumWords_DefaultActor;
 

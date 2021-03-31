@@ -423,6 +423,13 @@ bool typesSatisfyConstraint(Type t1, Type t2, bool openArchetypes,
 /// of the function, set the result type of the expression to that sugar type.
 Expr *substituteInputSugarTypeForResult(ApplyExpr *E);
 
+/// Type check a \c StmtConditionElement.
+/// Sets \p isFalsable to \c true if the condition might evaluate to \c false,
+/// otherwise leaves \p isFalsable untouched.
+/// \returns \c true if there was an error type checking, \c false otherwise.
+bool typeCheckStmtConditionElement(StmtConditionElement &elt, bool &isFalsable,
+                                   DeclContext *dc);
+
 void typeCheckASTNode(ASTNode &node, DeclContext *DC,
                       bool LeaveBodyUnchecked = false);
 
@@ -1185,6 +1192,12 @@ UnresolvedMemberExpr *getUnresolvedMemberChainBase(Expr *expr);
 bool typeSupportsBuilderOp(Type builderType, DeclContext *dc, Identifier fnName,
                            ArrayRef<Identifier> argLabels = {},
                            SmallVectorImpl<ValueDecl *> *allResults = nullptr);
+
+/// Forces all changes specified by the module's access notes file to be
+/// applied to this declaration. It is safe to call this function more than
+/// once.
+void applyAccessNote(ValueDecl *VD);
+
 }; // namespace TypeChecker
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

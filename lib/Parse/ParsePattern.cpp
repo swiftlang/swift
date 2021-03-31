@@ -351,9 +351,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.FirstNameLoc = SourceLoc();
         param.SecondName = Identifier();
         param.SecondNameLoc = SourceLoc();
-      } else if (isBareType) {
+      } else if (isBareType && !Tok.is(tok::code_complete)) {
         // Otherwise, if this is a bare type, then the user forgot to name the
         // parameter, e.g. "func foo(Int) {}"
+        // Don't enter this case if the element could only be parsed as a bare
+        // type because a code completion token is positioned here. In this case
+        // the user is about to type the parameter label and we shouldn't
+        // suggest types.
         SourceLoc typeStartLoc = Tok.getLoc();
         auto type = parseType(diag::expected_parameter_type, false);
         status |= type;

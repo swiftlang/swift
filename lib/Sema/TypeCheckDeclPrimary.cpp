@@ -1506,6 +1506,7 @@ static void addOrRemoveAttr(ValueDecl *VD, const AccessNotesFile &notes,
 
   if (*expected) {
     attr = willCreate();
+    attr->setAddedByAccessNote();
     VD->getAttrs().add(attr);
 
     SmallString<64> attrString;
@@ -1571,6 +1572,11 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   }
 }
 
+void TypeChecker::applyAccessNote(ValueDecl *VD) {
+  (void)evaluateOrDefault(VD->getASTContext().evaluator,
+                          ApplyAccessNoteRequest{VD}, {});
+}
+
 evaluator::SideEffect
 ApplyAccessNoteRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   AccessNotesFile &notes = VD->getModuleContext()->getAccessNotes();
@@ -1602,8 +1608,7 @@ public:
     PrettyStackTraceDecl StackTrace("type-checking", decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl))
-      (void)evaluateOrDefault(VD->getASTContext().evaluator,
-                              ApplyAccessNoteRequest{VD}, {});
+      TypeChecker::applyAccessNote(VD);
 
     DeclVisitor<DeclChecker>::visit(decl);
 
@@ -1664,6 +1669,25 @@ public:
     // Force the lookup of decls referenced by a scoped import in case it emits
     // diagnostics.
     (void)ID->getDecls();
+
+    // Report the public import of a private module.
+    if (ID->getASTContext().LangOpts.LibraryLevel == LibraryLevel::API) {
+      auto target = ID->getModule();
+      auto importer = ID->getModuleContext();
+      if (target &&
+          !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>() &&
+          target->getLibraryLevel() == LibraryLevel::SPI) {
+
+        auto &diags = ID->getASTContext().Diags;
+        InFlightDiagnostic inFlight =
+            diags.diagnose(ID, diag::warn_public_import_of_private_module,
+                           target->getName(), importer->getName());
+        if (ID->getAttrs().isEmpty()) {
+           inFlight.fixItInsert(ID->getStartLoc(),
+                              "@_implementationOnly ");
+        }
+      }
+    }
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
@@ -1703,6 +1727,7 @@ public:
     // when the VarDecl is merely used from another file.
 
     // Compute these requests in case they emit diagnostics.
+    TypeChecker::applyAccessNote(VD);
     (void) VD->getInterfaceType();
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();

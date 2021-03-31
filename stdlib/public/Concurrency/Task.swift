@@ -1,14 +1,14 @@
-////===----------------------------------------------------------------------===//
-////
-//// This source file is part of the Swift.org open source project
-////
-//// Copyright (c) 2020 Apple Inc. and the Swift project authors
-//// Licensed under Apache License v2.0 with Runtime Library Exception
-////
-//// See https://swift.org/LICENSE.txt for license information
-//// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-////
-////===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
@@ -377,7 +377,7 @@ extension Task {
   @discardableResult
   public static func runDetached<T>(
     priority: Priority = .default,
-    operation: @Sendable @escaping () async -> T
+    operation: __owned @Sendable @escaping () async -> T
     // TODO: Allow inheriting task-locals?
   ) -> Handle<T, Never> {
     // Set up the job flags for a new task.
@@ -430,7 +430,7 @@ extension Task {
   @discardableResult
   public static func runDetached<T, Failure>(
     priority: Priority = .default,
-    operation: @Sendable @escaping () async throws -> T
+    operation: __owned @Sendable @escaping () async throws -> T
   ) -> Handle<T, Failure> {
     // Set up the job flags for a new task.
     var flags = JobFlags()
@@ -667,7 +667,9 @@ internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) 
   // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other
   // situations.
+#if compiler(>=5.5) && $Sendable
   Task.runDetached { await body() }
+#endif
 }
 
 #endif

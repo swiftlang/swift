@@ -783,16 +783,6 @@ namespace {
     DeclContext *CurDC;
     ConstraintSystemPhase CurrPhase;
 
-    static const unsigned numEditorPlaceholderVariables = 2;
-
-    /// A buffer of type variables used for editor placeholders. We only
-    /// use a small number of these (rotating through), to prevent expressions
-    /// with a large number of editor placeholders from flooding the constraint
-    /// system with type variables.
-    TypeVariableType *editorPlaceholderVariables[numEditorPlaceholderVariables]
-      = { nullptr, nullptr };
-    unsigned currentEditorPlaceholderVariable = 0;
-
     /// A map from each UnresolvedMemberExpr to the respective (implicit) base
     /// found during our walk.
     llvm::MapVector<UnresolvedMemberExpr *, Type> UnresolvedBaseTypes;
@@ -1994,6 +1984,18 @@ namespace {
           Type externalType;
           if (param->getTypeRepr()) {
             auto declaredTy = CS.getVarType(param);
+
+            // If closure parameter couldn't be resolved, let's record
+            // a fix to make sure that type resolution diagnosed the
+            // problem and replace it with a placeholder, so that solver
+            // can make forward progress (especially important for result
+            // builders).
+            if (declaredTy->hasError()) {
+              CS.recordFix(AllowRefToInvalidDecl::create(
+                  CS, CS.getConstraintLocator(param)));
+              declaredTy = PlaceholderType::get(CS.getASTContext(), param);
+            }
+
             externalType = CS.replaceInferableTypesWithTypeVars(declaredTy,
                                                                 paramLoc);
           } else {
@@ -3033,33 +3035,23 @@ namespace {
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-      if (auto *placeholderRepr = E->getPlaceholderTypeRepr()) {
-        // Just resolve the referenced type.
-        return resolveTypeReferenceInExpression(
-            placeholderRepr, TypeResolverContext::InExpression,
-            CS.getConstraintLocator(E));
-      }
+      auto *locator = CS.getConstraintLocator(E);
 
-      auto locator = CS.getConstraintLocator(E);
+      if (auto *placeholderRepr = E->getPlaceholderTypeRepr()) {
+        // Let's try to use specified type, if that's impossible,
+        // fallback to a type variable.
+        if (auto preferredTy = resolveTypeReferenceInExpression(
+                placeholderRepr, TypeResolverContext::InExpression, locator))
+          return preferredTy;
+      }
 
       // A placeholder may have any type, but default to Void type if
       // otherwise unconstrained.
-      auto &placeholderTy
-        = editorPlaceholderVariables[currentEditorPlaceholderVariable];
-      if (!placeholderTy) {
-        placeholderTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+      auto *placeholderTy =
+          CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
 
-        CS.addConstraint(ConstraintKind::Defaultable,
-                         placeholderTy,
-                         TupleType::getEmpty(CS.getASTContext()),
-                         locator);
-      }
-
-      // Move to the next placeholder variable.
-      // FIXME: Cycling type variables like this is unsound.
-      currentEditorPlaceholderVariable
-        = (currentEditorPlaceholderVariable + 1) %
-            numEditorPlaceholderVariables;
+      CS.addConstraint(ConstraintKind::Defaultable, placeholderTy,
+                       TupleType::getEmpty(CS.getASTContext()), locator);
 
       return placeholderTy;
     }
@@ -3580,9 +3572,7 @@ static bool generateWrappedPropertyTypeConstraints(
     Type propertyType) {
   auto dc = wrappedVar->getInnermostDeclContext();
 
-  Type wrapperType = LValueType::get(initializerType);
   Type wrappedValueType;
-
   auto wrapperAttributes = wrappedVar->getAttachedPropertyWrappers();
   for (unsigned i : indices(wrapperAttributes)) {
     // FIXME: We should somehow pass an OpenUnboundGenericTypeFn to
@@ -3593,16 +3583,20 @@ static bool generateWrappedPropertyTypeConstraints(
     if (rawWrapperType->hasError() || !wrapperInfo)
       return true;
 
-    // The former wrappedValue type must be equal to the current wrapper type
-    if (wrappedValueType) {
-      auto *typeRepr = wrapperAttributes[i]->getTypeRepr();
-      auto *locator =
-          cs.getConstraintLocator(typeRepr, LocatorPathElt::ContextualType());
-      wrapperType = cs.replaceInferableTypesWithTypeVars(rawWrapperType,
-                                                         locator);
+    auto *typeExpr = wrapperAttributes[i]->getTypeExpr();
+    auto *locator = cs.getConstraintLocator(typeExpr);
+    auto wrapperType = cs.replaceInferableTypesWithTypeVars(rawWrapperType, locator);
+    cs.setType(typeExpr, wrapperType);
+
+    if (!wrappedValueType) {
+      // Equate the outermost wrapper type to the initializer type.
+      if (initializerType)
+        cs.addConstraint(ConstraintKind::Equal, wrapperType, initializerType, locator);
+    } else {
+      // The former wrappedValue type must be equal to the current wrapper type
       cs.addConstraint(ConstraintKind::Equal, wrapperType, wrappedValueType,
-                       locator);
-      cs.setContextualType(typeRepr, TypeLoc::withoutLoc(wrappedValueType),
+                       cs.getConstraintLocator(locator, LocatorPathElt::ContextualType()));
+      cs.setContextualType(typeExpr, TypeLoc::withoutLoc(wrappedValueType),
                            CTP_ComposedPropertyWrapper);
     }
 
@@ -3908,19 +3902,12 @@ bool ConstraintSystem::generateConstraints(
 
   case SolutionApplicationTarget::Kind::uninitializedWrappedVar: {
     auto *wrappedVar = target.getAsUninitializedWrappedVar();
-    auto *outermostWrapper = wrappedVar->getAttachedPropertyWrappers().front();
-    auto *typeExpr = outermostWrapper->getTypeExpr();
-    auto backingType = replaceInferableTypesWithTypeVars(
-        outermostWrapper->getType(),getConstraintLocator(typeExpr));
-
-    setType(typeExpr, backingType);
-
     auto propertyType = getVarType(wrappedVar);
     if (propertyType->hasError())
       return true;
 
     return generateWrappedPropertyTypeConstraints(
-        *this, backingType, wrappedVar, propertyType);
+        *this, /*initializerType=*/Type(), wrappedVar, propertyType);
   }
   }
 }
@@ -4071,12 +4058,29 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     anchor = apply->getFn();
   }
 
-  if (argLabel.hasDollarPrefix() && (!param || !param->hasAttachedPropertyWrapper())) {
+  auto supportsProjectedValueInit = [&](ParamDecl *param) -> bool {
+    if (!param->hasAttachedPropertyWrapper())
+      return false;
+
+    if (param->hasImplicitPropertyWrapper())
+      return true;
+
+    if (param->getAttachedPropertyWrappers().front()->getArg())
+      return false;
+
+    auto wrapperInfo = param->getAttachedPropertyWrapperTypeInfo(0);
+    return wrapperInfo.projectedValueVar && wrapperInfo.hasProjectedValueInit;
+  };
+
+  if (argLabel.hasDollarPrefix() && (!param || !supportsProjectedValueInit(param))) {
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    addConstraint(matchKind, paramType, wrapperType, locator);
-    auto *fix = AddPropertyWrapperAttribute::create(*this, wrapperType, getConstraintLocator(locator));
+    if (paramType->hasTypeVariable())
+      recordPotentialHole(paramType);
+
+    auto *loc = getConstraintLocator(locator);
+    auto *fix = RemoveProjectedValueArgument::create(*this, wrapperType, param, loc);
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
 
@@ -4085,32 +4089,12 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 
   PropertyWrapperInitKind initKind;
   if (argLabel.hasDollarPrefix()) {
-    auto attemptProjectedValueFix = [&](ConstraintFix *fix) -> ConstraintSystem::TypeMatchResult {
-      if (shouldAttemptFixes()) {
-        if (paramType->hasTypeVariable())
-          recordPotentialHole(paramType);
-
-        if (!recordFix(fix))
-          return getTypeMatchSuccess();
-      }
-
-      return getTypeMatchFailure(locator);
-    };
-
-    auto typeInfo = wrapperType->getAnyNominal()->getPropertyWrapperTypeInfo();
-    if (!typeInfo.projectedValueVar) {
-      auto *fix = AddProjectedValue::create(*this, wrapperType, getConstraintLocator(locator));
-      return attemptProjectedValueFix(fix);
-    }
-
     Type projectionType = computeProjectedValueType(param, wrapperType);
     addConstraint(matchKind, paramType, projectionType, locator);
-
-    if (!param->hasImplicitPropertyWrapper() &&
-        param->getAttachedPropertyWrappers().front()->getArg()) {
-      auto *fix = UseWrappedValue::create(*this, param, /*base=*/Type(), wrapperType,
-                                          getConstraintLocator(locator));
-      return attemptProjectedValueFix(fix);
+    if (param->hasImplicitPropertyWrapper()) {
+      auto wrappedValueType = getType(param->getPropertyWrapperWrappedValueVar());
+      addConstraint(ConstraintKind::PropertyWrapper, projectionType, wrappedValueType,
+                    getConstraintLocator(param));
     }
 
     initKind = PropertyWrapperInitKind::ProjectedValue;

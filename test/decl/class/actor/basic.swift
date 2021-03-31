@@ -13,7 +13,7 @@ actor class MyActorClass { }
 
 class NonActor { }
 
-actor NonActorSubclass : NonActor { } // expected-error{{actor class cannot inherit from non-actor class 'NonActor'}}
+actor NonActorSubclass : NonActor { } // expected-error{{actor cannot inherit from non-actor class 'NonActor'}}
 
 // expected-warning@+1{{'actor class' has been renamed to 'actor'}}{{14-20=}}
 public actor class BobHope {}

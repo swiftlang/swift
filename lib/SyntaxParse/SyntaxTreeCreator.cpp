@@ -141,18 +141,10 @@ SyntaxTreeCreator::recordMissingToken(tok kind, SourceLoc loc) {
 OpaqueSyntaxNode
 SyntaxTreeCreator::recordRawSyntax(syntax::SyntaxKind kind,
                                    ArrayRef<OpaqueSyntaxNode> elements) {
-  SmallVector<const RawSyntax *, 16> parts;
-  parts.reserve(elements.size());
-  size_t TextLength = 0;
-  for (OpaqueSyntaxNode opaqueN : elements) {
-    auto Raw = static_cast<const RawSyntax *>(opaqueN);
-    parts.push_back(Raw);
-    if (Raw) {
-      TextLength += Raw->getTextLength();
-    }
-  }
-  auto raw =
-      RawSyntax::make(kind, parts, TextLength, SourcePresence::Present, Arena);
+  const RawSyntax *const *rawChildren =
+      reinterpret_cast<const RawSyntax *const *>(elements.begin());
+  auto raw = RawSyntax::make(kind, rawChildren, elements.size(),
+                             SourcePresence::Present, Arena);
   return static_cast<OpaqueSyntaxNode>(raw);
 }
 
@@ -194,19 +186,12 @@ OpaqueSyntaxNode SyntaxTreeCreator::makeDeferredLayout(
     const MutableArrayRef<ParsedRawSyntaxNode> &parsedChildren) {
   assert(!IsMissing && "Missing layout nodes not implemented yet");
 
-  SmallVector<const RawSyntax *, 16> children;
-  children.reserve(parsedChildren.size());
-
-  size_t TextLength = 0;
-  for (size_t i = 0; i < parsedChildren.size(); ++i) {
-    auto Raw = static_cast<const RawSyntax *>(parsedChildren[i].takeData());
-    if (Raw) {
-      TextLength += Raw->getTextLength();
-    }
-    children.push_back(Raw);
-  }
-
-  auto raw = RawSyntax::make(kind, children, TextLength,
+  auto rawChildren = llvm::map_iterator(
+      parsedChildren.begin(),
+      [](ParsedRawSyntaxNode &parsedChild) -> const RawSyntax * {
+        return static_cast<const RawSyntax *>(parsedChild.takeData());
+      });
+  auto raw = RawSyntax::make(kind, rawChildren, parsedChildren.size(),
                              SourcePresence::Present, Arena);
   return static_cast<OpaqueSyntaxNode>(raw);
 }

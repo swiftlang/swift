@@ -38,6 +38,7 @@ UID_KEYS = [
     KEY('Line', 'key.line'),
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
+    KEY('Receivers', 'key.receivers'),
     KEY('IsDynamic', 'key.is_dynamic'),
     KEY('IsImplicit', 'key.is_implicit'),
     KEY('FilePath', 'key.filepath'),
@@ -112,7 +113,6 @@ UID_KEYS = [
     KEY('Deprecated', 'key.deprecated'),
     KEY('Obsoleted', 'key.obsoleted'),
     KEY('RemoveCache', 'key.removecache'),
-    KEY('TypeInterface', 'key.typeinterface'),
     KEY('TypeUsr', 'key.typeusr'),
     KEY('ContainerTypeUsr', 'key.containertypeusr'),
     KEY('ModuleGroups', 'key.modulegroups'),
@@ -189,6 +189,7 @@ UID_KEYS = [
     KEY('CompileOperation', 'key.compile_operation'),
     KEY('EffectiveAccess', 'key.effective_access'),
     KEY('DeclarationLang', 'key.decl_lang'),
+    KEY('SecondarySymbols', 'key.secondary_symbols'),
 ]
 
 

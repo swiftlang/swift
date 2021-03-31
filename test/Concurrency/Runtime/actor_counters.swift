@@ -4,6 +4,8 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
 
 actor Counter {
   private var value = 0

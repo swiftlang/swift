@@ -656,6 +656,10 @@ void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << "z";
 }
 
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  Buffer << "D" << (char)node->getIndex(); // differentiability kind
+}
+
 void Remangler::mangleFieldOffset(Node *node) {
   Buffer << "Wv";
   mangleChildNodes(node); // directness, entity
@@ -1227,26 +1231,6 @@ void Remangler::mangleEscapingAutoClosureType(Node *node) {
 
 void Remangler::mangleThinFunctionType(Node *node) {
   Buffer << "Xf";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleDifferentiableFunctionType(Node *node) {
-  Buffer << "XF";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
-  Buffer << "XG";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleLinearFunctionType(Node *node) {
-  Buffer << "XH";
-  mangleChildNodes(node); // argument tuple, result type
-}
-
-void Remangler::mangleEscapingLinearFunctionType(Node *node) {
-  Buffer << "XI";
   mangleChildNodes(node); // argument tuple, result type
 }
 

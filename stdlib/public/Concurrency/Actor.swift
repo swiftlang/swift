@@ -13,7 +13,7 @@
 import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
-/// Common protocol to which all actor classes conform.
+/// Common protocol to which all actors conform.
 ///
 /// The \c Actor protocol generalizes over all actor types. Actor types
 /// implicitly conform to this protocol.

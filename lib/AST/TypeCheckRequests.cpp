@@ -1533,7 +1533,6 @@ bool ActorIsolation::requiresSubstitution() const {
   case ActorInstance:
   case DistributedActorInstance:
   case Independent:
-  case IndependentUnsafe:
   case Unspecified:
     return false;
 
@@ -1549,7 +1548,6 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   case ActorInstance:
   case DistributedActorInstance:
   case Independent:
-  case IndependentUnsafe:
   case Unspecified:
     return *this;
 
@@ -1574,10 +1572,6 @@ void swift::simple_display(
 
     case ActorIsolation::Independent:
       out << "actor-independent";
-      break;
-
-    case ActorIsolation::IndependentUnsafe:
-      out << "actor-independent (unsafe)";
       break;
 
     case ActorIsolation::Unspecified:

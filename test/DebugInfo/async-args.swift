@@ -18,7 +18,7 @@ func withGenericArg<T>(_ msg: T) async {
   // CHECK-SAME:     DW_OP_plus_uconst, {{[0-9]+}}))
 
   await forceSplit()
-  // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYlF.resume.0"(i8* swiftasync %0)
+  // CHECK-LABEL: {{^define .*}} @"$s1M14withGenericArgyyxYlFTQ0_"(i8* swiftasync %0)
   // CHECK: call void @llvm.dbg.declare(metadata i8* %0,
   // CHECK-SAME:   metadata ![[MSG_R:[0-9]+]], metadata !DIExpression(DW_OP_deref,
   // CHECK-SAME:     DW_OP_plus_uconst, [[OFFSET:[0-9]+]],

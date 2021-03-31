@@ -1736,6 +1736,94 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
 // ReportCursorInfo
 //===----------------------------------------------------------------------===//
 
+static void addCursorSymbolInfo(const CursorSymbolInfo &Symbol,
+                                ResponseBuilder::Dictionary &Elem) {
+  Elem.set(KeyKind, Symbol.Kind);
+  if (Symbol.DeclarationLang.isValid())
+    Elem.set(KeyDeclarationLang, Symbol.DeclarationLang);
+  Elem.set(KeyName, Symbol.Name);
+  if (!Symbol.USR.empty())
+    Elem.set(KeyUSR, Symbol.USR);
+  if (!Symbol.TypeName.empty())
+    Elem.set(KeyTypeName, Symbol.TypeName);
+  if (!Symbol.TypeUSR.empty())
+    Elem.set(KeyTypeUsr, Symbol.TypeUSR);
+  if (!Symbol.ContainerTypeUSR.empty())
+    Elem.set(KeyContainerTypeUsr, Symbol.ContainerTypeUSR);
+  if (!Symbol.DocComment.empty())
+    Elem.set(KeyDocFullAsXML, Symbol.DocComment);
+  if (!Symbol.GroupName.empty())
+    Elem.set(KeyGroupName, Symbol.GroupName);
+  if (!Symbol.LocalizationKey.empty())
+    Elem.set(KeyLocalizationKey, Symbol.LocalizationKey);
+  if (!Symbol.AnnotatedDeclaration.empty())
+    Elem.set(KeyAnnotatedDecl, Symbol.AnnotatedDeclaration);
+  if (!Symbol.FullyAnnotatedDeclaration.empty())
+    Elem.set(KeyFullyAnnotatedDecl, Symbol.FullyAnnotatedDeclaration);
+  if (!Symbol.SymbolGraph.empty())
+    Elem.set(KeySymbolGraph, Symbol.SymbolGraph);
+  if (!Symbol.ModuleName.empty())
+    Elem.set(KeyModuleName, Symbol.ModuleName);
+  if (!Symbol.ModuleInterfaceName.empty())
+    Elem.set(KeyModuleInterfaceName, Symbol.ModuleInterfaceName);
+  if (Symbol.DeclarationLoc.hasValue()) {
+    Elem.set(KeyOffset, Symbol.DeclarationLoc.getValue().first);
+    Elem.set(KeyLength, Symbol.DeclarationLoc.getValue().second);
+    if (!Symbol.Filename.empty())
+      Elem.set(KeyFilePath, Symbol.Filename);
+  }
+
+  if (!Symbol.OverrideUSRs.empty()) {
+    auto Overrides = Elem.setArray(KeyOverrides);
+    for (auto USR : Symbol.OverrideUSRs) {
+      auto Override = Overrides.appendDictionary();
+      Override.set(KeyUSR, USR);
+    }
+  }
+
+  if (!Symbol.AnnotatedRelatedDeclarations.empty()) {
+    auto RelDecls = Elem.setArray(KeyRelatedDecls);
+    for (auto AnnotDecl : Symbol.AnnotatedRelatedDeclarations) {
+      auto RelDecl = RelDecls.appendDictionary();
+      RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
+    }
+  }
+
+  if (!Symbol.ModuleGroupArray.empty()) {
+    auto Groups = Elem.setArray(KeyModuleGroups);
+    for (auto Name : Symbol.ModuleGroupArray) {
+      auto Entry = Groups.appendDictionary();
+      Entry.set(KeyGroupName, Name);
+    }
+  }
+
+  if (!Symbol.ParentContexts.empty()) {
+    auto Parents = Elem.setArray(KeyParentContexts);
+    for (const auto &ParentTy : Symbol.ParentContexts) {
+      auto Parent = Parents.appendDictionary();
+      Parent.set(KeyName, ParentTy.Title);
+      Parent.set(KeyKind, ParentTy.KindName);
+      Parent.set(KeyUSR, ParentTy.USR);
+    }
+  }
+
+  if (!Symbol.ReceiverUSRs.empty()) {
+    auto Receivers = Elem.setArray(KeyReceivers);
+    for (auto USR : Symbol.ReceiverUSRs) {
+      auto Receiver = Receivers.appendDictionary();
+      Receiver.set(KeyUSR, USR);
+    }
+  }
+
+  if (Symbol.IsSystem)
+    Elem.setBool(KeyIsSystem, true);
+  if (Symbol.IsDynamic)
+    Elem.setBool(KeyIsDynamic, true);
+
+  if (Symbol.ParentNameOffset)
+    Elem.set(KeyParentLoc, Symbol.ParentNameOffset.getValue());
+}
+
 static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
                              ResponseReceiver Rec) {
   if (Result.isCancelled())
@@ -1746,58 +1834,29 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
   const CursorInfoData &Info = Result.value();
 
   ResponseBuilder RespBuilder;
+  auto Elem = RespBuilder.getDictionary();
   if (!Info.InternalDiagnostic.empty()) {
-    auto Elem = RespBuilder.getDictionary();
     Elem.set(KeyInternalDiagnostic, Info.InternalDiagnostic);
     return Rec(RespBuilder.createResponse());
   }
-  if (Info.Kind.isInvalid())
-    return Rec(RespBuilder.createResponse());
 
-  auto Elem = RespBuilder.getDictionary();
-  Elem.set(KeyKind, Info.Kind);
-  Elem.set(KeyName, Info.Name);
-  if (Info.DeclarationLang.isValid())
-    Elem.set(KeyDeclarationLang, Info.DeclarationLang);
-  if (!Info.USR.empty())
-    Elem.set(KeyUSR, Info.USR);
-  if (!Info.TypeName.empty())
-    Elem.set(KeyTypeName, Info.TypeName);
-  if (!Info.DocComment.empty())
-    Elem.set(KeyDocFullAsXML, Info.DocComment);
-  if (!Info.AnnotatedDeclaration.empty())
-    Elem.set(KeyAnnotatedDecl, Info.AnnotatedDeclaration);
-  if (!Info.FullyAnnotatedDeclaration.empty())
-    Elem.set(KeyFullyAnnotatedDecl, Info.FullyAnnotatedDeclaration);
-  if (!Info.ModuleName.empty())
-    Elem.set(KeyModuleName, Info.ModuleName);
-  if (!Info.GroupName.empty())
-    Elem.set(KeyGroupName, Info.GroupName);
-  if (!Info.LocalizationKey.empty())
-    Elem.set(KeyLocalizationKey, Info.LocalizationKey);
-  if (!Info.ModuleInterfaceName.empty())
-    Elem.set(KeyModuleInterfaceName, Info.ModuleInterfaceName);
-  if (Info.DeclarationLoc.hasValue()) {
-    Elem.set(KeyOffset, Info.DeclarationLoc.getValue().first);
-    Elem.set(KeyLength, Info.DeclarationLoc.getValue().second);
-    if (!Info.Filename.empty())
-      Elem.set(KeyFilePath, Info.Filename);
-  }
-  if (!Info.OverrideUSRs.empty()) {
-    auto Overrides = Elem.setArray(KeyOverrides);
-    for (auto USR : Info.OverrideUSRs) {
-      auto Override = Overrides.appendDictionary();
-      Override.set(KeyUSR, USR);
+  if (!Info.Symbols.empty()) {
+    addCursorSymbolInfo(Info.Symbols[0], Elem);
+    if (Info.Symbols.size() > 1) {
+      auto SecondarySymbols = Elem.setArray(KeySecondarySymbols);
+      for (auto Secondary : makeArrayRef(Info.Symbols).drop_front()) {
+        auto SecondaryElem = SecondarySymbols.appendDictionary();
+        addCursorSymbolInfo(Secondary, SecondaryElem);
+      }
     }
   }
-  if (!Info.ModuleGroupArray.empty()) {
-    auto Groups = Elem.setArray(KeyModuleGroups);
-    for (auto Name : Info.ModuleGroupArray) {
-      auto Entry = Groups.appendDictionary();
-      Entry.set(KeyGroupName, Name);
-    }
-  }
+
   if (!Info.AvailableActions.empty()) {
+    // Clients rely on a kind being set to determine whether the cursor
+    // has any results or not. Add one if there's no symbols, ie. only actions
+    // were requested (even though it's meaningless).
+    if (Info.Symbols.empty())
+      Elem.set(KeyKind, KindRefModule);
     auto Actions = Elem.setArray(KeyRefactorActions);
     for (auto Info : Info.AvailableActions) {
       auto Entry = Actions.appendDictionary();
@@ -1805,35 +1864,6 @@ static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
       Entry.set(KeyActionName, Info.KindName);
       if (!Info.UnavailableReason.empty())
         Entry.set(KeyActionUnavailableReason, Info.UnavailableReason);
-    }
-  }
-  if (Info.ParentNameOffset) {
-    Elem.set(KeyParentLoc, Info.ParentNameOffset.getValue());
-  }
-  if (!Info.AnnotatedRelatedDeclarations.empty()) {
-    auto RelDecls = Elem.setArray(KeyRelatedDecls);
-    for (auto AnnotDecl : Info.AnnotatedRelatedDeclarations) {
-      auto RelDecl = RelDecls.appendDictionary();
-      RelDecl.set(KeyAnnotatedDecl, AnnotDecl);
-    }
-  }
-  if (Info.IsSystem)
-    Elem.setBool(KeyIsSystem, true);
-  if (!Info.TypeInterface.empty())
-    Elem.set(KeyTypeInterface, Info.TypeInterface);
-  if (!Info.TypeUSR.empty())
-    Elem.set(KeyTypeUsr, Info.TypeUSR);
-  if (!Info.ContainerTypeUSR.empty())
-    Elem.set(KeyContainerTypeUsr, Info.ContainerTypeUSR);
-  if (!Info.SymbolGraph.empty())
-    Elem.set(KeySymbolGraph, Info.SymbolGraph);
-  if (!Info.ParentContexts.empty()) {
-    auto Parents = Elem.setArray(KeyParentContexts);
-    for (const auto &ParentTy: Info.ParentContexts) {
-      auto Parent = Parents.appendDictionary();
-      Parent.set(KeyName, ParentTy.Title);
-      Parent.set(KeyKind, ParentTy.KindName);
-      Parent.set(KeyUSR, ParentTy.USR);
     }
   }
 

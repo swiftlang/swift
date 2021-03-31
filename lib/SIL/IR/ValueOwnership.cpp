@@ -551,6 +551,9 @@ CONSTANT_OWNERSHIP_BUILTIN(Owned, AutoDiffCreateLinearMapContext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffProjectTopLevelSubcontext)
 CONSTANT_OWNERSHIP_BUILTIN(None, AutoDiffAllocateSubcontext)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
+CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
+CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
+CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
