@@ -306,6 +306,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::BuildSerialExecutorRef) {
+    auto executor = args.claimNext();
+    executor = IGF.Builder.CreateBitCast(executor,
+                                         IGF.IGM.SwiftExecutorPtrTy);
+    out.add(executor);
+    return;
+  }
+
   // If this is an LLVM IR intrinsic, lower it to an intrinsic call.
   const IntrinsicInfo &IInfo = IGF.getSILModule().getIntrinsicInfo(FnId);
   llvm::Intrinsic::ID IID = IInfo.ID;

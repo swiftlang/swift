@@ -735,6 +735,10 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
 
+/// Build a Builtin.Executor value from the given serial executor reference.
+BUILTIN_MISC_OPERATION(BuildSerialExecutorRef,
+                       "buildSerialExecutorRef", "", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //
