@@ -29,6 +29,36 @@ CHANGELOG
 Swift 5.5
 ---------
 
+* [SE-0293][]:
+
+  Property wrappers can now be applied to function and closure parameters:
+
+  ```swift
+  @propertyWrapper
+  struct Wrapper<Value> {
+    var wrappedValue: Value
+
+    var projectedValue: Self { return self }
+
+    init(wrappedValue: Value) { ... }
+
+    init(projectedValue: Self) { ... }
+  }
+
+  func test(@Wrapper value: Int) {
+    print(value)
+    print($value)
+    print(_value)
+  }
+
+  test(value: 10)
+
+  let projection = Wrapper(wrappedValue: 10)
+  test($value: projection)
+  ```
+
+  The call-site can pass a wrapped value or a projected value, and the property wrapper will be initialized using `init(wrappedValue:)` or `init(projectedValue:)`, respectively.
+
 * [SE-0299][]:
 
   It is now possible to use leading-dot syntax in generic contexts to access static members of protocol extensions where `Self` is constrained to a fully concrete type:
