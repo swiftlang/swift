@@ -3474,11 +3474,12 @@ class HopToExecutorInst
 {
   friend SILBuilder;
 
-  HopToExecutorInst(SILDebugLocation DebugLoc, SILValue Actor, bool HasOwnership)
-      : UnaryInstructionBase(DebugLoc, Actor) { }
+  HopToExecutorInst(SILDebugLocation debugLoc, SILValue executor,
+                    bool hasOwnership)
+      : UnaryInstructionBase(debugLoc, executor) { }
 
 public:
-  SILValue getActor() const { return getOperand(); }
+  SILValue getTargetExecutor() const { return getOperand(); }
 };
 
 /// Instantiates a key path object.

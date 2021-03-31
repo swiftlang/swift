@@ -453,11 +453,11 @@ public:
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
-  /// If set, the current function is an async function which is isolated to
-  /// this actor.
-  /// If set, hop_to_executor instructions must be inserted at the begin of the
-  /// function and after all suspension points.
-  SILValue actor;
+  /// If set, the current function is an async function which is formally
+  /// isolated to the given executor, and hop_to_executor instructions must
+  /// be inserted at the begin of the function and after all suspension
+  /// points.
+  SILValue ExpectedExecutor;
 
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
@@ -842,15 +842,17 @@ public:
                             Optional<ManagedValue> actorSelf);
 
   /// Gets a reference to the current executor for the task.
+  /// \returns a value of type Builtin.Executor
   SILValue emitGetCurrentExecutor(SILLocation loc);
   
-  /// Generates code to obtain the executor given the actor's decl.
-  /// \returns a SILValue representing the executor.
-  SILValue emitLoadActorExecutor(VarDecl *actorDecl);
+  /// Generates code to obtain an actor's executor given a reference
+  /// to the actor.
+  /// \returns a value which can be used with hop_to_executor
+  SILValue emitLoadActorExecutor(SILLocation loc, ManagedValue actor);
 
   /// Generates the code to obtain the executor for the shared instance 
   /// of the \p globalActor based on the type.
-  /// \returns a SILValue representing the executor.
+  /// \returns a value which can be used with hop_to_executor
   SILValue emitLoadGlobalActorExecutor(Type globalActor);
 
   //===--------------------------------------------------------------------===//

@@ -4406,12 +4406,12 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
       breadcrumb = emitHopToTargetActor(loc, getActorIsolation(funcDecl),
                                         actorSelf);
     }
-  } else if (actor && substFnType->isAsync()) {
+  } else if (ExpectedExecutor && substFnType->isAsync()) {
     // Otherwise, if we're in an actor method ourselves, and we're calling into
     // any sort of async function, we'll want to make sure to hop back to our
     // own executor afterward, since the callee could have made arbitrary hops
     // out of our isolation domain.
-    breadcrumb = ExecutorBreadcrumb(actor);
+    breadcrumb = ExecutorBreadcrumb(ExpectedExecutor);
   }
 
   SILValue rawDirectResult;

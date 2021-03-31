@@ -2144,7 +2144,7 @@ public:
   }
 
   void visitHopToExecutorInst(HopToExecutorInst *HTEI) {
-    *this << getIDAndType(HTEI->getActor());
+    *this << getIDAndType(HTEI->getTargetExecutor());
   }
 
   void visitSwitchValueInst(SwitchValueInst *SII) {
