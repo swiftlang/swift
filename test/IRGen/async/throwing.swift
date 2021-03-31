@@ -7,9 +7,8 @@
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
 
-// See SR-14333
-// XFAIL: OS=windows-msvc
-// UNSUPPORTED: MSVC_VER=15.0
+// https://bugs.swift.org/browse/SR-14333
+// UNSUPPORTED: OS=windows-msvc
 
 struct E : Error {}
 
