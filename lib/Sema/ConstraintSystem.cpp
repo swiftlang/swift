@@ -2511,10 +2511,14 @@ FunctionType::ExtInfo ConstraintSystem::closureEffects(ClosureExpr *expr) {
 
     bool walkToDeclPre(Decl *decl) override {
       // Do not walk into function or type declarations.
-      if (!isa<PatternBindingDecl>(decl))
-        return false;
+      if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
+        if (patternBinding->isAsyncLet())
+          FoundAsync = true;
 
-      return true;
+        return true;
+      }
+
+      return false;
     }
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override { 

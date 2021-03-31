@@ -1153,17 +1153,14 @@ private:
       return ShouldNotRecurse;
     }
     ShouldRecurse_t checkAsyncLet(PatternBindingDecl *patternBinding) {
-      // FIXME
-      llvm_unreachable("Test me");
-      // return ShouldRecurse;
+      AsyncKind = ConditionalEffectKind::Always;
+      return ShouldRecurse;
     }
     ShouldRecurse_t checkThrow(ThrowStmt *E) {
       return ShouldRecurse;
     }
     ShouldRecurse_t checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
-      // FIXME
-      llvm_unreachable("Test me");
-      //return ShouldRecurse;
+      return ShouldRecurse;
     }
 
     ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {

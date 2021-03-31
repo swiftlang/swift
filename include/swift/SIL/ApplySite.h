@@ -452,7 +452,7 @@ public:
     case ApplySiteKind::TryApplyInst:
       return cast<TryApplyInst>(Inst)->getApplyOptions();
     case ApplySiteKind::PartialApplyInst:
-      llvm_unreachable("Unhandled case");
+      return ApplyOptions();
     }
   }
   /// Return whether the given apply is of a formally-throwing function
