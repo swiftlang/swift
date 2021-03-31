@@ -5709,15 +5709,15 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyContextuallyConcurrent(
+static void applyUnsafeConcurrent(
       Expr *expr, bool sendable, bool forMainActor) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-    closure->setContextuallyConcurrent(sendable, forMainActor);
+    closure->setUnsafeConcurrent(sendable, forMainActor);
     return;
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyContextuallyConcurrent(
+    applyUnsafeConcurrent(
         captureList->getClosureBody(), sendable, forMainActor);
   }
 }
@@ -5972,18 +5972,14 @@ Expr *ExprRewriter::coerceCallArguments(
     // Save the original label location.
     newLabelLocs.push_back(getLabelLoc(argIdx));
 
-    // If the parameter is contextually Sendable and we are in a
-    // context that has adopted concurrency, apply contextual Sendable
-    // to the closure (if there is one).
-    if (paramInfo.isUnsafeSendable(paramIdx)) {
-      bool forMainActor = false;
-      if (apply) {
-        forMainActor = isMainDispatchQueue(apply->getFn());
-      }
-
-      applyContextuallyConcurrent(
-          arg, contextUsesConcurrencyFeatures(dc), forMainActor);
-    }
+    // Determine whether the parameter is unsafe Sendable or MainActor, and
+    // record it as such.
+    bool isUnsafeSendable = paramInfo.isUnsafeSendable(paramIdx);
+    bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
+        (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
+    applyUnsafeConcurrent(
+        arg, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
+        isMainActor);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();

@@ -642,6 +642,11 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeSendable, UnsafeSendable,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   113)
 
+CONTEXTUAL_SIMPLE_DECL_ATTR(_unsafeMainActor, UnsafeMainActor,
+  OnParam | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
+  114)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

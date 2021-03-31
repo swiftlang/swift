@@ -4,6 +4,7 @@
 #pragma clang assume_nonnull begin
 
 #define MAIN_ACTOR __attribute__((__swift_attr__("@MainActor")))
+#define MAIN_ACTOR_UNSAFE __attribute__((__swift_attr__("@_unsafeMainActor")))
 
 @protocol ServiceProvider
 @property(readonly) NSArray<NSString *> *allOperations;
@@ -74,6 +75,8 @@ typedef void (^CompletionHandler)(NSString * _Nullable, NSString * _Nullable_res
 // Both would be imported as the same decl - require swift_async(none) on one
 -(void)asyncImportSame:(NSString *)operation completionHandler:(void (^)(NSInteger))handler;
 -(void)asyncImportSame:(NSString *)operation replyTo:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
+
+-(void)overridableButRunsOnMainThreadWithCompletionHandler:(MAIN_ACTOR_UNSAFE void (^ _Nullable)(NSString *))completion;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>

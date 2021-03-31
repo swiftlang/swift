@@ -3983,7 +3983,7 @@ public:
         UnsafeConcurrencyBits::MainActor;
   }
 
-  void setContextuallyConcurrent(bool sendable, bool forMainActor) {
+  void setUnsafeConcurrent(bool sendable, bool forMainActor) {
     uint8_t bits = 0;
     if (sendable)
       bits |= UnsafeConcurrencyBits::Sendable;

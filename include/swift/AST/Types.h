@@ -3344,6 +3344,7 @@ struct ParameterListInfo {
   SmallBitVector acceptsUnlabeledTrailingClosures;
   SmallBitVector propertyWrappers;
   SmallBitVector unsafeSendable;
+  SmallBitVector unsafeMainActor;
 
 public:
   ParameterListInfo() { }
@@ -3366,6 +3367,11 @@ public:
   /// we will treat it as Sendable in a context that has adopted concurrency
   /// features.
   bool isUnsafeSendable(unsigned paramIdx) const;
+
+  /// Whether the given parameter is unsafe MainActor, meaning that
+  /// we will treat it as being part of the main actor but that it is not
+  /// part of the type system.
+  bool isUnsafeMainActor(unsigned paramIdx) const;
 
   /// Retrieve the number of non-defaulted parameters.
   unsigned numNonDefaultedParameters() const {

@@ -942,6 +942,7 @@ ParameterListInfo::ParameterListInfo(
   defaultArguments.resize(params.size());
   propertyWrappers.resize(params.size());
   unsafeSendable.resize(params.size());
+  unsafeMainActor.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -997,6 +998,10 @@ ParameterListInfo::ParameterListInfo(
     if (isParamUnsafeSendable(param)) {
       unsafeSendable.set(i);
     }
+
+    if (param->getAttrs().hasAttribute<UnsafeMainActorAttr>()) {
+      unsafeMainActor.set(i);
+    }
   }
 }
 
@@ -1018,6 +1023,12 @@ bool ParameterListInfo::hasExternalPropertyWrapper(unsigned paramIdx) const {
 bool ParameterListInfo::isUnsafeSendable(unsigned paramIdx) const {
   return paramIdx < unsafeSendable.size()
       ? unsafeSendable[paramIdx]
+      : false;
+}
+
+bool ParameterListInfo::isUnsafeMainActor(unsigned paramIdx) const {
+  return paramIdx < unsafeMainActor.size()
+      ? unsafeMainActor[paramIdx]
       : false;
 }
 

@@ -72,6 +72,13 @@ func testSlowServerSynchronous(slowServer: SlowServer) {
     print(s)
     onlyOnMainActor() // okay because runOnMainThread has a @MainActor closure
   }
+
+  slowServer.overridableButRunsOnMainThread { s in
+    print(s)
+    onlyOnMainActor() // okay because parameter has @_unsafeMainActor
+  }
+
+  let _: Int = slowServer.overridableButRunsOnMainThread // expected-error{{cannot convert value of type '(((String) -> Void)?) -> Void' to specified type 'Int'}}
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {
