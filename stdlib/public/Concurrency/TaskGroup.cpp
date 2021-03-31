@@ -621,6 +621,8 @@ void TaskGroupImpl::offer(AsyncTask *completedTask, AsyncContext *context) {
 
         fillGroupNextResult(waitingContext, result);
 
+        _swift_tsan_acquire(static_cast<Job *>(waitingTask));
+
         // TODO: allow the caller to suggest an executor
         swift_task_enqueueGlobal(waitingTask);
         return;
@@ -750,6 +752,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.status = PollStatus::Success;
           result.storage = futureFragment->getStoragePtr();
           assert(result.retainedTask && "polled a task, it must be not null");
+          _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
@@ -759,6 +762,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
           result.storage =
               reinterpret_cast<OpaqueValue *>(futureFragment->getError());
           assert(result.retainedTask && "polled a task, it must be not null");
+          _swift_tsan_acquire(static_cast<Job *>(result.retainedTask));
           mutex.unlock(); // TODO: remove fragment lock, and use status for synchronization
           return result;
 
@@ -775,6 +779,7 @@ PollResult TaskGroupImpl::poll(AsyncTask *waitingTask) {
 
   // ==== 3) Add to wait queue -------------------------------------------------
   assert(assumed.readyTasks() == 0);
+  _swift_tsan_release(static_cast<Job *>(waitingTask));
   while (true) {
     // Put the waiting task at the beginning of the wait queue.
     if (waitQueue.compare_exchange_weak(
