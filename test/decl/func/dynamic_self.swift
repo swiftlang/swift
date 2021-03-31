@@ -347,7 +347,6 @@ class Runce : Runcible {
 // Forming a type with 'Self' in invariant position
 
 struct Generic<T> { init(_: T) {} } // expected-note {{arguments to generic parameter 'T' ('Self' and 'InvariantSelf') are expected to be equal}}
-// expected-note@-1 {{arguments to generic parameter 'T' ('Self' and 'FinalInvariantSelf') are expected to be equal}}
 
 class InvariantSelf {
   func me() -> Self {
@@ -359,13 +358,10 @@ class InvariantSelf {
   }
 }
 
-// FIXME: This should be allowed
-
 final class FinalInvariantSelf {
   func me() -> Self {
     let a = Generic(self)
-    let _: Generic<FinalInvariantSelf> = a
-    // expected-error@-1 {{cannot assign value of type 'Generic<Self>' to type 'Generic<FinalInvariantSelf>'}}
+    let _: Generic<FinalInvariantSelf> = a // okay
 
     return self
   }

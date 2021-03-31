@@ -32,7 +32,7 @@ class Mario {
   func getEnemy() -> Mario { return self }
 }
 class SuperMario : Mario {
-  override func getFriend() -> SuperMario { // expected-error{{cannot override a Self return type with a non-Self return type}}
+  override func getFriend() -> SuperMario { // expected-error{{cannot override a Self return type with a non-Self return type in non-final class}}
     return SuperMario()
   }
   override func getEnemy() -> Self { return self }
@@ -41,6 +41,20 @@ final class FinalMario : Mario {
     override func getFriend() -> FinalMario {
         return FinalMario()
     }
+}
+
+do {
+  final class GenericClass<T> {
+    func me() -> Self { self }
+
+    func invalidMe() -> Self {
+      GenericClass<Never>() // expected-error{{cannot convert return expression of type 'GenericClass<Never>' to return type 'Self'}}
+    }
+
+    func inAndOut(arg: GenericClass) -> Self { arg }
+
+    func nonCovariantSelf(_: GenericClass<Self>, _: Self) {}
+  }
 }
 
 // These references to Self are now possible (SE-0068)

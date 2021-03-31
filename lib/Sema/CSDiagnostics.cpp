@@ -6456,6 +6456,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
   case ConversionRestrictionKind::HashableToAnyHashable:
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+  case ConversionRestrictionKind::FinalClassToDynamicSelf:
     llvm_unreachable("Expected an ephemeral conversion!");
   }
 }

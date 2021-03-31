@@ -261,6 +261,9 @@ enum class ConversionRestrictionKind {
   /// Implicit conversion from an Objective-C class type to its
   /// toll-free-bridged CF type.
   ObjCTollFreeBridgeToCF,
+  /// Implicit downcast from a final class type to its \c DynamicSelfType
+  /// (C -> DynamicSelfType<C>).
+  FinalClassToDynamicSelf,
 };
 
 /// Specifies whether a given conversion requires the creation of a temporary

@@ -1309,7 +1309,8 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
 
   // In enums and structs, 'Self' is just a shorthand for the nominal type,
   // and can be used anywhere.
-  if (!typeDC->getSelfClassDecl())
+  auto *const classDecl = typeDC->getSelfClassDecl();
+  if (!classDecl)
     return SelfTypeKind::StaticSelf;
 
   // In class methods, 'Self' is the DynamicSelfType and can only appear in
@@ -1317,11 +1318,16 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
   switch (options.getBaseContext()) {
   case TypeResolverContext::FunctionResult:
   case TypeResolverContext::PatternBindingDecl:
+    // Because we have been using DynamicSelf here since before ABI stability
+    // kicked in, we cannot afford to have final classes use StaticSelf today.
     return SelfTypeKind::DynamicSelf;
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::SubscriptDecl:
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
+    if (classDecl->isFinal())
+      return SelfTypeKind::StaticSelf;
+
     // When checking a function or subscript parameter list, we have to go up
     // one level to determine if we're in a local context or not.
     if (dc->getParent()->isLocalContext())
@@ -1329,10 +1335,10 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
 
     return SelfTypeKind::InvalidSelf;
   default:
-    // In local functions inside classes, 'Self' is the DynamicSelfType and can
-    // be used anywhere.
+    // In local contexts inside classes, 'Self' can be used anywhere.
     if (dc->isLocalContext())
-      return SelfTypeKind::DynamicSelf;
+      return classDecl->isFinal() ? SelfTypeKind::StaticSelf
+                                  : SelfTypeKind::DynamicSelf;
 
     return SelfTypeKind::InvalidSelf;
   }

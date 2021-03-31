@@ -5430,7 +5430,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       }
     }
   }
-  
+
+  // C -> DynamicSelfType<C> for a final class type.
+  if (kind == ConstraintKind::Conversion) {
+    auto *const fromClassDecl = desugar1->getClassOrBoundGenericClass();
+    if (fromClassDecl && fromClassDecl->isFinal()) {
+      // The class type must match the static Self type.
+      auto *const toDynamicSelf = desugar2->getAs<DynamicSelfType>();
+      if (toDynamicSelf && toDynamicSelf->getSelfType()->isEqual(desugar1))
+        conversionsOrFixes.push_back(
+            ConversionRestrictionKind::FinalClassToDynamicSelf);
+    }
+  }
+
   if (kind == ConstraintKind::BindToPointerType) {
     if (desugar2->isEqual(getASTContext().TheEmptyTupleType))
       return getTypeMatchSuccess();
@@ -10576,6 +10588,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
   }
+  case ConversionRestrictionKind::FinalClassToDynamicSelf:
+    increaseScore(SK_UserConversion); // FIXME: Use separate score kind?
+    return getTypeMatchSuccess();
   }
   
   llvm_unreachable("bad conversion restriction");
