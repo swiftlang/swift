@@ -5,7 +5,7 @@
 import Foundation
 import ObjCConcurrency
 
-@MainActor func onlyOnMainActor() { } // expected-note{{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
+@MainActor func onlyOnMainActor() { }
 
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
@@ -130,8 +130,6 @@ struct SomeGlobalActor {
   static let shared = SomeActor()
 }
 
-@SomeGlobalActor(unsafe) func unsafelyOnSomeGlobal() { }
-
 class MyButton : NXButton {
   @MainActor func testMain() {
     onButtonPress() // okay
@@ -141,28 +139,10 @@ class MyButton : NXButton {
     onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
   }
 
-  func test() { // expected-note{{add '@MainActor' to make instance method 'test()' part of global actor 'MainActor'}}
-    onButtonPress() // okay, onButtonPress is @MainActor(unsafe)
-    unsafelyOnSomeGlobal() // okay, we haven't opted into anything
-    onlyOnMainActor() // expected-error{{global function 'onlyOnMainActor()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
-  }
-}
-
-class MyOtherButton: NXButton {
-  override func onButtonPress() { // expected-note{{calls to instance method 'onButtonPress()' from outside of its actor context are implicitly asynchronous}}
-    onlyOnMainActor() // yes, we're on the main actor
-    unsafelyOnSomeGlobal() // okay, we haven't opted into any actual checking
-  }
-
   func test() {
-    onButtonPress() // okay, it's @MainActor(unsafe)
-  }
-
-  @SomeGlobalActor func testOther() {
-    onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
+    onButtonPress() // okay
   }
 }
-
 
 func testButtons(mb: MyButton) {
   mb.onButtonPress()

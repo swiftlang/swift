@@ -647,14 +647,24 @@ class SomeClassWithInits {
   var mutableState: Int = 17
   var otherMutableState: Int
 
-  init() {
+  static var shared = SomeClassWithInits() // expected-note{{static property declared here}}
+
+  init() { // expected-note{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
     self.mutableState = 42
     self.otherMutableState = 17
 
-    self.isolated() // expected-error{{'isolated()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+    self.isolated()
   }
 
-  func isolated() { } // expected-note{{calls to instance method 'isolated()' from outside of its actor context are implicitly asynchronous}}
+  deinit {
+    print(SomeClassWithInits.shared) // okay, we're actor-isolated
+  }
+
+  func isolated() { }
+
+  static func staticIsolated() { // expected-note{{calls to static method 'staticIsolated()' from outside of its actor context are implicitly asynchronous}}
+    _ = SomeClassWithInits.shared
+  }
 
   func hasDetached() {
     Task.runDetached {
@@ -668,8 +678,10 @@ class SomeClassWithInits {
   }
 }
 
-func outsideSomeClassWithInits() {
-  _ = SomeClassWithInits() // okay, initializer is not isolated
+func outsideSomeClassWithInits() { // expected-note 3 {{add '@MainActor' to make global function 'outsideSomeClassWithInits()' part of global actor 'MainActor'}}
+  _ = SomeClassWithInits() // expected-error{{initializer 'init()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+  _ = SomeClassWithInits.shared // expected-error{{static property 'shared' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
+  SomeClassWithInits.staticIsolated() // expected-error{{static method 'staticIsolated()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
 }
 
 // ----------------------------------------------------------------------
