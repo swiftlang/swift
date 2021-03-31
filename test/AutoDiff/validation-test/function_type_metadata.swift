@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// rdar://76039256
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 import _Differentiation
 
