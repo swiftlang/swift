@@ -5131,10 +5131,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           nominal1->getDecl() != nominal2->getDecl() &&
           ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
            (nominal1->isDoubleType() || nominal2->isDoubleType()))) {
-        if (Options.contains(
-                ConstraintSystemFlags::DisableImplicitDoubleCGFloatConversion))
-          return getTypeMatchFailure(locator);
-
         // Support implicit Double<->CGFloat conversions only for
         // something which could be directly represented in the AST
         // e.g. argument-to-parameter, contextual conversions etc.
