@@ -1524,7 +1524,6 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
-  std::vector<StringRef> Groups;
   std::string Error;
   if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
                                                      CI.getDiags(), Error)) {
@@ -1551,7 +1550,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
     Receiver(RequestResult<ArrayRef<StringRef>>::fromError(Error));
     return;
   }
-  std::vector<StringRef> Scratch;
-  Receiver(RequestResult<ArrayRef<StringRef>>::fromResult(
-      collectModuleGroups(M, Scratch)));
+
+  llvm::SmallVector<StringRef, 0> Groups;
+  collectModuleGroups(M, Groups);
+  Receiver(RequestResult<ArrayRef<StringRef>>::fromResult(Groups));
 }
