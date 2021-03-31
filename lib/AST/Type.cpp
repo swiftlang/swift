@@ -1444,6 +1444,11 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
   : SugarType(TypeKind::Paren,
               flags.isInOut() ? InOutType::get(baseType) : baseType,
               properties) {
+  // In some situations (rdar://75740683) we appear to end up with ParenTypes
+  // that contain a nullptr baseType. Once this is eliminated, we can remove
+  // the checks for `type.isNull()` in the `DiagnosticArgumentKind::Type` case
+  // of `formatDiagnosticArgument`.
+  assert(baseType && "A ParenType should always wrap a non-null type");
   Bits.ParenType.Flags = flags.toRaw();
   if (flags.isInOut())
     assert(!baseType->is<InOutType>() && "caller did not pass a base type");
