@@ -88,6 +88,9 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
   }
   if (Context.LangOpts.UseClangFunctionTypes)
     Options |= ConstraintSystemFlags::UseClangFunctionTypes;
+
+  if (Context.TypeCheckerOpts.DisableImplicitDoubleCGFloatConversion)
+    Options |= ConstraintSystemFlags::DisableImplicitDoubleCGFloatConversion;
 }
 
 ConstraintSystem::~ConstraintSystem() {
@@ -449,6 +452,16 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     llvm::function_ref<Type(Type)> simplifyType,
     llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
         getOverloadFor) {
+  if (auto conversion =
+          locator->findLast<LocatorPathElt::ImplicitConversion>()) {
+    if (conversion->is(ConversionRestrictionKind::DoubleToCGFloat) ||
+        conversion->is(ConversionRestrictionKind::CGFloatToDouble)) {
+      return getConstraintLocator(
+          ASTNode(), {*conversion, ConstraintLocator::ApplyFunction,
+                      ConstraintLocator::ConstructorMember});
+    }
+  }
+
   auto anchor = locator->getAnchor();
   assert(bool(anchor) && "Expected an anchor!");
 
@@ -4304,7 +4317,10 @@ ASTNode constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
 }
 
 Expr *constraints::getArgumentExpr(ASTNode node, unsigned index) {
-  auto *expr = castToExpr(node);
+  auto *expr = getAsExpr(node);
+  if (!expr)
+    return nullptr;
+
   Expr *argExpr = nullptr;
   if (auto *AE = dyn_cast<ApplyExpr>(expr))
     argExpr = AE->getArg();
@@ -4443,7 +4459,9 @@ void ConstraintSystem::generateConstraints(
 ConstraintLocator *
 ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   auto anchor = locator->getAnchor();
-  if (!anchor)
+
+  // An empty locator which code completion uses for member references.
+  if (anchor.isNull() && locator->getPath().empty())
     return nullptr;
 
   // Applies and unresolved member exprs can have callee locators that are
@@ -4931,6 +4949,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::HashableToAnyHashable:
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
+  case ConversionRestrictionKind::CGFloatToDouble:
+  case ConversionRestrictionKind::DoubleToCGFloat:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.

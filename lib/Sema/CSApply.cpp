@@ -5743,7 +5743,7 @@ Expr *ExprRewriter::coerceCallArguments(
   // wrapped value placeholder, the first non-defaulted argument must be
   // wrapped in an OpaqueValueExpr.
   bool shouldInjectWrappedValuePlaceholder =
-     target->shouldInjectWrappedValuePlaceholder(apply);
+      target && target->shouldInjectWrappedValuePlaceholder(apply);
 
   auto injectWrappedValuePlaceholder =
       [&](Expr *arg, bool isAutoClosure = false) -> Expr * {
@@ -6748,6 +6748,59 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       return cs.cacheType(new (ctx)
                               ForeignObjectConversionExpr(result, toType));
+    }
+
+    case ConversionRestrictionKind::CGFloatToDouble:
+    case ConversionRestrictionKind::DoubleToCGFloat: {
+      auto conversionKind = knownRestriction->second;
+
+      auto *argExpr = locator.trySimplifyToExpr();
+      assert(argExpr);
+
+      // Load the value for conversion.
+      argExpr = cs.coerceToRValue(argExpr);
+
+      auto *implicitInit =
+          CallExpr::createImplicit(ctx, TypeExpr::createImplicit(toType, ctx),
+                                   /*args=*/{argExpr},
+                                   /*argLabels=*/{Identifier()});
+
+      cs.cacheExprTypes(implicitInit->getFn());
+      cs.setType(argExpr, fromType);
+      cs.setType(implicitInit->getArg(),
+                 ParenType::get(cs.getASTContext(), fromType));
+
+      auto *callLocator = cs.getConstraintLocator(
+          implicitInit, LocatorPathElt::ImplicitConversion(conversionKind));
+
+      // HACK: Temporarily push the call expr onto the expr stack to make sure
+      // we don't try to prematurely close an existential when applying the
+      // curried member ref. This can be removed once existential opening is
+      // refactored not to rely on the shape of the AST prior to rewriting.
+      ExprStack.push_back(implicitInit);
+      SWIFT_DEFER { ExprStack.pop_back(); };
+
+      // We need to take information recorded for all conversions of this
+      // kind and move it to a specific location where restriction is applied.
+      {
+        auto *memberLoc = solution.getConstraintLocator(
+            callLocator, {ConstraintLocator::ApplyFunction,
+                          ConstraintLocator::ConstructorMember});
+
+        auto overload = solution.getOverloadChoice(cs.getConstraintLocator(
+            ASTNode(), {LocatorPathElt::ImplicitConversion(conversionKind),
+                        ConstraintLocator::ApplyFunction,
+                        ConstraintLocator::ConstructorMember}));
+
+        solution.overloadChoices.insert({memberLoc, overload});
+        solution.trailingClosureMatchingChoices.insert(
+            {cs.getConstraintLocator(callLocator,
+                                     ConstraintLocator::ApplyArgument),
+             TrailingClosureMatching::Forward});
+      }
+
+      finishApply(implicitInit, toType, callLocator, callLocator);
+      return implicitInit;
     }
     }
   }
@@ -8588,16 +8641,15 @@ ExprWalker::rewriteTarget(SolutionApplicationTarget target) {
     // If we're supposed to convert the expression to some particular type,
     // do so now.
     if (shouldCoerceToContextualType()) {
-      resultExpr = Rewriter.coerceToType(resultExpr,
-                                         solution.simplifyType(convertType),
-                                         cs.getConstraintLocator(expr));
+      resultExpr =
+          Rewriter.coerceToType(resultExpr, solution.simplifyType(convertType),
+                                cs.getConstraintLocator(resultExpr));
     } else if (cs.getType(resultExpr)->hasLValueType() &&
                !target.isDiscardedExpr()) {
       // We referenced an lvalue. Load it.
       resultExpr = Rewriter.coerceToType(
-          resultExpr,
-          cs.getType(resultExpr)->getRValueType(),
-          cs.getConstraintLocator(expr));
+          resultExpr, cs.getType(resultExpr)->getRValueType(),
+          cs.getConstraintLocator(resultExpr));
     }
 
     if (!resultExpr)

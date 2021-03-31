@@ -553,8 +553,12 @@ template <typename T = Expr> T *castToExpr(ASTNode node) {
 }
 
 template <typename T = Expr> T *getAsExpr(ASTNode node) {
+  if (node.isNull())
+    return nullptr;
+
   if (auto *E = node.dyn_cast<Expr *>())
     return dyn_cast_or_null<T>(E);
+
   return nullptr;
 }
 
@@ -788,6 +792,10 @@ enum ScoreKind {
   SK_UnresolvedMemberViaOptional,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
+  /// An implicit conversion from a value of one type (lhs)
+  /// to another type (rhs) via implicit initialization of
+  /// `rhs` type with an argument of `lhs` value.
+  SK_ImplicitValueConversion,
   /// A user-defined conversion.
   SK_UserConversion,
   /// A non-trivial function conversion.
@@ -1169,6 +1177,10 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
+  /// Implicit value conversions applied for a given locator.
+  SmallVector<std::pair<ConstraintLocator *, ConversionRestrictionKind>, 2>
+      ImplicitValueConversions;
+
   /// The node -> type mappings introduced by this solution.
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
@@ -1393,6 +1405,10 @@ enum class ConstraintSystemFlags {
   /// calling conventions, say due to Clang attributes such as
   /// `__attribute__((ns_consumed))`.
   UseClangFunctionTypes = 0x80,
+
+  /// Disallow using Double and CGFloat interchangeably by means of
+  /// an implicit value conversion.
+  DisableImplicitDoubleCGFloatConversion = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -2202,6 +2218,11 @@ private:
   std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
       trailingClosureMatchingChoices;
 
+  /// The set of implicit value conversions performed by the solver on
+  /// a current path to reach a solution.
+  SmallVector<std::pair<ConstraintLocator *, ConversionRestrictionKind>, 2>
+      ImplicitValueConversions;
+
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
   ConstraintList ActiveConstraints;
@@ -2729,6 +2750,9 @@ public:
 
     /// The length of \c caseLabelItems.
     unsigned numCaseLabelItems;
+
+    /// The length of \c ImplicitValueConversions.
+    unsigned numImplicitValueConversions;
 
     /// The previous score.
     Score PreviousScore;
@@ -3996,7 +4020,7 @@ private:
   /// \returns \c true if an error was encountered, \c false otherwise.
   bool simplifyAppliedOverloadsImpl(Constraint *disjunction,
                                     TypeVariableType *fnTypeVar,
-                                    const FunctionType *argFnType,
+                                    FunctionType *argFnType,
                                     unsigned numOptionalUnwraps,
                                     ConstraintLocatorBuilder locator);
 
@@ -4021,7 +4045,7 @@ public:
   /// call.
   ///
   /// \returns \c true if an error was encountered, \c false otherwise.
-  bool simplifyAppliedOverloads(Type fnType, const FunctionType *argFnType,
+  bool simplifyAppliedOverloads(Type fnType, FunctionType *argFnType,
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
@@ -5334,11 +5358,12 @@ public:
 
   bool isBeginningOfPartition() const { return IsBeginningOfPartition; }
 
-  // FIXME: Both of the accessors below are required to support
+  // FIXME: All three of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
 
   bool isGenericOperator() const;
   bool isSymmetricOperator() const;
+  bool isUnaryOperator() const;
 
   void print(llvm::raw_ostream &Out, SourceManager *SM) const {
     Out << "disjunction choice ";

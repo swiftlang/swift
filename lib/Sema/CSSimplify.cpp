@@ -1345,12 +1345,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     }
   }
 
-  // If this application is part of an operator, then we allow an implicit
-  // lvalue to be compatible with inout arguments.  This is used by
-  // assignment operators.
-  auto anchor = locator.getAnchor();
-  assert(bool(anchor) && "locator without anchor?");
-
   auto isSynthesizedArgument = [](const AnyFunctionType::Param &arg) -> bool {
     if (auto *typeVar = arg.getPlainType()->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
@@ -5130,6 +5124,70 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             class2->getAttrs().hasAttribute<ObjCBridgedAttr>()) {
           conversionsOrFixes.push_back(
             ConversionRestrictionKind::ObjCTollFreeBridgeToCF);
+        }
+      }
+
+      if (kind >= ConstraintKind::Subtype &&
+          nominal1->getDecl() != nominal2->getDecl() &&
+          ((nominal1->isCGFloatType() || nominal2->isCGFloatType()) &&
+           (nominal1->isDoubleType() || nominal2->isDoubleType()))) {
+        if (Options.contains(
+                ConstraintSystemFlags::DisableImplicitDoubleCGFloatConversion))
+          return getTypeMatchFailure(locator);
+
+        // Support implicit Double<->CGFloat conversions only for
+        // something which could be directly represented in the AST
+        // e.g. argument-to-parameter, contextual conversions etc.
+        if (!locator.trySimplifyToExpr())
+          return getTypeMatchFailure(locator);
+
+        SmallVector<LocatorPathElt, 4> path;
+        auto anchor = locator.getLocatorParts(path);
+
+        // Try implicit CGFloat conversion only if:
+        // - This is not:
+        //     - an explicit call to a CGFloat initializer;
+        //     - an explicit coercion;
+        //     - a runtime type check (via `is` expression);
+        //     - a checked or conditional cast;
+        // - This is a first type such conversion is attempted for
+        //   for a given path (AST element).
+
+        auto isCGFloatInit = [&](ASTNode location) {
+          if (auto *call = getAsExpr<CallExpr>(location)) {
+            if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
+              return getInstanceType(typeExpr)->isCGFloatType();
+            }
+          }
+          return false;
+        };
+
+        auto isCoercionOrCast = [](ASTNode anchor,
+                                   ArrayRef<LocatorPathElt> path) {
+          // E.g. contextual conversion from coercion/cast
+          // to some other type.
+          if (!path.empty())
+            return false;
+
+          return isExpr<CoerceExpr>(anchor) || isExpr<IsExpr>(anchor) ||
+                 isExpr<ConditionalCheckedCastExpr>(anchor) ||
+                 isExpr<ForcedCheckedCastExpr>(anchor);
+        };
+
+        if (!isCGFloatInit(anchor) && !isCoercionOrCast(anchor, path) &&
+            llvm::none_of(path, [&](const LocatorPathElt &rawElt) {
+              if (auto elt =
+                      rawElt.getAs<LocatorPathElt::ImplicitConversion>()) {
+                auto convKind = elt->getConversionKind();
+                return convKind == ConversionRestrictionKind::DoubleToCGFloat ||
+                       convKind == ConversionRestrictionKind::CGFloatToDouble;
+              }
+              return false;
+            })) {
+          conversionsOrFixes.push_back(
+              desugar1->isCGFloatType()
+                  ? ConversionRestrictionKind::CGFloatToDouble
+                  : ConversionRestrictionKind::DoubleToCGFloat);
         }
       }
 
@@ -9307,7 +9365,7 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 
 bool ConstraintSystem::simplifyAppliedOverloadsImpl(
     Constraint *disjunction, TypeVariableType *fnTypeVar,
-    const FunctionType *argFnType, unsigned numOptionalUnwraps,
+    FunctionType *argFnType, unsigned numOptionalUnwraps,
     ConstraintLocatorBuilder locator) {
   // Don't attempt to filter overloads when solving for code completion
   // because presence of code completion token means that any call
@@ -9407,6 +9465,10 @@ retry_after_fail:
           return true;
         }
 
+        // If types lined up exactly, let's favor this overload choice.
+        if (Type(argFnType)->isEqual(choiceType))
+          constraint->setFavored();
+
         // Account for any optional unwrapping/binding
         for (unsigned i : range(numOptionalUnwraps)) {
           (void)i;
@@ -9494,8 +9556,7 @@ bool ConstraintSystem::simplifyAppliedOverloads(
 }
 
 bool ConstraintSystem::simplifyAppliedOverloads(
-    Type fnType, const FunctionType *argFnType,
-    ConstraintLocatorBuilder locator) {
+    Type fnType, FunctionType *argFnType, ConstraintLocatorBuilder locator) {
   // If we've already bound the function type, bail.
   auto *fnTypeVar = fnType->getAs<TypeVariableType>();
   if (!fnTypeVar || getFixedType(fnTypeVar))
@@ -10575,6 +10636,63 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     return matchTypes(type1,
                       bridgedObjCClass->getDeclaredInterfaceType(),
                       ConstraintKind::Subtype, subflags, locator);
+  }
+
+  case ConversionRestrictionKind::DoubleToCGFloat:
+  case ConversionRestrictionKind::CGFloatToDouble: {
+    // Prefer CGFloat -> Double over other way araund.
+    auto impact =
+        restriction == ConversionRestrictionKind::CGFloatToDouble ? 1 : 10;
+
+    if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
+      if (auto *anchor = locator.trySimplifyToExpr()) {
+        if (auto depth = getExprDepth(anchor))
+          impact = (*depth + 1) * impact;
+      }
+    }
+
+    increaseScore(SK_ImplicitValueConversion, impact);
+
+    if (worseThanBestSolution())
+      return SolutionKind::Error;
+
+    auto *conversionLoc = getConstraintLocator(
+        /*anchor=*/ASTNode(), LocatorPathElt::ImplicitConversion(restriction));
+
+    auto *applicationLoc =
+        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyFunction);
+
+    auto *memberLoc = getConstraintLocator(
+        applicationLoc, ConstraintLocator::ConstructorMember);
+
+    // Conversion has been already attempted for this direction
+    // and constructor choice has been recorded.
+    if (findSelectedOverloadFor(memberLoc))
+      return SolutionKind::Solved;
+
+    // Allocate a single argument info to cover all possible
+    // Double <-> CGFloat conversion locations.
+    if (!ArgumentInfos.count(memberLoc)) {
+      auto &ctx = getASTContext();
+      ArgumentInfo callInfo{
+          ctx.Allocate<Identifier>(1, AllocationArena::ConstraintSolver), None};
+      ArgumentInfos.insert({memberLoc, std::move(callInfo)});
+    }
+
+    auto *memberTy = createTypeVariable(memberLoc, TVO_CanBindToNoEscape);
+
+    addValueMemberConstraint(MetatypeType::get(type2, getASTContext()),
+                             DeclNameRef(DeclBaseName::createConstructor()),
+                             memberTy, DC, FunctionRefKind::DoubleApply,
+                             /*outerAlternatives=*/{}, memberLoc);
+
+    addConstraint(ConstraintKind::ApplicableFunction,
+                  FunctionType::get({FunctionType::Param(type1)}, type2),
+                  memberTy, applicationLoc);
+
+    ImplicitValueConversions.push_back(
+        {getConstraintLocator(locator), restriction});
+    return SolutionKind::Solved;
   }
   }
   
