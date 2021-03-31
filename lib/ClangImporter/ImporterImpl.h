@@ -405,9 +405,6 @@ private:
   /// Clang arguments used to create the Clang invocation.
   std::vector<std::string> ClangArgs;
 
-  /// The main actor type, populated the first time we look for it.
-  Optional<Type> MainActorType;
-
   /// Mapping from Clang swift_attr attribute text to the Swift source buffer
   /// IDs that contain that attribute text. These are re-used when parsing the
   /// Swift attributes on import.
@@ -686,6 +683,19 @@ public:
     decl->setImplicitlyUnwrappedOptional(true);
   }
 
+  void recordUnsafeConcurrencyForDecl(
+      ValueDecl *decl, bool isUnsafeSendable, bool isUnsafeMainActor) {
+    if (isUnsafeSendable) {
+      decl->getAttrs().add(
+          new (SwiftContext) UnsafeSendableAttr(/*implicit=*/true));
+    }
+
+    if (isUnsafeMainActor) {
+      decl->getAttrs().add(
+          new (SwiftContext) UnsafeMainActorAttr(/*implicit=*/true));
+    }
+  }
+
   /// Retrieve the Clang AST context.
   clang::ASTContext &getClangASTContext() const {
     return Instance->getASTContext();
@@ -818,9 +828,6 @@ public:
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
 
-  /// Look for the MainActor type in the _Concurrency library.
-  Type getMainActorType();
-
   /// Retrieve the Swift source buffer ID that corresponds to the given
   /// swift_attr attribute text, creating one if necessary.
   unsigned getClangSwiftAttrSourceBuffer(StringRef attributeText);
@@ -839,7 +846,8 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
-  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type);
+  Type applyParamAttributes(const clang::ParmVarDecl *param, Type type,
+                            bool &isUnsafeSendable, bool &isUnsafeMainActor);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.

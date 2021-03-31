@@ -19,6 +19,7 @@
 #include "CSDiagnostics.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckConcurrency.h"
 #include "TypeCheckProtocol.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTVisitor.h"
@@ -5707,6 +5708,52 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
+/// Apply the contextually Sendable flag to the given expression,
+static void applyUnsafeConcurrent(
+      Expr *expr, bool sendable, bool forMainActor) {
+  if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+    closure->setUnsafeConcurrent(sendable, forMainActor);
+    return;
+  }
+
+  if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
+    applyUnsafeConcurrent(
+        captureList->getClosureBody(), sendable, forMainActor);
+  }
+}
+
+/// Whether this is a reference to a method on the main dispatch queue.
+static bool isMainDispatchQueue(Expr *arg) {
+  auto call = dyn_cast<DotSyntaxCallExpr>(arg);
+  if (!call)
+    return false;
+
+  auto memberRef = dyn_cast<MemberRefExpr>(
+      call->getBase()->getValueProvidingExpr());
+  if (!memberRef)
+    return false;
+
+  auto member = memberRef->getMember();
+  if (member.getDecl()->getName().getBaseName().userFacingName() != "main")
+    return false;
+
+  auto typeExpr = dyn_cast<TypeExpr>(
+      memberRef->getBase()->getValueProvidingExpr());
+  if (!typeExpr)
+    return false;
+
+  Type baseType = typeExpr->getInstanceType();
+  if (!baseType)
+    return false;
+
+  auto baseNominal = baseType->getAnyNominal();
+  if (!baseNominal)
+    return false;
+
+  return baseNominal->getName().str() == "DispatchQueue";
+}
+
+
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, AnyFunctionType *funcType,
     ConcreteDeclRef callee,
@@ -5924,6 +5971,15 @@ Expr *ExprRewriter::coerceCallArguments(
 
     // Save the original label location.
     newLabelLocs.push_back(getLabelLoc(argIdx));
+
+    // Determine whether the parameter is unsafe Sendable or MainActor, and
+    // record it as such.
+    bool isUnsafeSendable = paramInfo.isUnsafeSendable(paramIdx);
+    bool isMainActor = paramInfo.isUnsafeMainActor(paramIdx) ||
+        (isUnsafeSendable && apply && isMainDispatchQueue(apply->getFn()));
+    applyUnsafeConcurrent(
+        arg, isUnsafeSendable && contextUsesConcurrencyFeatures(dc),
+        isMainActor);
 
     // If the types exactly match, this is easy.
     auto paramType = param.getOldType();

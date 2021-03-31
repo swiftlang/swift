@@ -6097,7 +6097,16 @@ public:
   /// constructor.
   bool hasDynamicSelfResult() const;
 
+
   AbstractFunctionDecl *getAsyncAlternative() const;
+
+  /// Determine whether this function is implicitly known to have its
+  /// parameters of function type be @_unsafeSendable.
+  ///
+  /// This hard-codes knowledge of a number of functions that will
+  /// eventually have @_unsafeSendable and, eventually, @Sendable,
+  /// on their parameters of function type.
+  bool hasKnownUnsafeSendableFunctionParams() const;
 
   using DeclContext::operator new;
   using Decl::getASTContext;

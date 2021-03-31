@@ -935,12 +935,36 @@ static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
   return paramType->is<AnyFunctionType>();
 }
 
+/// Determine whether the parameter is contextually Sendable.
+static bool isParamUnsafeSendable(const ParamDecl *param) {
+  // Check for @_unsafeSendable.
+  if (param->getAttrs().hasAttribute<UnsafeSendableAttr>())
+    return true;
+
+  // Check that the parameter is of function type.
+  Type paramType = param->isVariadic() ? param->getVarargBaseTy()
+                                       : param->getInterfaceType();
+  paramType = paramType->getRValueType()->lookThroughAllOptionalTypes();
+  if (!paramType->is<FunctionType>())
+    return false;
+
+  // Check whether this function is known to have @_unsafeSendable function
+  // parameters.
+  auto func = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
+  if (!func)
+    return false;
+
+  return func->hasKnownUnsafeSendableFunctionParams();
+}
+
 ParameterListInfo::ParameterListInfo(
     ArrayRef<AnyFunctionType::Param> params,
     const ValueDecl *paramOwner,
     bool skipCurriedSelf) {
   defaultArguments.resize(params.size());
   propertyWrappers.resize(params.size());
+  unsafeSendable.resize(params.size());
+  unsafeMainActor.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -992,6 +1016,14 @@ ParameterListInfo::ParameterListInfo(
     if (param->hasAttachedPropertyWrapper()) {
       propertyWrappers.set(i);
     }
+
+    if (isParamUnsafeSendable(param)) {
+      unsafeSendable.set(i);
+    }
+
+    if (param->getAttrs().hasAttribute<UnsafeMainActorAttr>()) {
+      unsafeMainActor.set(i);
+    }
   }
 }
 
@@ -1008,6 +1040,18 @@ bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
 
 bool ParameterListInfo::hasExternalPropertyWrapper(unsigned paramIdx) const {
   return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : false;
+}
+
+bool ParameterListInfo::isUnsafeSendable(unsigned paramIdx) const {
+  return paramIdx < unsafeSendable.size()
+      ? unsafeSendable[paramIdx]
+      : false;
+}
+
+bool ParameterListInfo::isUnsafeMainActor(unsigned paramIdx) const {
+  return paramIdx < unsafeMainActor.size()
+      ? unsafeMainActor[paramIdx]
+      : false;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not

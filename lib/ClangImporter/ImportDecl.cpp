@@ -8289,35 +8289,6 @@ bool importer::isImportedAsStatic(const clang::OverloadedOperatorKind op) {
   }
 }
 
-Type ClangImporter::Implementation::getMainActorType() {
-  if (MainActorType)
-    return *MainActorType;
-
-  auto finish = [&](Type type) -> Type {
-    MainActorType = type;
-    return type;
-  };
-
-  if (!SwiftContext.LangOpts.EnableExperimentalConcurrency) {
-    return finish(Type());
-  }
-
-  auto module = SwiftContext.getLoadedModule(SwiftContext.Id_Concurrency);
-  if (!module)
-    return finish(Type());
-
-  SmallVector<ValueDecl *, 1> decls;
-  module->lookupValue(
-    SwiftContext.getIdentifier("MainActor"),
-    NLKind::QualifiedLookup, decls);
-  for (auto decl : decls) {
-    if (auto typeDecl = dyn_cast<TypeDecl>(decl))
-      return finish(typeDecl->getDeclaredInterfaceType());
-  }
-
-  return finish(Type());
-}
-
 unsigned ClangImporter::Implementation::getClangSwiftAttrSourceBuffer(
     StringRef attributeText) {
   auto known = ClangSwiftAttrSourceBuffers.find(attributeText);
@@ -8529,7 +8500,7 @@ void ClangImporter::Implementation::importAttributes(
       // point at which to do name lookup for imported entities.
       if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
         bool isUnsafe = *isMainActor;
-        if (Type mainActorType = getMainActorType()) {
+        if (Type mainActorType = SwiftContext.getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
           attr->setArgIsUnsafe(isUnsafe);
