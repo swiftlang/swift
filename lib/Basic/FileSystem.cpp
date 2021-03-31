@@ -101,7 +101,8 @@ tryToOpenTemporaryFile(Optional<llvm::raw_fd_ostream> &openedStream,
 
   int fd;
   const unsigned perms = fs::all_read | fs::all_write;
-  std::error_code EC = fs::createUniqueFile(tempPath, fd, tempPath, perms);
+  std::error_code EC = fs::createUniqueFile(tempPath, fd, tempPath,
+                                            fs::OF_None, perms);
 
   if (EC) {
     // Ignore the specific error; the caller has to fall back to not using a
