@@ -31,6 +31,7 @@ import Swift
 /// These partial periods towards the task's completion are `PartialAsyncTask`.
 /// Partial tasks are generally not interacted with by end-users directly,
 /// unless implementing a scheduler.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct Task {
   internal let _task: Builtin.NativeObject
 
@@ -42,6 +43,7 @@ public struct Task {
 
 // ==== Current Task -----------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
   /// Returns 'current' `Task` instance, representing the task from within which
@@ -57,6 +59,7 @@ extension Task {
 
 // ==== Task Priority ----------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
   /// Returns the `current` task's priority.
@@ -128,6 +131,7 @@ extension Task {
 
 // ==== Task Handle ------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   /// A task handle refers to an in-flight `Task`,
   /// allowing for potentially awaiting for its result or Cancelling it.
@@ -202,6 +206,7 @@ extension Task {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task.Handle where Failure == Never {
 
   /// Wait for the task to complete, returning its result.
@@ -223,12 +228,14 @@ extension Task.Handle where Failure == Never {
   
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task.Handle: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task.Handle: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
@@ -238,12 +245,14 @@ extension Task.Handle: Equatable {
 
 // ==== Conformances -----------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
@@ -253,6 +262,7 @@ extension Task: Equatable {
 
 // ==== Job Flags --------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   /// Flags for schedulable jobs.
   ///
@@ -341,6 +351,7 @@ extension Task {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   /// Run given throwing `operation` as part of a new top-level task.
   ///
@@ -450,6 +461,7 @@ extension Task {
 
 // ==== Async Handler ----------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @Sendable () async -> ()
   Task.runDetached(
@@ -459,6 +471,7 @@ public func _runAsyncHandler(operation: @escaping () async -> ()) {
 
 // ==== Async Sleep ------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   /// Suspends the current task for _at least_ the given duration
   /// in nanoseconds.
@@ -483,6 +496,7 @@ extension Task {
 
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
   /// If available, returns the 'current' task, representing the async context
   /// from which this function was called.
@@ -520,6 +534,7 @@ extension Task {
 /// represented by this handle itself. Doing so may result in undefined behavior,
 /// and most certainly will break invariants in other places of the program
 /// actively running on this task.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct UnsafeCurrentTask {
   internal let _task: Builtin.NativeObject
 
@@ -555,12 +570,14 @@ public struct UnsafeCurrentTask {
 
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeCurrentTask: Hashable {
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeCurrentTask: Equatable {
   public static func ==(lhs: Self, rhs: Self) -> Bool {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
@@ -570,16 +587,20 @@ extension UnsafeCurrentTask: Equatable {
 
 // ==== Internal ---------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_getCurrent")
 func _getCurrentAsyncTask() -> Builtin.NativeObject?
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_getJobFlags")
 func getJobFlags(_ task: Builtin.NativeObject) -> Task.JobFlags
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
 func _enqueueJobGlobal(_ task: Builtin.Job)
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelay")
 @usableFromInline
 func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
@@ -588,9 +609,11 @@ func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 @_silgen_name("swift_task_runAndBlockThread")
 public func runAsyncAndBlock(_ asyncFun: @escaping () async -> ())
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_asyncMainDrainQueue")
 public func _asyncMainDrainQueue() -> Never
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 #if os(Windows)
   Task.runDetached {
@@ -622,12 +645,15 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 // FIXME: both of these ought to take their arguments _owned so that
 // we can do a move out of the future in the common case where it's
 // unreferenced
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_future_wait")
 public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_future_wait_throwing")
 public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func _runChildTask<T>(
   operation: @Sendable @escaping () async throws -> T
 ) async -> Builtin.NativeObject {
@@ -650,9 +676,11 @@ public func _runChildTask<T>(
   return task
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_cancel")
 func _taskCancel(_ task: Builtin.NativeObject)
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_isCancelled")
 func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
@@ -660,6 +688,7 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 
 /// Intrinsic used by SILGen to launch a task for bridging a Swift async method
 /// which was called through its ObjC-exported completion-handler-based API.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {

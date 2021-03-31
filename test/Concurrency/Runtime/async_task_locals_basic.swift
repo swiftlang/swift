@@ -17,6 +17,7 @@ class StringLike: CustomStringConvertible {
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension TaskLocalValues {
 
   struct StringKey: TaskLocalKey {
@@ -41,6 +42,7 @@ extension TaskLocalValues {
 
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 final class ClassTaskLocal {
   init() {
     print("clazz init \(ObjectIdentifier(self))")
@@ -51,6 +53,7 @@ final class ClassTaskLocal {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
   _ expected: Key.Value? = nil,
@@ -66,6 +69,7 @@ func printTaskLocal<Key>(
 
 // ==== ------------------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple() async {
   printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
   await Task.withLocal(\.number, boundTo: 1) {
@@ -73,6 +77,7 @@ func simple() async {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple_deinit() async {
   await Task.withLocal(\.clazz, boundTo: ClassTaskLocal()) {
     // CHECK: clazz init [[C:.*]]
@@ -85,6 +90,7 @@ func simple_deinit() async {
 struct Boom: Error {
   let value: String
 }
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple_throw() async {
   do {
     try await Task.withLocal(\.clazz, boundTo: ClassTaskLocal()) {
@@ -96,6 +102,7 @@ func simple_throw() async {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func nested() async {
   printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "hello") {
@@ -112,6 +119,7 @@ func nested() async {
   printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func nested_allContribute() async {
   printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "one") {
@@ -128,6 +136,7 @@ func nested_allContribute() async {
   printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func nested_3_onlyTopContributes() async {
   printTaskLocal(\.string) // CHECK: StringKey: <undefined> {{.*}}
   await Task.withLocal(\.string, boundTo: "one") {
@@ -144,6 +153,7 @@ func nested_3_onlyTopContributes() async {
   printTaskLocal(\.string) // CHECK-NEXT: StringKey: <undefined> {{.*}}
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func withLocal_body_mustNotEscape() async {
   var something = "Nice"
   await Task.withLocal(\.string, boundTo: "xxx") {
@@ -152,6 +162,7 @@ func withLocal_body_mustNotEscape() async {
   _ = something // silence not used warning
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await simple()
