@@ -5020,3 +5020,66 @@ bb0:
   return %3 : $Builtin.Word
 }
 
+struct Function {
+  var impl: (MyInt) -> Double
+}
+
+sil @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+
+// CHECK-LABEL: sil [ossa] @test_borrow_struct_extract : $@convention(thin) (@guaranteed Function) -> Double {
+// CHECK-NOT: struct_extract
+// CHECK-NOT: struct $Function
+// CHECK: } // end sil function 'test_borrow_struct_extract'
+sil [ossa] @test_borrow_struct_extract : $@convention(thin) (@guaranteed Function) -> Double {
+bb0(%0 : @guaranteed $Function):
+  %3 = function_ref @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %4 = copy_value %0 : $Function
+  %5 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %6 = struct $Function (%5 : $@callee_guaranteed (MyInt) -> Double)
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = struct $MyInt (%7 : $Builtin.Int32)
+  %9 = begin_borrow %6 : $Function
+  %12 = struct_extract %9 : $Function, #Function.impl
+  %13 = apply %12(%8) : $@callee_guaranteed (MyInt) -> Double
+  end_borrow %9 : $Function
+  destroy_value %6 : $Function
+  return %13 : $Double
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_tuple_extract : $@convention(thin) (@guaranteed Function) -> Double {
+// CHECK-NOT: tuple_extract
+// CHECK: } // end sil function 'test_borrow_tuple_extract'
+sil [ossa] @test_borrow_tuple_extract : $@convention(thin) (@guaranteed Function) -> Double {
+bb0(%0 : @guaranteed $Function):
+  %3 = function_ref @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %4 = copy_value %0 : $Function
+  %5 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = struct $MyInt (%7 : $Builtin.Int32)
+  %6 = tuple (%5 : $@callee_guaranteed (MyInt) -> Double, %7 : $Builtin.Int32)
+  %9 = begin_borrow %6 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32)
+  %12 = tuple_extract %9 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32), 0
+  %13 = apply %12(%8) : $@callee_guaranteed (MyInt) -> Double
+  end_borrow %9 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32)
+  destroy_value %6 : $(@callee_guaranteed (MyInt) -> Double, Builtin.Int32)
+  return %13 : $Double
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_unchecked_enum_data : $@convention(thin) (@guaranteed Function) -> Double {
+// CHECK-NOT: unchecked_enum_data
+// CHECK: } // end sil function 'test_borrow_unchecked_enum_data'
+sil [ossa] @test_borrow_unchecked_enum_data : $@convention(thin) (@guaranteed Function) -> Double {
+bb0(%0 : @guaranteed $Function):
+  %3 = function_ref @negateFunction : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %4 = copy_value %0 : $Function
+  %5 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed Function) -> Double
+  %7 = integer_literal $Builtin.Int32, 0
+  %8 = struct $MyInt (%7 : $Builtin.Int32)
+  %6 = enum $Optional<@callee_guaranteed (MyInt) -> Double>, #Optional.some!enumelt, %5 : $@callee_guaranteed (MyInt) -> Double
+  %9 = begin_borrow %6 : $Optional<@callee_guaranteed (MyInt) -> Double>
+  %12 = unchecked_enum_data %9 : $Optional<@callee_guaranteed (MyInt) -> Double>, #Optional.some!enumelt
+  %13 = apply %12(%8) : $@callee_guaranteed (MyInt) -> Double
+  end_borrow %9 : $Optional<@callee_guaranteed (MyInt) -> Double>
+  destroy_value %6 : $Optional<@callee_guaranteed (MyInt) -> Double>
+  return %13 : $Double
+}
