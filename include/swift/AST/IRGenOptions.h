@@ -40,7 +40,10 @@ enum class IRGenOutputKind : unsigned {
   Module,
 
   /// Generate an LLVM module and write it out as LLVM assembly.
-  LLVMAssembly,
+  LLVMAssemblyBeforeOptimization,
+
+  /// Generate an LLVM module and write it out as LLVM assembly.
+  LLVMAssemblyAfterOptimization,
 
   /// Generate an LLVM module and write it out as LLVM bitcode.
   LLVMBitcode,
@@ -354,7 +357,8 @@ public:
   JITDebugArtifact DumpJIT = JITDebugArtifact::None;
 
   IRGenOptions()
-      : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
+      : DWARFVersion(2),
+        OutputKind(IRGenOutputKind::LLVMAssemblyAfterOptimization),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
@@ -401,7 +405,8 @@ public:
     if (HasValueNamesSetting) {
       return ValueNames;
     } else {
-      return OutputKind == IRGenOutputKind::LLVMAssembly;
+      return OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization ||
+             OutputKind == IRGenOutputKind::LLVMAssemblyAfterOptimization;
     }
   }
 
