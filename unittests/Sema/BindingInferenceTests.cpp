@@ -300,3 +300,39 @@ TEST_F(SemaTest, TestComplexTransitiveProtocolInference) {
       *bindingsForT5.TransitiveProtocols,
       {protocolTy1, protocolTy2, protocolTy3, protocolTy4});
 }
+
+/// Let's try a situation where there protocols are inferred from
+/// multiple sources on different levels of equivalence chain.
+///
+/// T0 = T1
+///         = T2 (P0)
+///              = T3 (P1)
+TEST_F(SemaTest, TestTransitiveProtocolInferenceThroughEquivalenceChains) {
+  ConstraintSystemOptions options;
+  ConstraintSystem cs(DC, options);
+
+  auto *protocolTy0 = createProtocol("P0");
+  auto *protocolTy1 = createProtocol("P1");
+
+  auto *nilLocator = cs.getConstraintLocator({});
+
+  auto typeVar0 = cs.createTypeVariable(nilLocator, /*options=*/0);
+  // Allow this type variable to be bound to l-value type to prevent
+  // it from being merged with the rest of the type variables.
+  auto typeVar1 =
+    cs.createTypeVariable(nilLocator, /*options=*/TVO_CanBindToLValue);
+  auto typeVar2 = cs.createTypeVariable(nilLocator, /*options=*/0);
+  auto typeVar3 = cs.createTypeVariable(nilLocator, TVO_CanBindToLValue);
+
+  cs.addConstraint(ConstraintKind::Conversion, typeVar0, typeVar1, nilLocator);
+  cs.addConstraint(ConstraintKind::Equal, typeVar1, typeVar2, nilLocator);
+  cs.addConstraint(ConstraintKind::Equal, typeVar2, typeVar3, nilLocator);
+  cs.addConstraint(ConstraintKind::ConformsTo, typeVar2, protocolTy0, nilLocator);
+  cs.addConstraint(ConstraintKind::ConformsTo, typeVar3, protocolTy1, nilLocator);
+
+  auto bindings = inferBindings(cs, typeVar0);
+
+  ASSERT_TRUE(bool(bindings.TransitiveProtocols));
+  verifyProtocolInferenceResults(*bindings.TransitiveProtocols,
+                                 {protocolTy0, protocolTy1});
+}
