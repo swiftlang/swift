@@ -1264,8 +1264,8 @@ SerializedASTFile::getSourceOrderForDecl(const Decl *D) const {
   return File.getSourceOrderForDecl(D);
 }
 
-void
-SerializedASTFile::collectAllGroups(std::vector<StringRef> &Names) const {
+void SerializedASTFile::collectAllGroups(
+    SmallVectorImpl<StringRef> &Names) const {
   File.collectAllGroups(Names);
 };
 

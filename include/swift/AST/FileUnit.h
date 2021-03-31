@@ -166,7 +166,7 @@ public:
     return None;
   }
 
-  virtual void collectAllGroups(std::vector<StringRef> &Names) const {}
+  virtual void collectAllGroups(SmallVectorImpl<StringRef> &Names) const {}
 
   /// Returns an implementation-defined "discriminator" for \p D, which
   /// distinguishes \p D from other declarations in the same module with the

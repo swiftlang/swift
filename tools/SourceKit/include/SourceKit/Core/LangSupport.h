@@ -376,20 +376,21 @@ struct RefactoringInfo {
   UIdent Kind;
   StringRef KindName;
   StringRef UnavailableReason;
+
+  RefactoringInfo(UIdent Kind, StringRef KindName, StringRef UnavailableReason)
+      : Kind(Kind), KindName(KindName), UnavailableReason(UnavailableReason) {}
 };
 
 struct ParentInfo {
   StringRef Title;
   StringRef KindName;
   StringRef USR;
+
+  ParentInfo(StringRef Title, StringRef KindName, StringRef USR)
+      : Title(Title), KindName(KindName), USR(USR) {}
 };
 
-struct CursorInfoData {
-  // If nonempty, a proper Info could not be resolved (and the rest of the Info
-  // will be empty). Clients can potentially use this to show a diagnostic
-  // message to the user in lieu of using the empty response.
-  StringRef InternalDiagnostic;
-
+struct CursorSymbolInfo {
   UIdent Kind;
   UIdent DeclarationLang;
   StringRef Name;
@@ -398,7 +399,6 @@ struct CursorInfoData {
   StringRef TypeUSR;
   StringRef ContainerTypeUSR;
   StringRef DocComment;
-  StringRef TypeInterface;
   StringRef GroupName;
   /// A key for documentation comment localization, if it exists in the doc
   /// comment for the declaration.
@@ -415,8 +415,8 @@ struct CursorInfoData {
   /// Non-empty if a generated interface editor document has previously been
   /// opened for the module the symbol came from.
   StringRef ModuleInterfaceName;
-  /// This is an (offset,length) pair.
-  /// It is set only if the declaration has a source location.
+  /// This is an (offset,length) pair. It is set only if the declaration has a
+  /// source location.
   llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc = None;
   /// Set only if the declaration has a source location.
   StringRef Filename;
@@ -426,8 +426,6 @@ struct CursorInfoData {
   ArrayRef<StringRef> AnnotatedRelatedDeclarations;
   /// All groups of the module name under cursor.
   ArrayRef<StringRef> ModuleGroupArray;
-  /// All available actions on the code under cursor.
-  ArrayRef<RefactoringInfo> AvailableActions;
   /// Stores the Symbol Graph title, kind, and USR of the parent contexts of the
   /// symbol under the cursor.
   ArrayRef<ParentInfo> ParentContexts;
@@ -439,6 +437,16 @@ struct CursorInfoData {
   bool IsDynamic = false;
 
   llvm::Optional<unsigned> ParentNameOffset;
+};
+
+struct CursorInfoData {
+  // If nonempty, a proper Info could not be resolved (and the rest of the Info
+  // will be empty). Clients can potentially use this to show a diagnostic
+  // message to the user in lieu of using the empty response.
+  StringRef InternalDiagnostic;
+  llvm::ArrayRef<CursorSymbolInfo> Symbols;
+  /// All available actions on the code under cursor.
+  llvm::ArrayRef<RefactoringInfo> AvailableActions;
 };
 
 struct RangeInfo {
