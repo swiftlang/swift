@@ -6097,6 +6097,8 @@ public:
   /// constructor.
   bool hasDynamicSelfResult() const;
 
+  AbstractFunctionDecl *getAsyncAlternative() const;
+
   using DeclContext::operator new;
   using Decl::getASTContext;
 };

@@ -2954,10 +2954,9 @@ public:
   bool isCached() const { return true; }
 };
 
-class TypeCheckCompletionHandlerAsyncAttrRequest
-    : public SimpleRequest<TypeCheckCompletionHandlerAsyncAttrRequest,
-                           bool(AbstractFunctionDecl *,
-                                CompletionHandlerAsyncAttr *),
+class AsyncAlternativeRequest
+    : public SimpleRequest<AsyncAlternativeRequest,
+                           AbstractFunctionDecl *(AbstractFunctionDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2965,12 +2964,10 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator,
-                AbstractFunctionDecl *attachedFucntionDecl,
-                CompletionHandlerAsyncAttr *attr) const;
+  AbstractFunctionDecl *evaluate(
+      Evaluator &evaluator, AbstractFunctionDecl *attachedFunctionDecl) const;
 
 public:
-  // Caching
   bool isCached() const { return true; }
 };
 

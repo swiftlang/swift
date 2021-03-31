@@ -6843,6 +6843,12 @@ bool AbstractFunctionDecl::hasDynamicSelfResult() const {
   return isa<ConstructorDecl>(this);
 }
 
+AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
+  auto mutableFunc = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           AsyncAlternativeRequest{mutableFunc}, nullptr);
+}
+
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   // Initializers have argument labels.
   if (isa<ConstructorDecl>(this))
