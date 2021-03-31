@@ -221,9 +221,12 @@ extension Slice: Collection {
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     try _base.withContiguousStorageIfAvailable { buffer in
-      let start = _base.distance(from: _base.startIndex, to: _startIndex)
+      guard let baseAddress = buffer.baseAddress else { 
+        return try body(UnsafeBufferPointer(start: nil, count: 0))
+      }
+      let startOffset = _base.distance(from: _base.startIndex, to: _startIndex)
       let count = _base.distance(from: _startIndex, to: _endIndex)
-      let slice = UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
+      let slice = UnsafeBufferPointer(start: baseAddress + startOffset, count: count)
       return try body(slice)
     }
   }
