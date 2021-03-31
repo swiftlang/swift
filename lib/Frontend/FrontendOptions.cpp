@@ -59,6 +59,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::PrintFeature:
     return false;
   case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
@@ -119,6 +120,7 @@ bool FrontendOptions::doesActionRequireSwiftStandardLibrary(ActionType action) {
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
@@ -162,6 +164,7 @@ bool FrontendOptions::doesActionRequireInputs(ActionType action) {
   case ActionType::EmitSIB:
   case ActionType::Immediate:
   case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
@@ -203,6 +206,7 @@ bool FrontendOptions::doesActionPerformEndOfPipelineActions(ActionType action) {
   case ActionType::EmitSIB:
   case ActionType::Immediate:
   case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
@@ -287,6 +291,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::EmitAssembly:
     return TY_Assembly;
 
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
     return TY_LLVM_IR;
 
@@ -339,6 +344,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
@@ -382,6 +388,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
@@ -424,6 +431,7 @@ bool FrontendOptions::canActionEmitModuleSummary(ActionType action) {
     return false;
   case ActionType::EmitSIL:
   case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
@@ -464,6 +472,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
@@ -505,6 +514,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
@@ -546,6 +556,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::EmitSIL:
   case ActionType::EmitSIBGen:
   case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
@@ -591,6 +602,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitModuleOnly:
   case ActionType::EmitSIL:
   case ActionType::EmitSIB:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:
@@ -620,6 +632,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitSIB:
   case ActionType::EmitModuleOnly:
   case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
@@ -674,6 +687,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::EmitSILGen:
   case ActionType::EmitSIL:
   case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::DumpTypeInfo:
   case ActionType::DumpPCM:
@@ -717,6 +731,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitObject:
@@ -758,6 +773,7 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
     return false;
   case ActionType::Immediate:
   case ActionType::REPL:
+  case ActionType::EmitIRGen:
   case ActionType::EmitIR:
   case ActionType::EmitBC:
   case ActionType::EmitAssembly:

@@ -386,6 +386,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitObject;
   if (Opt.matches(OPT_emit_assembly))
     return FrontendOptions::ActionType::EmitAssembly;
+  if (Opt.matches(OPT_emit_irgen))
+    return FrontendOptions::ActionType::EmitIRGen;
   if (Opt.matches(OPT_emit_ir))
     return FrontendOptions::ActionType::EmitIR;
   if (Opt.matches(OPT_emit_bc))
