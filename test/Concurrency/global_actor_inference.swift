@@ -461,3 +461,16 @@ func acceptClosure<T>(_: () -> T) { }
   acceptClosure { getGlobal7() } // okay
   acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{global function 'getGlobal7()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
 }
+
+// ----------------------------------------------------------------------
+// Unsafe main actor parameter annotation
+// ----------------------------------------------------------------------
+func takesUnsafeMainActor(@_unsafeMainActor fn: () -> Void) { }
+
+@MainActor func onlyOnMainActor() { }
+
+func useUnsafeMainActor() {
+  takesUnsafeMainActor {
+    onlyOnMainActor() // okay due to parameter attribute
+  }
+}

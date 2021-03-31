@@ -4091,21 +4091,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
     anchor = apply->getFn();
   }
 
-  auto supportsProjectedValueInit = [&](ParamDecl *param) -> bool {
-    if (!param->hasAttachedPropertyWrapper())
-      return false;
-
-    if (param->hasImplicitPropertyWrapper())
-      return true;
-
-    if (param->getAttachedPropertyWrappers().front()->getArg())
-      return false;
-
-    auto wrapperInfo = param->getAttachedPropertyWrapperTypeInfo(0);
-    return wrapperInfo.projectedValueVar && wrapperInfo.hasProjectedValueInit;
-  };
-
-  if (argLabel.hasDollarPrefix() && (!param || !supportsProjectedValueInit(param))) {
+  if (argLabel.hasDollarPrefix() && (!param || !param->hasExternalPropertyWrapper())) {
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 

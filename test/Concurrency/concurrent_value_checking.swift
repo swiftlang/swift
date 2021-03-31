@@ -122,6 +122,24 @@ func testConcurrency() {
   }
 }
 
+func acceptUnsafeSendable(@_unsafeSendable _ fn: () -> Void) { }
+
+func testUnsafeSendableNothing() {
+  var x = 5
+  acceptUnsafeSendable {
+    x = 17
+  }
+  print(x)
+}
+
+func testUnsafeSendableInAsync() async {
+  var x = 5
+  acceptUnsafeSendable {
+    x = 17 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+  }
+  print(x)
+}
+
 // ----------------------------------------------------------------------
 // Sendable restriction on key paths.
 // ----------------------------------------------------------------------
