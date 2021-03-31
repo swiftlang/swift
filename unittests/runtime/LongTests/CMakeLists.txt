@@ -19,6 +19,12 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
     # Link the Objective-C runtime.
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES "objc")
+  elseif(SWIFT_HOST_VARIANT STREQUAL "linux")
+    if(SWIFT_HOST_VARIANT_ARCH MATCHES "armv6|armv7|i686")
+      list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
+        "atomic"
+        )
+    endif()
   elseif(SWIFT_HOST_VARIANT STREQUAL "freebsd")
     find_library(EXECINFO_LIBRARY execinfo)
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
