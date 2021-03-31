@@ -3596,6 +3596,9 @@ ERROR(unresolved_nil_literal,none,
 ERROR(cannot_force_unwrap_nil_literal,none,
       "'nil' literal cannot be force unwrapped", ())
 
+ERROR(could_not_infer_placeholder,none,
+      "could not infer type for placeholder", ())
+
 ERROR(type_of_expression_is_ambiguous,none,
       "type of expression is ambiguous without more context", ())
 
