@@ -63,3 +63,65 @@ func overload() -> String { "" }
 
 let _: _? = overload()
 let _ = overload() as _?
+
+struct Bar<T, U>
+where T: ExpressibleByIntegerLiteral, U: ExpressibleByIntegerLiteral {
+    var t: T
+    var u: U
+    func frobnicate() -> Bar {
+        return Bar(t: 42, u: 42)
+    }
+}
+
+extension Bar {
+    func frobnicate2() -> Bar<_, _> { // expected-error {{placeholder type not allowed here}}
+        return Bar(t: 42, u: 42)
+    }
+    func frobnicate3() -> Bar {
+        return Bar<_, _>(t: 42, u: 42)
+    }
+    func frobnicate4() -> Bar<_, _> { // expected-error {{placeholder type not allowed here}}
+        return Bar<_, _>(t: 42, u: 42)
+    }
+    func frobnicate5() -> Bar<_, U> { // expected-error {{placeholder type not allowed here}}
+        return Bar(t: 42, u: 42)
+    }
+    func frobnicate6() -> Bar {
+        return Bar<_, U>(t: 42, u: 42)
+    }
+    func frobnicate7() -> Bar<_, _> { // expected-error {{placeholder type not allowed here}}
+        return Bar<_, U>(t: 42, u: 42)
+    }
+    func frobnicate8() -> Bar<_, U> { // expected-error {{placeholder type not allowed here}}
+        return Bar<_, _>(t: 42, u: 42)
+    }
+}
+
+protocol P {}
+struct ConformsToP: P{}
+
+func somePlaceholder() -> some _ { ConformsToP() } // expected-error {{placeholder type not allowed here}}
+
+// FIXME: We should probably have better diagnostics for these situations--the user probably meant to use implicit member syntax
+let _: Int = _() // expected-error {{type of expression is ambiguous without more context}}
+let _: () -> Int = { _() } // expected-error {{unable to infer closure type in the current context}}
+let _: Int = _.init() // expected-error {{could not infer type for placeholder}}
+let _: () -> Int = { _.init() } // expected-error {{could not infer type for placeholder}}
+
+func returnsInt() -> Int { _() } // expected-error {{type of expression is ambiguous without more context}}
+func returnsIntClosure() -> () -> Int { { _() } } // expected-error {{unable to infer closure type in the current context}}
+func returnsInt2() -> Int { _.init() }  // expected-error {{could not infer type for placeholder}}
+func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error {{could not infer type for placeholder}}
+
+let _: Int.Type = _ // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
+let _: Int.Type = _.self
+
+struct SomeSuperLongAndComplexType {}
+func getSomething() -> SomeSuperLongAndComplexType? { .init() }
+let something: _! = getSomething()
+
+extension Array where Element == Int {
+    static var staticMember: Self { [] }
+}
+
+let _ = [_].staticMember
