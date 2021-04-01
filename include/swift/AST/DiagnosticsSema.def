@@ -3676,7 +3676,7 @@ NOTE(descriptive_generic_type_declared_here,none,
      "%0 declared here", (StringRef))
 
 ERROR(placeholder_type_not_allowed,none,
-      "you cannot use a placeholder type here", ())
+      "type placeholder not allowed here", ())
 
 WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
