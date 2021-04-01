@@ -4312,6 +4312,12 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
+  case ConstraintLocator::WrappedValue: {
+    conversionsOrFixes.push_back(AllowWrappedValueMismatch::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
   case ConstraintLocator::FunctionArgument: {
     auto *argLoc = getConstraintLocator(
         locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
@@ -11390,6 +11396,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     }
 
     return SolutionKind::Solved;
+  }
+          
+  case FixKind::AllowWrappedValueMismatch: {
+    if (recordFix(fix)) return SolutionKind::Error;
+      return SolutionKind::Solved;
   }
 
   case FixKind::UseSubscriptOperator:
