@@ -761,16 +761,6 @@ static bool isAsyncCall(const ApplyExpr *call) {
 static bool shouldDiagnoseExistingDataRaces(const DeclContext *dc);
 
 /// Determine whether this closure is escaping.
-static bool isEscapingClosure(const AbstractClosureExpr *closure) {
-  if (auto type = closure->getType()) {
-    if (auto fnType = type->getAs<AnyFunctionType>())
-      return !fnType->isNoEscape();
-  }
-
-  return true;
-}
-
-/// Determine whether this closure is escaping.
 static bool isSendableClosure(const AbstractClosureExpr *closure) {
   if (auto type = closure->getType()) {
     if (auto fnType = type->getAs<AnyFunctionType>())
@@ -2018,10 +2008,6 @@ namespace {
           return diag::actor_isolated_from_concurrent_closure;
         }
 
-        if (isEscapingClosure(closure)) {
-          return diag::actor_isolated_from_escaping_closure;
-        }
-
         return findActorIndependentReason(dc->getParent());
       }
 
@@ -2215,8 +2201,8 @@ namespace {
         }
       }
 
-      // Escaping and concurrent closures are always actor-independent.
-      if (isEscapingClosure(closure) || isSendableClosure(closure))
+      // Sendable closures are always actor-independent.
+      if (isSendableClosure(closure))
         return ClosureActorIsolation::forIndependent();
 
       // A non-escaping closure gets its isolation from its context.

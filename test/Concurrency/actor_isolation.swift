@@ -22,7 +22,7 @@ actor MySuperActor {
   var superState: Int = 25 // expected-note {{mutation of this property is only permitted within the actor}}
 
 
-  func superMethod() { // expected-note 2 {{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
+  func superMethod() { // expected-note {{calls to instance method 'superMethod()' from outside of its actor context are implicitly asynchronous}}
     self.superState += 5
   }
 
@@ -40,12 +40,12 @@ class Point {
 
 actor MyActor: MySuperActor {
   let immutable: Int = 17
-  // expected-note@+2 3{{property declared here}}
-  // expected-note@+1 8{{mutation of this property is only permitted within the actor}}
+  // expected-note@+2 2{{property declared here}}
+  // expected-note@+1 6{{mutation of this property is only permitted within the actor}}
   var mutable: Int = 71
 
   // expected-note@+2 3 {{mutation of this property is only permitted within the actor}}
-  // expected-note@+1 5{{property declared here}}
+  // expected-note@+1 4{{property declared here}}
   var text: [String] = []
 
   let point : Point = Point()
@@ -60,7 +60,7 @@ actor MyActor: MySuperActor {
   class func synchronousClass() { }
   static func synchronousStatic() { }
 
-  func synchronous() -> String { text.first ?? "nothing" } // expected-note 20{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
+  func synchronous() -> String { text.first ?? "nothing" } // expected-note 19{{calls to instance method 'synchronous()' from outside of its actor context are implicitly asynchronous}}
   func asynchronous() async -> String {
     super.superState += 4
     return synchronous()
@@ -241,15 +241,15 @@ extension MyActor {
       _ = otherLocalVar
     }
 
-    // Escaping closures might run concurrently.
+    // Escaping closures are still actor-isolated
     acceptEscapingClosure {
-      _ = self.text[0] // expected-error{{actor-isolated property 'text' cannot be referenced from an '@escaping' closure}}
-      _ = self.mutable // expected-error{{actor-isolated property 'mutable' cannot be referenced from an '@escaping' closure}}
-      self.mutable = 0 // expected-error{{actor-isolated property 'mutable' cannot be mutated from an '@escaping' closure}}
-      acceptInout(&self.mutable) // expected-error{{actor-isolated property 'mutable' cannot be used 'inout' from an '@escaping' closure}}
+      _ = self.text[0]
+      _ = self.mutable
+      self.mutable = 0
+      acceptInout(&self.mutable)
       _ = self.immutable
-      _ = self.synchronous() // expected-error{{actor-isolated instance method 'synchronous()' cannot be referenced from an '@escaping' closure}}
-      _ = localVar // okay, don't complain about escaping
+      _ = self.synchronous()
+      _ = localVar
       _ = localConstant
     }
 
@@ -281,7 +281,7 @@ extension MyActor {
 
     // Partial application
     _ = synchronous  // expected-error{{actor-isolated instance method 'synchronous()' can not be partially applied}}
-    _ = super.superMethod // expected-error{{actor-isolated instance method 'superMethod()' can not be referenced from a non-isolated context}}
+    _ = super.superMethod
     acceptClosure(synchronous)
     acceptClosure(self.synchronous)
     acceptClosure(otherActor.synchronous) // expected-error{{actor-isolated instance method 'synchronous()' can only be referenced on 'self'}}
