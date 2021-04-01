@@ -1790,9 +1790,6 @@ public:
       if (nom->getDecl() != substNom->getDecl())
         return CanType();
       
-      if (nom->getDecl()->isInvalid())
-        return CanType();
-      
       // Same decl should always either have or not have a parent.
       assert((bool)nom->getParent() == (bool)substNom->getParent());
       
@@ -2034,8 +2031,6 @@ public:
       return CanType();
 
     auto *decl = bgt->getDecl();
-    if (decl->isInvalid())
-      return CanType();
 
     auto *moduleDecl = decl->getParentModule();
     auto origSubMap = bgt->getContextSubstitutionMap(
