@@ -44,7 +44,11 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) where E == Never {
+    #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeNonThrowingContinuationReturning(context, value)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it return normally
@@ -61,7 +65,11 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(returning value: __owned T) {
+    #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationReturning(context, value)
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Resume the task awaiting the continuation by having it throw an error
@@ -78,7 +86,11 @@ public struct UnsafeContinuation<T, E: Error> {
   /// able to reschedule it.
   @_alwaysEmitIntoClient
   public func resume(throwing error: __owned E) {
+#if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationThrowing(context, error)
+#else
+    fatalError("Swift compiler is incompatible with this SDK version")
+#endif
   }
 }
 
