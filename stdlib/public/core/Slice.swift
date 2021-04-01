@@ -226,7 +226,9 @@ extension Slice: Collection {
       }
       let startOffset = _base.distance(from: _base.startIndex, to: _startIndex)
       let count = _base.distance(from: _startIndex, to: _endIndex)
-      let slice = UnsafeBufferPointer(start: baseAddress + startOffset, count: count)
+      let slice = UnsafeBufferPointer(
+        start: baseAddress + startOffset, count: _assumeNonNegative(count)
+      )
       return try body(slice)
     }
   }
