@@ -6240,6 +6240,20 @@ void GenericSignatureBuilder::ExplicitRequirement::dump(
     out << rhs.get<LayoutConstraint>();
 }
 
+static bool typeImpliesLayoutConstraint(Type t, LayoutConstraint layout) {
+  if (layout->isRefCounted() && t->satisfiesClassConstraint())
+    return true;
+
+  return false;
+}
+
+static bool typeConflictsWithLayoutConstraint(Type t, LayoutConstraint layout) {
+  if (layout->isClass() && !t->satisfiesClassConstraint())
+    return true;
+
+  return false;
+}
+
 void GenericSignatureBuilder::computeRedundantRequirements() {
   assert(!Impl->computedRedundantRequirements &&
          "Already computed redundant requirements");
@@ -6397,9 +6411,12 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
                                                concreteTypeRequirement);
     }
 
+    Optional<ExplicitRequirement> layoutRequirement;
+
     if (equivClass.layout) {
       SmallVector<Constraint<LayoutConstraint>, 2> exact;
       SmallVector<Constraint<LayoutConstraint>, 2> lessSpecific;
+      SmallVector<Constraint<LayoutConstraint>, 2> impliedByConcrete;
 
       for (const auto &constraint : equivClass.layoutConstraints) {
         auto *source = constraint.source;
@@ -6416,6 +6433,12 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
         if (derivedViaConcrete)
           continue;
 
+        if (resolvedConcreteType) {
+          if (typeImpliesLayoutConstraint(resolvedConcreteType, layout)) {
+            impliedByConcrete.push_back(constraint);
+          }
+        }
+
         if (layout == equivClass.layout) {
           exact.push_back(constraint);
           continue;
@@ -6431,12 +6454,16 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
               std::make_pair(req, equivClass.layout));
         }
 
-        // FIXME: Check for a conflict via the concrete type.
         lessSpecific.push_back(constraint);
       }
 
-      graph.addConstraintsFromEquivClass(RequirementKind::Layout,
-                                         exact, lessSpecific);
+      layoutRequirement =
+          graph.addConstraintsFromEquivClass(RequirementKind::Layout,
+                                             exact, lessSpecific);
+
+      graph.handleConstraintsImpliedByConcrete(RequirementKind::Layout,
+                                               impliedByConcrete,
+                                               concreteTypeRequirement);
     }
 
     if (resolvedConcreteType && resolvedSuperclass) {
@@ -6444,6 +6471,13 @@ void GenericSignatureBuilder::computeRedundantRequirements() {
         Impl->ConflictingConcreteTypeRequirements.push_back(
             {*concreteTypeRequirement, *superclassRequirement,
              resolvedConcreteType, resolvedSuperclass});
+      }
+    } else if (resolvedConcreteType && equivClass.layout) {
+      if (typeConflictsWithLayoutConstraint(resolvedConcreteType,
+                                            equivClass.layout)) {
+        Impl->ConflictingConcreteTypeRequirements.push_back(
+            {*concreteTypeRequirement, *layoutRequirement,
+             resolvedConcreteType, equivClass.layout});
       }
     }
   }
@@ -7267,8 +7301,6 @@ void GenericSignatureBuilder::diagnoseConflictingConcreteTypeRequirements() cons
     SourceLoc loc = pair.concreteTypeRequirement.getSource()->getLoc();
     SourceLoc otherLoc = pair.otherRequirement.getSource()->getLoc();
 
-    Type otherRHS = pair.otherRHS.get<Type>();
-
     if (loc.isInvalid() && otherLoc.isInvalid())
       continue;
 
@@ -7280,18 +7312,30 @@ void GenericSignatureBuilder::diagnoseConflictingConcreteTypeRequirements() cons
     switch (pair.otherRequirement.getKind()) {
     case RequirementKind::Superclass: {
       Context.Diags.diagnose(subjectLoc, diag::type_does_not_inherit,
-                             subjectType, pair.resolvedConcreteType, otherRHS);
+                             subjectType, pair.resolvedConcreteType,
+                             pair.otherRHS.get<Type>());
 
       if (otherLoc.isValid()) {
         Context.Diags.diagnose(otherLoc, diag::superclass_redundancy_here,
-                               subjectType, otherRHS);
+                               subjectType, pair.otherRHS.get<Type>());
+      }
+
+      break;
+    }
+
+    case RequirementKind::Layout: {
+      Context.Diags.diagnose(subjectLoc, diag::type_is_not_a_class,
+                             subjectType, pair.resolvedConcreteType, Type());
+
+      if (otherLoc.isValid()) {
+        Context.Diags.diagnose(otherLoc, diag::previous_layout_constraint,
+                               subjectType, pair.otherRHS.get<LayoutConstraint>());
       }
 
       break;
     }
 
     case RequirementKind::Conformance:
-    case RequirementKind::Layout:
     case RequirementKind::SameType:
       llvm_unreachable("TODO");
     }
