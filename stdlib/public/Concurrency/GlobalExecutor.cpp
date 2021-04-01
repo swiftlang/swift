@@ -60,10 +60,11 @@
 
 #if !SWIFT_CONCURRENCY_COOPERATIVE_GLOBAL_EXECUTOR
 #include <dispatch/dispatch.h>
-#endif
 
 #if !defined(_WIN32)
 #include <dlfcn.h>
+#endif
+
 #endif
 
 using namespace swift;
