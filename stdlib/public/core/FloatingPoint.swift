@@ -1130,7 +1130,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// A Boolean value indicating whether this instance is finite.
   ///
   /// All values other than NaN and infinity are considered finite, whether
-  /// normal or subnormal.
+  /// normal or subnormal.  For NaN, both `isFinite` and `isInfinite` are false.
   var isFinite: Bool { get }
 
   /// A Boolean value indicating whether the instance is equal to zero.
@@ -1157,8 +1157,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
 
   /// A Boolean value indicating whether the instance is infinite.
   ///
-  /// Note that `isFinite` and `isInfinite` don't form a dichotomy, because
-  /// they are not total: If `x` is `NaN`, then both properties are `false`.
+  /// For NaN, both `isFinite` and `isInfinite` are false.
   var isInfinite: Bool { get }
 
   /// A Boolean value indicating whether the instance is NaN ("not a number").
