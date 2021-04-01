@@ -93,7 +93,7 @@ ${Availability(bits)}
 extension ${Self}: CustomStringConvertible {
   /// A textual representation of the value.
   ///
-  /// For all finite values, the value of this property is a string that can be
+  /// For any finite value, this property provides a string that can be
   /// converted back to an instance of `${Self}` without rounding errors.  That
   /// is, if `x` is an instance of `${Self}`, then `${Self}(x.description) ==
   /// x` is always true.  For any NaN value, the property's value is "nan", and
