@@ -142,6 +142,7 @@ public func withTaskGroup<ChildTaskResult: Sendable, GroupResult>(
 ///   - once the `withTaskGroup` returns the group is guaranteed to be empty.
 /// - if the body throws:
 ///   - all tasks remaining in the group will be automatically cancelled.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func withThrowingTaskGroup<ChildTaskResult: Sendable, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
   returning returnType: GroupResult.Type = GroupResult.self,
@@ -189,6 +190,7 @@ public func withThrowingTaskGroup<ChildTaskResult: Sendable, GroupResult>(
 /// A task group serves as storage for dynamically spawned tasks.
 ///
 /// It is created by the `withTaskGroup` function.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct TaskGroup<ChildTaskResult: Sendable> {
 
   private let _task: Builtin.NativeObject
@@ -427,6 +429,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 /// child tasks.
 ///
 /// It is created by the `withTaskGroup` function.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   private let _task: Builtin.NativeObject
@@ -685,6 +688,7 @@ extension TaskGroup: AsyncSequence {
   /// after any task completes by throwing an error.
   ///
   /// - SeeAlso: `TaskGroup.next()`
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
 
@@ -738,6 +742,7 @@ extension ThrowingTaskGroup: AsyncSequence {
   /// throwing an error, no further task results are returned.
   ///
   /// - SeeAlso: `ThrowingTaskGroup.next()`
+  @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   public struct Iterator: AsyncIteratorProtocol {
     public typealias Element = ChildTaskResult
 

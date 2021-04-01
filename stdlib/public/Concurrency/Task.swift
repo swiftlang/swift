@@ -393,8 +393,8 @@ extension Task {
 /// - Returns: handle to the task, allowing to `await handle.get()` on the
 ///     tasks result or `cancel` it. If the operation fails the handle will
 ///     throw the error the operation has thrown when awaited on.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func detach<T>(
   priority: Task.Priority = .unspecified,
   operation: __owned @Sendable @escaping () async -> T
@@ -447,6 +447,7 @@ public func detach<T>(
 ///     tasks result or `cancel` it. If the operation fails the handle will
 ///     throw the error the operation has thrown when awaited on.
 @discardableResult
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func detach<T, Failure>(
   priority: Task.Priority = .unspecified,
   operation: __owned @Sendable @escaping () async throws -> T
@@ -468,8 +469,8 @@ public func detach<T, Failure>(
 
 // ==== Async Handler ----------------------------------------------------------
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 // TODO: remove this?
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @Sendable () async -> ()
   detach(
