@@ -3302,7 +3302,7 @@ hop_to_executor
 
   hop_to_executor %0 : $T
 
-  // $T must conform to the Actor protocol
+  // $T must be Builtin.Executor or conform to the Actor protocol
 
 Ensures that all instructions, which need to run on the actor's executor
 actually run on that executor.
@@ -3311,6 +3311,11 @@ This instruction can only be used inside an ``@async`` function.
 Checks if the current executor is the one which is bound to the operand actor.
 If not, begins a suspension point and enqueues the continuation to the executor
 which is bound to the operand actor.
+
+SIL generation emits this instruction with operands of actor type as
+well as of type ``Builtin.Executor``.  The former are expected to be
+lowered by the SIL pipeline, so that IR generation only operands of type
+``Builtin.Executor`` remain.
 
 The operand is a guaranteed operand, i.e. not consumed.
 

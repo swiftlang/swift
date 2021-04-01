@@ -20,4 +20,13 @@ struct AddressOnlyIntWrapper {
   int operator()(int x, int y) const;
 };
 
+struct ReadWriteIntArray {
+private:
+  int values[5] = { 1, 2, 3, 4, 5 };
+
+public:
+  const int &operator[](int x) const;
+  int &operator[](int x);
+};
+
 #endif

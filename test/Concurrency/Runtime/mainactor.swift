@@ -4,6 +4,9 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 import Dispatch
 
 /// @returns true iff the expected answer is actually the case, i.e., correct.

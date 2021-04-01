@@ -68,6 +68,30 @@ class C2: P2 {
   }
 }
 
+struct AllInP1: P1 {
+  func method() { } // expected-note {{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+  func other() { } // expected-note {{calls to instance method 'other()' from outside of its actor context are implicitly asynchronous}}
+}
+
+func testAllInP1(ap1: AllInP1) { // expected-note 2 {{add '@SomeGlobalActor' to make global function 'testAllInP1(ap1:)' part of global actor 'SomeGlobalActor'}}
+  ap1.method() // expected-error{{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  ap1.other() // expected-error{{instance method 'other()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+}
+
+struct NotAllInP1 {
+  func other() { }
+}
+
+extension NotAllInP1: P1 {
+  func method() { } // expected-note{{calls to instance method 'method()' from outside of its actor context are implicitly asynchronous}}
+}
+
+func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor' to make global function 'testNotAllInP1(nap1:)' part of global actor 'SomeGlobalActor'}}
+  nap1.method() // expected-error{{instance method 'method()' isolated to global actor 'SomeGlobalActor' can not be referenced from this synchronous context}}
+  nap1.other() // okay
+}
+
+
 // ----------------------------------------------------------------------
 // Global actor inference for classes and extensions
 // ----------------------------------------------------------------------
@@ -436,4 +460,17 @@ func acceptClosure<T>(_: () -> T) { }
 @SomeGlobalActor func someGlobalActorFunc() async {
   acceptClosure { getGlobal7() } // okay
   acceptClosure { @actorIndependent in getGlobal7() } // expected-error{{global function 'getGlobal7()' isolated to global actor 'SomeGlobalActor' can not be referenced from a non-isolated synchronous context}}
+}
+
+// ----------------------------------------------------------------------
+// Unsafe main actor parameter annotation
+// ----------------------------------------------------------------------
+func takesUnsafeMainActor(@_unsafeMainActor fn: () -> Void) { }
+
+@MainActor func onlyOnMainActor() { }
+
+func useUnsafeMainActor() {
+  takesUnsafeMainActor {
+    onlyOnMainActor() // okay due to parameter attribute
+  }
 }

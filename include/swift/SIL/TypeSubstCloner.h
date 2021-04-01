@@ -54,6 +54,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
     SubstitutionMap Subs;
     SmallVector<SILValue, 8> Args;
     SubstitutionMap RecursiveSubs;
+    ApplyOptions ApplyOpts;
 
   public:
     ApplySiteCloningHelper(ApplySite AI, TypeSubstCloner &Cloner)
@@ -66,6 +67,14 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       // Remap substitutions.
       Subs = Cloner.getOpSubstitutionMap(AI.getSubstitutionMap());
+
+      // If we're inlining a [noasync] function, make sure any calls inside it
+      // are marked as [noasync] as appropriate.
+      ApplyOpts = AI.getApplyOptions();
+      if (!Builder.getFunction().isAsync() &&
+          SubstCalleeSILType.castTo<SILFunctionType>()->isAsync()) {
+        ApplyOpts |= ApplyFlags::DoesNotAwait;
+      }
 
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
@@ -122,6 +131,10 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
     SubstitutionMap getSubstitutions() const {
       return Subs;
+    }
+
+    ApplyOptions getApplyOptions() const {
+      return ApplyOpts;
     }
   };
 
@@ -214,7 +227,7 @@ protected:
         getBuilder().createApply(getOpLocation(Inst->getLoc()),
                                  Helper.getCallee(), Helper.getSubstitutions(),
                                  Helper.getArguments(),
-                                 Inst->getApplyOptions(),
+                                 Helper.getApplyOptions(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
     // Specialization can return noreturn applies that were not identified as
@@ -234,7 +247,7 @@ protected:
         Helper.getSubstitutions(), Helper.getArguments(),
         getOpBasicBlock(Inst->getNormalBB()),
         getOpBasicBlock(Inst->getErrorBB()),
-        Inst->getApplyOptions(),
+        Helper.getApplyOptions(),
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
     recordClonedInstruction(Inst, N);

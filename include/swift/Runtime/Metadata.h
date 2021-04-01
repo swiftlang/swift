@@ -494,6 +494,13 @@ swift_getFunctionTypeMetadata(FunctionTypeFlags flags,
 
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
+swift_getFunctionTypeMetadataDifferentiable(
+    FunctionTypeFlags flags, FunctionMetadataDifferentiabilityKind diffKind,
+    const Metadata *const *parameters, const uint32_t *parameterFlags,
+    const Metadata *result);
+
+SWIFT_RUNTIME_EXPORT
+const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata0(FunctionTypeFlags flags,
                                const Metadata *result);
 

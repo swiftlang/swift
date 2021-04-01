@@ -164,8 +164,14 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = mod.lookUpFunction(nameTmp)) {
-    assert(fn->getLoweredFunctionType() == constantType);
-    assert(fn->getLinkage() == linkage ||
+    // During SILGen (where the module's SIL stage is Raw), there might be
+    // mismatches between the type or linkage. This can happen, when two
+    // functions are mistakenly mapped to the same name (e.g. with @_cdecl).
+    // We want to issue a regular error in this case and not crash with an
+    // assert.
+    assert(mod.getStage() == SILStage::Raw ||
+           fn->getLoweredFunctionType() == constantType);
+    assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
             fn->getLinkage() ==
                 constant.getLinkage(ForDefinition_t::ForDefinition)));

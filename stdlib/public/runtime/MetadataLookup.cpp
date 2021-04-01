@@ -1477,8 +1477,13 @@ public:
   }
 
   TypeLookupErrorOr<BuiltType>
-  createFunctionType(llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
-                     BuiltType result, FunctionTypeFlags flags) const {
+  createFunctionType(
+      llvm::ArrayRef<Demangle::FunctionParam<BuiltType>> params,
+      BuiltType result, FunctionTypeFlags flags,
+      FunctionMetadataDifferentiabilityKind diffKind) const {
+    assert(
+        (flags.isDifferentiable() && diffKind.isDifferentiable()) ||
+        (!flags.isDifferentiable() && !diffKind.isDifferentiable()));
     llvm::SmallVector<BuiltType, 8> paramTypes;
     llvm::SmallVector<uint32_t, 8> paramFlags;
 
@@ -1492,11 +1497,15 @@ public:
         paramFlags.push_back(param.getFlags().getIntValue());
     }
 
-    return swift_getFunctionTypeMetadata(flags, paramTypes.data(),
-                                         flags.hasParameterFlags()
-                                           ? paramFlags.data()
-                                           : nullptr,
-                                         result);
+    return flags.isDifferentiable()
+        ? swift_getFunctionTypeMetadataDifferentiable(
+              flags, diffKind, paramTypes.data(),
+              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+              result)
+        : swift_getFunctionTypeMetadata(
+              flags, paramTypes.data(),
+              flags.hasParameterFlags() ? paramFlags.data() : nullptr,
+              result);
   }
 
   struct BuiltLayoutConstraint {

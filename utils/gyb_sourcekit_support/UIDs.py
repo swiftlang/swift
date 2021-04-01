@@ -113,7 +113,6 @@ UID_KEYS = [
     KEY('Deprecated', 'key.deprecated'),
     KEY('Obsoleted', 'key.obsoleted'),
     KEY('RemoveCache', 'key.removecache'),
-    KEY('TypeInterface', 'key.typeinterface'),
     KEY('TypeUsr', 'key.typeusr'),
     KEY('ContainerTypeUsr', 'key.containertypeusr'),
     KEY('ModuleGroups', 'key.modulegroups'),
@@ -190,6 +189,7 @@ UID_KEYS = [
     KEY('CompileOperation', 'key.compile_operation'),
     KEY('EffectiveAccess', 'key.effective_access'),
     KEY('DeclarationLang', 'key.decl_lang'),
+    KEY('SecondarySymbols', 'key.secondary_symbols'),
 ]
 
 

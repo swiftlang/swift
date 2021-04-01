@@ -1157,7 +1157,7 @@ ModuleFile::getSourceOrderForDecl(const Decl *D) const {
   return Triple.getValue().SourceOrder;
 }
 
-void ModuleFile::collectAllGroups(std::vector<StringRef> &Names) const {
+void ModuleFile::collectAllGroups(SmallVectorImpl<StringRef> &Names) const {
   if (!Core->GroupNamesMap)
     return;
   for (auto It = Core->GroupNamesMap->begin(); It != Core->GroupNamesMap->end();

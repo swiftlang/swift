@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -enable-experimental-enum-codable-derivation
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
 // Enums with a CodingKeys entity which is not a type should not derive
 // conformance.

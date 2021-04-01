@@ -787,13 +787,29 @@ enum class FunctionMetadataConvention: uint8_t {
 
 /// Differentiability kind for function type metadata.
 /// Duplicates `DifferentiabilityKind` in AST/AutoDiff.h.
-enum class FunctionMetadataDifferentiabilityKind: uint8_t {
-  NonDifferentiable = 0b00000,
-  Forward           = 0b00001,
-  Reverse           = 0b00010,
-  Normal            = 0b00011,
-  Linear            = 0b10000,
+template <typename int_type>
+struct TargetFunctionMetadataDifferentiabilityKind {
+  enum Value : int_type {
+    NonDifferentiable = 0,
+    Forward           = 1,
+    Reverse           = 2,
+    Normal            = 3,
+    Linear            = 4,
+  } Value;
+
+  constexpr TargetFunctionMetadataDifferentiabilityKind(
+      enum Value value = NonDifferentiable) : Value(value) {}
+
+  int_type getIntValue() const {
+    return (int_type)Value;
+  }
+
+  bool isDifferentiable() const {
+    return Value != NonDifferentiable;
+  }
 };
+using FunctionMetadataDifferentiabilityKind =
+    TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
 /// Flags in a function type metadata record.
 template <typename int_type>
@@ -808,8 +824,7 @@ class TargetFunctionTypeFlags {
     ThrowsMask             = 0x01000000U,
     ParamFlagsMask         = 0x02000000U,
     EscapingMask           = 0x04000000U,
-    DifferentiabilityMask  = 0x98000000U,
-    DifferentiabilityShift = 27U,
+    DifferentiableMask     = 0x08000000U,
     AsyncMask              = 0x20000000U,
     SendableMask           = 0x40000000U,
   };
@@ -842,10 +857,10 @@ public:
                                              (throws ? ThrowsMask : 0));
   }
 
-  constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
-      FunctionMetadataDifferentiabilityKind differentiabilityKind) const {
-    return TargetFunctionTypeFlags((Data & ~DifferentiabilityMask)
-        | (int_type(differentiabilityKind) << DifferentiabilityShift));
+  constexpr TargetFunctionTypeFlags<int_type>
+  withDifferentiable(bool differentiable) const {
+    return TargetFunctionTypeFlags<int_type>((Data & ~DifferentiableMask) |
+                                     (differentiable ? DifferentiableMask : 0));
   }
 
   constexpr TargetFunctionTypeFlags<int_type>
@@ -888,13 +903,7 @@ public:
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
 
   bool isDifferentiable() const {
-    return getDifferentiabilityKind() !=
-        FunctionMetadataDifferentiabilityKind::NonDifferentiable;
-  }
-
-  FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
-    return FunctionMetadataDifferentiabilityKind(
-        (Data & DifferentiabilityMask) >> DifferentiabilityShift);
+    return bool (Data & DifferentiableMask);
   }
 
   int_type getIntValue() const {
@@ -945,6 +954,12 @@ public:
   withAutoClosure(bool isAutoClosure) const {
     return TargetParameterTypeFlags<int_type>(
         (Data & ~AutoClosureMask) | (isAutoClosure ? AutoClosureMask : 0));
+  }
+
+  constexpr TargetParameterTypeFlags<int_type>
+  withNoDerivative(bool isNoDerivative) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~NoDerivativeMask) | (isNoDerivative ? NoDerivativeMask : 0));
   }
 
   bool isNone() const { return Data == 0; }
@@ -1212,6 +1227,9 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
+
+  /// Dispatch integration.
+  const uint16_t DispatchInvokeFunction = 0xf493; // = 62611
 }
 
 /// The number of arguments that will be passed directly to a generic

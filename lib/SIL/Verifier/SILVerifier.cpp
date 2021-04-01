@@ -1851,6 +1851,16 @@ public:
               "default-actor builtin can only operate on default actors");
       return;
     }
+
+    if (builtinKind == BuiltinValueKind::BuildSerialExecutorRef) {
+      requireObjectType(BuiltinExecutorType, BI,
+                        "result of buildSerialExecutorRef");
+      auto arguments = BI->getArguments();
+      require(arguments.size() == 1,
+              "buildSerialExecutorRef expects one argument");
+      require(arguments[0]->getType().isObject(),
+              "operand of buildSerialExecutorRef should have object type");
+    }
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
@@ -4770,6 +4780,15 @@ public:
     for (unsigned i : indices(blockParams)) {
       require(blockParams[i] == invokeBlockParams[i],
           "result must match all parameters of invoke function but the first");
+    }
+  }
+
+  void checkHopToExecutorInst(HopToExecutorInst *HI) {
+    auto executor = HI->getTargetExecutor();
+    if (HI->getModule().getStage() == SILStage::Lowered) {
+      requireObjectType(BuiltinExecutorType, executor->getType(),
+                        "hop_to_executor instruction must take a "
+                        "Builtin.Executor in lowered SIL");
     }
   }
   

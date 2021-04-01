@@ -6,7 +6,7 @@
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 
 // This file is testing out the basic YAML functionality to make sure that it
-// works without burdening opt-remark-generator-yaml.swift with having to update all
+// works without burdening opt_remark_generator_yaml.swift with having to update all
 // of the yaml test cases everytime new code is added.
 
 public class Klass {}
@@ -14,7 +14,7 @@ public class Klass {}
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt_remark_generator_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 7 ]], Column: 21 }
 // CHECK-NEXT: Function:        main
 // CHECK-NEXT: Args:
@@ -27,7 +27,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift', 
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt_remark_generator_yaml.swift', 
 // CHECK-NEXT:                    Line: [[# @LINE + 27 ]], Column: 12 }
 // CHECK-NEXT: Function:        'getGlobal()'
 // CHECK-NEXT: Args:
@@ -35,14 +35,14 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:   - ValueType:       Klass
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT:   - InferredValue:   'of ''global'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift', 
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt_remark_generator_yaml.swift', 
 // CHECK-NEXT:                        Line: [[# @LINE - 14 ]], Column: 12 }
 // CHECK-NEXT: ...
 //
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt_remark_generator_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 12]], Column: 5 }
 // CHECK-NEXT: Function:        'getGlobal()'
 // CHECK-NEXT: Args:
@@ -50,7 +50,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT:   - ValueType:       Klass
 // CHECK-NEXT:   - String:          ''''
 // CHECK-NEXT:   - InferredValue:   'of ''global'''
-// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}opt_remark_generator_yaml.swift',
 // CHECK-NEXT:                        Line: [[# @LINE - 29 ]], Column: 12 }
 // CHECK-NEXT: ...
 @inline(never)
@@ -64,7 +64,7 @@ public func getGlobal() -> Klass {
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt_remark_generator_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 23]], Column: 11 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
@@ -75,7 +75,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-opt-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt-remark-generator-yaml.swift',
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}opt_remark_generator_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 12]], Column: 12 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:

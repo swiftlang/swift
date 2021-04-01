@@ -290,25 +290,51 @@ void BindingSet::inferTransitiveProtocolRequirements(
     // If current type variable is part of an equivalence
     // class, make it a "representative" and let it infer
     // supertypes and direct protocol requirements from
-    // other members.
-    for (const auto &entry : bindings.Info.EquivalentTo) {
-      auto eqBindings = inferredBindings.find(entry.first);
-      if (eqBindings != inferredBindings.end()) {
-        const auto &bindings = eqBindings->getSecond();
+    // other members and their equivalence classes.
+    SmallSetVector<TypeVariableType *, 4> equivalenceClass;
+    {
+      SmallVector<TypeVariableType *, 4> workList;
+      workList.push_back(currentVar);
 
-        llvm::SmallPtrSet<Constraint *, 2> placeholder;
-        // Add any direct protocols from members of the
-        // equivalence class, so they could be propagated
-        // to all of the members.
-        propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
-                             placeholder);
+      do {
+        auto *typeVar = workList.pop_back_val();
 
-        // Since type variables are equal, current type variable
-        // becomes a subtype to any supertype found in the current
-        // equivalence  class.
-        for (const auto &eqEntry : bindings.Info.SubtypeOf)
-          addToWorkList(currentVar, eqEntry.first);
-      }
+        if (!equivalenceClass.insert(typeVar))
+          continue;
+
+        auto bindingSet = inferredBindings.find(typeVar);
+        if (bindingSet == inferredBindings.end())
+          continue;
+
+        auto &equivalences = bindingSet->getSecond().Info.EquivalentTo;
+        for (const auto &eqVar : equivalences) {
+          workList.push_back(eqVar.first);
+        }
+      } while (!workList.empty());
+    }
+
+    for (const auto &memberVar : equivalenceClass) {
+      if (memberVar == currentVar)
+        continue;
+
+      auto eqBindings = inferredBindings.find(memberVar);
+      if (eqBindings == inferredBindings.end())
+        continue;
+
+      const auto &bindings = eqBindings->getSecond();
+
+      llvm::SmallPtrSet<Constraint *, 2> placeholder;
+      // Add any direct protocols from members of the
+      // equivalence class, so they could be propagated
+      // to all of the members.
+      propagateProtocolsTo(currentVar, bindings.getConformanceRequirements(),
+                           placeholder);
+
+      // Since type variables are equal, current type variable
+      // becomes a subtype to any supertype found in the current
+      // equivalence  class.
+      for (const auto &eqEntry : bindings.Info.SubtypeOf)
+        addToWorkList(currentVar, eqEntry.first);
     }
 
     // More subtype/equivalences relations have been added.
@@ -435,7 +461,6 @@ void BindingSet::inferTransitiveBindings(
 
 void BindingSet::finalize(
     llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings) {
-  inferTransitiveProtocolRequirements(inferredBindings);
   inferTransitiveBindings(inferredBindings);
 
   determineLiteralCoverage();
@@ -452,11 +477,14 @@ void BindingSet::finalize(
       // func foo<T: P>(_: T) {}
       // foo(.bar) <- `.bar` should be a static member of `P`.
       // \endcode
-      if (!hasViableBindings() && TransitiveProtocols.hasValue()) {
-        for (auto *constraint : *TransitiveProtocols) {
-          auto protocolTy = constraint->getSecondType();
-          addBinding(
-              {protocolTy, AllowedBindingKind::Exact, constraint});
+      if (!hasViableBindings()) {
+        inferTransitiveProtocolRequirements(inferredBindings);
+
+        if (TransitiveProtocols.hasValue()) {
+          for (auto *constraint : *TransitiveProtocols) {
+            auto protocolTy = constraint->getSecondType();
+            addBinding({protocolTy, AllowedBindingKind::Exact, constraint});
+          }
         }
       }
     }
@@ -507,6 +535,36 @@ void BindingSet::addBinding(PotentialBinding binding) {
     for (auto *typeVar : referencedTypeVars) {
       if (typeVar->getImpl().canBindToLValue())
         return;
+    }
+  }
+
+  // Since Double and CGFloat are effectively the same type due to an
+  // implicit conversion between them, always prefer Double over CGFloat
+  // when possible.
+  //
+  // Note: This optimization can't be performed for closure parameters
+  //       because their type could be converted only at the point of
+  //       use in the closure body.
+  if (!TypeVar->getImpl().isClosureParameterType()) {
+    auto type = binding.BindingType;
+
+    if (type->isCGFloatType() &&
+        llvm::any_of(Bindings, [](const PotentialBinding &binding) {
+          return binding.BindingType->isDoubleType();
+        }))
+      return;
+
+    if (type->isDoubleType()) {
+      auto inferredCGFloat =
+          llvm::find_if(Bindings, [](const PotentialBinding &binding) {
+            return binding.BindingType->isCGFloatType();
+          });
+
+      if (inferredCGFloat != Bindings.end()) {
+        Bindings.erase(inferredCGFloat);
+        Bindings.insert(inferredCGFloat->withType(type));
+        return;
+      }
     }
   }
 

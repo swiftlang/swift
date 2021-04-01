@@ -756,6 +756,12 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
 
+  if (!f->empty()) {
+    diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
+             f->getName());
+    return;
+  }
+
   if (constant.isForeignToNativeThunk()) {
     f->setThunk(IsThunk);
     if (constant.asForeign().isClangGenerated())

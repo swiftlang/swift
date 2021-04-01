@@ -1711,7 +1711,8 @@ static Type applyToFunctionType(
 }
 
 Type ClangImporter::Implementation::applyParamAttributes(
-    const clang::ParmVarDecl *param, Type type) {
+    const clang::ParmVarDecl *param, Type type, bool &isUnsafeSendable,
+    bool &isUnsafeMainActor) {
   if (!param->hasAttrs())
     return type;
 
@@ -1731,7 +1732,7 @@ Type ClangImporter::Implementation::applyParamAttributes(
 
     // Map the main-actor attribute.
     if (isMainActorAttr(SwiftContext, swiftAttr)) {
-      if (Type mainActor = getMainActorType()) {
+      if (Type mainActor = SwiftContext.getMainActorType()) {
         type = applyToFunctionType(type, [&](ASTExtInfo extInfo) {
           return extInfo.withGlobalActor(mainActor);
         });
@@ -1746,6 +1747,18 @@ Type ClangImporter::Implementation::applyParamAttributes(
         return extInfo.withConcurrent();
       });
 
+      continue;
+    }
+
+    // Map @_unsafeSendable.
+    if (swiftAttr->getAttribute() == "@_unsafeSendable") {
+      isUnsafeSendable = true;
+      continue;
+    }
+
+    // Map @_unsafeMainActor.
+    if (swiftAttr->getAttribute() == "@_unsafeMainActor") {
+      isUnsafeMainActor = true;
       continue;
     }
   }
@@ -1928,7 +1941,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     // Apply attributes to the type.
-    swiftParamTy = applyParamAttributes(param, swiftParamTy);
+    bool isUnsafeSendable = false;
+    bool isUnsafeMainActor = false;
+    swiftParamTy = applyParamAttributes(
+        param, swiftParamTy, isUnsafeSendable, isUnsafeMainActor);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -1949,6 +1965,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
+    recordUnsafeConcurrencyForDecl(
+        paramInfo, isUnsafeSendable, isUnsafeMainActor);
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -2426,7 +2444,10 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     }
 
     // Apply Clang attributes to the parameter type.
-    swiftParamTy = applyParamAttributes(param, swiftParamTy);
+    bool isUnsafeSendable = false;
+    bool isUnsafeMainActor = false;
+    swiftParamTy = applyParamAttributes(
+        param, swiftParamTy, isUnsafeSendable, isUnsafeMainActor);
 
     // Figure out the name for this parameter.
     Identifier bodyName = importFullName(param, CurrentVersion)
@@ -2450,6 +2471,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
+    recordUnsafeConcurrencyForDecl(
+        paramInfo, isUnsafeSendable, isUnsafeMainActor);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||

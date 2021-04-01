@@ -5,7 +5,7 @@
 import Foundation
 import ObjCConcurrency
 
-@MainActor func onlyOnMainActor() { } // expected-note{{calls to global function 'onlyOnMainActor()' from outside of its actor context are implicitly asynchronous}}
+@MainActor func onlyOnMainActor() { }
 
 func testSlowServer(slowServer: SlowServer) async throws {
   let _: Int = await slowServer.doSomethingSlow("mail")
@@ -72,6 +72,13 @@ func testSlowServerSynchronous(slowServer: SlowServer) {
     print(s)
     onlyOnMainActor() // okay because runOnMainThread has a @MainActor closure
   }
+
+  slowServer.overridableButRunsOnMainThread { s in
+    print(s)
+    onlyOnMainActor() // okay because parameter has @_unsafeMainActor
+  }
+
+  let _: Int = slowServer.overridableButRunsOnMainThread // expected-error{{cannot convert value of type '(((String) -> Void)?) -> Void' to specified type 'Int'}}
 }
 
 func testSlowServerOldSchool(slowServer: SlowServer) {
@@ -85,6 +92,7 @@ func testSlowServerOldSchool(slowServer: SlowServer) {
 func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicitly non-concurrent}}
   doSomethingConcurrently(fn)
   // expected-error@-1{{passing non-concurrent parameter 'fn' to function expecting a @Sendable closure}}
+  doSomethingConcurrentlyButUnsafe(fn) // okay, @Sendable not part of the type
 
   var x = 17
   doSomethingConcurrently {
@@ -92,6 +100,14 @@ func testSendable(fn: () -> Void) { // expected-note{{parameter 'fn' is implicit
     x = x + 1 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
     // expected-error@-1{{reference to captured var 'x' in concurrently-executing code}}
   }
+}
+
+func testSendableInAsync() async {
+  var x = 17
+  doSomethingConcurrentlyButUnsafe {
+    x = 42 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+  }
+  print(x)
 }
 
 // Check import of attributes
@@ -130,8 +146,6 @@ struct SomeGlobalActor {
   static let shared = SomeActor()
 }
 
-@SomeGlobalActor(unsafe) func unsafelyOnSomeGlobal() { }
-
 class MyButton : NXButton {
   @MainActor func testMain() {
     onButtonPress() // okay
@@ -141,28 +155,10 @@ class MyButton : NXButton {
     onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor'}}
   }
 
-  func test() { // expected-note{{add '@MainActor' to make instance method 'test()' part of global actor 'MainActor'}}
-    onButtonPress() // okay, onButtonPress is @MainActor(unsafe)
-    unsafelyOnSomeGlobal() // okay, we haven't opted into anything
-    onlyOnMainActor() // expected-error{{global function 'onlyOnMainActor()' isolated to global actor 'MainActor' can not be referenced from this synchronous context}}
-  }
-}
-
-class MyOtherButton: NXButton {
-  override func onButtonPress() { // expected-note{{calls to instance method 'onButtonPress()' from outside of its actor context are implicitly asynchronous}}
-    onlyOnMainActor() // yes, we're on the main actor
-    unsafelyOnSomeGlobal() // okay, we haven't opted into any actual checking
-  }
-
   func test() {
-    onButtonPress() // okay, it's @MainActor(unsafe)
-  }
-
-  @SomeGlobalActor func testOther() {
-    onButtonPress() // expected-error{{instance method 'onButtonPress()' isolated to global actor 'MainActor' can not be referenced from different global actor 'SomeGlobalActor' in a synchronous context}}
+    onButtonPress() // okay
   }
 }
-
 
 func testButtons(mb: MyButton) {
   mb.onButtonPress()

@@ -344,3 +344,20 @@ func testConstantRange(x: Int) {
   constantClosedRange(x: x...10)
     // expected-error@-1 {{argument must be an integer literal}}
 }
+
+struct ConstructorTest {
+  @_semantics("oslog.requires_constant_arguments")
+  init(x: Int) { }
+
+  @_semantics("oslog.requires_constant_arguments")
+  init(_ x: Int) { }
+}
+
+func testConstructorAnnotation(x: Int) {
+  let _ = ConstructorTest(x: 10)
+  let _ = ConstructorTest(x: x)
+    // expected-error@-1 {{argument must be an integer literal}}
+  let _ = ConstructorTest(10)
+  let _ = ConstructorTest(x)
+    // expected-error@-1 {{argument must be an integer literal}}
+}

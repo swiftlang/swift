@@ -808,9 +808,26 @@ public:
                        .withAsync(Function->isAsync())
                        .withThrows(Function->isThrowing())
                        .withParameterFlags(Function->hasParameterFlags())
-                       .withEscaping(Function->isEscaping());
-      auto BuiltFunction =
-          Builder.createFunctionType(Parameters, Result, flags);
+                       .withEscaping(Function->isEscaping())
+                       .withDifferentiable(Function->isDifferentiable());
+
+      FunctionMetadataDifferentiabilityKind diffKind;
+      switch (Function->getDifferentiabilityKind().Value) {
+      #define CASE(X) \
+        case TargetFunctionMetadataDifferentiabilityKind< \
+            typename Runtime::StoredSize>::X: \
+          diffKind = FunctionMetadataDifferentiabilityKind::X; \
+          break;
+      CASE(NonDifferentiable)
+      CASE(Forward)
+      CASE(Reverse)
+      CASE(Normal)
+      CASE(Linear)
+      #undef CASE
+      }
+
+      auto BuiltFunction = Builder.createFunctionType(
+          Parameters, Result, flags, diffKind);
       TypeCache[MetadataAddress] = BuiltFunction;
       return BuiltFunction;
     }
@@ -1669,6 +1686,11 @@ protected:
 
         if (flags.hasParameterFlags())
           totalSize += flags.getNumParameters() * sizeof(uint32_t);
+
+        if (flags.isDifferentiable())
+          totalSize = roundUpToAlignment(totalSize, sizeof(void *)) +
+              sizeof(TargetFunctionMetadataDifferentiabilityKind<
+                  typename Runtime::StoredSize>);
 
         return _readMetadata(address,
                              roundUpToAlignment(totalSize, sizeof(void *)));

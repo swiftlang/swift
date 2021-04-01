@@ -3053,7 +3053,7 @@ void SILCloner<ImplClass>
   recordClonedInstruction(Inst,
                           getBuilder().createHopToExecutor(
                             getOpLocation(Inst->getLoc()),
-                            getOpValue(Inst->getActor())));
+                            getOpValue(Inst->getTargetExecutor())));
 }
 
 
