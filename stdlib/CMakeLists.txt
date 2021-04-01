@@ -83,6 +83,10 @@ set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     must specify the form of LTO by setting this to one of: 'full', 'thin'. This
     option only affects the standard library and runtime, not tools.")
 
+set(SWIFT_EXPERIMENTAL_COREFOUNDATION_OVERLAY_SDKS_FROM_REPO ""
+    CACHE STRING
+    "SDKs for which to build CoreFoundation overlay from swift-corelibs-foundation repo")
+
 #
 # End of user-configurable options.
 #
