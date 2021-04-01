@@ -281,8 +281,10 @@ public:
   /// See if we have an alloc_stack that is only written to once by an
   /// initializing instruction.
   void visitStackAccess(AllocStackInst *stack) {
-    SmallVector<Operand *, 8> destroyAddrOperands;
-    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrOperands);
+    // These will contain all of the address destroying operands that form the
+    // lifetime of the object. They may not be destroy_addr!
+    SmallVector<Operand *, 8> addrDestroyingOperands;
+    bool initialAnswer = isSingleInitAllocStack(stack, addrDestroyingOperands);
     if (!initialAnswer)
       return answer(true);
 
@@ -291,7 +293,7 @@ public:
     LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError = !checker.validateLifetime(
-        stack, destroyAddrOperands /*consuming users*/,
+        stack, addrDestroyingOperands /*consuming users*/,
         liveRange.getAllConsumingUses() /*non consuming users*/);
     return answer(foundError);
   }
