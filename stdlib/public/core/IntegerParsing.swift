@@ -11,42 +11,47 @@
 //===----------------------------------------------------------------------===//
 
 @_alwaysEmitIntoClient
-internal func _parseASCIIDigits<Result: FixedWidthInteger>(
+internal func _parseDigitsInASCII<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
   _internalInvariant(radix >= 2 && radix <= 36)
   guard _fastPath(!codeUnits.isEmpty) else { return nil }
-  let numericalUpperBound, uppercaseUpperBound, lowercaseUpperBound: UInt8
+  
+  // ASCII constants, named for clarity:
+  let _0 = 48 as UInt8, _A = 65 as UInt8, _a = 97 as UInt8
+  
+  let numericalUpperBound: UInt8
+  let uppercaseUpperBound: UInt8
+  let lowercaseUpperBound: UInt8
   if radix <= 10 {
-    numericalUpperBound = 48 /* "0" */ &+ UInt8(radix)
-    uppercaseUpperBound = 65
-    lowercaseUpperBound = 97
+    numericalUpperBound = _0 &+ UInt8(truncatingIfNeeded: radix)
+    uppercaseUpperBound = _A
+    lowercaseUpperBound = _a
   } else {
-    numericalUpperBound = 58
-    uppercaseUpperBound = 65 /* "A" */ &+ UInt8(radix &- 10)
-    lowercaseUpperBound = 97 /* "a" */ &+ UInt8(radix &- 10)
+    numericalUpperBound = _0 &+ 10
+    uppercaseUpperBound = _A &+ UInt8(truncatingIfNeeded: radix &- 10)
+    lowercaseUpperBound = _a &+ UInt8(truncatingIfNeeded: radix &- 10)
   }
-  let multiplicand = Result(radix)
+  let multiplicand = Result(truncatingIfNeeded: radix)
   var result = 0 as Result
   for digit in codeUnits {
     let digitValue: Result
-    if _fastPath(digit >= 48 && digit < numericalUpperBound) {
-      digitValue = Result(digit &- 48)
-    } else if _fastPath(digit >= 65 && digit < uppercaseUpperBound) {
-      digitValue = Result(digit &- 65 &+ 10)
-    } else if _fastPath(digit >= 97 && digit < lowercaseUpperBound) {
-      digitValue = Result(digit &- 97 &+ 10)
+    if _fastPath(digit >= _0 && digit < numericalUpperBound) {
+      digitValue = Result(truncatingIfNeeded: digit &- _0)
+    } else if _fastPath(digit >= _A && digit < uppercaseUpperBound) {
+      digitValue = Result(truncatingIfNeeded: digit &- _A &+ 10)
+    } else if _fastPath(digit >= _a && digit < lowercaseUpperBound) {
+      digitValue = Result(truncatingIfNeeded: digit &- _a &+ 10)
     } else {
       return nil
     }
-    let (temporary, overflow1) =
-      result.multipliedReportingOverflow(by: multiplicand)
-    guard _fastPath(!overflow1) else { return nil }
-    let (nextResult, overflow2) = isNegative
-      ? temporary.subtractingReportingOverflow(digitValue)
-      : temporary.addingReportingOverflow(digitValue)
-    guard _fastPath(!overflow2) else { return nil }
-    result = nextResult
+    let overflow1: Bool
+    (result, overflow1) = result.multipliedReportingOverflow(by: multiplicand)
+    let overflow2: Bool
+    (result, overflow2) = isNegative
+      ? result.subtractingReportingOverflow(digitValue)
+      : result.addingReportingOverflow(digitValue)
+    guard _fastPath(!overflow1 && !overflow2) else { return nil }
   }
   return result
 }
@@ -56,18 +61,22 @@ internal func _parseASCII<Result: FixedWidthInteger>(
   _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
   _internalInvariant(!codeUnits.isEmpty)
+  
+  // ASCII constants, named for clarity:
+  let _plus = 43 as UInt8, _minus = 45 as UInt8
+  
   let first = codeUnits[0]
-  if first == 45 /* "-" */ {
-    return _parseASCIIDigits(
+  if first == _minus {
+    return _parseDigitsInASCII(
       UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: true)
   }
-  if first == 43 /* "+" */ {
-    return _parseASCIIDigits(
+  if first == _plus {
+    return _parseDigitsInASCII(
       UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: false)
   }
-  return _parseASCIIDigits(codeUnits, radix: radix, isNegative: false)
+  return _parseDigitsInASCII(codeUnits, radix: radix, isNegative: false)
 }
 
 @_alwaysEmitIntoClient
@@ -150,18 +159,18 @@ extension FixedWidthInteger {
   }
 }
 
-// -----------------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
 // Old entry points preserved for ABI compatibility.
-// -----------------------------------------------------------------------------
+//===----------------------------------------------------------------------===//
 
 /// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
-@usableFromInline
+@usableFromInline // Previously '@inlinable'.
 internal func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
   _internalInvariant(c.value >= 0 && c.value <= 0x7F, "not ASCII")
   return UTF16.CodeUnit(c.value)
 }
 
-@usableFromInline
+@usableFromInline // Previously '@inlinable @inline(__always)'.
 internal func _asciiDigit<CodeUnit: UnsignedInteger, Result: BinaryInteger>(
   codeUnit u_: CodeUnit, radix: Result
 ) -> Result? {
@@ -179,7 +188,7 @@ internal func _asciiDigit<CodeUnit: UnsignedInteger, Result: BinaryInteger>(
   return Result(truncatingIfNeeded: d)
 }
 
-@usableFromInline
+@usableFromInline // Previously '@inlinable @inline(__always)'.
 internal func _parseUnsignedASCII<
   Rest: IteratorProtocol, Result: FixedWidthInteger
 >(
@@ -209,12 +218,10 @@ where Rest.Element: UnsignedInteger {
   return result
 }
 
-//
-// Before it was superseded, this function was about 20KB of always-inline code,
-// most of which were MOV instructions.
-//
+// This function has been superseded because it is about 20KB of previously
+// always-inline code, most of which are MOV instructions.
 
-@usableFromInline
+@usableFromInline // Previously '@inlinable @inline(__always)'.
 internal func _parseASCII<
   CodeUnits: IteratorProtocol, Result: FixedWidthInteger
 >(
