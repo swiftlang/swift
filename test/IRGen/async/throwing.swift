@@ -130,6 +130,15 @@ func testSyncDoesntThrowThenAsyncDoesntThrow() async throws -> (Int, Int) {
   return (sync, async)
 }
 
+public enum MyError : Error {
+    case a
+}
+
+// We used to crash on this.
+public func throwLarge() async throws -> (Int, Int, Int, Int, Int, Int, Int, Int) {
+    throw MyError.a
+}
+
 // CHECK: E()
 // CHECK: E()
 // CHECK: E()
