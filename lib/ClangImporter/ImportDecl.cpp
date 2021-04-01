@@ -172,8 +172,8 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
                                 accessorInfo->Kind, accessorInfo->Storage,
                                 /*StaticLoc*/ SourceLoc(),
                                 StaticSpellingKind::None,
-                                throws, /*ThrowsLoc=*/SourceLoc(),
                                 async, /*AsyncLoc=*/SourceLoc(),
+                                throws, /*ThrowsLoc=*/SourceLoc(),
                                 genericParams, bodyParams,
                                 resultTy, dc, clangNode);
   } else {

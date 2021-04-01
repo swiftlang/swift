@@ -106,8 +106,13 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   if (isDone())
     return false;
 
-  if (shouldIgnore(D))
+  if (shouldIgnore(D)) {
+    // If we return true here, the children will still be visited, but we won't
+    // call walkToDeclPre on SEWalker. The corresponding walkToDeclPost call
+    // on SEWalker will be prevented by the check for shouldIgnore in
+    // walkToDeclPost in SemaAnnotator.
     return isa<PatternBindingDecl>(D);
+  }
 
   if (!handleCustomAttributes(D)) {
     Cancelled = true;
@@ -134,15 +139,15 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
         if (!SEWalker.visitDeclarationArgumentName(PD->getArgumentName(), Loc,
                                                    VD)) {
           Cancelled = true;
-          return true;
+          return false;
         }
       }
-      return false;
+      return true;
     };
 
     if (isa<AbstractFunctionDecl>(VD) || isa<SubscriptDecl>(VD)) {
       auto ParamList = getParameterList(VD);
-      if (ReportParamList(ParamList))
+      if (!ReportParamList(ParamList))
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -208,6 +213,10 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
 }
 
 std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
+  if (isDone()) {
+    return { false, nullptr };
+  }
+
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
   if (TraverseChildren) {
     if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
@@ -230,6 +239,10 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
 }
 
 Stmt *SemaAnnotator::walkToStmtPost(Stmt *S) {
+  if (isDone()) {
+    return nullptr;
+  }
+
   bool Continue = SEWalker.walkToStmtPost(S);
   if (!Continue)
     Cancelled = true;
@@ -247,23 +260,36 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   assert(E);
 
-  std::pair<bool, Expr *> stopTraversal = { false, nullptr };
-  std::pair<bool, Expr *> skipChildren = { false, E };
+  if (isDone()) {
+    return { false, nullptr };
+  }
+
+  if (ExprsToSkip.count(E) != 0) {
+    // We are skipping the expression. Call neither walkToExprPr nor
+    // walkToExprPost on it
+    return { false, E };
+  }
+
+  if (!SEWalker.walkToExprPre(E)) {
+    return { false, E };
+  }
 
   auto doSkipChildren = [&]() -> std::pair<bool, Expr *> {
-    if (!SEWalker.walkToExprPost(E))
-      return stopTraversal;
-    return skipChildren;
+    // If we decide to skip the children after having issued the call to
+    // walkToExprPre, we need to simulate a corresponding call to walkToExprPost
+    // which will not be issued by the ASTWalker if we return false in the first
+    // component.
+    if (!walkToExprPost(E)) {
+      // walkToExprPost has cancelled the traversal. Stop.
+      return { false, nullptr };
+    }
+    return { false, E };
   };
 
-  if (isDone())
-    return stopTraversal;
-
-  if (ExprsToSkip.count(E) != 0)
-    return skipChildren;
-
-  if (!SEWalker.walkToExprPre(E))
-    return skipChildren;
+  auto doStopTraversal = [&]() -> std::pair<bool, Expr *> {
+    Cancelled = true;
+    return { false, nullptr };
+  };
 
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
@@ -275,7 +301,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                            DRE->getNameLoc(),
                            ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
                                              OpAccess)))
-          return stopTraversal;
+          return doStopTraversal();
 
         return doSkipChildren();
       }
@@ -311,12 +337,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module),
                          {module->getName(), E->getLoc()}))
-        return stopTraversal;
+        return doStopTraversal();
     } else if (!passReference(DRE->getDecl(), DRE->getType(),
                               DRE->getNameLoc(),
                       ReferenceMetaData(getReferenceKind(Parent.getAsExpr(), DRE),
                                         OpAccess))) {
-      return stopTraversal;
+      return doStopTraversal();
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     {
@@ -335,14 +361,14 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
       // Visit in source order.
       if (!MRE->getBase()->walk(*this))
-        return stopTraversal;
+        return doStopTraversal();
     }
 
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
                                          OpAccess)))
-      return stopTraversal;
+      return doStopTraversal();
 
     // We already visited the children.
     return doSkipChildren();
@@ -352,12 +378,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
                        OtherCtorE->getConstructorLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclConstructorRef,
                                          OpAccess)))
-      return stopTraversal;
+      return doStopTraversal();
 
   } else if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     // Visit in source order.
     if (!SE->getBase()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     ValueDecl *SubscrD = nullptr;
     if (SE->hasDecl())
@@ -368,15 +394,15 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getLoc(), data, true))
-        return stopTraversal;
+        return doStopTraversal();
     }
 
     if (!SE->getIndex()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     if (SubscrD) {
       if (!passSubscriptReference(SubscrD, E->getEndLoc(), data, false))
-        return stopTraversal;
+        return doStopTraversal();
     }
 
     // We already visited the children.
@@ -414,11 +440,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getArg()->getElement(0)->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
     if (!BinE->getFn()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
     if (!BinE->getArg()->getElement(1)->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     // We already visited the children.
     return doSkipChildren();
@@ -426,25 +452,23 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   } else if (auto TupleE = dyn_cast<TupleExpr>(E)) {
     if (auto CallE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
       if (!passCallArgNames(CallE->getFn(), TupleE))
-        return stopTraversal;
+        return doStopTraversal();
     }
   } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
     llvm::SaveAndRestore<Optional<AccessKind>>
       C(this->OpAccess, AccessKind::ReadWrite);
 
     if (!IOE->getSubExpr()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     // We already visited the children.
-    if (!walkToExprPost(E))
-      return stopTraversal;
-    return skipChildren;
+    return doSkipChildren();
   } else if (auto LE = dyn_cast<LoadExpr>(E)) {
     llvm::SaveAndRestore<Optional<AccessKind>>
       C(this->OpAccess, AccessKind::Read);
 
     if (!LE->getSubExpr()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     // We already visited the children.
     return doSkipChildren();
@@ -454,11 +478,11 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         C(this->OpAccess, AccessKind::Write);
 
       if (AE->getDest() && !AE->getDest()->walk(*this))
-        return stopTraversal;
+        return doStopTraversal();
     }
 
     if (AE->getSrc() && !AE->getSrc()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     // We already visited the children.
     return doSkipChildren();
@@ -470,7 +494,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     };
 
     if (!OEE->getSubExpr()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     return doSkipChildren();
   } else if (auto MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(E)) {
@@ -479,12 +503,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
     // Original non-escaping closure.
     if (!MTEE->getNonescapingClosureValue()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     // Body, which is called by synthesized CallExpr.
     auto *callExpr = cast<CallExpr>(MTEE->getSubExpr());
     if (!callExpr->getFn()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     return doSkipChildren();
   } else if (auto CUCE = dyn_cast<CollectionUpcastConversionExpr>(E)) {
@@ -492,7 +516,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     // because it's only in conversion expressions. Instead, just walk into
     // sub expression.
     if (!CUCE->getSubExpr()->walk(*this))
-      return stopTraversal;
+      return doStopTraversal();
 
     return doSkipChildren();
   } else if (auto OVE = dyn_cast<OpaqueValueExpr>(E)) {
@@ -500,24 +524,40 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     auto value = OpaqueValueMap.find(OVE);
     if (value != OpaqueValueMap.end()) {
       if (!value->second->walk(*this))
-        return stopTraversal;
+        return doStopTraversal();
 
       return doSkipChildren();
     }
   } else if (auto DMRE = dyn_cast<DynamicMemberRefExpr>(E)) {
     // Visit in source order.
     if (!DMRE->getBase()->walk(*this))
-        return stopTraversal;
+        return doStopTraversal();
     if (!passReference(DMRE->getMember().getDecl(), DMRE->getType(),
                        DMRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DynamicMemberRef,
                                          OpAccess)))
-        return stopTraversal;
+        return doStopTraversal();
     // We already visited the children.
     return doSkipChildren();
   }
 
   return { true, E };
+}
+
+Expr *SemaAnnotator::walkToExprPost(Expr *E) {
+  if (isDone()) {
+    return nullptr;
+  }
+
+  if (isa<ConstructorRefCallExpr>(E)) {
+    assert(CtorRefs.back() == E);
+    CtorRefs.pop_back();
+  }
+
+  bool Continue = SEWalker.walkToExprPost(E);
+  if (!Continue)
+    Cancelled = true;
+  return Continue ? E : nullptr;
 }
 
 bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
@@ -538,23 +578,15 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   return true;
 }
 
-Expr *SemaAnnotator::walkToExprPost(Expr *E) {
-  if (isa<ConstructorRefCallExpr>(E)) {
-    assert(CtorRefs.back() == E);
-    CtorRefs.pop_back();
-  }
-
-  bool Continue = SEWalker.walkToExprPost(E);
-  if (!Continue)
-    Cancelled = true;
-  return Continue ? E : nullptr;
-}
-
 bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
   return !isDone();
 }
 
 std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
+  if (isDone()) {
+    return { false, nullptr };
+  }
+
   if (P->isImplicit())
     return { true, P };
 
