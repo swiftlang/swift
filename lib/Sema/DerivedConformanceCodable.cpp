@@ -48,11 +48,20 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
 }
 
 /// Retrieve the variable name for the purposes of encoding/decoding.
-static Identifier getVarNameForCoding(VarDecl *var) {
+///
+/// \param paramIndex if set will be used to generate name in the form of
+///                   '_$paramIndex' when VarDecl has no name.
+static Identifier getVarNameForCoding(VarDecl *var,
+                                      Optional<int> paramIndex = None) {
+  auto &C = var->getASTContext();
+  Identifier identifier = var->getName();
   if (auto originalVar = var->getOriginalWrappedProperty())
-    return originalVar->getName();
+    identifier = originalVar->getName();
 
-  return var->getName();
+  if (identifier.empty() && paramIndex.hasValue())
+    return C.getIdentifier("_" + std::to_string(paramIndex.getValue()));
+
+  return identifier;
 }
 
 /// Compute the Identifier for the CodingKey of an enum case
@@ -60,9 +69,8 @@ static Identifier caseCodingKeysIdentifier(const ASTContext &C,
                                          EnumElementDecl *elt) {
   llvm::SmallString<16> scratch;
   camel_case::appendSentenceCase(scratch, elt->getBaseIdentifier().str());
-  llvm::StringRef result =
-      camel_case::appendSentenceCase(scratch, C.Id_CodingKeys.str());
-  return C.getIdentifier(result);
+  scratch += C.Id_CodingKeys.str();
+  return C.getIdentifier(scratch.str());
 }
 
 /// Fetches the \c CodingKeys enum nested in \c target, potentially reaching
@@ -118,104 +126,12 @@ static NominalTypeDecl *lookupErrorContext(ASTContext &C,
   return dyn_cast<NominalTypeDecl>(decl);
 }
 
-static EnumDecl *addImplicitCodingKeys_enum(EnumDecl *target) {
+static EnumDecl *
+addImplicitCodingKeys(NominalTypeDecl *target,
+                      llvm::SmallVectorImpl<Identifier> &caseIdentifiers,
+                      Identifier codingKeysEnumIdentifier) {
   auto &C = target->getASTContext();
-
-  // We want to look through all the case declarations of this enum to create
-  // enum cases based on those case names.
-  auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
-  TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
-
-  llvm::SmallVector<EnumDecl *, 4> codingKeys;
-
-  auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
-                                    inherited, nullptr, target);
-  enumDecl->setImplicit();
-  enumDecl->setAccess(AccessLevel::Private);
-
-  for (auto *elementDecl : target->getAllElements()) {
-    auto *elt =
-        new (C) EnumElementDecl(SourceLoc(), elementDecl->getBaseName(),
-                                nullptr, SourceLoc(), nullptr, enumDecl);
-    elt->setImplicit();
-    enumDecl->addMember(elt);
-  }
-  // Forcibly derive conformance to CodingKey.
-  TypeChecker::checkConformancesInContext(enumDecl);
-
-  target->addMember(enumDecl);
-
-  return enumDecl;
-}
-
-static EnumDecl *addImplicitCaseCodingKeys(EnumDecl *target,
-                                      EnumElementDecl *elementDecl,
-                                      EnumDecl *codingKeysEnum) {
-  auto &C = target->getASTContext();
-
-  auto enumIdentifier = caseCodingKeysIdentifier(C, elementDecl);
-
-  auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  auto codingKeyType = codingKeyProto->getDeclaredInterfaceType();
-  TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
-  ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
-
-  // Only derive if this case exist in the CodingKeys enum
-  auto *codingKeyCase =
-      lookupEnumCase(C, codingKeysEnum, elementDecl->getBaseIdentifier());
-  if (!codingKeyCase)
-    return nullptr;
-
-  auto *caseEnum = new (C) EnumDecl(SourceLoc(), enumIdentifier, SourceLoc(),
-                                    inherited, nullptr, target);
-  caseEnum->setImplicit();
-  caseEnum->setAccess(AccessLevel::Private);
-
-  if (elementDecl->hasAssociatedValues()) {
-    for (auto entry : llvm::enumerate(*elementDecl->getParameterList())) {
-      auto *paramDecl = entry.value();
-
-      // if the type conforms to {En,De}codable, add it to the enum.
-      Identifier paramIdentifier = getVarNameForCoding(paramDecl);
-      bool generatedName = false;
-      if (paramIdentifier.empty()) {
-        paramIdentifier = C.getIdentifier("_" + std::to_string(entry.index()));
-        generatedName = true;
-      }
-      
-      auto *elt =
-          new (C) EnumElementDecl(SourceLoc(), paramIdentifier, nullptr,
-                                  SourceLoc(), nullptr, caseEnum);
-      elt->setImplicit();
-      caseEnum->addMember(elt);
-    }
-  }
-
-  // Forcibly derive conformance to CodingKey.
-  TypeChecker::checkConformancesInContext(caseEnum);
-  target->addMember(caseEnum);
-
-  return caseEnum;
-}
-
-// Create CodingKeys in the parent type always, because both
-// Encodable and Decodable might want to use it, and they may have
-// different conditional bounds. CodingKeys is simple and can't
-// depend on those bounds.
-//
-// FIXME: Eventually we should find a way to expose this function to the lookup
-// machinery so it no longer costs two protocol conformance lookups to retrieve
-// CodingKeys. It will also help in our quest to separate semantic and parsed
-// members.
-static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
-  if (auto *enumDecl = dyn_cast<EnumDecl>(target)) {
-    return addImplicitCodingKeys_enum(enumDecl);
-  }
-
-  auto &C = target->getASTContext();
-  assert(target->lookupDirect(DeclName(C.Id_CodingKeys)).empty());
+  assert(target->lookupDirect(DeclName(codingKeysEnumIdentifier)).empty());
 
   // We want to look through all the var declarations of this type to create
   // enum cases based on those var names.
@@ -224,8 +140,8 @@ static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
   TypeLoc protoTypeLoc[1] = {TypeLoc::withoutLoc(codingKeyType)};
   ArrayRef<TypeLoc> inherited = C.AllocateCopy(protoTypeLoc);
 
-  auto *enumDecl = new (C) EnumDecl(SourceLoc(), C.Id_CodingKeys, SourceLoc(),
-                                    inherited, nullptr, target);
+  auto *enumDecl = new (C) EnumDecl(SourceLoc(), codingKeysEnumIdentifier,
+                                    SourceLoc(), inherited, nullptr, target);
   enumDecl->setImplicit();
   enumDecl->setSynthesized();
   enumDecl->setAccess(AccessLevel::Private);
@@ -244,14 +160,9 @@ static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
     enumDecl->addMember(super);
   }
 
-  for (auto *varDecl : target->getStoredProperties()) {
-    if (!varDecl->isUserAccessible()) {
-      continue;
-    }
-
-    auto *elt =
-        new (C) EnumElementDecl(SourceLoc(), getVarNameForCoding(varDecl),
-                                nullptr, SourceLoc(), nullptr, enumDecl);
+  for (auto caseIdentifier : caseIdentifiers) {
+    auto *elt = new (C) EnumElementDecl(SourceLoc(), caseIdentifier, nullptr,
+                                        SourceLoc(), nullptr, enumDecl);
     elt->setImplicit();
     enumDecl->addMember(elt);
   }
@@ -265,12 +176,72 @@ static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
   return enumDecl;
 }
 
+static EnumDecl *addImplicitCaseCodingKeys(EnumDecl *target,
+                                           EnumElementDecl *elementDecl,
+                                           EnumDecl *codingKeysEnum) {
+  auto &C = target->getASTContext();
+
+  // Only derive if this case exist in the CodingKeys enum
+  auto *codingKeyCase =
+      lookupEnumCase(C, codingKeysEnum, elementDecl->getBaseIdentifier());
+  if (!codingKeyCase)
+    return nullptr;
+
+  auto enumIdentifier = caseCodingKeysIdentifier(C, elementDecl);
+
+  llvm::SmallVector<Identifier, 4> caseIdentifiers;
+  if (elementDecl->hasAssociatedValues()) {
+    for (auto entry : llvm::enumerate(*elementDecl->getParameterList())) {
+      auto *paramDecl = entry.value();
+
+      // if the type conforms to {En,De}codable, add it to the enum.
+      Identifier paramIdentifier =
+          getVarNameForCoding(paramDecl, entry.index());
+
+      caseIdentifiers.push_back(paramIdentifier);
+    }
+  }
+
+  return addImplicitCodingKeys(target, caseIdentifiers, enumIdentifier);
+}
+
+// Create CodingKeys in the parent type always, because both
+// Encodable and Decodable might want to use it, and they may have
+// different conditional bounds. CodingKeys is simple and can't
+// depend on those bounds.
+//
+// FIXME: Eventually we should find a way to expose this function to the lookup
+// machinery so it no longer costs two protocol conformance lookups to retrieve
+// CodingKeys. It will also help in our quest to separate semantic and parsed
+// members.
+static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
+  auto &C = target->getASTContext();
+
+  llvm::SmallVector<Identifier, 4> caseIdentifiers;
+  if (auto *enumDecl = dyn_cast<EnumDecl>(target)) {
+    for (auto *elementDecl : enumDecl->getAllElements()) {
+      caseIdentifiers.push_back(elementDecl->getBaseIdentifier());
+    }
+  } else {
+    for (auto *varDecl : target->getStoredProperties()) {
+      if (!varDecl->isUserAccessible()) {
+        continue;
+      }
+
+      caseIdentifiers.push_back(getVarNameForCoding(varDecl));
+    }
+  }
+
+  return addImplicitCodingKeys(target, caseIdentifiers, C.Id_CodingKeys);
+}
+
 static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
                                         TypeDecl *_codingKeysTypeDecl) {
   auto &C = derived.Context;
-  auto *codingKeysTypeDecl = _codingKeysTypeDecl;
   // CodingKeys may be a typealias. If so, follow the alias to its canonical
-  // type.
+  // type. We are creating a copy here, so we can hold on to the original
+  // `TypeDecl` in case we need to produce a diagnostic.
+  auto *codingKeysTypeDecl = _codingKeysTypeDecl;
   auto codingKeysType = codingKeysTypeDecl->getDeclaredInterfaceType();
   if (isa<TypeAliasDecl>(codingKeysTypeDecl))
     codingKeysTypeDecl = codingKeysType->getAnyNominal();
@@ -504,11 +475,7 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
       if (!paramDecl->isUserAccessible())
         continue;
 
-      auto identifier = getVarNameForCoding(paramDecl);
-      if (identifier.empty()) {
-        identifier = C.getIdentifier("_" + std::to_string(entry.index()));
-      }
-
+      auto identifier = getVarNameForCoding(paramDecl, entry.index());
       properties[identifier] = paramDecl;
     }
   }
@@ -649,12 +616,17 @@ static CallExpr *createNestedContainerKeyedByForKeyCall(
                                   argNames);
 }
 
-static ThrowStmt *createThrowDecodingErrorTypeMismatchStmt(
-    ASTContext &C, DeclContext *DC, NominalTypeDecl *targetDecl,
-    Expr *containerExpr, Expr *debugMessage) {
-  auto *errorDecl = C.getDecodingErrorDecl();
+static ThrowStmt *createThrowCodingErrorStmt(ASTContext &C, Expr *containerExpr,
+                                             NominalTypeDecl *errorDecl,
+                                             Identifier errorId,
+                                             Optional<Expr *> argument,
+                                             StringRef debugMessage) {
   auto *contextDecl = lookupErrorContext(C, errorDecl);
   assert(contextDecl && "Missing Context decl.");
+
+  auto *debugMessageExpr = new (C) StringLiteralExpr(
+      StringRef("Invalid number of keys found, expected one."), SourceRange(),
+      /* Implicit */ true);
 
   auto *contextTypeExpr =
       TypeExpr::createImplicit(contextDecl->getDeclaredType(), C);
@@ -669,61 +641,29 @@ static ThrowStmt *createThrowDecodingErrorTypeMismatchStmt(
 
   auto *contextInitCallExpr = CallExpr::createImplicit(
       C, contextInitCall,
-      {codingPathExpr, debugMessage,
+      {codingPathExpr, debugMessageExpr,
        new (C) NilLiteralExpr(SourceLoc(), /* Implicit */ true)},
       {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
+
+  llvm::SmallVector<Expr *, 2> arguments;
+  llvm::SmallVector<Identifier, 2> argumentLabels;
+
+  if (argument.hasValue()) {
+    arguments.push_back(argument.getValue());
+    argumentLabels.push_back(Identifier());
+  }
+
+  arguments.push_back(contextInitCallExpr);
+  argumentLabels.push_back(Identifier());
 
   auto *decodingErrorTypeExpr =
       TypeExpr::createImplicit(errorDecl->getDeclaredType(), C);
   auto *decodingErrorCall = UnresolvedDotExpr::createImplicit(
-      C, decodingErrorTypeExpr, C.Id_typeMismatch,
-      {Identifier(), Identifier()});
-  auto *targetType = TypeExpr::createImplicit(
-      DC->mapTypeIntoContext(targetDecl->getDeclaredInterfaceType()), C);
-  auto *targetTypeExpr =
-      new (C) DotSelfExpr(targetType, SourceLoc(), SourceLoc());
+      C, decodingErrorTypeExpr, errorId, C.AllocateCopy(argumentLabels));
 
-  auto *decodingErrorCallExpr = CallExpr::createImplicit(
-      C, decodingErrorCall, {targetTypeExpr, contextInitCallExpr},
-      {Identifier(), Identifier()});
-  return new (C) ThrowStmt(SourceLoc(), decodingErrorCallExpr);
-}
-
-static ThrowStmt *createThrowEncodingErrorInvalidValueStmt(ASTContext &C,
-                                                           DeclContext *DC,
-                                                           Expr *valueExpr,
-                                                           Expr *containerExpr,
-                                                           Expr *debugMessage) {
-  auto *errorDecl = C.getEncodingErrorDecl();
-  auto *contextDecl = lookupErrorContext(C, errorDecl);
-  assert(contextDecl && "Missing Context decl.");
-
-  auto *contextTypeExpr =
-      TypeExpr::createImplicit(contextDecl->getDeclaredType(), C);
-
-  // Context.init(codingPath:, debugDescription:)
-  auto *contextInitCall = UnresolvedDotExpr::createImplicit(
-      C, contextTypeExpr, DeclBaseName::createConstructor(),
-      {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
-
-  auto *codingPathExpr =
-      UnresolvedDotExpr::createImplicit(C, containerExpr, C.Id_codingPath);
-
-  auto *contextInitCallExpr = CallExpr::createImplicit(
-      C, contextInitCall,
-      {codingPathExpr, debugMessage,
-       new (C) NilLiteralExpr(SourceLoc(), /* Implicit */ true)},
-      {C.Id_codingPath, C.Id_debugDescription, C.Id_underlyingError});
-
-  auto *decodingErrorTypeExpr =
-      TypeExpr::createImplicit(errorDecl->getDeclaredType(), C);
-  auto *decodingErrorCall = UnresolvedDotExpr::createImplicit(
-      C, decodingErrorTypeExpr, C.Id_invalidValue,
-      {Identifier(), Identifier()});
-
-  auto *decodingErrorCallExpr = CallExpr::createImplicit(
-      C, decodingErrorCall, {valueExpr, contextInitCallExpr},
-      {Identifier(), Identifier()});
+  auto *decodingErrorCallExpr =
+      CallExpr::createImplicit(C, decodingErrorCall, C.AllocateCopy(arguments),
+                               C.AllocateCopy(argumentLabels));
   return new (C) ThrowStmt(SourceLoc(), decodingErrorCallExpr);
 }
 
@@ -767,6 +707,33 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
   }
 
   llvm_unreachable("Should have found at least 1 var decl");
+}
+
+static TryExpr *createEncodeCall(ASTContext &C, Type codingKeysType,
+                                 EnumElementDecl *codingKey,
+                                 Expr *containerExpr, Expr *varExpr,
+                                 bool useIfPresentVariant) {
+  // CodingKeys.x
+  auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
+  auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), codingKey,
+                                        DeclNameLoc(), /*Implicit=*/true);
+
+  // encode(_:forKey:)/encodeIfPresent(_:forKey:)
+  auto methodName = useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
+  SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
+
+  auto *encodeCall =
+      UnresolvedDotExpr::createImplicit(C, containerExpr, methodName, argNames);
+
+  // container.encode(x, forKey: CodingKeys.x)
+  Expr *args[2] = {varExpr, keyExpr};
+  auto *callExpr = CallExpr::createImplicit(C, encodeCall, C.AllocateCopy(args),
+                                            C.AllocateCopy(argNames));
+
+  // try container.encode(x, forKey: CodingKeys.x)
+  auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
+                                  /*Implicit=*/true);
+  return tryExpr;
 }
 
 /// Synthesizes the body for `func encode(to encoder: Encoder) throws`.
@@ -864,28 +831,10 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                           ConcreteDeclRef(varDecl),
                                           DeclNameLoc(), /*Implicit=*/true);
 
-    // CodingKeys.x
-    auto *metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
-    auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(), elt,
-                                          DeclNameLoc(), /*Implicit=*/true);
+    auto *encodeCallExpr = createEncodeCall(
+        C, codingKeysType, elt, containerExpr, varExpr, useIfPresentVariant);
 
-    // encode(_:forKey:)/encodeIfPresent(_:forKey:)
-    auto methodName = useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
-    SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-
-    auto *encodeCall = UnresolvedDotExpr::createImplicit(C, containerExpr,
-                                                         methodName, argNames);
-
-    // container.encode(self.x, forKey: CodingKeys.x)
-    Expr *args[2] = {varExpr, keyExpr};
-    auto *callExpr = CallExpr::createImplicit(C, encodeCall,
-                                              C.AllocateCopy(args),
-                                              C.AllocateCopy(argNames));
-
-    // try container.encode(self.x, forKey: CodingKeys.x)
-    auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                    /*Implicit=*/true);
-    statements.push_back(tryExpr);
+    statements.push_back(encodeCallExpr);
   }
 
   // Classes which inherit from something Codable should encode super as well.
@@ -928,6 +877,112 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
                                  /*implicit=*/true);
   return { body, /*isTypeChecked=*/false };
+}
+
+static SwitchStmt *
+createEnumSwitch(ASTContext &C, DeclContext *DC, Expr *expr, EnumDecl *enumDecl,
+                 EnumDecl *codingKeysEnum, bool createSubpattern,
+                 std::function<std::tuple<EnumElementDecl *, BraceStmt *>(
+                     EnumElementDecl *, EnumElementDecl *, ArrayRef<VarDecl *>)>
+                     createCase) {
+  SmallVector<ASTNode, 4> cases;
+  for (auto elt : enumDecl->getAllElements()) {
+    // .<elt>(let a0, let a1, ...)
+    SmallVector<VarDecl *, 3> payloadVars;
+    Pattern *subpattern = nullptr;
+    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
+
+    if (createSubpattern) {
+      subpattern = DerivedConformance::enumElementPayloadSubpattern(
+          elt, 'a', DC, payloadVars, /* useLabels */ true);
+
+      auto hasBoundDecls = !payloadVars.empty();
+      if (hasBoundDecls) {
+        // We allocated a direct copy of our var decls for the case
+        // body.
+        auto copy = C.Allocate<VarDecl *>(payloadVars.size());
+        for (unsigned i : indices(payloadVars)) {
+          auto *vOld = payloadVars[i];
+          auto *vNew = new (C) VarDecl(
+              /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
+              vOld->getName(), vOld->getDeclContext());
+          vNew->setImplicit();
+          copy[i] = vNew;
+        }
+        caseBodyVarDecls.emplace(copy);
+      }
+    }
+
+    // CodingKeys.x
+    auto *codingKeyCase =
+        lookupEnumCase(C, codingKeysEnum, elt->getName().getBaseIdentifier());
+
+    EnumElementDecl *targetElt;
+    BraceStmt *caseBody;
+    std::tie(targetElt, caseBody) = createCase(elt, codingKeyCase, payloadVars);
+
+    if (caseBody) {
+      // generate: case .<Case>:
+      auto pat = new (C) EnumElementPattern(
+          TypeExpr::createImplicit(
+              DC->mapTypeIntoContext(
+                  targetElt->getParentEnum()->getDeclaredInterfaceType()),
+              C),
+          SourceLoc(), DeclNameLoc(), DeclNameRef(), targetElt, subpattern);
+      pat->setImplicit();
+
+      auto labelItem = CaseLabelItem(pat);
+      auto stmt = CaseStmt::create(
+          C, CaseParentKind::Switch, SourceLoc(), labelItem, SourceLoc(),
+          SourceLoc(), caseBody,
+          /*case body vardecls*/ createSubpattern ? caseBodyVarDecls : None);
+      cases.push_back(stmt);
+    }
+  }
+
+  // generate: switch $expr { }
+  return SwitchStmt::createImplicit(LabeledStmtInfo(), expr, cases, C);
+}
+
+static DeclRefExpr *createContainer(ASTContext &C, DeclContext *DC,
+                                    VarDecl::Introducer introducer,
+                                    NominalTypeDecl *containerTypeDecl,
+                                    VarDecl *target, EnumDecl *codingKeysEnum,
+                                    llvm::SmallVectorImpl<ASTNode> &statements,
+                                    bool throws) {
+  // let/var container : KeyedDecodingContainer<CodingKeys>
+  auto *containerDecl = createKeyedContainer(
+      C, DC, containerTypeDecl, codingKeysEnum->getDeclaredInterfaceType(),
+      introducer);
+
+  auto *containerExpr =
+      new (C) DeclRefExpr(ConcreteDeclRef(containerDecl), DeclNameLoc(),
+                          /*Implicit=*/true, AccessSemantics::DirectToStorage);
+
+  // de/encoder
+  auto *decoderExpr = new (C)
+      DeclRefExpr(ConcreteDeclRef(target), DeclNameLoc(), /*Implicit=*/true);
+
+  // Bound de/encoder.container(keyedBy: CodingKeys.self) call
+  auto containerType = containerDecl->getInterfaceType();
+  Expr *callExpr = createContainerKeyedByCall(C, DC, decoderExpr, containerType,
+                                              codingKeysEnum);
+
+  if (throws) {
+    // try decoder.container(keyedBy: CodingKeys.self)
+    callExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
+                               /*implicit=*/true);
+  }
+
+  // Full `let container = decoder.container(keyedBy: CodingKeys.self)`
+  // binding.
+  auto *containerPattern = NamedPattern::createImplicit(C, containerDecl);
+  auto *bindingDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, containerPattern, callExpr, DC);
+  statements.push_back(bindingDecl);
+  statements.push_back(containerDecl);
+
+  return containerExpr;
 }
 
 static std::pair<BraceStmt *, bool>
@@ -986,185 +1041,105 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
   // properties to encode or decode, but the type is a class which inherits from
   // something Codable and needs to encode super.
 
-  // let container : KeyedEncodingContainer<CodingKeys>
-  auto *containerDecl =
-      createKeyedContainer(C, funcDC, C.getKeyedEncodingContainerDecl(),
-                           codingKeysEnum->getDeclaredInterfaceType(),
-                           VarDecl::Introducer::Var);
-
-  auto *containerExpr =
-      new (C) DeclRefExpr(ConcreteDeclRef(containerDecl), DeclNameLoc(),
-                          /*Implicit=*/true, AccessSemantics::DirectToStorage);
-
   // Need to generate
   //   `let container = encoder.container(keyedBy: CodingKeys.self)`
   // This is unconditional because a type with no properties should encode as an
   // empty container.
-  //
-  // `let container` (containerExpr) is generated above.
 
-  // encoder
-  auto encoderParam = encodeDecl->getParameters()->get(0);
-  auto *encoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(encoderParam),
-                                          DeclNameLoc(), /*Implicit=*/true);
-
-  // Bound encoder.container(keyedBy: CodingKeys.self) call
-  auto containerType = containerDecl->getInterfaceType();
-  auto *callExpr = createContainerKeyedByCall(C, funcDC, encoderExpr,
-                                              containerType, codingKeysEnum);
-
-  // Full `let container = encoder.container(keyedBy: CodingKeys.self)`
-  // binding.
-  auto *containerPattern = NamedPattern::createImplicit(C, containerDecl);
-  auto *bindingDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, containerPattern, callExpr, funcDC);
-  statements.push_back(bindingDecl);
-  statements.push_back(containerDecl);
+  // let container : KeyedEncodingContainer<CodingKeys>
+  auto *containerExpr = createContainer(
+      C, funcDC, VarDecl::Introducer::Var, C.getKeyedEncodingContainerDecl(),
+      encodeDecl->getParameters()->get(0), codingKeysEnum, statements,
+      /*throws*/ false);
 
   auto *selfRef = encodeDecl->getImplicitSelfDecl();
-
-  SmallVector<ASTNode, 4> cases;
-  for (auto elt : enumDecl->getAllElements()) {
-    // CodingKeys.x
-    auto *codingKeyCase =
-        lookupEnumCase(C, codingKeysEnum, elt->getName().getBaseIdentifier());
-
-    SmallVector<ASTNode, 3> caseStatements;
-
-    // .<elt>(let a0, let a1, ...)
-    SmallVector<VarDecl *, 3> payloadVars;
-    auto subpattern = DerivedConformance::enumElementPayloadSubpattern(
-        elt, 'a', encodeDecl, payloadVars, /* useLabels */ true);
-
-    auto hasBoundDecls = !payloadVars.empty();
-    Optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
-    if (hasBoundDecls) {
-      // We allocated a direct copy of our var decls for the case
-      // body.
-      auto copy = C.Allocate<VarDecl *>(payloadVars.size());
-      for (unsigned i : indices(payloadVars)) {
-        auto *vOld = payloadVars[i];
-        auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
-            vOld->getName(), vOld->getDeclContext());
-        vNew->setImplicit();
-        copy[i] = vNew;
-      }
-      caseBodyVarDecls.emplace(copy);
-    }
-
-    if (!codingKeyCase) {
-      // This case should not be encodable, so throw an error if an attempt is
-      // made to encode it
-      llvm::SmallString<128> buffer;
-      buffer.append("Case '");
-      buffer.append(elt->getBaseIdentifier().str());
-      buffer.append(
-          "' cannot be decoded because it is not defined in CodingKeys.");
-      auto *debugMessage = new (C) StringLiteralExpr(
-          C.AllocateCopy(buffer.str()), SourceRange(), /* Implicit */ true);
-      auto *selfRefExpr = new (C) DeclRefExpr(
-          ConcreteDeclRef(selfRef), DeclNameLoc(), /* Implicit */ true);
-      auto *throwStmt = createThrowEncodingErrorInvalidValueStmt(
-          C, funcDC, selfRefExpr, containerExpr, debugMessage);
-      caseStatements.push_back(throwStmt);
-    } else {
-      auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
-      auto *caseCodingKeys =
-          lookupEvaluatedCodingKeysEnum(C, enumDecl, caseIdentifier);
-
-      auto *nestedContainerDecl = createKeyedContainer(
-          C, funcDC, C.getKeyedEncodingContainerDecl(),
-          caseCodingKeys->getDeclaredInterfaceType(), VarDecl::Introducer::Var,
-          C.Id_nestedContainer);
-
-      auto *nestedContainerCall = createNestedContainerKeyedByForKeyCall(
-          C, funcDC, containerExpr, caseCodingKeys, codingKeyCase);
-
-      auto *containerPattern =
-          NamedPattern::createImplicit(C, nestedContainerDecl);
-      auto *bindingDecl = PatternBindingDecl::createImplicit(
-          C, StaticSpellingKind::None, containerPattern, nestedContainerCall,
-          funcDC);
-      caseStatements.push_back(bindingDecl);
-      caseStatements.push_back(nestedContainerDecl);
-
-      // TODO: use param decls to get names
-      for (auto entry : llvm::enumerate(payloadVars)) {
-        auto *payloadVar = entry.value();
-        auto *nestedContainerExpr = new (C)
-            DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
-                        /*Implicit=*/true, AccessSemantics::DirectToStorage);
-        auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
-                                                 /*implicit*/ true);
-        auto *paramDecl = elt->getParameterList()->get(entry.index());
-        auto caseCodingKeysIdentifier = getVarNameForCoding(paramDecl);
-        if (caseCodingKeysIdentifier.empty()) {
-          caseCodingKeysIdentifier = C.getIdentifier("_" + std::to_string(entry.index()));
-        }
-        auto *caseCodingKey =
-            lookupEnumCase(C, caseCodingKeys, caseCodingKeysIdentifier);
-
-        // If there is no key defined for this parameter, skip it.
-        if (!caseCodingKey)
-          continue;
-
-        auto varType = conformanceDC->mapTypeIntoContext(
-            payloadVar->getValueInterfaceType());
-
-        bool useIfPresentVariant = false;
-        if (auto objType = varType->getOptionalObjectType()) {
-          varType = objType;
-          useIfPresentVariant = true;
-        }
-
-        // BarCodingKeys.x
-        auto *metaTyRef =
-            TypeExpr::createImplicit(caseCodingKeys->getDeclaredType(), C);
-        auto *keyExpr =
-            new (C) MemberRefExpr(metaTyRef, SourceLoc(), caseCodingKey,
-                                  DeclNameLoc(), /*Implicit=*/true);
-
-        // encode(_:forKey:)/encodeIfPresent(_:forKey:)
-        auto methodName =
-            useIfPresentVariant ? C.Id_encodeIfPresent : C.Id_encode;
-        SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-
-        auto *encodeCall = UnresolvedDotExpr::createImplicit(
-            C, nestedContainerExpr, methodName, argNames);
-
-        // nestedContainer.encode(x, forKey: CodingKeys.x)
-        Expr *args[2] = {payloadVarRef, keyExpr};
-        auto *callExpr = CallExpr::createImplicit(
-            C, encodeCall, C.AllocateCopy(args), C.AllocateCopy(argNames));
-
-        // try nestedContainer.encode(x, forKey: CodingKeys.x)
-        auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                        /*Implicit=*/true);
-        caseStatements.push_back(tryExpr);
-      }
-    }
-
-    // generate: case .<Case>:
-    auto pat = new (C) EnumElementPattern(
-        TypeExpr::createImplicit(enumDecl->getDeclaredType(), C), SourceLoc(),
-        DeclNameLoc(), DeclNameRef(), elt, subpattern);
-    pat->setImplicit();
-
-    auto labelItem = CaseLabelItem(pat);
-    auto body = BraceStmt::create(C, SourceLoc(), caseStatements, SourceLoc());
-    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                     labelItem, SourceLoc(), SourceLoc(), body,
-                                     /*case body vardecls*/ caseBodyVarDecls));
-  }
 
   // generate: switch self { }
   auto enumRef =
       new (C) DeclRefExpr(ConcreteDeclRef(selfRef), DeclNameLoc(),
                           /*implicit*/ true, AccessSemantics::Ordinary);
+  auto switchStmt = createEnumSwitch(
+      C, funcDC, enumRef, enumDecl, codingKeysEnum,
+      /*createSubpattern*/ true,
+      [&](auto *elt, auto *codingKeyCase,
+          auto payloadVars) -> std::tuple<EnumElementDecl *, BraceStmt *> {
+        SmallVector<ASTNode, 3> caseStatements;
 
-  auto switchStmt =
-      SwitchStmt::createImplicit(LabeledStmtInfo(), enumRef, cases, C);
+        if (!codingKeyCase) {
+          // This case should not be encodable, so throw an error if an attempt
+          // is made to encode it
+          auto debugMessage =
+              "Case '" + elt->getBaseIdentifier().str() +
+              "' cannot be decoded because it is not defined in CodingKeys.";
+          auto *selfRefExpr = new (C) DeclRefExpr(
+              ConcreteDeclRef(selfRef), DeclNameLoc(), /* Implicit */ true);
+
+          auto *throwStmt = createThrowCodingErrorStmt(
+              C, containerExpr, C.getEncodingErrorDecl(), C.Id_invalidValue,
+              selfRefExpr, debugMessage.str());
+
+          caseStatements.push_back(throwStmt);
+        } else {
+          auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
+          auto *caseCodingKeys =
+              lookupEvaluatedCodingKeysEnum(C, enumDecl, caseIdentifier);
+
+          auto *nestedContainerDecl = createKeyedContainer(
+              C, funcDC, C.getKeyedEncodingContainerDecl(),
+              caseCodingKeys->getDeclaredInterfaceType(),
+              VarDecl::Introducer::Var, C.Id_nestedContainer);
+
+          auto *nestedContainerCall = createNestedContainerKeyedByForKeyCall(
+              C, funcDC, containerExpr, caseCodingKeys, codingKeyCase);
+
+          auto *containerPattern =
+              NamedPattern::createImplicit(C, nestedContainerDecl);
+          auto *bindingDecl = PatternBindingDecl::createImplicit(
+              C, StaticSpellingKind::None, containerPattern,
+              nestedContainerCall, funcDC);
+          caseStatements.push_back(bindingDecl);
+          caseStatements.push_back(nestedContainerDecl);
+
+          for (auto entry : llvm::enumerate(payloadVars)) {
+            auto *payloadVar = entry.value();
+            auto *nestedContainerExpr = new (C) DeclRefExpr(
+                ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
+                /*Implicit=*/true, AccessSemantics::DirectToStorage);
+            auto payloadVarRef = new (C) DeclRefExpr(payloadVar, DeclNameLoc(),
+                                                     /*implicit*/ true);
+            auto *paramDecl = elt->getParameterList()->get(entry.index());
+            auto caseCodingKeysIdentifier =
+                getVarNameForCoding(paramDecl, entry.index());
+            auto *caseCodingKey =
+                lookupEnumCase(C, caseCodingKeys, caseCodingKeysIdentifier);
+
+            // If there is no key defined for this parameter, skip it.
+            if (!caseCodingKey)
+              continue;
+
+            auto varType = conformanceDC->mapTypeIntoContext(
+                payloadVar->getValueInterfaceType());
+
+            bool useIfPresentVariant = false;
+            if (auto objType = varType->getOptionalObjectType()) {
+              varType = objType;
+              useIfPresentVariant = true;
+            }
+
+            auto *encodeCallExpr = createEncodeCall(
+                C, caseCodingKeys->getDeclaredType(), caseCodingKey,
+                nestedContainerExpr, payloadVarRef, useIfPresentVariant);
+
+            caseStatements.push_back(encodeCallExpr);
+          }
+        }
+
+        auto body =
+            BraceStmt::create(C, SourceLoc(), caseStatements, SourceLoc());
+
+        return std::make_tuple(elt, body);
+      });
+
   statements.push_back(switchStmt);
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
@@ -1231,6 +1206,40 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   derived.addMembersToConformanceContext({encodeDecl});
 
   return encodeDecl;
+}
+
+static TryExpr *createDecodeCall(ASTContext &C, Type resultType,
+                                 Type codingKeysType,
+                                 EnumElementDecl *codingKey,
+                                 Expr *containerExpr,
+                                 bool useIfPresentVariant) {
+  auto methodName = useIfPresentVariant ? C.Id_decodeIfPresent : C.Id_decode;
+
+  // Type.self
+  auto *metaTyRef = TypeExpr::createImplicit(resultType, C);
+  auto *targetExpr =
+      new (C) DotSelfExpr(metaTyRef, SourceLoc(), SourceLoc(), resultType);
+
+  // CodingKeys.x
+  metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
+  auto *keyExpr =
+      new (C) MemberRefExpr(metaTyRef, SourceLoc(), codingKey, DeclNameLoc(),
+                            /*Implicit=*/true);
+
+  // decode(_:forKey:)/decodeIfPresent(_:forKey:)
+  SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
+  auto *decodeCall =
+      UnresolvedDotExpr::createImplicit(C, containerExpr, methodName, argNames);
+
+  // container.decode(Type.self, forKey: CodingKeys.x)
+  Expr *args[2] = {targetExpr, keyExpr};
+  auto *callExpr = CallExpr::createImplicit(C, decodeCall, C.AllocateCopy(args),
+                                            C.AllocateCopy(argNames));
+
+  // try container.decode(Type.self, forKey: CodingKeys.x)
+  auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
+                                  /*Implicit=*/true);
+  return tryExpr;
 }
 
 /// Synthesizes the body for `init(from decoder: Decoder) throws`.
@@ -1386,35 +1395,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         continue;
       }
 
-      auto methodName =
-          useIfPresentVariant ? C.Id_decodeIfPresent : C.Id_decode;
-
-      // Type.self (where Type === type(of: x))
-      // Calculating the metatype needs to happen after potential Optional
-      // unwrapping in lookupVarDeclForCodingKeysCase().
-      auto *metaTyRef = TypeExpr::createImplicit(varType, C);
-      auto *targetExpr = new (C) DotSelfExpr(metaTyRef, SourceLoc(),
-                                             SourceLoc(), varType);
-
-      // CodingKeys.x
-      metaTyRef = TypeExpr::createImplicit(codingKeysType, C);
-      auto *keyExpr = new (C) MemberRefExpr(metaTyRef, SourceLoc(),
-                                            elt, DeclNameLoc(), /*Implicit=*/true);
-
-      // decode(_:forKey:)/decodeIfPresent(_:forKey:)
-      SmallVector<Identifier, 2> argNames{Identifier(), C.Id_forKey};
-      auto *decodeCall = UnresolvedDotExpr::createImplicit(
-          C, containerExpr, methodName, argNames);
-
-      // container.decode(Type.self, forKey: CodingKeys.x)
-      Expr *args[2] = {targetExpr, keyExpr};
-      auto *callExpr = CallExpr::createImplicit(C, decodeCall,
-                                                C.AllocateCopy(args),
-                                                C.AllocateCopy(argNames));
-
-      // try container.decode(Type.self, forKey: CodingKeys.x)
-      auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                      /*Implicit=*/true);
+      auto *tryExpr = createDecodeCall(C, varType, codingKeysType, elt,
+                                       containerExpr, useIfPresentVariant);
 
       auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
       auto *varExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
@@ -1537,13 +1519,15 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
   //     }
   //     switch container.allKeys.first {
   //     case .bar:
-  //       let nestedContainer = try container.nestedContainer(keyedBy:
-  //       BarCodingKeys.self, forKey: .bar) let x = try
-  //       nestedContainer.decode(Int.self, forKey: .x) self = .bar(x: x)
+  //       let nestedContainer = try container.nestedContainer(
+  //           keyedBy: BarCodingKeys.self, forKey: .bar)
+  //       let x = try nestedContainer.decode(Int.self, forKey: .x)
+  //       self = .bar(x: x)
   //     case .baz:
-  //       let nestedContainer = try container.nestedContainer(keyedBy:
-  //       BarCodingKeys.self, forKey: .baz) let y = try
-  //       nestedContainer.decode(String.self, forKey: .y) self = .baz(y: y)
+  //       let nestedContainer = try container.nestedContainer(
+  //           keyedBy: BarCodingKeys.self, forKey: .baz)
+  //       let y = try nestedContainer.decode(String.self, forKey: .y)
+  //       self = .baz(y: y)
   //     }
   //   }
 
@@ -1562,192 +1546,15 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
   // b) The type is not an enum
   assert(codingKeysEnum && "Missing CodingKeys decl.");
 
-  // Generate a reference to containerExpr ahead of time in case there are no
-  // properties to encode or decode, but the type is a class which inherits from
-  // something Codable and needs to decode super.
-
-  // let container : KeyedDecodingContainer<CodingKeys>
-  auto codingKeysType = codingKeysEnum->getDeclaredInterfaceType();
-  auto *containerDecl =
-      createKeyedContainer(C, funcDC, C.getKeyedDecodingContainerDecl(),
-                           codingKeysEnum->getDeclaredInterfaceType(),
-                           VarDecl::Introducer::Let);
-
-  auto *containerExpr =
-      new (C) DeclRefExpr(ConcreteDeclRef(containerDecl), DeclNameLoc(),
-                          /*Implicit=*/true, AccessSemantics::DirectToStorage);
-
   SmallVector<ASTNode, 5> statements;
   if (codingKeysEnum->hasCases()) {
     // Need to generate
     //   `let container = try decoder.container(keyedBy: CodingKeys.self)`
-    // `let container` (containerExpr) is generated above.
 
-    // decoder
-    auto decoderParam = initDecl->getParameters()->get(0);
-    auto *decoderExpr = new (C) DeclRefExpr(ConcreteDeclRef(decoderParam),
-                                            DeclNameLoc(), /*Implicit=*/true);
-
-    // Bound decoder.container(keyedBy: CodingKeys.self) call
-    auto containerType = containerDecl->getInterfaceType();
-    auto *callExpr = createContainerKeyedByCall(C, funcDC, decoderExpr,
-                                                containerType, codingKeysEnum);
-
-    // try decoder.container(keyedBy: CodingKeys.self)
-    auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                    /*implicit=*/true);
-
-    // Full `let container = decoder.container(keyedBy: CodingKeys.self)`
-    // binding.
-    auto *containerPattern = NamedPattern::createImplicit(C, containerDecl);
-    auto *bindingDecl = PatternBindingDecl::createImplicit(
-        C, StaticSpellingKind::None, containerPattern, tryExpr, funcDC);
-    statements.push_back(bindingDecl);
-    statements.push_back(containerDecl);
-
-    SmallVector<ASTNode, 3> cases;
-
-    for (auto *elt : targetEnum->getAllElements()) {
-      auto *codingKeyCase =
-          lookupEnumCase(C, codingKeysEnum, elt->getName().getBaseIdentifier());
-
-      // Skip this case if it's not defined in the CodingKeys
-      if (!codingKeyCase)
-        continue;
-
-      // generate: case .<Case>:
-      auto pat = new (C) EnumElementPattern(
-          TypeExpr::createImplicit(funcDC->mapTypeIntoContext(codingKeysType),
-                                   C),
-          SourceLoc(), DeclNameLoc(), DeclNameRef(), codingKeyCase, nullptr);
-      pat->setImplicit();
-      pat->setType(codingKeysType);
-
-      auto labelItem =
-          CaseLabelItem(new (C) OptionalSomePattern(pat, SourceLoc()));
-
-      llvm::SmallVector<ASTNode, 3> caseStatements;
-
-      auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
-      auto *caseCodingKeys =
-          lookupEvaluatedCodingKeysEnum(C, targetEnum, caseIdentifier);
-
-      auto *nestedContainerDecl = createKeyedContainer(
-          C, funcDC, C.getKeyedDecodingContainerDecl(),
-          caseCodingKeys->getDeclaredInterfaceType(), VarDecl::Introducer::Var,
-          C.Id_nestedContainer);
-
-      auto *nestedContainerCall = createNestedContainerKeyedByForKeyCall(
-          C, funcDC, containerExpr, caseCodingKeys, codingKeyCase);
-
-      auto *tryNestedContainerCall = new (C) TryExpr(
-          SourceLoc(), nestedContainerCall, Type(), /* Implicit */ true);
-
-      auto *containerPattern =
-          NamedPattern::createImplicit(C, nestedContainerDecl);
-      auto *bindingDecl = PatternBindingDecl::createImplicit(
-          C, StaticSpellingKind::None, containerPattern, tryNestedContainerCall,
-          funcDC);
-      caseStatements.push_back(bindingDecl);
-      caseStatements.push_back(nestedContainerDecl);
-
-      llvm::SmallVector<Expr *, 3> decodeCalls;
-      llvm::SmallVector<Identifier, 3> params;
-      if (elt->hasAssociatedValues()) {
-        for (auto entry : llvm::enumerate(*elt->getParameterList())) {
-          auto *paramDecl = entry.value();
-          Identifier identifier = getVarNameForCoding(paramDecl);
-          if (identifier.empty()) {
-            identifier = C.getIdentifier("_" + std::to_string(entry.index()));
-          }
-          auto *caseCodingKey = lookupEnumCase(C, caseCodingKeys, identifier);
-
-          params.push_back(getVarNameForCoding(paramDecl));
-
-          // If no key is defined for this parameter, use the default value
-          if (!caseCodingKey) {
-            // This should have been verified to have a default expr in the
-            // CodingKey synthesis
-            assert(paramDecl->hasDefaultExpr());
-            decodeCalls.push_back(paramDecl->getTypeCheckedDefaultExpr());
-            continue;
-          }
-
-          // Type.self
-          auto *parameterTypeExpr = TypeExpr::createImplicit(
-              funcDC->mapTypeIntoContext(paramDecl->getInterfaceType()), C);
-          auto *parameterMetaTypeExpr =
-              new (C) DotSelfExpr(parameterTypeExpr, SourceLoc(), SourceLoc());
-          // BarCodingKeys.x
-          auto *metaTyRef =
-              TypeExpr::createImplicit(caseCodingKeys->getDeclaredType(), C);
-          auto *keyExpr =
-              new (C) MemberRefExpr(metaTyRef, SourceLoc(), caseCodingKey,
-                                    DeclNameLoc(), /*Implicit=*/true);
-
-          auto *nestedContainerExpr = new (C)
-              DeclRefExpr(ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
-                          /*Implicit=*/true, AccessSemantics::DirectToStorage);
-          // decode(_:, forKey:)
-          auto *decodeCall = UnresolvedDotExpr::createImplicit(
-              C, nestedContainerExpr, C.Id_decode, {Identifier(), C.Id_forKey});
-
-          // nestedContainer.decode(Type.self, forKey: BarCodingKeys.x)
-          auto *callExpr = CallExpr::createImplicit(
-              C, decodeCall, {parameterMetaTypeExpr, keyExpr},
-              {Identifier(), C.Id_forKey});
-
-          // try nestedContainer.decode(Type.self, forKey: BarCodingKeys.x)
-          auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
-                                          /*Implicit=*/true);
-
-          decodeCalls.push_back(tryExpr);
-        }
-      }
-
-      auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
-
-      // Foo.bar
-      auto *selfTypeExpr =
-          TypeExpr::createImplicit(targetEnum->getDeclaredType(), C);
-
-      if (params.empty()) {
-        auto *selfCaseExpr = new (C) MemberRefExpr(
-            selfTypeExpr, SourceLoc(), elt, DeclNameLoc(), /*Implicit=*/true);
-
-        auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
-
-        auto *assignExpr =
-            new (C) AssignExpr(selfRef, SourceLoc(), selfCaseExpr,
-                               /*Implicit=*/true);
-
-        caseStatements.push_back(assignExpr);
-      } else {
-        // Foo.bar(x:)
-        auto *selfCaseExpr = UnresolvedDotExpr::createImplicit(
-            C, selfTypeExpr, elt->getBaseIdentifier(), C.AllocateCopy(params));
-
-        // Foo.bar(x: try nestedContainer.decode(Int.self, forKey: .x))
-        auto *caseCallExpr = CallExpr::createImplicit(
-            C, selfCaseExpr, C.AllocateCopy(decodeCalls),
-            C.AllocateCopy(params));
-
-        // self = Foo.bar(x: try nestedContainer.decode(Int.self))
-        auto *assignExpr =
-            new (C) AssignExpr(selfRef, SourceLoc(), caseCallExpr,
-                               /*Implicit=*/true);
-
-        caseStatements.push_back(assignExpr);
-      }
-
-      auto body =
-          BraceStmt::create(C, SourceLoc(), caseStatements, SourceLoc());
-
-      cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
-                                       labelItem, SourceLoc(), SourceLoc(),
-                                       body,
-                                       /*case body vardecls*/ None));
-    }
+    auto *containerExpr = createContainer(
+        C, funcDC, VarDecl::Introducer::Let, C.getKeyedDecodingContainerDecl(),
+        initDecl->getParameters()->get(0), codingKeysEnum, statements,
+        /*throws*/ true);
 
     // generate:
     //
@@ -1758,11 +1565,14 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
     //            one.")
     //    throw DecodingError.typeMismatch(Foo.self, context)
     //  }
-    auto *debugMessage = new (C) StringLiteralExpr(
-        StringRef("Invalid number of keys found, expected one."), SourceRange(),
-        /* Implicit */ true);
-    auto *throwStmt = createThrowDecodingErrorTypeMismatchStmt(
-        C, funcDC, targetEnum, containerExpr, debugMessage);
+    auto *targetType = TypeExpr::createImplicit(
+        funcDC->mapTypeIntoContext(targetEnum->getDeclaredInterfaceType()), C);
+    auto *targetTypeExpr =
+        new (C) DotSelfExpr(targetType, SourceLoc(), SourceLoc());
+
+    auto *throwStmt = createThrowCodingErrorStmt(
+        C, containerExpr, C.getDecodingErrorDecl(), C.Id_typeMismatch,
+        targetTypeExpr, "Invalid number of keys found, expected one.");
 
     // container.allKeys
     auto *allKeysExpr =
@@ -1799,8 +1609,131 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
     auto *firstExpr =
         UnresolvedDotExpr::createImplicit(C, allKeysExpr, C.Id_first);
 
-    auto switchStmt =
-        SwitchStmt::createImplicit(LabeledStmtInfo(), firstExpr, cases, C);
+    // generate: switch container.allKeys.first.unsafelyUnwrapped { }
+    auto *unwrapped =
+        UnresolvedDotExpr::createImplicit(C, firstExpr, C.Id_unsafelyUnwrapped);
+
+    auto switchStmt = createEnumSwitch(
+        C, funcDC, unwrapped, targetEnum, codingKeysEnum,
+        /*createSubpattern*/ false,
+        [&](auto *elt, auto *codingKeyCase,
+            auto payloadVars) -> std::tuple<EnumElementDecl *, BraceStmt *> {
+          // Skip this case if it's not defined in the CodingKeys
+          if (!codingKeyCase)
+            return std::make_tuple(nullptr, nullptr);
+
+          llvm::SmallVector<ASTNode, 3> caseStatements;
+
+          auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
+          auto *caseCodingKeys =
+              lookupEvaluatedCodingKeysEnum(C, targetEnum, caseIdentifier);
+
+          auto *nestedContainerDecl = createKeyedContainer(
+              C, funcDC, C.getKeyedDecodingContainerDecl(),
+              caseCodingKeys->getDeclaredInterfaceType(),
+              VarDecl::Introducer::Var, C.Id_nestedContainer);
+
+          auto *nestedContainerCall = createNestedContainerKeyedByForKeyCall(
+              C, funcDC, containerExpr, caseCodingKeys, codingKeyCase);
+
+          auto *tryNestedContainerCall = new (C) TryExpr(
+              SourceLoc(), nestedContainerCall, Type(), /* Implicit */ true);
+
+          auto *containerPattern =
+              NamedPattern::createImplicit(C, nestedContainerDecl);
+          auto *bindingDecl = PatternBindingDecl::createImplicit(
+              C, StaticSpellingKind::None, containerPattern,
+              tryNestedContainerCall, funcDC);
+          caseStatements.push_back(bindingDecl);
+          caseStatements.push_back(nestedContainerDecl);
+
+          llvm::SmallVector<Expr *, 3> decodeCalls;
+          llvm::SmallVector<Identifier, 3> params;
+          if (elt->hasAssociatedValues()) {
+            for (auto entry : llvm::enumerate(*elt->getParameterList())) {
+              auto *paramDecl = entry.value();
+              Identifier identifier = getVarNameForCoding(paramDecl);
+              if (identifier.empty()) {
+                identifier =
+                    C.getIdentifier("_" + std::to_string(entry.index()));
+              }
+              auto *caseCodingKey =
+                  lookupEnumCase(C, caseCodingKeys, identifier);
+
+              params.push_back(getVarNameForCoding(paramDecl));
+
+              // If no key is defined for this parameter, use the default value
+              if (!caseCodingKey) {
+                // This should have been verified to have a default expr in the
+                // CodingKey synthesis
+                assert(paramDecl->hasDefaultExpr());
+                decodeCalls.push_back(paramDecl->getTypeCheckedDefaultExpr());
+                continue;
+              }
+
+              auto varType = conformanceDC->mapTypeIntoContext(
+                  paramDecl->getValueInterfaceType());
+
+              bool useIfPresentVariant = false;
+              if (auto objType = varType->getOptionalObjectType()) {
+                varType = objType;
+                useIfPresentVariant = true;
+              }
+
+              auto *nestedContainerExpr = new (C) DeclRefExpr(
+                  ConcreteDeclRef(nestedContainerDecl), DeclNameLoc(),
+                  /*Implicit=*/true, AccessSemantics::DirectToStorage);
+
+              auto *tryExpr = createDecodeCall(
+                  C, varType, caseCodingKeys->getDeclaredType(), caseCodingKey,
+                  nestedContainerExpr, useIfPresentVariant);
+
+              decodeCalls.push_back(tryExpr);
+            }
+          }
+
+          auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
+
+          // Foo.bar
+          auto *selfTypeExpr =
+              TypeExpr::createImplicit(targetEnum->getDeclaredType(), C);
+
+          if (params.empty()) {
+            auto *selfCaseExpr =
+                new (C) MemberRefExpr(selfTypeExpr, SourceLoc(), elt,
+                                      DeclNameLoc(), /*Implicit=*/true);
+
+            auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
+
+            auto *assignExpr =
+                new (C) AssignExpr(selfRef, SourceLoc(), selfCaseExpr,
+                                   /*Implicit=*/true);
+
+            caseStatements.push_back(assignExpr);
+          } else {
+            // Foo.bar(x:)
+            auto *selfCaseExpr = UnresolvedDotExpr::createImplicit(
+                C, selfTypeExpr, elt->getBaseIdentifier(),
+                C.AllocateCopy(params));
+
+            // Foo.bar(x: try nestedContainer.decode(Int.self, forKey: .x))
+            auto *caseCallExpr = CallExpr::createImplicit(
+                C, selfCaseExpr, C.AllocateCopy(decodeCalls),
+                C.AllocateCopy(params));
+
+            // self = Foo.bar(x: try nestedContainer.decode(Int.self))
+            auto *assignExpr =
+                new (C) AssignExpr(selfRef, SourceLoc(), caseCallExpr,
+                                   /*Implicit=*/true);
+
+            caseStatements.push_back(assignExpr);
+          }
+
+          auto body =
+              BraceStmt::create(C, SourceLoc(), caseStatements, SourceLoc());
+
+          return std::make_tuple(codingKeyCase, body);
+        });
 
     statements.push_back(switchStmt);
   }
