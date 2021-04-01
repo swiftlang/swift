@@ -1312,6 +1312,12 @@ void PotentialBindings::infer(Constraint *constraint) {
     // Constraints from which we can't do anything.
     break;
 
+  // For now let's avoid inferring protocol requirements from
+  // this constraint, but in the future we could do that to
+  // to filter bindings.
+  case ConstraintKind::TransitivelyConformsTo:
+    break;
+
   case ConstraintKind::DynamicTypeOf: {
     // Direct binding of the left-hand side could result
     // in `DynamicTypeOf` failure if right-hand side is

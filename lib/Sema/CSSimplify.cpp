@@ -1542,6 +1542,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -1682,6 +1683,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -2072,6 +2074,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -4983,6 +4986,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::ConformsTo:
+    case ConstraintKind::TransitivelyConformsTo:
     case ConstraintKind::Defaultable:
     case ConstraintKind::Disjunction:
     case ConstraintKind::DynamicTypeOf:
@@ -6183,6 +6187,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
 
   // There's nothing more we can do; fail.
+  return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
+    Type type, Type protocolTy, ConstraintLocatorBuilder locator,
+    TypeMatchOptions flags) {
   return SolutionKind::Error;
 }
 
@@ -11259,6 +11269,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyConformsToConstraint(first, second, kind, locator,
                                         subflags);
 
+  case ConstraintKind::TransitivelyConformsTo:
+    return simplifyTransitivelyConformsTo(first, second, locator,
+                                          subflags);
+
   case ConstraintKind::CheckedCast:
     return simplifyCheckedCastConstraint(first, second, subflags, locator);
 
@@ -11724,6 +11738,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
              constraint.getFirstType(),
              constraint.getSecondType(),
              constraint.getKind(),
+             constraint.getLocator(),
+             None);
+
+  case ConstraintKind::TransitivelyConformsTo:
+    return simplifyTransitivelyConformsTo(
+             constraint.getFirstType(),
+             constraint.getSecondType(),
              constraint.getLocator(),
              None);
 
