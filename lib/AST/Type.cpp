@@ -2095,6 +2095,12 @@ public:
       if (req.getKind() != RequirementKind::Conformance) continue;
 
       auto canTy = req.getFirstType()->getCanonicalType();
+
+      // If the substituted type is an interface type, we can't verify the
+      // generic requirements.
+      if (canTy.subst(substSubMap)->isTypeParameter())
+        continue;
+
       auto *proto = req.getProtocolDecl();
       auto origConf = origSubMap.lookupConformance(canTy, proto);
       auto substConf = substSubMap.lookupConformance(canTy, proto);
