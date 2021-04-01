@@ -183,7 +183,7 @@ func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_6$valueL_AFvg : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
 
   // getter of value #1 in closure #1 in implicit closure #1 in testImplicitPropertyWrapper(projection:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_5valueL_Sivg : $@convention(thin) () -> Int
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFyAFcfu_yAFcfU_5valueL_Sivg : $@convention(thin) (ProjectionWrapper<Int>) -> Int
 
   let _: (ProjectionWrapper<Int>) -> (Int, ProjectionWrapper<Int>) = { $value in
     (value, $value)
@@ -202,7 +202,7 @@ func testImplicitPropertyWrapper(projection: ProjectionWrapper<Int>) {
   // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFSi_AFtAFcfu0_Si_AFtAFcfU0_6$valueL_AFvg : $@convention(thin) (ProjectionWrapper<Int>) -> ProjectionWrapper<Int>
 
   // getter of value #1 in closure #2 in implicit closure #2 in testImplicitPropertyWrapper(projection:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFSi_AFtAFcfu0_Si_AFtAFcfU0_5valueL_Sivg : $@convention(thin) () -> Int
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter27testImplicitPropertyWrapper10projectionyAA010ProjectionG0VySiG_tFSi_AFtAFcfu0_Si_AFtAFcfU0_5valueL_Sivg : $@convention(thin) (ProjectionWrapper<Int>) -> Int
 }
 
 @propertyWrapper
@@ -246,4 +246,40 @@ public func publicFunc(@PublicWrapper value: String) {
   // CHECK: sil shared [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tFySScfu_ : $@convention(thin) (@guaranteed String) -> ()
   // CHECK: function_ref @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned PublicWrapper<String>
   // CHECK: function_ref @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tF : $@convention(thin) (@guaranteed PublicWrapper<String>) -> ()
+}
+
+@propertyWrapper
+struct NonmutatingSetter<Value> {
+  var wrappedValue: Value {
+    // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter17NonmutatingSetterV12wrappedValuexvg : $@convention(method) <Value> (NonmutatingSetter<Value>) -> @out Value
+    get { fatalError() }
+    // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter17NonmutatingSetterV12wrappedValuexvs : $@convention(method) <Value> (@in Value, NonmutatingSetter<Value>) -> ()
+    nonmutating set {}
+  }
+  var projectedValue: Self { self }
+  init(wrappedValue: Value) {}
+  init(projectedValue: Self) {}
+}
+
+func genericClosure<T>(arg: T, _ closure: (T) -> Int) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter30testNonmutatingSetterSynthesis5valueyAA0eF0VySiG_tF : $@convention(thin) (NonmutatingSetter<Int>) -> ()
+func testNonmutatingSetterSynthesis(@NonmutatingSetter value: Int) {
+  genericClosure(arg: $value) { $value in
+    (value = 10, value).1
+  }
+
+  // closure #1 in implicit closure #1 in testNonmutatingSetterSynthesis(value:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter30testNonmutatingSetterSynthesis5valueyAA0eF0VySiG_tFSiAFcfu_SiAFcfU_ : $@convention(thin) (NonmutatingSetter<Int>) -> Int
+  // CHECK: function_ref @$s26property_wrapper_parameter30testNonmutatingSetterSynthesis5valueyAA0eF0VySiG_tFSiAFcfu_SiAFcfU_ACL_Sivs : $@convention(thin) (Int, NonmutatingSetter<Int>) -> ()
+  // CHECK: function_ref @$s26property_wrapper_parameter30testNonmutatingSetterSynthesis5valueyAA0eF0VySiG_tFSiAFcfu_SiAFcfU_ACL_Sivg : $@convention(thin) (NonmutatingSetter<Int>) -> Int
+  // CHECK: return
+
+  // getter of value #1 in closure #1 in implicit closure #1 in testNonmutatingSetterSynthesis(value:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter30testNonmutatingSetterSynthesis5valueyAA0eF0VySiG_tFSiAFcfu_SiAFcfU_ACL_Sivg : $@convention(thin) (NonmutatingSetter<Int>) -> Int
+  // CHECK: function_ref @$s26property_wrapper_parameter17NonmutatingSetterV12wrappedValuexvg : $@convention(method) <τ_0_0> (NonmutatingSetter<τ_0_0>) -> @out τ_0_0
+
+  // setter of value #1 in closure #1 in implicit closure #1 in testNonmutatingSetterSynthesis(value:)
+  // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter30testNonmutatingSetterSynthesis5valueyAA0eF0VySiG_tFSiAFcfu_SiAFcfU_ACL_Sivs : $@convention(thin) (Int, NonmutatingSetter<Int>) -> ()
+  // CHECK: function_ref @$s26property_wrapper_parameter17NonmutatingSetterV12wrappedValuexvs : $@convention(method) <τ_0_0> (@in τ_0_0, NonmutatingSetter<τ_0_0>) -> ()
 }
