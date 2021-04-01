@@ -25,6 +25,13 @@ variations = [
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+%   if kind != 'Sequence': # <https://github.com/apple/swift/pull/29274>
+%
+// With a non-optimized stdlib the test takes very long.
+// REQUIRES: optimized_stdlib
+
+%   end # <https://github.com/apple/swift/pull/29274>
+%
 import StdlibUnittest
 import StdlibCollectionUnittest
 
