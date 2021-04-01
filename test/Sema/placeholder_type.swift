@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 let x: _ = 0
+let x2 = x
 let dict1: [_: Int] = ["hi": 0]
 let dict2: [Character: _] = ["h": 0]
 
@@ -27,7 +28,7 @@ let func1: (_) -> Double = { (x: Int) in 0.0 }
 let func2: (Int) -> _ = { x in 0.0 }
 let func3: (_) -> _ = { (x: Int) in 0.0 }
 let func4: (_, String) -> _ = { (x: Int, y: String) in 0.0 }
-let func5: (_, String) -> _ = { (x: Int, y: Double) in 0.0 } // expected-error {{cannot convert value of type '(Int, Double) -> _' to specified type '(_, String) -> _'}}
+let func5: (_, String) -> _ = { (x: Int, y: Double) in 0.0 } // expected-error {{cannot convert value of type '(Int, Double) -> Double' to specified type '(_, String) -> _'}}
 
 let type: _.Type = Int.self
 let type2: Int.Type.Type = _.Type.self
@@ -49,3 +50,16 @@ let _: [String: _] = dictionary(ofType: [_: Int].self)
 let _: [_: _] = dictionary(ofType: [String: Int].self)
 let _: [String: Int] = dictionary(ofType: _.self)
 
+let _: @convention(c) _ = { 0 } // expected-error {{@convention attribute only applies to function types}}
+let _: @convention(c) (_) -> _ = { (x: Double) in 0 }
+let _: @convention(c) (_) -> Int = { (x: Double) in 0 }
+
+struct NonObjc {}
+
+let _: @convention(c) (_) -> Int = { (x: NonObjc) in 0 } // expected-error {{'(NonObjc) -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
+
+func overload() -> Int? { 0 }
+func overload() -> String { "" }
+
+let _: _? = overload()
+let _ = overload() as _?
