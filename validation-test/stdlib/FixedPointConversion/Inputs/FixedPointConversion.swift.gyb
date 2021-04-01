@@ -19,8 +19,7 @@
 %     selfMin = selfType.min
 %     selfMax = selfType.max
 %
-%     testSuite = 'FixedPointConversion_{configuration}{bitWidth}_To{SelfName}'\
-%       .format(**locals()) # TODO(python3): use f-string (PEP 498).
+%     testSuite = f'FixedPointConversion_{configuration}{bitWidth}_To{SelfName}'
 %
 // BEGIN ${testSuite}.swift
 //===----------------------------------------------------------------------===//
@@ -159,7 +158,7 @@ ${testSuite}
 %
 %     # Test conversion behaviors for all floating-point types.
 %     for otherType in all_floating_point_types():
-%       OtherName = 'Float{}'.format(otherType.bits)
+%       OtherName = f'Float{otherType.bits}'
 %       otherMax = int_max(bits=otherType.explicit_significand_bits, signed=False)
 %       otherMin = -otherMax
 %
