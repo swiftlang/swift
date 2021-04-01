@@ -427,6 +427,15 @@ public:
                         Type superclass,
                         FloatingRequirementSource source);
 
+  /// Update the layout constraint for the equivalence class of \c T.
+  ///
+  /// This assumes that the constraint has already been recorded.
+  ///
+  /// \returns true if anything in the equivalence class changed, false
+  /// otherwise.
+  bool updateLayout(ResolvedType type,
+                    LayoutConstraint layout);
+
 private:
   /// Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.

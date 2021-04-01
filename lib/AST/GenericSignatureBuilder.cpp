@@ -4555,23 +4555,11 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirementDirect(
                             resolvedSource, layout));
   }
 
-  auto equivClass = type.getEquivalenceClass(*this);
-
   // Update the layout in the equivalence class, if we didn't have one already.
-  bool anyChanges = false;
-  if (!equivClass->layout) {
-    equivClass->layout = layout;
-    anyChanges = true;
-  } else {
-    // Try to merge layout constraints.
-    auto mergedLayout = equivClass->layout.merge(layout);
-    if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout) {
-      equivClass->layout = mergedLayout;
-      anyChanges = true;
-    }
-  }
+  bool anyChanges = updateLayout(type, layout);
 
   // Record this layout constraint.
+  auto equivClass = type.getEquivalenceClass(*this);
   equivClass->layoutConstraints.push_back({type.getUnresolvedType(),
                                            layout, resolvedSource});
   equivClass->modified(*this);
@@ -4679,6 +4667,25 @@ bool GenericSignatureBuilder::updateSuperclass(
 
     // We've strengthened the bound, so update superclass conformances.
     updateSuperclassConformances();
+    return true;
+  }
+
+  return false;
+}
+
+bool GenericSignatureBuilder::updateLayout(ResolvedType type,
+                                           LayoutConstraint layout) {
+  auto equivClass = type.getEquivalenceClass(*this);
+
+  if (!equivClass->layout) {
+    equivClass->layout = layout;
+    return true;
+  }
+
+  // Try to merge layout constraints.
+  auto mergedLayout = equivClass->layout.merge(layout);
+  if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout) {
+    equivClass->layout = mergedLayout;
     return true;
   }
 
@@ -5020,9 +5027,7 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
       equivClass->layout = equivClass2->layout;
       equivClass->layoutConstraints = std::move(equivClass2->layoutConstraints);
     } else {
-      const RequirementSource *source2
-        = equivClass2->layoutConstraints.front().source;
-      addLayoutRequirementDirect(T1, equivClass2->layout, source2);
+      updateLayout(T1, equivClass2->layout);
       equivClass->layoutConstraints.insert(
                                    equivClass->layoutConstraints.end(),
                                    equivClass2->layoutConstraints.begin() + 1,
