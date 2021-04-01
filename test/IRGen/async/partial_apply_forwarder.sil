@@ -29,6 +29,7 @@ bb0(%0 : $*S):
   return %2 : $@async @callee_guaranteed (@in O) -> ()
 }
 
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s23unspecialized_uncurriedTA"(
 sil hidden @specialized_curried : $@async @convention(thin) (@owned E) -> @owned @async @callee_guaranteed () -> @owned D<C> {
 bb0(%0 : $E):
   %1 = function_ref @unspecialized_uncurried : $@async @convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed E) -> @owned D<τ_0_0>
@@ -49,6 +50,7 @@ entry(%p : $*τ_0_0):
   unreachable
 }
 
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingPTA"(
 sil hidden @reabstract_context : $@async @convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %6 = alloc_stack $C
@@ -90,7 +92,7 @@ entry(%e : $EmptyType, %b : $WeakBox<τ_0_0>):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context(
-
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA"(
 sil public @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_guaranteed () -> () {
 bb0(%0 : $*τ_0_1):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
@@ -118,7 +120,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_forwarder_parameter(
-
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA.{{[0-9]+}}"(
 sil public @bind_polymorphic_param_from_forwarder_parameter : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> () {
 bb0(%0 : $*τ_0_1):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
@@ -139,6 +141,7 @@ entry(%s : $S, %b : $WeakBox<τ_0_0>):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context_with_layout(
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s11takingQAndSTA"(
 sil public @bind_polymorphic_param_from_context_with_layout : $@async @convention(thin) <τ_0_1>(@in τ_0_1, S) -> @owned @async @callee_guaranteed () -> () {
 bb0(%0 : $*τ_0_1, %1: $S):
   %2 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>
@@ -170,6 +173,7 @@ bb0:
 }
 
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @specializes_closure_returning_closure(
+// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s15returns_closureTA"(
 protocol MyEquatable {
   static func isEqual (lhs: Self, rhs: Self) -> Builtin.Int1
 }
@@ -256,9 +260,3 @@ sil_vtable E {}
 sil_vtable Empty {}
 sil_witness_table C: P module main {}
 
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s23unspecialized_uncurriedTA"(
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingPTA"(
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA"(
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA.{{[0-9]+}}"(
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s11takingQAndSTA"(
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s15returns_closureTA"(

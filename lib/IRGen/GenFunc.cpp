@@ -768,15 +768,12 @@ protected:
         origParams(subIGF.collectParameters()) {}
 
 public:
-  enum class DynamicFunctionKind {
-    Witness,
-    PartialApply,
-  };
   virtual void begin(){};
 
   virtual void gatherArgumentsFromApply() = 0;
 
-  virtual void mapAsyncParameters() {}
+  virtual void mapAsyncParameters(FunctionPointer fnPtr) {}
+  virtual void recordAsyncParametersInsertionPoint(){};
 
   void gatherArgumentsFromApply(bool isAsync) {
     // Lower the forwarded arguments in the original function's generic context.
@@ -831,7 +828,7 @@ public:
     }
 
     if (isAsync)
-      mapAsyncParameters();
+      recordAsyncParametersInsertionPoint();
 
     // Reemit the parameters as unsubstituted.
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
@@ -921,12 +918,10 @@ public:
 
   llvm::Value *getContext() { return origParams.claimNext(); }
 
-  virtual llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) = 0;
+  virtual llvm::Value *getDynamicFunctionPointer() = 0;
   virtual llvm::Value *getDynamicFunctionContext() = 0;
-  virtual void addDynamicFunctionContext(Explosion &explosion,
-                                         DynamicFunctionKind kind) = 0;
-  virtual void addDynamicFunctionPointer(Explosion &explosion,
-                                         DynamicFunctionKind kind) = 0;
+  virtual void addDynamicFunctionContext(Explosion &explosion) = 0;
+  virtual void addDynamicFunctionPointer(Explosion &explosion) = 0;
 
   void addSelf(Explosion &explosion) { addArgument(explosion); }
   void addWitnessSelfMetadata(llvm::Value *value) {
@@ -965,16 +960,12 @@ public:
   void gatherArgumentsFromApply() override {
     super::gatherArgumentsFromApply(false);
   }
-  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
-    return args.takeLast();
-  }
+  llvm::Value *getDynamicFunctionPointer() override { return args.takeLast(); }
   llvm::Value *getDynamicFunctionContext() override { return args.takeLast(); }
-  void addDynamicFunctionContext(Explosion &explosion,
-                                 DynamicFunctionKind kind) override {
+  void addDynamicFunctionContext(Explosion &explosion) override {
     addArgument(explosion);
   }
-  void addDynamicFunctionPointer(Explosion &explosion,
-                                 DynamicFunctionKind kind) override {
+  void addDynamicFunctionPointer(Explosion &explosion) override {
     addArgument(explosion);
   }
   void forwardErrorResult() override {
@@ -1045,13 +1036,6 @@ class AsyncPartialApplicationForwarderEmission
   Address context;
   Address calleeContextBuffer;
   unsigned currentArgumentIndex;
-  struct DynamicFunction {
-    using Kind = DynamicFunctionKind;
-    Kind kind;
-    llvm::Value *pointer;
-    llvm::Value *context;
-  };
-  Optional<DynamicFunction> dynamicFunction = llvm::None;
   struct Self {
     enum class Kind {
       Method,
@@ -1061,6 +1045,7 @@ class AsyncPartialApplicationForwarderEmission
     llvm::Value *value;
   };
   Optional<Self> self = llvm::None;
+  unsigned asyncParametersInsertionIndex = 0;
 
   void saveValue(ElementLayout layout, Explosion &explosion) {
     Address addr = layout.project(subIGF, context, /*offsets*/ llvm::None);
@@ -1088,15 +1073,18 @@ public:
 
   void begin() override { super::begin(); }
 
-  void mapAsyncParameters() override {
+  void recordAsyncParametersInsertionPoint() override {
     // Ignore the original context.
     (void)origParams.claimNext();
 
+    asyncParametersInsertionIndex = args.size();
+  }
+  void mapAsyncParameters(FunctionPointer fnPtr) override {
     llvm::Value *dynamicContextSize32;
     auto initialContextSize = Size(0);
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        subIGF, origType->getRepresentation(), *staticFnPtr,
-        nullptr, std::make_pair(true, true), initialContextSize);
+        subIGF, origType->getRepresentation(), fnPtr, nullptr,
+        std::make_pair(true, true), initialContextSize);
     auto *dynamicContextSize =
         subIGF.Builder.CreateZExt(dynamicContextSize32, subIGF.IGM.SizeTy);
     calleeContextBuffer =
@@ -1104,8 +1092,9 @@ public:
     context = layout.emitCastTo(subIGF, calleeContextBuffer.getAddress());
     auto calleeContext =
         layout.emitCastTo(subIGF, calleeContextBuffer.getAddress());
-    args.add(subIGF.Builder.CreateBitOrPointerCast(
-        calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
+    args.insert(asyncParametersInsertionIndex,
+                subIGF.Builder.CreateBitOrPointerCast(
+                    calleeContextBuffer.getAddress(), IGM.SwiftContextPtrTy));
 
     // Set caller info into the context.
     { // caller context
@@ -1146,20 +1135,14 @@ public:
   void gatherArgumentsFromApply() override {
     super::gatherArgumentsFromApply(true);
   }
-  llvm::Value *getDynamicFunctionPointer(PointerAuthInfo &authInfo) override {
-    llvm_unreachable(
-        "async partial applies never have dynamic function pointers");
-  }
+  llvm::Value *getDynamicFunctionPointer() override { return args.takeLast(); }
   llvm::Value *getDynamicFunctionContext() override {
     return args.takeLast();
   }
-  void addDynamicFunctionContext(Explosion &explosion,
-                                 DynamicFunction::Kind kind) override {
+  void addDynamicFunctionContext(Explosion &explosion) override {
     addArgument(explosion);
   }
-  void addDynamicFunctionPointer(Explosion &explosion,
-                                 DynamicFunction::Kind kind) override {
-    assert(false);
+  void addDynamicFunctionPointer(Explosion &explosion) override {
     addArgument(explosion);
   }
 
@@ -1669,20 +1652,10 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
       } else {
         switch (extraFieldIndex) {
         case 0:
-          emission->addDynamicFunctionContext(
-              param, isWitnessMethodCallee
-                         ? PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::Witness
-                         : PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::PartialApply);
+          emission->addDynamicFunctionContext(param);
           break;
         case 1:
-          emission->addDynamicFunctionPointer(
-              param, isWitnessMethodCallee
-                         ? PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::Witness
-                         : PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::PartialApply);
+          emission->addDynamicFunctionPointer(param);
           break;
         default:
           llvm_unreachable("unexpected extra field in thick context");
@@ -1724,21 +1697,28 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Otherwise, it was the last thing we added to the layout.
 
     assert(lastCapturedFieldPtr);
-    auto authInfo = PointerAuthInfo::emit(subIGF,
-                            IGM.getOptions().PointerAuth.PartialApplyCapture,
-                            lastCapturedFieldPtr,
-                            PointerAuthEntity::Special::PartialApplyCapture);
+    auto authInfo = PointerAuthInfo::emit(
+        subIGF,
+        origType->isAsync()
+            ? IGM.getOptions().PointerAuth.AsyncPartialApplyCapture
+            : IGM.getOptions().PointerAuth.PartialApplyCapture,
+        lastCapturedFieldPtr, PointerAuthEntity::Special::PartialApplyCapture);
 
     // The dynamic function pointer is packed "last" into the context,
     // and we pulled it out as an argument.  Just pop it off.
-    auto fnPtr = emission->getDynamicFunctionPointer(authInfo);
+    auto fnPtr = emission->getDynamicFunctionPointer();
 
     // It comes out of the context as an i8*. Cast to the function type.
     fnPtr = subIGF.Builder.CreateBitCast(fnPtr, fnTy);
 
-    return FunctionPointer(FunctionPointer::Kind::Function, fnPtr, authInfo,
-                           origSig);
+    return FunctionPointer(origType->isAsync()
+                               ? FunctionPointer::Kind::AsyncFunctionPointer
+                               : FunctionPointer::Kind::Function,
+                           fnPtr, authInfo, origSig);
   }();
+
+  if (origType->isAsync())
+    emission->mapAsyncParameters(fnPtr);
 
   // Derive the context argument if needed.  This is either:
   //   - the saved context argument, in which case it was the last
@@ -1770,12 +1750,7 @@ static llvm::Value *emitPartialApplicationForwarder(IRGenModule &IGM,
     if (isMethodCallee) {
       emission->addSelf(explosion);
     } else {
-      emission->addDynamicFunctionContext(
-          explosion, isWitnessMethodCallee
-                         ? PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::Witness
-                         : PartialApplicationForwarderEmission::
-                               DynamicFunctionKind::PartialApply);
+      emission->addDynamicFunctionContext(explosion);
     }
 
   // Pass a placeholder for thin function calls.
@@ -2120,16 +2095,18 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
       // We don't add non-constant function pointers to the explosion above,
       // so we need to handle them specially now.
       if (i == nonStaticFnIndex) {
-        llvm::Value *fnPtr;
-        if (auto &schema = IGF.getOptions().PointerAuth.PartialApplyCapture) {
-          auto schemaAuthInfo =
-            PointerAuthInfo::emit(IGF, schema, fieldAddr.getAddress(),
-                           PointerAuthEntity::Special::PartialApplyCapture);
+        llvm::Value *fnPtr = fn.getRawPointer();
+        if (auto &schema =
+                origType->isAsync()
+                    ? IGF.getOptions().PointerAuth.AsyncPartialApplyCapture
+                    : IGF.getOptions().PointerAuth.PartialApplyCapture) {
+          auto schemaAuthInfo = PointerAuthInfo::emit(
+              IGF, schema, fieldAddr.getAddress(),
+              PointerAuthEntity::Special::PartialApplyCapture);
           fnPtr =
               emitPointerAuthResign(IGF, fn, schemaAuthInfo).getRawPointer();
-        } else {
-          fnPtr = fn.getRawPointer();
         }
+
         fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
         IGF.Builder.CreateStore(fnPtr, fieldAddr);
         continue;
