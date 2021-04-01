@@ -220,22 +220,17 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns:
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
-  @discardableResult
   public mutating func spawn(
-    overridingPriority priorityOverride: Task.Priority? = nil,
+    priority: Task.Priority = .unspecified,
     operation: __owned @Sendable @escaping () async -> ChildTaskResult
-  ) -> Self.Spawned {
-    let canAdd = _taskGroupAddPendingTask(group: _group)
-    
-    guard canAdd else {
-      // the group is cancelled and is not accepting any new work
-      return Spawned(handle: nil)
-    }
+  ) {
+    _ = _taskGroupAddPendingTask(group: _group, unconditionally: true)
     
     // Set up the job flags for a new task.
     var flags = Task.JobFlags()
     flags.kind = .task
-    flags.priority = priorityOverride ?? getJobFlags(_task).priority
+    flags.priority = priority != Task.Priority.unspecified ?
+        priority : getJobFlags(_task).priority
     flags.isFuture = true
     flags.isChildTask = true
     flags.isGroupChildTask = true
@@ -249,25 +244,56 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
-    
-    return Spawned(handle: Task.Handle(childTask))
   }
 
-  public struct Spawned: Sendable {
-    /// Returns `true` if the task was successfully spawned in the task group,
-    /// `false` otherwise which means that the group was already cancelled and
-    /// refused to accept spawn a new child task.
-    public var successfully: Bool { handle != nil }
+  /// Add a child task to the group.
+  ///
+  /// ### Error handling
+  /// Operations are allowed to `throw`, in which case the `try await next()`
+  /// invocation corresponding to the failed task will re-throw the given task.
+  ///
+  /// The `add` function will never (re-)throw errors from the `operation`.
+  /// Instead, the corresponding `next()` call will throw the error when necessary.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: override priority of the operation task
+  ///   - operation: operation to execute and add to the group
+  /// - Returns:
+  ///   - `true` if the operation was added to the group successfully,
+  ///     `false` otherwise (e.g. because the group `isCancelled`)
+  public mutating func spawnUnlessCancelled(
+    priority: Task.Priority = .unspecified,
+    operation: __owned @Sendable @escaping () async -> ChildTaskResult
+  ) -> Bool {
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
-    /// Task handle for the spawned task group child task,
-    /// or `nil` if it was not spawned successfully.
-    public let handle: Task.Handle<ChildTaskResult, Never>?
-
-    init(handle: Task.Handle<ChildTaskResult, Never>?) {
-      self.handle = handle
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
     }
+
+    // Set up the job flags for a new task.
+    var flags = Task.JobFlags()
+    flags.kind = .task
+    flags.priority = priority != Task.Priority.unspecified ?
+        priority : getJobFlags(_task).priority
+    flags.isFuture = true
+    flags.isChildTask = true
+    flags.isGroupChildTask = true
+
+    // Create the asynchronous task future.
+    let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
+      flags.bits, _group, operation)
+
+    // Attach it to the group's task record in the current task.
+    _ = _taskGroupAttachChild(group: _group, child: childTask)
+
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+
+    return true
   }
-  
+
   /// Wait for the a child task that was added to the group to complete,
   /// and return (or rethrow) the value it completed with. If no tasks are
   /// pending in the task group this function returns `nil`, allowing the
@@ -417,6 +443,48 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     self._group = group
   }
 
+  /// Spawn, unconditionally, a child task in the group.
+  ///
+  /// ### Error handling
+  /// Operations are allowed to `throw`, in which case the `try await next()`
+  /// invocation corresponding to the failed task will re-throw the given task.
+  ///
+  /// The `add` function will never (re-)throw errors from the `operation`.
+  /// Instead, the corresponding `next()` call will throw the error when necessary.
+  ///
+  /// - Parameters:
+  ///   - overridingPriority: override priority of the operation task
+  ///   - operation: operation to execute and add to the group
+  /// - Returns:
+  ///   - `true` if the operation was added to the group successfully,
+  ///     `false` otherwise (e.g. because the group `isCancelled`)
+  public mutating func spawn(
+    priority: Task.Priority = .unspecified,
+    operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
+  ) {
+    // we always add, so no need to check if group was cancelled
+    _ = _taskGroupAddPendingTask(group: _group, unconditionally: true)
+
+    // Set up the job flags for a new task.
+    var flags = Task.JobFlags()
+    flags.kind = .task
+    flags.priority = priority != Task.Priority.unspecified ?
+        priority : getJobFlags(_task).priority
+    flags.isFuture = true
+    flags.isChildTask = true
+    flags.isGroupChildTask = true
+
+    // Create the asynchronous task future.
+    let (childTask, _) = Builtin.createAsyncTaskGroupFuture(
+      flags.bits, _group, operation)
+
+    // Attach it to the group's task record in the current task.
+    _ = _taskGroupAttachChild(group: _group, child: childTask)
+
+    // Enqueue the resulting job.
+    _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
+  }
+
   /// Add a child task to the group.
   ///
   /// ### Error handling
@@ -432,22 +500,22 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Returns:
   ///   - `true` if the operation was added to the group successfully,
   ///     `false` otherwise (e.g. because the group `isCancelled`)
-  @discardableResult
-  public mutating func spawn(
-    overridingPriority priorityOverride: Task.Priority? = nil,
+  public mutating func spawnUnlessCancelled(
+    priority: Task.Priority = .unspecified,
     operation: __owned @Sendable @escaping () async throws -> ChildTaskResult
-  ) -> Self.Spawned {
-    let canAdd = _taskGroupAddPendingTask(group: _group)
+  ) -> Bool {
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
 
     guard canAdd else {
       // the group is cancelled and is not accepting any new work
-      return Spawned(handle: nil)
+      return false
     }
 
     // Set up the job flags for a new task.
     var flags = Task.JobFlags()
     flags.kind = .task
-    flags.priority = priorityOverride ?? getJobFlags(_task).priority
+    flags.priority = priority != Task.Priority.unspecified ?
+        priority : getJobFlags(_task).priority
     flags.isFuture = true
     flags.isChildTask = true
     flags.isGroupChildTask = true
@@ -462,22 +530,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(childTask))
 
-    return Spawned(handle: Task.Handle(childTask))
-  }
-
-  public struct Spawned: Sendable  {
-    /// Returns `true` if the task was successfully spawned in the task group,
-    /// `false` otherwise which means that the group was already cancelled and
-    /// refused to accept spawn a new child task.
-    public var successfully: Bool { handle != nil }
-
-    /// Task handle for the spawned task group child task,
-    /// or `nil` if it was not spawned successfully.
-    public let handle: Task.Handle<ChildTaskResult, Error>?
-
-    init(handle: Task.Handle<ChildTaskResult, Error>?) {
-      self.handle = handle
-    }
+    return true
   }
 
   /// Wait for the a child task that was added to the group to complete,
@@ -754,7 +807,8 @@ func _taskGroupDestroy(group: __owned Builtin.RawPointer)
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_addPending")
 func _taskGroupAddPendingTask(
-  group: Builtin.RawPointer
+  group: Builtin.RawPointer,
+  unconditionally: Bool
 ) -> Bool
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

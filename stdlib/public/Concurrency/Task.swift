@@ -396,7 +396,7 @@ extension Task {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
 public func detach<T>(
-  priority: Task.Priority = .default,
+  priority: Task.Priority = .unspecified,
   operation: __owned @Sendable @escaping () async -> T
 ) -> Task.Handle<T, Never> {
   // Set up the job flags for a new task.
@@ -448,7 +448,7 @@ public func detach<T>(
 ///     throw the error the operation has thrown when awaited on.
 @discardableResult
 public func detach<T, Failure>(
-  priority: Task.Priority = .default,
+  priority: Task.Priority = .unspecified,
   operation: __owned @Sendable @escaping () async throws -> T
 ) -> Task.Handle<T, Failure> {
   // Set up the job flags for a new task.
@@ -470,7 +470,7 @@ public func detach<T, Failure>(
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 // TODO: remove this?
-public func _runAsyncHandler(operation: @escaping () async -> ()) {
+func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @Sendable () async -> ()
   detach(
     operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)

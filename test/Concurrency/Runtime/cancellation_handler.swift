@@ -12,7 +12,7 @@ class Canary {
 }
 
 if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
-  let task = Task.runDetached {
+  let task = detach {
     let canary = Canary()
     _ = await Task.withCancellationHandler {
       print(canary)

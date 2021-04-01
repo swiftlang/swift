@@ -34,23 +34,23 @@ func test_taskGroup_cancel_then_completions() async {
 
   let result: Int = await withTaskGroup(of: SendableTuple2<Int, Bool>.self) { group in
     print("group cancelled: \(group.isCancelled)") // CHECK: group cancelled: false
-    let spawnedFirst = group.spawn {
+    let spawnedFirst = group.spawnUnlessCancelled {
       print("start first")
       await Task.sleep(1_000_000_000)
       print("done first")
       return SendableTuple2(1, Task.isCancelled)
     }
-    print("spawned first: \(spawnedFirst.successfully)") // CHECK: spawned first: true
-    assert(spawnedFirst.successfully)
+    print("spawned first: \(spawnedFirst)") // CHECK: spawned first: true
+    assert(spawnedFirst)
 
-    let spawnedSecond = group.spawn {
+    let spawnedSecond = group.spawnUnlessCancelled {
       print("start second")
       await Task.sleep(3_000_000_000)
       print("done second")
       return SendableTuple2(2, Task.isCancelled)
     }
-    print("spawned second: \(spawnedSecond.successfully)") // CHECK: spawned second: true
-    assert(spawnedSecond.successfully)
+    print("spawned second: \(spawnedSecond)") // CHECK: spawned second: true
+    assert(spawnedSecond)
 
     group.cancelAll()
     print("cancelAll") // CHECK: cancelAll

@@ -180,7 +180,8 @@ OVERRIDE_TASK_GROUP(taskGroup_cancelAll, void,
 
 OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                    swift::, (TaskGroup *group), (group))
+                    swift::, (TaskGroup *group, bool unconditionally),
+                    (group, unconditionally))
 
 OVERRIDE_TASK_LOCAL(task_localValuePush, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

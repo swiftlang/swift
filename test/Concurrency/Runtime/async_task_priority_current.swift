@@ -12,7 +12,7 @@ import Dispatch
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_detach() async {
   let a1 = Task.currentPriority
-  print("a1: \(a1)") // CHECK: a1: default
+  print("a1: \(a1)") // CHECK: a1: unspecified
 
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
@@ -23,7 +23,7 @@ func test_detach() async {
   }.get()
 
   let a3 = Task.currentPriority
-  print("a3: \(a3)") // CHECK: a3: default
+  print("a3: \(a3)") // CHECK: a3: unspecified
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)

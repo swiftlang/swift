@@ -361,13 +361,19 @@ public:
   /// is currently executing the group. Here we only need the counts of
   /// pending/ready tasks.
   ///
+  /// If the `unconditionally` parameter is `true` the operation always successfully
+  /// adds a pending task, even if the group is cancelled. If the unconditionally
+  /// flag is `false`, the added pending count will be *reverted* before returning.
+  /// This is because we will NOT add a task to a cancelled group, unless doing
+  /// so unconditionally.
+  ///
   /// Returns *assumed* new status, including the just performed +1.
-  GroupStatus statusAddPendingTaskRelaxed() {
+  GroupStatus statusAddPendingTaskRelaxed(bool unconditionally) {
     auto old = status.fetch_add(GroupStatus::onePendingTask,
                                 std::memory_order_relaxed);
     auto s = GroupStatus{old + GroupStatus::onePendingTask};
 
-    if (s.isCancelled()) {
+    if (!unconditionally && s.isCancelled()) {
       // revert that add, it was meaningless
       auto o = status.fetch_sub(GroupStatus::onePendingTask,
                                 std::memory_order_relaxed);
@@ -821,8 +827,8 @@ bool TaskGroupImpl::cancelAll() {
 // =============================================================================
 // ==== addPending -------------------------------------------------------------
 SWIFT_CC(swift)
-static bool swift_taskGroup_addPendingImpl(TaskGroup *group) {
-  auto assumedStatus = asImpl(group)->statusAddPendingTaskRelaxed();
+static bool swift_taskGroup_addPendingImpl(TaskGroup *group, bool unconditionally) {
+  auto assumedStatus = asImpl(group)->statusAddPendingTaskRelaxed(unconditionally);
   return !assumedStatus.isCancelled();
 }
 

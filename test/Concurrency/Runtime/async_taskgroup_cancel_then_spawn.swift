@@ -20,20 +20,28 @@ func test_taskGroup_cancel_then_add() async {
   print("\(#function)")
   let result: Int = await withTaskGroup(of: Int.self) { group in
 
-    let addedFirst = group.spawn { 1 }
-    print("added first: \(addedFirst.successfully)") // CHECK: added first: true
+    let addedFirst = group.spawnUnlessCancelled { 1 }
+    print("added first: \(addedFirst)") // CHECK: added first: true
 
     let one = await group.next()!
     print("next first: \(one)") // CHECK: next first: 1
 
     group.cancelAll()
     print("cancelAll")
+    print("group isCancelled: \(group.isCancelled)") // CHECK: group isCancelled: true
 
-    let addedSecond = group.spawn { 1 }
-    print("added second: \(addedSecond.successfully)") // CHECK: added second: false
+    let addedSecond = group.spawnUnlessCancelled { 2 }
+    print("added second: \(addedSecond)") // CHECK: added second: false
 
     let none = await group.next()
     print("next second: \(none)") // CHECK: next second: nil
+
+    group.spawn { 3 }
+    print("added third, unconditionally") // CHECK: added third, unconditionally
+    print("group isCancelled: \(group.isCancelled)") // CHECK: group isCancelled: true
+
+    let three = await group.next()!
+    print("next third: \(three)") // CHECK: next third: 3
 
     return one + (none ?? 0)
   }
