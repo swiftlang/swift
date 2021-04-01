@@ -522,15 +522,13 @@ extension Task {
     // Create the asynchronous task future, it will do nothing, but simply serves
     // as a way for us to yield our execution until the executor gets to it and
     // resumes us.
-    // FIXME: This should be an empty closure instead. Returning `0` here is
-    //        a workaround for rdar://74957357
     // TODO: consider if it would be useful for this task to be a child task
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, nil, { return 0 })
+    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, {})
 
     // Enqueue the resulting job.
     _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
-    let _ = await Handle<Int, Never>(task).get()
+    let _ = await Handle<Void, Never>(task).get()
   }
 }
 
