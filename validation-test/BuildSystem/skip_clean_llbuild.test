@@ -12,4 +12,4 @@
 # CLEAN-LLBUILD-CHECK-NEXT: rm -rf
 
 # SKIP-CLEAN-LLBUILD-CHECK-NOT: Cleaning the llbuild build directory
-# SKIP-CLEAN-LLBUILD-CHECK-NOT: rm -rf {{.*llbuild.*}}
+# SKIP-CLEAN-LLBUILD-CHECK-NOT: rm -rf {{.*/llbuild-[^/]*}}
