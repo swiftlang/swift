@@ -105,6 +105,7 @@ struct NonMutatingSetterWrapper<Value> {
     nonmutating set { }
   }
 
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter24NonMutatingSetterWrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <Value> (@in Value, @thin NonMutatingSetterWrapper<Value>.Type) -> @out NonMutatingSetterWrapper<Value>
   init(wrappedValue: Value) {
     self.value = wrappedValue
   }
@@ -114,36 +115,36 @@ struct NonMutatingSetterWrapper<Value> {
 class ClassWrapper<Value> {
   var wrappedValue: Value
 
+  // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter12ClassWrapperC12wrappedValueACyxGx_tcfc : $@convention(method) <Value> (@in Value, @owned ClassWrapper<Value>) -> @owned ClassWrapper<Value>
   init(wrappedValue: Value) {
     self.wrappedValue = wrappedValue
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtF : $@convention(thin) (@guaranteed NonMutatingSetterWrapper<String>, @guaranteed ClassWrapper<Int>) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitF : $@convention(thin) (@guaranteed String, Int) -> ()
 func testNonMutatingSetter(@NonMutatingSetterWrapper value1: String, @ClassWrapper value2: Int) {
+  // CHECK: alloc_box ${ var NonMutatingSetterWrapper<String> }, var, name "_value1"
+  // CHECK: function_ref @$s26property_wrapper_parameter24NonMutatingSetterWrapperV12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin NonMutatingSetterWrapper<τ_0_0>.Type) -> @out NonMutatingSetterWrapper<τ_0_0>
+  // CHECK: alloc_box ${ var ClassWrapper<Int> }, var, name "_value2"
+  // CHECK: function_ref @$s26property_wrapper_parameter12ClassWrapperC12wrappedValueACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thick ClassWrapper<τ_0_0>.Type) -> @owned ClassWrapper<τ_0_0>
+
   _ = value1
   value1 = "hello!"
 
-  // property wrapper backing initializer of value1 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned NonMutatingSetterWrapper<String>
-
-  // property wrapper backing initializer of value2 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFADL_SivpfP : $@convention(thin) (Int) -> @owned ClassWrapper<Int>
-
   // getter of value1 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFACL_SSvg : $@convention(thin) (@guaranteed NonMutatingSetterWrapper<String>) -> @owned String
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFACL_SSvg : $@convention(thin) (@guaranteed { var NonMutatingSetterWrapper<String> }) -> @owned String
 
   // setter of value1 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFACL_SSvs : $@convention(thin) (@owned String, @guaranteed NonMutatingSetterWrapper<String>) -> ()
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFACL_SSvs : $@convention(thin) (@owned String, @guaranteed { var NonMutatingSetterWrapper<String> }) -> ()
 
   _ = value2
   value2 = 10
 
   // getter of value2 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFADL_Sivg : $@convention(thin) (@guaranteed ClassWrapper<Int>) -> Int
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFADL_Sivg : $@convention(thin) (@guaranteed { var ClassWrapper<Int> }) -> Int
 
   // setter of value2 #1 in testNonMutatingSetter(value1:value2:)
-  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2yAA0efG7WrapperVySSG_AA05ClassJ0CySiGtFADL_Sivs : $@convention(thin) (Int, @guaranteed ClassWrapper<Int>) -> ()
+  // CHECK: sil private [ossa] @$s26property_wrapper_parameter21testNonMutatingSetter6value16value2ySS_SitFADL_Sivs : $@convention(thin) (Int, @guaranteed { var ClassWrapper<Int> }) -> ()
 }
 
 @propertyWrapper
@@ -228,4 +229,21 @@ public func publicFunc(@PublicWrapper value: String) {
 
   // property wrapper init from projected value of value #1 in publicFunc(value:)
   // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfW : $@convention(thin) (@owned PublicWrapper<String>) -> @owned PublicWrapper<String>
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tF : $@convention(thin) (@guaranteed PublicWrapper<String>) -> ()
+@inlinable func inlinableFunc(@PublicWrapper value: String) {
+  // property wrapper backing initializer of value #1 in inlinableFunc(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned PublicWrapper<String>
+
+  // property wrapper init from projected value of value #1 in inlinableFunc(value:)
+  // CHECK: sil non_abi [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfW : $@convention(thin) (@owned PublicWrapper<String>) -> @owned PublicWrapper<String>
+
+
+  _ = publicFunc(value:)
+
+  // implicit closure #1 in inlinableFunc(value:)
+  // CHECK: sil shared [serialized] [ossa] @$s26property_wrapper_parameter13inlinableFunc5valueyAA13PublicWrapperVySSG_tFySScfu_ : $@convention(thin) (@guaranteed String) -> ()
+  // CHECK: function_ref @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tFACL_SSvpfP : $@convention(thin) (@owned String) -> @owned PublicWrapper<String>
+  // CHECK: function_ref @$s26property_wrapper_parameter10publicFunc5valueyAA13PublicWrapperVySSG_tF : $@convention(thin) (@guaranteed PublicWrapper<String>) -> ()
 }

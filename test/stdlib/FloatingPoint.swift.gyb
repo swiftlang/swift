@@ -243,15 +243,20 @@ FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
       from: Double._convert(from: Float.leastNonzeroMagnitude).value).value,
     Float.leastNonzeroMagnitude)
 
-  // Let's make sure that the correct value is returned when two representable
-  // values are equally close to the original value.
-  let bitPattern: UInt64 = 0b01111111111_0000000000000000000000110000000000000000000000000000
-  var z = Double(bitPattern: bitPattern)
-  expectEqual(Float._convert(from: z).value, Float(z))
+  if #available(macOS 11, iOS 14, watchOS 7, tvOS 14, *) {
+    // The behavior tested here was introduced in
+    // https://github.com/apple/swift/pull/30194
 
-  z = Double(Float.greatestFiniteMagnitude) +
-      Double(Float.greatestFiniteMagnitude.ulp / 2)
-  expectEqual(Float._convert(from: z).value, Float(z))
+    // Let's make sure that the correct value is returned when two representable
+    // values are equally close to the original value.
+    let bitPattern: UInt64 = 0b01111111111_0000000000000000000000110000000000000000000000000000
+    var z = Double(bitPattern: bitPattern)
+    expectEqual(Float._convert(from: z).value, Float(z))
+
+    z = Double(Float.greatestFiniteMagnitude) +
+    Double(Float.greatestFiniteMagnitude.ulp / 2)
+    expectEqual(Float._convert(from: z).value, Float(z))
+  }
 }
 
 func positiveOne<T: ExpressibleByIntegerLiteral>() -> T {

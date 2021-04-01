@@ -619,8 +619,9 @@ static const ValueDecl *getRelatedSystemDecl(const ValueDecl *VD) {
 static Optional<RefactoringKind>
 getAvailableRenameForDecl(const ValueDecl *VD,
                           Optional<RenameRefInfo> RefInfo) {
-  std::vector<RenameAvailabiliyInfo> Scratch;
-  for (auto &Info : collectRenameAvailabilityInfo(VD, RefInfo, Scratch)) {
+  SmallVector<RenameAvailabilityInfo, 2> Infos;
+  collectRenameAvailabilityInfo(VD, RefInfo, Infos);
+  for (auto &Info : Infos) {
     if (Info.AvailableKind == RenameAvailableKind::Available)
       return Info.Kind;
   }
@@ -882,7 +883,7 @@ bool RefactoringActionLocalRename::performChange() {
                           CursorInfoRequest{CursorInfoOwner(TheFile, StartLoc)},
                                  ResolvedCursorInfo());
   if (CursorInfo.isValid() && CursorInfo.ValueD) {
-    ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
+    ValueDecl *VD = CursorInfo.typeOrValue();
     SmallVector<DeclContext *, 8> Scopes;
 
     Optional<RenameRefInfo> RefInfo;
@@ -2919,10 +2920,10 @@ bool RefactoringActionFillProtocolStub::performChange() {
   return false;
 }
 
-ArrayRef<RefactoringKind> collectAvailableRefactoringsAtCursor(
+static void collectAvailableRefactoringsAtCursor(
     SourceFile *SF, unsigned Line, unsigned Column,
-    std::vector<RefactoringKind> &Scratch,
-    ArrayRef<DiagnosticConsumer*> DiagConsumers) {
+    SmallVectorImpl<RefactoringKind> &Kinds,
+    ArrayRef<DiagnosticConsumer *> DiagConsumers) {
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
@@ -2931,11 +2932,12 @@ ArrayRef<RefactoringKind> collectAvailableRefactoringsAtCursor(
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
   SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().getValue(), Line, Column);
   if (Loc.isInvalid())
-    return {};
+    return;
+
   ResolvedCursorInfo Tok = evaluateOrDefault(SF->getASTContext().evaluator,
     CursorInfoRequest{CursorInfoOwner(SF, Lexer::getLocForStartOfToken(SM, Loc))},
                                              ResolvedCursorInfo());
-  return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
+  collectAvailableRefactorings(Tok, Kinds, /*Exclude rename*/ false);
 }
 
 static EnumDecl* getEnumDeclFromSwitchStmt(SwitchStmt *SwitchS) {
@@ -5464,10 +5466,9 @@ accept(SourceManager &SM, RegionType RegionType,
   }
 }
 
-ArrayRef<RenameAvailabiliyInfo>
-swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
-                                          Optional<RenameRefInfo> RefInfo,
-                                  std::vector<RenameAvailabiliyInfo> &Scratch) {
+void swift::ide::collectRenameAvailabilityInfo(
+    const ValueDecl *VD, Optional<RenameRefInfo> RefInfo,
+    SmallVectorImpl<RenameAvailabilityInfo> &Infos) {
   RenameAvailableKind AvailKind = RenameAvailableKind::Available;
   if (getRelatedSystemDecl(VD)){
     AvailKind = RenameAvailableKind::Unavailable_system_symbol;
@@ -5482,22 +5483,22 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
   if (isa<AbstractFunctionDecl>(VD)) {
     // Disallow renaming accessors.
     if (isa<AccessorDecl>(VD))
-      return Scratch;
+      return;
 
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
-      return Scratch;
-    
+      return;
+
     // Disallow renaming init with no arguments.
     if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
       if (!CD->getParameters()->size())
-        return Scratch;
+        return;
 
       if (RefInfo && !RefInfo->IsArgLabel) {
         NameMatcher Matcher(*(RefInfo->SF));
         auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
         if (Resolved.LabelRanges.empty())
-          return Scratch;
+          return;
       }
     }
 
@@ -5507,13 +5508,13 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
       // whether it's an instance method, so we do the same here for now.
       if (FD->getBaseIdentifier() == FD->getASTContext().Id_callAsFunction) {
         if (!FD->getParameters()->size())
-          return Scratch;
+          return;
 
         if (RefInfo && !RefInfo->IsArgLabel) {
           NameMatcher Matcher(*(RefInfo->SF));
           auto Resolved = Matcher.resolve({RefInfo->Loc, /*ResolveArgs*/true});
           if (Resolved.LabelRanges.empty())
-            return Scratch;
+            return;
         }
       }
     }
@@ -5522,74 +5523,58 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
   // Always return local rename for parameters.
   // FIXME: if the cursor is on the argument, we should return global rename.
   if (isa<ParamDecl>(VD)) {
-    Scratch.emplace_back(RefactoringKind::LocalRename, AvailKind);
-    return Scratch;
+    Infos.emplace_back(RefactoringKind::LocalRename, AvailKind);
+    return;
   }
 
   // If the indexer considers VD a global symbol, then we apply global rename.
   if (index::isLocalSymbol(VD))
-    Scratch.emplace_back(RefactoringKind::LocalRename, AvailKind);
+    Infos.emplace_back(RefactoringKind::LocalRename, AvailKind);
   else
-    Scratch.emplace_back(RefactoringKind::GlobalRename, AvailKind);
-
-  return llvm::makeArrayRef(Scratch);
+    Infos.emplace_back(RefactoringKind::GlobalRename, AvailKind);
 }
 
-ArrayRef<RefactoringKind> swift::ide::
-collectAvailableRefactorings(SourceFile *SF,
-                             const ResolvedCursorInfo &CursorInfo,
-                             std::vector<RefactoringKind> &Scratch,
-                             bool ExcludeRename) {
-  SmallVector<RefactoringKind, 2> AllKinds;
-  switch(CursorInfo.Kind) {
-  case CursorInfoKind::ModuleRef:
-  case CursorInfoKind::Invalid:
-  case CursorInfoKind::StmtStart:
-  case CursorInfoKind::ExprStart:
-    break;
-  case CursorInfoKind::ValueRef: {
-    Optional<RenameRefInfo> RefInfo;
-    if (CursorInfo.IsRef)
-      RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
-    auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
-    if (RenameOp.hasValue() &&
-        RenameOp.getValue() == RefactoringKind::GlobalRename)
-      AllKinds.push_back(RenameOp.getValue());
+void swift::ide::collectAvailableRefactorings(
+    const ResolvedCursorInfo &CursorInfo,
+    SmallVectorImpl<RefactoringKind> &Kinds, bool ExcludeRename) {
+  DiagnosticEngine DiagEngine(CursorInfo.SF->getASTContext().SourceMgr);
+
+  if (!ExcludeRename) {
+    if (RefactoringActionLocalRename::isApplicable(CursorInfo, DiagEngine))
+      Kinds.push_back(RefactoringKind::LocalRename);
+
+    switch (CursorInfo.Kind) {
+    case CursorInfoKind::ModuleRef:
+    case CursorInfoKind::Invalid:
+    case CursorInfoKind::StmtStart:
+    case CursorInfoKind::ExprStart:
+      break;
+    case CursorInfoKind::ValueRef: {
+      Optional<RenameRefInfo> RefInfo;
+      if (CursorInfo.IsRef)
+        RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};
+      auto RenameOp = getAvailableRenameForDecl(CursorInfo.ValueD, RefInfo);
+      if (RenameOp.hasValue() &&
+          RenameOp.getValue() == RefactoringKind::GlobalRename)
+        Kinds.push_back(RenameOp.getValue());
+    }
     }
   }
-  DiagnosticEngine DiagEngine(SF->getASTContext().SourceMgr);
+
 #define CURSOR_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
-    AllKinds.push_back(RefactoringKind::KIND);
+  if (RefactoringKind::KIND != RefactoringKind::LocalRename &&                 \
+      RefactoringAction##KIND::isApplicable(CursorInfo, DiagEngine))           \
+    Kinds.push_back(RefactoringKind::KIND);
 #include "swift/IDE/RefactoringKinds.def"
-
-  // Exclude renames.
-  for(auto Kind: AllKinds) {
-    switch (Kind) {
-    case RefactoringKind::LocalRename:
-    case RefactoringKind::GlobalRename:
-      if (ExcludeRename)
-        break;
-      LLVM_FALLTHROUGH;
-    default:
-      Scratch.push_back(Kind);
-    }
-  }
-
-  return llvm::makeArrayRef(Scratch);
 }
 
-
-
-ArrayRef<RefactoringKind> swift::ide::
-collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
-                             bool &RangeStartMayNeedRename,
-                             std::vector<RefactoringKind> &Scratch,
-                             ArrayRef<DiagnosticConsumer*> DiagConsumers) {
-
+void swift::ide::collectAvailableRefactorings(
+    SourceFile *SF, RangeConfig Range, bool &RangeStartMayNeedRename,
+    SmallVectorImpl<RefactoringKind> &Kinds,
+    ArrayRef<DiagnosticConsumer *> DiagConsumers) {
   if (Range.Length == 0) {
     return collectAvailableRefactoringsAtCursor(SF, Range.Line, Range.Column,
-                                                Scratch, DiagConsumers);
+                                                Kinds, DiagConsumers);
   }
   // Prepare the tool box.
   ASTContext &Ctx = SF->getASTContext();
@@ -5605,16 +5590,15 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
 
   bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
 
-#define RANGE_REFACTORING(KIND, NAME, ID)                                     \
-  if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
-    Scratch.push_back(RefactoringKind::KIND);
+#define RANGE_REFACTORING(KIND, NAME, ID)                                      \
+  if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))               \
+    Kinds.push_back(RefactoringKind::KIND);
 #define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID)                            \
   if (enableInternalRefactoring)                                              \
     RANGE_REFACTORING(KIND, NAME, ID)
 #include "swift/IDE/RefactoringKinds.def"
 
   RangeStartMayNeedRename = rangeStartMayNeedRename(Result);
-  return Scratch;
 }
 
 bool swift::ide::
@@ -5787,7 +5771,7 @@ int swift::ide::findLocalRenameRanges(
     Diags.diagnose(StartLoc, diag::unresolved_location);
     return true;
   }
-  ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
+  ValueDecl *VD = CursorInfo.typeOrValue();
   Optional<RenameRefInfo> RefInfo;
   if (CursorInfo.IsRef)
     RefInfo = {CursorInfo.SF, CursorInfo.Loc, CursorInfo.IsKeywordArgument};

@@ -6,5 +6,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-@_cdecl("main")func x(){}
+// RUN: %target-swift-frontend %s -emit-ir -o /dev/null -verify
+
+@_cdecl("main")func x(){} // expected-error {{multiple definitions of symbol 'main'}}

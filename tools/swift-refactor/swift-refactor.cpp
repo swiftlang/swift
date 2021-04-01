@@ -374,13 +374,12 @@ int main(int argc, char *argv[]) {
   RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);
 
   if (options::Action == RefactoringKind::None) {
-    std::vector<RefactoringKind> Scratch;
-    ArrayRef<RefactoringKind> AllKinds;
+    llvm::SmallVector<RefactoringKind, 32> Kinds;
     bool RangeStartMayNeedRename = false;
-    AllKinds = collectAvailableRefactorings(SF, Range,RangeStartMayNeedRename,
-                                            Scratch, {&PrintDiags});
+    collectAvailableRefactorings(SF, Range, RangeStartMayNeedRename, Kinds,
+                                 {&PrintDiags});
     llvm::outs() << "Action begins\n";
-    for (auto Kind : AllKinds) {
+    for (auto Kind : Kinds) {
       llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
     }
     llvm::outs() << "Action ends\n";

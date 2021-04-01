@@ -97,8 +97,10 @@ public:
 
   Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels);
 
-  Type createFunctionType(ArrayRef<Demangle::FunctionParam<Type>> params,
-                          Type output, FunctionTypeFlags flags);
+  Type createFunctionType(
+      ArrayRef<Demangle::FunctionParam<Type>> params,
+      Type output, FunctionTypeFlags flags,
+      FunctionMetadataDifferentiabilityKind diffKind);
 
   Type createImplFunctionType(
       Demangle::ImplParameterConvention calleeConvention,

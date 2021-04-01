@@ -1338,18 +1338,20 @@ using ClassMetadata = TargetClassMetadata<InProcess>;
 /// dispatch expects to see, with padding to place them at the expected offsets.
 template <typename Runtime>
 struct TargetDispatchClassMetadata : public TargetHeapMetadata<Runtime> {
-  using DummyVTableCall = void (*)(void);
+  using InvokeCall = void (*)(void *, void *, uint32_t);
 
-  TargetDispatchClassMetadata(MetadataKind Kind,
-                              DummyVTableCall DummyVTableEntry)
-      : TargetHeapMetadata<Runtime>(Kind), DummyVTableEntry(DummyVTableEntry) {}
+  TargetDispatchClassMetadata(MetadataKind Kind, unsigned long VTableType,
+                              InvokeCall Invoke)
+      : TargetHeapMetadata<Runtime>(Kind), VTableType(VTableType),
+        VTableInvoke(Invoke) {}
 
   TargetPointer<Runtime, void> Opaque;
 #if SWIFT_OBJC_INTEROP
   TargetPointer<Runtime, void> OpaqueObjC[3];
 #endif
 
-  TargetSignedPointer<Runtime, DummyVTableCall> DummyVTableEntry;
+  unsigned long VTableType;
+  TargetSignedPointer<Runtime, InvokeCall __ptrauth_swift_dispatch_invoke_function> VTableInvoke;
 };
 using DispatchClassMetadata = TargetDispatchClassMetadata<InProcess>;
 
@@ -1658,6 +1660,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   bool isAsync() const { return Flags.isAsync(); }
   bool isThrowing() const { return Flags.isThrowing(); }
   bool isSendable() const { return Flags.isSendable(); }
+  bool isDifferentiable() const { return Flags.isDifferentiable(); }
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
   bool isEscaping() const { return Flags.isEscaping(); }
 
@@ -1674,6 +1677,28 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   const uint32_t *getParameterFlags() const {
     return reinterpret_cast<const uint32_t *>(getParameters() +
                                               getNumParameters());
+  }
+
+  TargetFunctionMetadataDifferentiabilityKind<StoredSize> *
+  getDifferentiabilityKindAddress() {
+    assert(isDifferentiable());
+    void *previousEndAddr = hasParameterFlags()
+        ? reinterpret_cast<void *>(getParameterFlags() + getNumParameters())
+        : reinterpret_cast<void *>(getParameters() + getNumParameters());
+    return reinterpret_cast<
+        TargetFunctionMetadataDifferentiabilityKind<StoredSize> *>(
+        llvm::alignAddr(previousEndAddr,
+                        llvm::Align(alignof(typename Runtime::StoredPointer))));
+  }
+
+  TargetFunctionMetadataDifferentiabilityKind<StoredSize>
+  getDifferentiabilityKind() const {
+    if (isDifferentiable()) {
+      return *const_cast<TargetFunctionTypeMetadata<Runtime> *>(this)
+          ->getDifferentiabilityKindAddress();
+    }
+    return TargetFunctionMetadataDifferentiabilityKind<StoredSize>
+        ::NonDifferentiable;
   }
 };
 using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;

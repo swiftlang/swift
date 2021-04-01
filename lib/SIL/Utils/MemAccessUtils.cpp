@@ -16,6 +16,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/Consumption.h"
+#include "swift/SIL/SILInstruction.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -1545,12 +1547,13 @@ bool swift::memInstMustInitialize(Operand *memOper) {
   }
 }
 
-bool swift::isSingleInitAllocStack(AllocStackInst *asi,
-                                   SmallVectorImpl<Operand *> &destroyingUses) {
+Operand *
+swift::getSingleInitAllocStackUse(AllocStackInst *asi,
+                                  SmallVectorImpl<Operand *> *destroyingUses) {
   // For now, we just look through projections and rely on memInstMustInitialize
   // to classify all other uses as init or not.
   SmallVector<Operand *, 32> worklist(asi->getUses());
-  bool foundInit = false;
+  Operand *singleInit = nullptr;
 
   while (!worklist.empty()) {
     auto *use = worklist.pop_back_val();
@@ -1571,14 +1574,42 @@ bool swift::isSingleInitAllocStack(AllocStackInst *asi,
         continue;
       }
       // Treat load [take] as a write.
-      return false;
+      return nullptr;
     }
 
     switch (user->getKind()) {
     default:
       break;
+    case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
+      auto *uccai = cast<UnconditionalCheckedCastAddrInst>(user);
+      // Only handle the case where we are doing a take of our alloc_stack as a
+      // source value. If we are the dest, then something else is happening!
+      // Break!
+      if (use->get() == uccai->getDest())
+        break;
+      // Ok, we are the Src and are performing a take. Treat it as a destroy!
+      if (destroyingUses)
+        destroyingUses->push_back(use);
+      continue;
+    }
+    case SILInstructionKind::CheckedCastAddrBranchInst: {
+      auto *ccabi = cast<CheckedCastAddrBranchInst>(user);
+      // We only handle the case where we are doing a take of our alloc_stack as
+      // a source.
+      //
+      // TODO: Can we expand this?
+      if (use->get() == ccabi->getDest())
+        break;
+      if (ccabi->getConsumptionKind() != CastConsumptionKind::TakeAlways)
+        break;
+      // Ok, we are the Src and are performing a take. Treat it as a destroy!
+      if (destroyingUses)
+        destroyingUses->push_back(use);
+      continue;
+    }
     case SILInstructionKind::DestroyAddrInst:
-      destroyingUses.push_back(use);
+      if (destroyingUses)
+        destroyingUses->push_back(use);
       continue;
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::LoadBorrowInst:
@@ -1589,21 +1620,21 @@ bool swift::isSingleInitAllocStack(AllocStackInst *asi,
     // See if we have an initializer and that such initializer is in the same
     // block.
     if (memInstMustInitialize(use)) {
-      if (user->getParent() != asi->getParent() || foundInit) {
-        return false;
+      if (user->getParent() != asi->getParent() || singleInit) {
+        return nullptr;
       }
 
-      foundInit = true;
+      singleInit = use;
       continue;
     }
 
     // Otherwise, if we have found something not in our allowlist, return false.
-    return false;
+    return nullptr;
   }
 
   // We did not find any users that we did not understand. So we can
-  // conservatively return true here.
-  return true;
+  // conservatively return the single initializing write that we found.
+  return singleInit;
 }
 
 /// Return true if the given address value is produced by a special address

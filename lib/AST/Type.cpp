@@ -813,6 +813,28 @@ bool TypeBase::isStdlibType() {
   return false;
 }
 
+bool TypeBase::isCGFloatType() {
+  auto *NTD = getAnyNominal();
+  if (!NTD)
+    return false;
+
+  auto *DC = NTD->getDeclContext();
+  if (!DC->isModuleScopeContext())
+    return false;
+
+  auto *module = DC->getParentModule();
+  // On macOS `CGFloat` is part of a `CoreGraphics` module,
+  // but on Linux it could be found in `Foundation`.
+  return (module->getName().is("CoreGraphics") ||
+          module->getName().is("Foundation")) &&
+         NTD->getName().is("CGFloat");
+}
+
+bool TypeBase::isDoubleType() {
+  auto *NTD = getAnyNominal();
+  return NTD ? NTD->getDecl() == getASTContext().getDoubleDecl() : false;
+}
+
 bool TypeBase::isKnownStdlibCollectionType() {
   if (auto *structType = getAs<BoundGenericStructType>()) {
     auto &ctx = getASTContext();
@@ -913,12 +935,36 @@ static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
   return paramType->is<AnyFunctionType>();
 }
 
+/// Determine whether the parameter is contextually Sendable.
+static bool isParamUnsafeSendable(const ParamDecl *param) {
+  // Check for @_unsafeSendable.
+  if (param->getAttrs().hasAttribute<UnsafeSendableAttr>())
+    return true;
+
+  // Check that the parameter is of function type.
+  Type paramType = param->isVariadic() ? param->getVarargBaseTy()
+                                       : param->getInterfaceType();
+  paramType = paramType->getRValueType()->lookThroughAllOptionalTypes();
+  if (!paramType->is<FunctionType>())
+    return false;
+
+  // Check whether this function is known to have @_unsafeSendable function
+  // parameters.
+  auto func = dyn_cast<AbstractFunctionDecl>(param->getDeclContext());
+  if (!func)
+    return false;
+
+  return func->hasKnownUnsafeSendableFunctionParams();
+}
+
 ParameterListInfo::ParameterListInfo(
     ArrayRef<AnyFunctionType::Param> params,
     const ValueDecl *paramOwner,
     bool skipCurriedSelf) {
   defaultArguments.resize(params.size());
   propertyWrappers.resize(params.size());
+  unsafeSendable.resize(params.size());
+  unsafeMainActor.resize(params.size());
 
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -967,8 +1013,16 @@ ParameterListInfo::ParameterListInfo(
       acceptsUnlabeledTrailingClosures.set(i);
     }
 
-    if (param->hasAttachedPropertyWrapper()) {
+    if (param->hasExternalPropertyWrapper()) {
       propertyWrappers.set(i);
+    }
+
+    if (isParamUnsafeSendable(param)) {
+      unsafeSendable.set(i);
+    }
+
+    if (param->getAttrs().hasAttribute<UnsafeMainActorAttr>()) {
+      unsafeMainActor.set(i);
     }
   }
 }
@@ -986,6 +1040,18 @@ bool ParameterListInfo::acceptsUnlabeledTrailingClosureArgument(
 
 bool ParameterListInfo::hasExternalPropertyWrapper(unsigned paramIdx) const {
   return paramIdx < propertyWrappers.size() ? propertyWrappers[paramIdx] : false;
+}
+
+bool ParameterListInfo::isUnsafeSendable(unsigned paramIdx) const {
+  return paramIdx < unsafeSendable.size()
+      ? unsafeSendable[paramIdx]
+      : false;
+}
+
+bool ParameterListInfo::isUnsafeMainActor(unsigned paramIdx) const {
+  return paramIdx < unsafeMainActor.size()
+      ? unsafeMainActor[paramIdx]
+      : false;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -1444,6 +1510,11 @@ ParenType::ParenType(Type baseType, RecursiveTypeProperties properties,
   : SugarType(TypeKind::Paren,
               flags.isInOut() ? InOutType::get(baseType) : baseType,
               properties) {
+  // In some situations (rdar://75740683) we appear to end up with ParenTypes
+  // that contain a nullptr baseType. Once this is eliminated, we can remove
+  // the checks for `type.isNull()` in the `DiagnosticArgumentKind::Type` case
+  // of `formatDiagnosticArgument`.
+  assert(baseType && "A ParenType should always wrap a non-null type");
   Bits.ParenType.Flags = flags.toRaw();
   if (flags.isInOut())
     assert(!baseType->is<InOutType>() && "caller did not pass a base type");

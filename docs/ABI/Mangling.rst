@@ -560,24 +560,24 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer type with with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
-  FUNCTION-KIND ::= 'F'                      // @differentiable function type
-  FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
-  FUNCTION-KIND ::= 'H'                      // @differentiable(_linear) function type
-  FUNCTION-KIND ::= 'I'                      // @differentiable(_linear) function type (escaping)
 
   C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
   Non-ASCII identifiers are preserved as-is; we do not use Punycode.
 
-  function-signature ::= params-type params-type async? sendable? throws? // results and parameters
+  function-signature ::= params-type params-type async? sendable? throws? differentiable? // results and parameters
 
-  params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
+  params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
-  params-type ::= empty-list                  // shortcut for no parameters
+  params-type ::= empty-list                 // shortcut for no parameters
 
-  sendable ::= 'J'                         // @Sendable on function types
+  sendable ::= 'J'                           // @Sendable on function types
   async ::= 'Y'                              // 'async' annotation on function types
   throws ::= 'K'                             // 'throws' annotation on function types
+  differentiable ::= 'jf'                    // @differentiable(_forward) on function type
+  differentiable ::= 'jr'                    // @differentiable(reverse) on function type
+  differentiable ::= 'jd'                    // @differentiable on function type
+  differentiable ::= 'jl'                    // @differentiable(_linear) on function type
 
   type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list

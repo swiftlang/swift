@@ -3,6 +3,7 @@ public class Observable<Element> {
 }
 Observable.create { }
 
+// Check that cursor info on create doesn't crash
 // RUN: %sourcekitd-test -req=cursor -cursor-action -pos=4:12 -length 10 %s -- %s | %FileCheck %s
-
-// CHECK: source.lang.swift.ref.module ()
+// CHECK: ACTIONS BEGIN
+// CHECK: ACTIONS END

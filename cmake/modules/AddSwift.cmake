@@ -301,6 +301,9 @@ function(_add_host_variant_link_flags target)
     target_link_libraries(${target} PRIVATE
       pthread
       dl)
+    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686")
+      target_link_libraries(${target} PRIVATE atomic)
+    endif()
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL FREEBSD)
     target_link_libraries(${target} PRIVATE
       pthread)

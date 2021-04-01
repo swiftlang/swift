@@ -7,6 +7,9 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
+// rdar://76038845
+// UNSUPPORTED: use_os_stdlib
+
 @main struct Main {
   static func main() async {
   let butt = Butt()

@@ -2,14 +2,8 @@
 
 set -ex
 
-if ! command -v pip &> /dev/null
-then
-  PIP_COMMAND=pip3
-else
-  PIP_COMMAND=pip
-fi
-
-$PIP_COMMAND install six
+pip install six
+pip3 install six
 
 brew install cmake ninja llvm sccache
 

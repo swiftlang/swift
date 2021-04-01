@@ -2540,7 +2540,8 @@ void LoadableByAddress::recreateSingleApply(
     applyBuilder.createTryApply(
         castedApply->getLoc(), callee,
         applySite.getSubstitutionMap(), callArgs,
-        castedApply->getNormalBB(), castedApply->getErrorBB());
+        castedApply->getNormalBB(), castedApply->getErrorBB(),
+        castedApply->getApplyOptions());
     break;
   }
   case SILInstructionKind::BeginApplyInst: {

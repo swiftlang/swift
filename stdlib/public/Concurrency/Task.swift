@@ -477,7 +477,7 @@ extension Task {
     // Enqueue the resulting job.
     _enqueueJobGlobalWithDelay(duration, Builtin.convertTaskToJob(task))
 
-    let _ = await Handle<Int, Never>(task).get()
+    await Handle<Void, Never>(task).get()
   }
 }
 
@@ -667,7 +667,9 @@ internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) 
   // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other
   // situations.
+#if compiler(>=5.5) && $Sendable
   Task.runDetached { await body() }
+#endif
 }
 
 #endif

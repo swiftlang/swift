@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 -enable-experimental-enum-codable-derivation | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
-// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 -enable-library-evolution -enable-experimental-enum-codable-derivation | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
+// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 | %FileCheck -check-prefix CHECK -check-prefix CHECK-FRAGILE %s
+// RUN: %target-swift-frontend -emit-silgen %s -swift-version 4 -enable-library-evolution | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 
 enum Enum<T> {
     case a(T), b(T)
