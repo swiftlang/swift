@@ -702,11 +702,9 @@ Type ConstraintSystem::openUnboundGenericType(
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
-  return TypeChecker::applyUnboundGenericArguments(
-      decl, parentTy, SourceLoc(),
-      TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
-                                    /*placeholderHandler*/ nullptr),
-      arguments);
+  return TypeResolution::forContextual(DC, None, /*unboundTyOpener*/ nullptr,
+                                       /*placeholderHandler*/ nullptr)
+      .applyUnboundGenericArguments(decl, parentTy, SourceLoc(), arguments);
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,

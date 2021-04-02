@@ -43,7 +43,6 @@ class GenericSignatureBuilder;
 class NominalTypeDecl;
 class NormalProtocolConformance;
 class RootProtocolConformance;
-class TypeResolution;
 class TypeResolutionOptions;
 class TypoCorrectionResults;
 class ExprPattern;
@@ -263,27 +262,6 @@ void checkUnsupportedProtocolType(ASTContext &ctx,
 /// list.
 void checkUnsupportedProtocolType(ASTContext &ctx,
                                   GenericParamList *genericParams);
-
-/// Apply generic arguments to the unbound generic type represented by the
-/// given declaration and parent type.
-///
-/// This function requires the correct number of generic arguments,
-/// whereas applyGenericArguments emits diagnostics in those cases.
-///
-/// \param decl The declaration that the resulting bound generic type
-/// shall reference.
-/// \param parentTy The parent type.
-/// \param loc The source location for diagnostic reporting.
-/// \param resolution The type resolution.
-/// \param genericArgs The list of generic arguments to apply.
-///
-/// \returns A BoundGenericType bound to the given arguments, or null on
-/// error.
-///
-/// \see applyGenericArguments
-Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
-                                  SourceLoc loc, TypeResolution resolution,
-                                  ArrayRef<Type> genericArgs);
 
 /// Substitute the given base type into the type of the given nested type,
 /// producing the effective type that the nested type will have.

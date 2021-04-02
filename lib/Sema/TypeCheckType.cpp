@@ -421,7 +421,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
 
 Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
                                           DeclContext *foundDC,
-                                          bool isSpecialized) {
+                                          bool isSpecialized) const {
   auto fromDC = getDeclContext();
   ASTContext &ctx = fromDC->getASTContext();
 
@@ -680,7 +680,8 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);
 /// If the type is itself not generic, this does nothing.
 ///
 /// This function emits diagnostics about an invalid type or the wrong number
-/// of generic arguments, whereas applyUnboundGenericArguments requires this
+/// of generic arguments, whereas
+/// \c TypeResolution::applyUnboundGenericArguments requires this
 /// to be in a correct and valid form.
 ///
 /// \param type The generic type to which to apply arguments.
@@ -692,7 +693,7 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc);
 /// \returns A BoundGenericType bound to the given arguments, or null on
 /// error.
 ///
-/// \see applyUnboundGenericArguments
+/// \see TypeResolution::applyUnboundGenericArguments
 static Type applyGenericArguments(Type type, TypeResolution resolution,
                                   GenericParamList *silParams,
                                   ComponentIdentTypeRepr *comp) {
@@ -826,8 +827,8 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
     args.push_back(substTy);
   }
 
-  const auto result = TypeChecker::applyUnboundGenericArguments(
-      decl, unboundType->getParent(), loc, resolution, args);
+  const auto result = resolution.applyUnboundGenericArguments(
+      decl, unboundType->getParent(), loc, args);
 
   // Migration hack.
   bool isMutablePointer;
@@ -883,10 +884,9 @@ static Type applyGenericArguments(Type type, TypeResolution resolution,
 }
 
 /// Apply generic arguments to the given type.
-Type TypeChecker::applyUnboundGenericArguments(GenericTypeDecl *decl,
-                                               Type parentTy, SourceLoc loc,
-                                               TypeResolution resolution,
-                                               ArrayRef<Type> genericArgs) {
+Type TypeResolution::applyUnboundGenericArguments(
+    GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
+    ArrayRef<Type> genericArgs) const {
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
@@ -926,9 +926,7 @@ Type TypeChecker::applyUnboundGenericArguments(GenericTypeDecl *decl,
     auto genericSig = genericEnv->getGenericSignature();
     for (auto gp : genericSig->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-        (resolution.usesArchetypes()
-         ? genericEnv->mapTypeIntoContext(gp)
-         : gp);
+          (usesArchetypes() ? genericEnv->mapTypeIntoContext(gp) : gp);
     }
   }
 
@@ -952,21 +950,19 @@ Type TypeChecker::applyUnboundGenericArguments(GenericTypeDecl *decl,
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
-  auto dc = resolution.getDeclContext();
-  auto *module = dc->getParentModule();
+  auto *module = getDeclContext()->getParentModule();
 
-  if (!skipRequirementsCheck &&
-      resolution.getStage() > TypeResolutionStage::Structural) {
-    auto result = checkGenericArguments(
-        dc, loc, noteLoc,
-        UnboundGenericType::get(decl, parentTy, dc->getASTContext()),
+  if (!skipRequirementsCheck && getStage() > TypeResolutionStage::Structural) {
+    auto result = TypeChecker::checkGenericArguments(
+        getDeclContext(), loc, noteLoc,
+        UnboundGenericType::get(decl, parentTy, getASTContext()),
         genericSig->getGenericParams(), genericSig->getRequirements(),
         QueryTypeSubstitutionMap{subs});
 
     switch (result) {
     case RequirementCheckResult::Failure:
     case RequirementCheckResult::SubstitutionFailure:
-      return ErrorType::get(dc->getASTContext());
+      return ErrorType::get(getASTContext());
     case RequirementCheckResult::Success:
       break;
     }
@@ -3522,9 +3518,8 @@ TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  if (!TypeChecker::applyUnboundGenericArguments(
-          dictDecl, nullptr, repr->getStartLoc(), resolution,
-          {keyTy, valueTy})) {
+  if (!resolution.applyUnboundGenericArguments(
+          dictDecl, nullptr, repr->getStartLoc(), {keyTy, valueTy})) {
     assert(getASTContext().Diags.hadAnyError());
     return ErrorType::get(getASTContext());
   }

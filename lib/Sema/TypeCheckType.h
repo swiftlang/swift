@@ -421,7 +421,27 @@ public:
   ///
   /// \returns the resolved type.
   Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
-                            bool isSpecialized);
+                            bool isSpecialized) const;
+
+  /// Apply generic arguments to the unbound generic type represented by the
+  /// given declaration and parent type.
+  ///
+  /// This function requires the correct number of generic arguments,
+  /// whereas applyGenericArguments emits diagnostics in those cases.
+  ///
+  /// \param decl The declaration that the resulting bound generic type
+  /// shall reference.
+  /// \param parentTy The parent type.
+  /// \param loc The source location for diagnostic reporting.
+  /// \param genericArgs The list of generic arguments to apply.
+  ///
+  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// error.
+  ///
+  /// \see applyGenericArguments
+  Type applyUnboundGenericArguments(GenericTypeDecl *decl, Type parentTy,
+                                    SourceLoc loc,
+                                    ArrayRef<Type> genericArgs) const;
 };
 
 } // end namespace swift
