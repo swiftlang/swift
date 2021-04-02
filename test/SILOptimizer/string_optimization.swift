@@ -22,6 +22,13 @@ struct Outer {
   static let staticString = "static"
 }
 
+class C {
+  @inline(never)
+  func f() -> String {
+    return "\(Self.self)"
+  }
+}
+
 // More types are tested in test/stdlib/TypeName.swift and
 // test/stdlib/TypeNameInterpolation.swift
 
@@ -148,6 +155,9 @@ printEmbeeded(testQualifiedLocalType())
 
 // CHECK-OUTPUT: <test.Outer.InnerClass>
 printEmbeeded(testInnerClass())
+
+// CHECK-OUTPUT: <C>
+printEmbeeded(C().f())
 
 #if _runtime(_ObjC)
 
