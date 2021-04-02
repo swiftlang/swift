@@ -8,6 +8,8 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: OS=windows-msvc
+// Windows doesn't use musttail yet.
 
 import _Concurrency
 
