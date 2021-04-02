@@ -8,6 +8,7 @@
 // REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: concurrency
 // UNSUPPORTED: use_os_stdlib
+// REQUIRES: waiting_on_automerger
 
 import _Concurrency
 
