@@ -8353,6 +8353,7 @@ void ClangImporter::Implementation::importAttributes(
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
   PatternBindingInitializer *initContext = nullptr;
+  Optional<const clang::SwiftAttrAttr *> SeenMainActorAttr;
   bool AnyUnavailable = MappedDecl->getAttrs().isUnavailable(C);
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
@@ -8496,15 +8497,32 @@ void ClangImporter::Implementation::importAttributes(
     // __attribute__((swift_attr("attribute")))
     //
     if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(*AI)) {
-      // FIXME: Hard-core @MainActor and @UIActor, because we don't have a
+      // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
       if (auto isMainActor = isMainActorAttr(SwiftContext, swiftAttr)) {
         bool isUnsafe = *isMainActor;
+
+        if (SeenMainActorAttr) {
+          // Cannot add main actor annotation twice. We'll keep the first
+          // one and raise a warning about the duplicate.
+          auto &clangSrcMgr = getClangASTContext().getSourceManager();
+          ClangSourceBufferImporter &bufferImporter =
+              getBufferImporterForDiagnostics();
+          SourceLoc attrLoc = bufferImporter.resolveSourceLocation(
+              clangSrcMgr, swiftAttr->getLocation());
+
+          diagnose(attrLoc, diag::import_multiple_mainactor_attr,
+                   swiftAttr->getAttribute(),
+                   SeenMainActorAttr.getValue()->getAttribute());
+          continue;
+        }
+
         if (Type mainActorType = SwiftContext.getMainActorType()) {
           auto typeExpr = TypeExpr::createImplicit(mainActorType, SwiftContext);
           auto attr = CustomAttr::create(SwiftContext, SourceLoc(), typeExpr);
           attr->setArgIsUnsafe(isUnsafe);
           MappedDecl->getAttrs().add(attr);
+          SeenMainActorAttr = swiftAttr;
         }
 
         continue;
