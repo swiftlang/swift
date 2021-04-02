@@ -1,58 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_1 | %FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_1P | %FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_1P
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_2 | %FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_CONSTRUCTORS_2P | %FileCheck %s -check-prefix=IMPLICIT_CONSTRUCTORS_2P
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_1P | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_1P
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_2 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_2P | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_2P
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_3P | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_3P
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_SELECTOR_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_SELECTOR_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_VAL_META_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_VAL_META_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_VAL_META_2 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_VAL_META_2
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_INIT_FROM_PROT_NODOT | %FileCheck %s -check-prefix=DEFAULT_INIT_FROM_PROT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_INIT_FROM_PROT_DOT | %FileCheck %s -check-prefix=DEFAULT_INIT_FROM_PROT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_INIT_FROM_PROT_PAREN | %FileCheck %s -check-prefix=DEFAULT_INIT_FROM_PROT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE1 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_1 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_2 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_3 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_4 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_SHOW_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_5 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_SHOW_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_6 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE3 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE4 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE5 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE6 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE6
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_1 | %FileCheck %s -check-prefix=HAVE_RPAREN_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_2 | %FileCheck %s -check-prefix=HAVE_RPAREN_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_COMMA_1 -code-complete-call-pattern-heuristics | %FileCheck %s -check-prefix=HAVE_COMMA_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_COMMA_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_1P
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_ALIAS_1 | %FileCheck %s -check-prefix=WITH_ALIAS_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_1 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_2 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_3 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_IN_INIT_4 | %FileCheck %s -check-prefix=CLOSURE_IN_INIT_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_1 | %FileCheck %s -check-prefix=AVAILABLE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAILABLE_2 | %FileCheck %s -check-prefix=AVAILABLE_1
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPENDENT_IN_CLOSURE_1 | %FileCheck %s -check-prefix=DEPENDENT_IN_CLOSURE_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPENDENT_IN_CLOSURE_2 | %FileCheck %s -check-prefix=DEPENDENT_IN_CLOSURE_2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_WITH_UNRESOLVEDTYPE_1 | %FileCheck %s -check-prefix=INIT_WITH_UNRESOLVEDTYPE_1
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
 func freeFunc() {}
 
@@ -196,9 +143,9 @@ func testExplicitConstructorsSelector2() {
   ExplicitConstructorsSelector2#^EXPLICIT_CONSTRUCTORS_SELECTOR_2^#
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2: Begin completions, 6 items
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#noArgs: ()#})[#ExplicitConstructorsSelector2#]{{; name=.+$}}
-// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#Int#})[#ExplicitConstructorsSelector2#]{{; name=.+$}}
-// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#Int#}, {#withFloat: Float#})[#ExplicitConstructorsSelector2#]{{; name=.+$}}
-// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#int: Int#}, {#Float#})[#ExplicitConstructorsSelector2#]{{; name=.+$}}
+// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#(a): Int#})[#ExplicitConstructorsSelector2#]{{; name=.+$}}
+// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#(a): Int#}, {#withFloat: Float#})[#ExplicitConstructorsSelector2#]{{; name=.+$}}
+// EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Decl[Constructor]/CurrNominal: ({#int: Int#}, {#(b): Float#})[#ExplicitConstructorsSelector2#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Keyword[self]/CurrNominal:     .self[#ExplicitConstructorsSelector2.Type#]; name=self
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2-DAG: Keyword/CurrNominal:           .Type[#ExplicitConstructorsSelector2.Type#]; name=Type
 // EXPLICIT_CONSTRUCTORS_SELECTOR_2: End completions
@@ -218,7 +165,7 @@ class ExplicitConstructorsDerived2 : ExplicitConstructorsBase1 {
   init() {}
   required init(a : Int) {}
   class func foo() {
-    self.#^INIT_FROM_METATYPE5^#
+    self.#^INIT_FROM_METATYPE5?check=INIT_FROM_METATYPE4^#
   }
 }
 
@@ -246,12 +193,12 @@ func testGetInitFromMetatype1() {
 func testGetInitFromMetatype2() {
   var S1 = ExplicitConstructorsBase1.self
   var S2 = ExplicitConstructorsDerived2.self
-  S1.#^INIT_FROM_METATYPE2_1^#
-  S1#^INIT_FROM_METATYPE2_2^#
-  S1(#^INIT_FROM_METATYPE2_3^#
-  S2.#^INIT_FROM_METATYPE2_4^#
-  S2#^INIT_FROM_METATYPE2_5^#
-  S2(#^INIT_FROM_METATYPE2_6^#
+  S1.#^INIT_FROM_METATYPE2_1?check=INIT_FROM_METATYPE2_NOINIT^#
+  S1#^INIT_FROM_METATYPE2_2?check=INIT_FROM_METATYPE2_NOINIT^#
+  S1(#^INIT_FROM_METATYPE2_3?check=INIT_FROM_METATYPE2_NOINIT^#
+  S2.#^INIT_FROM_METATYPE2_4?check=INIT_FROM_METATYPE2_SHOW_INIT^#
+  S2#^INIT_FROM_METATYPE2_5?check=INIT_FROM_METATYPE2_SHOW_INIT^#
+  S2(#^INIT_FROM_METATYPE2_6?check=INIT_FROM_METATYPE2_NOINIT^#
 }
 // INIT_FROM_METATYPE2_NOINIT-NOT: Decl[Constructor]
 
@@ -301,8 +248,7 @@ func testHaveRParen2() {
 }
 
 func testHaveComma1() {
-  ExplicitConstructors1(#^HAVE_COMMA_1^#,
-// HAVE_COMMA_1-NOT: Decl[Constructor]
+  ExplicitConstructors1(#^HAVE_COMMA_1?check=EXPLICIT_CONSTRUCTORS_1P^#,
 }
 
 //===--- Test that we show default constuctors inherited from protocols
@@ -315,9 +261,9 @@ class ConformsToProtDefaultInit: ProtDefaultInit {
 }
 
 func testHasDefaultInitFromProtocol() {
-  ConformsToProtDefaultInit#^DEFAULT_INIT_FROM_PROT_NODOT^#
-  ConformsToProtDefaultInit.#^DEFAULT_INIT_FROM_PROT_DOT^#
-  ConformsToProtDefaultInit(#^DEFAULT_INIT_FROM_PROT_PAREN^#
+  ConformsToProtDefaultInit#^DEFAULT_INIT_FROM_PROT_NODOT?check=DEFAULT_INIT_FROM_PROT^#
+  ConformsToProtDefaultInit.#^DEFAULT_INIT_FROM_PROT_DOT?check=DEFAULT_INIT_FROM_PROT^#
+  ConformsToProtDefaultInit(#^DEFAULT_INIT_FROM_PROT_PAREN?check=DEFAULT_INIT_FROM_PROT^#
 
 // DEFAULT_INIT_FROM_PROT-DAG: Decl[Constructor]/CurrNominal:  {{.+}}{#bar: Int#}
 // DEFAULT_INIT_FROM_PROT-DAG: Decl[Constructor]/Super:        {{.+}}{#foo: Int#}
@@ -340,13 +286,13 @@ struct ClosureInInit1 {
   }
 // CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal{{(/TypeRelation\[Identical\])?}}:      ['(']{#Int#}[')'][#S#];
   var prop2: S = {
-    return S(#^CLOSURE_IN_INIT_2^#
+    return S(#^CLOSURE_IN_INIT_2?check=CLOSURE_IN_INIT_1^#
   }()
   var prop3: S = {
-    S(#^CLOSURE_IN_INIT_3^#
+    S(#^CLOSURE_IN_INIT_3?check=CLOSURE_IN_INIT_1^#
   }
   var prop3: S = {
-    S(#^CLOSURE_IN_INIT_4^#
+    S(#^CLOSURE_IN_INIT_4?check=CLOSURE_IN_INIT_1^#
   }()
 }
 
@@ -371,7 +317,7 @@ func testAvailable() {
 // AVAILABLE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#normal2: Int#}[')'][#AvailableTest#]; name=normal2: Int
 // AVAILABLE_1: End completions
 
-  let _ = AvailableTest.init(#^AVAILABLE_2^#
+  let _ = AvailableTest.init(#^AVAILABLE_2?check=AVAILABLE_1^#
 }
 
 protocol DataType {
@@ -383,6 +329,11 @@ class DependentTypeInClosure<Data: DataType> {
 }
 func testDependentTypeInClosure() {
   let _: DependentTypeInClosure = .#^DEPENDENT_IN_CLOSURE_3^#
+// DEPENDENT_IN_CLOSURE_3: Begin completions, 2 items
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#(arg): DataType#}, {#fn: (Data.Content) -> Void##(Data.Content) -> Void#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init({#arg: DataType#}, {#fn: () -> Data.Content##() -> Data.Content#})[#DependentTypeInClosure<DataType>#];
+// DEPENDENT_IN_CLOSURE_3: End completions
+
   let _ = DependentTypeInClosure(#^DEPENDENT_IN_CLOSURE_1^#)
 // DEPENDENT_IN_CLOSURE_1: Begin completions
 // DEPENDENT_IN_CLOSURE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#(arg): _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#}[')'][#DependentTypeInClosure<_>#];
