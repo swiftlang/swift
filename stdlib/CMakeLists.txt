@@ -87,6 +87,9 @@ set(SWIFT_EXPERIMENTAL_COREFOUNDATION_OVERLAY_SDKS_FROM_REPO ""
     CACHE STRING
     "SDKs for which to build CoreFoundation overlay from swift-corelibs-foundation repo")
 
+set(SWIFT_EXPERIMENTAL_FOUNDATION_OVERLAY_SDKS_FROM_REPO ""
+    CACHE STRING
+    "SDKs for which to build Foundation overlay from swift-corelibs-foundation repo")
 #
 # End of user-configurable options.
 #
