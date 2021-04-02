@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 @_alwaysEmitIntoClient
-internal func _parseDigitsInASCII<Result: FixedWidthInteger>(
-  _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
+internal func _parseIntegerDigits<Result: FixedWidthInteger>(
+  ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int, isNegative: Bool
 ) -> Result? {
   _internalInvariant(radix >= 2 && radix <= 36)
   guard _fastPath(!codeUnits.isEmpty) else { return nil }
@@ -57,8 +57,8 @@ internal func _parseDigitsInASCII<Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
-internal func _parseASCII<Result: FixedWidthInteger>(
-  _ codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
+internal func _parseInteger<Result: FixedWidthInteger>(
+  ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
   _internalInvariant(!codeUnits.isEmpty)
   
@@ -67,25 +67,25 @@ internal func _parseASCII<Result: FixedWidthInteger>(
   
   let first = codeUnits[0]
   if first == _minus {
-    return _parseDigitsInASCII(
-      UnsafeBufferPointer(rebasing: codeUnits[1...]),
+    return _parseIntegerDigits(
+      ascii: UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: true)
   }
   if first == _plus {
-    return _parseDigitsInASCII(
-      UnsafeBufferPointer(rebasing: codeUnits[1...]),
+    return _parseIntegerDigits(
+      ascii: UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: false)
   }
-  return _parseDigitsInASCII(codeUnits, radix: radix, isNegative: false)
+  return _parseIntegerDigits(ascii: codeUnits, radix: radix, isNegative: false)
 }
 
 @_alwaysEmitIntoClient
 @inline(never)
-internal func _parseASCII<S: StringProtocol, Result: FixedWidthInteger>(
-  _ text: S, radix: Int
+internal func _parseInteger<S: StringProtocol, Result: FixedWidthInteger>(
+  ascii text: S, radix: Int
 ) -> Result? {
   var str = String(text)
-  return str.withUTF8 { _parseASCII($0, radix: radix) }
+  return str.withUTF8 { _parseInteger(ascii: $0, radix: radix) }
 }
 
 extension FixedWidthInteger {
@@ -128,8 +128,8 @@ extension FixedWidthInteger {
     guard _fastPath(!text.isEmpty) else { return nil }
     let result: Self? =
       text.utf8.withContiguousStorageIfAvailable {
-        _parseASCII($0, radix: radix)
-      } ?? _parseASCII(text, radix: radix)
+        _parseInteger(ascii: $0, radix: radix)
+      } ?? _parseInteger(ascii: text, radix: radix)
     guard let result_ = result else { return nil }
     self = result_
   }
