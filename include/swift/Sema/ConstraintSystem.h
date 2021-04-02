@@ -1111,6 +1111,43 @@ public:
   }
 };
 
+/// Describes the arguments to which a parameter binds.
+/// FIXME: This is an awful data structure. We want the equivalent of a
+/// TinyPtrVector for unsigned values.
+using ParamBinding = SmallVector<unsigned, 1>;
+
+/// The result of calling matchCallArguments().
+struct MatchCallArgumentResult {
+  /// The direction of trailing closure matching that was performed.
+  TrailingClosureMatching trailingClosureMatching;
+
+  /// The parameter bindings determined by the match.
+  SmallVector<ParamBinding, 4> parameterBindings;
+
+  /// When present, the forward and backward scans each produced a result,
+  /// and the parameter bindings are different. The primary result will be
+  /// forwarding, and this represents the backward binding.
+  Optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
+
+  friend bool operator==(const MatchCallArgumentResult &lhs,
+                         const MatchCallArgumentResult &rhs) {
+    if (lhs.trailingClosureMatching != rhs.trailingClosureMatching)
+      return false;
+    if (lhs.parameterBindings != rhs.parameterBindings)
+      return false;
+    return lhs.backwardParameterBindings == rhs.backwardParameterBindings;
+  }
+
+  /// Generate a result that maps the provided number of arguments to the same
+  /// number of parameters via forward match.
+  static MatchCallArgumentResult forArity(unsigned argCount) {
+    SmallVector<ParamBinding, 4> Bindings;
+    for (unsigned i : range(argCount))
+      Bindings.push_back({i});
+    return {TrailingClosureMatching::Forward, Bindings, None};
+  }
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -1159,9 +1196,9 @@ public:
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// For locators associated with call expressions, the trailing closure
-  /// matching rule that was applied.
-  llvm::SmallMapVector<ConstraintLocator*, TrailingClosureMatching, 4>
-    trailingClosureMatchingChoices;
+  /// matching rule and parameter bindings that were applied.
+  llvm::SmallMapVector<ConstraintLocator *, MatchCallArgumentResult, 4>
+      argumentMatchingChoices;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -1202,6 +1239,10 @@ public:
 
   /// A map from argument expressions to their applied property wrapper expressions.
   llvm::MapVector<ASTNode, SmallVector<AppliedPropertyWrapper, 2>> appliedPropertyWrappers;
+
+  /// Record a new argument matching choice for given locator that maps a
+  /// single argument to a single parameter.
+  void recordSingleArgMatchingChoice(ConstraintLocator *locator);
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -2210,9 +2251,9 @@ private:
       AppliedDisjunctions;
 
   /// For locators associated with call expressions, the trailing closure
-  /// matching rule that was applied.
-  std::vector<std::pair<ConstraintLocator*, TrailingClosureMatching>>
-      trailingClosureMatchingChoices;
+  /// matching rule and parameter bindings that were applied.
+  std::vector<std::pair<ConstraintLocator *, MatchCallArgumentResult>>
+      argumentMatchingChoices;
 
   /// The set of implicit value conversions performed by the solver on
   /// a current path to reach a solution.
@@ -2709,8 +2750,8 @@ public:
     /// The length of \c AppliedDisjunctions.
     unsigned numAppliedDisjunctions;
 
-    /// The length of \c trailingClosureMatchingChoices;
-    unsigned numTrailingClosureMatchingChoices;
+    /// The length of \c argumentMatchingChoices.
+    unsigned numArgumentMatchingChoices;
 
     /// The length of \c OpenedTypes.
     unsigned numOpenedTypes;
@@ -3226,11 +3267,8 @@ public:
 
   void recordPotentialHole(Type type);
 
-  void recordTrailingClosureMatch(
-      ConstraintLocator *locator,
-      TrailingClosureMatching trailingClosureMatch) {
-    trailingClosureMatchingChoices.push_back({locator, trailingClosureMatch});
-  }
+  void recordMatchCallArgumentResult(ConstraintLocator *locator,
+                                     MatchCallArgumentResult result);
 
   /// Walk a closure AST to determine its effects.
   ///
@@ -5071,11 +5109,6 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
                              sources);
 }
 
-/// Describes the arguments to which a parameter binds.
-/// FIXME: This is an awful data structure. We want the equivalent of a
-/// TinyPtrVector for unsigned values.
-using ParamBinding = SmallVector<unsigned, 1>;
-
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
 /// By default, none of the callbacks do anything.
@@ -5141,20 +5174,6 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
-};
-
-/// The result of calling matchCallArguments().
-struct MatchCallArgumentResult {
-  /// The direction of trailing closure matching that was performed.
-  TrailingClosureMatching trailingClosureMatching;
-
-  /// The parameter bindings determined by the match.
-  SmallVector<ParamBinding, 4> parameterBindings;
-
-  /// When present, the forward and backward scans each produced a result,
-  /// and the parameter bindings are different. The primary result will be
-  /// forwarding, and this represents the backward binding.
-  Optional<SmallVector<ParamBinding, 4>> backwardParameterBindings;
 };
 
 /// Match the call arguments (as described by the given argument type) to
