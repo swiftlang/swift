@@ -1433,6 +1433,40 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       assert(!argsWithLabels[argIdx].isAutoClosure() ||
              isSynthesizedArgument(argument));
 
+      // If parameter is a generic parameter, let's copy its
+      // conformance requirements (if any), to the argument
+      // be able to filter mismatching choices earlier.
+      if (auto *typeVar = paramTy->getAs<TypeVariableType>()) {
+        auto *locator = typeVar->getImpl().getLocator();
+        if (locator->isForGenericParameter()) {
+          auto &CG = cs.getConstraintGraph();
+          auto *repr = cs.getRepresentative(typeVar);
+          for (auto *constraint : CG[repr].getConstraints()) {
+            if (constraint->getKind() != ConstraintKind::ConformsTo)
+              continue;
+
+            // This is not a direct requirement.
+            if (!constraint->getFirstType()->isEqual(typeVar))
+              continue;
+
+            // If the composition consists of a class + protocol,
+            // we can't attach conformance to the argument because
+            // parameter would have to pick one of the components.
+            if (argTy.findIf([](Type type) {
+                  return type->is<ProtocolCompositionType>();
+                }))
+              continue;
+
+            auto protocolTy = constraint->getSecondType();
+            if (!protocolTy->is<ProtocolType>())
+              continue;
+
+            cs.addConstraint(ConstraintKind::TransitivelyConformsTo, argTy,
+                             protocolTy, constraint->getLocator());
+          }
+        }
+      }
+
       cs.addConstraint(
           subKind, argTy, paramTy,
           matchingAutoClosureResult
@@ -6193,7 +6227,79 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     Type type, Type protocolTy, ConstraintLocatorBuilder locator,
     TypeMatchOptions flags) {
-  return SolutionKind::Error;
+  // Since this is a performance optimization, let's ignore it
+  // in diagnostic mode.
+  if (shouldAttemptFixes())
+    return SolutionKind::Solved;
+
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *conformance =
+          Constraint::create(*this, ConstraintKind::TransitivelyConformsTo,
+                             type, protocolTy, getConstraintLocator(locator));
+
+      addUnsolvedConstraint(conformance);
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  };
+
+  auto resolvedTy = getFixedTypeRecursive(type, /*wantRValue=*/true);
+  if (resolvedTy->isTypeVariableOrMember())
+    return formUnsolved();
+
+  auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
+
+  // First, let's check whether the type itself conforms,
+  // if it does - we are done.
+  if (TypeChecker::conformsToProtocol(resolvedTy, protocol, DC))
+    return SolutionKind::Solved;
+
+  // If the type doesn't conform, let's check whether
+  // an Optional or Unsafe{Mutable}Pointer from it would.
+
+  SmallVector<Type, 4> typesToCheck;
+
+  // Optional<T>
+  typesToCheck.push_back(
+      OptionalType::get(resolvedTy->getWithoutSpecifierType()));
+
+  // Unsafe{Mutable}Pointer<T>
+  {
+    auto &ctx = getASTContext();
+
+    auto *ptrDecl = ctx.getUnsafePointerDecl();
+
+    // String -> UnsafePointer<Void>
+    if (resolvedTy->isEqual(ctx.getStringDecl()->getDeclaredInterfaceType())) {
+      typesToCheck.push_back(BoundGenericType::get(ptrDecl, /*parent=*/Type(),
+                                                   {ctx.TheEmptyTupleType}));
+    }
+
+    // Array<T> -> UnsafePointer<T>
+    if (auto elt = isArrayType(resolvedTy)) {
+      typesToCheck.push_back(
+          BoundGenericType::get(ptrDecl, /*parent=*/Type(), {*elt}));
+    }
+
+    // inout argument -> UnsafePointer<T>, UnsafeMutablePointer<T>
+    if (type->is<InOutType>()) {
+      typesToCheck.push_back(
+          BoundGenericType::get(ptrDecl, /*parent=*/Type(), {resolvedTy}));
+      typesToCheck.push_back(BoundGenericType::get(
+          ctx.getUnsafeMutablePointerDecl(), /*parent=*/Type(), {resolvedTy}));
+    }
+  }
+
+  return llvm::any_of(
+             typesToCheck,
+             [&](Type type) {
+               return bool(TypeChecker::conformsToProtocol(type, protocol, DC));
+             })
+             ? SolutionKind::Solved
+             : SolutionKind::Error;
 }
 
 /// Determine the kind of checked cast to perform from the given type to
