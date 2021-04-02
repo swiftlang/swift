@@ -25,25 +25,11 @@ word_bits = int(CMAKE_SIZEOF_VOID_P)
 def maskOfWidth(n):
   return (1 << n) - 1
 
-def inRadix(radix, n, zero='0'):
-  """
-Represent the int n in the given radix.
-Note: the third parameter, zero, is not for user consumption.
-  """
-  if n < 0:
-    return '-' + inRadix(radix, -n, '')
-  elif n == 0:
-    return zero
-  else:
-    r = n % radix
-    digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
-    return inRadix(radix, int(n // radix), '') + digit
-
 # The maximal legal radix
 max_radix = ord('z') - ord('a') + 1 + 10
 
-# Test a few important radices
-radices_to_test = [2, 8, 10, 16, max_radix]
+# Test a few important radices + an odd one
+radices_to_test = [2, 10, 16, 8, 11, max_radix]
 
 # How many values to test in each radix?  A nice prime number of course.
 number_of_values = 23
@@ -54,71 +40,200 @@ import StdlibUnittest
 
 var tests = TestSuite("NumericParsing")
 
-% for type in all_integer_types(word_bits):
-%   Self = type.stdlib_name
-%   maxValue = maskOfWidth((type.bits - 1) if type.is_signed else type.bits)
-%   minValue = -maxValue - 1 if type.is_signed else 0
-%   required_values = [minValue, 0, maxValue]
-tests.test("${Self}/success") {
-  let isSigned = ${str(type.is_signed).lower()}
+% for int_type in all_integer_types(word_bits):
+%   for string_type in [ "String", "Substring" ]:
+%     for radix in radices_to_test:
+%       Self = int_type.stdlib_name
+%       maxValue = maskOfWidth((int_type.bits - 1) if int_type.is_signed else int_type.bits)
+%       minValue = -maxValue - 1 if int_type.is_signed else 0
+%
+%       def inRadix(n, zero='0'):
+%         """
+%         Represent the int n in the given radix.
+%         Note: the second parameter, zero, is not for user consumption.
+%         """
+%         if n < 0:
+%           return '-' + inRadix(-n, '')
+%         elif n == 0:
+%           return zero
+%         else:
+%           r = n % radix
+%           digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
+%           return inRadix(int(n // radix), '') + digit
+%
+%       def expectResult(result, input):
+%         input = '\"' + input + '\"'
+%         if string_type == "Substring": input = "Substring(" + input + ")"
+%         return "expectEqual(" + str(result) + ", " \
+%           + Self + "(" + input + ", radix: " + str(radix) + "))"
+%
+%       max_digit = inRadix(radix-1)
 
+tests.test("${Self}/${string_type}/base${radix}/success") {
   //===--- Important cases ------------------------------------------------===//
-  expectEqual(0, ${Self}("0"))      // zero
-  expectEqual(17, ${Self}("17"))    // non-zero with no radix
+  // Basic sanity check
+  ${expectResult(0, "0")}
+  ${expectResult(123, inRadix(123))}
 
-  // Leading zeroes, with and without a radix
-  expectEqual(10, ${Self}("010"))
-  expectEqual(15, ${Self}("00F", radix: 16))
+  // Leading zeroes
+  ${expectResult(37, "0" + inRadix(37))}
+  ${expectResult(42, "00" + inRadix(42))}
+  ${expectResult(0, "000")}
 
   // Leading '+'
-  expectEqual(0, ${Self}("+0"))
-  expectEqual(10, ${Self}("+10"))
-  expectEqual(10, ${Self}("+010"))
-  expectEqual(15, ${Self}("+00F", radix: 16))
+  ${expectResult(0, "+0")}
+  ${expectResult(14, "+" + inRadix(14))}
+  ${expectResult(23, "+0" + inRadix(23))}
 
   // Negative numbers
-  expectEqual(${-128 if type.is_signed else 'nil'}, ${Self}("-0080", radix: 16))
-  expectEqual(0, ${Self}("-0"))
-  expectEqual(0, ${Self}("-00", radix: 16))
+  ${expectResult(-128 if int_type.is_signed else "nil", inRadix(-128))}
+  ${expectResult(-6 if int_type.is_signed else "nil", "-0" + inRadix(6))}
+  ${expectResult(0, "-0")} // Must be valid even for unsigned types
+  ${expectResult(0, "-00")}
 
-  // Maximum radix
-  expectEqual(${max_radix} - 1, ${Self}("z", radix: ${max_radix})!)
+  % if radix > 10:
+  // Letters uppercase/lowercase
+  ${expectResult(radix - 1, max_digit.lower())}
+  ${expectResult(radix - 1, max_digit.upper())}
+  % two_letter_val = 10*radix + radix-1
+  % two_letter_result = two_letter_val if two_letter_val <= maxValue else "nil"
+  ${expectResult(two_letter_result, "A" + max_digit.lower())}
+  %end
 
-  // Out-of-range values
-  expectEqual(nil, ${Self}("${maxValue + 1}"))
-  expectEqual(nil, ${Self}("${minValue - 1}"))
-  expectEqual(nil, ${Self}("\u{1D7FF}"))  // MATHEMATICAL MONOSPACE DIGIT NINE
+  // Extrema
+  ${expectResult(minValue, inRadix(minValue))}
+  ${expectResult(maxValue, inRadix(maxValue))}
+  ${expectResult("nil", inRadix(minValue-1))}
+  ${expectResult("nil", inRadix(maxValue+1))}
 
-  // Cases that should fail to parse
-  expectEqual(nil, ${Self}("--0")) // Zero w/ repeated plus
-  expectEqual(nil, ${Self}("-+5")) // Non-zero with -+
+  //===--- Boundary cases -------------------------------------------------===//
 
-  // Do more exhaustive testing
-  % for radix in radices_to_test:
-  %   for n in required_values + list(range(
-  %     minValue + 1, maxValue - 1,
-  %     int((maxValue - minValue - 2) // (number_of_values - len(required_values))))):
-  %     prefix = '+' if n > 0 and n % 2 == 0 else '' # leading '+'
-  %     text = inRadix(radix, n)
-  expectEqual(${n}, ${Self}("${prefix + text}", radix: ${radix}))
-  %     if text != text.upper():
-  expectEqual(${n}, ${Self}("${prefix + text.upper()}", radix: ${radix}))
+  % if string_type == "String":
+  %   # Fast path boundary cases
+  %   if radix == 10:
+  // Base 10 fast path, 4-digit chunk boundaries
+  ${expectResult("0_0000", "00000")} // 2 chunks, both zero
+  ${expectResult("0_0000_0000", "000000000")} // 3 chunks, all zero
+  %     if maxValue >= 10000:
+  ${expectResult("9999", "9999")} // 1 chunk, max value
+  ${expectResult("0_9999", "09999")} // 2 chunks, leading chunk zero
+  ${expectResult("1_0000", "10000")} // 2 chunks, trailing chunk zero
   %     end
+  %     if maxValue >= 100000000:
+  ${expectResult("9999_9999", "99999999")} // 2 chunks, max value
+  ${expectResult("0_9999_9999", "099999999")} // 3 chunks, leading chunk zero
+  ${expectResult("1_0000_0000", "100000000")} // 3 chunks, trailing chunks zero
+  %     end
+  %   elif radix == 2:
+  // Base 2 fast path, 8-digit chunk boundaries
+  ${expectResult("0b0_0000_0000", "000000000")} // 2 chunks, both zero
+  %     if maxValue >= 0b100000000:
+  ${expectResult("0b1111_1111", "11111111")} // 1 chunk, max value
+  ${expectResult("0b0_1111_1111", "011111111")} // 2 chunks, leading chunk zero
+  ${expectResult("0b1_0000_0000", "100000000")} // 2 chunks, trailing chunk zero
+  %     end
+  %   elif radix == 16:
+  // Base 16 fast path, 8-digit chunk boundaries
+  ${expectResult("0x0_0000_000", "000000000")} // 2 chunks, both zero
+  %     if maxValue >= 0x100000000:
+  ${expectResult("0xffff_ffff", "ffffffff")} // 1 chunk, max value
+  ${expectResult("0x0_ffff_ffff", "0ffffffff")} // 2 chunks, leading chunk zero
+  ${expectResult("0x1_0000_0000", "100000000")} // 2 chunks, trailing chunk zero
+  %     end
+  %   end
+
+  %   small_max_count = 15 if word_bits == 64 else 10
+  // Every length small value
+  %   for n in range(1, small_max_count+1):
+  %     value = (radix ** n) - 1
+  %     result = value if value <= maxValue else "nil"
+  ${expectResult(result, n * max_digit)}
+  %   end
+  % end
+
+  //===--- Normal values --------------------------------------------------===//
+
+  // Numbers through range
+  % required_values = [minValue, 0, maxValue]
+  % range_value_count =  (number_of_values - len(required_values))
+  % for n in required_values + list(range(
+  %   minValue + 1, maxValue - 1,
+  %   int((maxValue - minValue - 2) // range_value_count))):
+  %   prefix = '+' if n > 0 and n % 2 == 0 else '' # leading '+'
+  %   text = inRadix(n)
+  ${expectResult(n, prefix + text)}
+  %   if text != text.upper():
+  ${expectResult(n, prefix + text.upper())}
   %   end
   % end
 }
 
+tests.test("${Self}/${string_type}/base${radix}/failures") {
+  // Too short
+  ${expectResult("nil", "")}
+  ${expectResult("nil", "+")}
+  ${expectResult("nil", "-")}
+
+  // Multiple signs
+  ${expectResult("nil", "--1")}
+  ${expectResult("nil", "++0")}
+  ${expectResult("nil", "-+1")}
+  ${expectResult("nil", "+-0")}
+
+  // UInt64 boundaries
+  ${expectResult("nil", inRadix(2**64))}
+  ${expectResult("nil", "-" + inRadix(2**64))}
+  ${expectResult("nil", "-" + inRadix(2**63 + 1))}
+  ${expectResult("nil", "-" + inRadix(2**64 - 1))}
+
+  // Invalid characters
+  // Test several important boundary characters at different positions
+  % invalid_chars = [
+  %  ' ', # Whitespace
+  %  '*', ',', '.', # Above/below sign characters
+  %  '/', ':', '@', '[', '`', '{', # Above/below digit ranges
+  %  "\\u{1d7ff}", # Non-ASCII digit (MATHEMATICAL MONOSPACE DIGIT NINE)
+  %  "\\u{00}", "\\u{7f}", # UTF-8 1-byte (ASCII) limits
+  %  "\\u{80}", "\\u{7ff}", # UTF-8 2-byte limits
+  %  "\\u{800}", "\\u{ffff}", # UTF-8 3-byte limits
+  %  "\\u{10000}", "\\u{10ffff}", # UTF-8 4-byte limits
+  % ]
+  % invalid_chars = map(lambda c: c.encode('utf8') if isinstance(c, unicode) else c, invalid_chars)
+  % if radix <= 10:
+  %  above_max_digit = chr(ord('0') + radix)
+  %  invalid_chars.extend([ above_max_digit, 'a', 'z', 'A', 'Z' ])
+  % else:
+  %  above_max_digit = chr(ord('a') + (radix - 10))
+  %  invalid_chars.extend([ above_max_digit, above_max_digit.upper() ])
+  % end
+  % for invalid_char in invalid_chars:
+  // "${invalid_char}"
+  ${expectResult("nil", invalid_char)}
+  ${expectResult("nil", "-" + invalid_char)}
+  ${expectResult("nil", "1" + invalid_char)}
+  ${expectResult("nil", invalid_char + "1")}
+  ${expectResult("nil", invalid_char + "-1")}
+  % end
+}
+
+%     end
+%   end
+
+tests.test("${Self}/implicitRadix") {
+  expectEqual(123, ${Self}("123"))
+}
+
 tests.test("${Self}/radixTooLow") {
-  ${Self}("0", radix: 2)
+  _ = ${Self}("0", radix: 2)
   expectCrashLater()
-  ${Self}("0", radix: 1)
+  _ = ${Self}("0", radix: 1)
 }
 
 tests.test("${Self}/radixTooHigh") {
   let maxRadix = ${ord('z') - ord('a') + 1 + 10}
-  ${Self}("0", radix: maxRadix)
+  _ = ${Self}("0", radix: maxRadix)
   expectCrashLater()
-  let y = ${Self}("0", radix: maxRadix + 1)
+  _ = ${Self}("0", radix: maxRadix + 1)
 }
 
 % end
