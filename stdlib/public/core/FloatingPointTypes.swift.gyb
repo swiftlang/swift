@@ -1019,6 +1019,9 @@ extension ${Self} {
   }
 }
 
+${Availability(bits)}
+extension ${Self}: Sendable { }
+
 //===----------------------------------------------------------------------===//
 // Explicit conversions between types.
 //===----------------------------------------------------------------------===//
@@ -1343,9 +1346,6 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 }
 % end
 
-${Availability(bits)}
-extension ${Self} : Sendable { }
-
 //===----------------------------------------------------------------------===//
 // Deprecated operators
 //===----------------------------------------------------------------------===//
@@ -1369,6 +1369,17 @@ public struct ${Self} {
     fatalError("${Self} is not available")
   }
 }
+
+%  if bits == 16:
+// This is a workaround for a compiler bug that omits the macOS 11 availability
+// from the implicit conformance emitted into the generated .swiftinterface
+// file. See https://github.com/apple/swift/pull/36669 for details.
+// FIXME: rdar://76092800
+@available(macOS 11, iOS 14, tvOS 14, watchOS 7, *)
+@available(macOS, unavailable)
+@available(macCatalyst, unavailable)
+extension ${Self}: Sendable { }
+%  end
 
 #endif
 % end
