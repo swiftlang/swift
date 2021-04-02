@@ -8092,8 +8092,9 @@ namespace {
 
         // Set the interface type of each property wrapper synthesized var
         auto *backingVar = param->getPropertyWrapperBackingProperty();
-        backingVar->setInterfaceType(
-            solution.simplifyType(solution.getType(backingVar))->mapTypeOutOfContext());
+        auto backingType =
+            solution.simplifyType(solution.getType(backingVar))->mapTypeOutOfContext();
+        backingVar->setInterfaceType(backingType);
 
         if (auto *projectionVar = param->getPropertyWrapperProjectionVar()) {
           projectionVar->setInterfaceType(
@@ -8101,8 +8102,20 @@ namespace {
         }
 
         auto *wrappedValueVar = param->getPropertyWrapperWrappedValueVar();
-        wrappedValueVar->setInterfaceType(
-            solution.simplifyType(solution.getType(wrappedValueVar)));
+        auto wrappedValueType = solution.simplifyType(solution.getType(wrappedValueVar));
+        wrappedValueVar->setInterfaceType(wrappedValueType->getWithoutSpecifierType());
+
+        if (param->hasImplicitPropertyWrapper()) {
+          if (wrappedValueType->is<LValueType>())
+            wrappedValueVar->setImplInfo(StorageImplInfo::getMutableComputed());
+
+          // Add an explicit property wrapper attribute, which is needed for
+          // synthesizing the accessors.
+          auto &context = wrappedValueVar->getASTContext();
+          auto *typeExpr = TypeExpr::createImplicit(backingType, context);
+          auto *attr = CustomAttr::create(context, SourceLoc(), typeExpr, /*implicit=*/true);
+          wrappedValueVar->getAttrs().add(attr);
+        }
       }
 
       TypeChecker::checkParameterList(closure->getParameters(), closure);
