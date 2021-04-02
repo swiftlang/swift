@@ -898,6 +898,12 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   return cache;
 }
 
+llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
+  return getAddrOfLLVMVariable(
+      LinkEntity::forKnownAsyncFunctionPointer("swift_deletedAsyncMethodError"),
+      ConstantInit(), DebugTypeInfo());
+}
+
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
