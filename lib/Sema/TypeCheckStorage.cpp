@@ -1968,6 +1968,17 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   
   // Copy availability from the accessor we'll synthesize the setter from.
   SmallVector<Decl *, 2> asAvailableAs;
+
+  auto addEnclosingScopeAvailability = [&]() {
+    Decl *enclosingDecl = storage;
+    // Find the innermost enclosing declaration with an @available annotation.
+    while ((enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl())) {
+      if (enclosingDecl->getAttrs().hasAttribute<AvailableAttr>()) {
+        asAvailableAs.push_back(enclosingDecl);
+        break;
+      }
+    }
+  };
   
   // That could be a property wrapper...
   if (auto var = dyn_cast<VarDecl>(storage)) {
@@ -1978,6 +1989,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
       if (info.valueVar) {
         if (auto setter = info.valueVar->getOpaqueAccessor(AccessorKind::Set)) {
           asAvailableAs.push_back(setter);
+          addEnclosingScopeAvailability();
         }
       }
     } else if (auto wrapperSynthesizedKind
@@ -1995,6 +2007,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
             if (auto setter
                 = info.projectedValueVar->getOpaqueAccessor(AccessorKind::Set)){
               asAvailableAs.push_back(setter);
+              addEnclosingScopeAvailability();
             }
           }
         }
