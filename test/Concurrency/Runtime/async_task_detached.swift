@@ -18,6 +18,7 @@ class X {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_detach() async {
   for _ in 1...3 {
     let x = X()
@@ -32,6 +33,7 @@ func test_detach() async {
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_detach()

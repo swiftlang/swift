@@ -12,6 +12,7 @@
 
 import Swift
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   public __consuming func prefix(
@@ -23,6 +24,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct AsyncPrefixSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -37,6 +39,7 @@ public struct AsyncPrefixSequence<Base: AsyncSequence> {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncPrefixSequence: AsyncSequence {
   public typealias Element = Base.Element
   public typealias AsyncIterator = Iterator

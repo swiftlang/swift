@@ -16,6 +16,7 @@ class StringLike: CustomStringConvertible {
   var description: String { value }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension TaskLocalValues {
   struct NumberKey: TaskLocalKey {
     static var defaultValue: Int { 0 }
@@ -23,6 +24,7 @@ extension TaskLocalValues {
   var number: NumberKey { .init() }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @discardableResult
 func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
@@ -40,6 +42,7 @@ func printTaskLocal<Key>(
 
 // ==== ------------------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func async_let_nested() async {
   _ = printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
   async let x1: () = Task.withLocal(\.number, boundTo: 2) {
@@ -61,6 +64,7 @@ func async_let_nested() async {
   printTaskLocal(\.number) // CHECK: NumberKey: 0 {{.*}}
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func async_let_nested_skip_optimization() async {
   async let x1: Int? = Task.withLocal(\.number, boundTo: 2) {
     async let x2: Int? = { () async -> Int? in
@@ -83,6 +87,7 @@ func async_let_nested_skip_optimization() async {
   _ = await x1
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await async_let_nested()

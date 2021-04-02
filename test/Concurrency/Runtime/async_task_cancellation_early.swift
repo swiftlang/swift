@@ -9,6 +9,7 @@
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_runDetached_cancel_child_early() async {
   print(#function) // CHECK: test_runDetached_cancel_child_early
   let h: Task.Handle<Bool, Error> = Task.runDetached {
@@ -33,6 +34,7 @@ func test_runDetached_cancel_child_early() async {
   print("was cancelled: \(got)") // CHECK: was cancelled: true
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_runDetached_cancel_child_early()

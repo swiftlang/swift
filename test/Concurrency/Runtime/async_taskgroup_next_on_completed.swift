@@ -9,6 +9,7 @@
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_sum_nextOnCompleted() async {
   let numbers = [1, 2, 3, 4, 5]
   let expected = 15 // FIXME: numbers.reduce(0, +) this hangs?
@@ -64,6 +65,7 @@ func test_sum_nextOnCompleted() async {
   print("result: \(sum)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_sum_nextOnCompleted()

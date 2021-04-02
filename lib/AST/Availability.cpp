@@ -324,7 +324,7 @@ ASTContext::getIntermodulePrespecializedGenericMetadataAvailability() {
 }
 
 AvailabilityContext ASTContext::getConcurrencyAvailability() {
-  return getSwiftFutureAvailability();
+  return getSwift55Availability();
 }
 
 AvailabilityContext ASTContext::getDifferentiationAvailability() {
@@ -408,6 +408,11 @@ AvailabilityContext ASTContext::getSwift54Availability() {
     return AvailabilityContext::alwaysAvailable();
   }
 }
+
+AvailabilityContext ASTContext::getSwift55Availability() {
+  return getSwiftFutureAvailability();
+}
+
 
 AvailabilityContext ASTContext::getSwiftFutureAvailability() {
   auto target = LangOpts.Target;
