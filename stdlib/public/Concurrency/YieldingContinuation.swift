@@ -1,6 +1,3 @@
-import Swift
-import _Concurrency
-
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -15,6 +12,7 @@ import _Concurrency
 
 import Swift
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   @_fixed_layout
   @usableFromInline
@@ -116,6 +114,7 @@ public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension YieldingContinuation where Failure == Never {
   /// Construct a YieldingContinuation with a specific Element type.
   ///
@@ -139,6 +138,7 @@ extension YieldingContinuation where Failure == Never {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension YieldingContinuation {
   /// Resume the task awaiting the continuation by having it either
   /// return normally or throw an error based on the state of the given
