@@ -8212,7 +8212,12 @@ ConstraintSystem::simplifyPropertyWrapperConstraint(
   }
 
   auto resolvedType = wrapperType->getTypeOfMember(DC->getParentModule(), typeInfo.valueVar);
-  addConstraint(ConstraintKind::Equal, wrappedValueType, resolvedType, locator);
+  if (typeInfo.valueVar->isSettable(nullptr) && typeInfo.valueVar->isSetterAccessibleFrom(DC) &&
+      !typeInfo.valueVar->isSetterMutating()) {
+    resolvedType = LValueType::get(resolvedType);
+  }
+
+  addConstraint(ConstraintKind::Bind, wrappedValueType, resolvedType, locator);
 
   return SolutionKind::Solved;
 }
@@ -8390,7 +8395,8 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
 
       if (paramDecl->hasImplicitPropertyWrapper()) {
         backingType = getContextualParamAt(i)->getPlainType();
-        wrappedValueType = createTypeVariable(getConstraintLocator(locator), TVO_CanBindToHole);
+        wrappedValueType = createTypeVariable(getConstraintLocator(locator),
+                                              TVO_CanBindToHole | TVO_CanBindToLValue);
       } else {
         auto *wrapperAttr = paramDecl->getAttachedPropertyWrappers().front();
         auto wrapperType = paramDecl->getAttachedPropertyWrapperType(0);
