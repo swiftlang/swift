@@ -1309,9 +1309,9 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     }
 
     selectedTrailingMatching = callArgumentMatch->trailingClosureMatching;
-    // Record the direction of matching used for this call.
-    cs.recordTrailingClosureMatch(cs.getConstraintLocator(locator),
-                                  selectedTrailingMatching);
+    // Record the matching direction and parameter bindings used for this call.
+    cs.recordMatchCallArgumentResult(cs.getConstraintLocator(locator),
+                                     *callArgumentMatch);
 
     // If there was a disjunction because both forward and backward were
     // possible, increase the score for forward matches to bias toward the
@@ -9716,10 +9716,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // have an explicit inout argument.
   if (type1.getPointer() == desugar2) {
     if (!isOperator || !hasInOut()) {
-      recordTrailingClosureMatch(
+      recordMatchCallArgumentResult(
           getConstraintLocator(
               outerLocator.withPathElement(ConstraintLocator::ApplyArgument)),
-          TrailingClosureMatching::Forward);
+          MatchCallArgumentResult::forArity(func1->getNumParams()));
       return SolutionKind::Solved;
     }
   }
@@ -10862,6 +10862,12 @@ void ConstraintSystem::recordPotentialHole(Type type) {
     if (auto *typeVar = type->getAs<TypeVariableType>())
       typeVar->getImpl().enableCanBindToHole(getSavedBindings());
   });
+}
+
+void ConstraintSystem::recordMatchCallArgumentResult(
+    ConstraintLocator *locator, MatchCallArgumentResult result) {
+  assert(locator->isLastElement<LocatorPathElt::ApplyArgument>());
+  argumentMatchingChoices.push_back({locator, result});
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
