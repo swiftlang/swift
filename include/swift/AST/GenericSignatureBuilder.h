@@ -537,8 +537,7 @@ public:
   LookUpConformanceInBuilder getLookupConformanceFn();
 
   /// Lookup a protocol conformance in a module-agnostic manner.
-  ProtocolConformanceRef lookupConformance(CanType dependentType,
-                                           Type conformingReplacementType,
+  ProtocolConformanceRef lookupConformance(Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol);
 
   /// Enumerate the requirements that describe the signature of this
