@@ -16,11 +16,11 @@ import Swift
 // ==== Task Cancellation ------------------------------------------------------
 
 /// Execute an operation with cancellation handler which will immediately be
-/// invoked if the current task is cancelled.
+/// invoked if the current task is canceled.
 ///
 /// This differs from the operation cooperatively checking for cancellation
 /// and reacting to it in that the cancellation handler is _always_ and
-/// _immediately_ invoked when the task is cancelled. For example, even if the
+/// _immediately_ invoked when the task is canceled. For example, even if the
 /// operation is running code which never checks for cancellation, a cancellation
 /// handler still would run and give us a chance to run some cleanup code.
 ///
@@ -49,10 +49,10 @@ public func withTaskCancellationHandler<T>(
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
-  /// Returns `true` if the task is cancelled, and should stop executing.
+  /// A Boolean value that indicates whether
+  /// the current task should stop executing.
   ///
-  /// If no current `Task` is available, returns `false`, as outside of a task
-  /// context no task cancellation may be observed.
+  /// If there is no current task, the value of this property is `false`.
   ///
   /// - SeeAlso: `checkCancellation()`
   public static var isCancelled: Bool {
@@ -61,7 +61,7 @@ extension Task {
      }
   }
 
-  /// Returns `true` if the task is cancelled, and should stop executing.
+  /// A Boolean value that indicates whether the task should stop executing.
   ///
   /// - SeeAlso: `checkCancellation()`
   @available(*, deprecated, message: "Storing `Task` instances has been deprecated and will be removed soon. Use the static 'Task.isCancelled' instead.")
@@ -69,18 +69,9 @@ extension Task {
     _taskIsCancelled(_task)
   }
 
-  /// Check if the task is cancelled and throw an `CancellationError` if it was.
+  /// Throws a cancellation error if the current task was canceled.
   ///
-  /// It is intentional that no information is passed to the task about why it
-  /// was cancelled. A task may be cancelled for many reasons, and additional
-  /// reasons may accrue / after the initial cancellation (for example, if the
-  /// task fails to immediately exit, it may pass a deadline).
-  ///
-  /// The goal of cancellation is to allow tasks to be cancelled in a
-  /// lightweight way, not to be a secondary method of inter-task communication.
-  ///
-  /// ### Suspension
-  /// This function returns instantly and will never suspend.
+  /// The error is always an instance of `Task.CancellationError`.
   ///
   /// - SeeAlso: `isCancelled()`
   public static func checkCancellation() throws {
@@ -97,10 +88,11 @@ extension Task {
     try await withTaskCancellationHandler(handler: handler, operation: operation)
   }
 
-  /// The default cancellation thrown when a task is cancelled.
+  /// The default error thrown by a cancelled task.
   ///
-  /// This error is also thrown automatically by `Task.checkCancellation()`,
-  /// if the current task has been cancelled.
+  /// The `Task.checkCancellation()` method throws this error
+  /// if the current task has been canceled.
+  /// You can use this error in your own cancellation-checking code also.
   public struct CancellationError: Error {
     // no extra information, cancellation is intended to be light-weight
     public init() {}
