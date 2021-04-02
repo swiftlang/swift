@@ -751,6 +751,11 @@ EnableExperimentalConcurrency("enable-experimental-concurrency",
                               llvm::cl::desc("Enable experimental concurrency model"),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+DisableImplicitConcurrencyImport("disable-implicit-concurrency-module-import",
+                                 llvm::cl::desc("Disable implicit import of _Concurrency module"),
+                                 llvm::cl::init(false));
+
 static llvm::cl::list<std::string>
 AccessNotesPath("access-notes-path", llvm::cl::desc("Path to access notes file"),
                 llvm::cl::cat(Category));
@@ -3851,6 +3856,9 @@ int main(int argc, char *argv[]) {
   }
   if (options::EnableExperimentalConcurrency) {
     InitInvok.getLangOptions().EnableExperimentalConcurrency = true;
+  }
+  if (options::DisableImplicitConcurrencyImport) {
+    InitInvok.getLangOptions().DisableImplicitConcurrencyModuleImport = true;
   }
 
   // We disable source location resolutions from .swiftsourceinfo files by

@@ -24,6 +24,7 @@ import NotSoSecret2 // expected-warning {{'NotSoSecret2' inconsistently imported
 // CHECK-NEXT: {{^}}import NotSoSecret{{$}}
 // CHECK-NEXT: {{^}}import NotSoSecret2{{$}}
 // CHECK-NEXT: {{^}}import Swift{{$}}
+// CHECK-NEXT: {{^}}import _Concurrency{{$}}
 // CHECK-NEXT: {{^}}@_exported import empty{{$}}
 // CHECK-NEXT: {{^}}@_exported import emptyButWithLibraryEvolution{{$}}
 // CHECK-NOT: import

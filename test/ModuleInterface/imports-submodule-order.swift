@@ -20,4 +20,5 @@
 // CHECK-NEXT: {{^}}import Swift{{$}}
 // CHECK-NEXT: import X{{$}}
 // CHECK-NEXT: import Y{{$}}
+// CHECK-NEXT: {{^}}import _Concurrency{{$}}
 // CHECK-NOT: import
