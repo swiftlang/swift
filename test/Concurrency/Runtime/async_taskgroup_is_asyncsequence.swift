@@ -9,6 +9,7 @@
 // XFAIL: linux
 // XFAIL: windows
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_is_asyncSequence() async {
   let sum: Int = try! await Task.withGroup(resultType: Int.self) { group in
     for n in 1...10 {
@@ -31,6 +32,7 @@ func test_taskGroup_is_asyncSequence() async {
   print("result: \(sum)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main()
 

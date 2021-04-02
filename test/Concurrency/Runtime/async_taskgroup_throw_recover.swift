@@ -11,12 +11,15 @@
 struct Boom: Error {}
 struct IgnoredBoom: Error {}
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func one() async -> Int { 1 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func boom() async throws -> Int {
   throw Boom()
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_throws() async {
   let got: Int = await Task.withGroup(resultType: Int.self) { group in
     await group.add { try await boom()  }
@@ -59,6 +62,7 @@ func test_taskGroup_throws() async {
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_throws()

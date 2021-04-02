@@ -14,6 +14,7 @@ import Swift
 @_implementationOnly import _SwiftConcurrencyShims
 
 /// Namespace for declaring `TaskLocalKey`s.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public enum TaskLocalValues {}
 
 /// A `TaskLocalKey` is used to identify, bind and get a task local value from
@@ -21,6 +22,7 @@ public enum TaskLocalValues {}
 ///
 /// - SeeAlso: `Task.withLocal(_:boundTo:operation:)`
 /// - SeeAlso: `Task.local(_:)`
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public protocol TaskLocalKey {
   /// The type of `Value` uniquely identified by this key.
   associatedtype Value
@@ -43,12 +45,14 @@ public protocol TaskLocalKey {
   static var inherit: TaskLocalInheritance { get }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension TaskLocalKey {
   public static var inherit: TaskLocalInheritance { .default }
 }
 
 /// Determines task local value behavior in child tasks.
 // TODO: should likely remain extensible
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public enum TaskLocalInheritance: UInt8, Equatable {
   /// The default inheritance strategy.
   ///
@@ -62,6 +66,7 @@ public enum TaskLocalInheritance: UInt8, Equatable {
   case never = 1
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
   /// Read a task-local value, bound to the specified key.
@@ -112,6 +117,7 @@ extension Task {
 
 // ==== ------------------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_localValuePush")
 public func _taskLocalValuePush<Value>(
   _ task: Builtin.NativeObject,
@@ -119,11 +125,13 @@ public func _taskLocalValuePush<Value>(
   value: __owned Value
 ) // where Key: TaskLocalKey
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_localValuePop")
 public func _taskLocalValuePop(
   _ task: Builtin.NativeObject
 )
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_task_localValueGet")
 public func _taskLocalValueGet(
   _ task: Builtin.NativeObject,
