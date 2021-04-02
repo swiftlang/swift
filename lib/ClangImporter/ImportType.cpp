@@ -2206,6 +2206,49 @@ static Type decomposeCompletionHandlerType(
   }
 }
 
+ImportedType ClangImporter::Implementation::importEffectfulPropertyType(
+                                        const clang::ObjCMethodDecl *decl,
+                                        DeclContext *dc,
+                                        importer::ImportedName name,
+                                        bool isFromSystemModule) {
+  // here we expect a method that is being imported as an effectful property.
+  // thus, we currently require async info.
+  if (!name.getAsyncInfo())
+    return ImportedType();
+
+  // a variadic method doesn't make sense here
+  if (decl->isVariadic())
+    return ImportedType();
+
+  // Our strategy here is to determine what the return type of the method would
+  // be, had we imported it as a method.
+
+  Optional<ForeignAsyncConvention> asyncConvention;
+  Optional<ForeignErrorConvention> errorConvention;
+
+  const auto kind = SpecialMethodKind::Regular;
+
+  // Import the parameter list and result type.
+  ParameterList *bodyParams = nullptr;
+  ImportedType importedType;
+
+  auto methodReturnType = importMethodParamsAndReturnType(
+      dc, decl, decl->parameters(), false,
+      isFromSystemModule, &bodyParams, name,
+      asyncConvention, errorConvention, kind);
+
+  // getter mustn't have any parameters!
+  if (bodyParams->size() != 0) {
+    return ImportedType();
+  }
+
+  // We expect that the method, after import, will have only an async convention
+  if (!asyncConvention || errorConvention)
+    return ImportedType();
+
+  return methodReturnType;
+}
+
 ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCMethodDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,

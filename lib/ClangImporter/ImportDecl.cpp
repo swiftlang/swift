@@ -4590,7 +4590,27 @@ namespace {
       if (auto Known = Impl.importDeclCached(decl, getVersion()))
         return Known;
 
-      return importObjCMethodDecl(decl, dc, None);
+      ImportedName importedName;
+      Optional<ImportedName> correctSwiftName; // TODO: not sure if we need this.
+      importedName = importFullName(decl, correctSwiftName);
+      if (!importedName)
+        return nullptr;
+
+      // some ObjC method decls are imported as computed properties.
+      switch(importedName.getAccessorKind()) {
+      case ImportedAccessorKind::PropertyGetter:
+        if (importedName.getAsyncInfo())
+          return importObjCMethodAsEffectfulProp(decl, dc, importedName);
+
+        // if there is no valid async info, then fall-back to method import.
+      LLVM_FALLTHROUGH;
+
+      case ImportedAccessorKind::PropertySetter:
+      case ImportedAccessorKind::SubscriptGetter:
+      case ImportedAccessorKind::SubscriptSetter:
+      case ImportedAccessorKind::None:
+        return importObjCMethodDecl(decl, dc, None);
+      }
     }
 
     /// Check whether we have already imported a method with the given
@@ -4664,6 +4684,78 @@ namespace {
       // For consistency with previous behavior, allow it even if it's been
       // imported for some other property.
       return (accessor && accessor->getAccessorKind() == accessorInfo->Kind);
+    }
+
+    /// Creates a fresh VarDecl with a single 'get' accessor to represent
+    /// an ObjC method that takes no arguments other than a completion-handler
+    /// (where the handler may have an NSError argument).
+    Decl *importObjCMethodAsEffectfulProp(const clang::ObjCMethodDecl *decl,
+                                         DeclContext *dc,
+                                         ImportedName name) {
+      assert(name.getAsyncInfo() && "expected to be for an effectful prop!");
+
+      if (name.getAccessorKind() != ImportedAccessorKind::PropertyGetter) {
+         assert(false && "unexpected accessor kind as a computed prop");
+         // NOTE: to handle setters, we would need to search for an existing
+         // VarDecl corresponding to the one we might have already created
+         // for the 'get' accessor, and tack this accessor onto it.
+         return nullptr;
+      }
+
+      auto importedType = Impl.importEffectfulPropertyType(decl, dc, name,
+                                                  isInSystemModule(dc));
+      if (!importedType)
+        return nullptr;
+
+      auto type = importedType.getType();
+      const auto access = getOverridableAccessLevel(dc);
+      auto ident = name.getDeclName().getBaseIdentifier();
+      auto propDecl = Impl.createDeclWithClangNode<VarDecl>(decl, access,
+          /*IsStatic*/decl->isClassMethod(), VarDecl::Introducer::Var,
+                        Impl.importSourceLoc(decl->getLocation()), ident, dc);
+      propDecl->setInterfaceType(type);
+      Impl.recordImplicitUnwrapForDecl(propDecl,
+                                       importedType.isImplicitlyUnwrapped());
+
+      ////
+      // Build the getter
+      AccessorInfo info{propDecl, AccessorKind::Get};
+      auto *getter = cast_or_null<AccessorDecl>(
+                      importObjCMethodDecl(decl, dc, info));
+      if (!getter)
+        return nullptr;
+
+      Impl.importAttributes(decl, getter);
+
+      ////
+      // Combine the getter and the VarDecl into a computed property.
+
+      // NOTE: since it's an ObjC method we're turning into a Swift computed
+      // property, we infer that it has no ObjC 'atomic' guarantees.
+      auto inferredObjCPropertyAttrs =
+          static_cast<clang::ObjCPropertyAttribute::Kind>
+          ( clang::ObjCPropertyAttribute::Kind::kind_readonly
+          | clang::ObjCPropertyAttribute::Kind::kind_nonatomic
+          | (decl->isInstanceMethod()
+              ? clang::ObjCPropertyAttribute::Kind::kind_class
+              : clang::ObjCPropertyAttribute::Kind::kind_noattr)
+          );
+
+      // FIXME: Fake locations for '{' and '}'?
+      propDecl->setIsSetterMutating(false);
+      makeComputed(propDecl, getter, /*setter=*/nullptr);
+      addObjCAttribute(propDecl, Impl.importIdentifier(decl->getIdentifier()));
+      applyPropertyOwnership(propDecl, inferredObjCPropertyAttrs);
+
+      ////
+      // Check correctness
+
+      if (getter->getParameters()->size() != 0) {
+        assert(false && "this should not happen!");
+        return nullptr;
+      }
+
+      return propDecl;
     }
 
     Decl *importObjCMethodDecl(const clang::ObjCMethodDecl *decl,
@@ -4797,11 +4889,16 @@ namespace {
           prop = nullptr;
       }
 
-      // If we have an accessor-import request but didn't find a property,
-      // reject the import request.
-      if (accessorInfo && !prop) {
+      const bool nameImportIsGetter =
+        importedName.getAccessorKind() == ImportedAccessorKind::PropertyGetter;
+
+      const bool needAccessorDecl = prop || nameImportIsGetter;
+
+      // If we have an accessor-import request, but didn't find a property
+      // or it's ImportedName doesn't indicate a getter,
+      // then reject the import request.
+      if (accessorInfo && !needAccessorDecl)
         return nullptr;
-      }
 
       // Import the parameter list and result type.
       ParameterList *bodyParams = nullptr;
@@ -4854,7 +4951,7 @@ namespace {
 
       // If the method has a related result type that is representable
       // in Swift as DynamicSelf, do so.
-      if (!prop && decl->hasRelatedResultType()) {
+      if (!needAccessorDecl && decl->hasRelatedResultType()) {
         resultTy = dc->getSelfInterfaceType();
         if (dc->getSelfClassDecl())
           resultTy = DynamicSelfType::get(resultTy, Impl.SwiftContext);
@@ -5020,7 +5117,7 @@ namespace {
                                  FuncDecl *setter);
 
     /// Import the accessor and its attributes.
-    AccessorDecl *importAccessor(clang::ObjCMethodDecl *clangAccessor,
+    AccessorDecl *importAccessor(const clang::ObjCMethodDecl *clangAccessor,
                                  AbstractStorageDecl *storage,
                                  AccessorKind accessorKind,
                                  DeclContext *dc);
@@ -7389,7 +7486,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 }
 
 AccessorDecl *
-SwiftDeclConverter::importAccessor(clang::ObjCMethodDecl *clangAccessor,
+SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
                                    AbstractStorageDecl *storage,
                                    AccessorKind accessorKind,
                                    DeclContext *dc) {
