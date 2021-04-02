@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -enable-experimental-concurrency %s | %FileCheck %s
+// REQUIRES: concurrency
 
 @_transparent
 func reasyncFunction(_ value: Optional<Int>, _ fn: () async throws -> Int) reasync rethrows -> Int {

@@ -506,3 +506,12 @@ bb0(%thick : $@callee_guaranteed @async @convention(thick) (Int64, Int32) -> Int
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}"(
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s12create_pa_f2Tw_"(
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s12create_pa_f2Tw0_"(
+
+sil @external_closure : $@convention(thin) @async (Int, Int) -> (Int, @error Error)
+
+sil @dont_crash : $@convention(thin) @async (Int) -> @owned @async @callee_guaranteed (Int) -> (Int, @error Error) {
+bb0(%0 : $Int):
+  %2 = function_ref @external_closure : $@convention(thin) @async (Int, Int) -> (Int, @error Error)
+  %3 = partial_apply [callee_guaranteed] %2(%0) : $@convention(thin) @async (Int, Int) -> (Int, @error Error)
+  return %3 : $@async @callee_guaranteed (Int) -> (Int, @error Error)
+}
