@@ -1,4 +1,5 @@
 /// rdar://69876253
+// REQUIRES: VENDOR=apple
 // RUN: %target-build-swift %s -o %t.out
 
 import SwiftShims
