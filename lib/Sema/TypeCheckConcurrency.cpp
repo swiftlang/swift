@@ -1460,7 +1460,7 @@ namespace {
     ///
     /// \returns true if we diagnosed the entity, \c false otherwise.
     bool diagnoseReferenceToUnsafeGlobal(ValueDecl *value, SourceLoc loc) {
-      if (!shouldDiagnoseExistingDataRaces(getDeclContext()))
+      if (!ctx.LangOpts.WarnConcurrency)
         return false;
 
       // Only diagnose direct references to mutable global state.
