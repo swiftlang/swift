@@ -1097,8 +1097,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
       if (parentEquivClass->concreteType)
         derivedViaConcrete = true;
       else if (parentEquivClass->superclass &&
-               builder.lookupConformance(parentType->getCanonicalType(),
-                                         parentEquivClass->superclass,
+               builder.lookupConformance(parentEquivClass->superclass,
                                          source->getProtocolDecl()))
         derivedViaConcrete = true;
 
@@ -2591,8 +2590,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
     concreteSource = equivClass->concreteTypeConstraints.front().source;
 
   // Lookup the conformance of the concrete type to this protocol.
-  auto conformance =
-      lookupConformance(type.getDependentType(), concrete, proto);
+  auto conformance = lookupConformance(concrete, proto);
   if (conformance.isInvalid()) {
     if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
       Impl->HadAnyError = true;
@@ -2655,8 +2653,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   if (!superclass) return nullptr;
 
   // Lookup the conformance of the superclass to this protocol.
-  auto conformance =
-    lookupConformance(type.getDependentType(), superclass, proto);
+  auto conformance = lookupConformance(superclass, proto);
   if (conformance.isInvalid())
     return nullptr;
 
@@ -3762,13 +3759,12 @@ GenericSignatureBuilder::LookUpConformanceInBuilder::operator()(
     return conformedProtocol->getModuleContext()->lookupConformance(
         conformingReplacementType, conformedProtocol);
   }
-  return builder->lookupConformance(dependentType, conformingReplacementType,
+  return builder->lookupConformance(conformingReplacementType,
                                     conformedProtocol);
 }
 
 ProtocolConformanceRef
-GenericSignatureBuilder::lookupConformance(CanType dependentType,
-                                           Type conformingReplacementType,
+GenericSignatureBuilder::lookupConformance(Type conformingReplacementType,
                                            ProtocolDecl *conformedProtocol) {
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol);
@@ -3945,13 +3941,11 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
       if (baseEquivClass->conformsTo.find(proto)
           == baseEquivClass->conformsTo.end()) {
         if (baseEquivClass->concreteType &&
-            lookupConformance(type->getCanonicalType(),
-                              baseEquivClass->concreteType,
+            lookupConformance(baseEquivClass->concreteType,
                               proto)) {
           // Fall through
         } else if (baseEquivClass->superclass &&
-                   lookupConformance(type->getCanonicalType(),
-                                     baseEquivClass->superclass,
+                   lookupConformance(baseEquivClass->superclass,
                                      proto)) {
           // Fall through
         } else {
@@ -3985,13 +3979,11 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                       : baseEquivClass->superclass);
       } else {
         if (baseEquivClass->concreteType &&
-            lookupConformance(type->getCanonicalType(),
-                              baseEquivClass->concreteType,
+            lookupConformance(baseEquivClass->concreteType,
                               proto)) {
           parentType = baseEquivClass->concreteType;
         } else if (baseEquivClass->superclass &&
-                   lookupConformance(type->getCanonicalType(),
-                                     baseEquivClass->superclass,
+                   lookupConformance(baseEquivClass->superclass,
                                      proto)) {
           parentType = baseEquivClass->superclass;
         } else {
@@ -5480,7 +5472,7 @@ public:
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
           auto *protocol = assocType->getProtocol();
-          auto conf = Builder.lookupConformance(CanType(), firstType, protocol);
+          auto conf = Builder.lookupConformance(firstType, protocol);
           auto secondType = conf.getAssociatedType(
               firstType, assocType->getDeclaredInterfaceType());
           Requirement req(RequirementKind::SameType, firstType, secondType);
