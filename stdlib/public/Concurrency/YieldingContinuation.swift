@@ -16,7 +16,7 @@ import Swift
 public struct YieldingContinuation<Element, Failure: Error>: Sendable {
   @_fixed_layout
   @usableFromInline
-  internal final class Storage: UnsafeConcurrentValue {
+  internal final class Storage {
     @usableFromInline
     var continuation: UnsafeContinuation<Element, Error>?
   }
