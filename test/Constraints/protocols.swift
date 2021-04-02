@@ -432,3 +432,20 @@ func rdar70814576() {
 
   test(S()) // expected-error {{argument type 'S' does not conform to expected type 'Fooable'}}
 }
+
+extension Optional : Trivial {
+  typealias T = Wrapped
+}
+
+extension UnsafePointer : Trivial {
+  typealias T = Int
+}
+
+func test_inference_through_implicit_conversion() {
+  class C {}
+
+  func test<T: Trivial>(_: T) -> T {}
+
+  let _: C? = test(C()) // Ok -> argument is implicitly promoted into an optional
+  let _: UnsafePointer<C> = test([C()]) // Ok - argument is implicitly converted to a pointer
+}
