@@ -42,7 +42,7 @@ extension MyActor {
 
     // CHECK: acceptEscapingAsyncClosure
     // CHECK: closure_expr
-    // CHEC:actor-isolated
+    // CHECK: actor-isolated
     acceptEscapingAsyncClosure { () async in print(self) }
   }
 }
