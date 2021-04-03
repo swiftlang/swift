@@ -114,14 +114,14 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
       return 2
     }
     expectEqual(str1, str5)
-  }
 
-  // Ensure reasonable behavior despite a deliberate API contract violation.
-  let str6 = String(unsafeUninitializedCapacity: 3) {
+    // Ensure reasonable behavior despite a deliberate API contract violation.
+    let str6 = String(unsafeUninitializedCapacity: 3) {
       $0[0] = UInt8(ascii: "4")
       $0[1] = UInt8(ascii: "2")
       $0[2] = UInt8(ascii: "X")
       return 2
     }
     expectEqual(str1, str6)
+  }
 }
