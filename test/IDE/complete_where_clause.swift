@@ -1,5 +1,46 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP1 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP2 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP3 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP4 | %FileCheck %s -check-prefix=TYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP5 | %FileCheck %s -check-prefix=TYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP6 | %FileCheck %s -check-prefix=EMPTY
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_1 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_2 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_1 | %FileCheck %s -check-prefix=GEN_T
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2_ASSOC | %FileCheck %s -check-prefix=GEN_T_ASSOC_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_3 | %FileCheck %s -check-prefix=GEN_T
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_4 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_5 | %FileCheck %s -check-prefix=GEN_T_S1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_6 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_1 | %FileCheck %s -check-prefix=GEN_T_S1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUBSCRIPT_2 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_1 | %FileCheck %s -check-prefix=GEN_T_S1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_2 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ALIAS_1 | %FileCheck %s -check-prefix=GEN_T_S1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ALIAS_2 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_1 | %FileCheck %s -check-prefix=GEN_T_NOMINAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_2 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_3 | %FileCheck %s -check-prefix=ANYTYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_4 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_1 | %FileCheck %s -check-prefix=GEN_T_NOMINAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_2 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_1 | %FileCheck %s -check-prefix=GEN_T_NOMINAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_2 | %FileCheck %s -check-prefix=GEN_T_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_1 | %FileCheck %s -check-prefix=P2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSOC_2 | %FileCheck %s -check-prefix=U_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL | %FileCheck %s -check-prefix=PROTOCOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT | %FileCheck %s -check-prefix=PROTOCOL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_SELF | %FileCheck %s -check-prefix=PROTOCOL_SELF
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_EXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED1 | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED2 | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED1_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED1_EXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NOMINAL_TYPEALIAS_NESTED2_EXT | %FileCheck %s -check-prefix=NOMINAL_TYPEALIAS_NESTED2_EXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_1 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_ASSOC_MEMBER_2 | %FileCheck %s -check-prefix=EXT_ASSOC_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXT_SECONDTYPE | %FileCheck %s -check-prefix=EXT_SECONDTYPE
 
 class A1<T1, T2, T3> {}
 
@@ -7,17 +48,17 @@ class A2<T4, T5> {}
 
 protocol P1 {}
 
-extension A1 where #^GP1?check=A1^#{}
+extension A1 where #^GP1^#{}
 
-extension A1 where T1 : P1, #^GP2?check=A1^# {}
+extension A1 where T1 : P1, #^GP2^# {}
 
-extension A1 where T1 : P1, #^GP3?check=A1^#
+extension A1 where T1 : P1, #^GP3^#
 
-extension A1 where T1 : #^GP4?check=TYPE1^#
+extension A1 where T1 : #^GP4^#
 
-extension A1 where T1 : P1, T2 : #^GP5?check=TYPE1^#
+extension A1 where T1 : P1, T2 : #^GP5^#
 
-extension A1 where T1.#^GP6?check=EMPTY^# {}
+extension A1 where T1.#^GP6^# {}
 
 // A1: Begin completions
 // A1-DAG: Decl[GenericTypeParam]/Local:       T1[#T1#]; name=T1
@@ -49,9 +90,9 @@ protocol B {associatedtype E}
 protocol C {associatedtype E}
 protocol D: C {associatedtype E}
 
-func ab<T: A & B>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_1?check=GEN_T_ASSOC_E^#
+func ab<T: A & B>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_1^#
 
-func ab<T: D>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_2?check=GEN_T_ASSOC_E^#
+func ab<T: D>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_2^#
 
 // GEN_T_ASSOC_E: Begin completions, 2 items
 // GEN_T_ASSOC_E-NEXT: Decl[AssociatedType]/{{Super|CurrNominal}}: E; name=E
@@ -62,30 +103,30 @@ protocol Assoc {
   associatedtype Q
 }
 
-func f1<T>(_: T) where #^FUNC_1?check=GEN_T^# {}
+func f1<T>(_: T) where #^FUNC_1^# {}
 // GEN_T: Decl[GenericTypeParam]/Local: T[#T#]; name=T
-func f2<T>(_: T) where T.#^FUNC_2?check=GEN_T_DOT^# {}
+func f2<T>(_: T) where T.#^FUNC_2^# {}
 // GEN_T_DOT: Begin completions
 // GEN_T_DOT-DAG: Keyword/None:                       Type[#T.Type#];
 // GEN_T_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 // GEN_T_DOT: End completions
-func f2b<T: Assoc>(_: T) where T.#^FUNC_2_ASSOC?check=GEN_T_ASSOC_DOT^# {}
+func f2b<T: Assoc>(_: T) where T.#^FUNC_2_ASSOC^# {}
 // GEN_T_ASSOC_DOT: Begin completions
 // GEN_T_ASSOC_DOT-DAG: Decl[AssociatedType]/{{Super|CurrNominal}}: Q;
 // GEN_T_ASSOC_DOT-DAG: Keyword/None:                       Type[#T.Type#];
 // GEN_T_ASSOC_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 // GEN_T_ASSOC_DOT: End completions
-func f3<T>(_: T) where T == #^FUNC_3?check=GEN_T^# {}
-func f3<T>(_: T) where T == T.#^FUNC_4?check=GEN_T_DOT^# {}
+func f3<T>(_: T) where T == #^FUNC_3^# {}
+func f3<T>(_: T) where T == T.#^FUNC_4^# {}
 struct S1 {
-  func f1<T>(_: T) where #^FUNC_5?check=GEN_T_S1^# {}
-  func f2<T>(_: T) where T.#^FUNC_6?check=GEN_T_DOT^# {}
-  subscript<T>(x: T) -> T where #^SUBSCRIPT_1?check=GEN_T_S1^# { return x }
-  subscript<T>(x: T) -> T where T.#^SUBSCRIPT_2?check=GEN_T_DOT^# { return x }
-  init<T>(_: T) where #^INIT_1?check=GEN_T_S1^# {}
-  init<T>(_: T) where T.#^INIT_2?check=GEN_T_DOT^# {}
-  typealias TA1<T> = A1<T, T, T> where #^ALIAS_1?check=GEN_T_S1^#
-  typealias TA2<T> = A1<T, T, T> where T.#^ALIAS_2?check=GEN_T_DOT^#
+  func f1<T>(_: T) where #^FUNC_5^# {}
+  func f2<T>(_: T) where T.#^FUNC_6^# {}
+  subscript<T>(x: T) -> T where #^SUBSCRIPT_1^# { return x }
+  subscript<T>(x: T) -> T where T.#^SUBSCRIPT_2^# { return x }
+  init<T>(_: T) where #^INIT_1^# {}
+  init<T>(_: T) where T.#^INIT_2^# {}
+  typealias TA1<T> = A1<T, T, T> where #^ALIAS_1^#
+  typealias TA2<T> = A1<T, T, T> where T.#^ALIAS_2^#
 }
 // GEN_T_S1: Begin completions, 3 items
 // GEN_T_S1-DAG: Decl[GenericTypeParam]/Local: T[#T#];
@@ -93,14 +134,14 @@ struct S1 {
 // GEN_T_S1-DAG: Keyword[Self]/CurrNominal:    Self[#S1#];
 // GEN_T_S1: End completions
 
-struct S2<T> where #^STRUCT_1?check=GEN_T_NOMINAL^# {}
-struct S3<T> where T.#^STRUCT_2?check=GEN_T_DOT^# {}
-struct S4<T> where T == #^STRUCT_3?check=ANYTYPE^# {}
-struct S5<T> where T == T.#^STRUCT_4?check=GEN_T_DOT^# {}
-class C1<T> where #^CLASS_1?check=GEN_T_NOMINAL^# {}
-class C2<T> where T.#^CLASS_2?check=GEN_T_DOT^# {}
-enum E1<T> where #^ENUM_1?check=GEN_T_NOMINAL^# {}
-enum E2<T> where T.#^ENUM_2?check=GEN_T_DOT^# {}
+struct S2<T> where #^STRUCT_1^# {}
+struct S3<T> where T.#^STRUCT_2^# {}
+struct S4<T> where T == #^STRUCT_3^# {}
+struct S5<T> where T == T.#^STRUCT_4^# {}
+class C1<T> where #^CLASS_1^# {}
+class C2<T> where T.#^CLASS_2^# {}
+enum E1<T> where #^ENUM_1^# {}
+enum E2<T> where T.#^ENUM_2^# {}
 // GEN_T_NOMINAL: Begin completions, 1 items
 // GEN_T_NOMINAL: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 // GEN_T_NOMINAL: End completions
@@ -112,8 +153,8 @@ enum E2<T> where T.#^ENUM_2?check=GEN_T_DOT^# {}
 // ANYTYPE: End completions
 
 protocol P2 {
-  associatedtype T where #^ASSOC_1?check=P2^#
-  associatedtype U: Assoc where U.#^ASSOC_2?check=U_DOT^#
+  associatedtype T where #^ASSOC_1^#
+  associatedtype U: Assoc where U.#^ASSOC_2^#
 }
 
 // P2: Begin completions, 4 items
@@ -140,7 +181,7 @@ protocol P3 where #^PROTOCOL^# {
 // PROTOCOL-DAG: Decl[Protocol]/Local:               P3[#P3#];
 // PROTOCOL: End completions
 
-extension P3 where #^PROTOCOL_EXT?check=PROTOCOL^# {
+extension P3 where #^PROTOCOL_EXT^# {
   // Same as PROTOCOL
 }
 
@@ -210,13 +251,13 @@ extension TA2.Inner2 where #^NOMINAL_TYPEALIAS_NESTED2_EXT^# {}
 protocol WithAssoc {
   associatedtype T: Assoc
 }
-extension WithAssoc where T.#^EXT_ASSOC_MEMBER_1?check=EXT_ASSOC_MEMBER^# 
+extension WithAssoc where T.#^EXT_ASSOC_MEMBER_1^# 
 // EXT_ASSOC_MEMBER: Begin completions, 2 items
 // EXT_ASSOC_MEMBER-DAG: Decl[AssociatedType]/CurrNominal:   Q;
 // EXT_ASSOC_MEMBER-DAG: Keyword/None:                       Type[#Self.T.Type#];
 // EXT_ASSOC_MEMBER: End completions
 
-extension WithAssoc where Int == T.#^EXT_ASSOC_MEMBER_2?check=EXT_ASSOC_MEMBER^# 
+extension WithAssoc where Int == T.#^EXT_ASSOC_MEMBER_2^# 
 // Same as EXT_ASSOC_MEMBER
 
 extension WithAssoc where Int == #^EXT_SECONDTYPE^# 
