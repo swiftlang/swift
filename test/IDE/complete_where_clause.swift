@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
+// REQUIRES: rdar76184601
+
 class A1<T1, T2, T3> {}
 
 class A2<T4, T5> {}
