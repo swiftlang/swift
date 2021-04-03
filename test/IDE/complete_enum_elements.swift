@@ -1,5 +1,80 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_TYPE_CONTEXT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_2 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_TYPE_CONTEXT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_3 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAR_ENUM_TYPE_CONTEXT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_4 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAZ_ENUM_TYPE_CONTEXT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_5 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=QUX_ENUM_TYPE_CONTEXT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_6 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=QUX_ENUM_TYPE_CONTEXT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_2 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_QUAL_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_CONTEXT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_EXPR_ERROR_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_1 < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_IN_PATTERN_2 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=ENUM_SW_IN_PATTERN_2 < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_NO_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_2 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAR_ENUM_NO_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_3 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAZ_INT_ENUM_NO_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_4 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAZ_T_ENUM_NO_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_NO_DOT_5 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=QUX_ENUM_NO_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_2 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAR_ENUM_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_3 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAZ_INT_ENUM_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_4 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=BAZ_T_ENUM_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_5 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=QUX_ENUM_DOT < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_INVALID_DOT_1 | %FileCheck %s -check-prefix=WITH_INVALID_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_1 | %FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_2 | %FileCheck %s -check-prefix=UNRESOLVED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 //===---
 //===--- Test that we can complete enum elements.
@@ -236,63 +311,63 @@ func freeFunc() {}
 
 func testSwitch1(e: FooEnum) {
   switch e {
-  case #^ENUM_SW_1?check=WITH_GLOBAL_RESULTS;check=FOO_ENUM_TYPE_CONTEXT^#
+  case #^ENUM_SW_1^#
   }
 }
 func testSwitch2(e: FooEnum) {
   switch e {
   case .Foo1:
-  case #^ENUM_SW_2?check=WITH_GLOBAL_RESULTS;check=FOO_ENUM_TYPE_CONTEXT^#
+  case #^ENUM_SW_2^#
   }
 }
 func testSwitch3(e: BarEnum) {
   switch e {
-  case #^ENUM_SW_3?check=WITH_GLOBAL_RESULTS;check=BAR_ENUM_TYPE_CONTEXT^#
+  case #^ENUM_SW_3^#
   }
 }
 func testSwitch4(e: BazEnum<Int>) {
   switch e {
-  case #^ENUM_SW_4?check=WITH_GLOBAL_RESULTS;check=BAZ_ENUM_TYPE_CONTEXT^#
+  case #^ENUM_SW_4^#
   }
 }
 func testSwitch5(e: QuxEnum) {
   switch e {
-  case #^ENUM_SW_5?check=WITH_GLOBAL_RESULTS;check=QUX_ENUM_TYPE_CONTEXT^#
+  case #^ENUM_SW_5^#
   }
 }
 
 // Test for top level code
 switch QuxEnum.Qux1 {
-case #^ENUM_SW_6?check=WITH_GLOBAL_RESULTS;check=QUX_ENUM_TYPE_CONTEXT^#
+case #^ENUM_SW_6^#
 }
 
 func testSwitchWithDot1(e: FooEnum) {
   switch e {
-  case .#^ENUM_SW_WITH_DOT_1?check=FOO_ENUM_DOT_ELEMENTS^#
+  case .#^ENUM_SW_WITH_DOT_1^#
   }
 }
 
 // Test for top level code
 switch FooEnum.Foo2 {
-case .#^ENUM_SW_WITH_DOT_2?check=FOO_ENUM_DOT_ELEMENTS^#
+case .#^ENUM_SW_WITH_DOT_2^#
 }
 
 func testSwitchWithQualification1(e: FooEnum) {
   switch e {
-  case FooEnum.#^ENUM_SW_WITH_QUAL_1?check=FOO_ENUM_DOT_CONTEXT^#
+  case FooEnum.#^ENUM_SW_WITH_QUAL_1^#
   }
 }
 
 func testSwitchExprError1() {
   switch unknown_var {
-  case FooEnum.#^ENUM_SW_EXPR_ERROR_1?check=FOO_ENUM_DOT^#
+  case FooEnum.#^ENUM_SW_EXPR_ERROR_1^#
   }
 }
 
 // FIXME
 func testSwitchInPattern1(e: BazEnum<Int>) {
   switch e {
-  case .Baz2(#^ENUM_SW_IN_PATTERN_1?check=WITH_GLOBAL_RESULTS;check=ENUM_SW_IN_PATTERN_1^#
+  case .Baz2(#^ENUM_SW_IN_PATTERN_1^#
   }
 }
 // ENUM_SW_IN_PATTERN_1-NOT: .Baz1
@@ -307,35 +382,35 @@ func testSwitchInPattern2(e: BazEnum<Int>) {
 //===--- Complete qualified references to enum elements.
 
 func testQualifiedNoDot1() {
-  var e = FooEnum#^ENUM_QUAL_NO_DOT_1?check=FOO_ENUM_NO_DOT^#
+  var e = FooEnum#^ENUM_QUAL_NO_DOT_1^#
 }
 func testQualifiedNoDot2() {
-  var e = BarEnum#^ENUM_QUAL_NO_DOT_2?check=BAR_ENUM_NO_DOT^#
+  var e = BarEnum#^ENUM_QUAL_NO_DOT_2^#
 }
 func testQualifiedNoDot3() {
-  var e = BazEnum<Int>#^ENUM_QUAL_NO_DOT_3?check=BAZ_INT_ENUM_NO_DOT^#
+  var e = BazEnum<Int>#^ENUM_QUAL_NO_DOT_3^#
 }
 func testQualifiedNoDot4() {
-  var e = BazEnum#^ENUM_QUAL_NO_DOT_4?check=BAZ_T_ENUM_NO_DOT^#
+  var e = BazEnum#^ENUM_QUAL_NO_DOT_4^#
 }
 func testQualifiedNoDot5() {
-  var e = QuxEnum#^ENUM_QUAL_NO_DOT_5?check=QUX_ENUM_NO_DOT^#
+  var e = QuxEnum#^ENUM_QUAL_NO_DOT_5^#
 }
 
 func testQualifiedDot1() {
-  var e = FooEnum.#^ENUM_QUAL_DOT_1?check=FOO_ENUM_DOT^#
+  var e = FooEnum.#^ENUM_QUAL_DOT_1^#
 }
 func testQualifiedDot2() {
-  var e = BarEnum.#^ENUM_QUAL_DOT_2?check=BAR_ENUM_DOT^#
+  var e = BarEnum.#^ENUM_QUAL_DOT_2^#
 }
 func testQualifiedDot3() {
-  var e = BazEnum<Int>.#^ENUM_QUAL_DOT_3?check=BAZ_INT_ENUM_DOT^#
+  var e = BazEnum<Int>.#^ENUM_QUAL_DOT_3^#
 }
 func testQualifiedDot4() {
-  var e = BazEnum.#^ENUM_QUAL_DOT_4?check=BAZ_T_ENUM_DOT^#
+  var e = BazEnum.#^ENUM_QUAL_DOT_4^#
 }
 func testQualifiedDot5() {
-  var e = QuxEnum.#^ENUM_QUAL_DOT_5?check=QUX_ENUM_DOT^#
+  var e = QuxEnum.#^ENUM_QUAL_DOT_5^#
 }
 
 // ===--- Complete in the presence of invalid enum elements.
@@ -349,7 +424,7 @@ enum WithInvalid {
 }
 
 func testWithInvalid1() {
-  let x = WithInvalid.#^WITH_INVALID_DOT_1?check=WITH_INVALID_DOT^#
+  let x = WithInvalid.#^WITH_INVALID_DOT_1^#
 
 // WITH_INVALID_DOT: Begin completions
 // WITH_INVALID_DOT-DAG: Decl[EnumElement]/CurrNominal:      Okay[#WithInvalid#]; name=Okay
