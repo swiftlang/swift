@@ -80,3 +80,27 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
     expectTrue(empty.isEmpty)
   }
 }
+
+if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
+  StringCreateTests.test("Small string unsafeUninitializedCapacity") {
+    let str1 = "42"
+    let str2 = String(42)
+    expectEqual(str1, str2)
+
+    let str3 = String(unsafeUninitializedCapacity: 2) {
+      $0[0] = UInt8(ascii: "4")
+      $0[1] = UInt8(ascii: "2")
+      return 2
+    }
+    expectEqual(str1, str3)
+
+    // Write into uninitialized space
+    let str4 = String(unsafeUninitializedCapacity: 3) {
+      $0[0] = UInt8(ascii: "4")
+      $0[1] = UInt8(ascii: "2")
+      $0[2] = UInt8(ascii: "X")
+      return 2
+    }
+    expectEqual(str1, str4)
+  }
+}

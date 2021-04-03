@@ -17,6 +17,7 @@ class StringLike: CustomStringConvertible {
 }
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension TaskLocalValues {
   struct NumberKey: TaskLocalKey {
     static var defaultValue: Int { 0 }
@@ -24,6 +25,7 @@ extension TaskLocalValues {
   var number: NumberKey { .init() }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func printTaskLocal<Key>(
   _ key: KeyPath<TaskLocalValues, Key>,
   _ expected: Key.Value? = nil,
@@ -40,6 +42,7 @@ func printTaskLocal<Key>(
 // ==== ------------------------------------------------------------------------
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func groups() async {
   // no value
   try! await Task.withGroup(resultType: Int.self) { group in
@@ -85,6 +88,7 @@ func groups() async {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await groups()

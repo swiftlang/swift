@@ -9,6 +9,7 @@
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_cancel_from_inside_child() async {
   let result: Int = try! await Task.withGroup(resultType: Int.self) { group in
     let firstAdded = await group.add { [group] in // must explicitly capture, as the task executes concurrently
@@ -34,6 +35,7 @@ func test_taskGroup_cancel_from_inside_child() async {
 
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancel_from_inside_child()

@@ -11,7 +11,7 @@ class Canary {
   }
 }
 
-do {
+if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
   let task = Task.runDetached {
     let canary = Canary()
     _ = await Task.withCancellationHandler {
@@ -21,6 +21,10 @@ do {
     }
   }
   task.cancel()
+} else {
+  // Fake prints to satisfy FileCheck.
+  print("Canary")
+  print("canary died")
 }
 // CHECK: Canary
 // CHECK-NEXT: canary died

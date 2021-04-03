@@ -12,6 +12,7 @@
 
 import Swift
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncSequence {
   @inlinable
   public __consuming func flatMap<SegmentOfResult: AsyncSequence>(
@@ -21,6 +22,7 @@ extension AsyncSequence {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSequence> {
   @usableFromInline
   let base: Base
@@ -38,6 +40,7 @@ public struct AsyncFlatMapSequence<Base: AsyncSequence, SegmentOfResult: AsyncSe
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension AsyncFlatMapSequence: AsyncSequence {
   public typealias Element = SegmentOfResult.Element
   public typealias AsyncIterator = Iterator

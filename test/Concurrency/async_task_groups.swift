@@ -4,8 +4,11 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncFunc() async -> Int { 42 }
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncThrowsFunc() async throws -> Int { 42 }
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncThrowsOnCancel() async throws -> Int {
   // terrible suspend-spin-loop -- do not do this
   // only for purposes of demonstration
@@ -16,6 +19,7 @@ func asyncThrowsOnCancel() async throws -> Int {
   throw Task.CancellationError()
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_add() async throws -> Int {
   try await Task.withGroup(resultType: Int.self) { group in
     await group.add {
@@ -38,9 +42,12 @@ func test_taskGroup_add() async throws -> Int {
 // MARK: Example group Usages
 
 struct Boom: Error {}
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func work() async -> Int { 42 }
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func boom() async throws -> Int { throw Boom() }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func first_allMustSucceed() async throws {
 
   let first: Int = try await Task.withGroup(resultType: Int.self) { group in
@@ -59,6 +66,7 @@ func first_allMustSucceed() async throws {
   // Expected: re-thrown Boom
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func first_ignoreFailures() async throws {
   @Sendable func work() async -> Int { 42 }
   @Sendable func boom() async throws -> Int { throw Boom() }
@@ -92,6 +100,7 @@ func first_ignoreFailures() async throws {
 // ==== ------------------------------------------------------------------------
 // MARK: Advanced Custom Task Group Usage
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_quorum_thenCancel() async {
   // imitates a typical "gather quorum" routine that is typical in distributed systems programming
   enum Vote {
@@ -145,6 +154,7 @@ func test_taskGroup_quorum_thenCancel() async {
   _ = await gatherQuorum(followers: [Follower("A"), Follower("B"), Follower("C")])
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendable {
 
   /// Just another example of how one might use task groups.

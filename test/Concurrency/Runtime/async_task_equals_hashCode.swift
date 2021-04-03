@@ -8,6 +8,7 @@
 
 // UNSUPPORTED: OS=windows-msvc
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple() async {
   print("\(#function) -----------------------")
   let one = await Task.current()
@@ -22,6 +23,7 @@ func simple() async {
   print("parent/child hashes equal: \(three.hashValue == two.hashValue)") // CHECK: parent/child hashes equal: false
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func unsafe() async {
   print("\(#function) -----------------------")
   let one = Task.unsafeCurrent!
@@ -39,6 +41,7 @@ func unsafe() async {
   print("unsafe.task parent/child hashes equal: \(three.task.hashValue == two.task.hashValue)") // CHECK: parent/child hashes equal: false
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func unsafeSync() {
   print("\(#function) -----------------------")
   let one = Task.unsafeCurrent!
@@ -47,6 +50,7 @@ func unsafeSync() {
   print("unsafe hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await simple()

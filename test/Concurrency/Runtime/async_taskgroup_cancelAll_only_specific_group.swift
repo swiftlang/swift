@@ -9,12 +9,14 @@
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func asyncEcho(_ value: Int) async -> Int {
   value
 }
 
 /// Tests that only the specific group we cancelAll on is cancelled,
 /// and not accidentally all tasks in all groups within the given parent task.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_cancelAll_onlySpecificGroup() async {
   async let g1: Int = Task.withGroup(resultType: Int.self) { group in
 
@@ -76,6 +78,7 @@ func test_taskGroup_cancelAll_onlySpecificGroup() async {
 
 
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_cancelAll_onlySpecificGroup()

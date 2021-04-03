@@ -2,6 +2,7 @@
 // RUN:    -module-name M -enable-experimental-concurrency | %FileCheck %s
 // REQUIRES: concurrency
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Collection {
   public func f() async throws {
     return await try Task.withGroup(resultType: Element.self) { group in

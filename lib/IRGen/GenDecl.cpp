@@ -2684,7 +2684,12 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
       FunctionPointer(silFunctionType, realReplFn, authInfo, signature)
           .getAsFunction(IGF),
       forwardedArgs);
-  Res->setTailCall();
+  if (Res->getCallingConv() == llvm::CallingConv::SwiftTail &&
+      Res->getCaller()->getCallingConv() == llvm::CallingConv::SwiftTail) {
+    Res->setTailCallKind(IGF.IGM.AsyncTailCallKind);
+  } else {
+    Res->setTailCall();
+  }
   if (IGF.CurFn->getReturnType()->isVoidTy())
     IGF.Builder.CreateRetVoid();
   else

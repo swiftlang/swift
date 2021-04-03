@@ -1834,9 +1834,6 @@ public:
       if (nom->getDecl() != substNom->getDecl())
         return CanType();
       
-      if (nom->getDecl()->isInvalid())
-        return CanType();
-      
       // Same decl should always either have or not have a parent.
       assert((bool)nom->getParent() == (bool)substNom->getParent());
       
@@ -2078,8 +2075,6 @@ public:
       return CanType();
 
     auto *decl = bgt->getDecl();
-    if (decl->isInvalid())
-      return CanType();
 
     auto *moduleDecl = decl->getParentModule();
     auto origSubMap = bgt->getContextSubstitutionMap(
@@ -2139,6 +2134,12 @@ public:
       if (req.getKind() != RequirementKind::Conformance) continue;
 
       auto canTy = req.getFirstType()->getCanonicalType();
+
+      // If the substituted type is an interface type, we can't verify the
+      // generic requirements.
+      if (canTy.subst(substSubMap)->isTypeParameter())
+        continue;
+
       auto *proto = req.getProtocolDecl();
       auto origConf = origSubMap.lookupConformance(canTy, proto);
       auto substConf = substSubMap.lookupConformance(canTy, proto);

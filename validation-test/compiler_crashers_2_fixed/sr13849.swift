@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s
 
 public protocol Prot {
     associatedtype T

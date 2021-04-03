@@ -157,4 +157,8 @@ void doSomethingConcurrently(__attribute__((noescape)) __attribute__((swift_attr
 
 void doSomethingConcurrentlyButUnsafe(__attribute__((noescape)) __attribute__((swift_attr("@_unsafeSendable"))) void (^block)(void));
 
+
+MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor(unsafe)"))) @protocol TripleMainActor
+@end
+
 #pragma clang assume_nonnull end

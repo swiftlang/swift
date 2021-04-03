@@ -15,6 +15,7 @@ import Swift
 
 // ==== Task Group -------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task {
 
   /// Starts a new task group which provides a scope in which a dynamic number of
@@ -265,6 +266,7 @@ extension Task {
 
 /// ==== TaskGroup: AsyncSequence.AsyncIterator --------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task.Group {
 
   public func makeAsyncIterator() -> GroupIterator {
@@ -302,6 +304,7 @@ extension Task.Group {
 
 /// ==== -----------------------------------------------------------------------
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Task.Group {
   /// Invoked after a withGroup's body exits, and initiates an orderly
   /// teardown of the group.
@@ -341,35 +344,43 @@ func _swiftRelease(
   _ object: Builtin.NativeObject
 )
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_create")
 func _taskGroupCreate() -> Builtin.RawPointer
 
 /// Attach task group child to the group group to the task.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_attachChild")
 func _taskGroupAttachChild(
   group: Builtin.RawPointer,
   child: Builtin.NativeObject
 ) -> UnsafeRawPointer /*ChildTaskStatusRecord*/
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_destroy")
 func _taskGroupDestroy(group: __owned Builtin.RawPointer)
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_addPending")
 func _taskGroupAddPendingTask(
   group: Builtin.RawPointer
 ) -> Bool
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(group: Builtin.RawPointer)
 
 /// Checks ONLY if the group was specifically cancelled.
 /// The task itself being cancelled must be checked separately.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_isCancelled")
 func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_wait_next_throwing")
 func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 enum PollStatus: Int {
   case empty   = 0
   case waiting = 1
@@ -377,6 +388,7 @@ enum PollStatus: Int {
   case error   = 3
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @_silgen_name("swift_taskGroup_isEmpty")
 func _taskGroupIsEmpty(
   _ group: Builtin.RawPointer

@@ -9,6 +9,7 @@
 
 import Dispatch
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_skipCallingNext() async {
   let numbers = [1, 1]
 
@@ -41,6 +42,7 @@ func test_skipCallingNext() async {
   assert(result == 0)
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_skipCallingNext()

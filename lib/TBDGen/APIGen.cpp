@@ -27,24 +27,27 @@ namespace apigen {
 void API::addSymbol(llvm::StringRef symbol, APILoc loc, APILinkage linkage,
                     APIFlags flags, APIAccess access,
                     APIAvailability availability) {
-  globals.emplace_back(symbol, loc, linkage, flags, access, GVKind::Function,
-                       availability);
+  auto *global = new (allocator) GlobalRecord(
+      symbol, loc, linkage, flags, access, GVKind::Function, availability);
+  globals.push_back(global);
 }
 
 ObjCInterfaceRecord *API::addObjCClass(llvm::StringRef name, APILinkage linkage,
                                        APILoc loc, APIAccess access,
                                        APIAvailability availability,
                                        llvm::StringRef superClassName) {
-  interfaces.emplace_back(name, linkage, loc, access, availability,
-                          superClassName);
-  return &interfaces.back();
+  auto *interface = new (allocator) ObjCInterfaceRecord(
+      name, linkage, loc, access, availability, superClassName);
+  interfaces.push_back(interface);
+  return interface;
 }
 
 void API::addObjCMethod(ObjCInterfaceRecord *cls, llvm::StringRef name,
                         APILoc loc, APIAccess access, bool isInstanceMethod,
                         bool isOptional, APIAvailability availability) {
-  cls->methods.emplace_back(name, loc, access, isInstanceMethod, isOptional,
-                            availability);
+  auto method = new (allocator) ObjCMethodRecord(
+      name, loc, access, isInstanceMethod, isOptional, availability);
+  cls->methods.push_back(method);
 }
 
 static void serialize(llvm::json::OStream &OS, APIAccess access) {
@@ -120,6 +123,10 @@ static void serialize(llvm::json::OStream &OS, const ObjCMethodRecord &record) {
   });
 }
 
+static bool sortAPIRecords(const APIRecord *base, const APIRecord *compare) {
+  return base->name < compare->name;
+}
+
 static void serialize(llvm::json::OStream &OS,
                       const ObjCInterfaceRecord &record) {
   OS.object([&]() {
@@ -131,39 +138,34 @@ static void serialize(llvm::json::OStream &OS,
     OS.attribute("super", record.superClassName);
     OS.attributeArray("instanceMethods", [&]() {
       for (auto &method : record.methods) {
-        if (method.isInstanceMethod)
-          serialize(OS, method);
+        if (method->isInstanceMethod)
+          serialize(OS, *method);
       }
     });
     OS.attributeArray("classMethods", [&]() {
       for (auto &method : record.methods) {
-        if (!method.isInstanceMethod)
-          serialize(OS, method);
+        if (!method->isInstanceMethod)
+          serialize(OS, *method);
       }
     });
   });
-}
-
-static bool sortAPIRecords(const APIRecord &base, const APIRecord &compare) {
-  return base.name < compare.name;
 }
 
 void API::writeAPIJSONFile(llvm::raw_ostream &os, bool PrettyPrint) {
   unsigned indentSize = PrettyPrint ? 2 : 0;
   llvm::json::OStream JSON(os, indentSize);
 
-  // FIXME: only write PublicSDKContentRoot now.
   JSON.object([&]() {
     JSON.attribute("target", target.str());
     JSON.attributeArray("globals", [&]() {
       llvm::sort(globals, sortAPIRecords);
-      for (const auto &g : globals)
-        serialize(JSON, g);
+      for (const auto *g : globals)
+        serialize(JSON, *g);
     });
     JSON.attributeArray("interfaces", [&]() {
       llvm::sort(interfaces, sortAPIRecords);
-      for (const auto &i : interfaces)
-        serialize(JSON, i);
+      for (const auto *i : interfaces)
+        serialize(JSON, *i);
     });
     JSON.attribute("version", "1.0");
   });
