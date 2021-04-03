@@ -99,8 +99,17 @@ if #available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
       $0[0] = UInt8(ascii: "4")
       $0[1] = UInt8(ascii: "2")
       $0[2] = UInt8(ascii: "X")
+      ($0.baseAddress! + 2).deinitialize(count: 1)
       return 2
     }
     expectEqual(str1, str4)
+    
+    let str5 = String(unsafeUninitializedCapacity: 3) {
+      $0[1] = UInt8(ascii: "4")
+      $0[2] = UInt8(ascii: "2")
+      $0.baseAddress!.moveInitialize(from: $0.baseAddress! + 1, count: 2)
+      return 2
+    }
+    expectEqual(str1, str5)
   }
 }
