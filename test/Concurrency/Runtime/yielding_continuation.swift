@@ -15,10 +15,13 @@ let sleepInterval: UInt64 = 125_000_000
 var tests = TestSuite("YieldingContinuation")
 
 if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+	func forceBeingAsync() async -> Void { }
+
 	tests.test("yield with no awaiting next") {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
 	    expectFalse(continuation.yield("hello"))
+	    await forceBeingAsync()
 	  }
 	}
 
@@ -26,6 +29,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
 	    expectFalse(continuation.yield(throwing: SomeError()))
+	    await forceBeingAsync()
 	  }
 	}
 
@@ -33,6 +37,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self)
 	    expectFalse(continuation.yield(with: .success("hello")))
+	    await forceBeingAsync()
 	  }
 	}
 
@@ -40,6 +45,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 	  runAsyncAndBlock {
 	    let continuation = YieldingContinuation(yielding: String.self, throwing: SomeError.self)
 	    expectFalse(continuation.yield(with: .failure(SomeError())))
+	    await forceBeingAsync()
 	  }
 	}
 
