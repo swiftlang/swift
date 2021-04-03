@@ -122,6 +122,84 @@ let something: _! = getSomething()
 
 extension Array where Element == Int {
     static var staticMember: Self { [] }
+    static func staticFunc() -> Self { [] }
+
+    var member: Self { [] }
+    func method() -> Self { [] }
+}
+
+extension Array {
+    static var otherStaticMember: Self { [] }
 }
 
 let _ = [_].staticMember
+let _ = [_].staticFunc()
+let _ = [_].otherStaticMember.member
+let _ = [_].otherStaticMember.method()
+
+func f(x: Any, arr: [Int]) {
+    // FIXME: Better diagnostics here. Maybe we should suggest replacing placeholders with 'Any'?
+
+    if x is _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if x is [_] {} // expected-error {{type of expression is ambiguous without more context}}
+    if x is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = x as? _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = x as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = x as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
+    let y1 = x as! _ // expected-error {{type of expression is ambiguous without more context}}
+    let y2 = x as! [_] // expected-error {{type of expression is ambiguous without more context}}
+    let y3 = x as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
+
+    switch x {
+    case is _: break // expected-error {{placeholder type not allowed here}}
+    case is [_]: break // expected-error {{placeholder type not allowed here}}
+    case is () -> _: break // expected-error {{placeholder type not allowed here}}
+    case let y as _: break // expected-error {{placeholder type not allowed here}}
+    case let y as [_]: break // expected-error {{placeholder type not allowed here}}
+    case let y as () -> _: break // expected-error {{placeholder type not allowed here}}
+    }
+
+    if arr is _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if arr is [_] {} // expected-error {{type of expression is ambiguous without more context}}
+    if arr is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = arr as? _ {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = arr as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
+    if let y = arr as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
+    let y1 = arr as! _ // expected-error {{type of expression is ambiguous without more context}}
+    let y2 = arr as! [_] // expected-error {{type of expression is ambiguous without more context}}
+    let y3 = arr as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
+
+    switch arr {
+    case is _: break // expected-error {{placeholder type not allowed here}}
+    case is [_]: break // expected-error {{placeholder type not allowed here}}
+    case is () -> _: break // expected-error {{placeholder type not allowed here}}
+    case let y as _: break // expected-error {{placeholder type not allowed here}}
+    case let y as [_]: break // expected-error {{placeholder type not allowed here}}
+    case let y as () -> _: break // expected-error {{placeholder type not allowed here}}
+    }
+}
+
+protocol Publisher {
+    associatedtype Output
+    associatedtype Failure
+}
+
+struct Just<Output>: Publisher {
+    typealias Failure = Never
+}
+
+struct SetFailureType<Output, Failure>: Publisher {}
+
+extension Publisher {
+    func setFailureType<T>(to: T.Type) -> SetFailureType<Output, T> { // expected-note {{in call to function 'setFailureType(to:)'}}
+        return .init()
+    }
+}
+
+let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self)
+let _: SetFailureType<Int, [String]> = Just<Int>().setFailureType(to: [_].self)
+let _: SetFailureType<Int, (String) -> Double> = Just<Int>().setFailureType(to: ((_) -> _).self)
+let _: SetFailureType<Int, (String, Double)> = Just<Int>().setFailureType(to: (_, _).self)
+
+// TODO: Better error message here? Would be nice if we could point to the placeholder...
+let _: SetFailureType<Int, String> = Just<Int>().setFailureType(to: _.self).setFailureType(to: String.self) // expected-error {{generic parameter 'T' could not be inferred}}
