@@ -8,6 +8,7 @@
 
 // XFAIL: linux
 // XFAIL: windows
+// XFAIL: openbsd
 
 func test_taskGroup_is_asyncSequence() async {
   let sum: Int = try! await Task.withGroup(resultType: Int.self) { group in
