@@ -1244,7 +1244,16 @@ private:
   Classification classifyArgument(Expr *arg, Type paramType, EffectKind kind) {
     arg = arg->getValueProvidingExpr();
 
-    if (isa<DefaultArgumentExpr>(arg)) {
+    if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(arg)) {
+      // Special-case a 'nil' default argument, which is known not to throw.
+      if (defaultArg->isCallerSide()) {
+        auto *callerSideArg = defaultArg->getCallerSideDefaultExpr();
+        if (isa<NilLiteralExpr>(callerSideArg)) {
+          if (callerSideArg->getType()->getOptionalObjectType())
+            return Classification();
+        }
+      }
+
       return classifyArgumentByType(arg->getType(),
                                     PotentialEffectReason::forDefaultClosure(),
                                     kind);
