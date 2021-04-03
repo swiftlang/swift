@@ -847,7 +847,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("non-Diagnostic Enabling Mandatory Optimizations");
   P.addForEachLoopUnroll();
   P.addMandatoryCombine();
-  if (!P.getOptions().DisableCopyPropagation) {
+  if (P.getOptions().EnableCopyPropagation) {
     // MandatoryCopyPropagation should only be run at -Onone, not -O.
     P.addMandatoryCopyPropagation();
   }
