@@ -39,6 +39,12 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
   if (!init)
     return DefaultArgumentKind::None;
 
+  // Parse an as-written 'nil' expression as the special NilLiteral kind,
+  // which is emitted by the caller and can participate in rethrows
+  // checking.
+  if (isa<NilLiteralExpr>(init))
+    return DefaultArgumentKind::NilLiteral;
+
   auto magic = dyn_cast<MagicIdentifierLiteralExpr>(init);
   if (!magic)
     return DefaultArgumentKind::Normal;

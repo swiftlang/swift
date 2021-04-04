@@ -44,7 +44,7 @@ extension Array where Element == Int {
 
   // CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZfA_ : $@convention(thin) () -> Optional<Int>
   // CHECK-LABEL: sil [ossa] @$sSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZ : $@convention(method) (Optional<Int>, @thin Array<Int>.Type) -> Int
-  public static func staticMethod(e: Element? = nil) -> Element {
+  public static func staticMethod(e: Element? = (nil)) -> Element {
     return e!
   }
 
@@ -104,7 +104,7 @@ extension Dictionary where Key == Int {
   // CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA_ : $@convention(thin) <Key, Value where Key == Int> () -> Optional<Int>
   // CHECK-LABEL: sil non_abi [serialized] [ossa] @$sSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA0_ : $@convention(thin) <Key, Value where Key == Int> () -> @out Optional<Value>
   // CHECK-LABEL: sil [ossa] @$sSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZ : $@convention(method) <Key, Value where Key == Int> (Optional<Int>, @in_guaranteed Optional<Value>, @thin Dictionary<Int, Value>.Type) -> @out Value
-  public static func staticMethod(k: Key? = nil, v: Value? = nil) -> Value {
+  public static func staticMethod(k: Key? = (nil), v: Value? = (nil)) -> Value {
     return v!
   }
 
@@ -191,7 +191,7 @@ extension Array where Element == Int {
 
     // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV10hasDefault1eySiSg_tFfA_ : $@convention(thin) () -> Optional<Int>
     // CHECK-LABEL: sil hidden [ossa] @$sSa22constrained_extensionsSiRszlE6NestedV10hasDefault1eySiSg_tF : $@convention(method) (Optional<Int>, @inout Array<Int>.Nested) -> ()
-    mutating func hasDefault(e: Element? = nil) {
+    mutating func hasDefault(e: Element? = (nil)) {
       self.e = e
     }
   }
