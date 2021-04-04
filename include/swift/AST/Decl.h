@@ -3486,7 +3486,7 @@ class StructDecl final : public NominalTypeDecl {
   SourceLoc StructLoc;
 
   // We import C++ class templates as generic structs. Then when in Swift code
-  // we want to substitude generic parameters with actual arguments, we
+  // we want to substitute generic parameters with actual arguments, we
   // convert the arguments to C++ equivalents and ask Clang to instantiate the
   // C++ template. Then we import the C++ class template instantiation
   // as a non-generic structs with a name prefixed with `__CxxTemplateInst`.
