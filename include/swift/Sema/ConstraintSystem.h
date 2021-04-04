@@ -5037,7 +5037,7 @@ public:
     this->locator = cs.getConstraintLocator(locator);
   }
 
-  Type operator()(PlaceholderTypeRepr *placeholderRepr) const {
+  Type operator()(ASTContext &ctx, PlaceholderTypeRepr *placeholderRepr) const {
     return cs.createTypeVariable(
         cs.getConstraintLocator(
             locator, LocatorPathElt::PlaceholderType(placeholderRepr)),
