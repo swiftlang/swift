@@ -5790,6 +5790,11 @@ public:
       RequirementKind kind,
       const SmallVectorImpl<Constraint<T>> &impliedByConcrete,
       const Optional<ExplicitRequirement> &concreteTypeRequirement) {
+    // This can occur if the combination of a superclass requirement and
+    // protocol conformance requirement force a type to become concrete.
+    if (!concreteTypeRequirement)
+      return;
+
     for (auto constraint : impliedByConcrete) {
       if (constraint.source->isDerivedNonRootRequirement())
         continue;
@@ -8102,6 +8107,11 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
                     /*dropDerivedViaConcrete=*/true,
                     /*allCanBeSelfDerived=*/true);
 
+  // This can occur if the combination of a superclass requirement and
+  // protocol conformance requirement force a type to become concrete.
+  if (equivClass->concreteTypeConstraints.empty())
+    return;
+
   checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints, RequirementKind::SameType,
     [&](const ConcreteConstraint &constraint) {
@@ -8527,12 +8537,26 @@ GenericSignature GenericSignatureBuilder::rebuildSignatureWithoutRedundantRequir
 
     auto subjectType = req.getSource()->getStoredType();
     subjectType = stripBoundDependentMemberTypes(subjectType);
-    subjectType =
+    auto resolvedSubjectType =
         resolveDependentMemberTypes(*this, subjectType,
                                     ArchetypeResolutionKind::WellFormed);
 
-    if (auto optReq = createRequirement(req.getKind(), subjectType, req.getRHS(),
-                                        getGenericParams())) {
+    // This can occur if the combination of a superclass requirement and
+    // protocol conformance requirement force a type to become concrete.
+    //
+    // FIXME: Is there a more principled formulation of this?
+    if (req.getKind() == RequirementKind::Superclass &&
+        !resolvedSubjectType->isTypeParameter()) {
+      newBuilder.addRequirement(Requirement(RequirementKind::SameType,
+                                            subjectType, resolvedSubjectType),
+                                newSource, nullptr);
+      continue;
+    }
+
+    assert(resolvedSubjectType->isTypeParameter());
+
+    if (auto optReq = createRequirement(req.getKind(), resolvedSubjectType,
+                                        req.getRHS(), getGenericParams())) {
       auto newReq = stripBoundDependentMemberTypes(*optReq);
       newBuilder.addRequirement(newReq, newSource, nullptr);
     }
