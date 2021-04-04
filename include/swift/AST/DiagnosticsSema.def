@@ -2414,16 +2414,17 @@ NOTE(same_type_redundancy_here,none,
      "same-type constraint %1 == %2 %select{written here|implied here|"
      "inferred from type here}0",
      (unsigned, Type, Type))
-ERROR(requires_superclass_conflict,none,
-      "%select{generic parameter %1 cannot|protocol %1 cannot require 'Self' to|" 
-      "%1 cannot}0 be a subclass of both %2 and %3",
-      (unsigned, Type, Type, Type))
+ERROR(conflicting_superclass_constraints,none,
+      "type %0 cannot be a subclass of both %1 and %2",
+      (Type, Type, Type))
+NOTE(conflicting_superclass_constraint,none,
+     "constraint conflicts with %0 : %1",
+     (Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
 NOTE(superclass_redundancy_here,none,
-     "superclass constraint %1 : %2 %select{written here|implied here|"
-     "inferred from type here}0",
-     (unsigned, Type, Type))
+     "superclass constraint %0 : %1 implied here",
+     (Type, Type))
 
 ERROR(conflicting_layout_constraints,none,
       "type %0 has conflicting constraints %1 and %2",

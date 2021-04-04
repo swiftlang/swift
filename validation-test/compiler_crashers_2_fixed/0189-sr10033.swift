@@ -1,6 +1,4 @@
-// RUN: not --crash %target-swift-frontend -typecheck %s
-
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -emit-ir -verify %s
 
 protocol P1 {
   associatedtype A2 : P2 where A2.A1 == Self
