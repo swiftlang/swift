@@ -3342,7 +3342,8 @@ std::string ClangImporter::getClangModuleHash() const {
 }
 
 Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
-  return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
+  return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion)
+      .getValueOr(nullptr);
 }
 
 void ClangImporter::printStatistics() const {

@@ -4587,7 +4587,8 @@ namespace {
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
-      if (auto Known = Impl.importDeclCached(decl, getVersion()))
+      if (auto Known =
+              Impl.importDeclCached(decl, getVersion()).getValueOr(nullptr))
         return Known;
 
       ImportedName importedName;
@@ -5615,7 +5616,8 @@ namespace {
 
       // While importing the DeclContext, we might have imported the decl
       // itself.
-      if (auto Known = Impl.importDeclCached(decl, getVersion()))
+      if (auto Known =
+              Impl.importDeclCached(decl, getVersion()).getValueOr(nullptr))
         return Known;
 
       return importObjCPropertyDecl(decl, dc);
@@ -8271,16 +8273,16 @@ void SwiftDeclConverter::importInheritedConstructors(
   }
 }
 
-Decl *ClangImporter::Implementation::importDeclCached(
-    const clang::NamedDecl *ClangDecl,
-    ImportNameVersion version,
+Optional<Decl *> ClangImporter::Implementation::importDeclCached(
+    const clang::NamedDecl *ClangDecl, ImportNameVersion version,
     bool UseCanonical) {
-  auto Known = ImportedDecls.find(
-    { UseCanonical? ClangDecl->getCanonicalDecl(): ClangDecl, version });
+  std::pair<const clang::Decl *, Version> Key = {
+      UseCanonical ? ClangDecl->getCanonicalDecl() : ClangDecl, version};
+  auto Known = ImportedDecls.find(Key);
   if (Known != ImportedDecls.end())
     return Known->second;
 
-  return nullptr;
+  return None;
 }
 
 /// Checks if we don't need to import the typedef itself.  If the typedef
@@ -9021,12 +9023,11 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
                                     Instance->getSourceManager(), "importing");
 
   auto Canon = cast<clang::NamedDecl>(UseCanonicalDecl? ClangDecl->getCanonicalDecl(): ClangDecl);
-
-  if (auto Known = importDeclCached(Canon, version, UseCanonicalDecl)) {
-    if (!SuperfluousTypedefsAreTransparent &&
-        SuperfluousTypedefs.count(Canon))
+  if (Optional<Decl *> Known =
+          importDeclCached(Canon, version, UseCanonicalDecl)) {
+    if (!SuperfluousTypedefsAreTransparent && SuperfluousTypedefs.count(Canon))
       return nullptr;
-    return Known;
+    return Known.getValue();
   }
 
   bool TypedefIsSuperfluous = false;
@@ -9035,8 +9036,10 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   startedImportingEntity();
   Decl *Result = importDeclImpl(ClangDecl, version, TypedefIsSuperfluous,
                                 HadForwardDeclaration);
-  if (!Result)
+  if (!Result) {
+    ImportedDecls[{Canon, version}] = nullptr;
     return nullptr;
+  }
 
   if (TypedefIsSuperfluous) {
     SuperfluousTypedefs.insert(Canon);
