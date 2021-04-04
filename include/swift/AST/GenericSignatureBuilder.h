@@ -706,34 +706,6 @@ private:
                            Diag<Type, T> redundancyDiag,
                            Diag<unsigned, Type, T> otherNoteDiag);
 
-  /// Check a list of constraints, removing self-derived constraints
-  /// and diagnosing redundant constraints.
-  ///
-  /// \param isSuitableRepresentative Determines whether the given constraint
-  /// is a suitable representative.
-  ///
-  /// \param checkConstraint Checks the given constraint against the
-  /// canonical constraint to determine which diagnostics (if any) should be
-  /// emitted.
-  ///
-  /// \returns the representative constraint.
-  template<typename T, typename DiagT>
-  Constraint<T> checkConstraintList(
-                           TypeArrayView<GenericTypeParamType> genericParams,
-                           std::vector<Constraint<T>> &constraints,
-                           RequirementKind kind,
-                           llvm::function_ref<bool(const Constraint<T> &)>
-                             isSuitableRepresentative,
-                           llvm::function_ref<
-                             ConstraintRelation(const Constraint<T>&)>
-                               checkConstraint,
-                           Optional<Diag<unsigned, Type, DiagT, DiagT>>
-                             conflictingDiag,
-                           Diag<Type, DiagT> redundancyDiag,
-                           Diag<unsigned, Type, DiagT> otherNoteDiag,
-                           llvm::function_ref<DiagT(const T&)> diagValue,
-                           bool removeSelfDerived);
-
   /// Check the concrete type constraints within the equivalence
   /// class of the given potential archetype.
   void checkConcreteTypeConstraints(

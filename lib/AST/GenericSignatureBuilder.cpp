@@ -6852,28 +6852,6 @@ void GenericSignatureBuilder::processDelayedRequirements() {
   } while (anySolved);
 }
 
-template<typename T>
-Constraint<T> GenericSignatureBuilder::checkConstraintList(
-                           TypeArrayView<GenericTypeParamType> genericParams,
-                           std::vector<Constraint<T>> &constraints,
-                           RequirementKind kind,
-                           llvm::function_ref<bool(const Constraint<T> &)>
-                             isSuitableRepresentative,
-                           llvm::function_ref<
-                             ConstraintRelation(const Constraint<T>&)>
-                               checkConstraint,
-                           Optional<Diag<unsigned, Type, T, T>>
-                             conflictingDiag,
-                           Diag<Type, T> redundancyDiag,
-                           Diag<unsigned, Type, T> otherNoteDiag) {
-  return checkConstraintList<T, T>(genericParams, constraints, kind,
-                                   isSuitableRepresentative, checkConstraint,
-                                   conflictingDiag, redundancyDiag,
-                                   otherNoteDiag,
-                                   [](const T& value) { return value; },
-                                   /*removeSelfDerived=*/true);
-}
-
 namespace {
   /// Remove self-derived sources from the given vector of constraints.
   ///
@@ -6957,7 +6935,7 @@ namespace {
   }
 } // end anonymous namespace
 
-template<typename T, typename DiagT>
+template<typename T>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            TypeArrayView<GenericTypeParamType> genericParams,
                            std::vector<Constraint<T>> &constraints,
@@ -6967,16 +6945,11 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            llvm::function_ref<
                              ConstraintRelation(const Constraint<T>&)>
                                checkConstraint,
-                           Optional<Diag<unsigned, Type, DiagT, DiagT>>
+                           Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
-                           Diag<Type, DiagT> redundancyDiag,
-                           Diag<unsigned, Type, DiagT> otherNoteDiag,
-                           llvm::function_ref<DiagT(const T&)> diagValue,
-                           bool removeSelfDerived) {
+                           Diag<Type, T> redundancyDiag,
+                           Diag<unsigned, Type, T> otherNoteDiag) {
   assert(!constraints.empty() && "No constraints?");
-  if (removeSelfDerived) {
-    ::removeSelfDerived(*this, constraints, /*proto=*/nullptr);
-  }
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
   std::sort(constraints.begin(), constraints.end());
@@ -6995,7 +6968,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                    representativeConstraint->source->classifyDiagKind(),
                    representativeConstraint->getSubjectDependentType(
                                                                genericParams),
-                   diagValue(representativeConstraint->value));
+                   representativeConstraint->value);
   };
 
   // Go through the concrete constraints looking for redundancies.
@@ -7041,8 +7014,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
           getSubjectType(constraint.getSubjectDependentType(genericParams));
         Diags.diagnose(constraint.source->getLoc(), *conflictingDiag,
                        subject.first, subject.second,
-                       diagValue(constraint.value),
-                       diagValue(representativeConstraint->value));
+                       constraint.value,
+                       representativeConstraint->value);
 
         noteRepresentativeConstraint();
         break;
@@ -7060,8 +7033,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
         Diags.diagnose(representativeConstraint->source->getLoc(),
                        *conflictingDiag,
                        subject.first, subject.second,
-                       diagValue(representativeConstraint->value),
-                       diagValue(constraint.value));
+                       representativeConstraint->value,
+                       constraint.value);
 
         diagnosedConflictingRepresentative = true;
         break;
@@ -7078,7 +7051,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
                        constraint.getSubjectDependentType(genericParams),
-                       diagValue(constraint.value));
+                       constraint.value);
 
         noteRepresentativeConstraint();
       }
@@ -7935,7 +7908,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   for (auto &constraints : intracomponentEdges) {
     if (constraints.empty()) continue;
 
-    checkConstraintList<Type, Type>(
+    checkConstraintList<Type>(
       genericParams, constraints, RequirementKind::SameType,
       [](const Constraint<Type> &) { return true; },
       [](const Constraint<Type> &constraint) {
@@ -7948,11 +7921,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       },
       None,
       diag::redundant_same_type_constraint,
-      diag::previous_same_type_constraint,
-      [&](Type type) {
-        return type;
-      },
-      /*removeSelfDerived=*/false);
+      diag::previous_same_type_constraint);
   }
 
   // Diagnose redundant same-type constraints across components. First,
@@ -8127,6 +8096,11 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
   // Resolve any thus-far-unresolved dependent types.
   Type resolvedConcreteType =
     getCanonicalTypeInContext(equivClass->concreteType, genericParams);
+
+  removeSelfDerived(*this, equivClass->concreteTypeConstraints,
+                    /*proto=*/nullptr,
+                    /*dropDerivedViaConcrete=*/true,
+                    /*allCanBeSelfDerived=*/true);
 
   checkConstraintList<Type>(
     genericParams, equivClass->concreteTypeConstraints, RequirementKind::SameType,
