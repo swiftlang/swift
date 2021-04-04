@@ -163,7 +163,7 @@ func sameTypeConcrete1<T : P9 & P10>(_: T) where T.A == X3, T.C == T.B, T.C == I
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P10, τ_0_0 : P9, τ_0_0.B == X3, τ_0_0.C == X3>
 func sameTypeConcrete2<T : P9 & P10>(_: T) where T.B : X3, T.C == T.B, T.C == X3 { }
 // expected-warning@-1{{redundant superclass constraint 'T.B' : 'X3'}}
-// expected-note@-2{{same-type constraint 'T.C' == 'X3' written here}}
+// expected-note@-2{{superclass constraint 'T.B' : 'X3' implied here}}
 
 // Note: a standard-library-based stress test to make sure we don't inject
 // any additional requirements.

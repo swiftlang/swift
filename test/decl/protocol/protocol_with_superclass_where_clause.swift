@@ -324,10 +324,10 @@ class SecondConformer : SecondClass, SecondProtocol {}
 // Duplicate superclass
 // FIXME: Should be an error here too
 protocol DuplicateSuper1 : Concrete where Self : Concrete {}
-// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' written here}}
+// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' implied here}}
 // expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
 protocol DuplicateSuper2 where Self : Concrete, Self : Concrete {}
-// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' written here}}
+// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' implied here}}
 // expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
 
 // Ambiguous name lookup situation

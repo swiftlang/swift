@@ -628,3 +628,21 @@ func throwableDefaultRethrows(_ f: () throws -> () = { throw SomeError.Badness }
 // This should always emit a diagnostic because we can statically know that default argument can throw. 
 throwableDefaultRethrows()  // expected-error {{call can throw but is not marked with 'try'}}
                             // expected-note@-1 {{call is to 'rethrows' function, but a defaulted argument function can throw}}
+
+// rdar://76169080 - rethrows -vs- Optional default arguments
+func optionalRethrowsDefaultArg1(_: (() throws -> ())? = nil) rethrows {}
+
+func callsOptionalRethrowsDefaultArg1() throws {
+  optionalRethrowsDefaultArg1()
+  optionalRethrowsDefaultArg1(nil)
+  try optionalRethrowsDefaultArg1 { throw SomeError.Badness }
+}
+
+func optionalRethrowsDefaultArg2(_: (() throws -> ())? = { throw SomeError.Badness }) rethrows {}
+
+func callsOptionalRethrowsDefaultArg2() throws {
+  optionalRethrowsDefaultArg2()  // expected-error {{call can throw but is not marked with 'try'}}
+                                 // expected-note@-1 {{call is to 'rethrows' function, but a defaulted argument function can throw}}
+  optionalRethrowsDefaultArg2(nil)
+  try optionalRethrowsDefaultArg2 { throw SomeError.Badness }
+}
