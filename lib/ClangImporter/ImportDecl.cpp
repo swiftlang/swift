@@ -2494,7 +2494,7 @@ namespace {
         // case we need to bail here.
         auto cachedResult =
             Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
-        if (cachedResult != Impl.ImportedDecls.end())
+        if (cachedResult != Impl.ImportedDecls.end() && cachedResult->second != nullptr)
           return cachedResult->second;
         dc = cast<ExtensionDecl>(parent)
                  ->getExtendedType()
@@ -3444,7 +3444,7 @@ namespace {
       // this will cause an infinite loop.
       auto alreadyImportedResult =
           Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
-      if (alreadyImportedResult != Impl.ImportedDecls.end())
+      if (alreadyImportedResult != Impl.ImportedDecls.end() && alreadyImportedResult->second != nullptr)
         return alreadyImportedResult->second;
       result = Impl.createDeclWithClangNode<StructDecl>(
           decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
@@ -4784,7 +4784,7 @@ namespace {
         // methods.
         auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
                                               getVersion()});
-        if (known != Impl.ImportedDecls.end()) {
+        if (known != Impl.ImportedDecls.end() && known->second != nullptr) {
           auto decl = known->second;
           if (isAcceptableResult(decl, accessorInfo))
             return decl;
@@ -4930,7 +4930,7 @@ namespace {
         // methods.
         auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
                                               getVersion()});
-        if (known != Impl.ImportedDecls.end()) {
+        if (known != Impl.ImportedDecls.end() && known->second != nullptr) {
           auto decl = known->second;
           if (isAcceptableResult(decl, accessorInfo))
             return decl;
@@ -5737,7 +5737,7 @@ namespace {
       if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext())) {
         auto known = Impl.ImportedDecls.find({decl->getCanonicalDecl(),
                                               getVersion()});
-        if (known != Impl.ImportedDecls.end())
+        if (known != Impl.ImportedDecls.end() && known->second != nullptr)
           return known->second;
       }
 
@@ -8279,7 +8279,7 @@ Optional<Decl *> ClangImporter::Implementation::importDeclCached(
   std::pair<const clang::Decl *, Version> Key = {
       UseCanonical ? ClangDecl->getCanonicalDecl() : ClangDecl, version};
   auto Known = ImportedDecls.find(Key);
-  if (Known != ImportedDecls.end())
+  if (Known != ImportedDecls.end() && Known->second != nullptr)
     return Known->second;
 
   return None;
