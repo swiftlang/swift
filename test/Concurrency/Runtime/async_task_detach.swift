@@ -22,7 +22,7 @@ class X {
 func test_detach() async {
   for _ in 1...3 {
     let x = X()
-    let h = Task.runDetached {
+    let h = detach {
       print("inside: \(x)")
     }
     await h.get()

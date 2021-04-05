@@ -11,12 +11,12 @@
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func simple() async {
   print("\(#function) -----------------------")
-  let one = await Task.current()
-  let two = await Task.current()
+  let one = Task.current!
+  let two = Task.current!
   print("same equal: \(one == two)") // CHECK: same equal: true
   print("hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 
-  async let x = Task.current()
+  async let x = Task.current
   let three = await x
 
   print("parent/child equal: \(three == two)") // CHECK: parent/child equal: false
@@ -26,12 +26,12 @@ func simple() async {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func unsafe() async {
   print("\(#function) -----------------------")
-  let one = Task.unsafeCurrent!
-  let two = Task.unsafeCurrent!
+  let one = withUnsafeCurrentTask { $0! }
+  let two = withUnsafeCurrentTask { $0! }
   print("unsafe same equal: \(one == two)") // CHECK: same equal: true
   print("unsafe hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 
-  async let x = Task.unsafeCurrent!
+  async let x = withUnsafeCurrentTask { $0! }
   let three = await x
 
   print("unsafe parent/child equal: \(three == two)") // CHECK: parent/child equal: false
@@ -44,8 +44,8 @@ func unsafe() async {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func unsafeSync() {
   print("\(#function) -----------------------")
-  let one = Task.unsafeCurrent!
-  let two = Task.unsafeCurrent!
+  let one = withUnsafeCurrentTask { $0! }
+  let two = withUnsafeCurrentTask { $0! }
   print("unsafe same equal: \(one == two)") // CHECK: same equal: true
   print("unsafe hashes equal: \(one.hashValue == two.hashValue)") // CHECK: hashes equal: true
 }

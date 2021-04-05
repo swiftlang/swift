@@ -50,9 +50,17 @@ extension Task {
   /// this function was called.
   ///
   /// All functions available on the Task
-  // TODO: once we can have async properties land make this computed property
-  public static func current() async -> Task {
-    return Task.unsafeCurrent!.task // !-safe, we are guaranteed to have a task available within an async function
+  public static var current: Task? {
+    guard let _task = _getCurrentAsyncTask() else {
+      return nil
+    }
+
+    // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+    //        with "destroying a task that never completed" in the task's destroy.
+    //        How do we solve this properly?
+    _swiftRetain(_task)
+
+    return Task(_task)
   }
 
 }
@@ -69,7 +77,9 @@ extension Task {
   /// - SeeAlso: `Task.Priority`
   /// - SeeAlso: `Task.priority`
   public static var currentPriority: Priority {
-    Task.unsafeCurrent?.priority ?? Priority.default
+    withUnsafeCurrentTask { task in
+      task?.priority ?? Priority.default
+    }
   }
 
   /// Returns the `current` task's priority.
@@ -95,7 +105,7 @@ extension Task {
   /// ### Priority inheritance
   /// Child tasks automatically inherit their parent task's priority.
   ///
-  /// Detached tasks (created by `Task.runDetached`) DO NOT inherit task priority,
+  /// Detached tasks (created by `detach`) DO NOT inherit task priority,
   /// as they are "detached" from their parent tasks after all.
   ///
   /// ### Priority elevation
@@ -140,7 +150,7 @@ extension Task {
   /// i.e. the task will run regardless of the handle still being present or not.
   /// Dropping a handle however means losing the ability to await on the task's result
   /// and losing the ability to cancel it.
-  public struct Handle<Success, Failure: Error> {
+  public struct Handle<Success, Failure: Error>: Sendable {
     internal let _task: Builtin.NativeObject
 
     internal init(_ task: Builtin.NativeObject) {
@@ -271,7 +281,7 @@ extension Task {
     /// Kinds of schedulable jobs.
     enum Kind: Int {
       case task = 0
-    };
+    }
 
     /// The actual bit representation of these flags.
     var bits: Int = 0
@@ -351,120 +361,119 @@ extension Task {
 
 // ==== Detached Tasks ---------------------------------------------------------
 
+/// Run given throwing `operation` as part of a new top-level task.
+///
+/// Creating detached tasks should, generally, be avoided in favor of using
+/// `async` functions, `async let` declarations and `await` expressions - as
+/// those benefit from structured, bounded concurrency which is easier to reason
+/// about, as well as automatically inheriting the parent tasks priority,
+/// task-local storage, deadlines, as well as being cancelled automatically
+/// when their parent task is cancelled. Detached tasks do not get any of those
+/// benefits, and thus should only be used when an operation is impossible to
+/// be modelled with child tasks.
+///
+/// ### Cancellation
+/// A detached task always runs to completion unless it is explicitly cancelled.
+/// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
+/// cancel given task.
+///
+/// Cancelling a task must be performed explicitly via `handle.cancel()`.
+///
+/// - Note: it is generally preferable to use child tasks rather than detached
+///   tasks. Child tasks automatically carry priorities, task-local state,
+///   deadlines and have other benefits resulting from the structured
+///   concurrency concepts that they model. Consider using detached tasks only
+///   when strictly necessary and impossible to model operations otherwise.
+///
+/// - Parameters:
+///   - priority: priority of the task
+///   - executor: the executor on which the detached closure should start
+///               executing on.
+///   - operation: the operation to execute
+/// - Returns: handle to the task, allowing to `await handle.get()` on the
+///     tasks result or `cancel` it. If the operation fails the handle will
+///     throw the error the operation has thrown when awaited on.
+@discardableResult
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Task {
-  /// Run given throwing `operation` as part of a new top-level task.
-  ///
-  /// Creating detached tasks should, generally, be avoided in favor of using
-  /// `async` functions, `async let` declarations and `await` expressions - as
-  /// those benefit from structured, bounded concurrency which is easier to reason
-  /// about, as well as automatically inheriting the parent tasks priority,
-  /// task-local storage, deadlines, as well as being cancelled automatically
-  /// when their parent task is cancelled. Detached tasks do not get any of those
-  /// benefits, and thus should only be used when an operation is impossible to
-  /// be modelled with child tasks.
-  ///
-  /// ### Cancellation
-  /// A detached task always runs to completion unless it is explicitly cancelled.
-  /// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
-  /// cancel given task.
-  ///
-  /// Cancelling a task must be performed explicitly via `handle.cancel()`.
-  ///
-  /// - Note: it is generally preferable to use child tasks rather than detached
-  ///   tasks. Child tasks automatically carry priorities, task-local state,
-  ///   deadlines and have other benefits resulting from the structured
-  ///   concurrency concepts that they model. Consider using detached tasks only
-  ///   when strictly necessary and impossible to model operations otherwise.
-  ///
-  /// - Parameters:
-  ///   - priority: priority of the task
-  ///   - executor: the executor on which the detached closure should start
-  ///               executing on.
-  ///   - operation: the operation to execute
-  /// - Returns: handle to the task, allowing to `await handle.get()` on the
-  ///     tasks result or `cancel` it. If the operation fails the handle will
-  ///     throw the error the operation has thrown when awaited on.
-  @discardableResult
-  public static func runDetached<T>(
-    priority: Priority = .default,
-    operation: __owned @Sendable @escaping () async -> T
-    // TODO: Allow inheriting task-locals?
-  ) -> Handle<T, Never> {
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority
-    flags.isFuture = true
+public func detach<T>(
+  priority: Task.Priority = .unspecified,
+  operation: __owned @Sendable @escaping () async -> T
+) -> Task.Handle<T, Never> {
+  // Set up the job flags for a new task.
+  var flags = Task.JobFlags()
+  flags.kind = .task
+  flags.priority = priority
+  flags.isFuture = true
 
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  // Create the asynchronous task future.
+  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
 
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+  // Enqueue the resulting job.
+  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
-    return Handle<T, Never>(task)
-  }
+  return Task.Handle<T, Never>(task)
+}
 
-  /// Run given throwing `operation` as part of a new top-level task.
-  ///
-  /// Creating detached tasks should, generally, be avoided in favor of using
-  /// `async` functions, `async let` declarations and `await` expressions - as
-  /// those benefit from structured, bounded concurrency which is easier to reason
-  /// about, as well as automatically inheriting the parent tasks priority,
-  /// task-local storage, deadlines, as well as being cancelled automatically
-  /// when their parent task is cancelled. Detached tasks do not get any of those
-  /// benefits, and thus should only be used when an operation is impossible to
-  /// be modelled with child tasks.
-  ///
-  /// ### Cancellation
-  /// A detached task always runs to completion unless it is explicitly cancelled.
-  /// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
-  /// cancel given task.
-  ///
-  /// Cancelling a task must be performed explicitly via `handle.cancel()`.
-  ///
-  /// - Note: it is generally preferable to use child tasks rather than detached
-  ///   tasks. Child tasks automatically carry priorities, task-local state,
-  ///   deadlines and have other benefits resulting from the structured
-  ///   concurrency concepts that they model. Consider using detached tasks only
-  ///   when strictly necessary and impossible to model operations otherwise.
-  ///
-  /// - Parameters:
-  ///   - priority: priority of the task
-  ///   - executor: the executor on which the detached closure should start
-  ///               executing on.
-  ///   - operation: the operation to execute
-  /// - Returns: handle to the task, allowing to `await handle.get()` on the
-  ///     tasks result or `cancel` it. If the operation fails the handle will
-  ///     throw the error the operation has thrown when awaited on.
-  @discardableResult
-  public static func runDetached<T, Failure>(
-    priority: Priority = .default,
-    operation: __owned @Sendable @escaping () async throws -> T
-  ) -> Handle<T, Failure> {
-    // Set up the job flags for a new task.
-    var flags = JobFlags()
-    flags.kind = .task
-    flags.priority = priority
-    flags.isFuture = true
+/// Run given throwing `operation` as part of a new top-level task.
+///
+/// Creating detached tasks should, generally, be avoided in favor of using
+/// `async` functions, `async let` declarations and `await` expressions - as
+/// those benefit from structured, bounded concurrency which is easier to reason
+/// about, as well as automatically inheriting the parent tasks priority,
+/// task-local storage, deadlines, as well as being cancelled automatically
+/// when their parent task is cancelled. Detached tasks do not get any of those
+/// benefits, and thus should only be used when an operation is impossible to
+/// be modelled with child tasks.
+///
+/// ### Cancellation
+/// A detached task always runs to completion unless it is explicitly cancelled.
+/// Specifically, dropping a detached tasks `Task.Handle` does _not_ automatically
+/// cancel given task.
+///
+/// Cancelling a task must be performed explicitly via `handle.cancel()`.
+///
+/// - Note: it is generally preferable to use child tasks rather than detached
+///   tasks. Child tasks automatically carry priorities, task-local state,
+///   deadlines and have other benefits resulting from the structured
+///   concurrency concepts that they model. Consider using detached tasks only
+///   when strictly necessary and impossible to model operations otherwise.
+///
+/// - Parameters:
+///   - priority: priority of the task
+///   - executor: the executor on which the detached closure should start
+///               executing on.
+///   - operation: the operation to execute
+/// - Returns: handle to the task, allowing to `await handle.get()` on the
+///     tasks result or `cancel` it. If the operation fails the handle will
+///     throw the error the operation has thrown when awaited on.
+@discardableResult
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+public func detach<T, Failure>(
+  priority: Task.Priority = .unspecified,
+  operation: __owned @Sendable @escaping () async throws -> T
+) -> Task.Handle<T, Failure> {
+  // Set up the job flags for a new task.
+  var flags = Task.JobFlags()
+  flags.kind = .task
+  flags.priority = priority
+  flags.isFuture = true
 
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
+  // Create the asynchronous task future.
+  let (task, _) = Builtin.createAsyncTaskFuture(flags.bits, operation)
 
-    // Enqueue the resulting job.
-    _enqueueJobGlobal(Builtin.convertTaskToJob(task))
+  // Enqueue the resulting job.
+  _enqueueJobGlobal(Builtin.convertTaskToJob(task))
 
-    return Handle<T, Failure>(task)
-  }
+  return Task.Handle<T, Failure>(task)
 }
 
 // ==== Async Handler ----------------------------------------------------------
 
+// TODO: remove this?
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public func _runAsyncHandler(operation: @escaping () async -> ()) {
+func _runAsyncHandler(operation: @escaping () async -> ()) {
   typealias ConcurrentFunctionType = @Sendable () async -> ()
-  Task.runDetached(
+  detach(
     operation: unsafeBitCast(operation, to: ConcurrentFunctionType.self)
   )
 }
@@ -479,7 +488,7 @@ extension Task {
   /// This function does _not_ block the underlying thread.
   public static func sleep(_ duration: UInt64) async {
     // Set up the job flags for a new task.
-    var flags = JobFlags()
+    var flags = Task.JobFlags()
     flags.kind = .task
     flags.priority = .default
     flags.isFuture = true
@@ -496,29 +505,34 @@ extension Task {
 
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
+/// Calls the given closure with the with the "current" task in which this
+/// function was invoked.
+///
+/// If invoked from an asynchronous function the task will always be non-nil,
+/// as an asynchronous function is always running within some task.
+/// However if invoked from a synchronous function the task may be nil,
+/// meaning that the function is not executing within a task, i.e. there is no
+/// asynchronous context available in the call stack.
+///
+/// It is generally not safe to escape/store the `UnsafeCurrentTask` for future
+/// use, as some operations on it may only be performed from the same task
+/// that it is representing.
+///
+/// It is possible to obtain a `Task` fom the `UnsafeCurrentTask` which is safe
+/// to access from other tasks or even store for future reference e.g. equality
+/// checks.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension Task {
-  /// If available, returns the 'current' task, representing the async context
-  /// from which this function was called.
-  ///
-  /// This computed property can be called from 'async' as well as synchronous
-  /// functions. Within synchronous functions it may return a `nil` value,
-  /// which means that the function was not called within any asynchronous task
-  /// at all, otherwise the returned task is equal to the task of the nearest
-  /// asynchronous function present in this functions call stack.
-  ///
-  /// The returned value must not be accessed from tasks other than the current one.
-  public static var unsafeCurrent: UnsafeCurrentTask? {
-    guard let _task = _getCurrentAsyncTask() else {
-      return nil
-    }
-    // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
-    //        with "destroying a task that never completed" in the task's destroy.
-    //        How do we solve this properly?
-    _swiftRetain(_task)
-    return UnsafeCurrentTask(_task)
+public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) rethrows -> T {
+  guard let _task = _getCurrentAsyncTask() else {
+    return try body(nil)
   }
 
+  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
+  //        with "destroying a task that never completed" in the task's destroy.
+  //        How do we solve this properly?
+  _swiftRetain(_task)
+
+  return try body(UnsafeCurrentTask(_task))
 }
 
 /// An *unsafe* 'current' task handle.
@@ -616,7 +630,7 @@ public func _asyncMainDrainQueue() -> Never
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
 #if os(Windows)
-  Task.runDetached {
+  detach {
     do {
       try await asyncFun()
       exit(0)
@@ -634,7 +648,7 @@ public func _runAsyncMain(_ asyncFun: @escaping () async throws -> ()) {
     }
   }
 
-  Task.runDetached {
+  detach {
     await _doMain(asyncFun)
     exit(0)
   }
@@ -692,12 +706,12 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 @_alwaysEmitIntoClient
 @usableFromInline
 internal func _runTaskForBridgedAsyncMethod(_ body: @escaping () async -> Void) {
-  // TODO: We can probably do better than Task.runDetached
+  // TODO: We can probably do better than detach
   // if we're already running on behalf of a task,
   // if the receiver of the method invocation is itself an Actor, or in other
   // situations.
 #if compiler(>=5.5) && $Sendable
-  Task.runDetached { await body() }
+  detach { await body() }
 #endif
 }
 

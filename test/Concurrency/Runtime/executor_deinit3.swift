@@ -32,7 +32,7 @@ actor Container {
         for _ in 0..<n {
             let id = generation
             generation += 1
-            let t = Task.runDetached { [weak self] in
+            let t = detach { [weak self] in
                 let r = Runner()
                 await r.run()
                 await self?.remove(id)
