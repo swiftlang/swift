@@ -1926,6 +1926,45 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   return getter;
 }
 
+static void addPropertyWrapperAccessorAvailability(VarDecl *var, AccessorKind accessorKind,
+                                                   SmallVectorImpl<const Decl *> &asAvailableAs) {
+  AccessorDecl *synthesizedFrom = nullptr;
+  if (var->hasAttachedPropertyWrapper()) {
+    // The property wrapper info may not actually link back to a wrapper
+    // implementation, if there was a semantic error checking the wrapper.
+    auto info = var->getAttachedPropertyWrapperTypeInfo(0);
+    if (info.valueVar) {
+      synthesizedFrom = info.valueVar->getOpaqueAccessor(accessorKind);
+    }
+  } else if (auto wrapperSynthesizedKind
+               = var->getPropertyWrapperSynthesizedPropertyKind()) {
+    switch (*wrapperSynthesizedKind) {
+    case PropertyWrapperSynthesizedPropertyKind::Backing:
+      break;
+
+    case PropertyWrapperSynthesizedPropertyKind::Projection: {
+      if (auto origVar = var->getOriginalWrappedProperty(wrapperSynthesizedKind)) {
+        // The property wrapper info may not actually link back to a wrapper
+        // implementation, if there was a semantic error checking the wrapper.
+        auto info = origVar->getAttachedPropertyWrapperTypeInfo(0);
+        if (info.projectedValueVar) {
+          synthesizedFrom = info.projectedValueVar->getOpaqueAccessor(accessorKind);
+        }
+      }
+      break;
+    }
+    }
+  }
+
+  // Infer availability from the accessor used for synthesis, and intersect it
+  // with the availability of the enclosing scope.
+  if (synthesizedFrom) {
+    asAvailableAs.push_back(synthesizedFrom);
+    if (auto *enclosingDecl = var->getInnermostDeclWithAvailability())
+      asAvailableAs.push_back(enclosingDecl);
+  }
+}
+
 static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx,
                                            AccessorDecl *getter = nullptr) {
@@ -1971,41 +2010,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   // That could be a property wrapper...
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->hasAttachedPropertyWrapper()) {
-      // The property wrapper info may not actually link back to a wrapper
-      // implementation, if there was a semantic error checking the wrapper.
-      auto info = var->getAttachedPropertyWrapperTypeInfo(0);
-      if (info.valueVar) {
-        if (auto setter = info.valueVar->getOpaqueAccessor(AccessorKind::Set)) {
-          asAvailableAs.push_back(setter);
-          if (auto *enclosing = var->getInnermostDeclWithAvailability())
-            asAvailableAs.push_back(enclosing);
-        }
-      }
-    } else if (auto wrapperSynthesizedKind
-                 = var->getPropertyWrapperSynthesizedPropertyKind()) {
-      switch (*wrapperSynthesizedKind) {
-      case PropertyWrapperSynthesizedPropertyKind::Backing:
-        break;
-    
-      case PropertyWrapperSynthesizedPropertyKind::Projection: {
-        if (auto origVar = var->getOriginalWrappedProperty(wrapperSynthesizedKind)) {
-          // The property wrapper info may not actually link back to a wrapper
-          // implementation, if there was a semantic error checking the wrapper.
-          auto info = origVar->getAttachedPropertyWrapperTypeInfo(0);
-          if (info.projectedValueVar) {
-            if (auto setter
-                = info.projectedValueVar->getOpaqueAccessor(AccessorKind::Set)){
-              asAvailableAs.push_back(setter);
-              if (auto *enclosing = var->getInnermostDeclWithAvailability())
-                asAvailableAs.push_back(enclosing);
-            }
-          }
-        }
-        break;
-      }
-      }
-    }
+    addPropertyWrapperAccessorAvailability(var, AccessorKind::Set, asAvailableAs);
   }
 
 
@@ -2097,6 +2102,10 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
     if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set)) {
       asAvailableAs.push_back(setter);
     }
+  }
+
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    addPropertyWrapperAccessorAvailability(var, kind, asAvailableAs);
   }
 
   AvailabilityInference::applyInferredAvailableAttrs(accessor,
