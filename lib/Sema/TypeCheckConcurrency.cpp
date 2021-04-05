@@ -2987,8 +2987,9 @@ static Optional<ActorIsolation> getIsolationFromConformances(
   
   Optional<ActorIsolation> foundIsolation;
   for (auto proto : nominal->getLocalProtocols()) {
-    switch (auto protoIsolation = getActorIsolation(proto)) {
+     switch (auto protoIsolation = getActorIsolation(proto)) {
     case ActorIsolation::ActorInstance:
+    case ActorIsolation::DistributedActorInstance:
     case ActorIsolation::Unspecified:
     case ActorIsolation::Independent:
       break;
@@ -3114,7 +3115,7 @@ ActorIsolation ActorIsolationRequest::evaluate(
     // inferred, so that (e.g.) it will be printed and serialized.
     ASTContext &ctx = value->getASTContext();
     switch (inferred) {
-    case ActorIsolation::Independent:
+    case ActorIsolation::Independent: {
       if (onlyGlobal)
         return ActorIsolation::forUnspecified();
 

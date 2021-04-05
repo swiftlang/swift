@@ -2522,6 +2522,10 @@ public:
     auto isolation = getActorIsolation(const_cast<ValueDecl *>(VD));
 
     switch (isolation.getKind()) {
+    case ActorIsolation::DistributedActorInstance: {
+      // TODO: implicitlyThrowing here for distributed
+      LLVM_FALLTHROUGH; // continue the ActorInstance checks
+    }
     case ActorIsolation::ActorInstance: {
       if (IsCrossActorReference) {
         implicitlyAsync = true;

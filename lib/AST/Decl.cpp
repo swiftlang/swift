@@ -8172,7 +8172,7 @@ ActorIsolation swift::getActorIsolationOfContext(DeclContext *dc) {
     }
 
     case ClosureActorIsolation::ActorInstance: {
-      return ActorIsolation::forIndependent(ActorIndependentKind::Safe); // FIXME: workaround to build toolchain for now !!!!!
+      return ActorIsolation::forIndependent();
 //      auto selfDecl = isolation.getActorInstance();
 //      selfDecl->dump();
 //      auto actorClass = selfDecl->getType()->getRValueType()
