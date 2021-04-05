@@ -284,7 +284,7 @@ func test_r18400194() {
 //   Don't add capture arguments to local default argument generators.
 func localFunctionWithDefaultArg() {
   var z = 5
-  func bar(_ x: Int? = nil) {
+  func bar(_ x: Int? = (nil)) {
     z += 1
   }
   bar()
