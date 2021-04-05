@@ -8354,17 +8354,53 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
-  auto getContextualParamAt =
-      [&contextualType](unsigned index) -> Optional<AnyFunctionType::Param> {
-    auto *fnType = contextualType->getAs<FunctionType>();
-    return fnType && fnType->getNumParams() > index
-               ? fnType->getParams()[index]
-               : Optional<AnyFunctionType::Param>();
-  };
-
   auto *closureLocator = typeVar->getImpl().getLocator();
   auto *closure = castToExpr<ClosureExpr>(closureLocator->getAnchor());
   auto *inferredClosureType = getClosureType(closure);
+
+  auto getContextualParamAt =
+      [&contextualType, &inferredClosureType](
+          unsigned index) -> Optional<AnyFunctionType::Param> {
+    auto *fnType = contextualType->getAs<FunctionType>();
+    if (!fnType)
+      return None;
+
+    auto numContextualParams = fnType->getNumParams();
+    if (numContextualParams != inferredClosureType->getNumParams() ||
+        numContextualParams <= index)
+      return None;
+
+    return fnType->getParams()[index];
+  };
+
+  // Check whether given contextual parameter type could be
+  // used to bind external closure parameter type.
+  auto isSuitableContextualType = [](Type contextualTy) {
+    // We need to wait until contextual type
+    // is fully resolved before binding it.
+    if (contextualTy->isTypeVariableOrMember())
+      return false;
+
+    // If contextual type has an error, let's wait for inference,
+    // otherwise contextual would interfere with diagnostics.
+    if (contextualTy->hasError())
+      return false;
+
+    if (isa<TypeAliasType>(contextualTy.getPointer())) {
+      auto underlyingTy = contextualTy->getDesugaredType();
+      // FIXME: typealias pointing to an existential type is special
+      // because if the typealias has type variables then we'd end up
+      // opening existential from a type with unresolved generic
+      // parameter(s), which CSApply can't currently simplify while
+      // building type-checked AST because `OpenedArchetypeType` doesn't
+      // propagate flags. Example is as simple as `{ $0.description }`
+      // where `$0` is `Error` that inferred from a (generic) typealias.
+      if (underlyingTy->isExistentialType() && contextualTy->hasTypeVariable())
+        return false;
+    }
+
+    return true;
+  };
 
   // Determine whether a result builder will be applied.
   auto resultBuilderType = getOpenedResultBuilderTypeFor(*this, locator);
@@ -8456,6 +8492,24 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
           param.isVariadic() ? ArraySliceType::get(typeVar) : Type(typeVar);
 
       auto externalType = param.getOldType();
+
+      // Performance optimization.
+      //
+      // If there is a concrete contextual type we could use, let's bind
+      // it to the external type right away because internal type has to
+      // be equal to that type anyway (through `BindParam` on external type
+      // i.e. <internal> bind param <external> conv <concrete contextual>).
+      //
+      // Note: it's correct to avoid doing this, but it would result
+      // in (a lot) more checking since solver would have to re-discover,
+      // re-attempt and fail parameter type while solving for overloaded
+      // choices in the body.
+      if (auto contextualParam = getContextualParamAt(i)) {
+        auto paramTy = simplifyType(contextualParam->getOldType());
+        if (isSuitableContextualType(paramTy))
+          addConstraint(ConstraintKind::Bind, externalType, paramTy, paramLoc);
+      }
+
       if (oneWayConstraints) {
         addConstraint(
             ConstraintKind::OneWayBindParam, typeVar, externalType, paramLoc);
