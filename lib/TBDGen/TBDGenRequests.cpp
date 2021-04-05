@@ -19,7 +19,7 @@
 #include "swift/Subsystems.h"
 #include "swift/TBDGen/TBDGen.h"
 #include "clang/Basic/TargetInfo.h"
-#include "llvm/TextAPI/MachO/InterfaceFile.h"
+#include "llvm/TextAPI/InterfaceFile.h"
 
 #include "APIGen.h"
 
