@@ -33,6 +33,7 @@ func test_taskGroup_is_asyncSequence() async {
   print("result: \(sum)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_throwingTaskGroup_is_asyncSequence() async throws {
   print(#function)
 

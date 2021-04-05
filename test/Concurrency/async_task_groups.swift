@@ -167,6 +167,7 @@ struct SendableTuple2<A: Sendable, B: Sendable>: Sendable {
   }
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension Collection where Self: Sendable, Element: Sendable, Self.Index: Sendable {
 
   /// Just another example of how one might use task groups.

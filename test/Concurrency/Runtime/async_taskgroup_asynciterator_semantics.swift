@@ -10,6 +10,7 @@ func boom() async throws -> Int {
   throw Boom()
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_next() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
@@ -40,6 +41,7 @@ func test_taskGroup_next() async {
   print("result with group.next(): \(sum)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_for_in() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
@@ -70,6 +72,7 @@ func test_taskGroup_for_in() async {
   print("result with for-in: \(sum)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 func test_taskGroup_asyncIterator() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
@@ -107,6 +110,7 @@ func test_taskGroup_asyncIterator() async {
   print("result with async iterator: \(sum)")
 }
 
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @main struct Main {
   static func main() async {
     await test_taskGroup_next()
